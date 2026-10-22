@@ -16,6 +16,7 @@ from .common import (
     atomic_write_json,
     canonical_fingerprint,
     capture_codex_jsonl_trace,
+    capture_codex_judge_output,
     ensure_within,
     prepare_run_output_root,
     safe_relative_path,
@@ -33,6 +34,13 @@ from .target_workspace import (
     SCENARIO_DIR,
     prepare_sanitized_target,
     verify_workspace_unchanged,
+)
+from .tools.codex_docker_launcher import launcher_argv
+from .tools.codex_judge_docker_launcher import (
+    is_codex_judge,
+)
+from .tools.codex_judge_docker_launcher import (
+    launcher_argv_for_profile as judge_launcher_argv_for_profile,
 )
 from .workspace import (
     assert_clean_checkout,
@@ -348,7 +356,6 @@ def _copy_safe_agent_output(source: Path, destination: Path) -> dict[str, Any]:
             entries.append(
                 {
                     "path": relative.as_posix(),
-                    "sha256": sha256_bytes(raw),
                     "status": "evidence_unverified",
                     "reason": "non_utf8_output_not_saved",
                 }
@@ -362,7 +369,7 @@ def _copy_safe_agent_output(source: Path, destination: Path) -> dict[str, Any]:
         entries.append(
             {
                 "path": relative.as_posix(),
-                "sha256": sha256_bytes(raw),
+                "sha256": None if safe != raw else sha256_bytes(raw),
                 "saved_sha256": sha256_bytes(safe),
                 "status": "evidence_unverified" if safe != raw else "saved",
                 "redacted": safe != raw,
@@ -431,7 +438,13 @@ def build_artifact_manifest(
             files.append(
                 {
                     "path": relative,
-                    "sha256": _file_hash(path),
+                    "sha256": (
+                        None
+                        if _SECRET_TEXT_RE.search(
+                            path.read_text(encoding="utf-8", errors="replace")
+                        )
+                        else _file_hash(path)
+                    ),
                     "size": path.stat().st_size,
                     "classification": classification,
                     "artifact_id": artifact_id,
@@ -586,14 +599,29 @@ def run_independent_judges(
         judge_command, judge_cleanup = named_container_command(
             profile["judge"]["command_argv"], name=judge_name
         )
+        judge_observations_path = cwd / "launcher-observations.json"
+        codex_judge = is_codex_judge(profile["judge"])
+        judge_execution_command = (
+            judge_launcher_argv_for_profile(
+                profile["judge"],
+                docker_argv=judge_command,
+                observations_path=judge_observations_path,
+            )
+            if codex_judge
+            else judge_command
+        )
         execution = run_command(
-            judge_command,
+            judge_execution_command,
             input_text=prompt,
             cwd=cwd,
             timeout_seconds=profile["judge"]["timeout_seconds"],
             timeout_cleanup_argv=judge_cleanup,
         )
-        safe_stdout = sanitize_diagnostic(execution.stdout)
+        judge_capture = capture_codex_judge_output(
+            execution.stdout,
+            observations_path=judge_observations_path if codex_judge else None,
+        )
+        safe_stdout = judge_capture["response"]
         run_record: dict[str, Any] = {
             "group": group,
             "criteria": requested,
@@ -602,13 +630,15 @@ def run_independent_judges(
             "timed_out": execution.timed_out,
             "duration_seconds": execution.duration_seconds,
             "stderr_status": execution.stderr_status,
-            "response_sha256": sha256_bytes(execution.stdout.encode("utf-8")),
+            "response_sha256": sha256_bytes(safe_stdout.encode("utf-8")),
             "evidence_status": "captured"
             if safe_stdout == execution.stdout
+            and judge_capture["status"] in {"unwrapped", "completed"}
             else "evidence_unverified",
             "isolation": isolation,
             "container_cleanup_status": execution.cleanup_status,
             "response": safe_stdout,
+            "launcher_observations": judge_capture["launcher_observations"],
         }
         if (
             execution.timed_out
@@ -618,6 +648,10 @@ def run_independent_judges(
             run_record["status"] = "execution_error"
             if execution.cleanup_status == "failed":
                 run_record["error"] = "judge_container_cleanup_failed"
+            runs.append(run_record)
+            continue
+        if run_record["evidence_status"] != "captured":
+            run_record["status"] = "evidence_unverified"
             runs.append(run_record)
             continue
         try:
@@ -899,8 +933,18 @@ def run(argv: list[str] | None = None) -> int:
                     agent_command, cleanup_command = named_container_command(
                         agent_command, name=container_name
                     )
+                    execution_command = agent_command
+                    if profile["agent"]["name"].lower() == "codex":
+                        execution_command = launcher_argv(
+                            output_root=target / ".qa-eval-output",
+                            model=profile["agent"]["model"],
+                            reasoning_effort=profile["agent"]["reasoning_effort"],
+                            cli_version=profile["agent"]["cli_version"],
+                            sandbox_policy=profile["agent"]["sandbox_policy"],
+                            docker_argv=agent_command,
+                        )
                     agent = run_command(
-                        agent_command,
+                        execution_command,
                         input_text=prompt,
                         cwd=target,
                         timeout_seconds=profile["agent"]["timeout_seconds"],
@@ -914,9 +958,9 @@ def run(argv: list[str] | None = None) -> int:
                     )
                     final_message = sanitize_diagnostic(trace["final_message"])
                     trace_path = None
-                    if trace["trace_jsonl"] is not None:
-                        trace_file = attempt_root / "agent-trace.jsonl"
-                        trace_file.write_text(trace["trace_jsonl"], encoding="utf-8")
+                    if trace["trace_summary"].get("status") == "captured":
+                        trace_file = attempt_root / "agent-trace.json"
+                        atomic_write_json(trace_file, trace["trace_summary"])
                         trace_path = str(trace_file.relative_to(output_root))
                     final_output.parent.mkdir(parents=True, exist_ok=True)
                     final_output.write_text(final_message, encoding="utf-8")
@@ -931,7 +975,9 @@ def run(argv: list[str] | None = None) -> int:
                             "command_argv": agent_command,
                             "command_fingerprint": canonical_fingerprint(agent_command),
                             "stderr": agent.stderr,
-                            "stdout_sha256": sha256_bytes(agent.stdout.encode("utf-8")),
+                            "stdout_sha256": sha256_bytes(
+                                sanitize_diagnostic(agent.stdout).encode("utf-8")
+                            ),
                             "final_message_sha256": sha256_bytes(
                                 final_message.encode("utf-8")
                             ),
@@ -939,6 +985,9 @@ def run(argv: list[str] | None = None) -> int:
                             "trace_status": trace["status"],
                             "trace_path": trace_path,
                             "trace_redacted": trace["redacted"],
+                            "codex_launcher_evidence": trace.get(
+                                "launcher_observations"
+                            ),
                         },
                     )
                     workspace_integrity = verify_workspace_unchanged(
@@ -1013,6 +1062,21 @@ def run(argv: list[str] | None = None) -> int:
                             "reason": "agent_execution_failed",
                             "runs": [],
                         }
+                    elif (
+                        trace.get("launcher_observations") is not None
+                        and trace.get("execution_status") != "completed"
+                    ):
+                        judges = {
+                            "status": "not_run",
+                            "reason": "codex_launcher_evidence_unverified",
+                            "runs": [],
+                        }
+                    elif trace["redacted"]:
+                        judges = {
+                            "status": "not_run",
+                            "reason": "agent_output_redacted",
+                            "runs": [],
+                        }
                     elif secret_paths:
                         judges = {
                             "status": "not_run",
@@ -1062,6 +1126,10 @@ def run(argv: list[str] | None = None) -> int:
                     if (
                         safe_final != final_message
                         or trace["redacted"]
+                        or (
+                            trace.get("launcher_observations") is not None
+                            and trace.get("execution_status") != "completed"
+                        )
                         or secret_paths
                         or not workspace_integrity["unchanged"]
                     ):
@@ -1119,6 +1187,7 @@ def run(argv: list[str] | None = None) -> int:
                         "agent_timed_out": agent.timed_out,
                         "workspace_integrity": workspace_integrity,
                         "agent_isolation": agent_isolation,
+                        "codex_launcher_evidence": trace.get("launcher_observations"),
                         "skill_use_observation": {
                             artifact["skill"]: (
                                 "observed"

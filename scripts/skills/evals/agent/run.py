@@ -18,6 +18,7 @@ if __package__ in {None, ""}:
         atomic_write_json,
         canonical_fingerprint,
         capture_codex_jsonl_trace,
+        capture_codex_judge_output,
         prepare_run_output_root,
         sanitize_diagnostic,
         sha256_bytes,
@@ -25,6 +26,13 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.agent.executor import AgentExecutionError, run_command
     from scripts.skills.evals.agent.prompt_builder import build_generation_prompt
+    from scripts.skills.evals.agent.tools.codex_docker_launcher import launcher_argv
+    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
+        is_codex_judge,
+    )
+    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
+        launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    )
     from scripts.skills.evals.agent.workspace import (
         assert_clean_checkout,
         create_skill_workspace,
@@ -58,6 +66,7 @@ else:
         atomic_write_json,
         canonical_fingerprint,
         capture_codex_jsonl_trace,
+        capture_codex_judge_output,
         prepare_run_output_root,
         sanitize_diagnostic,
         sha256_bytes,
@@ -65,6 +74,13 @@ else:
     )
     from .executor import AgentExecutionError, run_command
     from .prompt_builder import build_generation_prompt
+    from .tools.codex_docker_launcher import launcher_argv
+    from .tools.codex_judge_docker_launcher import (
+        is_codex_judge,
+    )
+    from .tools.codex_judge_docker_launcher import (
+        launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    )
     from .workspace import (
         assert_clean_checkout,
         create_skill_workspace,
@@ -220,8 +236,19 @@ def _render_grade(
     judge_command, judge_cleanup = named_container_command(
         profile["judge"]["command_argv"], name=judge_name
     )
+    judge_observations_path = judge_workspace / "launcher-observations.json"
+    codex_judge = is_codex_judge(profile["judge"])
+    judge_execution_command = (
+        judge_launcher_argv_for_profile(
+            profile["judge"],
+            docker_argv=judge_command,
+            observations_path=judge_observations_path,
+        )
+        if codex_judge
+        else judge_command
+    )
     result = run_command(
-        judge_command,
+        judge_execution_command,
         input_text=prompt,
         cwd=judge_workspace,
         timeout_seconds=profile["judge"]["timeout_seconds"],
@@ -233,7 +260,28 @@ def _render_grade(
         raise AgentExecutionError("Judge container cleanup failed")
     if result.exit_code != 0:
         raise AgentExecutionError(f"Judge exited with code {result.exit_code}")
-    safe_judge_output = sanitize_diagnostic(result.stdout)
+    judge_capture = capture_codex_judge_output(
+        result.stdout,
+        observations_path=judge_observations_path if codex_judge else None,
+    )
+    safe_judge_output = judge_capture["response"]
+    if codex_judge and (
+        judge_capture["status"] != "completed" or judge_capture["redacted"]
+    ):
+        return {"status": "needs_review", "reason": "judge_evidence_unverified"}, [
+            {
+                "stdout": safe_judge_output,
+                "stderr": result.stderr,
+                "stderr_status": result.stderr_status,
+                "exit_code": result.exit_code,
+                "timed_out": result.timed_out,
+                "duration_seconds": result.duration_seconds,
+                "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
+                "isolation": judge_isolation,
+                "container_cleanup_status": result.cleanup_status,
+                "launcher_observations": judge_capture["launcher_observations"],
+            }
+        ]
     normalized = normalize_judge_response(
         safe_judge_output,
         skill=case["skill"],
@@ -255,6 +303,7 @@ def _render_grade(
             "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
             "isolation": judge_isolation,
             "container_cleanup_status": result.cleanup_status,
+            "launcher_observations": judge_capture["launcher_observations"],
         }
     ]
 
@@ -524,8 +573,22 @@ def run(argv: list[str] | None = None) -> int:
                             "argv": command,
                             "fingerprint": canonical_fingerprint(command),
                         }
+                        execution_command = command
+                        if profile["agent"]["name"].lower() == "codex":
+                            execution_command = launcher_argv(
+                                output_root=case_dir,
+                                model=profile["agent"]["model"],
+                                reasoning_effort=profile["agent"]["reasoning_effort"],
+                                cli_version=profile["agent"]["cli_version"],
+                                sandbox_policy=profile["agent"]["sandbox_policy"],
+                                docker_argv=command,
+                            )
+                            attempt["codex_launcher"] = {
+                                "protocol": "codex_docker_launcher_v1",
+                                "status": "used",
+                            }
                         execution = run_command(
-                            command,
+                            execution_command,
                             input_text=prompt,
                             cwd=agent_workspace,
                             timeout_seconds=profile["agent"]["timeout_seconds"],
@@ -560,6 +623,16 @@ def run(argv: list[str] | None = None) -> int:
                                 execution.stdout, skill_names=[case["skill"]]
                             )
                             output_text = trace["final_message"]
+                            if trace.get("launcher_observations") is not None:
+                                attempt["codex_launcher_evidence"] = trace[
+                                    "launcher_observations"
+                                ]
+                                if trace.get("execution_status") != "completed":
+                                    attempt["status"] = "needs_review"
+                                    attempt["evidence_status"] = "evidence_unverified"
+                                    attempt["evidence_reason"] = (
+                                        "codex_launcher_evidence_unverified"
+                                    )
                             if SECRET_TEXT_RE.search(output_text):
                                 output_text = sanitize_diagnostic(output_text)
                                 attempt["evidence_status"] = "evidence_unverified"
@@ -567,17 +640,17 @@ def run(argv: list[str] | None = None) -> int:
                                     "secret_redaction_changed_candidate_output"
                                 )
                                 attempt["status"] = "needs_review"
-                            if trace["trace_jsonl"] is not None:
-                                (case_dir / "agent-trace.jsonl").write_text(
-                                    trace["trace_jsonl"], encoding="utf-8"
+                            trace_path = None
+                            if trace["trace_summary"].get("status") == "captured":
+                                trace_path = "agent-trace.json"
+                                atomic_write_json(
+                                    case_dir / trace_path, trace["trace_summary"]
                                 )
                             attempt["agent_trace"] = {
                                 "format": trace["format"],
                                 "status": trace["status"],
                                 "redacted": trace["redacted"],
-                                "path": "agent-trace.jsonl"
-                                if trace["trace_jsonl"] is not None
-                                else None,
+                                "path": trace_path,
                             }
                             attempt["skill_use_observation"] = trace[
                                 "skill_use_observation"

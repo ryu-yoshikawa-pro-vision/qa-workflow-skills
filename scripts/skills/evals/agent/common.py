@@ -4,7 +4,9 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,16 @@ _SECRET_PATTERNS = (
         r"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+"
     ),
 )
+_CODEX_JSONL_EVENT_TYPES = {
+    "thread.started",
+    "turn.started",
+    "turn.completed",
+    "turn.failed",
+    "item.started",
+    "item.updated",
+    "item.completed",
+    "error",
+}
 
 
 class AgentEvalError(RuntimeError):
@@ -101,53 +113,283 @@ def sanitize_diagnostic(value: str, limit: int = 64_000) -> str:
     return bounded_text(sanitized, limit)
 
 
+def capture_codex_judge_output(
+    stdout: str, *, observations_path: Path | None = None
+) -> dict[str, Any]:
+    """Keep final Judge JSON on stdout and read safe provenance from its sidecar."""
+    envelope = None
+    if observations_path is not None:
+        try:
+            if observations_path.is_symlink():
+                raise OSError("symlink observations")
+            observations = json.loads(observations_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            observations = None
+        response = stdout
+        if not isinstance(observations, dict):
+            return {
+                "response": sanitize_diagnostic(stdout, MAX_TEXT_BYTES),
+                "launcher_observations": {"status": "unverified"},
+                "redacted": False,
+                "status": "unverified",
+            }
+    else:
+        try:
+            envelope = json.loads(stdout)
+        except json.JSONDecodeError:
+            envelope = None
+        if not (
+            isinstance(envelope, dict)
+            and envelope.get("protocol") == "codex_judge_docker_launcher_v1"
+        ):
+            return {
+                "response": stdout,
+                "launcher_observations": None,
+                "redacted": False,
+                "status": "unwrapped",
+            }
+        observations = envelope.get("observations")
+        response = envelope.get("response")
+        if not isinstance(observations, dict) or not isinstance(response, str):
+            return {
+                "response": "",
+                "launcher_observations": {"status": "unverified"},
+                "redacted": False,
+                "status": "unverified",
+            }
+    safe_response = sanitize_diagnostic(response, MAX_TEXT_BYTES)
+    image = observations.get("image")
+    safe_image = None
+    if isinstance(image, dict):
+        safe_image = {
+            key: value
+            for key, value in image.items()
+            if key in {"image_id", "codex_cli_version", "python_version"}
+            and isinstance(value, str)
+        }
+    jsonl = observations.get("jsonl")
+    safe_jsonl = None
+    if isinstance(jsonl, dict):
+        safe_jsonl = {
+            "status": jsonl.get("status", "unverified"),
+            "event_count": jsonl.get("event_count", 0),
+            "event_types": jsonl.get("event_types", {}),
+            "item_types": jsonl.get("item_types", {}),
+            "tool_use_detected": jsonl.get("tool_use_detected") is True,
+            "turn_completed": jsonl.get("turn_completed") is True,
+            "turn_failed": jsonl.get("turn_failed") is True,
+        }
+    launcher_status = observations.get(
+        "status",
+        envelope.get("status", "unverified")
+        if isinstance(envelope, dict)
+        else "unverified",
+    )
+    response_redacted = observations.get("response_redacted") is True or (
+        safe_response != response
+    )
+    if launcher_status == "completed" and (
+        not safe_response
+        or safe_jsonl is None
+        or safe_jsonl["status"] != "captured"
+        or safe_jsonl["tool_use_detected"]
+        or observations.get("web_search_enabled") is not False
+        or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
+        or observations.get("auth_mode")
+        not in {
+            "temporary_auth_file",
+            "api_key_environment",
+        }
+        or safe_image is None
+        or observations.get("docker_exit_code") != 0
+        or response_redacted
+    ):
+        launcher_status = "evidence_unverified"
+    launcher_observations = {
+        "status": launcher_status,
+        "auth_mode": observations.get("auth_mode", "unverified"),
+        "image": safe_image,
+        "jsonl": safe_jsonl,
+        "docker_exit_code": observations.get("docker_exit_code"),
+        "model": observations.get("model"),
+        "reasoning_effort": observations.get("reasoning_effort"),
+        "sandbox_policy": observations.get("sandbox_policy"),
+        "approval_policy": observations.get("approval_policy"),
+        "web_search_enabled": observations.get("web_search_enabled")
+        if isinstance(observations.get("web_search_enabled"), bool)
+        else None,
+        "tool_policy": observations.get("tool_policy", "unverified"),
+        "response_redacted": response_redacted,
+    }
+    return {
+        "response": safe_response,
+        "launcher_observations": launcher_observations,
+        "redacted": launcher_observations["response_redacted"],
+        "status": launcher_observations["status"],
+    }
+
+
 def capture_codex_jsonl_trace(
     stdout: str, *, skill_names: list[str] | tuple[str, ...] = ()
 ) -> dict[str, Any]:
-    """Extract a final message and auditable command observations from codex exec --json."""
+    """Extract bounded evidence without retaining Codex's raw JSONL event stream."""
+    try:
+        launcher = json.loads(stdout)
+    except json.JSONDecodeError:
+        launcher = None
+    if (
+        isinstance(launcher, dict)
+        and launcher.get("protocol") == "codex_docker_launcher_v1"
+    ):
+        observations = launcher.get("observations")
+        jsonl_summary = (
+            observations.get("jsonl") if isinstance(observations, dict) else None
+        )
+        if (
+            not isinstance(observations, dict)
+            or not isinstance(jsonl_summary, dict)
+            or not isinstance(launcher.get("final_message"), str)
+        ):
+            return _unavailable_trace(skill_names, "codex_docker_launcher_v1")
+        safe_commands: list[dict[str, Any]] = []
+        for row in jsonl_summary.get("commands", []):
+            if not isinstance(row, dict):
+                continue
+            exit_code = row.get("exit_code")
+            if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+                exit_code = None
+            captures = row.get("verifier_capture_invocations", [])
+            safe_captures = (
+                [
+                    capture
+                    for capture in captures
+                    if isinstance(capture, dict)
+                    and all(
+                        isinstance(capture.get(key), str)
+                        for key in (
+                            "skill",
+                            "operation",
+                            "request_relative_path",
+                            "record_relative_path",
+                        )
+                    )
+                ]
+                if isinstance(captures, list)
+                else []
+            )
+            observed_skills = row.get("skill_files_read", [])
+            if not isinstance(observed_skills, list):
+                observed_skills = []
+            safe_commands.append(
+                {
+                    "exit_code": exit_code,
+                    "successful": row.get("successful") is True and exit_code == 0,
+                    "skill_files_read": [
+                        name for name in observed_skills if isinstance(name, str)
+                    ],
+                    "verifier_capture_invocations": safe_captures,
+                }
+            )
+        final_message = launcher["final_message"]
+        safe_message = sanitize_diagnostic(final_message, MAX_TEXT_BYTES)
+        trace_summary = {
+            "format": "codex_exec_jsonl",
+            "status": jsonl_summary.get("status", "unverified"),
+            "event_count": jsonl_summary.get("event_count", 0),
+            "event_types": jsonl_summary.get("event_types", {}),
+            "command_count": jsonl_summary.get("command_count", len(safe_commands)),
+            "commands": safe_commands,
+            "turn_completed": jsonl_summary.get("turn_completed") is True,
+            "turn_failed": jsonl_summary.get("turn_failed") is True,
+        }
+        observed = {
+            name: any(
+                row["successful"] and name in row["skill_files_read"]
+                for row in safe_commands
+            )
+            for name in skill_names
+        }
+        image = observations.get("image")
+        safe_image = None
+        if isinstance(image, dict):
+            safe_image = {
+                key: value
+                for key, value in image.items()
+                if key in {"image_id", "codex_cli_version", "python_version"}
+                and isinstance(value, str)
+            }
+        return {
+            "format": "codex_docker_launcher_v1",
+            "status": jsonl_summary.get("status", "unverified"),
+            "execution_status": observations.get("status", "unverified"),
+            "final_message": safe_message,
+            "trace_jsonl": None,
+            "trace_summary": trace_summary,
+            "launcher_observations": {
+                "status": observations.get("status", "unverified"),
+                "auth_mode": observations.get("auth_mode", "unverified"),
+                "docker_exit_code": launcher.get("exit_code"),
+                "image": safe_image,
+            },
+            "redacted": (
+                safe_message != final_message
+                or observations.get("final_message_redacted") is True
+            ),
+            "commands": safe_commands,
+            "skill_use_observation": {
+                name: "observed" if was_observed else "unverified"
+                for name, was_observed in observed.items()
+            },
+        }
+
     original_lines = [line for line in stdout.splitlines() if line.strip()]
     try:
         events = [json.loads(line) for line in original_lines]
     except json.JSONDecodeError:
         events = []
-    event_types = {
-        "thread.started",
-        "turn.started",
-        "turn.completed",
-        "turn.failed",
-        "item.started",
-        "item.completed",
-        "item.updated",
-        "error",
-    }
     if not events or any(
-        not isinstance(event, dict) or event.get("type") not in event_types
+        not isinstance(event, dict) or not isinstance(event.get("type"), str)
         for event in events
     ):
+        first_line = original_lines[0] if original_lines else ""
+        try:
+            first_event = json.loads(first_line)
+        except json.JSONDecodeError:
+            first_event = None
+        jsonl_like = isinstance(first_event, dict) and isinstance(
+            first_event.get("type"), str
+        )
+        if jsonl_like:
+            return _unavailable_trace(skill_names, "unrecognized_jsonl")
+        safe_message = sanitize_diagnostic(stdout, MAX_TEXT_BYTES)
         return {
-            "format": "plain_text_or_unrecognized",
+            "format": "plain_text",
             "status": "unavailable",
-            "final_message": stdout,
+            "final_message": safe_message,
             "trace_jsonl": None,
-            "redacted": False,
+            "trace_summary": {
+                "format": "codex_exec_jsonl",
+                "status": "unavailable",
+                "event_count": 0,
+                "event_types": {},
+                "command_count": 0,
+                "commands": [],
+            },
+            "redacted": safe_message != stdout,
             "commands": [],
             "skill_use_observation": {name: "unverified" for name in skill_names},
         }
+    if any(event["type"] not in _CODEX_JSONL_EVENT_TYPES for event in events):
+        return _unavailable_trace(skill_names, "unrecognized_jsonl")
 
-    safe_trace = sanitize_diagnostic(stdout, MAX_TEXT_BYTES)
-    try:
-        safe_events = [
-            json.loads(line) for line in safe_trace.splitlines() if line.strip()
-        ]
-    except json.JSONDecodeError:
-        safe_events = []
-    if len(safe_events) != len(events):
-        safe_events = []
-
+    event_types = Counter(
+        event["type"] for event in events if isinstance(event.get("type"), str)
+    )
     messages: list[str] = []
     commands: list[dict[str, Any]] = []
     observed = {name: False for name in skill_names}
-    for event in safe_events:
+    safe_commands: list[dict[str, Any]] = []
+    for event in events:
         if event.get("type") != "item.completed":
             continue
         item = event.get("item")
@@ -168,13 +410,13 @@ def capture_codex_jsonl_trace(
         command = item["command"]
         commands.append(
             {
-                "event_id": item.get("id"),
                 "command": command,
                 "exit_code": exit_code,
                 "completed": True,
                 "successful": exit_code == 0,
             }
         )
+        observed_skills: list[str] = []
         if exit_code == 0:
             normalized = command.replace("\\", "/").lower()
             reader = re.search(
@@ -186,18 +428,133 @@ def capture_codex_jsonl_trace(
                     target = f".agents/skills/{name}/skill.md"
                     if target in normalized:
                         observed[name] = True
+                        observed_skills.append(name)
+        safe_captures: list[dict[str, Any]] = []
+        if exit_code == 0:
+            invocation = _safe_capture_invocation(command)
+            if invocation is not None:
+                safe_captures.append(invocation)
+        safe_commands.append(
+            {
+                "exit_code": exit_code,
+                "successful": exit_code == 0,
+                "skill_files_read": observed_skills,
+                "verifier_capture_invocations": safe_captures,
+            }
+        )
 
+    safe_messages = [
+        sanitize_diagnostic(message, MAX_TEXT_BYTES) for message in messages
+    ]
+    final_message = safe_messages[-1] if safe_messages else ""
+    turn_completed = event_types.get("turn.completed", 0) > 0
+    turn_failed = event_types.get("turn.failed", 0) > 0
+    event_error = event_types.get("error", 0) > 0
+    trace_status = (
+        "captured"
+        if messages and turn_completed and not turn_failed and not event_error
+        else "evidence_unverified"
+    )
+    trace_summary = {
+        "format": "codex_exec_jsonl",
+        "status": trace_status,
+        "event_count": len(events),
+        "event_types": dict(sorted(event_types.items())),
+        "command_count": len(commands),
+        "commands": safe_commands,
+        "turn_completed": event_types.get("turn.completed", 0) > 0,
+        "turn_failed": event_types.get("turn.failed", 0) > 0,
+    }
     return {
         "format": "codex_exec_jsonl",
-        "status": "captured" if safe_events else "evidence_unverified",
-        "final_message": messages[-1] if messages else "",
-        "trace_jsonl": safe_trace if safe_events else None,
-        "redacted": safe_trace != stdout,
+        "status": trace_status,
+        "final_message": final_message,
+        "trace_jsonl": None,
+        "trace_summary": trace_summary,
+        "redacted": bool(messages and final_message != messages[-1]),
         "commands": commands,
         "skill_use_observation": {
             name: "observed" if was_observed else "unverified"
             for name, was_observed in observed.items()
         },
+    }
+
+
+def _unavailable_trace(
+    skill_names: list[str] | tuple[str, ...], trace_format: str
+) -> dict[str, Any]:
+    return {
+        "format": trace_format,
+        "status": "unverified",
+        "final_message": "",
+        "trace_jsonl": None,
+        "trace_summary": {
+            "format": "codex_exec_jsonl",
+            "status": "unverified",
+            "event_count": 0,
+            "event_types": {},
+            "command_count": 0,
+            "commands": [],
+        },
+        "redacted": False,
+        "commands": [],
+        "skill_use_observation": {name: "unverified" for name in skill_names},
+    }
+
+
+def _safe_capture_invocation(command: str) -> dict[str, str] | None:
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        return None
+    script_seen = any(
+        token.replace("\\", "/").endswith(".qa-eval-tools/verifier_capture.py")
+        for token in tokens
+    )
+    if not script_seen:
+        return None
+    values: dict[str, str] = {}
+    for option in ("--skill", "--operation", "--request", "--record"):
+        for index, token in enumerate(tokens):
+            if token == option and index + 1 < len(tokens):
+                values[option] = tokens[index + 1]
+                break
+            if token.startswith(option + "="):
+                values[option] = token.split("=", 1)[1]
+                break
+
+    def relative(path: str) -> str | None:
+        normalized = path.replace("\\", "/")
+        prefixes = ("/workspace/.qa-eval-output/", ".qa-eval-output/")
+        for prefix in prefixes:
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix) :]
+                break
+        else:
+            return None
+        candidate = Path(normalized)
+        if candidate.is_absolute() or ".." in candidate.parts or not candidate.parts:
+            return None
+        if candidate.parts[0] != ".runtime-evidence":
+            return None
+        return candidate.as_posix()
+
+    skill = values.get("--skill", "")
+    operation = values.get("--operation", "")
+    request_path = relative(values.get("--request", ""))
+    record_path = relative(values.get("--record", ""))
+    if (
+        not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", skill)
+        or operation not in {"verify", "generate", "workflow"}
+        or request_path is None
+        or record_path is None
+    ):
+        return None
+    return {
+        "skill": skill,
+        "operation": operation,
+        "request_relative_path": request_path,
+        "record_relative_path": record_path,
     }
 
 
@@ -227,6 +584,21 @@ def trace_confirms_capture_invocation(
         )
 
     for row in commands:
+        safe_invocations = row.get("verifier_capture_invocations")
+        if row.get("successful") is True and isinstance(safe_invocations, list):
+            for captured in safe_invocations:
+                if not isinstance(captured, dict):
+                    continue
+                if all(
+                    captured.get(key) == expected
+                    for key, expected in (
+                        ("skill", skill),
+                        ("operation", operation),
+                        ("request_relative_path", request_path),
+                        ("record_relative_path", record_path),
+                    )
+                ):
+                    return True
         command = row.get("command")
         if row.get("successful") is not True or not isinstance(command, str):
             continue

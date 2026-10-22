@@ -417,7 +417,7 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 5. Agentのweb検索・外部資料取得tool / MCPと余分なSkillを無効化し、実効設定と許可toolを照合する。**モデルAPI通信は許可**し、コンテナのネットワーク方式、web機能、既存egress制御の有無を非秘密profileへ記録する。利用可能なproxy / firewallで宛先制限を行う場合はその設定を固定するが、専用egress環境は必須としない。モデルAPI通信を通じて残る外部アクセス可能性は評価の制約として報告し、それだけで`isolation_unverified` / `not_comparable`にはしない。意図しないweb検索・外部資料取得が観測されたrun、必要なtool / MCP設定を確認できないrunは比較不可とする。
 6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
 7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
-8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。
+8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。実Codex Judgeは専用`codex_judge_docker_launcher.py`で別の使い捨てcontainer・一時`CODEX_HOME`へ起動し、progress JSONLを保存せず最終Judge JSONだけをexecutorのstdoutへ返す。Judgeの実効profile、CLI・tool event、固定image IDを個別に記録し、shell等のtool eventがあった判定は検証済み扱いしない。
 
 コンテナ起動時の概形は次とし、`<...>`は起動前に固定・検証した値へ置き換える。実装する`codex_docker_launcher.py`がDockerへこれと等価なargvを渡し、利用者に毎回shell手順を組み立てさせない。
 
@@ -429,12 +429,15 @@ docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
   --mount type=bind,src=<temporary-codex-home>,dst=/codex-home
   -e CODEX_HOME=/codex-home
   <pinned-image-digest>
-  codex exec --json --model <model-id> --sandbox workspace-write
-    --ask-for-approval never --config model_reasoning_effort=<fixed-effort>
+  codex --no-daemon --strict-config --ask-for-approval never exec
+    --json --model <model-id> --sandbox workspace-write
+    --config model_reasoning_effort=<fixed-effort>
     --output-last-message /workspace/.qa-eval-output/final-message.md -
 ```
 
 上記はargvの構成例であり、shellに貼り付ける逐語的な完成コマンドではない。実際のDocker / Codex CLI引数は`docker run --help`と`codex exec --help`で検証する。フェーズ1の非Git workspaceでは、CodexがGit rootを要求する場合にのみ、そのCLIで確認した`--skip-git-repo-check`相当の正規optionをlauncher側から追加する。ホストでEvaluatorを動かすJudgeはこのコンテナへmountしない。
+
+Codex CLI `0.163.0`では`--json`、`--model`、`--sandbox`、`--config`、`--cd`、`--output-last-message`、`--skip-git-repo-check`を`codex exec --help`で確認し、root optionの`--no-daemon`、`--strict-config`、`--ask-for-approval never`は`exec`より前に置く。profileのcommandにはbuild済みimageのimmutable `sha256:<ID>`を記録し、launcherはそのIDを照合してversion probe・実行へ使う。runごとにtagからimageを変動解決しない。raw JSONLはmemory内で要約し、非秘密のevent事実以外をrunへ保存しない。
 
 `docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、source書込み拒否、必要なモデルAPI通信を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・必須のローカル隔離条件未確認なら比較可能なlive評価を完了したとは報告しない。外部egress制御を行えない場合は残留リスクとして記録する。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
 

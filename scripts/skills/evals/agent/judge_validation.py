@@ -14,6 +14,7 @@ from .common import (
     AgentEvalError,
     atomic_write_json,
     canonical_fingerprint,
+    capture_codex_judge_output,
     prepare_run_output_root,
     sanitize_diagnostic,
     sha256_bytes,
@@ -27,6 +28,12 @@ from .qa_training_store import (
     validate_artifact_index,
 )
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
+from .tools.codex_judge_docker_launcher import (
+    is_codex_judge,
+)
+from .tools.codex_judge_docker_launcher import (
+    launcher_argv_for_profile as judge_launcher_argv_for_profile,
+)
 from .workspace import (
     assert_clean_checkout,
     load_execution_profile,
@@ -307,6 +314,7 @@ def _expected_matches(definition: dict[str, Any], normalized: dict[str, Any]) ->
 def _run_judge_case(
     *,
     command_argv: list[str],
+    judge_profile: dict[str, Any],
     prompt: str,
     cwd: Path,
     timeout: int,
@@ -320,17 +328,32 @@ def _run_judge_case(
     named, cleanup = named_container_command(
         command_argv, name="agent-eval-judge-validation-" + run_tag
     )
+    observations_path = cwd / "launcher-observations.json"
+    codex_judge = is_codex_judge(judge_profile)
+    execution_command = (
+        judge_launcher_argv_for_profile(
+            judge_profile,
+            docker_argv=named,
+            observations_path=observations_path,
+        )
+        if codex_judge
+        else named
+    )
     execution = run_command(
-        named,
+        execution_command,
         input_text=prompt,
         cwd=cwd,
         timeout_seconds=timeout,
         timeout_cleanup_argv=cleanup,
     )
-    safe = sanitize_diagnostic(execution.stdout)
+    judge_capture = capture_codex_judge_output(
+        execution.stdout,
+        observations_path=observations_path if codex_judge else None,
+    )
+    safe = judge_capture["response"]
     row: dict[str, Any] = {
         "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
-        "response_sha256": sha256_bytes(execution.stdout.encode("utf-8")),
+        "response_sha256": sha256_bytes(safe.encode("utf-8")),
         "exit_code": execution.exit_code,
         "timed_out": execution.timed_out,
         "duration_seconds": execution.duration_seconds,
@@ -338,8 +361,10 @@ def _run_judge_case(
         "isolation": isolation,
         "evidence_status": "captured"
         if safe == execution.stdout
+        and judge_capture["status"] in {"unwrapped", "completed"}
         else "evidence_unverified",
         "response": safe,
+        "launcher_observations": judge_capture["launcher_observations"],
     }
     if (
         execution.exit_code != 0
@@ -347,6 +372,9 @@ def _run_judge_case(
         or execution.cleanup_status == "failed"
     ):
         row["status"] = "execution_error"
+        return row
+    if row["evidence_status"] != "captured":
+        row["status"] = "evidence_unverified"
         return row
     criteria_by_id = {item["id"]: item for item in scenario["rubric"]}
     try:
@@ -537,6 +565,7 @@ def run_validation(
             remaining_seconds = max(1, int(max_seconds - (time.monotonic() - start)))
             baseline_judge = _run_judge_case(
                 command_argv=profile["judge"]["command_argv"],
+                judge_profile=profile["judge"],
                 prompt=prompt,
                 cwd=cwd,
                 timeout=min(profile["judge"]["timeout_seconds"], remaining_seconds),
@@ -554,6 +583,7 @@ def run_validation(
                 candidate_cwd.mkdir()
                 candidate_command_result = _run_judge_case(
                     command_argv=candidate_judge_command,
+                    judge_profile=profile["judge"],
                     prompt=prompt,
                     cwd=candidate_cwd,
                     timeout=min(

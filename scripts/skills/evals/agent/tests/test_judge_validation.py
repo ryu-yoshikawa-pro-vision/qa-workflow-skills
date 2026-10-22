@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.skills.evals.agent import judge_validation
+from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.judge_validation import (
     load_fixture_catalogue,
     run_validation,
@@ -41,6 +42,11 @@ def _profile() -> dict:
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
+                "--mount",
+                "type=tmpfs,target=/tmp",
                 "python:3.11",
                 "judge",
             ],
@@ -72,6 +78,50 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_codex_judge_without_safe_launcher_observations_is_unverified(self) -> None:
+        scenario = load_scenario()
+        judge_profile = _profile()["judge"]
+        judge_profile.update(
+            {
+                "cli_version": "codex-cli 0.163.0",
+                "sandbox_policy": "read-only",
+            }
+        )
+        criterion = scenario["rubric"][0]["id"]
+        response = json.dumps(
+            {
+                "criteria": [
+                    {
+                        "id": criterion,
+                        "evaluable": True,
+                        "rating": 3,
+                        "reason": "Evidence supports the criterion.",
+                        "evidence": ["artifact-00.md"],
+                    }
+                ]
+            }
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            cwd = Path(temporary) / "judge"
+            cwd.mkdir()
+            with patch.object(
+                judge_validation,
+                "run_command",
+                return_value=ExecutionResult(0, response, None, "empty", False, 0.01),
+            ):
+                result = judge_validation._run_judge_case(
+                    command_argv=judge_profile["command_argv"],
+                    judge_profile=judge_profile,
+                    prompt="fixed prompt",
+                    cwd=cwd,
+                    timeout=30,
+                    run_tag="missing-sidecar",
+                    criteria=[criterion],
+                    scenario=scenario,
+                )
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertNotIn("normalized", result)
+
     def _baseline_output(self, output: Path, scenario: dict) -> None:
         output.mkdir(parents=True)
         artifacts = []
@@ -241,6 +291,11 @@ class JudgeValidationTests(unittest.TestCase):
                             "run",
                             "--rm",
                             "--read-only",
+                            "--cap-drop=ALL",
+                            "--security-opt=no-new-privileges",
+                            "-i",
+                            "--mount",
+                            "type=tmpfs,target=/tmp",
                             "python:3.11",
                             "candidate-judge",
                         ]

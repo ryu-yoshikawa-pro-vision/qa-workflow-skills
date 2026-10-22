@@ -62,6 +62,7 @@ def _docker_image_index(argv: list[str]) -> int:
         "--memory",
         "--cpus",
         "--security-opt",
+        "--cap-drop",
     }
     flag_options = {"--rm", "--read-only", "-i", "-t", "-d", "--init"}
     index = 2

@@ -297,6 +297,22 @@ def _approved_agent_tmpfs(target: Any, codex_home: str | None) -> bool:
     )
 
 
+def _option_values(argv: list[str], option: str) -> list[str]:
+    values: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == option and index + 1 < len(argv):
+            values.append(argv[index + 1])
+            index += 2
+        elif token.startswith(option + "="):
+            values.append(token.split("=", 1)[1])
+            index += 1
+        else:
+            index += 1
+    return values
+
+
 def verify_agent_docker_command(
     argv: list[str],
     *,
@@ -314,6 +330,18 @@ def verify_agent_docker_command(
     if "--rm" not in argv or "--read-only" not in argv:
         raise AgentEvalError(
             "Agent container must be disposable with a read-only root filesystem"
+        )
+    if "-i" not in argv:
+        raise AgentEvalError("Agent container must receive its prompt through stdin")
+    if [item.upper() for item in _option_values(argv, "--cap-drop")] != ["ALL"]:
+        raise AgentEvalError("Agent container must drop all Linux capabilities")
+    security_options = _option_values(argv, "--security-opt")
+    if len(security_options) != 1 or security_options[0].lower() not in {
+        "no-new-privileges",
+        "no-new-privileges:true",
+    }:
+        raise AgentEvalError(
+            "Agent container must enable no-new-privileges without other security overrides"
         )
     workdir = _option_value(argv, "--workdir") or _option_value(argv, "-w")
     if workdir != "/workspace":
@@ -335,6 +363,16 @@ def verify_agent_docker_command(
             "Agent container may not add host devices, volumes, or capabilities"
         )
     if any(
+        item in {"-e", "--env", "--env-file"}
+        or item.startswith(("--env=", "--env-file="))
+        for item in argv
+    ):
+        raise AgentEvalError(
+            "Agent environment variables and credentials must be supplied by the launcher"
+        )
+    if "--user" in argv or any(item.startswith("--user=") for item in argv):
+        raise AgentEvalError("Agent container UID/GID is set by the Codex launcher")
+    if any(
         _option_value(argv, option) == "host"
         for option in ("--pid", "--ipc", "--uts", "--cgroupns")
     ):
@@ -343,6 +381,7 @@ def verify_agent_docker_command(
         raise AgentEvalError("Agent tmpfs mounts must use auditable --mount entries")
     codex_home = _codex_home_from_argv(argv)
     mounts: list[dict[str, str | bool]] = []
+    tmpfs_targets: set[str] = set()
     index = 0
     while index < len(argv):
         token = argv[index]
@@ -367,6 +406,7 @@ def verify_agent_docker_command(
         if mount_type == "tmpfs":
             target = fields.get("target")
             if _approved_agent_tmpfs(target, codex_home):
+                tmpfs_targets.add(str(target))
                 continue
             raise AgentEvalError(
                 "Agent tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME"
@@ -408,6 +448,8 @@ def verify_agent_docker_command(
         raise AgentEvalError(
             "Agent command must mount only a read-only workspace and writable .qa-eval-output"
         )
+    if tmpfs_targets != {"/tmp"}:
+        raise AgentEvalError("Agent container must use /tmp as its only tmpfs mount")
     network = _option_value(argv, "--network")
     if network == "host":
         raise AgentEvalError("Agent container may not use host networking")
@@ -436,6 +478,18 @@ def verify_judge_docker_command(
         raise AgentEvalError(
             "Judge container must be disposable with a read-only root filesystem"
         )
+    if "-i" not in argv:
+        raise AgentEvalError("Judge container must receive its prompt through stdin")
+    if [item.upper() for item in _option_values(argv, "--cap-drop")] != ["ALL"]:
+        raise AgentEvalError("Judge container must drop all Linux capabilities")
+    security_options = _option_values(argv, "--security-opt")
+    if len(security_options) != 1 or security_options[0].lower() not in {
+        "no-new-privileges",
+        "no-new-privileges:true",
+    }:
+        raise AgentEvalError(
+            "Judge container must enable no-new-privileges without other security overrides"
+        )
     if (
         "--privileged" in argv
         or "host" in (_option_value(argv, "--network") or "")
@@ -460,6 +514,7 @@ def verify_judge_docker_command(
     if any(item in {"--pid=host", "--ipc=host", "--uts=host"} for item in argv):
         raise AgentEvalError("Judge container may not join host namespaces")
     mounts: list[str] = []
+    tmpfs_targets: set[str] = set()
     index = 0
     while index < len(argv):
         token = argv[index]
@@ -471,10 +526,23 @@ def verify_judge_docker_command(
             index += 1
         else:
             index += 1
+    for item in mounts:
+        fields = {
+            key: content if separator else True
+            for part in item.split(",")
+            for key, separator, content in [part.partition("=")]
+        }
+        if fields.get("type") == "tmpfs":
+            target = fields.get("target")
+            if target != "/tmp":
+                raise AgentEvalError("Judge container may use only /tmp as tmpfs")
+            tmpfs_targets.add(str(target))
     if any("type=bind" in item or "type=volume" in item for item in mounts):
         raise AgentEvalError(
             "Judge receives evaluator or source data only through its prompt"
         )
+    if tmpfs_targets != {"/tmp"}:
+        raise AgentEvalError("Judge container must use /tmp as its only tmpfs mount")
     if any(str(evaluator_root.resolve()).lower() in item.lower() for item in argv):
         raise AgentEvalError("Judge command contains an Evaluator path")
     return {
@@ -506,6 +574,18 @@ def verify_repair_docker_command(
         raise AgentEvalError(
             "repair container must be disposable with a read-only root filesystem"
         )
+    if "-i" not in argv:
+        raise AgentEvalError("repair container must receive its prompt through stdin")
+    if [item.upper() for item in _option_values(argv, "--cap-drop")] != ["ALL"]:
+        raise AgentEvalError("repair container must drop all Linux capabilities")
+    security_options = _option_values(argv, "--security-opt")
+    if len(security_options) != 1 or security_options[0].lower() not in {
+        "no-new-privileges",
+        "no-new-privileges:true",
+    }:
+        raise AgentEvalError(
+            "repair container must enable no-new-privileges without other security overrides"
+        )
     if (_option_value(argv, "--workdir") or _option_value(argv, "-w")) != "/workspace":
         raise AgentEvalError("repair container working directory must be /workspace")
     if (
@@ -529,6 +609,7 @@ def verify_repair_docker_command(
     if any(item == "--tmpfs" or item.startswith("--tmpfs=") for item in argv):
         raise AgentEvalError("repair tmpfs mounts must use auditable --mount entries")
     codex_home = _codex_home_from_argv(argv)
+    tmpfs_targets: set[str] = set()
     expected = {
         (workspace.resolve(), "/workspace", True): False,
         (skill_root.resolve(), f"/workspace/.agents/skills/{skill_name}", False): False,
@@ -556,6 +637,7 @@ def verify_repair_docker_command(
                 raise AgentEvalError(
                     "repair tmpfs mounts may cover only /tmp or the explicitly configured temporary CODEX_HOME"
                 )
+            tmpfs_targets.add(str(fields.get("target")))
             continue
         if (
             fields.get("type") != "bind"
@@ -575,6 +657,8 @@ def verify_repair_docker_command(
         raise AgentEvalError(
             "repair command must mount only read-only workspace, one Skill package, and output root"
         )
+    if "/tmp" not in tmpfs_targets:
+        raise AgentEvalError("repair container must provide a /tmp tmpfs")
     return {
         "status": "verified",
         "workspace_read_only": True,

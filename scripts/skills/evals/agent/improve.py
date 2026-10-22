@@ -24,6 +24,7 @@ from .common import (
 from .executor import run_command
 from .prompt_builder import build_analysis_prompt, build_repair_prompt
 from .target_workspace import DEFAULT_TARGET_REVISION
+from .tools.codex_docker_launcher import launcher_argv
 from .workspace import (
     assert_clean_checkout,
     create_skill_workspace,
@@ -659,8 +660,18 @@ def run_improvements(
             analysis_command,
             name=f"agent-eval-analysis-{experiment_id[-8:]}-{case_index:02d}",
         )
+        analysis_execution_command = analysis_named
+        if profile["agent"]["name"].lower() == "codex":
+            analysis_execution_command = launcher_argv(
+                output_root=analysis_workspace / ".qa-eval-output",
+                model=profile["agent"]["model"],
+                reasoning_effort=profile["agent"]["reasoning_effort"],
+                cli_version=profile["agent"]["cli_version"],
+                sandbox_policy=profile["agent"]["sandbox_policy"],
+                docker_argv=analysis_named,
+            )
         analysis_run = run_command(
-            analysis_named,
+            analysis_execution_command,
             input_text=analysis_prompt,
             cwd=analysis_workspace,
             timeout_seconds=min(
@@ -673,21 +684,29 @@ def run_improvements(
             analysis_run.stdout, skill_names=excerpt_candidates
         )
         analysis_safe = sanitize_diagnostic(analysis_trace["final_message"])
-        if analysis_trace["trace_jsonl"] is not None:
-            (case_root / "analysis-trace.jsonl").write_text(
-                analysis_trace["trace_jsonl"], encoding="utf-8"
+        analysis_launcher_unverified = (
+            analysis_trace.get("launcher_observations") is not None
+            and analysis_trace.get("execution_status") != "completed"
+        )
+        analysis_trace_path = None
+        if analysis_trace["trace_summary"].get("status") == "captured":
+            analysis_trace_path = "analysis-trace.json"
+            atomic_write_json(
+                case_root / analysis_trace_path, analysis_trace["trace_summary"]
             )
         case_record["analysis"] = {
             "status": "captured"
-            if not analysis_run.timed_out and analysis_run.exit_code == 0
+            if not analysis_run.timed_out
+            and analysis_run.exit_code == 0
+            and not analysis_trace["redacted"]
+            and not analysis_launcher_unverified
             else "execution_error",
             "response": analysis_safe,
             "response_sha256": sha256_bytes(analysis_safe.encode("utf-8")),
             "trace_format": analysis_trace["format"],
             "trace_status": analysis_trace["status"],
-            "trace_path": "analysis-trace.jsonl"
-            if analysis_trace["trace_jsonl"] is not None
-            else None,
+            "trace_path": analysis_trace_path,
+            "codex_launcher_evidence": analysis_trace.get("launcher_observations"),
             "prompt_sha256": sha256_bytes(analysis_prompt.encode("utf-8")),
             "isolation": analysis_isolation,
             "container_cleanup_status": analysis_run.cleanup_status,
@@ -696,9 +715,17 @@ def run_improvements(
             analysis_run.timed_out
             or analysis_run.exit_code != 0
             or analysis_run.cleanup_status == "failed"
+            or analysis_trace["redacted"]
+            or analysis_launcher_unverified
         ):
             case_record["status"] = "review_pending"
-            case_record["blocked_reason"] = "analysis_agent_execution_error"
+            case_record["blocked_reason"] = (
+                "analysis_output_redacted"
+                if analysis_trace["redacted"]
+                else "codex_launcher_evidence_unverified"
+                if analysis_launcher_unverified
+                else "analysis_agent_execution_error"
+            )
             result["cases"].append(case_record)
             _write_analysis_artifacts(case_root, case_record)
             atomic_write_json(case_root / "case.json", case_record)
@@ -838,8 +865,20 @@ def run_improvements(
                         "status": "repair_agent_running",
                     }
                     atomic_write_json(output_root / "result.json", result)
+                    repair_execution_command = repair_named
+                    if profile["agent"]["name"].lower() == "codex":
+                        repair_execution_command = launcher_argv(
+                            output_root=repair_output,
+                            model=profile["agent"]["model"],
+                            reasoning_effort=profile["agent"]["reasoning_effort"],
+                            cli_version=profile["agent"]["cli_version"],
+                            sandbox_policy=profile["agent"]["sandbox_policy"],
+                            docker_argv=repair_named,
+                            mode="repair",
+                            skill_name=chosen_skill,
+                        )
                     repair_execution = run_command(
-                        repair_named,
+                        repair_execution_command,
                         input_text=repair_prompt,
                         cwd=repair_workspace,
                         timeout_seconds=min(
@@ -849,24 +888,35 @@ def run_improvements(
                         timeout_cleanup_argv=repair_cleanup,
                     )
                     repair_trace = capture_codex_jsonl_trace(repair_execution.stdout)
+                    repair_output_unverified = repair_trace["redacted"] or (
+                        repair_trace.get("launcher_observations") is not None
+                        and repair_trace.get("execution_status") != "completed"
+                    )
                     trial: dict[str, Any] = {
                         "trial": repair_index,
                         "status": "execution_error"
                         if repair_execution.timed_out
                         or repair_execution.exit_code != 0
                         or repair_execution.cleanup_status == "failed"
+                        else "review_pending"
+                        if repair_output_unverified
                         else "running",
                         "repair_response_sha256": sha256_bytes(
-                            repair_trace["final_message"].encode("utf-8")
+                            sanitize_diagnostic(repair_trace["final_message"]).encode(
+                                "utf-8"
+                            )
                         ),
                         "repair_response": sanitize_diagnostic(
                             repair_trace["final_message"]
                         ),
                         "trace_format": repair_trace["format"],
                         "trace_status": repair_trace["status"],
-                        "trace_path": "repair-trace.jsonl"
-                        if repair_trace["trace_jsonl"] is not None
+                        "trace_path": "repair-trace.json"
+                        if repair_trace["trace_summary"].get("status") == "captured"
                         else None,
+                        "codex_launcher_evidence": repair_trace.get(
+                            "launcher_observations"
+                        ),
                         "isolation": repair_isolation,
                         "container_cleanup_status": repair_execution.cleanup_status,
                         "allowed_paths": sorted(requested_paths),
@@ -874,13 +924,24 @@ def run_improvements(
                             "package_fingerprint"
                         ],
                     }
-                    if repair_trace["trace_jsonl"] is not None:
-                        (trial_root / "repair-trace.jsonl").write_text(
-                            repair_trace["trace_jsonl"], encoding="utf-8"
+                    if repair_trace["trace_summary"].get("status") == "captured":
+                        atomic_write_json(
+                            trial_root / "repair-trace.json",
+                            repair_trace["trace_summary"],
                         )
                     trial_root.mkdir(exist_ok=True)
                     if trial["status"] == "execution_error":
                         trial["stop_reason"] = "repair_agent_execution_error"
+                        case_record["repair_trials"].append(trial)
+                        atomic_write_json(trial_root / "trial.json", trial)
+                        case_record["status"] = "review_pending"
+                        break
+                    if repair_output_unverified:
+                        trial["stop_reason"] = (
+                            "repair_output_redacted"
+                            if repair_trace["redacted"]
+                            else "codex_launcher_evidence_unverified"
+                        )
                         case_record["repair_trials"].append(trial)
                         atomic_write_json(trial_root / "trial.json", trial)
                         case_record["status"] = "review_pending"

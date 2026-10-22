@@ -18,21 +18,37 @@ Agent実行にはLinux Docker環境と利用者が用意したAgent / Judgeコ�
 ## 実行前提
 
 - Python 3.11と、既存deterministic validatorが使う`PyYAML==6.0.3`を評価環境へ用意します。
+- 実Codex imageは[`tools/codex-agent.Dockerfile`](tools/codex-agent.Dockerfile)から作り、Codex CLI `0.163.0`とPython 3.11を固定します。build後に得たimage IDは各launcherが照合・記録し、照合したIDで実行します。
 - 実Agent / Judgeは別々のargv・cwd・実効profileで起動します。どちらも直接`docker run`し、`shell=True`は使いません。
 - Agent containerはread-only root、`/workspace` read-only、`/workspace/.qa-eval-output`のみwrite可能なbind mountにします。Evaluator / Reference / graderをbind mountしません。
-- Judge containerはhost bind mount、MCP、Tool、user/global設定、Skill rootを無効にし、promptだけをstdinで渡します。
+- Judgeは[`tools/codex_judge_docker_launcher.py`](tools/codex_judge_docker_launcher.py)でAgentとは別の使い捨てcontainerに起動します。Judge専用の一時`CODEX_HOME`だけを認証用にmountし、sanitized target・Agent workspace・Evaluator checkoutはmountしません。Judge promptはstdinだけで渡し、stdoutは最終Judge JSONだけにします。
+- Judge containerではMCP、user/global設定、Skill rootを読み込まず、web searchも有効化しません。JSONLにshell等のtool eventがあればJudge出力を採点に使わず`evidence_unverified`にします。安全なevent summaryは各Judge workspaceの`launcher-observations.json`へ保存し、raw JSONLは保存しません。
 - AgentのSkill rootは`/workspace/.agents/skills`だけにします。global config、追加指示、MCP、Web / browser / search toolは無効にします。
-- `codex exec --help`を実機で確認し、現在利用できる非対話・stdin・sandbox flagを`--agent-command`へ渡します。CLI versionはprofileへ記録しますが、特定versionへの固定はしません。
+- Codex launcherは`codex exec --help`で確認した`--json`、`--model`、`--sandbox`、`--config`、`--cd`、`--output-last-message`、`--skip-git-repo-check`だけをexecへ渡します。`--no-daemon`、`--strict-config`、`--ask-for-approval never`はroot CLI optionとして`exec`より前に置きます。profileの`agent.cli_version`は`codex-cli 0.163.0`に固定します。
+- Codex JudgeもCLI `0.163.0`に固定し、profileの`judge.sandbox_policy` / `approval_policy`は`read-only` / `never`、`launch_options` / `tools` / `mcp_servers` / `skill_roots`は空配列、`global_config` / `external_instructions`は`disabled`にします。Judge commandには`-i`、`--read-only`、`--cap-drop=ALL`、`--security-opt=no-new-privileges`、`--mount type=tmpfs,target=/tmp`を指定します。
 - run開始前にEvaluator checkoutをcleanにします。固定対象repoもclean working treeにし、Plan記載のGit objectが存在することを確認します。
 - Profile / command JSONとrun出力は異なるdirectoryに置きます。出力rootには事前検証済み`isolation.json`だけを置けます。
 
 実効profileはJSON schema version `1`です。`agent` / `judge`には実際のmodel、version、timeout、launch option、sandbox、approval、network、tool、MCP、Skill root、global configの状態を記録します。`verification`は`status: "verified"`、`method`、`evidence_path`を設定し、probeが同profile fingerprint、Agent command fingerprint、Judge command fingerprint、Evaluator revisionに結び付いた証拠を作成します。probeが`unverified`を返した場合、そのprofileでlive runnerを起動しません。
 
-Codex smokeは`codex exec --json`のJSONL traceを保存し、利用可能なcommand eventからSkillファイルの読取とverifier wrapper実行を補助観測します。traceに読取事実がない場合は`unverified`を維持し、Skill改修効果を断定しません。
+Codex smokeはJSONLをlauncherのmemory内だけで解析します。保存する`agent-trace.json`はevent数・event type・終了code・安全化したSkill読取 / verifier実行事実だけを含み、raw command、JSONL本文、認証情報は保存しません。最終応答とstderrも秘密パターンを安全化し、安全化で内容が変わったattemptはJudgeへ渡さず`needs_review`にします。traceにSkill読取事実がない場合は`unverified`を維持し、Skill改修効果を断定しません。
 
 秘密値をprofile・command argvへ直接記載しないでください。認証情報はAgent / Judge imageの実行環境が安全に受け取る方法で供給し、結果・stdout・stderr・provenanceへ出さないでください。
 
 ## 共通case実行
+
+初回のみ、repository rootで固定Codex / Python imageをbuildします。実行時profileはCodex-specific optionや認証値を含めず、`docker run ... codex exec`までのargvを指定します。Agent launcherはCodex CLI引数と一時認証homeを加えます。Judge launcherも同じimageを使いますが、Agentと別container・別一時`CODEX_HOME`で実行します。
+
+```bash
+docker build --tag codex-agent:0.163.0 \
+  --file scripts/skills/evals/agent/tools/codex-agent.Dockerfile .
+```
+
+build後、imageのimmutable IDを取得し、Agent / Judge両方の`command_argv`にその`sha256:...` IDを設定します。launcherはtagの差替えを許さず、profileに記録された同じIDを照合して実行します。
+
+```bash
+docker image inspect --format '{{.Id}}' codex-agent:0.163.0
+```
 
 先に`agent-command.json`へ、実際に使用する`docker run` argvをJSON arrayとして保存します。下記の`{workspace}`と`{output_root}`はprobe / runnerが各run用pathへ置換します。
 
@@ -41,7 +57,10 @@ Codex smokeは`codex exec --json`のJSONL traceを保存し、利用可能なcom
   "docker",
   "run",
   "--rm",
+  "-i",
   "--read-only",
+  "--cap-drop=ALL",
+  "--security-opt=no-new-privileges",
   "--network",
   "bridge",
   "--workdir",
@@ -52,21 +71,36 @@ Codex smokeは`codex exec --json`のJSONL traceを保存し、利用可能なcom
   "type=bind,source={output_root},target=/workspace/.qa-eval-output",
   "--mount",
   "type=tmpfs,target=/tmp",
-  "--mount",
-  "type=tmpfs,target=/codex-home",
-  "--env",
-  "CODEX_HOME=/codex-home",
-  "codex-agent:local",
+  "sha256:<build後に取得した64桁image ID>",
   "codex",
-  "exec",
-  "--json",
-  "--cd",
-  "/workspace",
-  "-"
+  "exec"
 ]
 ```
 
-この例のimage名とCodex flagは説明用です。実際にpull済みのimage、`codex exec --help`、runtime sandbox contractへ合わせます。profileの`agent.tools`、`skill_roots`等も実環境と一致させます。
+実Agent commandではtagではなく上記で得たimage IDを指定し、`--cap-drop=ALL`と`--security-opt=no-new-privileges`を含めます。Codex agent profileの`cli_version`は`codex-cli 0.163.0`、`sandbox_policy`は固定値を記録します。Codex launcherは`auth.json`を一時`CODEX_HOME`へ複製するか、`OPENAI_API_KEY`環境変数だけをcontainerへ渡し、終了時に一時領域を削除します。hostのCodex home自体はmountしません。認証値はprofile・argv・run結果へ記載しないでください。image IDとcontainer内Codex / Python versionを確認できないrunはlive評価を開始しません。
+
+Codex Judgeの`judge.command_argv`はAgent commandと分け、stdinを接続できる`-i`を含めます。Judge launcherが認証・固定model・推論設定を加えます。
+
+```json
+[
+  "docker",
+  "run",
+  "--rm",
+  "--read-only",
+  "--cap-drop=ALL",
+  "--security-opt=no-new-privileges",
+  "-i",
+  "--network",
+  "bridge",
+  "--mount",
+  "type=tmpfs,target=/tmp",
+  "sha256:<build後に取得した64桁image ID>",
+  "codex",
+  "exec"
+]
+```
+
+Judge launcherは一時`CODEX_HOME`、`HOME=/tmp`、read-only sandbox、approval `never`を固定し、profileのimage IDを検証します。実行結果は`launcher-observations.json`に安全化して保存します。Codex `--search` optionは渡さず、JSONLからtool eventを検出した場合は判定を未検証にします。
 
 `profile.json`とcommand JSONを作成後、run用directoryに隔離証拠を保存します。
 

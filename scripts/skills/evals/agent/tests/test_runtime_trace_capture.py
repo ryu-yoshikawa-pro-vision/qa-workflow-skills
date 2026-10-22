@@ -48,6 +48,86 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
         self.assertEqual(captured["final_message"], "Final output.")
         self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
         self.assertTrue(captured["commands"][0]["successful"])
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertNotIn(
+            "cat /workspace/.agents/skills/qa-workflow/SKILL.md",
+            json.dumps(captured["trace_summary"]),
+        )
+
+    def test_launcher_envelope_keeps_only_safe_jsonl_observations(self) -> None:
+        envelope = {
+            "protocol": "codex_docker_launcher_v1",
+            "exit_code": 0,
+            "final_message": "Final output.",
+            "observations": {
+                "status": "completed",
+                "auth_mode": "temporary_auth_file",
+                "image": {
+                    "image_id": "sha256:" + "a" * 64,
+                    "codex_cli_version": "codex-cli 0.163.0",
+                    "python_version": "Python 3.11.17",
+                },
+                "jsonl": {
+                    "status": "captured",
+                    "event_count": 2,
+                    "event_types": {"item.completed": 1, "turn.completed": 1},
+                    "command_count": 1,
+                    "turn_completed": True,
+                    "turn_failed": False,
+                    "commands": [
+                        {
+                            "exit_code": 0,
+                            "successful": True,
+                            "skill_files_read": ["qa-workflow"],
+                            "verifier_capture_invocations": [],
+                        }
+                    ],
+                },
+            },
+        }
+        captured = capture_codex_jsonl_trace(
+            json.dumps(envelope), skill_names=["qa-workflow"]
+        )
+        self.assertEqual(captured["format"], "codex_docker_launcher_v1")
+        self.assertEqual(captured["execution_status"], "completed")
+        self.assertEqual(
+            captured["launcher_observations"]["image"]["codex_cli_version"],
+            "codex-cli 0.163.0",
+        )
+        self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertNotIn('"command":', json.dumps(captured["trace_summary"]))
+
+    def test_jsonl_with_unknown_event_type_is_not_saved_as_candidate_output(
+        self,
+    ) -> None:
+        raw = json.dumps({"type": "future.event", "payload": "sensitive"})
+        captured = capture_codex_jsonl_trace(raw, skill_names=["qa-workflow"])
+        self.assertEqual(captured["final_message"], "")
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertEqual(captured["status"], "unverified")
+
+    def test_final_message_after_failed_or_incomplete_turn_is_unverified(self) -> None:
+        final_message = {
+            "type": "item.completed",
+            "item": {"type": "agent_message", "text": "Partial output."},
+        }
+        cases = (
+            [final_message],
+            [final_message, {"type": "turn.failed"}],
+            [final_message, {"type": "error", "message": "request failed"}],
+        )
+        for events in cases:
+            with self.subTest(event_types=[event["type"] for event in events]):
+                captured = capture_codex_jsonl_trace(
+                    "\n".join(json.dumps(event) for event in events),
+                    skill_names=["qa-workflow"],
+                )
+                self.assertEqual(captured["final_message"], "Partial output.")
+                self.assertEqual(captured["status"], "evidence_unverified")
+                self.assertEqual(
+                    captured["trace_summary"]["status"], "evidence_unverified"
+                )
 
     def test_nonzero_or_missing_command_exit_code_does_not_confirm_skill_use(
         self,

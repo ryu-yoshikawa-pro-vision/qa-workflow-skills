@@ -18,6 +18,7 @@ from scripts.skills.evals.agent.workspace import (
     verify_agent_docker_command,
     verify_judge_docker_command,
     verify_profile_evidence,
+    verify_repair_docker_command,
 )
 
 
@@ -92,6 +93,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
                 "--network",
                 "bridge",
                 "--workdir",
@@ -100,6 +104,8 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 f"type=bind,source={workspace},target=/workspace,readonly",
                 "--mount",
                 f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "--mount",
+                "type=tmpfs,target=/tmp",
                 "python:3.11",
                 "codex",
                 "exec",
@@ -177,6 +183,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
                 "--network",
                 "bridge",
                 "--workdir",
@@ -185,6 +194,8 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 f"type=bind,source={workspace},target=/workspace,readonly",
                 "--mount",
                 f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "--mount",
+                "type=tmpfs,target=/tmp",
                 "python:3.11",
                 "codex",
                 "exec",
@@ -210,6 +221,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
                 "--network",
                 "bridge",
                 "--workdir",
@@ -233,7 +247,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
                     evaluator_root=evaluator,
                 )
 
-    def test_agent_tmpfs_is_limited_to_tmp_and_explicit_codex_home(self) -> None:
+    def test_agent_tmpfs_is_limited_to_tmp_and_launcher_owns_codex_home(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = root / "workspace"
@@ -246,6 +260,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
                 "--network",
                 "bridge",
                 "--workdir",
@@ -256,10 +273,6 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 f"type=bind,source={output},target=/workspace/.qa-eval-output",
                 "--mount",
                 "type=tmpfs,target=/tmp",
-                "--mount",
-                "type=tmpfs,target=/codex-home",
-                "--env",
-                "CODEX_HOME=/codex-home",
                 "python:3.11",
                 "codex",
                 "exec",
@@ -281,6 +294,15 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 )
             with self.assertRaises(AgentEvalError):
                 verify_agent_docker_command(
+                    base[: base.index("python:3.11")]
+                    + ["--mount", "type=tmpfs,target=/codex-home"]
+                    + base[base.index("python:3.11") :],
+                    workspace=workspace,
+                    output_root=output,
+                    evaluator_root=evaluator,
+                )
+            with self.assertRaises(AgentEvalError):
+                verify_agent_docker_command(
                     base[:2] + ["--tmpfs", "/workspace"] + base[2:],
                     workspace=workspace,
                     output_root=output,
@@ -295,8 +317,13 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 "run",
                 "--rm",
                 "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
                 "--network",
                 "bridge",
+                "-i",
+                "--mount",
+                "type=tmpfs,target=/tmp",
                 "python:3.11",
                 "codex",
                 "exec",
@@ -314,6 +341,61 @@ class WorkspaceIsolationTests(unittest.TestCase):
                     + ["--mount", f"type=bind,source={root},target=/data,readonly"]
                     + argv[6:],
                     evaluator_root=root,
+                )
+
+    def test_repair_container_writes_only_the_selected_skill_package(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            skill_root = root / "qa-workflow"
+            output = root / "output"
+            evaluator = root / "evaluator"
+            for path in (workspace, skill_root, output, evaluator):
+                path.mkdir()
+            base = [
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--cap-drop=ALL",
+                "--security-opt=no-new-privileges",
+                "-i",
+                "--network",
+                "bridge",
+                "--workdir",
+                "/workspace",
+                "--mount",
+                f"type=bind,source={workspace},target=/workspace,readonly",
+                "--mount",
+                f"type=bind,source={skill_root},target=/workspace/.agents/skills/qa-workflow",
+                "--mount",
+                f"type=bind,source={output},target=/workspace/.qa-eval-output",
+                "--mount",
+                "type=tmpfs,target=/tmp",
+                "python:3.11",
+                "codex",
+                "exec",
+                "-",
+            ]
+            result = verify_repair_docker_command(
+                base,
+                workspace=workspace,
+                skill_root=skill_root,
+                output_root=output,
+                skill_name="qa-workflow",
+            )
+            self.assertEqual(result["single_skill_writable"], "qa-workflow")
+            with self.assertRaises(AgentEvalError):
+                verify_repair_docker_command(
+                    base
+                    + [
+                        "--mount",
+                        f"type=bind,source={evaluator},target=/evaluator,readonly",
+                    ],
+                    workspace=workspace,
+                    skill_root=skill_root,
+                    output_root=output,
+                    skill_name="qa-workflow",
                 )
 
 

@@ -28,6 +28,16 @@
 
 ## 評価・検証
 
+### 実Agent評価ランナー
+
+`scripts/skills/evals/agent/`は、固定Evaluatorと任意のSkill revisionを分離して、実Agent出力をdeterministic / semantic / workflow evaluatorへ渡す評価基盤です。`run.py`は単一caseとbatch、`qa_training_store.py`は固定QTS revisionの2-attempt workflow、`judge_validation.py`はJudgeのfixture検証、`improve.py`は根拠が確認された失敗に限る分析・候補修正・再評価を担当します。候補Skill package・sanitized targetはread-only Agent workspaceへ配置し、Judge / Reference / graderはAgentから隔離します。
+
+Codex smokeでは`tools/codex_docker_launcher.py`がLinux Docker container内のAgentを起動します。受入imageはCodex CLI `0.163.0`とPython 3.11を含み、root filesystemとworkspaceをread-only、attempt outputだけをwrite可能にし、`/tmp`をtmpfsにします。Codexの認証は一時`CODEX_HOME`または環境変数で渡し、host homeをmountせずrun終了後に一時領域を削除します。launcherは`codex exec --json`のraw JSONLを保存せず、安全化したevent summaryと最終応答だけをrunnerへ渡します。
+
+`tools/codex_judge_docker_launcher.py`はJudge専用の別container・別一時`CODEX_HOME`を使います。Judgeにはpromptをstdinで渡し、stdoutには最終Judge JSONだけを返します。Judge用の安全なevent summaryは`launcher-observations.json`に記録し、raw JSONLは保存しません。shell等のtool eventが検出されたJudge出力や、秘密値の安全化で候補出力が変化したattemptは採点に使わず、レビュー対象にします。通常CIはDockerや外部LLMを起動せず、fake Agent / Judgeの契約testを実行します。
+
+live acceptanceではread-denial、source write-denial、Docker image ID / CLI / Python、Judge独立実行を個別に実証する必要があります。実行環境や未承認のJudge fixtureが不足するrunは成功扱いせず、独立して進められる検証と分けて記録します。
+
 ### 現在の構成
 
 現在のrepository eval datasetは22 Skill、trigger 488 query、deterministic output 46 case、semantic 163 caseです。`qa-workflow` routing fixtureは69件です。
