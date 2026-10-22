@@ -37,6 +37,20 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = [["git", "git.exe"], "commit", "--amend"],
+    decision = "forbidden",
+    justification = "Commit amend rewrites local history and is outside the supported autonomous workflow.",
+    match = [
+        "git commit --amend -m message",
+        "git.exe commit --amend -m message",
+    ],
+    not_match = [
+        "git commit -m message",
+        "git.exe commit -m message",
+    ],
+)
+
+prefix_rule(
     pattern = [["git", "git.exe"], ["clean", "rm", "update-ref"]],
     decision = "forbidden",
     justification = "These Git deletion or ref-update families are outside the supported autonomous workflow.",
@@ -50,6 +64,42 @@ prefix_rule(
     not_match = [
         "git status",
         "git restore file.txt",
+    ],
+)
+
+prefix_rule(
+    pattern = [["git", "git.exe"], "push", ["--force", "-f", "--force-with-lease", "--force-if-includes"]],
+    decision = "forbidden",
+    justification = "Force push can overwrite remote branch history and is outside the supported workflow.",
+    match = [
+        "git push --force origin feature",
+        "git.exe push -f origin feature",
+        "git push --force-with-lease origin feature",
+        "git.exe push --force-if-includes origin feature",
+    ],
+    not_match = [
+        "git push origin feature",
+        "git.exe push -u origin feature",
+    ],
+)
+
+prefix_rule(
+    pattern = [["git", "git.exe"], "push", ["--delete", "-d", "--prune", "--mirror", "--all", "--branches", "--tags", "--follow-tags"]],
+    decision = "forbidden",
+    justification = "Ref deletion, mirror, bulk, and implicit tag pushes can update refs beyond one explicit branch.",
+    match = [
+        "git push --delete origin feature",
+        "git.exe push -d origin feature",
+        "git push --prune origin feature",
+        "git.exe push --mirror origin",
+        "git push --all origin",
+        "git.exe push --branches origin",
+        "git push --tags origin",
+        "git.exe push --follow-tags origin feature",
+    ],
+    not_match = [
+        "git push origin feature",
+        "git.exe push -u origin feature",
     ],
 )
 
