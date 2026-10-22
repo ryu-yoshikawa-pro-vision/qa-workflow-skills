@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "dataset_revision": "qts-judge-fixtures-v1",
+  "splits": {
+    "tune": ["normal-workflow", "normal-artifacts", "major-violation-003", "major-violation-005", "major-violation-010"],
+    "independent": ["major-violation-001", "major-violation-002", "major-violation-004", "major-violation-006", "major-violation-007", "major-violation-009"]
+  },
+  "cases": [
+    {"id":"normal-workflow","group":"workflow","criteria":["QTS-SEM-001","QTS-SEM-002"],"mutation":"none","expected":"rating_at_least_3","approval_status":"pending_human_review","references":["docs/spec/README.md","docs/spec/features/checkout-and-payment.md"]},
+    {"id":"normal-artifacts","group":"artifacts","criteria":["QTS-SEM-003","QTS-SEM-004","QTS-SEM-005","QTS-SEM-006","QTS-SEM-007","QTS-SEM-008","QTS-SEM-009","QTS-SEM-010"],"mutation":"none","expected":"rating_at_least_3","approval_status":"pending_human_review","references":["docs/spec/README.md","docs/spec/features/checkout-and-payment.md"]},
+    {"id":"major-violation-001","group":"workflow","criteria":["QTS-SEM-001"],"mutation":"skip-required-test-case-design-routing","expected":"rating_1","approval_status":"pending_deterministic_review","references":["docs/spec/README.md","docs/spec/features/checkout-and-payment.md"]},
+    {"id":"major-violation-002","group":"workflow","criteria":["QTS-SEM-002"],"mutation":"claim-complete-with-required-incomplete-stage","expected":"rating_1","approval_status":"pending_deterministic_review","references":["docs/spec/README.md","docs/spec/features/checkout-and-payment.md"]},
+    {"id":"major-violation-003","group":"artifacts","criteria":["QTS-SEM-003"],"mutation":"promote-unresolved-specification-to-confirmed-oracle","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/README.md","docs/spec/unresolved-specifications.md"]},
+    {"id":"major-violation-004","group":"artifacts","criteria":["QTS-SEM-004"],"mutation":"allow-expired-checkout-session-to-resume-as-valid","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/features/checkout-and-payment.md","docs/spec/state-and-scenarios.md"]},
+    {"id":"major-violation-005","group":"artifacts","criteria":["QTS-SEM-005"],"mutation":"confirm-order-despite-stale-cart-version-or-price-mismatch","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/features/checkout-and-payment.md","docs/spec/features/cart.md"]},
+    {"id":"major-violation-006","group":"artifacts","criteria":["QTS-SEM-006"],"mutation":"decrement-inventory-after-explicit-payment-failure","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/features/checkout-and-payment.md","docs/spec/features/orders.md","docs/spec/features/admin-inventory.md"]},
+    {"id":"major-violation-007","group":"artifacts","criteria":["QTS-SEM-007"],"mutation":"allow-retry-or-cancel-during-payment-processing","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/features/checkout-and-payment.md","docs/spec/state-and-scenarios.md"]},
+    {"id":"major-violation-009","group":"artifacts","criteria":["QTS-SEM-009"],"mutation":"connect-authority-to-test-for-a-different-requirement-meaning","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/README.md","docs/spec/features/checkout-and-payment.md"]},
+    {"id":"major-violation-010","group":"artifacts","criteria":["QTS-SEM-010"],"mutation":"add-unsupported-external-payment-provider-as-confirmed-behavior","expected":"rating_1","approval_status":"pending_human_review","references":["docs/spec/product-scope.md","docs/spec/features/checkout-and-payment.md","docs/spec/unresolved-specifications.md"]}
+  ]
+}

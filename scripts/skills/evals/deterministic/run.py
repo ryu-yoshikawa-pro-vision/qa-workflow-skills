@@ -29,11 +29,17 @@ def load_eval_definition(skill: str, eval_id: str) -> tuple[dict, dict]:
     raise KeyError(f"unknown eval id for {skill}: {eval_id}")
 
 
-def grade(skill: str, eval_id: str, output_path: Path) -> dict:
+def grade(
+    skill: str,
+    eval_id: str,
+    output_path: Path,
+    *,
+    runtime_source_root: Path | None = None,
+) -> dict:
     _, expected = load_eval_definition(skill, eval_id)
     text = output_path.read_text(encoding="utf-8")
     result = VALIDATORS[skill](text, expected, eval_id)
-    validate_runtime_evidence(text, expected, result)
+    validate_runtime_evidence(text, expected, result, source_root=runtime_source_root)
     return result.to_dict()
 
 
@@ -51,6 +57,11 @@ def main() -> int:
         type=Path,
         help="All-mode directory containing <skill>/<eval-id>.md",
     )
+    parser.add_argument(
+        "--runtime-source-root",
+        type=Path,
+        help="Trusted source checkout used to verify runtime implementation fingerprints",
+    )
     parser.add_argument("--result", type=Path, help="Optional JSON result output path")
     args = parser.parse_args()
 
@@ -60,7 +71,14 @@ def main() -> int:
     if args.skill != "all":
         if not args.eval_id or not args.output:
             parser.error("--eval-id and --output are required unless --skill all")
-        results.append(grade(args.skill, args.eval_id, args.output))
+        results.append(
+            grade(
+                args.skill,
+                args.eval_id,
+                args.output,
+                runtime_source_root=args.runtime_source_root,
+            )
+        )
         payload = results[0]
     else:
         if not args.output_root:
@@ -72,7 +90,14 @@ def main() -> int:
                 relative = f"{skill}/{case['id']}.md"
                 output = args.output_root / relative
                 if output.is_file():
-                    results.append(grade(skill, case["id"], output))
+                    results.append(
+                        grade(
+                            skill,
+                            case["id"],
+                            output,
+                            runtime_source_root=args.runtime_source_root,
+                        )
+                    )
                 else:
                     missing_outputs.append(relative)
         payload = {

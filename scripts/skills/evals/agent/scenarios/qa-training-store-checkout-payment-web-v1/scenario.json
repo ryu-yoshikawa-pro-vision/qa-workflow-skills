@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "scenario_id": "qa-training-store-checkout-payment-web-v1",
+  "target_repository": "ryu-yoshikawa-pro-vision/qa-training-store",
+  "target_revision": "84ce165493649550832731a60cf436f8ae29c56b",
+  "platform": "Web",
+  "feature": "Checkout / Payment",
+  "scope": "checkout-payment-web",
+  "task": "task.md",
+  "rubric": "rubric.json",
+  "reference_paths": [
+    "docs/spec/README.md",
+    "docs/spec/product-scope.md",
+    "docs/spec/roles-and-permissions.md",
+    "docs/spec/state-and-scenarios.md",
+    "docs/spec/ui-ux-contract.md",
+    "docs/spec/features/checkout-and-payment.md",
+    "docs/spec/features/authentication.md",
+    "docs/spec/features/cart.md",
+    "docs/spec/features/orders.md",
+    "docs/spec/features/admin-inventory.md",
+    "docs/spec/known-deviations.md",
+    "docs/spec/unresolved-specifications.md"
+  ],
+  "excluded_paths": [
+    ".agents",
+    ".codex",
+    "AGENTS.md",
+    "QA_AGENT.md",
+    "docs/PROJECT_CONTEXT.md",
+    "docs/plans",
+    "docs/reports",
+    "training/agentic-qa/instructor",
+    "scripts/evals",
+    "tests/repository-contract/skill-semantic-output-evals.test.ts",
+    "tests/repository-contract/skill-trigger-evals.test.ts",
+    "tests/repository-contract/skill-workflow-evals.test.ts",
+    "tests/repository-contract/otel-skill-observer.test.ts",
+    "tests/repository-contract/validate-skills.test.ts"
+  ],
+  "required_artifacts": [
+    {"skill":"spec-analysis","kind":"spec-analysis","scope":"checkout-payment-web"},
+    {"skill":"test-analysis","kind":"test-analysis","scope":"checkout-payment-web"},
+    {"skill":"test-requirement-design","kind":"test-requirement","scope":"checkout-payment-web"},
+    {"skill":"test-condition-design","kind":"test-condition-and-ci","scope":"checkout-payment-web"},
+    {"skill":"test-case-design","kind":"test-case","scope":"checkout-payment-web"},
+    {"skill":"coverage-analysis","kind":"coverage-analysis","scope":"checkout-payment-web"},
+    {"skill":"adversarial-review","kind":"adversarial-review","scope":"checkout-payment-web"},
+    {"skill":"qa-workflow","kind":"workflow-decision","scope":"checkout-payment-web"}
+  ],
+  "max_artifact_file_bytes": 5000000,
+  "max_artifact_total_bytes": 50000000
+}
