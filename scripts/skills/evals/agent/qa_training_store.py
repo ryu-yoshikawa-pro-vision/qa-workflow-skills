@@ -933,6 +933,8 @@ def run(argv: list[str] | None = None) -> int:
                 prompt = build_generation_prompt(
                     skill="qa-workflow", eval_input=scenario["task_text"]
                 )
+                agent_execution_evidence = None
+                agent_execution_path = attempt_root / "agent-execution.json"
                 try:
                     agent_command = _substitute(
                         args.agent_command,
@@ -966,6 +968,20 @@ def run(argv: list[str] | None = None) -> int:
                         timeout_seconds=profile["agent"]["timeout_seconds"],
                         timeout_cleanup_argv=cleanup_command,
                     )
+                    agent_execution_evidence = {
+                        "exit_code": agent.exit_code,
+                        "timed_out": agent.timed_out,
+                        "duration_seconds": agent.duration_seconds,
+                        "stderr_status": agent.stderr_status,
+                        "container_cleanup_status": agent.cleanup_status,
+                    }
+                    atomic_write_json(
+                        agent_execution_path,
+                        {
+                            **agent_execution_evidence,
+                            "record_status": "execution_metadata_only",
+                        },
+                    )
                     if agent.cleanup_status == "failed":
                         raise AgentExecutionError("agent_container_cleanup_failed")
                     trace = capture_codex_jsonl_trace(
@@ -981,7 +997,7 @@ def run(argv: list[str] | None = None) -> int:
                         atomic_write_json(trace_file, trace["trace_summary"])
                         trace_path = str(trace_file.relative_to(output_root))
                     atomic_write_json(
-                        attempt_root / "agent-execution.json",
+                        agent_execution_path,
                         {
                             "exit_code": agent.exit_code,
                             "timed_out": agent.timed_out,
@@ -1263,6 +1279,11 @@ def run(argv: list[str] | None = None) -> int:
                             f"{type(exc).__name__}: {exc}", 2000
                         ),
                     }
+                    if agent_execution_evidence is not None:
+                        attempt_record["agent_execution"] = {
+                            **agent_execution_evidence,
+                            "path": str(agent_execution_path.relative_to(output_root)),
+                        }
                     atomic_write_json(attempt_root / "attempt.json", attempt_record)
                     record["attempts"].append(attempt_record)
                     atomic_write_json(result_path, record)

@@ -413,7 +413,7 @@ class QATrainingStoreTests(unittest.TestCase):
                         "Agent completed the workflow.",
                         None,
                         "empty",
-                        failure == "timeout",
+                        failure in {"timeout", "cleanup"},
                         0.01,
                         "failed" if failure == "cleanup" else "succeeded",
                     )
@@ -549,6 +549,25 @@ class QATrainingStoreTests(unittest.TestCase):
                     (output_root / "result.json").read_text(encoding="utf-8")
                 )
                 attempt = saved["attempts"][0]
+                if failure == "timeout" and link is None:
+                    self.assertEqual(attempt["status"], "execution_error")
+                    self.assertTrue(attempt["agent_timed_out"])
+                    execution_path = (
+                        output_root
+                        / attempt["saved_result_root"]
+                        / "agent-execution.json"
+                    )
+                    execution = json.loads(execution_path.read_text(encoding="utf-8"))
+                    self.assertTrue(execution["timed_out"])
+                    self.assertEqual(execution["container_cleanup_status"], "succeeded")
+                if failure == "cleanup":
+                    self.assertEqual(attempt["status"], "execution_error")
+                    execution = attempt["agent_execution"]
+                    self.assertEqual(execution["exit_code"], 1)
+                    self.assertTrue(execution["timed_out"])
+                    self.assertEqual(execution["container_cleanup_status"], "failed")
+                    self.assertEqual(execution["stderr_status"], "empty")
+                    self.assertTrue((output_root / execution["path"]).is_file())
                 if save_failure:
                     self.assertIn("simulated evaluator save failure", attempt["error"])
                 if "saved_output_root" in attempt:
