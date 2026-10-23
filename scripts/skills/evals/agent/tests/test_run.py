@@ -23,12 +23,15 @@ class CommonRunnerTests(unittest.TestCase):
         judge_status=None,
         race_save=False,
         save_failure=False,
+        candidate_package=False,
+        candidate_changes_during_run=False,
     ):
         run_output_parent = run.REPO_ROOT / ".agent-eval-runs"
         run_output_parent.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=run_output_parent) as temporary:
             root = Path(temporary)
             output = root / "run"
+            candidate_root = root / "candidate-package"
             sentinel = root / "dummy-source-sentinel"
             sentinel.write_text("unchanged", encoding="utf-8")
             dangling = root / "must-not-be-created"
@@ -42,6 +45,11 @@ class CommonRunnerTests(unittest.TestCase):
                     }
                 )
             case = run._load_semantic_cases("test-case-design", "TC-SEM-001")[0]
+            if candidate_package:
+                (candidate_root / "skills" / case["skill"]).mkdir(parents=True)
+                (candidate_root / "skills" / case["skill"] / "SKILL.md").write_text(
+                    "candidate skill", encoding="utf-8"
+                )
 
             def package(_root, revision, destination):
                 skill = destination / "skills" / case["skill"]
@@ -126,6 +134,43 @@ class CommonRunnerTests(unittest.TestCase):
                 stack.enter_context(
                     patch.object(run, "create_skill_workspace", side_effect=package)
                 )
+                if candidate_package:
+                    candidate_package_calls = 0
+
+                    def package_from_root(
+                        _source_root,
+                        destination,
+                        *,
+                        expected_skills,
+                        parent_revision,
+                    ):
+                        nonlocal candidate_package_calls
+                        candidate_package_calls += 1
+                        skill_root = destination / "skills" / case["skill"]
+                        skill_root.mkdir(parents=True)
+                        (skill_root / "SKILL.md").write_text(
+                            "candidate skill", encoding="utf-8"
+                        )
+                        return {
+                            "revision": parent_revision,
+                            "candidate_revision_status": "uncommitted_patch",
+                            "skills": sorted(expected_skills),
+                            "files": [],
+                            "package_fingerprint": (
+                                "changed-candidate-fingerprint"
+                                if candidate_changes_during_run
+                                and candidate_package_calls > 1
+                                else "candidate-package-fingerprint"
+                            ),
+                        }
+
+                    stack.enter_context(
+                        patch.object(
+                            run,
+                            "create_skill_workspace_from_root",
+                            side_effect=package_from_root,
+                        )
+                    )
                 stack.enter_context(
                     patch.object(run, "run_command", side_effect=execute)
                 )
@@ -178,20 +223,24 @@ class CommonRunnerTests(unittest.TestCase):
                     stack.enter_context(
                         patch.object(run, "_render_grade", side_effect=grade)
                     )
-                exit_code = run.run(
+                argv = [
+                    "--suite",
+                    "semantic",
+                    "--skill",
+                    case["skill"],
+                    "--eval-id",
+                    case["id"],
+                    "--skill-revision",
+                    "1" * 40,
+                    "--execution-profile",
+                    str(root / "profile.json"),
+                    "--output-root",
+                    str(output),
+                ]
+                if candidate_package:
+                    argv.extend(["--skill-package-root", str(candidate_root)])
+                argv.extend(
                     [
-                        "--suite",
-                        "semantic",
-                        "--skill",
-                        case["skill"],
-                        "--eval-id",
-                        case["id"],
-                        "--skill-revision",
-                        "1" * 40,
-                        "--execution-profile",
-                        str(root / "profile.json"),
-                        "--output-root",
-                        str(output),
                         "--agent-name",
                         "fake-agent",
                         "--agent-model",
@@ -207,6 +256,7 @@ class CommonRunnerTests(unittest.TestCase):
                         "agent",
                     ]
                 )
+                exit_code = run.run(argv)
             saved = json.loads((output / "result.json").read_text(encoding="utf-8"))
             if judge_status and judge_status != "completed":
                 saved_attempt = saved["attempts"][0]
@@ -222,6 +272,14 @@ class CommonRunnerTests(unittest.TestCase):
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "unchanged")
             self.assertFalse(dangling.exists())
             self.assertEqual(len(agent_output_roots), 1)
+            if candidate_package and not candidate_changes_during_run:
+                self.assertEqual(
+                    saved["skill_candidate_revision_status"], "uncommitted_patch"
+                )
+                self.assertEqual(
+                    saved["skill_package"]["package_fingerprint"],
+                    "candidate-package-fingerprint",
+                )
             agent_output_root = agent_output_roots[0]
             self.assertEqual(agent_output_root.name, "agent-output")
             if "output" in saved["attempts"][0]:
@@ -234,6 +292,18 @@ class CommonRunnerTests(unittest.TestCase):
     def test_normal_output_is_saved(self):
         exit_code, attempt = self._run()
         self.assertEqual(exit_code, 0, attempt)
+
+    def test_candidate_package_is_used_and_fingerprint_is_recorded(self):
+        exit_code, attempt = self._run(candidate_package=True)
+        self.assertEqual(exit_code, 0, attempt)
+        self.assertEqual(attempt["status"], "pass")
+
+    def test_candidate_package_mutation_during_evaluation_fails_closed(self):
+        exit_code, attempt = self._run(
+            candidate_package=True, candidate_changes_during_run=True
+        )
+        self.assertEqual(exit_code, 2, attempt)
+        self.assertEqual(attempt["status"], "pass")
 
     @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
     def test_host_result_writes_do_not_follow_agent_links(self):

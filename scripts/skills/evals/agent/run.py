@@ -37,6 +37,7 @@ if __package__ in {None, ""}:
     from scripts.skills.evals.agent.workspace import (
         assert_clean_checkout,
         create_skill_workspace,
+        create_skill_workspace_from_root,
         load_execution_profile,
         named_container_command,
         prepare_agent_output_mountpoint,
@@ -87,6 +88,7 @@ else:
     from .workspace import (
         assert_clean_checkout,
         create_skill_workspace,
+        create_skill_workspace_from_root,
         load_execution_profile,
         named_container_command,
         prepare_agent_output_mountpoint,
@@ -336,6 +338,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--skill", required=True, help="Skill name or explicit 'all'")
     parser.add_argument("--eval-id")
     parser.add_argument("--skill-revision", required=True)
+    parser.add_argument(
+        "--skill-package-root",
+        type=Path,
+        help="Optional uncommitted review candidate package, identified by content fingerprint",
+    )
     parser.add_argument("--execution-profile", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=1)
@@ -417,7 +424,22 @@ def run(argv: list[str] | None = None) -> int:
         if not profile_verified:
             raise AgentEvalError("live run requires verified isolation evidence")
 
-        package_manifest = create_skill_workspace(REPO_ROOT, skill_sha, skill_root)
+        if args.skill_package_root is None:
+            package_manifest = create_skill_workspace(REPO_ROOT, skill_sha, skill_root)
+        else:
+            base_package_root = output_root / ".candidate-base-package"
+            base_manifest = create_skill_workspace(
+                REPO_ROOT, skill_sha, base_package_root
+            )
+            try:
+                package_manifest = create_skill_workspace_from_root(
+                    args.skill_package_root,
+                    skill_root,
+                    expected_skills=set(base_manifest["skills"]),
+                    parent_revision=skill_sha,
+                )
+            finally:
+                shutil.rmtree(base_package_root, ignore_errors=True)
         skill_names = package_manifest["skills"]
         cases = (
             _load_deterministic_cases(args.skill, args.eval_id)
@@ -466,6 +488,9 @@ def run(argv: list[str] | None = None) -> int:
                 "status": "running",
                 "evaluator": {"revision": evaluator_sha},
                 "skill_package": package_manifest,
+                "skill_candidate_revision_status": package_manifest.get(
+                    "candidate_revision_status", "git_commit"
+                ),
                 "visible_skills": routed_skill_names,
                 "dataset_fingerprint": dataset_fp,
                 "profile_fingerprint": profile_fingerprint(profile),
@@ -725,6 +750,22 @@ def run(argv: list[str] | None = None) -> int:
                 atomic_write_json(result_path, record)
 
         shutil.rmtree(skill_root)
+        if args.skill_package_root is not None:
+            candidate_recheck_root = output_root / ".candidate-package-recheck"
+            rechecked_manifest = create_skill_workspace_from_root(
+                args.skill_package_root,
+                candidate_recheck_root,
+                expected_skills=set(package_manifest["skills"]),
+                parent_revision=skill_sha,
+            )
+            shutil.rmtree(candidate_recheck_root, ignore_errors=True)
+            if (
+                rechecked_manifest["package_fingerprint"]
+                != package_manifest["package_fingerprint"]
+            ):
+                raise AgentEvalError(
+                    "candidate package changed during the evaluation run"
+                )
         record["workspace_cleanup"] = "succeeded"
         statuses = [item["status"] for item in record["attempts"]]
         if any(status == "execution error" for status in statuses):

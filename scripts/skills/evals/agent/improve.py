@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import io
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import zipfile
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -37,6 +42,7 @@ from .qa_training_store import (
     load_scenario,
     validate_artifact_index,
 )
+from .run import run as run_agent_evaluation
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
 from .tools.codex_docker_launcher import launcher_argv
 from .workspace import (
@@ -1056,6 +1062,884 @@ def _skill_use_for_attempt(attempt: dict[str, Any], skill: str) -> str:
     return observation if isinstance(observation, str) else "unverified"
 
 
+def _related_contract_tests(skill: str) -> list[dict[str, str]]:
+    roots = (
+        REPO_ROOT / "scripts" / "skills" / "evals" / "deterministic" / "tests",
+        REPO_ROOT / "scripts" / "skills" / "evals" / "semantic" / "tests",
+        REPO_ROOT / "tests" / "skills" / "evals" / "deterministic",
+        REPO_ROOT / "tests" / "skills" / "evals" / "semantic",
+        REPO_ROOT / "tests" / "skills" / "runtime",
+    )
+    needle = skill.encode("utf-8").lower()
+    selected = []
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("test_*.py")):
+            if path.is_symlink() or not path.is_file():
+                continue
+            data = path.read_bytes()
+            if needle in data.lower():
+                selected.append(
+                    {
+                        "path": path.relative_to(REPO_ROOT).as_posix(),
+                        "sha256": sha256_bytes(data),
+                    }
+                )
+    return selected
+
+
+def _freeze_independent_eval_plan(
+    *,
+    skill: str,
+    evaluator_revision: str,
+    skill_revision: str,
+    baseline_package_fingerprint: str,
+    profile: dict[str, Any],
+    agent_command: list[str],
+) -> dict[str, Any]:
+    cases = []
+    try:
+        from .run import (
+            _dataset_fingerprint,
+            _load_deterministic_cases,
+            _load_semantic_cases,
+        )
+
+        for suite, values in (
+            ("deterministic", _load_deterministic_cases(skill, None)),
+            ("semantic", _load_semantic_cases(skill, None)),
+        ):
+            for case in values:
+                input_fingerprint = sha256_bytes(case["input"].encode("utf-8"))
+                cases.append(
+                    {
+                        "suite": suite,
+                        "skill": skill,
+                        "case_id": case["id"],
+                        "input_fingerprint": input_fingerprint,
+                        "dataset_fingerprint": _dataset_fingerprint(
+                            case["fingerprint_files"]
+                        ),
+                        "evaluator_revision": evaluator_revision,
+                        "skill_revision": skill_revision,
+                        "baseline_package_fingerprint": baseline_package_fingerprint,
+                        "profile_fingerprint": profile_fingerprint(profile),
+                        "agent_command_fingerprint": canonical_fingerprint(
+                            agent_command
+                        ),
+                        "judge_command_fingerprint": canonical_fingerprint(
+                            profile["judge"]["command_argv"]
+                        ),
+                        "grader": (
+                            "fixed_deterministic_grader"
+                            if suite == "deterministic"
+                            else "fixed_semantic_judge"
+                        ),
+                        "judge_profile_fingerprint": (
+                            profile_fingerprint(profile)
+                            if suite == "semantic"
+                            else None
+                        ),
+                        "repeat": 2,
+                    }
+                )
+    except (
+        AgentEvalError,
+        ImportError,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return {
+            "schema_version": 1,
+            "status": "blocked",
+            "cases": [],
+            "contract_tests": _related_contract_tests(skill),
+            "contract_test_execution": "fixed_evaluator_checkout",
+            "block_reason": sanitize_diagnostic(
+                f"independent_eval_cases_unavailable: {exc}", 500
+            ),
+        }
+    cases.sort(key=lambda row: (row["suite"], row["case_id"]))
+    tests = _related_contract_tests(skill)
+    return {
+        "schema_version": 1,
+        "status": "ready" if cases and tests else "blocked",
+        "cases": cases,
+        "contract_tests": tests,
+        "contract_test_execution": "fixed_evaluator_checkout",
+        "block_reason": None
+        if cases and tests
+        else "no_independent_eval_cases_or_related_contract_tests_found",
+    }
+
+
+def _run_related_contract_tests(
+    plan: list[dict[str, str]],
+    *,
+    timeout_seconds: int,
+    evaluator_revision: str,
+    skill: str,
+    skill_revision: str,
+    expected_skills: set[str],
+    candidate_package: Path,
+    candidate_package_fingerprint: str,
+) -> dict[str, Any]:
+    if timeout_seconds <= 0:
+        return {
+            "status": "review_pending",
+            "planned": len(plan),
+            "completed": 0,
+            "results": [{"status": "timeout", "reason": "time_budget_exhausted"}],
+            "conditions_match": False,
+            "evaluator_revision": evaluator_revision,
+            "candidate_package_fingerprint": candidate_package_fingerprint,
+        }
+    results = []
+    deadline = time.monotonic() + max(0, timeout_seconds)
+    workspace_owner = tempfile.TemporaryDirectory(prefix="agent-eval-contract-")
+    candidate_owner = tempfile.TemporaryDirectory(prefix="agent-eval-candidate-")
+    workspace = Path(workspace_owner.name)
+    try:
+        candidate_workspace = Path(candidate_owner.name)
+        candidate_manifest = create_skill_workspace_from_root(
+            candidate_package,
+            candidate_workspace,
+            expected_skills=expected_skills,
+            parent_revision=skill_revision,
+        )
+        if candidate_manifest["package_fingerprint"] != candidate_package_fingerprint:
+            raise AgentEvalError(
+                "candidate Skill package changed before contract tests"
+            )
+        archive = subprocess.run(
+            ["git", "archive", "--format=tar", evaluator_revision],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=min(30, max(1, int(deadline - time.monotonic()))),
+            check=False,
+            shell=False,
+        )
+        if archive.returncode != 0:
+            raise AgentEvalError("fixed Evaluator snapshot could not be prepared")
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as snapshot:
+            for member in snapshot.getmembers():
+                relative = PurePosixPath(member.name)
+                if (
+                    relative.is_absolute()
+                    or ".." in relative.parts
+                    or not relative.parts
+                    or not (member.isdir() or member.isfile())
+                ):
+                    raise AgentEvalError("fixed Evaluator archive has an unsafe member")
+                destination = workspace.joinpath(*relative.parts)
+                if member.isdir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                    continue
+                source = snapshot.extractfile(member)
+                if source is None:
+                    raise AgentEvalError("fixed Evaluator archive is incomplete")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(source.read())
+
+        source_root = candidate_workspace / "skills" / skill
+        if source_root.is_symlink() or not source_root.is_dir():
+            raise AgentEvalError("candidate Skill package is unavailable")
+        for source in source_root.rglob("*"):
+            if source.is_symlink() or not source.is_file():
+                if source.is_dir() and not source.is_symlink():
+                    continue
+                raise AgentEvalError("candidate Skill package contains an unsafe path")
+        destination_root = workspace / "skills" / skill
+        if destination_root.exists():
+            shutil.rmtree(destination_root)
+        shutil.copytree(source_root, destination_root)
+        candidate_owner.cleanup()
+    except (
+        AgentEvalError,
+        OSError,
+        subprocess.SubprocessError,
+        tarfile.TarError,
+    ) as exc:
+        workspace_owner.cleanup()
+        candidate_owner.cleanup()
+        reason = sanitize_diagnostic(str(exc), 500)
+        return {
+            "status": "review_pending",
+            "planned": len(plan),
+            "completed": 0,
+            "results": [{"status": "evidence_unverified", "reason": reason}],
+            "conditions_match": False,
+            "evaluator_revision": evaluator_revision,
+            "candidate_package_fingerprint": candidate_package_fingerprint,
+        }
+
+    for row in plan:
+        relative = row.get("path")
+        if not isinstance(relative, str):
+            results.append(
+                {"status": "evidence_unverified", "reason": "invalid_test_path"}
+            )
+            continue
+        try:
+            remaining = int(deadline - time.monotonic())
+            if remaining <= 0:
+                results.append({"path": relative, "status": "timeout"})
+                continue
+            path = _resolve_run_path(workspace, relative)
+            raw = path.read_bytes()
+            if sha256_bytes(raw) != row.get("sha256"):
+                raise AgentEvalError(
+                    "related contract test changed after it was frozen"
+                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "unittest",
+                    "discover",
+                    "-s",
+                    path.parent.relative_to(workspace).as_posix(),
+                    "-p",
+                    path.name,
+                    "-q",
+                ],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=remaining,
+                check=False,
+                shell=False,
+            )
+            output = result.stdout + result.stderr
+            match = re.search(r"Ran (\d+) tests?", output)
+            tests_run = int(match.group(1)) if match else 0
+            passed = result.returncode == 0 and tests_run > 0 and "OK" in output
+            dependency_unavailable = (
+                "ModuleNotFoundError" in output
+                or "ImportError: Failed to import test module" in output
+            )
+            results.append(
+                {
+                    "path": relative,
+                    "sha256": row["sha256"],
+                    "status": (
+                        "pass"
+                        if passed
+                        else "evidence_unverified"
+                        if dependency_unavailable
+                        else "fail"
+                    ),
+                    "reason": None
+                    if passed
+                    else "contract_test_dependency_unavailable"
+                    if dependency_unavailable
+                    else "contract_test_failed",
+                    "exit_code": result.returncode,
+                    "tests_run": tests_run,
+                    "output_sha256": sha256_bytes(output.encode("utf-8")),
+                }
+            )
+        except subprocess.TimeoutExpired as exc:
+            results.append(
+                {
+                    "path": relative,
+                    "sha256": row.get("sha256"),
+                    "status": "timeout",
+                    "reason": "contract_test_timeout",
+                    "timeout_seconds": max(1, timeout_seconds),
+                    "output_sha256": sha256_bytes(
+                        repr((exc.stdout, exc.stderr)).encode("utf-8")
+                    ),
+                }
+            )
+        except (AgentEvalError, OSError, ValueError) as exc:
+            results.append(
+                {
+                    "path": relative,
+                    "sha256": row.get("sha256"),
+                    "status": "evidence_unverified",
+                    "reason": sanitize_diagnostic(str(exc), 500),
+                }
+            )
+    status = (
+        "pass"
+        if results
+        and len(results) == len(plan)
+        and all(row["status"] == "pass" for row in results)
+        else "review_pending"
+    )
+    workspace_owner.cleanup()
+    return {
+        "status": status,
+        "planned": len(plan),
+        "completed": sum(row["status"] in {"pass", "fail"} for row in results),
+        "results": results,
+        "conditions_match": True,
+        "evaluator_revision": evaluator_revision,
+        "candidate_package_fingerprint": candidate_package_fingerprint,
+    }
+
+
+def _run_independent_eval(
+    *,
+    case: dict[str, Any],
+    baseline: dict[str, Any],
+    profile: dict[str, Any],
+    profile_path: Path,
+    evidence_root: Path,
+    destination: Path,
+    candidate_package: Path | None = None,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    evidence_relative = safe_relative_path(profile["verification"]["evidence_path"])
+    if timeout_seconds <= 0:
+        return {"status": "review_pending", "reason": "time_budget_exhausted"}
+    worst_case_seconds = 2 * (
+        profile["agent"]["timeout_seconds"]
+        + (profile["judge"]["timeout_seconds"] if case["suite"] == "semantic" else 0)
+        + 60
+    )
+    if timeout_seconds < worst_case_seconds:
+        return {
+            "status": "review_pending",
+            "reason": "insufficient_budget_for_independent_repeats",
+            "required_seconds": worst_case_seconds,
+            "available_seconds": timeout_seconds,
+        }
+    source_evidence = evidence_root / evidence_relative
+    if source_evidence.is_symlink() or not source_evidence.is_file():
+        return {"status": "review_pending", "reason": "isolation_evidence_missing"}
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.mkdir(parents=True, exist_ok=False)
+        evidence_destination = destination / evidence_relative
+        evidence_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_evidence, evidence_destination)
+    except OSError as exc:
+        return {
+            "status": "review_pending",
+            "reason": sanitize_diagnostic(str(exc), 500),
+        }
+    args = [
+        "--suite",
+        case["suite"],
+        "--skill",
+        case["skill"],
+        "--eval-id",
+        case["case_id"],
+        "--skill-revision",
+        baseline["skill_revision"],
+        "--execution-profile",
+        str(profile_path),
+        "--output-root",
+        str(destination),
+        "--repeat",
+        "2",
+        "--agent-name",
+        profile["agent"]["name"],
+        "--agent-model",
+        profile["agent"]["model"],
+        "--agent-version",
+        profile["agent"]["cli_version"],
+    ]
+    if candidate_package is not None:
+        args.extend(["--skill-package-root", str(candidate_package)])
+    args.extend(["--agent-command", *baseline["agent_command_template"]])
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    try:
+        if timeout_seconds <= 0:
+            return {"status": "review_pending", "reason": "time_budget_exhausted"}
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = run_agent_evaluation(args)
+        result_path = destination / "result.json"
+        if not result_path.is_file():
+            return {
+                "status": "review_pending",
+                "reason": sanitize_diagnostic(
+                    stderr.getvalue()
+                    or stdout.getvalue()
+                    or f"independent_eval_did_not_save_result_exit_{exit_code}",
+                    500,
+                ),
+                "runner_output_sha256": sha256_bytes(
+                    (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+                ),
+            }
+        return {
+            "status": "captured",
+            "exit_code": exit_code,
+            "result_path": str(result_path),
+            "runner_output_sha256": sha256_bytes(
+                (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+            ),
+        }
+    except (AgentEvalError, OSError, TypeError, ValueError, KeyError) as exc:
+        return {
+            "status": "review_pending",
+            "reason": sanitize_diagnostic(str(exc), 500),
+            "runner_output_sha256": sha256_bytes(
+                (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+            ),
+        }
+
+
+def _grade_snapshot(suite: str, grade: dict[str, Any]) -> dict[str, int] | None:
+    if suite == "deterministic":
+        rows = grade.get("assertions")
+        if not isinstance(rows, list) or not rows:
+            return None
+        score = {"fail": 0, "warning": 1, "pass": 2}
+        result = {}
+        for row in rows:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(row.get("id"), str)
+                or row.get("status") not in score
+                or row["id"] in result
+            ):
+                return None
+            result[row["id"]] = score[row["status"]]
+        return result
+    rows = grade.get("criteria")
+    if not isinstance(rows, list) or not rows:
+        return None
+    result = {}
+    for row in rows:
+        rating = row.get("rating") if isinstance(row, dict) else None
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("id"), str)
+            or isinstance(rating, bool)
+            or not isinstance(rating, int)
+            or rating not in {1, 2, 3, 4}
+            or row["id"] in result
+        ):
+            return None
+        result[row["id"]] = rating
+    return result
+
+
+def _validate_independent_run(
+    result_path: Path,
+    *,
+    case: dict[str, Any],
+    profile: dict[str, Any],
+    package_fingerprint: str,
+    candidate: bool,
+) -> dict[str, Any]:
+    try:
+        run = _load_json(result_path)
+        root = result_path.parent.resolve(strict=True)
+        evaluator = run.get("evaluator")
+        skill_package = run.get("skill_package")
+        if (
+            run.get("status") not in {"pass", "needs_review_or_fail"}
+            or run.get("suite") != case["suite"]
+            or not isinstance(evaluator, dict)
+            or evaluator.get("revision") != case["evaluator_revision"]
+            or run.get("skill_revision") != case["skill_revision"]
+            or run.get("dataset_fingerprint") != case["dataset_fingerprint"]
+            or run.get("profile_fingerprint") != case["profile_fingerprint"]
+            or run.get("profile_verification") != "verified"
+            or run.get("agent_command_fingerprint") != case["agent_command_fingerprint"]
+            or run.get("judge_command_fingerprint") != case["judge_command_fingerprint"]
+            or run.get("repeat") != 2
+            or not isinstance(skill_package, dict)
+            or skill_package.get("package_fingerprint") != package_fingerprint
+            or case["skill"] not in skill_package.get("skills", [])
+            or run.get("workspace_cleanup") != "succeeded"
+            or run.get("skill_candidate_revision_status")
+            != ("uncommitted_patch" if candidate else "git_commit")
+        ):
+            raise AgentEvalError(
+                "independent evaluation conditions do not match the frozen plan"
+            )
+        if profile_fingerprint(profile) != case["profile_fingerprint"]:
+            raise AgentEvalError(
+                "independent evaluation profile changed after freezing"
+            )
+        attempts = run.get("attempts")
+        if not isinstance(attempts, list) or len(attempts) != 2:
+            raise AgentEvalError(
+                "independent evaluation did not save exactly two attempts"
+            )
+        by_repeat: dict[int, dict[str, Any]] = {}
+        for attempt in attempts:
+            repeat = attempt.get("repeat") if isinstance(attempt, dict) else None
+            if (
+                not isinstance(attempt, dict)
+                or isinstance(repeat, bool)
+                or repeat not in {1, 2}
+                or repeat in by_repeat
+                or attempt.get("suite") != case["suite"]
+                or attempt.get("skill") != case["skill"]
+                or attempt.get("eval_id") != case["case_id"]
+                or attempt.get("input_fingerprint") != case["input_fingerprint"]
+                or attempt.get("status") not in {"pass", "fail"}
+                or attempt.get("skill_use_observation") != "observed"
+            ):
+                raise AgentEvalError(
+                    "independent attempt identity or Skill-use evidence is invalid"
+                )
+            execution = attempt.get("agent_execution")
+            isolation = attempt.get("agent_isolation")
+            trace = attempt.get("agent_trace")
+            output = attempt.get("output")
+            grade_ref = attempt.get("grade")
+            if (
+                not isinstance(execution, dict)
+                or isinstance(execution.get("exit_code"), bool)
+                or execution.get("exit_code") != 0
+                or execution.get("timed_out") is not False
+                or execution.get("container_cleanup_status") != "succeeded"
+                or not isinstance(isolation, dict)
+                or isolation.get("status") != "verified"
+                or not isinstance(trace, dict)
+                or trace.get("status") != "captured"
+                or trace.get("redacted") is not False
+                or not isinstance(trace.get("path"), str)
+                or not isinstance(output, dict)
+                or not isinstance(grade_ref, dict)
+            ):
+                raise AgentEvalError(
+                    "independent attempt runtime evidence is incomplete"
+                )
+            output_path = _resolve_run_path(root, output.get("path"))
+            output_bytes = output_path.read_bytes()
+            if sha256_bytes(output_bytes) != output.get("sha256"):
+                raise AgentEvalError("independent output changed after evaluation")
+            trace_relative = (
+                PurePosixPath(output["path"]).parent / trace["path"]
+            ).as_posix()
+            trace_path = _resolve_run_path(root, trace_relative)
+            trace_summary = _load_json(trace_path)
+            commands = trace_summary.get("commands")
+            if (
+                trace_summary.get("status") != "captured"
+                or not isinstance(commands, list)
+                or not any(
+                    isinstance(command, dict)
+                    and command.get("successful") is True
+                    and isinstance(command.get("skill_files_read"), list)
+                    and case["skill"] in command["skill_files_read"]
+                    for command in commands
+                )
+                or trace_summary.get("turn_completed") is not True
+                or trace_summary.get("turn_failed") is not False
+            ):
+                raise AgentEvalError(
+                    "independent Agent trace does not confirm Skill use"
+                )
+            if case["suite"] == "semantic":
+                judges = attempt.get("judge")
+                if (
+                    not isinstance(judges, list)
+                    or not judges
+                    or any(
+                        not isinstance(judge, dict)
+                        or isinstance(judge.get("exit_code"), bool)
+                        or judge.get("exit_code") != 0
+                        or judge.get("timed_out") is not False
+                        or judge.get("container_cleanup_status") != "succeeded"
+                        for judge in judges
+                    )
+                ):
+                    raise AgentEvalError("independent Judge evidence is incomplete")
+            grade_path = _resolve_run_path(root, grade_ref.get("path"))
+            grade_bytes = grade_path.read_bytes()
+            if sha256_bytes(grade_bytes) != grade_ref.get("sha256"):
+                raise AgentEvalError("independent grade changed after evaluation")
+            try:
+                grade = json.loads(grade_bytes)
+            except json.JSONDecodeError as exc:
+                raise AgentEvalError("independent grade is not valid JSON") from exc
+            if not isinstance(grade, dict):
+                raise AgentEvalError("independent grade must be a JSON object")
+            grade_status = (
+                grade.get("status")
+                if case["suite"] == "deterministic"
+                else grade.get("verdict")
+            )
+            snapshot = _grade_snapshot(case["suite"], grade)
+            if grade_status != attempt["status"] or snapshot is None:
+                raise AgentEvalError(
+                    "independent grade evidence is missing or inconsistent"
+                )
+            by_repeat[repeat] = snapshot
+        if set(by_repeat) != {1, 2} or by_repeat[1] != by_repeat[2]:
+            raise AgentEvalError("independent repeated grades are unstable")
+        return {"status": "pass", "run": run, "grades": by_repeat}
+    except (AgentEvalError, OSError, TypeError, ValueError, KeyError) as exc:
+        return {
+            "status": "review_pending",
+            "reason": sanitize_diagnostic(str(exc), 500),
+        }
+
+
+def _assess_independent_case(
+    *,
+    baseline_path: Path,
+    candidate_path: Path,
+    case: dict[str, Any],
+    profile: dict[str, Any],
+    baseline_package_fingerprint: str,
+    candidate_package_fingerprint: str,
+    comparison: dict[str, Any],
+) -> dict[str, Any]:
+    if not comparison.get("comparable"):
+        return {
+            "status": "review_pending",
+            "conditions_match": False,
+            "no_new_regressions": False,
+            "reason": "independent baseline and candidate conditions differ",
+        }
+    baseline = _validate_independent_run(
+        baseline_path,
+        case=case,
+        profile=profile,
+        package_fingerprint=baseline_package_fingerprint,
+        candidate=False,
+    )
+    candidate = _validate_independent_run(
+        candidate_path,
+        case=case,
+        profile=profile,
+        package_fingerprint=candidate_package_fingerprint,
+        candidate=True,
+    )
+    if baseline["status"] != "pass" or candidate["status"] != "pass":
+        return {
+            "status": "review_pending",
+            "conditions_match": True,
+            "no_new_regressions": False,
+            "baseline_status": baseline["status"],
+            "candidate_status": candidate["status"],
+            "baseline_reason": baseline.get("reason"),
+            "candidate_reason": candidate.get("reason"),
+        }
+    before = baseline["grades"]
+    after = candidate["grades"]
+    keys = set(before[1])
+    no_new_regressions = keys == set(after[1]) and all(
+        after[repeat][key] >= before[repeat][key] for repeat in (1, 2) for key in keys
+    )
+    return {
+        "status": "pass" if no_new_regressions else "review_pending",
+        "conditions_match": True,
+        "no_new_regressions": no_new_regressions,
+        "repeat_count": 2,
+        "candidate_package_fingerprint": candidate["run"]["skill_package"][
+            "package_fingerprint"
+        ],
+        "reason": None
+        if no_new_regressions
+        else "candidate has a new or worse independent grade",
+    }
+
+
+def _run_candidate_independent_assessment(
+    *,
+    plan: dict[str, Any],
+    baseline_results: list[dict[str, Any]],
+    baseline: dict[str, Any],
+    profile: dict[str, Any],
+    profile_path: Path,
+    evidence_root: Path,
+    case_root: Path,
+    candidate_package: Path,
+    candidate_package_fingerprint: str,
+    timeout_seconds: int,
+    compare_runs: Any,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + max(0, timeout_seconds)
+    baseline_by_key = {
+        (row.get("case", {}).get("suite"), row.get("case", {}).get("case_id")): row
+        for row in baseline_results
+        if isinstance(row, dict) and isinstance(row.get("case"), dict)
+    }
+    cases = []
+    conditions_match = True
+    fixed_candidate_fingerprint = True
+    for independent_case in plan.get("cases", []):
+        key = (independent_case.get("suite"), independent_case.get("case_id"))
+        baseline_entry = baseline_by_key.get(key)
+        case_key = f"{key[0]}:{key[1]}"
+        safe_case_key = sha256_bytes(case_key.encode("utf-8")).removeprefix("sha256:")[
+            :16
+        ]
+        candidate_root = case_root / "independent-candidate" / safe_case_key
+        entry: dict[str, Any] = {
+            "suite": key[0],
+            "case_id": key[1],
+            "status": "review_pending",
+            "candidate_package_fingerprint": candidate_package_fingerprint,
+        }
+        if (
+            not isinstance(baseline_entry, dict)
+            or baseline_entry.get("status") != "captured"
+            or baseline_entry.get("validation", {}).get("status") != "pass"
+            or not isinstance(baseline_entry.get("result_path"), str)
+        ):
+            entry["reason"] = "frozen_independent_baseline_is_unavailable"
+            conditions_match = False
+            cases.append(entry)
+            continue
+        run_status = _run_independent_eval(
+            case=independent_case,
+            baseline=baseline,
+            profile=profile,
+            profile_path=profile_path,
+            evidence_root=evidence_root,
+            destination=candidate_root,
+            candidate_package=candidate_package,
+            timeout_seconds=max(0, int(deadline - time.monotonic())),
+        )
+        entry["run"] = run_status
+        if run_status.get("status") != "captured":
+            entry["reason"] = run_status.get(
+                "reason", "candidate_independent_eval_unavailable"
+            )
+            conditions_match = False
+            fixed_candidate_fingerprint = False
+            cases.append(entry)
+            continue
+        candidate_path = Path(run_status["result_path"])
+        baseline_path = Path(baseline_entry["result_path"])
+        comparison_path = candidate_root / "comparison.json"
+        try:
+            comparison = compare_runs(baseline_path, candidate_path)
+            atomic_write_json(comparison_path, comparison)
+            assessment = _assess_independent_case(
+                baseline_path=baseline_path,
+                candidate_path=candidate_path,
+                case=independent_case,
+                profile=profile,
+                baseline_package_fingerprint=independent_case[
+                    "baseline_package_fingerprint"
+                ],
+                candidate_package_fingerprint=candidate_package_fingerprint,
+                comparison=comparison,
+            )
+        except (AgentEvalError, OSError, TypeError, ValueError, KeyError) as exc:
+            assessment = {
+                "status": "review_pending",
+                "conditions_match": False,
+                "no_new_regressions": False,
+                "reason": sanitize_diagnostic(str(exc), 500),
+            }
+        entry.update(
+            {
+                "status": assessment.get("status", "review_pending"),
+                "candidate_result_path": str(candidate_path),
+                "comparison_path": str(comparison_path),
+                "conditions_match": assessment.get("conditions_match") is True,
+                "no_new_regressions": assessment.get("no_new_regressions") is True,
+                "reason": assessment.get("reason"),
+            }
+        )
+        conditions_match = conditions_match and entry["conditions_match"]
+        fixed_candidate_fingerprint = fixed_candidate_fingerprint and (
+            assessment.get("candidate_package_fingerprint")
+            == candidate_package_fingerprint
+        )
+        if not fixed_candidate_fingerprint:
+            entry["status"] = "review_pending"
+            entry["reason"] = "candidate_package_fingerprint_changed"
+        cases.append(entry)
+    all_pass = (
+        bool(cases)
+        and len(cases) == len(plan.get("cases", []))
+        and all(row.get("status") == "pass" for row in cases)
+    )
+    return {
+        "status": "pass" if all_pass else "review_pending",
+        "planned": len(plan.get("cases", [])),
+        "cases": cases,
+        "conditions_match": conditions_match
+        and len(cases) == len(plan.get("cases", [])),
+        "candidate_fingerprint_fixed": fixed_candidate_fingerprint and all_pass,
+        "expected_inputs_disclosed": False,
+        "expected_results_disclosed": False,
+        "feedback_to_repair_agent": False,
+    }
+
+
+def _improvement_requirements(
+    *,
+    target_improved: bool,
+    no_critical_regressions: bool,
+    skill_use_verified: bool,
+    target_conditions_match: bool,
+    independent_assessment: dict[str, Any] | None,
+    contract_test_assessment: dict[str, Any] | None,
+) -> dict[str, Any]:
+    independent_cases = (
+        independent_assessment.get("cases")
+        if isinstance(independent_assessment, dict)
+        else None
+    )
+    independent_passed = bool(
+        isinstance(independent_assessment, dict)
+        and independent_assessment.get("status") == "pass"
+        and isinstance(independent_cases, list)
+        and independent_cases
+        and independent_assessment.get("planned") == len(independent_cases)
+        and all(
+            isinstance(row, dict) and row.get("status") == "pass"
+            for row in independent_cases
+        )
+    )
+    independent_isolated = bool(
+        isinstance(independent_assessment, dict)
+        and independent_assessment.get("expected_inputs_disclosed") is False
+        and independent_assessment.get("expected_results_disclosed") is False
+        and independent_assessment.get("feedback_to_repair_agent") is False
+        and independent_assessment.get("candidate_fingerprint_fixed") is True
+        and independent_assessment.get("conditions_match") is True
+    )
+    contract_tests_passed = bool(
+        isinstance(contract_test_assessment, dict)
+        and contract_test_assessment.get("status") == "pass"
+        and isinstance(contract_test_assessment.get("results"), list)
+        and contract_test_assessment.get("planned", 0) > 0
+        and contract_test_assessment.get("conditions_match") is True
+        and contract_test_assessment.get("completed")
+        == contract_test_assessment.get("planned")
+        and len(contract_test_assessment["results"])
+        == contract_test_assessment.get("planned")
+        and all(
+            isinstance(row, dict) and row.get("status") == "pass"
+            for row in contract_test_assessment.get("results", [])
+        )
+    )
+    return {
+        "target_improved": target_improved,
+        "no_critical_regressions": no_critical_regressions,
+        "skill_use_verified": skill_use_verified,
+        "target_conditions_match": target_conditions_match,
+        "independent_cases_passed": independent_passed,
+        "independent_information_isolated": independent_isolated,
+        "contract_tests_passed": contract_tests_passed,
+        "improvement_demonstrated": all(
+            (
+                target_improved,
+                no_critical_regressions,
+                skill_use_verified,
+                target_conditions_match,
+                independent_passed,
+                independent_isolated,
+                contract_tests_passed,
+            )
+        ),
+    }
+
+
 def _assess_improvement(
     baseline: Path,
     candidate: Path,
@@ -1063,6 +1947,8 @@ def _assess_improvement(
     criterion: str,
     *,
     comparison: dict[str, Any],
+    independent_assessment: dict[str, Any] | None = None,
+    contract_test_assessment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not comparison.get("comparable"):
         return {
@@ -1124,18 +2010,36 @@ def _assess_improvement(
         and candidate_use
         and all(value == "observed" for value in baseline_use + candidate_use)
     )
+    requirements = _improvement_requirements(
+        target_improved=target_improved,
+        no_critical_regressions=no_critical_regressions,
+        skill_use_verified=usage_verified,
+        target_conditions_match=comparison.get("comparable") is True,
+        independent_assessment=independent_assessment,
+        contract_test_assessment=contract_test_assessment,
+    )
+    unmet = [key for key, value in requirements.items() if value is False]
     return {
         "target_criterion_ratings": criterion_statuses,
         "target_progress_consistently": target_progress,
         "target_improved_consistently": target_improved,
         "no_critical_regressions": no_critical_regressions,
         "skill_use_observation": {"baseline": baseline_use, "candidate": candidate_use},
-        "improvement_demonstrated": target_improved
-        and no_critical_regressions
-        and usage_verified,
+        "independent_regression_status": (
+            independent_assessment.get("status", "review_pending")
+            if isinstance(independent_assessment, dict)
+            else "not_run"
+        ),
+        "contract_test_status": (
+            contract_test_assessment.get("status", "review_pending")
+            if isinstance(contract_test_assessment, dict)
+            else "not_run"
+        ),
+        "requirements": requirements,
+        "improvement_demonstrated": requirements["improvement_demonstrated"],
         "reason": None
-        if target_improved and no_critical_regressions and usage_verified
-        else "criterion, regression, or Skill-use evidence requirements are not all met",
+        if requirements["improvement_demonstrated"]
+        else "unmet_improvement_requirements:" + ",".join(unmet),
     }
 
 
@@ -1539,6 +2443,82 @@ def run_improvements(
             case_record["status"] = "stopped_by_repair_limit"
             case_record["blocked_reason"] = "global_repair_attempt_limit_reached"
         else:
+            independent_plan = _freeze_independent_eval_plan(
+                skill=chosen_skill,
+                evaluator_revision=baseline["evaluator_revision"],
+                skill_revision=baseline["skill_revision"],
+                baseline_package_fingerprint=baseline_manifest["package_fingerprint"],
+                profile=profile,
+                agent_command=baseline["agent_command_template"],
+            )
+            case_record["independent_regression_plan"] = independent_plan
+            case_record["independent_evaluation_isolation"] = {
+                "repair_agent_received_independent_inputs": False,
+                "repair_agent_received_expected_results": False,
+                "independent_results_returned_for_repair": False,
+            }
+            if independent_plan["status"] != "ready":
+                case_record["status"] = "review_pending"
+                case_record["blocked_reason"] = independent_plan["block_reason"]
+                result["cases"].append(case_record)
+                _write_analysis_artifacts(case_root, case_record)
+                atomic_write_json(case_root / "case.json", case_record)
+                atomic_write_json(output_root / "result.json", result)
+                continue
+            independent_baseline_results = []
+            independent_baseline_failed = False
+            for independent_case in independent_plan["cases"]:
+                case_key = f"{independent_case['suite']}:{independent_case['case_id']}"
+                safe_case_key = sha256_bytes(case_key.encode("utf-8")).removeprefix(
+                    "sha256:"
+                )[:16]
+                baseline_independent_root = (
+                    case_root / "independent-baseline" / safe_case_key
+                )
+                run_status = _run_independent_eval(
+                    case=independent_case,
+                    baseline=baseline,
+                    profile=profile,
+                    profile_path=profile_path,
+                    evidence_root=output_root,
+                    destination=baseline_independent_root,
+                    timeout_seconds=int(max_seconds - (time.monotonic() - start)),
+                )
+                entry = {"case": independent_case, **run_status}
+                if run_status.get("status") == "captured":
+                    validation = _validate_independent_run(
+                        Path(run_status["result_path"]),
+                        case=independent_case,
+                        profile=profile,
+                        package_fingerprint=baseline_manifest["package_fingerprint"],
+                        candidate=False,
+                    )
+                    entry["validation"] = {
+                        "status": validation["status"],
+                        "reason": validation.get("reason"),
+                    }
+                    if validation["status"] != "pass":
+                        entry["status"] = "review_pending"
+                        entry["reason"] = validation.get("reason")
+                if entry.get("status") != "captured":
+                    independent_baseline_failed = True
+                independent_baseline_results.append(entry)
+                case_record["independent_baseline_results"] = (
+                    independent_baseline_results
+                )
+                atomic_write_json(case_root / "case.json", case_record)
+                if independent_baseline_failed:
+                    break
+            if independent_baseline_failed:
+                case_record["status"] = "review_pending"
+                case_record["blocked_reason"] = (
+                    "independent_baseline_evaluation_unavailable_or_invalid"
+                )
+                result["cases"].append(case_record)
+                _write_analysis_artifacts(case_root, case_record)
+                atomic_write_json(case_root / "case.json", case_record)
+                atomic_write_json(output_root / "result.json", result)
+                continue
             requested_paths = set(repair_gate["requested_paths"])
             if not requested_paths:
                 case_record["status"] = "review_pending"
@@ -1841,23 +2821,121 @@ def run_improvements(
                     comparison_path = trial_root / "comparison.json"
                     comparison = compare_runs(baseline_result, candidate_result_path)
                     atomic_write_json(comparison_path, comparison)
-                    assessment = _assess_improvement(
+                    target_assessment = _assess_improvement(
                         baseline_result,
                         candidate_result_path,
                         chosen_skill,
                         criterion,
                         comparison=comparison,
                     )
+                    assessment = target_assessment
+                    contract_test_assessment = None
+                    contract_test_path = None
+                    if target_assessment["target_progress_consistently"]:
+                        contract_test_assessment = _run_related_contract_tests(
+                            independent_plan["contract_tests"],
+                            timeout_seconds=max(
+                                0, int(max_seconds - (time.monotonic() - start))
+                            ),
+                            evaluator_revision=baseline["evaluator_revision"],
+                            skill=chosen_skill,
+                            skill_revision=baseline["skill_revision"],
+                            expected_skills=set(candidate_manifest["skills"]),
+                            candidate_package=candidate_package,
+                            candidate_package_fingerprint=candidate_manifest[
+                                "package_fingerprint"
+                            ],
+                        )
+                        contract_test_path = trial_root / "contract-tests.json"
+                        atomic_write_json(contract_test_path, contract_test_assessment)
+                        if target_assessment["target_improved_consistently"]:
+                            if contract_test_assessment["status"] == "pass":
+                                independent_assessment = _run_candidate_independent_assessment(
+                                    plan=independent_plan,
+                                    baseline_results=independent_baseline_results,
+                                    baseline=baseline,
+                                    profile=profile,
+                                    profile_path=profile_path,
+                                    evidence_root=output_root,
+                                    case_root=trial_root,
+                                    candidate_package=candidate_package,
+                                    candidate_package_fingerprint=candidate_manifest[
+                                        "package_fingerprint"
+                                    ],
+                                    timeout_seconds=max(
+                                        0,
+                                        int(max_seconds - (time.monotonic() - start)),
+                                    ),
+                                    compare_runs=compare_runs,
+                                )
+                            else:
+                                independent_assessment = {
+                                    "status": "review_pending",
+                                    "planned": len(independent_plan["cases"]),
+                                    "cases": [
+                                        {
+                                            "suite": row["suite"],
+                                            "case_id": row["case_id"],
+                                            "status": "review_pending",
+                                            "reason": "candidate_contract_tests_did_not_pass",
+                                        }
+                                        for row in independent_plan["cases"]
+                                    ],
+                                    "conditions_match": False,
+                                    "candidate_fingerprint_fixed": False,
+                                    "expected_inputs_disclosed": False,
+                                    "expected_results_disclosed": False,
+                                    "feedback_to_repair_agent": False,
+                                }
+                            independent_assessment_path = (
+                                trial_root / "independent-assessment.json"
+                            )
+                            atomic_write_json(
+                                independent_assessment_path, independent_assessment
+                            )
+                            assessment = _assess_improvement(
+                                baseline_result,
+                                candidate_result_path,
+                                chosen_skill,
+                                criterion,
+                                comparison=comparison,
+                                independent_assessment=independent_assessment,
+                                contract_test_assessment=contract_test_assessment,
+                            )
+                        else:
+                            assessment = _assess_improvement(
+                                baseline_result,
+                                candidate_result_path,
+                                chosen_skill,
+                                criterion,
+                                comparison=comparison,
+                                contract_test_assessment=contract_test_assessment,
+                            )
                     trial["candidate_run_result"] = str(candidate_result_path)
                     trial["comparison"] = str(comparison_path)
                     trial["assessment"] = assessment
+                    if target_assessment["target_progress_consistently"]:
+                        trial["target_assessment"] = target_assessment
+                        trial["contract_test_assessment"] = str(contract_test_path)
+                    if target_assessment["target_improved_consistently"]:
+                        trial["independent_assessment"] = str(
+                            independent_assessment_path
+                        )
+                    can_continue_repair = bool(
+                        assessment["target_progress_consistently"]
+                        and not assessment["target_improved_consistently"]
+                        and contract_test_assessment is not None
+                        and contract_test_assessment["status"] == "pass"
+                    )
                     trial["status"] = (
                         "improvement_demonstrated"
                         if assessment["improvement_demonstrated"]
+                        else "intermediate_candidate_forward_progress"
+                        if can_continue_repair
                         else "reevaluated_review_pending"
                     )
                     trial["progress_observed"] = assessment[
-                        "target_improved_consistently"
+                        "target_progress_consistently"
                     ]
                     case_record["repair_trials"].append(trial)
                     atomic_write_json(trial_root / "trial.json", trial)
@@ -1870,10 +2948,19 @@ def run_improvements(
                         case_record["status"] = "review_pending"
                         case_record["blocked_reason"] = "no_verified_forward_progress"
                         break
+                    if (
+                        contract_test_assessment is not None
+                        and contract_test_assessment["status"] != "pass"
+                    ):
+                        case_record["status"] = "review_pending"
+                        case_record["blocked_reason"] = (
+                            "candidate_related_contract_tests_failed_or_unavailable"
+                        )
+                        break
                     if assessment["target_improved_consistently"]:
                         case_record["status"] = "review_pending"
                         case_record["blocked_reason"] = (
-                            "candidate_quality_improved_but_skill_use_or_regression_evidence_is_incomplete"
+                            "candidate_target_improved_but_full_independent_or_contract_evidence_is_incomplete"
                         )
                         break
                     case_record["status"] = "repair_in_progress"

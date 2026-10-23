@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import tempfile
 import unittest
@@ -16,7 +17,11 @@ from scripts.skills.evals.agent.common import (
 )
 from scripts.skills.evals.agent.improve import (
     _analysis_repair_gate,
+    _assess_independent_case,
+    _freeze_independent_eval_plan,
+    _improvement_requirements,
     _judge_verification_map,
+    _run_related_contract_tests,
     _skill_use_for_attempt,
     _stable_failures,
     _validate_analysis,
@@ -35,6 +40,7 @@ from scripts.skills.evals.agent.qa_training_store import (
     validate_artifact_index,
 )
 from scripts.skills.evals.agent.target_workspace import DEFAULT_TARGET_REVISION
+from scripts.skills.evals.agent.workspace import profile_fingerprint
 
 
 def _write_baseline_output(output: Path, scenario: dict) -> None:
@@ -65,6 +71,118 @@ def _write_baseline_output(output: Path, scenario: dict) -> None:
     (output / "final-message.md").write_text(
         "Analysis and design workflow completed.\n", encoding="utf-8"
     )
+
+
+def _write_independent_run(
+    root: Path,
+    *,
+    case: dict,
+    package_fingerprint: str,
+    candidate: bool,
+    ratings: list[int],
+) -> Path:
+    root.mkdir(parents=True)
+    attempts = []
+    for repeat, rating in enumerate(ratings, start=1):
+        attempt_root = root / f"repeat-{repeat}"
+        attempt_root.mkdir()
+        output_path = attempt_root / "output.md"
+        output_path.write_text("Independent output\n", encoding="utf-8")
+        trace_path = attempt_root / "agent-trace.json"
+        trace_path.write_text(
+            json.dumps(
+                {
+                    "status": "captured",
+                    "turn_completed": True,
+                    "turn_failed": False,
+                    "commands": [
+                        {
+                            "successful": True,
+                            "skill_files_read": [case["skill"]],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        grade = (
+            {
+                "status": "pass",
+                "assertions": [{"id": "assertion-1", "status": "pass"}],
+            }
+            if case["suite"] == "deterministic"
+            else {
+                "verdict": "pass",
+                "criteria": [{"id": "criterion-1", "rating": rating}],
+            }
+        )
+        grade_path = attempt_root / "grade.json"
+        grade_path.write_text(json.dumps(grade), encoding="utf-8")
+        attempt = {
+            "repeat": repeat,
+            "suite": case["suite"],
+            "skill": case["skill"],
+            "eval_id": case["case_id"],
+            "input_fingerprint": case["input_fingerprint"],
+            "status": "pass",
+            "skill_use_observation": "observed",
+            "agent_execution": {
+                "exit_code": 0,
+                "timed_out": False,
+                "container_cleanup_status": "succeeded",
+            },
+            "agent_isolation": {"status": "verified"},
+            "agent_trace": {
+                "status": "captured",
+                "redacted": False,
+                "path": "agent-trace.json",
+            },
+            "output": {
+                "path": f"repeat-{repeat}/output.md",
+                "sha256": sha256_bytes(output_path.read_bytes()),
+            },
+            "grade": {
+                "path": f"repeat-{repeat}/grade.json",
+                "sha256": sha256_bytes(grade_path.read_bytes()),
+            },
+        }
+        if case["suite"] == "semantic":
+            attempt["judge"] = [
+                {
+                    "exit_code": 0,
+                    "timed_out": False,
+                    "container_cleanup_status": "succeeded",
+                }
+            ]
+        attempts.append(attempt)
+    result_path = root / "result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "suite": case["suite"],
+                "evaluator": {"revision": case["evaluator_revision"]},
+                "skill_revision": case["skill_revision"],
+                "dataset_fingerprint": case["dataset_fingerprint"],
+                "profile_fingerprint": case["profile_fingerprint"],
+                "profile_verification": "verified",
+                "agent_command_fingerprint": case["agent_command_fingerprint"],
+                "judge_command_fingerprint": case["judge_command_fingerprint"],
+                "repeat": 2,
+                "skill_package": {
+                    "package_fingerprint": package_fingerprint,
+                    "skills": [case["skill"]],
+                },
+                "skill_candidate_revision_status": (
+                    "uncommitted_patch" if candidate else "git_commit"
+                ),
+                "workspace_cleanup": "succeeded",
+                "attempts": attempts,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return result_path
 
 
 def _complete_validation_fixture(root: Path) -> tuple[Path, str]:
@@ -174,6 +292,292 @@ def _complete_validation_fixture(root: Path) -> tuple[Path, str]:
 
 
 class ImprovementGateTests(unittest.TestCase):
+    def test_independent_eval_plan_freezes_all_existing_cases_without_expected_data(
+        self,
+    ) -> None:
+        run_module = importlib.import_module("scripts.skills.evals.agent.run")
+        deterministic = [
+            {
+                "id": "TC-OUT-001",
+                "skill": "test-case-design",
+                "input": "deterministic input one",
+                "fingerprint_files": [],
+            },
+            {
+                "id": "TC-OUT-002",
+                "skill": "test-case-design",
+                "input": "deterministic input two",
+                "fingerprint_files": [],
+            },
+        ]
+        semantic = [
+            {
+                "id": "TC-SEM-001",
+                "skill": "test-case-design",
+                "input": "semantic input one",
+                "fingerprint_files": [],
+            },
+            {
+                "id": "TC-SEM-002",
+                "skill": "test-case-design",
+                "input": "semantic input two",
+                "fingerprint_files": [],
+            },
+        ]
+        profile = {
+            "agent": {"command_argv": ["agent", "--safe"], "skill_roots": []},
+            "judge": {
+                "command_argv": ["judge", "--safe"],
+                "skill_roots": [],
+                "cwd": "judge",
+            },
+            "isolation": {"agent_read_roots": []},
+            "verification": {"evidence_path": "evidence.json"},
+        }
+        with (
+            patch.object(
+                run_module, "_load_deterministic_cases", return_value=deterministic
+            ),
+            patch.object(run_module, "_load_semantic_cases", return_value=semantic),
+            patch.object(run_module, "_dataset_fingerprint", return_value="d" * 64),
+        ):
+            plan = _freeze_independent_eval_plan(
+                skill="test-case-design",
+                evaluator_revision="1" * 40,
+                skill_revision="2" * 40,
+                baseline_package_fingerprint="baseline-package-fingerprint",
+                profile=profile,
+                agent_command=["docker", "run", "agent"],
+            )
+        identities = {(row["suite"], row["case_id"]) for row in plan["cases"]}
+        self.assertEqual(
+            identities,
+            {
+                ("deterministic", "TC-OUT-001"),
+                ("deterministic", "TC-OUT-002"),
+                ("semantic", "TC-SEM-001"),
+                ("semantic", "TC-SEM-002"),
+            },
+        )
+        self.assertEqual(plan["status"], "ready")
+        for row in plan["cases"]:
+            self.assertRegex(row["input_fingerprint"], r"^sha256:[a-f0-9]{64}$")
+            self.assertNotIn("input", row)
+            self.assertNotIn("expected", row)
+            self.assertEqual(row["repeat"], 2)
+            self.assertTrue(row["grader"])
+        self.assertTrue(plan["contract_tests"])
+        self.assertTrue(
+            all("sha256" in row and "path" in row for row in plan["contract_tests"])
+        )
+
+    def test_independent_eval_plan_fails_closed_when_case_loader_is_unavailable(
+        self,
+    ) -> None:
+        run_module = importlib.import_module("scripts.skills.evals.agent.run")
+        with patch.object(
+            run_module,
+            "_load_deterministic_cases",
+            side_effect=ImportError("missing fixed Evaluator dependency"),
+        ):
+            plan = _freeze_independent_eval_plan(
+                skill="test-case-design",
+                evaluator_revision="1" * 40,
+                skill_revision="2" * 40,
+                baseline_package_fingerprint="baseline-package-fingerprint",
+                profile={
+                    "agent": {"skill_roots": []},
+                    "judge": {"skill_roots": [], "cwd": "judge", "command_argv": []},
+                    "isolation": {"agent_read_roots": []},
+                    "verification": {"evidence_path": "evidence.json"},
+                },
+                agent_command=["docker", "run", "agent"],
+            )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["cases"], [])
+        self.assertIn("independent_eval_cases_unavailable", plan["block_reason"])
+
+    def test_independent_comparison_checks_stability_evidence_and_no_regression(
+        self,
+    ) -> None:
+        profile = {
+            "agent": {"skill_roots": []},
+            "judge": {"skill_roots": [], "cwd": "judge"},
+            "isolation": {"agent_read_roots": []},
+            "verification": {"evidence_path": "evidence.json"},
+        }
+        case = {
+            "suite": "semantic",
+            "skill": "test-case-design",
+            "case_id": "TC-SEM-001",
+            "input_fingerprint": "sha256:" + "a" * 64,
+            "dataset_fingerprint": "sha256:" + "b" * 64,
+            "evaluator_revision": "1" * 40,
+            "skill_revision": "2" * 40,
+            "profile_fingerprint": profile_fingerprint(profile),
+            "agent_command_fingerprint": "sha256:" + "c" * 64,
+            "judge_command_fingerprint": "sha256:" + "d" * 64,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = _write_independent_run(
+                root / "baseline",
+                case=case,
+                package_fingerprint="baseline-package",
+                candidate=False,
+                ratings=[2, 2],
+            )
+            candidate_equal = _write_independent_run(
+                root / "candidate-equal",
+                case=case,
+                package_fingerprint="candidate-package",
+                candidate=True,
+                ratings=[2, 2],
+            )
+            equal_assessment = _assess_independent_case(
+                baseline_path=baseline,
+                candidate_path=candidate_equal,
+                case=case,
+                profile=profile,
+                baseline_package_fingerprint="baseline-package",
+                candidate_package_fingerprint="candidate-package",
+                comparison={"comparable": True},
+            )
+            self.assertEqual(equal_assessment["status"], "pass")
+            self.assertTrue(equal_assessment["no_new_regressions"])
+
+            candidate_regressed = _write_independent_run(
+                root / "candidate-regressed",
+                case=case,
+                package_fingerprint="candidate-package-2",
+                candidate=True,
+                ratings=[1, 1],
+            )
+            regressed_assessment = _assess_independent_case(
+                baseline_path=baseline,
+                candidate_path=candidate_regressed,
+                case=case,
+                profile=profile,
+                baseline_package_fingerprint="baseline-package",
+                candidate_package_fingerprint="candidate-package-2",
+                comparison={"comparable": True},
+            )
+            self.assertEqual(regressed_assessment["status"], "review_pending")
+            self.assertFalse(regressed_assessment["no_new_regressions"])
+
+            candidate_unstable = _write_independent_run(
+                root / "candidate-unstable",
+                case=case,
+                package_fingerprint="candidate-package-3",
+                candidate=True,
+                ratings=[2, 3],
+            )
+            unstable_assessment = _assess_independent_case(
+                baseline_path=baseline,
+                candidate_path=candidate_unstable,
+                case=case,
+                profile=profile,
+                baseline_package_fingerprint="baseline-package",
+                candidate_package_fingerprint="candidate-package-3",
+                comparison={"comparable": True},
+            )
+            self.assertEqual(unstable_assessment["status"], "review_pending")
+            self.assertEqual(unstable_assessment["candidate_status"], "review_pending")
+
+    def test_related_contract_tests_require_the_frozen_candidate_package(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "candidate"
+            skill_root = package / "skills" / "test-case-design"
+            skill_root.mkdir(parents=True)
+            (skill_root / "SKILL.md").write_text("candidate\n", encoding="utf-8")
+            result = _run_related_contract_tests(
+                [],
+                timeout_seconds=10,
+                evaluator_revision="1" * 40,
+                skill="test-case-design",
+                skill_revision="2" * 40,
+                expected_skills={"test-case-design"},
+                candidate_package=package,
+                candidate_package_fingerprint="sha256:" + "a" * 64,
+            )
+        self.assertEqual(result["status"], "review_pending")
+        self.assertFalse(result["conditions_match"])
+        self.assertIn("candidate Skill package changed", result["results"][0]["reason"])
+
+    def test_improvement_requires_target_independent_and_contract_success(self) -> None:
+        passing_independent = {
+            "status": "pass",
+            "planned": 1,
+            "cases": [{"status": "pass"}],
+            "expected_inputs_disclosed": False,
+            "expected_results_disclosed": False,
+            "feedback_to_repair_agent": False,
+            "candidate_fingerprint_fixed": True,
+            "conditions_match": True,
+        }
+        passing_contract_tests = {
+            "status": "pass",
+            "planned": 1,
+            "completed": 1,
+            "conditions_match": True,
+            "results": [{"status": "pass"}],
+        }
+
+        def assess(**overrides):
+            values = {
+                "target_improved": True,
+                "no_critical_regressions": True,
+                "skill_use_verified": True,
+                "target_conditions_match": True,
+                "independent_assessment": passing_independent,
+                "contract_test_assessment": passing_contract_tests,
+            }
+            values.update(overrides)
+            return _improvement_requirements(**values)
+
+        self.assertTrue(assess()["improvement_demonstrated"])
+        self.assertFalse(
+            assess(independent_assessment=None)["improvement_demonstrated"]
+        )
+        self.assertFalse(
+            assess(
+                independent_assessment={
+                    **passing_independent,
+                    "status": "review_pending",
+                    "cases": [{"status": "review_pending"}],
+                }
+            )["improvement_demonstrated"]
+        )
+        self.assertFalse(
+            assess(
+                independent_assessment={
+                    **passing_independent,
+                    "cases": [{"status": "fail"}],
+                }
+            )["improvement_demonstrated"]
+        )
+        self.assertFalse(
+            assess(
+                contract_test_assessment={
+                    **passing_contract_tests,
+                    "status": "review_pending",
+                }
+            )["improvement_demonstrated"]
+        )
+        self.assertFalse(
+            assess(target_conditions_match=False)["improvement_demonstrated"]
+        )
+        self.assertFalse(assess(skill_use_verified=False)["improvement_demonstrated"])
+        self.assertFalse(
+            assess(
+                independent_assessment={
+                    **passing_independent,
+                    "expected_results_disclosed": True,
+                }
+            )["improvement_demonstrated"]
+        )
+        self.assertFalse(assess(target_improved=False)["improvement_demonstrated"])
+
     def test_analysis_evidence_requires_source_text_matching_path_and_hash(
         self,
     ) -> None:
@@ -509,8 +913,13 @@ class ImprovementGateTests(unittest.TestCase):
                 encoding="utf-8",
             )
             profile = {
-                "agent": {"name": "fake", "model": "fake-model", "timeout_seconds": 30},
-                "judge": {"timeout_seconds": 30},
+                "agent": {
+                    "name": "fake",
+                    "model": "fake-model",
+                    "cli_version": "fake-version",
+                    "timeout_seconds": 30,
+                },
+                "judge": {"timeout_seconds": 30, "command_argv": ["judge"]},
                 "verification": {"evidence_path": "isolation.json"},
             }
             artifact_source = run_root / "attempt-01" / "qa-output" / artifact_path
@@ -568,6 +977,32 @@ class ImprovementGateTests(unittest.TestCase):
                     "trace_summary": {"status": "not_captured"},
                 }
 
+            independent_plan = {
+                "schema_version": 1,
+                "status": "ready",
+                "cases": [
+                    {
+                        "suite": "semantic",
+                        "skill": "test-case-design",
+                        "case_id": "TC-SEM-001",
+                        "input_fingerprint": "e" * 64,
+                        "dataset_fingerprint": "d" * 64,
+                        "evaluator_revision": "1" * 40,
+                        "skill_revision": "2" * 40,
+                        "baseline_package_fingerprint": "baseline-package-fingerprint",
+                        "profile_fingerprint": "test-profile",
+                        "agent_command_fingerprint": "a" * 64,
+                        "judge_command_fingerprint": "b" * 64,
+                        "grader": "fixed_semantic_judge",
+                        "judge_profile_fingerprint": "test-profile",
+                        "repeat": 2,
+                    }
+                ],
+                "contract_tests": [{"path": "tests/contract.py", "sha256": "c" * 64}],
+                "contract_test_execution": "fixed_evaluator_checkout",
+                "block_reason": None,
+            }
+
             with (
                 patch.object(
                     improve_module,
@@ -611,6 +1046,11 @@ class ImprovementGateTests(unittest.TestCase):
                     side_effect=fake_create_skill_workspace,
                 ),
                 patch.object(
+                    improve_module,
+                    "_freeze_independent_eval_plan",
+                    return_value=independent_plan,
+                ),
+                patch.object(
                     improve_module, "extract_revision_files", return_value=public_refs
                 ),
                 patch.object(
@@ -625,6 +1065,13 @@ class ImprovementGateTests(unittest.TestCase):
                 ),
                 patch.object(
                     improve_module, "capture_codex_jsonl_trace", side_effect=fake_trace
+                ),
+                patch.object(
+                    improve_module,
+                    "run_agent_evaluation",
+                    side_effect=AgentEvalError(
+                        "synthetic independent evaluation unavailable"
+                    ),
                 ),
                 patch.object(
                     improve_module,
@@ -646,7 +1093,7 @@ class ImprovementGateTests(unittest.TestCase):
                     verifier_image="verifier-image",
                     max_cases=1,
                     max_repairs=1,
-                    max_seconds=120,
+                    max_seconds=600,
                     analyze_only=False,
                 )
             prompt = (
@@ -716,6 +1163,32 @@ class ImprovementGateTests(unittest.TestCase):
                 self.assertEqual(result["repair_attempts_started"], 0)
                 self.assertEqual(result["cases"][0]["status"], "review_pending")
                 self.assertTrue(result["cases"][0]["blocked_reason"])
+
+    def test_independent_baseline_failure_is_persisted_and_blocks_repair(self) -> None:
+        result, run_count, _output_root, prompt = self._run_integrated_qts_gate(
+            skill_observation="observed",
+            alternative_causes=[],
+        )
+        case = result["cases"][0]
+        self.assertEqual(run_count, 1)
+        self.assertEqual(result["repair_attempts_started"], 0)
+        self.assertEqual(case["status"], "review_pending")
+        self.assertEqual(
+            case["blocked_reason"],
+            "independent_baseline_evaluation_unavailable_or_invalid",
+        )
+        self.assertEqual(case["independent_regression_plan"]["status"], "ready")
+        self.assertEqual(
+            case["independent_evaluation_isolation"][
+                "repair_agent_received_expected_results"
+            ],
+            False,
+        )
+        self.assertEqual(
+            case["independent_baseline_results"][0]["reason"],
+            "synthetic independent evaluation unavailable",
+        )
+        self.assertNotIn("TC-SEM-001", prompt)
 
     def test_agent_workspace_exposes_only_skills_routed_by_selected_cases(self) -> None:
         self.assertEqual(
