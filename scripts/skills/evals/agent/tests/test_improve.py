@@ -174,9 +174,13 @@ def _complete_validation_fixture(root: Path) -> tuple[Path, str]:
 
 
 class ImprovementGateTests(unittest.TestCase):
-    def test_analysis_evidence_requires_source_text_matching_path_and_hash(self) -> None:
+    def test_analysis_evidence_requires_source_text_matching_path_and_hash(
+        self,
+    ) -> None:
         artifact_text = "The output omits the requested boundary condition.\n"
-        skill_text = "Derive cases from each stated boundary and record the rationale.\n"
+        skill_text = (
+            "Derive cases from each stated boundary and record the rationale.\n"
+        )
         sources = {
             "original-artifacts/attempt-01/cases.md": {
                 "sha256": sha256_bytes(artifact_text.encode()),
@@ -196,16 +200,16 @@ class ImprovementGateTests(unittest.TestCase):
             "evidence": [
                 {
                     "path": "original-artifacts/attempt-01/cases.md",
-                    "sha256": sources[
-                        "original-artifacts/attempt-01/cases.md"
-                    ]["sha256"],
+                    "sha256": sources["original-artifacts/attempt-01/cases.md"][
+                        "sha256"
+                    ],
                     "quote": "The output omits the requested boundary condition.",
                 },
                 {
                     "path": ".agents/skills/test-case-design/SKILL.md",
-                    "sha256": sources[
-                        ".agents/skills/test-case-design/SKILL.md"
-                    ]["sha256"],
+                    "sha256": sources[".agents/skills/test-case-design/SKILL.md"][
+                        "sha256"
+                    ],
                     "quote": "Derive cases from each stated boundary and record the rationale.",
                 },
             ],
@@ -243,12 +247,16 @@ class ImprovementGateTests(unittest.TestCase):
                 evidence_sources=sources,
             )
 
-    def test_repair_gate_blocks_unresolved_causes_unobserved_skill_and_other_paths(self) -> None:
+    def test_repair_gate_blocks_unresolved_causes_unobserved_skill_and_other_paths(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary) / "package"
             skill_root = package / "skills" / "test-case-design"
             skill_root.mkdir(parents=True)
-            (skill_root / "SKILL.md").write_text("Use boundary analysis.\n", encoding="utf-8")
+            (skill_root / "SKILL.md").write_text(
+                "Use boundary analysis.\n", encoding="utf-8"
+            )
             artifact = {
                 "path": "original-artifacts/attempt-01/cases.md",
                 "sha256": "sha256:" + "a" * 64,
@@ -264,8 +272,16 @@ class ImprovementGateTests(unittest.TestCase):
                 skill["path"]: {"kind": "skill"},
             }
             attempts = [
-                {"attempt": {"skill_use_observation": {"test-case-design": "observed"}}},
-                {"attempt": {"skill_use_observation": {"test-case-design": "observed"}}},
+                {
+                    "attempt": {
+                        "skill_use_observation": {"test-case-design": "observed"}
+                    }
+                },
+                {
+                    "attempt": {
+                        "skill_use_observation": {"test-case-design": "observed"}
+                    }
+                },
             ]
             analysis = {
                 "classification": "skill",
@@ -294,7 +310,10 @@ class ImprovementGateTests(unittest.TestCase):
                     package_root=package,
                 )["allowed"]
             )
-            unobserved_attempts = [attempts[0], {"attempt": {"skill_use_observation": "unverified"}}]
+            unobserved_attempts = [
+                attempts[0],
+                {"attempt": {"skill_use_observation": "unverified"}},
+            ]
             unobserved = _analysis_repair_gate(
                 resolved,
                 allowed_skills={"test-case-design"},
@@ -550,23 +569,73 @@ class ImprovementGateTests(unittest.TestCase):
                 }
 
             with (
-                patch.object(improve_module, "_judge_verification_map", return_value={
-                    "QTS-SEM-006": {
-                        "status": "verified",
-                        "verified_fixture_ids": ["fixture-006"],
-                    }
-                }),
-                patch.object(improve_module, "load_execution_profile", return_value=profile),
-                patch.object(improve_module, "profile_fingerprint", return_value="test-profile"),
-                patch.object(improve_module, "assert_clean_checkout", side_effect=lambda path: "1" * 40 if Path(path) == improve_module.REPO_ROOT else "target-sha"),
-                patch.object(improve_module, "prepare_run_output_root", side_effect=lambda output, **_kwargs: (Path(output).mkdir(parents=True, exist_ok=True) or Path(output) / "isolation.json")),
-                patch.object(improve_module, "verify_profile_evidence", return_value=True),
-                patch.object(improve_module, "create_skill_workspace", side_effect=fake_create_skill_workspace),
-                patch.object(improve_module, "extract_revision_files", return_value=public_refs),
-                patch.object(improve_module, "verify_agent_docker_command", return_value={"status": "verified"}),
-                patch.object(improve_module, "named_container_command", return_value=(["docker", "run", "image"], [])),
-                patch.object(improve_module, "capture_codex_jsonl_trace", side_effect=fake_trace),
-                patch.object(improve_module, "run_command", return_value=SimpleNamespace(stdout="agent response", timed_out=False, exit_code=0, cleanup_status="succeeded")) as run_spy,
+                patch.object(
+                    improve_module,
+                    "_judge_verification_map",
+                    return_value={
+                        "QTS-SEM-006": {
+                            "status": "verified",
+                            "verified_fixture_ids": ["fixture-006"],
+                        }
+                    },
+                ),
+                patch.object(
+                    improve_module, "load_execution_profile", return_value=profile
+                ),
+                patch.object(
+                    improve_module, "profile_fingerprint", return_value="test-profile"
+                ),
+                patch.object(
+                    improve_module,
+                    "assert_clean_checkout",
+                    side_effect=lambda path: (
+                        "1" * 40
+                        if Path(path) == improve_module.REPO_ROOT
+                        else "target-sha"
+                    ),
+                ),
+                patch.object(
+                    improve_module,
+                    "prepare_run_output_root",
+                    side_effect=lambda output, **_kwargs: (
+                        Path(output).mkdir(parents=True, exist_ok=True)
+                        or Path(output) / "isolation.json"
+                    ),
+                ),
+                patch.object(
+                    improve_module, "verify_profile_evidence", return_value=True
+                ),
+                patch.object(
+                    improve_module,
+                    "create_skill_workspace",
+                    side_effect=fake_create_skill_workspace,
+                ),
+                patch.object(
+                    improve_module, "extract_revision_files", return_value=public_refs
+                ),
+                patch.object(
+                    improve_module,
+                    "verify_agent_docker_command",
+                    return_value={"status": "verified"},
+                ),
+                patch.object(
+                    improve_module,
+                    "named_container_command",
+                    return_value=(["docker", "run", "image"], []),
+                ),
+                patch.object(
+                    improve_module, "capture_codex_jsonl_trace", side_effect=fake_trace
+                ),
+                patch.object(
+                    improve_module,
+                    "run_command",
+                    return_value=SimpleNamespace(
+                        stdout="agent response",
+                        timed_out=False,
+                        exit_code=0,
+                        cleanup_status="succeeded",
+                    ),
+                ) as run_spy,
             ):
                 result = improve_module.run_improvements(
                     baseline_result=baseline_path,
@@ -585,7 +654,9 @@ class ImprovementGateTests(unittest.TestCase):
             )
             return result, run_spy.call_count, output_root, prompt
 
-    def test_run_improvements_never_starts_repair_when_alternative_cause_remains(self) -> None:
+    def test_run_improvements_never_starts_repair_when_alternative_cause_remains(
+        self,
+    ) -> None:
         result, run_count, _output_root, prompt = self._run_integrated_qts_gate(
             skill_observation="observed",
             alternative_causes=["The Agent may have ignored the Skill instructions."],
@@ -598,7 +669,9 @@ class ImprovementGateTests(unittest.TestCase):
         self.assertNotIn("private evaluator finding", prompt)
         self.assertNotIn('"rating": 1', prompt)
 
-    def test_run_improvements_does_not_start_agent_when_skill_use_is_unverified(self) -> None:
+    def test_run_improvements_does_not_start_agent_when_skill_use_is_unverified(
+        self,
+    ) -> None:
         result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
             skill_observation="unverified",
             alternative_causes=[],
@@ -607,9 +680,13 @@ class ImprovementGateTests(unittest.TestCase):
         self.assertEqual(run_count, 0)
         self.assertEqual(result["repair_attempts_started"], 0)
         self.assertEqual(case["status"], "review_pending")
-        self.assertEqual(case["blocked_reason"], "eligible_skill_use_not_observed_in_all_attempts")
+        self.assertEqual(
+            case["blocked_reason"], "eligible_skill_use_not_observed_in_all_attempts"
+        )
 
-    def test_run_improvements_rejects_skill_use_not_supported_by_saved_trace(self) -> None:
+    def test_run_improvements_rejects_skill_use_not_supported_by_saved_trace(
+        self,
+    ) -> None:
         result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
             skill_observation="observed",
             alternative_causes=[],
@@ -623,13 +700,17 @@ class ImprovementGateTests(unittest.TestCase):
             result["cases"][0]["blocked_reason"],
         )
 
-    def test_run_improvements_preserves_pending_reason_for_missing_or_changed_artifacts(self) -> None:
+    def test_run_improvements_preserves_pending_reason_for_missing_or_changed_artifacts(
+        self,
+    ) -> None:
         for artifact_state in ("missing", "modified"):
             with self.subTest(artifact_state=artifact_state):
-                result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
-                    skill_observation="observed",
-                    alternative_causes=[],
-                    artifact_state=artifact_state,
+                result, run_count, _output_root, _prompt = (
+                    self._run_integrated_qts_gate(
+                        skill_observation="observed",
+                        alternative_causes=[],
+                        artifact_state=artifact_state,
+                    )
                 )
                 self.assertEqual(run_count, 0)
                 self.assertEqual(result["repair_attempts_started"], 0)
