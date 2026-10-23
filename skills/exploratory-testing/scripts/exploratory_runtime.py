@@ -127,6 +127,7 @@ def authorize_operation(
     operation: str,
     prior_side_effect_attempts: int,
     uncertain_previous_attempt: bool = False,
+    state_check_result: str | None = None,
 ) -> dict[str, Any]:
     target_origin = _origin(target_url)
     allowed = {
@@ -138,23 +139,55 @@ def authorize_operation(
         return {"status": "blocked", "reason": "origin_not_allowed"}
     if operation not in charter.get("allowed_operations", []):
         return {"status": "blocked", "reason": "operation_not_allowed"}
+    if state_check_result is not None and (
+        not isinstance(state_check_result, str)
+        or state_check_result not in {"applied", "not_applied", "inconclusive"}
+    ):
+        return {"status": "blocked", "reason": "invalid_state_check_result"}
+    if state_check_result is not None and not uncertain_previous_attempt:
+        return {"status": "blocked", "reason": "state_check_without_uncertain_attempt"}
+    is_side_effect = operation in charter.get("side_effect_operations", [])
+    if is_side_effect and uncertain_previous_attempt:
+        if state_check_result == "applied":
+            return {
+                "status": "blocked",
+                "reason": "previous_side_effect_already_applied",
+                "state_check_complete": True,
+                "retryable": False,
+            }
+        if state_check_result != "not_applied":
+            return {
+                "status": "blocked",
+                "reason": "state_check_required",
+                "state_check_complete": False,
+                "retryable": False,
+            }
     consumed = prior_side_effect_attempts + (1 if uncertain_previous_attempt else 0)
     next_attempt = consumed + 1
-    if operation in charter.get(
-        "side_effect_operations", []
-    ) and next_attempt > charter.get("side_effect_maximum", 0):
+    if is_side_effect and next_attempt > charter.get("side_effect_maximum", 0):
         return {
             "status": "blocked",
             "reason": "side_effect_limit_reached",
             "consumed_attempts": consumed,
+            "state_check_complete": state_check_result == "not_applied",
+            "retryable": False,
         }
     return {
         "status": "allowed",
         "origin": target_origin,
         "operation": operation,
-        "side_effect_attempt_number": next_attempt
-        if operation in charter.get("side_effect_operations", [])
-        else None,
+        "side_effect_attempt_number": next_attempt if is_side_effect else None,
+        "previous_attempt_outcome": "unknown" if uncertain_previous_attempt else None,
+        "state_check_complete": (
+            state_check_result in {"applied", "not_applied"}
+            if uncertain_previous_attempt
+            else None
+        ),
+        "retryable": (
+            not is_side_effect
+            or not uncertain_previous_attempt
+            or state_check_result == "not_applied"
+        ),
     }
 
 
@@ -294,24 +327,135 @@ def record_attempt(
     charter: dict[str, Any], attempts: list[dict[str, Any]], attempt: dict[str, Any]
 ) -> dict[str, Any]:
     refs = [item.get("attempt_ref") for item in attempts]
-    if not attempt.get("attempt_ref") or attempt["attempt_ref"] in refs:
+    attempt_ref = attempt.get("attempt_ref")
+    if not isinstance(attempt_ref, str) or not attempt_ref or attempt_ref in refs:
         return {"status": "blocked", "reason": "attempt_ref_missing_or_duplicate"}
-    if attempt.get("outcome") not in {"completed", "failed", "unknown"}:
+    outcome = attempt.get("outcome")
+    if not isinstance(outcome, str) or outcome not in {
+        "completed",
+        "failed",
+        "unknown",
+    }:
         return {"status": "blocked", "reason": "invalid_attempt_outcome"}
     operation = attempt.get("operation")
     is_side_effect = operation in charter.get("side_effect_operations", [])
     if not operation or attempt.get("side_effect") is not is_side_effect:
         return {"status": "blocked", "reason": "side_effect_mapping_mismatch"}
+    state_check_for = attempt.get("state_check_for")
+    state_check_result = attempt.get("state_check_result")
+    if (state_check_for is None) != (state_check_result is None):
+        return {"status": "blocked", "reason": "invalid_state_check_record"}
+    if state_check_for is not None:
+        if is_side_effect:
+            return {"status": "blocked", "reason": "state_check_must_be_read_only"}
+        if not isinstance(state_check_result, str) or state_check_result not in {
+            "applied",
+            "not_applied",
+            "inconclusive",
+        }:
+            return {"status": "blocked", "reason": "invalid_state_check_result"}
+        referenced = next(
+            (
+                item
+                for item in attempts
+                if item.get("attempt_ref") == state_check_for
+                and item.get("side_effect") is True
+                and item.get("outcome") == "unknown"
+            ),
+            None,
+        )
+        if referenced is None:
+            return {"status": "blocked", "reason": "state_check_target_not_unknown"}
+        prior_checks = [
+            item
+            for item in attempts
+            if item.get("state_check_for") == state_check_for
+            and item.get("outcome") == "completed"
+            and isinstance(item.get("state_check_result"), str)
+            and item.get("state_check_result") in {"applied", "not_applied"}
+        ]
+        if prior_checks:
+            return {"status": "blocked", "reason": "state_check_already_complete"}
+        if state_check_result in {"applied", "not_applied"} and attempt.get(
+            "outcome"
+        ) != "completed":
+            return {"status": "blocked", "reason": "state_check_not_completed"}
+    unresolved_unknowns = []
+    applied_unknowns = []
+    for previous in attempts:
+        if (
+            previous.get("side_effect") is not True
+            or previous.get("outcome") != "unknown"
+        ):
+            continue
+        checks = [
+            item
+            for item in attempts
+            if item.get("state_check_for") == previous.get("attempt_ref")
+            and item.get("outcome") == "completed"
+            and isinstance(item.get("state_check_result"), str)
+            and item.get("state_check_result") in {"applied", "not_applied"}
+        ]
+        if not checks:
+            unresolved_unknowns.append(previous.get("attempt_ref"))
+        elif checks[0].get("state_check_result") == "applied":
+            applied_unknowns.append(previous.get("attempt_ref"))
+    if is_side_effect and applied_unknowns:
+        return {
+            "status": "blocked",
+            "reason": "previous_side_effect_already_applied",
+            "state_check_complete": True,
+            "retryable": False,
+        }
+    if is_side_effect and unresolved_unknowns:
+        return {
+            "status": "blocked",
+            "reason": "state_check_required",
+            "unresolved_attempt_refs": unresolved_unknowns,
+            "state_check_complete": False,
+            "retryable": False,
+        }
     consumed = sum(1 for item in attempts if item.get("side_effect") is True)
     next_count = consumed + (1 if attempt.get("side_effect") else 0)
     if next_count > charter.get("side_effect_maximum", 0) and attempt.get(
         "side_effect"
     ):
         return {"status": "blocked", "reason": "side_effect_limit_reached"}
+    state_check_complete = (
+        state_check_for is not None
+        and attempt.get("outcome") == "completed"
+        and state_check_result in {"applied", "not_applied"}
+    )
+    if state_check_for is not None:
+        retryable = state_check_complete and state_check_result == "not_applied"
+    elif outcome == "unknown":
+        retryable = not is_side_effect
+    elif attempt.get("outcome") == "failed":
+        retryable = not is_side_effect or next_count < charter.get(
+            "side_effect_maximum", 0
+        )
+    else:
+        retryable = False
     return {
         "status": "recorded",
         "attempts": [*attempts, attempt],
         "side_effect_consumed": bool(attempt.get("side_effect")),
         "side_effect_count": next_count,
-        "retry_without_state_check": attempt.get("outcome") == "unknown",
+        "operation_outcome": {
+            "completed": "succeeded",
+            "failed": "failed",
+            "unknown": "unknown",
+        }[outcome],
+        "state_check_complete": state_check_complete,
+        "state_check_result": state_check_result,
+        "resolved_attempt_ref": state_check_for,
+        "resolved_attempt_outcome": (
+            {"applied": "succeeded", "not_applied": "failed"}.get(
+                state_check_result
+            )
+            if state_check_complete
+            else None
+        ),
+        "retryable": retryable,
+        "retry_without_state_check": retryable,
     }

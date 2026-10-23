@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -830,24 +832,62 @@ def update_activity(
 def scan_activity_files(
     root: str | Path, *, listing_complete: bool = True
 ) -> dict[str, Any]:
-    """Fixed-root direct scan; callers must report listing truncation or failures."""
+    """Scan a confirmed directory without following symlinks or hiding failures."""
+    root_path = Path(root)
     try:
-        files = sorted(
-            (
-                p
-                for p in Path(root).rglob("*.json")
-                if p.is_file() and not p.is_symlink()
-            ),
-            key=lambda p: p.as_posix(),
-        )
+        root_mode = root_path.lstat().st_mode
+    except FileNotFoundError:
+        return {
+            "activity_refs": [],
+            "complete": False,
+            "unresolved": ["history_root_missing"],
+        }
     except OSError as exc:
         return {
             "activity_refs": [],
             "complete": False,
             "unresolved": [f"scan_failed:{type(exc).__name__}"],
         }
+    if stat.S_ISLNK(root_mode):
+        return {
+            "activity_refs": [],
+            "complete": False,
+            "unresolved": ["history_root_symlink"],
+        }
+    if not stat.S_ISDIR(root_mode):
+        return {
+            "activity_refs": [],
+            "complete": False,
+            "unresolved": ["history_root_not_directory"],
+        }
+
+    activity_refs: list[str] = []
+    unresolved: list[str] = []
+    pending = [root_path]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            pending.append(Path(entry.path))
+                        elif entry.name.endswith(".json") and entry.is_file(
+                            follow_symlinks=False
+                        ):
+                            activity_refs.append(Path(entry.name).stem)
+                    except OSError as exc:
+                        unresolved.append(f"scan_failed:{type(exc).__name__}")
+        except OSError as exc:
+            unresolved.append(f"scan_failed:{type(exc).__name__}")
+    if not listing_complete:
+        unresolved.append("listing_incomplete_or_truncated")
+    unresolved = sorted(set(unresolved))
+    activity_refs.sort()
     return {
-        "activity_refs": [p.stem for p in files],
-        "complete": bool(listing_complete),
-        "unresolved": [] if listing_complete else ["listing_incomplete_or_truncated"],
+        "activity_refs": activity_refs,
+        "complete": not unresolved,
+        "unresolved": unresolved,
     }
