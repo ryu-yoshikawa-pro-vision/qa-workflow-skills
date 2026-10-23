@@ -3531,7 +3531,9 @@ def _run_deterministic_improvements(
                 try:
                     shutil.copytree(package_path, candidate_package)
                     for change in changes:
-                        destination = candidate_package / "skills" / chosen_skill / change["path"]
+                        destination = (
+                            candidate_package / "skills" / chosen_skill / change["path"]
+                        )
                         destination.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(skill_root / change["path"], destination)
                     candidate_manifest = create_skill_workspace_from_root(
