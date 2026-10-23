@@ -9,10 +9,18 @@ from unittest.mock import patch
 from scripts.skills.evals.agent import judge_validation
 from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.judge_validation import (
+    _approval_binding_status,
+    _artifact_content_fingerprint,
+    _fixture_approval_binding,
+    _fixture_prompt,
+    _prepare_fixture,
     load_fixture_catalogue,
     run_validation,
 )
-from scripts.skills.evals.agent.qa_training_store import load_scenario
+from scripts.skills.evals.agent.qa_training_store import (
+    build_artifact_manifest,
+    load_scenario,
+)
 from scripts.skills.evals.agent.target_workspace import DEFAULT_TARGET_REVISION
 
 
@@ -334,12 +342,20 @@ class JudgeValidationTests(unittest.TestCase):
             "Analysis and design workflow completed.\n", encoding="utf-8"
         )
 
-    def _run(self, *, approved: bool, candidate: bool) -> dict:
+    def _run(
+        self,
+        *,
+        approved: bool,
+        candidate: bool,
+        legacy_approval: bool = False,
+        mutate_baseline_after_binding: bool = False,
+        include_gate: bool = False,
+    ) -> dict | tuple[dict, dict, list[dict]]:
         scenario = load_scenario()
-        run_parent = judge_validation.REPO_ROOT / ".agent-eval-runs"
-        created_parent = not run_parent.exists()
-        run_parent.mkdir(exist_ok=True)
-        try:
+        with tempfile.TemporaryDirectory() as repository_temporary:
+            repository_root = Path(repository_temporary)
+            run_parent = repository_root / ".agent-eval-runs"
+            run_parent.mkdir()
             with tempfile.TemporaryDirectory(dir=run_parent) as temporary:
                 root = Path(temporary)
                 baseline_root = root / "baseline"
@@ -404,23 +420,86 @@ class JudgeValidationTests(unittest.TestCase):
                 approval = root / "approval.json"
                 approval_path = None
                 if approved:
+                    definition = catalogue["cases"][0]
+                    preview_root = root / "approval-preview"
+                    preview_root.mkdir()
+                    fixture_output, fixture_validation, final_message = (
+                        _prepare_fixture(
+                            definition=definition,
+                            baseline_output=baseline_output,
+                            fixture_root=preview_root,
+                            scenario=scenario,
+                        )
+                    )
+                    runtime = json.loads(
+                        (runtime_root / "runtime-checks.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    workflow = runtime["workflow_runtime"]
+                    machine = {
+                        "required_artifacts_present": fixture_validation["status"]
+                        == "pass",
+                        "workflow_runtime_can_complete": workflow[
+                            "workflow_runtime_can_complete"
+                        ],
+                        "workflow_runtime_has_unclosed_issues": workflow[
+                            "workflow_runtime_has_unclosed_issues"
+                        ],
+                    }
+                    references = {
+                        relative: b"Fixed specification reference.\n"
+                        for relative in scenario["reference_paths"]
+                    }
+                    prompt, criteria = _fixture_prompt(
+                        definition=definition,
+                        scenario=scenario,
+                        references=references,
+                        output=fixture_output,
+                        validation=fixture_validation,
+                        final_message=final_message,
+                        machine_summary=machine,
+                    )
+                    binding = _fixture_approval_binding(
+                        catalogue=catalogue,
+                        definition=definition,
+                        scenario=scenario,
+                        references=references,
+                        baseline_artifact_fingerprint=(
+                            _artifact_content_fingerprint(baseline_output)
+                        ),
+                        artifact_content_fingerprint=(
+                            _artifact_content_fingerprint(fixture_output)
+                        ),
+                        prompt=prompt,
+                        criteria=criteria,
+                        normative_revision=DEFAULT_TARGET_REVISION,
+                    )
+                    approval_row = {
+                        "case_id": "normal-workflow",
+                        "reviewer": "test-only-fixture-reviewer",
+                        "approved_at": "2026-10-22T00:00:00Z",
+                        "evidence": "docs/spec/features/checkout-and-payment.md#workflow",
+                    }
+                    if not legacy_approval:
+                        approval_row["binding"] = binding
                     approval.write_text(
                         json.dumps(
                             {
                                 "dataset_revision": catalogue["dataset_revision"],
-                                "approvals": [
-                                    {
-                                        "case_id": "normal-workflow",
-                                        "reviewer": "test-only-fixture-reviewer",
-                                        "approved_at": "2026-10-22T00:00:00Z",
-                                        "evidence": "docs/spec/features/checkout-and-payment.md#workflow",
-                                    }
-                                ],
+                                "approvals": [approval_row],
                             }
                         ),
                         encoding="utf-8",
                     )
                     approval_path = approval
+                    if mutate_baseline_after_binding:
+                        changed_artifact = baseline_output / "artifact-00.md"
+                        changed_artifact.write_text(
+                            changed_artifact.read_text(encoding="utf-8")
+                            + "Changed after approval.\n",
+                            encoding="utf-8",
+                        )
                 profile_path = root / "profile.json"
                 profile_path.write_text(json.dumps(_profile()), encoding="utf-8")
 
@@ -458,6 +537,7 @@ class JudgeValidationTests(unittest.TestCase):
                         return original_judge_case(**kwargs)
 
                 with (
+                    patch.object(judge_validation, "REPO_ROOT", repository_root),
                     patch.object(
                         judge_validation, "assert_clean_checkout", return_value="2" * 40
                     ),
@@ -520,22 +600,93 @@ class JudgeValidationTests(unittest.TestCase):
                     "evaluable",
                     result["cases"][0]["judge_runs"][0]["normalized"]["criteria"][0],
                 )
+                if include_gate:
+                    from scripts.skills.evals.agent.improve import (
+                        _judge_verification_map,
+                        _stable_failures,
+                    )
+
+                    verification = _judge_verification_map(
+                        output / "result.json",
+                        expected_evaluator_revision="1" * 40,
+                        expected_target_revision=DEFAULT_TARGET_REVISION,
+                        expected_profile_fingerprint=result[
+                            "judge_profile_fingerprint"
+                        ],
+                        expected_baseline_artifact_fingerprint=(
+                            _artifact_content_fingerprint(baseline_output)
+                        ),
+                    )
+                    attempts = [
+                        {
+                            "attempt": {"attempt_id": f"attempt-{index}"},
+                            "criteria": {
+                                criterion: {"rating": 1, "status": "fail"}
+                                for criterion in ("QTS-SEM-001", "QTS-SEM-002")
+                            },
+                        }
+                        for index in (1, 2)
+                    ]
+                    return (
+                        result,
+                        verification,
+                        _stable_failures(attempts, verification),
+                    )
                 return result
-        finally:
-            if created_parent:
-                try:
-                    run_parent.rmdir()
-                except OSError:
-                    pass
 
     def test_approved_fixture_and_candidate_judge_are_checked_on_independent_repeats(
         self,
     ) -> None:
-        result = self._run(approved=True, candidate=True)
+        result, verification, failures = self._run(
+            approved=True, candidate=True, include_gate=True
+        )
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["candidate_judge_validation_status"], "verified")
         self.assertEqual(result["cases"][0]["candidate_judge_status"], "verified")
         self.assertTrue(result["cases"][0]["candidate_matches_baseline"])
+        case = result["cases"][0]
+        binding = case["approval"]["binding"]
+        self.assertEqual(case["approval"]["binding_status"], "matched")
+        self.assertEqual(binding["fixture_id"], "normal-workflow")
+        self.assertEqual(binding["criteria"], case["criteria"])
+        self.assertEqual(binding["expected"], case["expected"])
+        self.assertEqual(binding["normative_revision"], DEFAULT_TARGET_REVISION)
+        self.assertTrue(binding["fixture_definition_fingerprint"].startswith("sha256:"))
+        self.assertTrue(binding["baseline_artifact_fingerprint"].startswith("sha256:"))
+        self.assertTrue(binding["artifact_content_fingerprint"].startswith("sha256:"))
+        self.assertTrue(binding["judge_input_fingerprint"].startswith("sha256:"))
+        self.assertTrue(binding["normative_content_fingerprint"].startswith("sha256:"))
+        self.assertEqual(
+            [row["prompt_sha256"] for row in case["judge_runs"]],
+            [binding["judge_input_fingerprint"]] * 2,
+        )
+        self.assertEqual(verification["QTS-SEM-001"]["status"], "judge_unverified")
+        self.assertEqual(verification["QTS-SEM-002"]["status"], "judge_unverified")
+        self.assertEqual(failures, [])
+        for field in (
+            "fixture_id",
+            "fixture_definition_fingerprint",
+            "baseline_artifact_fingerprint",
+            "artifact_content_fingerprint",
+            "judge_input_fingerprint",
+            "criteria",
+            "expected",
+            "normative_revision",
+            "normative_content_fingerprint",
+        ):
+            changed_binding = dict(binding)
+            changed_binding[field] = "changed"
+            self.assertEqual(
+                _approval_binding_status({"binding": changed_binding}, binding),
+                "mismatch",
+                field,
+            )
+        bool_binding_version = dict(binding)
+        bool_binding_version["binding_version"] = True
+        self.assertEqual(
+            _approval_binding_status({"binding": bool_binding_version}, binding),
+            "mismatch",
+        )
 
     def test_unapproved_fixture_remains_pending_even_when_fake_judge_matches(
         self,
@@ -543,6 +694,63 @@ class JudgeValidationTests(unittest.TestCase):
         result = self._run(approved=False, candidate=False)
         self.assertEqual(result["status"], "review_pending")
         self.assertEqual(result["cases"][0]["status"], "review_pending")
+
+    def test_legacy_approval_is_unbound_and_remains_pending(self) -> None:
+        result = self._run(approved=True, candidate=False, legacy_approval=True)
+        case = result["cases"][0]
+        self.assertTrue(case["judge_runs"][0]["expectation_matched"])
+        self.assertEqual(case["approval"]["binding_status"], "legacy_unbound")
+        self.assertEqual(case["approval"]["status"], "review_pending")
+        self.assertEqual(case["status"], "review_pending")
+
+    def test_changed_baseline_artifact_invalidates_existing_approval(self) -> None:
+        result = self._run(
+            approved=True,
+            candidate=False,
+            mutate_baseline_after_binding=True,
+        )
+        case = result["cases"][0]
+        self.assertTrue(case["judge_runs"][0]["expectation_matched"])
+        self.assertEqual(case["approval"]["binding_status"], "mismatch")
+        self.assertEqual(case["status"], "review_pending")
+
+    def test_fixture_manifest_is_rebuilt_after_mutated_artifact_body(self) -> None:
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_output = root / "baseline"
+            self._baseline_output(baseline_output, scenario)
+            (baseline_output / "artifact-manifest.json").write_text(
+                '{"stale": true}\n', encoding="utf-8"
+            )
+            definition = next(
+                row
+                for row in load_fixture_catalogue()["cases"]
+                if row["id"] == "major-violation-006"
+            )
+            output, validation, _ = _prepare_fixture(
+                definition=definition,
+                baseline_output=baseline_output,
+                fixture_root=root / "fixture",
+                scenario=scenario,
+            )
+            manifest = json.loads(
+                (output / "artifact-manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest, build_artifact_manifest(output, validation))
+            self.assertNotIn(
+                "artifact-manifest.json", {row["path"] for row in manifest["files"]}
+            )
+            index = json.loads(
+                (output / "artifact-index.json").read_text(encoding="utf-8")
+            )
+            test_case = next(
+                row for row in index["artifacts"] if row["kind"] == "test-case"
+            )
+            self.assertIn(
+                "Inventory is decremented and purchase history is created",
+                (output / test_case["path"]).read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":

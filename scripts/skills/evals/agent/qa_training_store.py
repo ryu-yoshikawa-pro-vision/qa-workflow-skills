@@ -438,6 +438,8 @@ def build_artifact_manifest(
             if not path.is_file():
                 continue
             relative = path.relative_to(output_root).as_posix()
+            if relative == "artifact-manifest.json":
+                continue
             if relative in registered:
                 classification = "qa_artifact"
                 artifact_id = registered[relative]["artifact_id"]

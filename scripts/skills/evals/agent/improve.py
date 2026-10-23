@@ -16,14 +16,25 @@ from typing import Any
 from .common import (
     AgentEvalError,
     atomic_write_json,
+    canonical_fingerprint,
     capture_codex_jsonl_trace,
     prepare_run_output_root,
     sanitize_diagnostic,
     sha256_bytes,
 )
 from .executor import run_command
+from .judge_validation import (
+    _artifact_content_fingerprint,
+    _expected_matches,
+    load_fixture_catalogue,
+)
 from .prompt_builder import build_analysis_prompt, build_repair_prompt
-from .target_workspace import DEFAULT_TARGET_REVISION
+from .qa_training_store import (
+    build_artifact_manifest,
+    load_scenario,
+    validate_artifact_index,
+)
+from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
 from .tools.codex_docker_launcher import launcher_argv
 from .workspace import (
     assert_clean_checkout,
@@ -71,20 +82,242 @@ def _load_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _judge_verification_map(path: Path) -> dict[str, dict[str, Any]]:
+def _judge_verification_map(
+    path: Path,
+    *,
+    expected_evaluator_revision: str | None = None,
+    expected_target_revision: str | None = None,
+    expected_profile_fingerprint: str | None = None,
+    expected_baseline_artifact_fingerprint: str | None = None,
+    target_root: Path | None = None,
+) -> dict[str, dict[str, Any]]:
     value = _load_json(path)
     if value.get("dataset_revision") is None or not isinstance(
         value.get("cases"), list
     ):
         raise AgentEvalError("Judge validation result schema is invalid")
-    result: dict[str, dict[str, Any]] = {}
-    for case in value["cases"]:
-        if not isinstance(case, dict) or not isinstance(case.get("criteria"), list):
+    catalogue = load_fixture_catalogue()
+    definitions = catalogue["cases"]
+    criteria = sorted(
+        {criterion for row in definitions for criterion in row["criteria"]}
+    )
+    result = {
+        criterion: {"status": "judge_unverified", "reason": "not_checked"}
+        for criterion in criteria
+    }
+
+    def unverified_all(reason: str) -> dict[str, dict[str, Any]]:
+        return {
+            criterion: {"status": "judge_unverified", "reason": reason}
+            for criterion in criteria
+        }
+
+    if value.get("dataset_revision") != catalogue["dataset_revision"] or value.get(
+        "fixture_catalogue_fingerprint"
+    ) != canonical_fingerprint(catalogue):
+        return unverified_all("fixture_catalogue_mismatch")
+    if value.get("target_revision") != DEFAULT_TARGET_REVISION:
+        return unverified_all("target_revision_mismatch")
+    if (
+        expected_evaluator_revision is not None
+        and value.get("evaluator_revision") != expected_evaluator_revision
+    ):
+        return unverified_all("evaluator_revision_mismatch")
+    if (
+        expected_target_revision is not None
+        and value.get("target_revision") != expected_target_revision
+    ):
+        return unverified_all("target_revision_mismatch")
+    if (
+        expected_profile_fingerprint is not None
+        and value.get("judge_profile_fingerprint") != expected_profile_fingerprint
+    ):
+        return unverified_all("judge_profile_mismatch")
+    if not isinstance(value.get("evaluator_revision"), str) or not isinstance(
+        value.get("judge_profile_fingerprint"), str
+    ):
+        return unverified_all("missing_provenance")
+    repeat = value.get("repeat")
+    if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 2:
+        return unverified_all("repeat_policy_not_satisfied")
+
+    scenario = load_scenario()
+    reference_hashes: dict[str, str] | None = None
+    if target_root is not None:
+        references = extract_revision_files(
+            source_root=target_root,
+            revision=DEFAULT_TARGET_REVISION,
+            paths=scenario["reference_paths"],
+        )
+        reference_hashes = {
+            relative: sha256_bytes(references[relative])
+            for relative in sorted(scenario["reference_paths"])
+        }
+
+    case_rows: dict[str, dict[str, Any]] = {}
+    duplicate_ids: set[str] = set()
+    for row in value["cases"]:
+        if not isinstance(row, dict) or not isinstance(row.get("case_id"), str):
             continue
-        if case.get("status") != "verified":
-            continue
-        for criterion in case["criteria"]:
-            result[criterion] = {"status": "verified", "case_id": case.get("case_id")}
+        case_id = row["case_id"]
+        if case_id in case_rows:
+            duplicate_ids.add(case_id)
+        case_rows[case_id] = row
+    for case_id in duplicate_ids:
+        case_rows.pop(case_id, None)
+
+    def case_verified(definition: dict[str, Any]) -> tuple[bool, str | None]:
+        case_id = definition["id"]
+        case = case_rows.get(case_id)
+        if case is None:
+            return False, f"missing_fixture:{case_id}"
+        if (
+            case.get("status") != "verified"
+            or case.get("criteria") != definition["criteria"]
+            or case.get("expected") != definition["expected"]
+        ):
+            return False, f"fixture_not_verified:{case_id}"
+        approval = case.get("approval")
+        binding = case.get("approval_binding")
+        if (
+            not isinstance(approval, dict)
+            or approval.get("status") != "approved"
+            or approval.get("binding_status") != "matched"
+            or not isinstance(binding, dict)
+            or not all(
+                isinstance(approval.get(field), str) and approval[field].strip()
+                for field in ("reviewer", "approved_at", "evidence")
+            )
+        ):
+            return False, f"approval_unverified:{case_id}"
+        try:
+            approval_binding_matches = canonical_fingerprint(
+                approval.get("binding")
+            ) == canonical_fingerprint(binding)
+        except (TypeError, ValueError):
+            approval_binding_matches = False
+        if not approval_binding_matches:
+            return False, f"approval_unverified:{case_id}"
+        if (
+            case.get("fixture_content_integrity_status") != "verified"
+            or isinstance(binding.get("binding_version"), bool)
+            or not isinstance(binding.get("binding_version"), int)
+            or binding.get("binding_version") != 1
+            or binding.get("fixture_id") != case_id
+            or binding.get("dataset_revision") != catalogue["dataset_revision"]
+            or binding.get("fixture_definition_fingerprint")
+            != canonical_fingerprint(definition)
+            or binding.get("criteria") != definition["criteria"]
+            or binding.get("expected") != definition["expected"]
+            or binding.get("normative_revision") != value.get("target_revision")
+            or binding.get("normative_content_fingerprint")
+            != canonical_fingerprint(binding.get("normative_reference_fingerprints"))
+            or case.get("fixture_fingerprint") != canonical_fingerprint(binding)
+        ):
+            return False, f"fixture_binding_mismatch:{case_id}"
+        if (
+            expected_baseline_artifact_fingerprint is not None
+            and binding.get("baseline_artifact_fingerprint")
+            != expected_baseline_artifact_fingerprint
+        ):
+            return False, f"baseline_artifacts_changed:{case_id}"
+        if reference_hashes is not None:
+            expected_references = {
+                relative: reference_hashes[relative]
+                for relative in sorted(set(definition["references"]))
+                if relative in reference_hashes
+            }
+            if (
+                set(definition["references"]) - set(expected_references)
+                or binding.get("normative_reference_fingerprints")
+                != expected_references
+            ):
+                return False, f"normative_reference_mismatch:{case_id}"
+        fixture_output = (
+            Path(path).resolve().parent / "fixtures" / case_id / "qa-output"
+        )
+        try:
+            current_fingerprint = _artifact_content_fingerprint(fixture_output)
+            if binding.get("artifact_content_fingerprint") != current_fingerprint:
+                return False, f"fixture_artifacts_changed:{case_id}"
+            manifest_path = fixture_output / "artifact-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            validation = validate_artifact_index(fixture_output, scenario)
+            if manifest != build_artifact_manifest(fixture_output, validation):
+                return False, f"fixture_manifest_stale:{case_id}"
+        except (OSError, ValueError, AgentEvalError):
+            return False, f"fixture_artifacts_unavailable:{case_id}"
+        judge_runs = case.get("judge_runs")
+        if not isinstance(judge_runs, list) or len(judge_runs) != repeat:
+            return False, f"fixture_repeat_incomplete:{case_id}"
+        signatures = set()
+        for judge_run in judge_runs:
+            if not isinstance(judge_run, dict) or judge_run.get("status") != "pass":
+                return False, f"fixture_run_error:{case_id}"
+            normalized = judge_run.get("normalized")
+            normalized_criteria = (
+                normalized.get("criteria") if isinstance(normalized, dict) else None
+            )
+            if (
+                not isinstance(normalized_criteria, list)
+                or [
+                    item.get("id")
+                    for item in normalized_criteria
+                    if isinstance(item, dict)
+                ]
+                != definition["criteria"]
+                or judge_run.get("prompt_sha256")
+                != binding.get("judge_input_fingerprint")
+                or judge_run.get("expectation_matched") is not True
+                or not _expected_matches(definition, normalized)
+            ):
+                return False, f"fixture_expectation_mismatch:{case_id}"
+            signatures.add(
+                canonical_fingerprint(
+                    [
+                        {
+                            "id": item.get("id"),
+                            "status": item.get("status"),
+                            "rating": item.get("rating"),
+                        }
+                        for item in normalized_criteria
+                    ]
+                )
+            )
+        if len(signatures) != 1:
+            return False, f"fixture_judge_jitter:{case_id}"
+        return True, None
+
+    for criterion in criteria:
+        required = [row for row in definitions if criterion in row["criteria"]]
+        normal_cases = [
+            row for row in required if row["expected"] == "rating_at_least_3"
+        ]
+        violation_cases = [row for row in required if row["expected"] == "rating_1"]
+        required_ids = [row["id"] for row in required]
+        reasons: list[str] = []
+        if not normal_cases:
+            reasons.append("missing_normal_fixture")
+        if not violation_cases:
+            reasons.append("missing_major_violation_fixture")
+        if not reasons:
+            for definition in required:
+                passed, reason = case_verified(definition)
+                if not passed and reason is not None:
+                    reasons.append(reason)
+        if reasons:
+            result[criterion] = {
+                "status": "judge_unverified",
+                "reason": ";".join(reasons),
+                "required_fixture_ids": required_ids,
+                "verified_fixture_ids": [],
+            }
+        else:
+            result[criterion] = {
+                "status": "verified",
+                "required_fixture_ids": required_ids,
+                "verified_fixture_ids": required_ids,
+            }
     return result
 
 
@@ -158,7 +391,10 @@ def _stable_failures(
         common &= set(attempt["criteria"])
     failures = []
     for criterion in sorted(common):
-        if criterion not in _CRITERION_SKILLS or criterion not in verified:
+        if (
+            criterion not in _CRITERION_SKILLS
+            or verified.get(criterion, {}).get("status") != "verified"
+        ):
             continue
         rows = [attempt["criteria"][criterion] for attempt in attempts]
         if all(row.get("rating") == 1 and row.get("status") == "fail" for row in rows):
@@ -512,9 +748,55 @@ def run_improvements(
         raise AgentEvalError(
             "Judge validation uses a different Evaluator or target revision"
         )
-    judge_verified = _judge_verification_map(judge_validation_result)
-    failures = _stable_failures(attempts, judge_verified)
     profile = load_execution_profile(profile_path)
+    if (
+        baseline.get("evaluator_revision") is None
+        or baseline.get("skill_revision") is None
+    ):
+        raise AgentEvalError(
+            "baseline provenance lacks fixed evaluator or Skill revision"
+        )
+    if not baseline.get("agent_command_template"):
+        raise AgentEvalError(
+            "baseline run does not preserve the Agent command template"
+        )
+    if judge_validation.get("judge_profile_fingerprint") != profile_fingerprint(
+        profile
+    ):
+        raise AgentEvalError(
+            "Judge validation uses a different Judge execution profile"
+        )
+    evaluator_sha = assert_clean_checkout(REPO_ROOT)
+    if evaluator_sha != baseline["evaluator_revision"]:
+        raise AgentEvalError("baseline run uses a different Evaluator revision")
+    target_source_sha = assert_clean_checkout(target_root)
+    baseline_attempt = next(
+        (
+            row
+            for row in baseline["attempts"]
+            if row.get("status") in {"pass", "fail", "needs_review"}
+        ),
+        None,
+    )
+    if baseline_attempt is None or not isinstance(
+        baseline_attempt.get("saved_output_root"), str
+    ):
+        raise AgentEvalError("baseline has no preserved Agent artifact directory")
+    baseline_output = (run_root / baseline_attempt["saved_output_root"]).resolve()
+    try:
+        baseline_output.relative_to(run_root.resolve())
+    except ValueError as exc:
+        raise AgentEvalError("baseline output path escapes the run root") from exc
+    baseline_artifact_fingerprint = _artifact_content_fingerprint(baseline_output)
+    judge_verified = _judge_verification_map(
+        judge_validation_result,
+        expected_evaluator_revision=evaluator_sha,
+        expected_target_revision=baseline.get("target_revision"),
+        expected_profile_fingerprint=profile_fingerprint(profile),
+        expected_baseline_artifact_fingerprint=baseline_artifact_fingerprint,
+        target_root=target_root,
+    )
+    failures = _stable_failures(attempts, judge_verified)
     evidence_rel = Path(profile["verification"]["evidence_path"])
     if evidence_rel.is_absolute() or ".." in evidence_rel.parts:
         raise AgentEvalError("execution profile evidence path is unsafe")
@@ -534,28 +816,6 @@ def run_improvements(
         agent_command_argv=baseline.get("agent_command_template"),
     ):
         raise AgentEvalError("improvement requires verified isolation evidence")
-    if judge_validation.get("judge_profile_fingerprint") != profile_fingerprint(
-        profile
-    ):
-        raise AgentEvalError(
-            "Judge validation uses a different Judge execution profile"
-        )
-    if (
-        baseline.get("evaluator_revision") is None
-        or baseline.get("skill_revision") is None
-    ):
-        raise AgentEvalError(
-            "baseline provenance lacks fixed evaluator or Skill revision"
-        )
-    evaluator_sha = assert_clean_checkout(REPO_ROOT)
-    if evaluator_sha != baseline["evaluator_revision"]:
-        raise AgentEvalError("baseline run uses a different Evaluator revision")
-    target_source_sha = assert_clean_checkout(target_root)
-    if not baseline.get("agent_command_template"):
-        raise AgentEvalError(
-            "baseline run does not preserve the Agent command template"
-        )
-
     experiment_id = f"improve-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.urandom(4).hex()}"
     experiments_root = output_root / "experiments" / experiment_id
     experiments_root.mkdir(parents=True, exist_ok=False)
@@ -570,6 +830,7 @@ def run_improvements(
         "target_revision": baseline["target_revision"],
         "target_source_checkout_revision": target_source_sha,
         "baseline_skill_revision": baseline["skill_revision"],
+        "judge_criterion_verification": judge_verified,
         "baseline_package_fingerprint": baseline.get("skill_package_manifest", {}).get(
             "package_fingerprint"
         ),

@@ -24,9 +24,9 @@ class CommonRunnerTests(unittest.TestCase):
         race_save=False,
         save_failure=False,
     ):
-        with tempfile.TemporaryDirectory(
-            dir=run.REPO_ROOT / ".agent-eval-runs"
-        ) as temporary:
+        run_output_parent = run.REPO_ROOT / ".agent-eval-runs"
+        run_output_parent.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=run_output_parent) as temporary:
             root = Path(temporary)
             output = root / "run"
             sentinel = root / "dummy-source-sentinel"

@@ -22,8 +22,8 @@ from .common import (
 from .executor import run_command
 from .qa_training_store import (
     SCENARIO_DIR,
-    _file_hash,
     _read_qa_artifacts,
+    build_artifact_manifest,
     load_scenario,
     validate_artifact_index,
 )
@@ -92,13 +92,20 @@ def _approval_map(
         )
     approvals: dict[str, dict[str, Any]] = {}
     for item in raw["approvals"]:
-        if not isinstance(item, dict) or set(item) != {
+        required_fields = {
             "case_id",
             "reviewer",
             "approved_at",
             "evidence",
-        }:
+        }
+        if (
+            not isinstance(item, dict)
+            or not required_fields <= set(item)
+            or set(item) - (required_fields | {"binding"})
+        ):
             raise AgentEvalError("Judge approval row has invalid fields")
+        if "binding" in item and not isinstance(item["binding"], dict):
+            raise AgentEvalError("Judge approval binding must be an object")
         if not all(
             isinstance(item[key], str) and item[key].strip()
             for key in ("case_id", "reviewer", "approved_at", "evidence")
@@ -126,6 +133,47 @@ def _approval_map(
                 "Judge approval evidence must cite a fixed normative reference for that fixture"
             )
     return approvals
+
+
+def _artifact_content_fingerprint(root: Path) -> str:
+    if root.is_symlink() or not root.is_dir():
+        raise AgentEvalError("Judge fixture artifact directory is missing or unsafe")
+    files: list[dict[str, Any]] = []
+    try:
+        for path in sorted(root.rglob("*")):
+            if path.is_symlink():
+                raise AgentEvalError("Judge fixture artifacts may not contain symlinks")
+            if not path.is_file():
+                continue
+            content = path.read_bytes()
+            files.append(
+                {
+                    "path": path.relative_to(root).as_posix(),
+                    "size": len(content),
+                    "sha256": sha256_bytes(content),
+                }
+            )
+    except OSError as exc:
+        raise AgentEvalError(
+            "Judge fixture artifacts could not be fingerprinted"
+        ) from exc
+    return canonical_fingerprint(files)
+
+
+def _approval_binding_status(
+    approval: dict[str, Any] | None, current_binding: dict[str, Any]
+) -> str:
+    if approval is None:
+        return "missing"
+    if "binding" not in approval:
+        return "legacy_unbound"
+    try:
+        matches = canonical_fingerprint(approval["binding"]) == canonical_fingerprint(
+            current_binding
+        )
+    except (TypeError, ValueError):
+        matches = False
+    return "matched" if matches else "mismatch"
 
 
 def _copy_baseline_artifacts(source: Path, destination: Path) -> None:
@@ -219,6 +267,8 @@ def _prepare_fixture(
             target.read_text(encoding="utf-8") + _MUTATIONS[mutation], encoding="utf-8"
         )
     validation = validate_artifact_index(output, scenario)
+    manifest = build_artifact_manifest(output, validation)
+    atomic_write_json(output / "artifact-manifest.json", manifest)
     return output, validation, final
 
 
@@ -296,6 +346,41 @@ def _fixture_prompt(
         if routing_blob and routing_blob in prompt:
             raise AgentEvalError("artifact Judge fixture prompt leaks routing rows")
     return prompt, definition["criteria"]
+
+
+def _fixture_approval_binding(
+    *,
+    catalogue: dict[str, Any],
+    definition: dict[str, Any],
+    scenario: dict[str, Any],
+    references: dict[str, bytes],
+    baseline_artifact_fingerprint: str,
+    artifact_content_fingerprint: str,
+    prompt: str,
+    criteria: list[str],
+    normative_revision: str,
+) -> dict[str, Any]:
+    scenario_references = set(scenario["reference_paths"])
+    if not set(definition["references"]) <= scenario_references:
+        raise AgentEvalError("Judge fixture references are outside the fixed scenario")
+    reference_hashes = {
+        relative: sha256_bytes(references[relative])
+        for relative in sorted(set(definition["references"]))
+    }
+    return {
+        "binding_version": 1,
+        "fixture_id": definition["id"],
+        "dataset_revision": catalogue["dataset_revision"],
+        "fixture_definition_fingerprint": canonical_fingerprint(definition),
+        "baseline_artifact_fingerprint": baseline_artifact_fingerprint,
+        "artifact_content_fingerprint": artifact_content_fingerprint,
+        "judge_input_fingerprint": sha256_bytes(prompt.encode("utf-8")),
+        "criteria": list(criteria),
+        "expected": definition["expected"],
+        "normative_revision": normative_revision,
+        "normative_reference_fingerprints": reference_hashes,
+        "normative_content_fingerprint": canonical_fingerprint(reference_hashes),
+    }
 
 
 def _expected_matches(definition: dict[str, Any], normalized: dict[str, Any]) -> bool:
@@ -467,6 +552,7 @@ def run_validation(
         revision=fixed_target_sha,
         paths=scenario["reference_paths"],
     )
+    baseline_artifact_fingerprint = _artifact_content_fingerprint(baseline_output)
     if run.get("scenario_fingerprint") != scenario["scenario_fingerprint"]:
         raise AgentEvalError("baseline uses a different fixed scenario revision")
     if (
@@ -544,6 +630,31 @@ def run_validation(
             final_message=final_message,
             machine_summary=machine,
         )
+        artifact_content_fingerprint = _artifact_content_fingerprint(fixture_output)
+        approval_binding = _fixture_approval_binding(
+            catalogue=catalogue,
+            definition=definition,
+            scenario=scenario,
+            references=references,
+            baseline_artifact_fingerprint=baseline_artifact_fingerprint,
+            artifact_content_fingerprint=artifact_content_fingerprint,
+            prompt=prompt,
+            criteria=criteria,
+            normative_revision=fixed_target_sha,
+        )
+        saved_approval = approvals.get(definition["id"])
+        binding_status = _approval_binding_status(saved_approval, approval_binding)
+        approval_record = dict(saved_approval) if saved_approval is not None else {}
+        approval_record.update(
+            {
+                "status": "approved"
+                if binding_status == "matched"
+                else definition["approval_status"]
+                if saved_approval is None
+                else "review_pending",
+                "binding_status": binding_status,
+            }
+        )
         fixture_record: dict[str, Any] = {
             "case_id": definition["id"],
             "split": "tune"
@@ -551,19 +662,10 @@ def run_validation(
             else "independent",
             "criteria": criteria,
             "expected": definition["expected"],
-            "approval": approvals.get(
-                definition["id"], {"status": definition["approval_status"]}
-            ),
-            "fixture_fingerprint": canonical_fingerprint(
-                {
-                    "definition": definition,
-                    "artifact_manifest": _file_hash(
-                        fixture_output / "artifact-manifest.json"
-                    )
-                    if (fixture_output / "artifact-manifest.json").is_file()
-                    else None,
-                }
-            ),
+            "approval": approval_record,
+            "approval_binding": approval_binding,
+            "fixture_fingerprint": canonical_fingerprint(approval_binding),
+            "fixture_content_integrity_status": "verified",
             "judge_runs": [],
         }
         for repeat_index in range(1, repeat + 1):
@@ -629,7 +731,19 @@ def run_validation(
             for row in fixture_record["judge_runs"]
         }
         inconsistent = len(ratings) > 1
-        approved = definition["id"] in approvals
+        try:
+            fixture_record["fixture_content_integrity_status"] = (
+                "verified"
+                if _artifact_content_fingerprint(fixture_output)
+                == artifact_content_fingerprint
+                else "mismatch"
+            )
+        except AgentEvalError:
+            fixture_record["fixture_content_integrity_status"] = "unverified"
+        approved = (
+            binding_status == "matched"
+            and fixture_record["fixture_content_integrity_status"] == "verified"
+        )
         if candidate_judge_command is not None:
             candidate_runs = fixture_record.get("candidate_judge_runs", [])
             candidate_states = [row.get("status") for row in candidate_runs]
