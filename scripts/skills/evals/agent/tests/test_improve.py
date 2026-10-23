@@ -205,7 +205,7 @@ def _write_deterministic_baseline(root: Path, *, assertion_status: str = "fail")
             ("skills/test-case-design/evals/output/input.md", input_bytes),
             (
                 "skills/test-case-design/evals/output/expected.json",
-                b"{\"hidden\":true}",
+                b'{"hidden":true}',
             ),
         ],
     }
@@ -307,9 +307,7 @@ def _write_deterministic_baseline(root: Path, *, assertion_status: str = "fail")
         "schema_version": 1,
         "run_id": "deterministic-baseline-run",
         "suite": "deterministic",
-        "status": "needs_review_or_fail"
-        if assertion_status == "fail"
-        else "pass",
+        "status": "needs_review_or_fail" if assertion_status == "fail" else "pass",
         "evaluator": {"revision": "1" * 40},
         "skill_revision": "2" * 40,
         "skill_package": {
@@ -734,11 +732,9 @@ class ImprovementGateTests(unittest.TestCase):
             deterministic_module = types.ModuleType(
                 "scripts.skills.evals.deterministic.run"
             )
-            deterministic_module.grade = (
-                lambda _skill, _eval, output, **_kwargs: json.loads(
-                    (output.parent.parent / "grade.json").read_text(
-                        encoding="utf-8"
-                    )
+            deterministic_module.grade = lambda _skill, _eval, output, **_kwargs: (
+                json.loads(
+                    (output.parent.parent / "grade.json").read_text(encoding="utf-8")
                 )
             )
 
@@ -884,7 +880,6 @@ class ImprovementGateTests(unittest.TestCase):
                 )
             self.assertEqual(result["status"], "review_pending")
             self.assertIn("did_not_save_result", result["reason"])
-
 
     def test_deterministic_environment_skill_use_and_mixed_evidence_block(self) -> None:
         mutations = (
@@ -1184,13 +1179,16 @@ class ImprovementGateTests(unittest.TestCase):
                 / "agent-trace.json"
             )
             trace_path.write_text('{"status":"captured"}\n', encoding="utf-8")
-            with patch.object(
-                improve_module,
-                "profile_fingerprint",
-                return_value="profile-fingerprint",
-            ), patch.dict(
-                sys.modules,
-                {"scripts.skills.evals.deterministic.run": fake_module},
+            with (
+                patch.object(
+                    improve_module,
+                    "profile_fingerprint",
+                    return_value="profile-fingerprint",
+                ),
+                patch.dict(
+                    sys.modules,
+                    {"scripts.skills.evals.deterministic.run": fake_module},
+                ),
             ):
                 tampered_assessment = improve_module._validate_independent_run(
                     result_path,

@@ -735,8 +735,7 @@ def _deterministic_attempt_data(
             or isolation.get("status") != "verified"
             or not isinstance(command, dict)
             or not isinstance(command.get("argv"), list)
-            or command.get("fingerprint")
-            != canonical_fingerprint(command.get("argv"))
+            or command.get("fingerprint") != canonical_fingerprint(command.get("argv"))
             or _has_secret_command_argument(command.get("argv", []))
         ):
             raise AgentEvalError(
@@ -759,10 +758,9 @@ def _deterministic_attempt_data(
         grade_path = _resolve_run_path(run_root, grade_relative)
         output_bytes = output_path.read_bytes()
         grade_bytes = grade_path.read_bytes()
-        if (
-            sha256_bytes(output_bytes) != output.get("sha256")
-            or sha256_bytes(grade_bytes) != grade_ref.get("sha256")
-        ):
+        if sha256_bytes(output_bytes) != output.get("sha256") or sha256_bytes(
+            grade_bytes
+        ) != grade_ref.get("sha256"):
             raise AgentEvalError(
                 "deterministic output or grade changed after evaluation"
             )
@@ -847,12 +845,9 @@ def _deterministic_attempt_data(
     case = cases[0]
     input_fingerprint = sha256_bytes(case["input"].encode("utf-8"))
     dataset_fingerprint = _dataset_fingerprint(case["fingerprint_files"])
-    if (
-        run.get("dataset_fingerprint") != dataset_fingerprint
-        or any(
-            row["attempt"].get("input_fingerprint") != input_fingerprint
-            for row in collected
-        )
+    if run.get("dataset_fingerprint") != dataset_fingerprint or any(
+        row["attempt"].get("input_fingerprint") != input_fingerprint
+        for row in collected
     ):
         raise AgentEvalError("deterministic input or dataset fingerprint changed")
     if collected[0]["snapshot"] != collected[1]["snapshot"]:
@@ -2690,8 +2685,7 @@ def _assess_deterministic_improvement(
         )
     target_progress = bool(target_statuses) and all(
         all(
-            isinstance(status, str)
-            and score[status] > score["fail"]
+            isinstance(status, str) and score[status] > score["fail"]
             for status in row.values()
         )
         for row in target_statuses
@@ -2880,8 +2874,7 @@ def _run_deterministic_improvements(
             or baseline.get("judge_command_fingerprint")
             != canonical_fingerprint(profile["judge"].get("command_argv", []))
             or not isinstance(baseline.get("isolation"), dict)
-            or baseline["isolation"].get("method")
-            != profile["isolation"].get("method")
+            or baseline["isolation"].get("method") != profile["isolation"].get("method")
             or baseline["isolation"].get("agent_read_roots")
             != profile["isolation"].get("agent_read_roots")
             or baseline["isolation"].get("evaluator_read_blocked")
@@ -2896,9 +2889,7 @@ def _run_deterministic_improvements(
             raise AgentEvalError(
                 "deterministic baseline provenance is incomplete or mixed"
             )
-        evidence_source = _resolve_run_path(
-            run_root, evidence_relative.as_posix()
-        )
+        evidence_source = _resolve_run_path(run_root, evidence_relative.as_posix())
         if not evidence_source.is_file():
             raise AgentEvalError("deterministic baseline isolation evidence is missing")
         if not evidence_destination.exists():
@@ -2915,25 +2906,20 @@ def _run_deterministic_improvements(
             trusted_manifest = create_skill_workspace(
                 REPO_ROOT, baseline["skill_revision"], trusted_baseline_package
             )
-            if (
-                baseline.get("skill_package", {}).get("package_fingerprint")
-                != trusted_manifest.get("package_fingerprint")
-                or baseline.get("skill_package", {}).get("skills")
-                != trusted_manifest.get("skills")
-            ):
+            if baseline.get("skill_package", {}).get(
+                "package_fingerprint"
+            ) != trusted_manifest.get("package_fingerprint") or baseline.get(
+                "skill_package", {}
+            ).get("skills") != trusted_manifest.get("skills"):
                 raise AgentEvalError("deterministic baseline Skill package changed")
             failure = _deterministic_attempt_data(
                 baseline,
                 run_root,
                 runtime_source_root=trusted_baseline_package,
-                expected_package_fingerprint=trusted_manifest[
-                    "package_fingerprint"
-                ],
+                expected_package_fingerprint=trusted_manifest["package_fingerprint"],
             )
         result["evaluator_revision"] = evaluator_revision
-        result["baseline_package_fingerprint"] = trusted_manifest[
-            "package_fingerprint"
-        ]
+        result["baseline_package_fingerprint"] = trusted_manifest["package_fingerprint"]
         result["profile_fingerprint"] = profile_fingerprint(profile)
         result["grader_evidence"] = {
             "status": "recomputed_match",
@@ -2999,9 +2985,10 @@ def _run_deterministic_improvements(
         baseline_manifest = create_skill_workspace(
             REPO_ROOT, baseline["skill_revision"], baseline_package
         )
-        if baseline_manifest["package_fingerprint"] != result[
-            "baseline_package_fingerprint"
-        ]:
+        if (
+            baseline_manifest["package_fingerprint"]
+            != result["baseline_package_fingerprint"]
+        ):
             raise AgentEvalError(
                 "deterministic baseline package changed before analysis"
             )
@@ -3049,9 +3036,9 @@ def _run_deterministic_improvements(
             "repair_agent_received_expected_results": False,
             "independent_results_returned_for_repair": False,
         }
-        case_record["fixed_evaluator_baseline_package_fingerprint"] = (
-            baseline_manifest["package_fingerprint"]
-        )
+        case_record["fixed_evaluator_baseline_package_fingerprint"] = baseline_manifest[
+            "package_fingerprint"
+        ]
         baseline_contract_assessment = _run_related_contract_tests(
             independent_plan["contract_tests"],
             timeout_seconds=max(0, int(max_seconds - (time.monotonic() - started))),
@@ -3126,23 +3113,16 @@ def _run_deterministic_improvements(
         "attempt_runtime_evidence": [
             {
                 "attempt_id": row["attempt"].get("attempt_id"),
-                "exit_code": row["attempt"].get("agent_execution", {}).get(
-                    "exit_code"
-                ),
-                "timed_out": row["attempt"].get("agent_execution", {}).get(
-                    "timed_out"
-                ),
+                "exit_code": row["attempt"].get("agent_execution", {}).get("exit_code"),
+                "timed_out": row["attempt"].get("agent_execution", {}).get("timed_out"),
                 "container_cleanup_status": row["attempt"]
                 .get("agent_execution", {})
                 .get("container_cleanup_status"),
-                "trace_status": row["attempt"].get("agent_trace", {}).get(
-                    "status"
-                ),
+                "trace_status": row["attempt"].get("agent_trace", {}).get("status"),
                 "trace_skill_files_read": [
                     skill
                     for command in _load_json(row["trace_path"]).get("commands", [])
-                    if isinstance(command, dict)
-                    and command.get("successful") is True
+                    if isinstance(command, dict) and command.get("successful") is True
                     for skill in command.get("skill_files_read", [])
                     if isinstance(skill, str)
                 ],
@@ -3432,8 +3412,7 @@ def _run_deterministic_improvements(
                 repair_named, repair_cleanup = named_container_command(
                     repair_command,
                     name=(
-                        f"agent-eval-repair-{experiment_id[-8:]}-det-"
-                        f"{repair_index:02d}"
+                        f"agent-eval-repair-{experiment_id[-8:]}-det-{repair_index:02d}"
                     ),
                 )
                 repair_attempt_number = result["repair_attempts_started"] + 1
@@ -3541,9 +3520,7 @@ def _run_deterministic_improvements(
                     {
                         "status": "candidate_saved",
                         "candidate_revision_status": "uncommitted_patch",
-                        "candidate_package_parent_revision": baseline[
-                            "skill_revision"
-                        ],
+                        "candidate_package_parent_revision": baseline["skill_revision"],
                         "changes": changes,
                         "patch_path": "patch.diff",
                         "changed_files_archive": "changed-files.zip",
@@ -3554,12 +3531,7 @@ def _run_deterministic_improvements(
                 try:
                     shutil.copytree(package_path, candidate_package)
                     for change in changes:
-                        destination = (
-                            candidate_package
-                            / "skills"
-                            / chosen_skill
-                            / change["path"]
-                        )
+                        destination = candidate_package / "skills" / chosen_skill / change["path"]
                         destination.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(skill_root / change["path"], destination)
                     candidate_manifest = create_skill_workspace_from_root(
@@ -3587,9 +3559,10 @@ def _run_deterministic_improvements(
                 trial["candidate_package_fingerprint"] = candidate_manifest[
                     "package_fingerprint"
                 ]
-                if candidate_manifest["package_fingerprint"] == package_manifest[
-                    "package_fingerprint"
-                ]:
+                if (
+                    candidate_manifest["package_fingerprint"]
+                    == package_manifest["package_fingerprint"]
+                ):
                     trial["status"] = "invalid_candidate"
                     trial["stop_reason"] = (
                         "candidate_package_fingerprint_did_not_change"
@@ -3756,9 +3729,7 @@ def _run_deterministic_improvements(
                         "independent_assessment_path": (
                             str(independent_path) if independent_path else None
                         ),
-                        "progress_observed": assessment[
-                            "target_progress_consistently"
-                        ],
+                        "progress_observed": assessment["target_progress_consistently"],
                         "candidate_evaluation_feedback_to_repair_agent": False,
                     }
                 )
