@@ -376,9 +376,10 @@ def record_attempt(
         ]
         if prior_checks:
             return {"status": "blocked", "reason": "state_check_already_complete"}
-        if state_check_result in {"applied", "not_applied"} and attempt.get(
-            "outcome"
-        ) != "completed":
+        if (
+            state_check_result in {"applied", "not_applied"}
+            and attempt.get("outcome") != "completed"
+        ):
             return {"status": "blocked", "reason": "state_check_not_completed"}
     unresolved_unknowns = []
     applied_unknowns = []
@@ -450,9 +451,7 @@ def record_attempt(
         "state_check_result": state_check_result,
         "resolved_attempt_ref": state_check_for,
         "resolved_attempt_outcome": (
-            {"applied": "succeeded", "not_applied": "failed"}.get(
-                state_check_result
-            )
+            {"applied": "succeeded", "not_applied": "failed"}.get(state_check_result)
             if state_check_complete
             else None
         ),

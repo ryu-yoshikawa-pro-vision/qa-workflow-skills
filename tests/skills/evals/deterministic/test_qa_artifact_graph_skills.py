@@ -1619,9 +1619,9 @@ class ExploratoryRuntimeTests(unittest.TestCase):
         self.assertFalse(failed_check_result["state_check_complete"])
         self.assertFalse(failed_check_result["retryable"])
         self.assertEqual(
-            exploratory.record_attempt(
-                charter, failed_check_result["attempts"], retry
-            )["reason"],
+            exploratory.record_attempt(charter, failed_check_result["attempts"], retry)[
+                "reason"
+            ],
             "state_check_required",
         )
         check = {
