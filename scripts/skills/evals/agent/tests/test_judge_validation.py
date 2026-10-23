@@ -78,6 +78,187 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_real_normalizer_matches_normal_violation_and_not_evaluable(self) -> None:
+        scenario = load_scenario()
+        criteria = [item["id"] for item in scenario["rubric"][:2]]
+        profile = _profile()["judge"]
+
+        def raw_criterion(criterion_id: str, rating: int | None) -> dict:
+            evaluable = rating is not None
+            return {
+                "id": criterion_id,
+                "evaluable": evaluable,
+                "rating": rating,
+                "reason": "Fixed evidence.",
+                "evidence": ["artifact-00.md"] if evaluable else [],
+            }
+
+        cases = (
+            (
+                "rating-3",
+                [criteria[0]],
+                [raw_criterion(criteria[0], 3)],
+                "rating_at_least_3",
+                True,
+                "pass",
+            ),
+            (
+                "rating-4",
+                [criteria[0]],
+                [raw_criterion(criteria[0], 4)],
+                "rating_at_least_3",
+                True,
+                "pass",
+            ),
+            (
+                "rating-1",
+                [criteria[0]],
+                [raw_criterion(criteria[0], 1)],
+                "rating_1",
+                True,
+                "fail",
+            ),
+            (
+                "rating-2",
+                [criteria[0]],
+                [raw_criterion(criteria[0], 2)],
+                "rating_at_least_3",
+                False,
+                "needs_review",
+            ),
+            (
+                "not-evaluable",
+                [criteria[0]],
+                [raw_criterion(criteria[0], None)],
+                "rating_at_least_3",
+                False,
+                "not_evaluable",
+            ),
+            (
+                "not-evaluable-rating-1",
+                [criteria[0]],
+                [raw_criterion(criteria[0], None)],
+                "rating_1",
+                False,
+                "not_evaluable",
+            ),
+            (
+                "multiple-pass",
+                criteria,
+                [raw_criterion(criteria[0], 3), raw_criterion(criteria[1], 4)],
+                "rating_at_least_3",
+                True,
+                None,
+            ),
+            (
+                "multiple-needs-review",
+                criteria,
+                [raw_criterion(criteria[0], 3), raw_criterion(criteria[1], 2)],
+                "rating_at_least_3",
+                False,
+                None,
+            ),
+            (
+                "missing-criterion",
+                criteria,
+                [raw_criterion(criteria[0], 3)],
+                "rating_at_least_3",
+                None,
+                None,
+            ),
+            (
+                "invalid-json",
+                [criteria[0]],
+                "not JSON",
+                "rating_at_least_3",
+                None,
+                None,
+            ),
+            (
+                "invalid-rating",
+                [criteria[0]],
+                [raw_criterion(criteria[0], 5)],
+                "rating_at_least_3",
+                None,
+                None,
+            ),
+        )
+        for label, requested, raw, expected, matched, normalized_status in cases:
+            with self.subTest(case=label):
+                response = (
+                    raw if isinstance(raw, str) else json.dumps({"criteria": raw})
+                )
+                with (
+                    tempfile.TemporaryDirectory() as temporary,
+                    patch.object(
+                        judge_validation,
+                        "run_command",
+                        return_value=ExecutionResult(
+                            0, response, None, "empty", False, 0.01
+                        ),
+                    ),
+                ):
+                    row = judge_validation._run_judge_case(
+                        command_argv=profile["command_argv"],
+                        judge_profile=profile,
+                        prompt="fixed prompt",
+                        cwd=Path(temporary),
+                        timeout=30,
+                        run_tag="normalizer-contract",
+                        criteria=requested,
+                        scenario=scenario,
+                    )
+                if matched is None:
+                    self.assertEqual(row["status"], "invalid_response")
+                    self.assertNotIn("normalized", row)
+                    self.assertFalse(
+                        judge_validation._expected_matches(
+                            {"expected": expected}, {"criteria": []}
+                        )
+                    )
+                    continue
+                self.assertEqual(row["status"], "pass")
+                normalized_criteria = row["normalized"]["criteria"]
+                if normalized_status is not None:
+                    self.assertEqual(
+                        normalized_criteria[0]["status"], normalized_status
+                    )
+                self.assertNotIn("evaluable", normalized_criteria[0])
+                self.assertEqual(
+                    judge_validation._expected_matches(
+                        {"expected": expected}, row["normalized"]
+                    ),
+                    matched,
+                )
+                self.assertTrue(
+                    set(normalized_criteria[0]) >= {"id", "status", "rating"}
+                )
+
+    def test_judge_execution_failure_is_not_a_normalizer_error(self) -> None:
+        scenario = load_scenario()
+        judge_profile = _profile()["judge"]
+        criterion = scenario["rubric"][0]["id"]
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch.object(
+                judge_validation,
+                "run_command",
+                return_value=ExecutionResult(7, "", "failed", "captured", False, 0.01),
+            ),
+        ):
+            row = judge_validation._run_judge_case(
+                command_argv=judge_profile["command_argv"],
+                judge_profile=judge_profile,
+                prompt="fixed prompt",
+                cwd=Path(temporary),
+                timeout=30,
+                run_tag="execution-error",
+                criteria=[criterion],
+                scenario=scenario,
+            )
+        self.assertEqual(row["status"], "execution_error")
+        self.assertNotIn("normalized", row)
+
     def test_codex_judge_without_safe_launcher_observations_is_unverified(self) -> None:
         scenario = load_scenario()
         judge_profile = _profile()["judge"]
@@ -243,17 +424,38 @@ class JudgeValidationTests(unittest.TestCase):
                 profile_path = root / "profile.json"
                 profile_path.write_text(json.dumps(_profile()), encoding="utf-8")
 
-                def fake_judge(**kwargs):
-                    criteria = kwargs["criteria"]
-                    return {
-                        "status": "pass",
-                        "normalized": {
+                original_judge_case = judge_validation._run_judge_case
+
+                def actual_judge(**kwargs):
+                    response = json.dumps(
+                        {
                             "criteria": [
-                                {"id": criterion, "evaluable": True, "rating": 3}
-                                for criterion in criteria
+                                {
+                                    "id": criterion,
+                                    "evaluable": True,
+                                    "rating": 3,
+                                    "reason": "Fixed fixture evidence.",
+                                    "evidence": ["artifact-00.md"],
+                                }
+                                for criterion in kwargs["criteria"]
                             ]
-                        },
-                    }
+                        }
+                    )
+                    with (
+                        patch.object(
+                            judge_validation,
+                            "run_command",
+                            return_value=ExecutionResult(
+                                0, response, None, "empty", False, 0.01
+                            ),
+                        ),
+                        patch.object(
+                            judge_validation,
+                            "verify_judge_docker_command",
+                            return_value={"status": "verified"},
+                        ),
+                    ):
+                        return original_judge_case(**kwargs)
 
                 with (
                     patch.object(
@@ -276,7 +478,7 @@ class JudgeValidationTests(unittest.TestCase):
                         judge_validation, "verify_profile_evidence", return_value=True
                     ),
                     patch.object(
-                        judge_validation, "_run_judge_case", side_effect=fake_judge
+                        judge_validation, "_run_judge_case", side_effect=actual_judge
                     ),
                 ):
                     result = run_validation(
@@ -306,6 +508,18 @@ class JudgeValidationTests(unittest.TestCase):
                         repeat=2,
                     )
                 self.assertTrue((output / "result.json").is_file())
+                saved_result = json.loads(
+                    (output / "result.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(saved_result, result)
+                self.assertIn(
+                    "evaluable",
+                    result["cases"][0]["judge_runs"][0]["response"],
+                )
+                self.assertNotIn(
+                    "evaluable",
+                    result["cases"][0]["judge_runs"][0]["normalized"]["criteria"][0],
+                )
                 return result
         finally:
             if created_parent:

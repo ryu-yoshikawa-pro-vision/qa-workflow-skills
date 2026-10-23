@@ -16,6 +16,7 @@ if __package__ in {None, ""}:
     from scripts.skills.evals.agent.common import (
         AgentEvalError,
         atomic_write_json,
+        atomic_write_text,
         canonical_fingerprint,
         capture_codex_jsonl_trace,
         capture_codex_judge_output,
@@ -65,6 +66,7 @@ else:
     from .common import (
         AgentEvalError,
         atomic_write_json,
+        atomic_write_text,
         canonical_fingerprint,
         capture_codex_jsonl_trace,
         capture_codex_judge_output,
@@ -534,6 +536,8 @@ def run(argv: list[str] | None = None) -> int:
                     / f"attempt-{repeat_index:02d}"
                 )
                 case_dir.mkdir(parents=True, exist_ok=True)
+                agent_output_root = case_dir / "agent-output"
+                agent_output_root.mkdir()
                 attempt: dict[str, Any] = {
                     "attempt_id": attempt_id,
                     "suite": args.suite,
@@ -559,13 +563,13 @@ def run(argv: list[str] | None = None) -> int:
                     command = _substitute_command(
                         args.agent_command,
                         workspace=agent_workspace,
-                        output_root=case_dir,
+                        output_root=agent_output_root,
                     )
                     try:
                         attempt["agent_isolation"] = verify_agent_docker_command(
                             command,
                             workspace=agent_workspace,
-                            output_root=case_dir,
+                            output_root=agent_output_root,
                             evaluator_root=REPO_ROOT,
                         )
                         container_name = f"agent-eval-{run_id[-8:]}-{attempt_id}"
@@ -579,7 +583,7 @@ def run(argv: list[str] | None = None) -> int:
                         execution_command = command
                         if profile["agent"]["name"].lower() == "codex":
                             execution_command = launcher_argv(
-                                output_root=case_dir,
+                                output_root=agent_output_root,
                                 model=profile["agent"]["model"],
                                 reasoning_effort=profile["agent"]["reasoning_effort"],
                                 cli_version=profile["agent"]["cli_version"],
@@ -604,9 +608,20 @@ def run(argv: list[str] | None = None) -> int:
                             "stderr_status": execution.stderr_status,
                             "container_cleanup_status": execution.cleanup_status,
                         }
+                        if execution.cleanup_status == "failed":
+                            raise AgentExecutionError("agent_container_cleanup_failed")
+                        symlink_outputs = sorted(
+                            path.relative_to(agent_output_root).as_posix()
+                            for path in agent_output_root.rglob("*")
+                            if path.is_symlink()
+                        )
+                        if symlink_outputs:
+                            attempt["agent_output_status"] = "evidence_unverified"
+                            attempt["agent_output_symlinks"] = symlink_outputs
+                            attempt["status"] = "needs_review"
                         if execution.stderr is not None:
-                            (case_dir / "agent.stderr.log").write_text(
-                                execution.stderr, encoding="utf-8"
+                            atomic_write_text(
+                                case_dir / "agent.stderr.log", execution.stderr
                             )
                         if (
                             execution.timed_out
@@ -662,9 +677,7 @@ def run(argv: list[str] | None = None) -> int:
                                 attempt["status"] = "needs_review"
                                 attempt["evidence_status"] = "evidence_unverified"
                                 attempt["evidence_reason"] = "agent_trace_was_redacted"
-                            (case_dir / "output.md").write_text(
-                                output_text, encoding="utf-8"
-                            )
+                            atomic_write_text(case_dir / "output.md", output_text)
                             attempt["output"] = {
                                 "path": str(
                                     (case_dir / "output.md").relative_to(output_root)
@@ -686,7 +699,7 @@ def run(argv: list[str] | None = None) -> int:
                                     output_root=output_root,
                                 )
                                 atomic_write_json(
-                                    case_dir / "grade.json", grade["grade"]
+                                    case_dir / "grade.json", grade.get("grade", grade)
                                 )
                                 attempt["grade"] = {
                                     "path": str(
@@ -699,6 +712,8 @@ def run(argv: list[str] | None = None) -> int:
                                     ),
                                 }
                                 attempt["status"] = grade["status"]
+                                if "reason" in grade:
+                                    attempt["reason"] = grade["reason"]
                                 if judge_runs:
                                     attempt["judge"] = judge_runs
                     except (AgentExecutionError, OSError, ValueError, KeyError) as exc:

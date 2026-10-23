@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import patch
 
@@ -260,6 +262,35 @@ class QATrainingStoreTests(unittest.TestCase):
                 self.assertIsNone(result["normalized"])
 
     def test_fake_agent_and_fake_judge_complete_the_two_attempt_runner(self) -> None:
+        self._run_fake_agent()
+
+    @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
+    def test_final_message_does_not_follow_agent_symlinks(self) -> None:
+        for link in ("relative", "absolute", "dangling", "parent"):
+            with self.subTest(link=link):
+                self._run_fake_agent(link=link)
+
+    @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
+    def test_evaluator_copy_saves_after_destination_is_replaced(self) -> None:
+        self._run_fake_agent(race_save=True)
+
+    def test_evaluator_save_failure_is_recorded(self) -> None:
+        self._run_fake_agent(save_failure=True)
+
+    def test_agent_timeout_and_cleanup_failure_are_execution_errors(self) -> None:
+        for failure in ("timeout", "cleanup"):
+            with self.subTest(failure=failure):
+                self._run_fake_agent(failure=failure)
+
+    @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
+    def test_timeout_cleanup_does_not_follow_final_message_links(self) -> None:
+        for link in ("relative", "absolute", "dangling", "parent"):
+            with self.subTest(link=link):
+                self._run_fake_agent(link=link, failure="timeout")
+
+    def _run_fake_agent(
+        self, *, link=None, failure=None, race_save=False, save_failure=False
+    ) -> None:
         scenario = load_scenario()
         run_parent = qa_training_store.REPO_ROOT / ".agent-eval-runs"
         created_parent = not run_parent.exists()
@@ -269,6 +300,9 @@ class QATrainingStoreTests(unittest.TestCase):
                 output_root = Path(temporary) / "run"
                 target_source = Path(temporary) / "target-source"
                 target_source.mkdir()
+                sentinel = Path(temporary) / "dummy-sentinel"
+                sentinel.write_text("unchanged", encoding="utf-8")
+                dangling = Path(temporary) / "must-not-be-created"
                 for relative in scenario["reference_paths"]:
                     reference = target_source / relative
                     reference.parent.mkdir(parents=True, exist_ok=True)
@@ -363,11 +397,56 @@ class QATrainingStoreTests(unittest.TestCase):
                     qa_root = cwd / ".qa-eval-output"
                     qa_root.mkdir(exist_ok=True)
                     self._valid_output(qa_root, scenario)
+                    if link == "parent":
+                        (qa_root / "linked-parent").symlink_to(
+                            sentinel.parent, target_is_directory=True
+                        )
+                    elif link:
+                        destination = dangling if link == "dangling" else sentinel
+                        (qa_root / "final-message.md").symlink_to(
+                            os.path.relpath(destination, qa_root)
+                            if link == "relative"
+                            else destination
+                        )
                     return ExecutionResult(
-                        0, "Agent completed the workflow.", None, "empty", False, 0.01
+                        1 if failure else 0,
+                        "Agent completed the workflow.",
+                        None,
+                        "empty",
+                        failure == "timeout",
+                        0.01,
+                        "failed" if failure == "cleanup" else "succeeded",
                     )
 
                 fake_profile = profile
+                original_replace = os.replace
+
+                def replace_after_symlink(source, destination):
+                    destination = Path(destination)
+                    if destination.parent.name == "qa-output" and destination.name in {
+                        "artifact-manifest.json",
+                        "final-message.md",
+                    }:
+                        destination.symlink_to(sentinel)
+                    original_replace(source, destination)
+
+                replace_context = (
+                    patch(
+                        "scripts.skills.evals.agent.common.os.replace",
+                        side_effect=replace_after_symlink,
+                    )
+                    if race_save
+                    else nullcontext()
+                )
+                save_failure_context = (
+                    patch.object(
+                        qa_training_store,
+                        "atomic_write_text",
+                        side_effect=OSError("simulated evaluator save failure"),
+                    )
+                    if save_failure
+                    else nullcontext()
+                )
                 with (
                     patch.object(
                         qa_training_store,
@@ -438,6 +517,8 @@ class QATrainingStoreTests(unittest.TestCase):
                     patch.object(
                         qa_training_store, "run_command", side_effect=fake_agent
                     ),
+                    replace_context,
+                    save_failure_context,
                 ):
                     exit_code = qa_training_store.run(
                         [
@@ -467,16 +548,68 @@ class QATrainingStoreTests(unittest.TestCase):
                 saved = json.loads(
                     (output_root / "result.json").read_text(encoding="utf-8")
                 )
+                attempt = saved["attempts"][0]
+                if save_failure:
+                    self.assertIn("simulated evaluator save failure", attempt["error"])
+                if "saved_output_root" in attempt:
+                    saved_output_root = output_root / attempt["saved_output_root"]
+                    self.assertEqual(
+                        (saved_output_root / "final-message.md").read_text(
+                            encoding="utf-8"
+                        ),
+                        "Agent completed the workflow.",
+                    )
+                    self.assertTrue(
+                        (saved_output_root / "artifact-manifest.json").is_file()
+                    )
+                    saved_agent_output = json.loads(
+                        (
+                            output_root
+                            / attempt["saved_result_root"]
+                            / "saved-agent-output.json"
+                        ).read_text(encoding="utf-8")
+                    )
+                    if link:
+                        self.assertEqual(
+                            saved_agent_output["status"], "evidence_unverified"
+                        )
+                        self.assertTrue(
+                            any(
+                                item["status"] == "evidence_unverified"
+                                for item in saved_agent_output["files"]
+                            )
+                        )
+                    else:
+                        self.assertEqual(saved_agent_output["status"], "saved")
+                self.assertEqual(sentinel.read_text(encoding="utf-8"), "unchanged")
+                self.assertFalse(dangling.exists())
         finally:
             if created_parent:
                 try:
                     run_parent.rmdir()
                 except OSError:
                     pass
-        self.assertEqual(exit_code, 0, saved)
-        self.assertEqual(saved["status"], "pass")
+        expected_status = (
+            "execution_error"
+            if save_failure or (failure and not (failure == "timeout" and link))
+            else "needs_review"
+            if link
+            else "pass"
+        )
+        expected_exit = (
+            2
+            if save_failure or (failure and not (failure == "timeout" and link))
+            else 1
+            if link
+            else 0
+        )
+        self.assertEqual(exit_code, expected_exit, saved)
+        self.assertEqual(saved["status"], expected_status)
         self.assertEqual(len(saved["attempts"]), 2)
-        self.assertTrue(all(row["status"] == "pass" for row in saved["attempts"]))
+        self.assertTrue(
+            all(row["status"] == expected_status for row in saved["attempts"]),
+            saved,
+        )
 
 
 if __name__ == "__main__":

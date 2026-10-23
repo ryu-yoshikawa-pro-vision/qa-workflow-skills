@@ -299,14 +299,25 @@ def _fixture_prompt(
 
 
 def _expected_matches(definition: dict[str, Any], normalized: dict[str, Any]) -> bool:
-    criteria = normalized["criteria"]
+    criteria = normalized.get("criteria") if isinstance(normalized, dict) else None
+    if not isinstance(criteria, list) or not criteria:
+        return False
     if definition["expected"] == "rating_at_least_3":
-        return all(item["evaluable"] and item["rating"] >= 3 for item in criteria)
+        return all(
+            isinstance(item, dict)
+            and item.get("status") == "pass"
+            and isinstance(item.get("rating"), int)
+            and not isinstance(item.get("rating"), bool)
+            and item["rating"] >= 3
+            for item in criteria
+        )
     if definition["expected"] == "rating_1":
         return (
             len(criteria) == 1
-            and criteria[0]["evaluable"]
-            and criteria[0]["rating"] == 1
+            and isinstance(criteria[0], dict)
+            and criteria[0].get("status") == "fail"
+            and criteria[0].get("rating") == 1
+            and not isinstance(criteria[0].get("rating"), bool)
         )
     raise AgentEvalError("unknown Judge fixture expectation")
 
@@ -610,7 +621,7 @@ def run_validation(
         ratings = {
             json.dumps(
                 [
-                    (item.get("id"), item.get("evaluable"), item.get("rating"))
+                    (item.get("id"), item.get("status"), item.get("rating"))
                     for item in row.get("normalized", {}).get("criteria", [])
                 ],
                 sort_keys=True,
@@ -628,7 +639,7 @@ def run_validation(
             candidate_ratings = {
                 json.dumps(
                     [
-                        (item.get("id"), item.get("evaluable"), item.get("rating"))
+                        (item.get("id"), item.get("status"), item.get("rating"))
                         for item in row.get("normalized", {}).get("criteria", [])
                     ],
                     sort_keys=True,
@@ -696,7 +707,7 @@ def run_validation(
                                         key: item.get(key)
                                         for key in (
                                             "id",
-                                            "evaluable",
+                                            "status",
                                             "rating",
                                             "reason",
                                             "evidence",

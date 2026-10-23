@@ -14,6 +14,7 @@ from typing import Any
 from .common import (
     AgentEvalError,
     atomic_write_json,
+    atomic_write_text,
     canonical_fingerprint,
     capture_codex_jsonl_trace,
     capture_codex_judge_output,
@@ -328,7 +329,12 @@ _SECRET_TEXT_RE = re.compile(
 )
 
 
-def _copy_safe_agent_output(source: Path, destination: Path) -> dict[str, Any]:
+def _copy_safe_agent_output(
+    source: Path,
+    destination: Path,
+    *,
+    reserved_paths: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     destination.mkdir(parents=True, exist_ok=False)
     entries: list[dict[str, Any]] = []
     total = 0
@@ -340,6 +346,15 @@ def _copy_safe_agent_output(source: Path, destination: Path) -> dict[str, Any]:
                     "path": relative.as_posix(),
                     "status": "evidence_unverified",
                     "reason": "symlink_output",
+                }
+            )
+            continue
+        if relative.as_posix() in reserved_paths:
+            entries.append(
+                {
+                    "path": relative.as_posix(),
+                    "status": "evidence_unverified",
+                    "reason": "reserved_evaluator_output",
                 }
             )
             continue
@@ -913,7 +928,6 @@ def run(argv: list[str] | None = None) -> int:
                     ),
                     destination=target,
                 )
-                final_output = target / ".qa-eval-output" / "final-message.md"
                 prompt = build_generation_prompt(
                     skill="qa-workflow", eval_input=scenario["task_text"]
                 )
@@ -950,6 +964,8 @@ def run(argv: list[str] | None = None) -> int:
                         timeout_seconds=profile["agent"]["timeout_seconds"],
                         timeout_cleanup_argv=cleanup_command,
                     )
+                    if agent.cleanup_status == "failed":
+                        raise AgentExecutionError("agent_container_cleanup_failed")
                     trace = capture_codex_jsonl_trace(
                         agent.stdout,
                         skill_names=[
@@ -962,8 +978,6 @@ def run(argv: list[str] | None = None) -> int:
                         trace_file = attempt_root / "agent-trace.json"
                         atomic_write_json(trace_file, trace["trace_summary"])
                         trace_path = str(trace_file.relative_to(output_root))
-                    final_output.parent.mkdir(parents=True, exist_ok=True)
-                    final_output.write_text(final_message, encoding="utf-8")
                     atomic_write_json(
                         attempt_root / "agent-execution.json",
                         {
@@ -999,7 +1013,6 @@ def run(argv: list[str] | None = None) -> int:
                     qa_root = target / ".qa-eval-output"
                     validation = validate_artifact_index(qa_root, scenario)
                     manifest = build_artifact_manifest(qa_root, validation)
-                    atomic_write_json(qa_root / "artifact-manifest.json", manifest)
                     secret_paths = _scan_secret_shaped_output(qa_root)
                     atomic_write_json(
                         attempt_root / "output-safety-scan.json",
@@ -1115,8 +1128,19 @@ def run(argv: list[str] | None = None) -> int:
                             judge_root=attempt_root / "judge-workspaces",
                         )
                     atomic_write_json(attempt_root / "judge-result.json", judges)
+                    saved_output_root = attempt_root / "qa-output"
                     saved_output = _copy_safe_agent_output(
-                        qa_root, attempt_root / "qa-output"
+                        qa_root,
+                        saved_output_root,
+                        reserved_paths=frozenset(
+                            {"artifact-manifest.json", "final-message.md"}
+                        ),
+                    )
+                    atomic_write_text(
+                        saved_output_root / "final-message.md", final_message
+                    )
+                    atomic_write_json(
+                        saved_output_root / "artifact-manifest.json", manifest
                     )
                     atomic_write_json(
                         attempt_root / "saved-agent-output.json", saved_output
