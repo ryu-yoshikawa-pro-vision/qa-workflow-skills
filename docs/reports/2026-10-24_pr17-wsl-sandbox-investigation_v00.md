@@ -91,18 +91,18 @@ Codex CLIの`:read-only` / `:workspace`内でのnetwork probeは別に実施し�
 
 Python 3.11.17とPyYAML 6.0.3を通常ユーザーのtemp venvに用意した。開始時の固定revisionで13個の検証commandを個別実行し、全てexit 0だった。
 
-| Suite                                           | 件数・結果                  |
+| Suite                                           |                  件数・結果 |
 | ----------------------------------------------- | --------------------------: |
-| Agent unit                                      | 92 PASS                     |
-| Agent repository contract                       | 4 PASS                      |
-| deterministic harness                           | 13 PASS                     |
-| deterministic repository                        | 293 PASS                    |
+| Agent unit                                      |                     92 PASS |
+| Agent repository contract                       |                      4 PASS |
+| deterministic harness                           |                     13 PASS |
+| deterministic repository                        |                    293 PASS |
 | semantic validator                              | 22 skills / 163 cases、PASS |
-| semantic harness                                | 27 PASS                     |
-| semantic repository                             | 13 PASS                     |
-| runtime contract                                | 371 PASS                    |
-| Codex harness                                   | 55 PASS                     |
-| agent/deterministic/semantic/runtime compileall | 4 commandすべてPASS         |
+| semantic harness                                |                     27 PASS |
+| semantic repository                             |                     13 PASS |
+| runtime contract                                |                    371 PASS |
+| Codex harness                                   |                     55 PASS |
+| agent/deterministic/semantic/runtime compileall |         4 commandすべてPASS |
 
 以前Windows上で6件errorになったAgent suiteをLinuxで確認した。既存記録では、Linux host条件を要求するlauncher test 3件、fake Dockerの`WinError 193` 1件、Windows Pythonに`os.getuid/getgid`がないことによる2件に分類されていた。Linux Agent suiteでは92件すべてが実行され、error/skipなしでPASSした。
 
