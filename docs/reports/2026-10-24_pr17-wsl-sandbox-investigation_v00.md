@@ -20,14 +20,14 @@ PR: [#17](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/17
 
 ## 2. 使用環境・CLI version
 
-| 項目 | 確認値 |
-|---|---|
-| WSL | Ubuntu 24.04.4、WSL2、kernel `6.18.54.1-microsoft-standard-WSL2` |
-| WSL user | uid 1000、通常ユーザー。sudo/adminは使用していない |
-| Python | 3.11.17 |
-| PyYAML | 6.0.3 |
-| Codex CLI | `codex-cli 0.163.0` |
-| QTS checkout | `/home/sella/src/qa-training-store-pr17-fixed-84ce165-20261023`、HEAD `84ce165493649550832731a60cf436f8ae29c56b`、clean |
+| 項目                  | 確認値                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| WSL                   | Ubuntu 24.04.4、WSL2、kernel `6.18.54.1-microsoft-standard-WSL2`                                                        |
+| WSL user              | uid 1000、通常ユーザー。sudo/adminは使用していない                                                                      |
+| Python                | 3.11.17                                                                                                                 |
+| PyYAML                | 6.0.3                                                                                                                   |
+| Codex CLI             | `codex-cli 0.163.0`                                                                                                     |
+| QTS checkout          | `/home/sella/src/qa-training-store-pr17-fixed-84ce165-20261023`、HEAD `84ce165493649550832731a60cf436f8ae29c56b`、clean |
 | QA evaluator checkout | `/home/sella/src/qa-workflow-skills-pr17-linux-34715bf-20261024`、開始時HEAD `34715bfefbd37c2a8a24dbea946e1d5fe40bceff` |
 
 Codex npm公開packageのversionとsha512 integrityを照合してLinux x64実体を取得した。system `bwrap`がPATH上にないこと、Codex package内にbundled `codex-resources/bwrap`があることは`.agent-eval-runs/pr17-wsl-20261024/codex-package-install.json`に記録した。CLI version、help、実行結果は同directoryの`codex-version.*`、`codex-sandbox-help.*`、`codex-readonly-smoke.*`にある。
@@ -61,12 +61,12 @@ bundled bwrapをCodex CLI経由とは別に1回起動した。user/PID/network n
 
 Codex CLIの`:read-only` / `:workspace`内でのnetwork probeは別に実施した。
 
-| Probe | 結果 |
-|---|---|
-| `getaddrinfo` | `gaierror`, errno `-3`。DNS解決不可 |
-| `203.0.113.1:443` | `connect_ex` errno `1` (`EPERM`) |
-| 合成AF_UNIX listener | connectは`EPERM`、server側acceptなし |
-| Windows interop | sandbox内からのWSL interop socket接続はできなかった |
+| Probe                | 結果                                                |
+| -------------------- | --------------------------------------------------- |
+| `getaddrinfo`        | `gaierror`, errno `-3`。DNS解決不可                 |
+| `203.0.113.1:443`    | `connect_ex` errno `1` (`EPERM`)                    |
+| 合成AF_UNIX listener | connectは`EPERM`、server側acceptなし                |
+| Windows interop      | sandbox内からのWSL interop socket接続はできなかった |
 
 これらは指定した宛先・経路の結果であり、全通信経路が遮断された証明ではない。外部へ秘密情報は送っていない。`.agent-eval-runs/pr17-wsl-20261024/permission-profile-boundary-probes-v2.json`に記録した。
 
@@ -74,10 +74,10 @@ Codex CLIの`:read-only` / `:workspace`内でのnetwork probeは別に実施し�
 
 合成ファイルを使い、`:workspace` probeのworkspace外sentinelは`/var/tmp`に置いた。`/tmp`に置いた最初の試験では`:workspace`がprofile上許可するtmp領域だったため、その結果をworkspace外write拒否の根拠にしなかった。修正版v2の結果を正式記録に使っている。
 
-| Profile | workspace read/write | `/var/tmp` sentinel | Windows dummy sentinel | symlink write |
-|---|---|---|---|---|
-| `:read-only` | read可、write拒否 | read可、write拒否。内容不変 | read可、write拒否。内容不変 | 拒否 |
-| `:workspace` | read可、write可 | read可、write拒否。内容不変 | read可、write拒否。内容不変 | 拒否 |
+| Profile      | workspace read/write | `/var/tmp` sentinel         | Windows dummy sentinel      | symlink write |
+| ------------ | -------------------- | --------------------------- | --------------------------- | ------------- |
+| `:read-only` | read可、write拒否    | read可、write拒否。内容不変 | read可、write拒否。内容不変 | 拒否          |
+| `:workspace` | read可、write可      | read可、write拒否。内容不変 | read可、write拒否。内容不変 | 拒否          |
 
 `/var/tmp`とWindows側dummyが読めたため、これらのpermission profileはfilesystem write範囲を制限するが、Evaluator-onlyデータをhost上の別pathから読めなくするものではない。`:workspace`のworkspace write sentinelだけが`inside-sentinel-mutated-v2`へ変わった。
 
@@ -91,18 +91,18 @@ Codex CLIの`:read-only` / `:workspace`内でのnetwork probeは別に実施し�
 
 Python 3.11.17とPyYAML 6.0.3を通常ユーザーのtemp venvに用意した。開始時の固定revisionで13個の検証commandを個別実行し、全てexit 0だった。
 
-| Suite | 件数・結果 |
-|---|---:|
-| Agent unit | 92 PASS |
-| Agent repository contract | 4 PASS |
-| deterministic harness | 13 PASS |
-| deterministic repository | 293 PASS |
-| semantic validator | 22 skills / 163 cases、PASS |
-| semantic harness | 27 PASS |
-| semantic repository | 13 PASS |
-| runtime contract | 371 PASS |
-| Codex harness | 55 PASS |
-| agent/deterministic/semantic/runtime compileall | 4 commandすべてPASS |
+| Suite                                           | 件数・結果                  |
+| ----------------------------------------------- | --------------------------: |
+| Agent unit                                      | 92 PASS                     |
+| Agent repository contract                       | 4 PASS                      |
+| deterministic harness                           | 13 PASS                     |
+| deterministic repository                        | 293 PASS                    |
+| semantic validator                              | 22 skills / 163 cases、PASS |
+| semantic harness                                | 27 PASS                     |
+| semantic repository                             | 13 PASS                     |
+| runtime contract                                | 371 PASS                    |
+| Codex harness                                   | 55 PASS                     |
+| agent/deterministic/semantic/runtime compileall | 4 commandすべてPASS         |
 
 以前Windows上で6件errorになったAgent suiteをLinuxで確認した。既存記録では、Linux host条件を要求するlauncher test 3件、fake Dockerの`WinError 193` 1件、Windows Pythonに`os.getuid/getgid`がないことによる2件に分類されていた。Linux Agent suiteでは92件すべてが実行され、error/skipなしでPASSした。
 
@@ -136,20 +136,20 @@ Judgeを起動せず、人間承認も作成していない。`001`/`002`は`pen
 
 指定されたrunnerと関連testを確認した。次表の状態はコードと既存testから確認したもので、live Agent受入を意味しない。
 
-| 確認項目 | 現行実装で確認した扱い |
-|---|---|
-| Agent起動前の隔離証拠 | `run.py` / QTS runnerがprofile evidence、fingerprint、clean evaluator revisionを確認してからAgentを起動する |
-| revision/profile一致 | evaluator・command・profile・targetのfingerprint/固定revisionを検証。比較条件が違うrunはcomparableにならない |
-| shell実行失敗 | timeout/nonzero/cleanup errorはexecution errorとして扱い、Skill gradeのFAILに読み替えない |
-| Skill未使用 | traceにSkill readがなければ`unverified`。improveはbaseline/candidateの各attemptで使用観測を要求する |
-| Judge未承認 | fixture承認・bindingが不足/不一致なら`judge_unverified`。今回は全fixture pending |
-| Agent symlink | evaluator-owned書込みはatomic writeを使い、untrusted symlink outputはevidence unverified/needs reviewへ送る。Linux symlink testあり |
-| 原成果物と原因確認 | repair gateは原artifactとSkill sourceのhash/quote、単一Skill attribution、未解消alternative causeなしを要求する |
-| 独立回帰 | `improvement_demonstrated`には独立caseと関連contract testの完全成功を要求する |
-| deterministic/semantic/mixed | deterministic-onlyは固定grader経路、semantic/mixedはJudge検証経路へ分かれ、mixedの未検証をdeterministicで代替しない |
-| 秘密情報保存 | stderr/final outputをsanitizeし、raw Codex JSONLは保存せずtrace summaryのみ記録。redactionで内容が変わる場合はneeds review |
-| timeout/cleanup | 共通executorとAgent runnerはtimeout/cleanup状態を保存する。QTS Agent cleanup失敗の詳細欠落を今回修正した |
-| 比較可能性 | evaluator revision、suite/dataset/target、Agent/Judge command、image、isolation、profile、repeatなどを比較する |
+| 確認項目                     | 現行実装で確認した扱い                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Agent起動前の隔離証拠        | `run.py` / QTS runnerがprofile evidence、fingerprint、clean evaluator revisionを確認してからAgentを起動する                         |
+| revision/profile一致         | evaluator・command・profile・targetのfingerprint/固定revisionを検証。比較条件が違うrunはcomparableにならない                        |
+| shell実行失敗                | timeout/nonzero/cleanup errorはexecution errorとして扱い、Skill gradeのFAILに読み替えない                                           |
+| Skill未使用                  | traceにSkill readがなければ`unverified`。improveはbaseline/candidateの各attemptで使用観測を要求する                                 |
+| Judge未承認                  | fixture承認・bindingが不足/不一致なら`judge_unverified`。今回は全fixture pending                                                    |
+| Agent symlink                | evaluator-owned書込みはatomic writeを使い、untrusted symlink outputはevidence unverified/needs reviewへ送る。Linux symlink testあり |
+| 原成果物と原因確認           | repair gateは原artifactとSkill sourceのhash/quote、単一Skill attribution、未解消alternative causeなしを要求する                     |
+| 独立回帰                     | `improvement_demonstrated`には独立caseと関連contract testの完全成功を要求する                                                       |
+| deterministic/semantic/mixed | deterministic-onlyは固定grader経路、semantic/mixedはJudge検証経路へ分かれ、mixedの未検証をdeterministicで代替しない                 |
+| 秘密情報保存                 | stderr/final outputをsanitizeし、raw Codex JSONLは保存せずtrace summaryのみ記録。redactionで内容が変わる場合はneeds review          |
+| timeout/cleanup              | 共通executorとAgent runnerはtimeout/cleanup状態を保存する。QTS Agent cleanup失敗の詳細欠落を今回修正した                            |
+| 比較可能性                   | evaluator revision、suite/dataset/target、Agent/Judge command、image、isolation、profile、repeatなどを比較する                      |
 
 ### 今回修正した不具合
 
@@ -173,11 +173,11 @@ Codex CLI 0.163.0 sourceのLinux helperはbwrapへnamespace、procfs、filesyste
 
 ## 14. 実行方式の比較と正式受入に不足する証拠
 
-| 方式 | 今回確認した利点・制約 | 正式受入 |
-|---|---|---|
-| 現行Docker | Planに適合しmount境界を検査できる。既存記録ではCodex内bwrap namespace/procfsが起動できず、credential/egressのshell実証が未完了 | 未達 |
-| WSL2 host-native | Codex permission-profile sandbox commandは動作。Linux外部sentinelとWindows dummyをreadでき、同じWSL user/Windows mountが残る | 不採用 |
-| 専用Linux VM/host | OS user/filesystem分離の可能性はあるが、作成・費用・管理者権限・credential供給・Docker内seccomp/procfsは未検証 | 作成していない |
+| 方式              | 今回確認した利点・制約                                                                                                         | 正式受入       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| 現行Docker        | Planに適合しmount境界を検査できる。既存記録ではCodex内bwrap namespace/procfsが起動できず、credential/egressのshell実証が未完了 | 未達           |
+| WSL2 host-native  | Codex permission-profile sandbox commandは動作。Linux外部sentinelとWindows dummyをreadでき、同じWSL user/Windows mountが残る   | 不採用         |
+| 専用Linux VM/host | OS user/filesystem分離の可能性はあるが、作成・費用・管理者権限・credential供給・Docker内seccomp/procfsは未検証                 | 作成していない |
 
 正式受入には、Plan適合Docker内でCodex shellが成功し、同一条件でworkspace外read/write、credential access、network制御、cleanupがnegative testを通る証拠が必要。さらに共通4 caseのAgent評価、固定QTSの独立2 attempt、実成果物とtarget不変性、承認済みJudge fixtureの独立評価が必要。QTS-SEM-008 fixtureと人間承認も未完了である。
 
@@ -201,12 +201,12 @@ docker image inspect --format '{{.Id}}' codex-agent:0.163.0
 
 各`--eval-id`は固定Evaluator datasetから入力を選ぶ。
 
-| Suite | Skill | Eval ID | 固定input |
-|---|---|---|---|
-| deterministic | `test-case-design` | `TC-OUT-001` | `skills/test-case-design/evals/output/cases/case-001/input.md` |
+| Suite         | Skill                   | Eval ID       | 固定input                                                           |
+| ------------- | ----------------------- | ------------- | ------------------------------------------------------------------- |
+| deterministic | `test-case-design`      | `TC-OUT-001`  | `skills/test-case-design/evals/output/cases/case-001/input.md`      |
 | deterministic | `test-condition-design` | `TCN-OUT-001` | `skills/test-condition-design/evals/output/cases/case-001/input.md` |
-| semantic | `test-case-design` | `TC-SEM-001` | `skills/test-case-design/evals/semantic/cases/case-001/input.md` |
-| semantic | `qa-workflow` | `WF-SEM-003` | `skills/qa-workflow/evals/semantic/cases/case-003/input.md` |
+| semantic      | `test-case-design`      | `TC-SEM-001`  | `skills/test-case-design/evals/semantic/cases/case-001/input.md`    |
+| semantic      | `qa-workflow`           | `WF-SEM-003`  | `skills/qa-workflow/evals/semantic/cases/case-003/input.md`         |
 
 確定したAgent argvをBash array `AGENT_COMMAND`、profile内のmodel IDを`AGENT_MODEL`、現行branch revisionを`SKILL_SHA`へ設定した後、以下を4回別々の引数で実行する。`AGENT_COMMAND`は最後のoption。
 
