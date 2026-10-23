@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib
 import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -136,6 +138,7 @@ def _write_independent_run(
                 "status": "captured",
                 "redacted": False,
                 "path": "agent-trace.json",
+                "sha256": sha256_bytes(trace_path.read_bytes()),
             },
             "output": {
                 "path": f"repeat-{repeat}/output.md",
@@ -183,6 +186,154 @@ def _write_independent_run(
         encoding="utf-8",
     )
     return result_path
+
+
+def _write_deterministic_baseline(root: Path, *, assertion_status: str = "fail"):
+    agent_run = importlib.import_module("scripts.skills.evals.agent.run")
+    run_root = root / "deterministic-baseline"
+    run_root.mkdir(parents=True)
+    input_path = root / "input.md"
+    input_path.write_text("Public deterministic evaluation input.\n", encoding="utf-8")
+    input_bytes = input_path.read_bytes()
+    case = {
+        "skill": "test-case-design",
+        "id": "TC-DT-TEST",
+        "input": input_bytes.decode("utf-8"),
+        "input_path": input_path,
+        "expected_path": root / "expected.json",
+        "fingerprint_files": [
+            ("skills/test-case-design/evals/output/input.md", input_bytes),
+            (
+                "skills/test-case-design/evals/output/expected.json",
+                b"{\"hidden\":true}",
+            ),
+        ],
+    }
+    template = ["docker", "run", "agent-image"]
+    attempts = []
+    for repeat in (1, 2):
+        attempt_root = (
+            run_root
+            / "deterministic"
+            / case["skill"]
+            / case["id"]
+            / f"attempt-{repeat:02d}"
+        )
+        output_root = attempt_root / "agent-output"
+        output_root.mkdir(parents=True)
+        output_path = output_root / "output.md"
+        output_path.write_text(
+            "Generated output with a reproducible deterministic defect.\n",
+            encoding="utf-8",
+        )
+        grade = {
+            "skill": case["skill"],
+            "eval_id": case["id"],
+            "status": "fail" if assertion_status == "fail" else "pass",
+            "summary": {
+                "errors": int(assertion_status == "fail"),
+                "warnings": 0,
+                "passed": int(assertion_status == "pass"),
+                "total": 1,
+                "assertion_pass_rate": 0.0 if assertion_status == "fail" else 1.0,
+            },
+            "assertions": [
+                {
+                    "id": "DT-ASSERT-001",
+                    "status": assertion_status,
+                    "severity": "error",
+                    "message": "Synthetic fixed grader assertion.",
+                    "evidence": {"actual": "visible output"},
+                }
+            ],
+        }
+        grade_path = attempt_root / "grade.json"
+        grade_path.write_text(json.dumps(grade), encoding="utf-8")
+        trace_path = attempt_root / "agent-trace.json"
+        trace_path.write_text(
+            json.dumps(
+                {
+                    "status": "captured",
+                    "turn_completed": True,
+                    "turn_failed": False,
+                    "commands": [
+                        {
+                            "successful": True,
+                            "skill_files_read": [case["skill"]],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        attempts.append(
+            {
+                "attempt_id": f"attempt-{repeat:02d}",
+                "suite": "deterministic",
+                "skill": case["skill"],
+                "eval_id": case["id"],
+                "repeat": repeat,
+                "input_fingerprint": sha256_bytes(input_bytes),
+                "status": grade["status"],
+                "skill_use_observation": "observed",
+                "agent_execution": {
+                    "exit_code": 0,
+                    "timed_out": False,
+                    "container_cleanup_status": "succeeded",
+                },
+                "agent_isolation": {"status": "verified"},
+                "agent_trace": {
+                    "status": "captured",
+                    "redacted": False,
+                    "path": "agent-trace.json",
+                    "sha256": sha256_bytes(trace_path.read_bytes()),
+                },
+                "agent_command": {
+                    "argv": template,
+                    "fingerprint": canonical_fingerprint(template),
+                },
+                "output": {
+                    "path": output_path.relative_to(run_root).as_posix(),
+                    "sha256": sha256_bytes(output_path.read_bytes()),
+                },
+                "grade": {
+                    "path": grade_path.relative_to(run_root).as_posix(),
+                    "sha256": sha256_bytes(grade_path.read_bytes()),
+                },
+            }
+        )
+    dataset_fingerprint = agent_run._dataset_fingerprint(case["fingerprint_files"])
+    run = {
+        "schema_version": 1,
+        "run_id": "deterministic-baseline-run",
+        "suite": "deterministic",
+        "status": "needs_review_or_fail"
+        if assertion_status == "fail"
+        else "pass",
+        "evaluator": {"revision": "1" * 40},
+        "skill_revision": "2" * 40,
+        "skill_package": {
+            "skills": [case["skill"]],
+            "package_fingerprint": "baseline-package-fingerprint",
+        },
+        "skill_candidate_revision_status": "git_commit",
+        "profile_verification": "verified",
+        "profile_fingerprint": "profile-fingerprint",
+        "agent_command_template": template,
+        "agent_command_saved": True,
+        "agent_command_fingerprint": canonical_fingerprint(template),
+        "judge_command_fingerprint": canonical_fingerprint([]),
+        "dataset_fingerprint": dataset_fingerprint,
+        "repeat": 2,
+        "cases_requested": 1,
+        "workspace_cleanup": "succeeded",
+        "summary": {"fail": 2} if assertion_status == "fail" else {"pass": 2},
+        "exit_code": 1 if assertion_status == "fail" else 0,
+        "attempts": attempts,
+    }
+    result_path = run_root / "result.json"
+    result_path.write_text(json.dumps(run), encoding="utf-8")
+    return result_path, run, case, run_root
 
 
 def _complete_validation_fixture(root: Path) -> tuple[Path, str]:
@@ -292,6 +443,44 @@ def _complete_validation_fixture(root: Path) -> tuple[Path, str]:
 
 
 class ImprovementGateTests(unittest.TestCase):
+    def _validate_deterministic_fixture(
+        self,
+        run: dict,
+        case: dict,
+        run_root: Path,
+        *,
+        grade_error: Exception | None = None,
+        grade_override: dict | None = None,
+    ):
+        agent_run = importlib.import_module("scripts.skills.evals.agent.run")
+
+        def fixed_grade(skill, eval_id, output_path, *, runtime_source_root):
+            if grade_error is not None:
+                raise grade_error
+            if grade_override is not None:
+                return grade_override
+            return json.loads(
+                (output_path.parent.parent / "grade.json").read_text(encoding="utf-8")
+            )
+
+        deterministic_module = types.ModuleType(
+            "scripts.skills.evals.deterministic.run"
+        )
+        deterministic_module.grade = fixed_grade
+        with (
+            patch.object(agent_run, "_load_deterministic_cases", return_value=[case]),
+            patch.dict(
+                sys.modules,
+                {"scripts.skills.evals.deterministic.run": deterministic_module},
+            ),
+        ):
+            return improve_module._deterministic_attempt_data(
+                run,
+                run_root,
+                runtime_source_root=run_root,
+                expected_package_fingerprint="baseline-package-fingerprint",
+            )
+
     def test_independent_eval_plan_freezes_all_existing_cases_without_expected_data(
         self,
     ) -> None:
@@ -483,6 +672,538 @@ class ImprovementGateTests(unittest.TestCase):
             )
             self.assertEqual(unstable_assessment["status"], "review_pending")
             self.assertEqual(unstable_assessment["candidate_status"], "review_pending")
+
+    def test_deterministic_only_failure_is_valid_without_judge(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            _result_path, run, case, run_root = _write_deterministic_baseline(
+                Path(temporary)
+            )
+            result = self._validate_deterministic_fixture(run, case, run_root)
+        self.assertEqual(result["failed_assertion_ids"], ["DT-ASSERT-001"])
+        self.assertEqual(len(result["attempts"]), 2)
+
+    def test_deterministic_trace_mutation_invalidates_saved_skill_use(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            _result_path, run, case, run_root = _write_deterministic_baseline(
+                Path(temporary)
+            )
+            trace_path = run_root / "deterministic" / case["skill"] / case["id"]
+            trace_path /= Path("attempt-01") / "agent-trace.json"
+            trace_path.write_text('{"status":"captured"}\n', encoding="utf-8")
+            with self.assertRaisesRegex(AgentEvalError, "trace changed"):
+                self._validate_deterministic_fixture(run, case, run_root)
+
+    def test_run_improvements_enters_deterministic_path_without_judge_validation(
+        self,
+    ) -> None:
+        agent_run = importlib.import_module("scripts.skills.evals.agent.run")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_path, baseline, case, run_root = _write_deterministic_baseline(
+                root
+            )
+            baseline["profile_fingerprint"] = "profile-fingerprint"
+            baseline["agent"] = {
+                "name": "fake",
+                "model": "fake-model",
+                "cli_version": "fake-version",
+            }
+            baseline["isolation"] = {
+                "method": "docker",
+                "agent_read_roots": [],
+                "evaluator_read_blocked": True,
+            }
+            baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+            (run_root / "isolation.json").write_text("verified\n", encoding="utf-8")
+            profile = {
+                "agent": {
+                    "name": "fake",
+                    "model": "fake-model",
+                    "cli_version": "fake-version",
+                    "timeout_seconds": 30,
+                },
+                "judge": {"command_argv": []},
+                "isolation": {
+                    "method": "docker",
+                    "agent_read_roots": [],
+                    "evaluator_read_blocked": True,
+                },
+                "verification": {"evidence_path": "isolation.json"},
+            }
+            output_root = root / "improvement"
+            deterministic_module = types.ModuleType(
+                "scripts.skills.evals.deterministic.run"
+            )
+            deterministic_module.grade = (
+                lambda _skill, _eval, output, **_kwargs: json.loads(
+                    (output.parent.parent / "grade.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+            )
+
+            def prepare_output(output, **_kwargs):
+                output.mkdir(parents=True, exist_ok=True)
+                return output / "isolation.json"
+
+            def create_workspace(_repo, _revision, destination):
+                (destination / "skills" / "test-case-design").mkdir(parents=True)
+                (destination / "skills" / "test-case-design" / "SKILL.md").write_text(
+                    "Test case design instructions are explicit and reproducible.\n",
+                    encoding="utf-8",
+                )
+                return {
+                    "skills": ["test-case-design"],
+                    "package_fingerprint": "baseline-package-fingerprint",
+                }
+
+            with (
+                patch.object(
+                    agent_run, "_load_deterministic_cases", return_value=[case]
+                ),
+                patch.dict(
+                    sys.modules,
+                    {"scripts.skills.evals.deterministic.run": deterministic_module},
+                ),
+                patch.object(
+                    improve_module, "load_execution_profile", return_value=profile
+                ),
+                patch.object(
+                    improve_module, "assert_clean_checkout", return_value="1" * 40
+                ),
+                patch.object(
+                    improve_module,
+                    "profile_fingerprint",
+                    return_value="profile-fingerprint",
+                ),
+                patch.object(
+                    improve_module,
+                    "prepare_run_output_root",
+                    side_effect=prepare_output,
+                ),
+                patch.object(
+                    improve_module, "verify_profile_evidence", return_value=True
+                ),
+                patch.object(
+                    improve_module,
+                    "create_skill_workspace",
+                    side_effect=create_workspace,
+                ),
+                patch.object(
+                    improve_module,
+                    "_freeze_independent_eval_plan",
+                    return_value={
+                        "status": "blocked",
+                        "cases": [],
+                        "contract_tests": [
+                            {"path": "tests/test_skill.py", "sha256": "a" * 64}
+                        ],
+                        "block_reason": "independent deterministic case missing",
+                    },
+                ),
+                patch.object(
+                    improve_module,
+                    "_run_related_contract_tests",
+                    return_value={"status": "review_pending", "results": []},
+                ),
+            ):
+                result = improve_module.run_improvements(
+                    baseline_result=baseline_path,
+                    judge_validation_result=None,
+                    target_root=None,
+                    profile_path=root / "profile.json",
+                    output_root=output_root,
+                    verifier_image=None,
+                    max_cases=1,
+                    max_repairs=1,
+                    max_seconds=120,
+                    analyze_only=False,
+                )
+        self.assertEqual(result["evidence_basis"], "deterministic_only")
+        self.assertFalse(result["judge_required"])
+        self.assertEqual(result["grader_evidence"]["status"], "recomputed_match")
+        self.assertEqual(result["cases"][0]["status"], "review_pending")
+        self.assertEqual(result["repair_attempts_started"], 0)
+
+    def test_deterministic_grader_failure_and_missing_grade_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            _result_path, run, case, run_root = _write_deterministic_baseline(
+                Path(temporary)
+            )
+            with self.assertRaisesRegex(
+                AgentEvalError, "fixed deterministic grader failed"
+            ):
+                self._validate_deterministic_fixture(
+                    run, case, run_root, grade_error=RuntimeError("grader crashed")
+                )
+            mismatch = json.loads(
+                (run_root / run["attempts"][0]["grade"]["path"]).read_text(
+                    encoding="utf-8"
+                )
+            )
+            mismatch["assertions"][0]["status"] = "pass"
+            with self.assertRaisesRegex(AgentEvalError, "does not match"):
+                self._validate_deterministic_fixture(
+                    run, case, run_root, grade_override=mismatch
+                )
+            (run_root / run["attempts"][0]["grade"]["path"]).unlink()
+            with self.assertRaisesRegex(AgentEvalError, "saved evaluation path"):
+                self._validate_deterministic_fixture(run, case, run_root)
+
+    def test_deterministic_candidate_missing_result_is_review_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir()
+            (evidence_root / "isolation.json").write_text(
+                "verified\n", encoding="utf-8"
+            )
+            profile = {
+                "agent": {
+                    "name": "fake",
+                    "model": "fake-model",
+                    "cli_version": "fake-version",
+                    "timeout_seconds": 30,
+                },
+                "verification": {"evidence_path": "isolation.json"},
+            }
+            with patch.object(improve_module, "run_agent_evaluation", return_value=2):
+                result = improve_module._run_deterministic_candidate_eval(
+                    baseline={
+                        "skill_revision": "2" * 40,
+                        "agent_command_template": ["docker", "run", "agent"],
+                    },
+                    skill="test-case-design",
+                    eval_id="TC-DT-TEST",
+                    profile=profile,
+                    profile_path=root / "profile.json",
+                    evidence_root=evidence_root,
+                    destination=root / "candidate-run",
+                    candidate_package=root / "candidate-package",
+                    timeout_seconds=240,
+                )
+            self.assertEqual(result["status"], "review_pending")
+            self.assertIn("did_not_save_result", result["reason"])
+
+
+    def test_deterministic_environment_skill_use_and_mixed_evidence_block(self) -> None:
+        mutations = (
+            ("environment", lambda row: row["agent_execution"].update(exit_code=1)),
+            (
+                "skill_unused",
+                lambda row: row.update(skill_use_observation="unverified"),
+            ),
+            ("mixed", lambda row: row.update(judge=[{"status": "pass"}])),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                _result_path, run, case, run_root = _write_deterministic_baseline(
+                    Path(temporary)
+                )
+                mutate(run["attempts"][0])
+                with self.assertRaises(AgentEvalError):
+                    self._validate_deterministic_fixture(run, case, run_root)
+
+    def test_semantic_or_mixed_improvement_requires_judge_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            baseline_path = Path(temporary) / "semantic-result.json"
+            baseline_path.write_text(
+                json.dumps({"suite": "semantic", "attempts": []}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AgentEvalError, "requires a verified Judge"):
+                improve_module.run_improvements(
+                    baseline_result=baseline_path,
+                    judge_validation_result=None,
+                    target_root=None,
+                    profile_path=Path(temporary) / "profile.json",
+                    output_root=Path(temporary) / "out",
+                    verifier_image=None,
+                    max_cases=1,
+                    max_repairs=1,
+                    max_seconds=60,
+                    analyze_only=False,
+                )
+
+    def test_deterministic_improvement_requires_independent_case_and_contract_pass(
+        self,
+    ) -> None:
+        before = [
+            {
+                "snapshot": {"DT-ASSERT-001": "fail"},
+                "grade": {"status": "fail"},
+                "attempt": {"skill_use_observation": "observed"},
+            }
+            for _ in range(2)
+        ]
+        after = [
+            {
+                "snapshot": {"DT-ASSERT-001": "pass"},
+                "grade": {"status": "pass"},
+                "attempt": {"skill_use_observation": "observed"},
+            }
+            for _ in range(2)
+        ]
+        baseline = {
+            "skill": "test-case-design",
+            "eval_id": "TC-DT-TEST",
+            "input_fingerprint": "input-fingerprint",
+            "dataset_fingerprint": "dataset-fingerprint",
+            "failed_assertion_ids": ["DT-ASSERT-001"],
+            "attempts": before,
+        }
+        candidate = {
+            **baseline,
+            "failed_assertion_ids": [],
+            "attempts": after,
+        }
+        contract = {
+            "status": "pass",
+            "planned": 1,
+            "completed": 1,
+            "conditions_match": True,
+            "results": [{"status": "pass"}],
+        }
+        independent = {
+            "status": "pass",
+            "planned": 1,
+            "cases": [{"status": "pass"}],
+            "expected_inputs_disclosed": False,
+            "expected_results_disclosed": False,
+            "feedback_to_repair_agent": False,
+            "candidate_fingerprint_fixed": True,
+            "conditions_match": True,
+        }
+        assessment = improve_module._assess_deterministic_improvement(
+            baseline,
+            candidate,
+            comparison={"comparable": True},
+            independent_assessment=independent,
+            contract_test_assessment=contract,
+        )
+        self.assertTrue(assessment["improvement_demonstrated"])
+        pending = improve_module._assess_deterministic_improvement(
+            baseline,
+            candidate,
+            comparison={"comparable": True},
+            independent_assessment={
+                **independent,
+                "status": "review_pending",
+                "cases": [{"status": "review_pending"}],
+            },
+            contract_test_assessment=contract,
+        )
+        self.assertFalse(pending["improvement_demonstrated"])
+        self.assertFalse(pending["requirements"]["independent_cases_passed"])
+
+    def test_deterministic_independent_plan_freezes_semantic_case_as_judge_gated(
+        self,
+    ) -> None:
+        agent_run = importlib.import_module("scripts.skills.evals.agent.run")
+        profile = {
+            "agent": {"skill_roots": []},
+            "judge": {"skill_roots": [], "cwd": "judge", "command_argv": []},
+            "isolation": {"agent_read_roots": []},
+            "verification": {"evidence_path": "evidence.json"},
+        }
+        cases = [
+            {
+                "skill": "test-case-design",
+                "id": "TC-DT-OTHER",
+                "input": "Independent input\n",
+                "fingerprint_files": [("input.md", b"Independent input\n")],
+            }
+        ]
+        semantic_cases = [
+            {
+                "skill": "test-case-design",
+                "id": "TC-SEM-OTHER",
+                "input": "Semantic input\n",
+                "fingerprint_files": [("semantic-input.md", b"Semantic input\n")],
+            }
+        ]
+        with (
+            patch.object(agent_run, "_load_deterministic_cases", return_value=cases),
+            patch.object(
+                agent_run,
+                "_load_semantic_cases",
+                return_value=semantic_cases,
+            ),
+            patch.object(
+                improve_module,
+                "_related_contract_tests",
+                return_value=[{"path": "tests/test_skill.py", "sha256": "a" * 64}],
+            ),
+        ):
+            plan = _freeze_independent_eval_plan(
+                skill="test-case-design",
+                evaluator_revision="1" * 40,
+                skill_revision="2" * 40,
+                baseline_package_fingerprint="baseline-package-fingerprint",
+                profile=profile,
+                agent_command=["docker", "run", "agent"],
+            )
+        self.assertEqual(plan["status"], "ready")
+        self.assertEqual(
+            [row["suite"] for row in plan["cases"]], ["deterministic", "semantic"]
+        )
+
+    def test_deterministic_independent_case_runs_while_semantic_case_stays_pending(
+        self,
+    ) -> None:
+        deterministic_case = {
+            "suite": "deterministic",
+            "skill": "test-case-design",
+            "case_id": "TC-DT-OTHER",
+            "baseline_package_fingerprint": "baseline-package",
+        }
+        semantic_case = {
+            "suite": "semantic",
+            "skill": "test-case-design",
+            "case_id": "TC-SEM-OTHER",
+            "verification_status": "judge_unverified",
+        }
+        baseline_results = [
+            {
+                "case": deterministic_case,
+                "status": "captured",
+                "validation": {"status": "pass"},
+                "result_path": "baseline-deterministic.json",
+            },
+            {
+                "case": semantic_case,
+                "status": "review_pending",
+                "reason": "semantic_independent_case_requires_verified_judge",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+
+            def fake_run(**kwargs):
+                destination = kwargs["destination"]
+                destination.mkdir(parents=True, exist_ok=True)
+                result_path = destination / "result.json"
+                result_path.write_text("{}\n", encoding="utf-8")
+                return {"status": "captured", "result_path": str(result_path)}
+
+            with (
+                patch.object(
+                    improve_module, "_run_independent_eval", side_effect=fake_run
+                ) as run_spy,
+                patch.object(
+                    improve_module,
+                    "_assess_independent_case",
+                    return_value={
+                        "status": "pass",
+                        "conditions_match": True,
+                        "no_new_regressions": True,
+                        "candidate_package_fingerprint": "candidate-package",
+                    },
+                ),
+            ):
+                result = improve_module._run_candidate_independent_assessment(
+                    plan={"cases": [deterministic_case, semantic_case]},
+                    baseline_results=baseline_results,
+                    baseline={"agent_command_template": ["docker", "run", "agent"]},
+                    profile={},
+                    profile_path=root / "profile.json",
+                    evidence_root=root,
+                    case_root=root / "case",
+                    candidate_package=root / "candidate-package",
+                    candidate_package_fingerprint="candidate-package",
+                    timeout_seconds=100,
+                    compare_runs=lambda *_args: {"comparable": True},
+                )
+        self.assertEqual(run_spy.call_count, 1)
+        self.assertEqual(run_spy.call_args.kwargs["case"]["suite"], "deterministic")
+        self.assertEqual(result["status"], "review_pending")
+        self.assertEqual(
+            [row["status"] for row in result["cases"]],
+            ["pass", "review_pending"],
+            result,
+        )
+
+    def test_independent_deterministic_run_regrades_and_resolves_saved_trace(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            result_path, run, case_data, run_root = _write_deterministic_baseline(
+                Path(temporary)
+            )
+            profile = {
+                "agent": {},
+                "judge": {},
+                "isolation": {},
+                "verification": {},
+            }
+            run["profile_fingerprint"] = "profile-fingerprint"
+            run["agent_command_fingerprint"] = canonical_fingerprint(
+                run["agent_command_template"]
+            )
+            case = {
+                "suite": "deterministic",
+                "skill": case_data["skill"],
+                "case_id": case_data["id"],
+                "input_fingerprint": run["attempts"][0]["input_fingerprint"],
+                "dataset_fingerprint": run["dataset_fingerprint"],
+                "evaluator_revision": "1" * 40,
+                "skill_revision": "2" * 40,
+                "profile_fingerprint": "profile-fingerprint",
+                "agent_command_fingerprint": run["agent_command_fingerprint"],
+                "judge_command_fingerprint": run["judge_command_fingerprint"],
+            }
+            fake_module = types.ModuleType("scripts.skills.evals.deterministic.run")
+            fake_module.grade = lambda _skill, _eval, output, **_kwargs: json.loads(
+                (output.parent.parent / "grade.json").read_text(encoding="utf-8")
+            )
+            with (
+                patch.object(
+                    improve_module,
+                    "profile_fingerprint",
+                    return_value="profile-fingerprint",
+                ),
+                patch.dict(
+                    sys.modules,
+                    {"scripts.skills.evals.deterministic.run": fake_module},
+                ),
+            ):
+                assessment = improve_module._validate_independent_run(
+                    result_path,
+                    case=case,
+                    profile=profile,
+                    package_fingerprint="baseline-package-fingerprint",
+                    candidate=False,
+                    runtime_source_root=run_root,
+                )
+            trace_path = (
+                run_root
+                / "deterministic"
+                / case_data["skill"]
+                / case_data["id"]
+                / "attempt-01"
+                / "agent-trace.json"
+            )
+            trace_path.write_text('{"status":"captured"}\n', encoding="utf-8")
+            with patch.object(
+                improve_module,
+                "profile_fingerprint",
+                return_value="profile-fingerprint",
+            ), patch.dict(
+                sys.modules,
+                {"scripts.skills.evals.deterministic.run": fake_module},
+            ):
+                tampered_assessment = improve_module._validate_independent_run(
+                    result_path,
+                    case=case,
+                    profile=profile,
+                    package_fingerprint="baseline-package-fingerprint",
+                    candidate=False,
+                    runtime_source_root=run_root,
+                )
+        self.assertEqual(assessment["status"], "pass")
+        self.assertEqual(assessment["grades"][1]["DT-ASSERT-001"], 0)
+        self.assertEqual(tampered_assessment["status"], "review_pending")
+        self.assertIn("trace changed", tampered_assessment["reason"])
 
     def test_related_contract_tests_require_the_frozen_candidate_package(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

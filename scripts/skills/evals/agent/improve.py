@@ -30,7 +30,7 @@ from .common import (
     sanitize_diagnostic,
     sha256_bytes,
 )
-from .executor import run_command
+from .executor import AgentExecutionError, run_command
 from .judge_validation import (
     _artifact_content_fingerprint,
     _expected_matches,
@@ -42,6 +42,7 @@ from .qa_training_store import (
     load_scenario,
     validate_artifact_index,
 )
+from .run import _has_secret_command_argument
 from .run import run as run_agent_evaluation
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
 from .tools.codex_docker_launcher import launcher_argv
@@ -577,6 +578,436 @@ def _stable_failures(
     return failures
 
 
+def _deterministic_grade_snapshot(
+    grade: dict[str, Any], *, skill: str, eval_id: str
+) -> dict[str, str]:
+    assertions = grade.get("assertions")
+    summary = grade.get("summary")
+    if (
+        grade.get("skill") != skill
+        or grade.get("eval_id") != eval_id
+        or grade.get("status") not in {"pass", "fail"}
+        or not isinstance(assertions, list)
+        or not assertions
+        or not isinstance(summary, dict)
+    ):
+        raise AgentEvalError("fixed deterministic grade schema is invalid")
+    scores = {"fail": 0, "warning": 1, "pass": 2}
+    snapshot: dict[str, str] = {}
+    for row in assertions:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("id"), str)
+            or not row["id"]
+            or row.get("status") not in scores
+            or row.get("severity") not in {"error", "warning"}
+            or not isinstance(row.get("message"), str)
+            or row["id"] in snapshot
+        ):
+            raise AgentEvalError("fixed deterministic assertion record is invalid")
+        snapshot[row["id"]] = row["status"]
+    counts = {
+        "errors": sum(status == "fail" for status in snapshot.values()),
+        "warnings": sum(status == "warning" for status in snapshot.values()),
+        "passed": sum(status == "pass" for status in snapshot.values()),
+        "total": len(snapshot),
+    }
+    if any(summary.get(key) != value for key, value in counts.items()):
+        raise AgentEvalError("fixed deterministic grade summary is inconsistent")
+    expected_rate = counts["passed"] / counts["total"]
+    if summary.get("assertion_pass_rate") != expected_rate:
+        raise AgentEvalError("fixed deterministic grade rate is inconsistent")
+    expected_status = "fail" if counts["errors"] else "pass"
+    if grade["status"] != expected_status:
+        raise AgentEvalError("fixed deterministic grade status is inconsistent")
+    return snapshot
+
+
+def _deterministic_attempt_data(
+    run: dict[str, Any],
+    run_root: Path,
+    *,
+    runtime_source_root: Path,
+    expected_package_fingerprint: str | None = None,
+    expected_candidate_status: str = "git_commit",
+) -> dict[str, Any]:
+    from .run import _dataset_fingerprint, _load_deterministic_cases
+    from scripts.skills.evals.deterministic.run import grade as deterministic_grade
+
+    evaluator = run.get("evaluator")
+    package = run.get("skill_package")
+    template = run.get("agent_command_template")
+    attempts = run.get("attempts")
+    if (
+        run.get("suite") != "deterministic"
+        or run.get("target_revision") is not None
+        or run.get("evidence_basis") not in {None, "deterministic_only"}
+        or run.get("judge_validation_result") is not None
+        or run.get("profile_verification") != "verified"
+        or run.get("workspace_cleanup") != "succeeded"
+        or run.get("skill_candidate_revision_status") != expected_candidate_status
+        or run.get("repeat") != 2
+        or run.get("cases_requested") != 1
+        or not isinstance(evaluator, dict)
+        or not isinstance(evaluator.get("revision"), str)
+        or not isinstance(run.get("skill_revision"), str)
+        or not isinstance(package, dict)
+        or not isinstance(package.get("skills"), list)
+        or any(not isinstance(name, str) or not name for name in package["skills"])
+        or len(set(package["skills"])) != len(package["skills"])
+        or not isinstance(package.get("package_fingerprint"), str)
+        or (
+            expected_package_fingerprint is not None
+            and package["package_fingerprint"] != expected_package_fingerprint
+        )
+        or not isinstance(run.get("profile_fingerprint"), str)
+        or not isinstance(run.get("agent_command_fingerprint"), str)
+        or not isinstance(run.get("judge_command_fingerprint"), str)
+        or not isinstance(template, list)
+        or not template
+        or run.get("agent_command_saved") is not True
+        or _has_secret_command_argument(template)
+        or run.get("agent_command_fingerprint") != canonical_fingerprint(template)
+        or not isinstance(attempts, list)
+        or len(attempts) != 2
+    ):
+        raise AgentEvalError("deterministic baseline run provenance is incomplete")
+
+    identities: set[tuple[str, str, int]] = set()
+    attempt_ids: set[str] = set()
+    attempt_roots: set[Path] = set()
+    collected: list[dict[str, Any]] = []
+    skill: str | None = None
+    eval_id: str | None = None
+    for attempt in attempts:
+        if not isinstance(attempt, dict):
+            raise AgentEvalError("deterministic attempt record is invalid")
+        repeat = attempt.get("repeat")
+        current_skill = attempt.get("skill")
+        current_eval_id = attempt.get("eval_id")
+        attempt_id = attempt.get("attempt_id")
+        if (
+            attempt.get("suite") != "deterministic"
+            or not isinstance(current_skill, str)
+            or not isinstance(current_eval_id, str)
+            or isinstance(repeat, bool)
+            or repeat not in {1, 2}
+            or not isinstance(attempt_id, str)
+            or not attempt_id
+            or attempt_id in attempt_ids
+            or (skill is not None and skill != current_skill)
+            or (eval_id is not None and eval_id != current_eval_id)
+            or "judge" in attempt
+        ):
+            raise AgentEvalError(
+                "deterministic run contains mixed, duplicate, or unsupported attempts"
+            )
+        skill = current_skill
+        eval_id = current_eval_id
+        attempt_ids.add(attempt_id)
+        identity = (current_skill, current_eval_id, repeat)
+        if identity in identities:
+            raise AgentEvalError("deterministic attempts are not independent")
+        identities.add(identity)
+
+        output = attempt.get("output")
+        grade_ref = attempt.get("grade")
+        trace = attempt.get("agent_trace")
+        execution = attempt.get("agent_execution")
+        isolation = attempt.get("agent_isolation")
+        command = attempt.get("agent_command")
+        if (
+            attempt.get("status") not in {"pass", "fail"}
+            or attempt.get("skill_use_observation") != "observed"
+            or not isinstance(output, dict)
+            or not isinstance(grade_ref, dict)
+            or not isinstance(trace, dict)
+            or trace.get("status") != "captured"
+            or trace.get("redacted") is not False
+            or trace.get("path") != "agent-trace.json"
+            or not isinstance(execution, dict)
+            or isinstance(execution.get("exit_code"), bool)
+            or execution.get("exit_code") != 0
+            or execution.get("timed_out") is not False
+            or execution.get("container_cleanup_status") != "succeeded"
+            or not isinstance(isolation, dict)
+            or isolation.get("status") != "verified"
+            or not isinstance(command, dict)
+            or not isinstance(command.get("argv"), list)
+            or command.get("fingerprint")
+            != canonical_fingerprint(command.get("argv"))
+            or _has_secret_command_argument(command.get("argv", []))
+        ):
+            raise AgentEvalError(
+                "deterministic Agent execution, Skill-use, or isolation evidence "
+                "is incomplete"
+            )
+
+        output_relative = output.get("path")
+        grade_relative = grade_ref.get("path")
+        expected_case_root = PurePosixPath(
+            "deterministic", current_skill, current_eval_id, f"attempt-{repeat:02d}"
+        )
+        if (
+            output_relative
+            != (expected_case_root / "agent-output" / "output.md").as_posix()
+            or grade_relative != (expected_case_root / "grade.json").as_posix()
+        ):
+            raise AgentEvalError("deterministic output paths do not match the attempt")
+        output_path = _resolve_run_path(run_root, output_relative)
+        grade_path = _resolve_run_path(run_root, grade_relative)
+        output_bytes = output_path.read_bytes()
+        grade_bytes = grade_path.read_bytes()
+        if (
+            sha256_bytes(output_bytes) != output.get("sha256")
+            or sha256_bytes(grade_bytes) != grade_ref.get("sha256")
+        ):
+            raise AgentEvalError(
+                "deterministic output or grade changed after evaluation"
+            )
+        attempt_root = grade_path.parent.resolve()
+        if attempt_root in attempt_roots:
+            raise AgentEvalError("deterministic attempts reuse an output directory")
+        attempt_roots.add(attempt_root)
+
+        trace_path = _resolve_run_path(
+            run_root, (expected_case_root / "agent-trace.json").as_posix()
+        )
+        trace_bytes = trace_path.read_bytes()
+        if sha256_bytes(trace_bytes) != trace.get("sha256"):
+            raise AgentEvalError("deterministic Agent trace changed after evaluation")
+        trace_value = _load_json(trace_path)
+        trace_commands = trace_value.get("commands")
+        if (
+            trace_value.get("status") != "captured"
+            or trace_value.get("turn_completed") is not True
+            or trace_value.get("turn_failed") is not False
+            or not isinstance(trace_commands, list)
+            or not any(
+                isinstance(row, dict)
+                and row.get("successful") is True
+                and isinstance(row.get("skill_files_read"), list)
+                and current_skill in row.get("skill_files_read", [])
+                for row in trace_commands
+            )
+        ):
+            raise AgentEvalError("deterministic trace does not prove Skill use")
+        try:
+            saved_grade = json.loads(grade_bytes)
+        except json.JSONDecodeError as exc:
+            raise AgentEvalError("deterministic grade is not valid JSON") from exc
+        if not isinstance(saved_grade, dict):
+            raise AgentEvalError("deterministic grade must be an object")
+        snapshot = _deterministic_grade_snapshot(
+            saved_grade, skill=current_skill, eval_id=current_eval_id
+        )
+        if saved_grade.get("status") != attempt.get("status"):
+            raise AgentEvalError("deterministic attempt and grade statuses differ")
+        try:
+            recomputed = deterministic_grade(
+                current_skill,
+                current_eval_id,
+                output_path,
+                runtime_source_root=runtime_source_root,
+            )
+        except Exception as exc:
+            raise AgentEvalError(
+                "fixed deterministic grader failed on saved output"
+            ) from exc
+        if canonical_fingerprint(recomputed) != canonical_fingerprint(saved_grade):
+            raise AgentEvalError(
+                "saved deterministic grade does not match the fixed grader output"
+            )
+        collected.append(
+            {
+                "attempt": attempt,
+                "root": attempt_root,
+                "output_path": output_path,
+                "grade_path": grade_path,
+                "grade": saved_grade,
+                "snapshot": snapshot,
+                "trace_path": trace_path,
+            }
+        )
+
+    if (
+        skill is None
+        or eval_id is None
+        or {row["attempt"]["repeat"] for row in collected} != {1, 2}
+    ):
+        raise AgentEvalError(
+            "deterministic baseline must contain two repeated attempts"
+        )
+    if skill not in package["skills"]:
+        raise AgentEvalError("deterministic baseline package omits the target Skill")
+    cases = _load_deterministic_cases(skill, eval_id)
+    if len(cases) != 1:
+        raise AgentEvalError("fixed deterministic case is missing or ambiguous")
+    case = cases[0]
+    input_fingerprint = sha256_bytes(case["input"].encode("utf-8"))
+    dataset_fingerprint = _dataset_fingerprint(case["fingerprint_files"])
+    if (
+        run.get("dataset_fingerprint") != dataset_fingerprint
+        or any(
+            row["attempt"].get("input_fingerprint") != input_fingerprint
+            for row in collected
+        )
+    ):
+        raise AgentEvalError("deterministic input or dataset fingerprint changed")
+    if collected[0]["snapshot"] != collected[1]["snapshot"]:
+        raise AgentEvalError("deterministic repeated grades are unstable")
+    expected_run_status = (
+        "needs_review_or_fail"
+        if any(row["attempt"]["status"] == "fail" for row in collected)
+        else "pass"
+    )
+    if run.get("status") != expected_run_status:
+        raise AgentEvalError("deterministic run summary status is inconsistent")
+    expected_summary = {
+        status: sum(row["attempt"]["status"] == status for row in collected)
+        for status in sorted({row["attempt"]["status"] for row in collected})
+    }
+    if run.get("summary") != expected_summary or run.get("exit_code") != (
+        1 if expected_run_status == "needs_review_or_fail" else 0
+    ):
+        raise AgentEvalError(
+            "deterministic run summary counts or exit code are inconsistent"
+        )
+    failures = sorted(
+        assertion_id
+        for assertion_id, status in collected[0]["snapshot"].items()
+        if status == "fail"
+    )
+    return {
+        "skill": skill,
+        "eval_id": eval_id,
+        "case": case,
+        "input_fingerprint": input_fingerprint,
+        "dataset_fingerprint": dataset_fingerprint,
+        "attempts": collected,
+        "failed_assertion_ids": failures,
+    }
+
+
+def _prepare_deterministic_analysis_workspace(
+    *,
+    workspace: Path,
+    failure: dict[str, Any],
+    package_root: Path,
+) -> tuple[dict[str, dict[str, Any]], str, list[dict[str, str]]]:
+    skill = failure["skill"]
+    source_map: dict[str, dict[str, Any]] = {}
+    prompt_parts: list[str] = []
+    manifest: list[dict[str, str]] = []
+    total_bytes = 0
+    input_path = failure["case"].get("input_path")
+    if not isinstance(input_path, Path) or input_path.is_symlink():
+        raise AgentEvalError("deterministic public input is unavailable or unsafe")
+    try:
+        input_relative = input_path.relative_to(REPO_ROOT).as_posix()
+    except ValueError as exc:
+        raise AgentEvalError(
+            "deterministic public input is outside the Evaluator"
+        ) from exc
+    input_bytes = _safe_child_file(REPO_ROOT, input_relative).read_bytes()
+    if sha256_bytes(input_bytes) != failure["input_fingerprint"]:
+        raise AgentEvalError("deterministic public input changed after grading")
+    total_bytes = _add_analysis_source(
+        workspace=workspace,
+        source_path="public-input/eval-input.md",
+        data=input_bytes,
+        kind="public_input",
+        sources=source_map,
+        prompt_parts=prompt_parts,
+        total_bytes=total_bytes,
+    )
+    manifest.append(
+        {
+            "path": "public-input/eval-input.md",
+            "sha256": source_map["public-input/eval-input.md"]["sha256"],
+        }
+    )
+    for index, attempt in enumerate(failure["attempts"], start=1):
+        output_bytes = attempt["output_path"].read_bytes()
+        if sha256_bytes(output_bytes) != attempt["attempt"].get("output", {}).get(
+            "sha256"
+        ):
+            raise AgentEvalError(
+                "original deterministic output changed before analysis"
+            )
+        grade_bytes = attempt["grade_path"].read_bytes()
+        if sha256_bytes(grade_bytes) != attempt["attempt"].get("grade", {}).get(
+            "sha256"
+        ):
+            raise AgentEvalError("original deterministic grade changed before analysis")
+        output_alias = f"original-artifacts/attempt-{index:02d}/output.md"
+        total_bytes = _add_analysis_source(
+            workspace=workspace,
+            source_path=output_alias,
+            data=output_bytes,
+            kind="artifact",
+            sources=source_map,
+            prompt_parts=prompt_parts,
+            total_bytes=total_bytes,
+        )
+        manifest.append(
+            {"path": output_alias, "sha256": source_map[output_alias]["sha256"]}
+        )
+        summary = {
+            "suite": "deterministic",
+            "skill": skill,
+            "eval_id": failure["eval_id"],
+            "repeat": attempt["attempt"]["repeat"],
+            "status": "fail",
+            "failed_assertion_ids": failure["failed_assertion_ids"],
+        }
+        summary_bytes = (
+            json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
+        ).encode()
+        summary_alias = f"original-artifacts/attempt-{index:02d}/grader-findings.json"
+        total_bytes = _add_analysis_source(
+            workspace=workspace,
+            source_path=summary_alias,
+            data=summary_bytes,
+            kind="artifact",
+            sources=source_map,
+            prompt_parts=prompt_parts,
+            total_bytes=total_bytes,
+        )
+        manifest.append(
+            {"path": summary_alias, "sha256": source_map[summary_alias]["sha256"]}
+        )
+
+    skills_root = package_root / "skills"
+    (workspace / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
+    skill_root = skills_root / skill
+    if skill_root.is_symlink() or not skill_root.is_dir():
+        raise AgentEvalError("deterministic analysis Skill source is missing or unsafe")
+    visible_root = workspace / ".agents" / "skills" / skill
+    for relative in _allowed_repair_paths(skill, package_root):
+        source = _safe_child_file(skill_root, relative)
+        data = source.read_bytes()
+        try:
+            data.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            continue
+        alias = f".agents/skills/{skill}/{relative}"
+        total_bytes = _add_analysis_source(
+            workspace=workspace,
+            source_path=alias,
+            data=data,
+            kind="skill",
+            sources=source_map,
+            prompt_parts=prompt_parts,
+            total_bytes=total_bytes,
+        )
+        destination = visible_root / safe_relative_path(relative)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_bytes(destination, data)
+        manifest.append({"path": alias, "sha256": source_map[alias]["sha256"]})
+    return source_map, "\n".join(prompt_parts), manifest
+
+
 def _source_paths(package_root: Path, skill: str) -> dict[str, str]:
     manifest: dict[str, str] = {}
     root = package_root / "skills" / skill
@@ -1097,6 +1528,7 @@ def _freeze_independent_eval_plan(
     baseline_package_fingerprint: str,
     profile: dict[str, Any],
     agent_command: list[str],
+    suites: set[str] | None = None,
 ) -> dict[str, Any]:
     cases = []
     try:
@@ -1106,10 +1538,14 @@ def _freeze_independent_eval_plan(
             _load_semantic_cases,
         )
 
-        for suite, values in (
-            ("deterministic", _load_deterministic_cases(skill, None)),
-            ("semantic", _load_semantic_cases(skill, None)),
-        ):
+        suite_values = []
+        if suites is None or "deterministic" in suites:
+            suite_values.append(
+                ("deterministic", _load_deterministic_cases(skill, None))
+            )
+        if suites is None or "semantic" in suites:
+            suite_values.append(("semantic", _load_semantic_cases(skill, None)))
+        for suite, values in suite_values:
             for case in values:
                 input_fingerprint = sha256_bytes(case["input"].encode("utf-8"))
                 cases.append(
@@ -1489,6 +1925,104 @@ def _run_independent_eval(
         }
 
 
+def _run_deterministic_candidate_eval(
+    *,
+    baseline: dict[str, Any],
+    skill: str,
+    eval_id: str,
+    profile: dict[str, Any],
+    profile_path: Path,
+    evidence_root: Path,
+    destination: Path,
+    candidate_package: Path,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    evidence_relative = safe_relative_path(profile["verification"]["evidence_path"])
+    required_seconds = 2 * (profile["agent"]["timeout_seconds"] + 60)
+    if timeout_seconds < required_seconds:
+        return {
+            "status": "review_pending",
+            "reason": "insufficient_budget_for_deterministic_candidate_repeats",
+            "required_seconds": required_seconds,
+            "available_seconds": timeout_seconds,
+        }
+    source_evidence = evidence_root / evidence_relative
+    if source_evidence.is_symlink() or not source_evidence.is_file():
+        return {"status": "review_pending", "reason": "isolation_evidence_missing"}
+    try:
+        destination.mkdir(parents=True, exist_ok=False)
+        evidence_destination = destination / evidence_relative
+        evidence_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_evidence, evidence_destination)
+    except OSError as exc:
+        return {
+            "status": "review_pending",
+            "reason": sanitize_diagnostic(str(exc), 500),
+        }
+    args = [
+        "--suite",
+        "deterministic",
+        "--skill",
+        skill,
+        "--eval-id",
+        eval_id,
+        "--skill-revision",
+        baseline["skill_revision"],
+        "--skill-package-root",
+        str(candidate_package),
+        "--execution-profile",
+        str(profile_path),
+        "--output-root",
+        str(destination),
+        "--repeat",
+        "2",
+        "--agent-name",
+        profile["agent"]["name"],
+        "--agent-model",
+        profile["agent"]["model"],
+        "--agent-version",
+        profile["agent"]["cli_version"],
+        "--agent-command",
+        *baseline["agent_command_template"],
+    ]
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    try:
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = run_agent_evaluation(args)
+        result_path = destination / "result.json"
+        if not result_path.is_file():
+            return {
+                "status": "review_pending",
+                "reason": sanitize_diagnostic(
+                    stderr.getvalue()
+                    or stdout.getvalue()
+                    or "candidate_deterministic_eval_did_not_save_result_"
+                    f"exit_{exit_code}",
+                    500,
+                ),
+                "runner_output_sha256": sha256_bytes(
+                    (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+                ),
+            }
+        return {
+            "status": "captured",
+            "exit_code": exit_code,
+            "result_path": str(result_path),
+            "runner_output_sha256": sha256_bytes(
+                (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+            ),
+        }
+    except (AgentEvalError, OSError, TypeError, ValueError, KeyError) as exc:
+        return {
+            "status": "review_pending",
+            "reason": sanitize_diagnostic(str(exc), 500),
+            "runner_output_sha256": sha256_bytes(
+                (stdout.getvalue() + stderr.getvalue()).encode("utf-8")
+            ),
+        }
+
+
 def _grade_snapshot(suite: str, grade: dict[str, Any]) -> dict[str, int] | None:
     if suite == "deterministic":
         rows = grade.get("assertions")
@@ -1532,6 +2066,7 @@ def _validate_independent_run(
     profile: dict[str, Any],
     package_fingerprint: str,
     candidate: bool,
+    runtime_source_root: Path | None = None,
 ) -> dict[str, Any]:
     try:
         run = _load_json(result_path)
@@ -1614,10 +2149,26 @@ def _validate_independent_run(
             output_bytes = output_path.read_bytes()
             if sha256_bytes(output_bytes) != output.get("sha256"):
                 raise AgentEvalError("independent output changed after evaluation")
-            trace_relative = (
-                PurePosixPath(output["path"]).parent / trace["path"]
-            ).as_posix()
-            trace_path = _resolve_run_path(root, trace_relative)
+            trace_relative = safe_relative_path(trace["path"])
+            output_parent = PurePosixPath(output["path"]).parent
+            trace_candidates = [
+                (output_parent / trace_relative).as_posix(),
+                (output_parent.parent / trace_relative).as_posix(),
+            ]
+            existing_trace_paths = []
+            for relative in dict.fromkeys(trace_candidates):
+                try:
+                    existing_trace_paths.append(_resolve_run_path(root, relative))
+                except AgentEvalError:
+                    continue
+            if len(existing_trace_paths) != 1:
+                raise AgentEvalError(
+                    "independent Agent trace path is missing or ambiguous"
+                )
+            trace_path = existing_trace_paths[0]
+            trace_bytes = trace_path.read_bytes()
+            if sha256_bytes(trace_bytes) != trace.get("sha256"):
+                raise AgentEvalError("independent Agent trace changed after evaluation")
             trace_summary = _load_json(trace_path)
             commands = trace_summary.get("commands")
             if (
@@ -1671,6 +2222,22 @@ def _validate_independent_run(
                 raise AgentEvalError(
                     "independent grade evidence is missing or inconsistent"
                 )
+            if case["suite"] == "deterministic" and runtime_source_root is not None:
+                from scripts.skills.evals.deterministic.run import (
+                    grade as deterministic_grade,
+                )
+
+                recomputed = deterministic_grade(
+                    case["skill"],
+                    case["case_id"],
+                    output_path,
+                    runtime_source_root=runtime_source_root,
+                )
+                if canonical_fingerprint(recomputed) != canonical_fingerprint(grade):
+                    raise AgentEvalError(
+                        "independent grade does not match the fixed "
+                        "deterministic grader"
+                    )
             by_repeat[repeat] = snapshot
         if set(by_repeat) != {1, 2} or by_repeat[1] != by_repeat[2]:
             raise AgentEvalError("independent repeated grades are unstable")
@@ -1691,6 +2258,8 @@ def _assess_independent_case(
     baseline_package_fingerprint: str,
     candidate_package_fingerprint: str,
     comparison: dict[str, Any],
+    baseline_runtime_source_root: Path | None = None,
+    candidate_runtime_source_root: Path | None = None,
 ) -> dict[str, Any]:
     if not comparison.get("comparable"):
         return {
@@ -1705,6 +2274,7 @@ def _assess_independent_case(
         profile=profile,
         package_fingerprint=baseline_package_fingerprint,
         candidate=False,
+        runtime_source_root=baseline_runtime_source_root,
     )
     candidate = _validate_independent_run(
         candidate_path,
@@ -1712,6 +2282,7 @@ def _assess_independent_case(
         profile=profile,
         package_fingerprint=candidate_package_fingerprint,
         candidate=True,
+        runtime_source_root=candidate_runtime_source_root,
     )
     if baseline["status"] != "pass" or candidate["status"] != "pass":
         return {
@@ -1754,6 +2325,7 @@ def _run_candidate_independent_assessment(
     case_root: Path,
     candidate_package: Path,
     candidate_package_fingerprint: str,
+    baseline_runtime_source_root: Path | None = None,
     timeout_seconds: int,
     compare_runs: Any,
 ) -> dict[str, Any]:
@@ -1780,6 +2352,16 @@ def _run_candidate_independent_assessment(
             "status": "review_pending",
             "candidate_package_fingerprint": candidate_package_fingerprint,
         }
+        if (
+            key[0] == "semantic"
+            and independent_case.get("verification_status") != "verified"
+        ):
+            entry["reason"] = "semantic_independent_case_requires_verified_judge"
+            entry["judge_validation_status"] = "judge_unverified"
+            conditions_match = False
+            fixed_candidate_fingerprint = False
+            cases.append(entry)
+            continue
         if (
             not isinstance(baseline_entry, dict)
             or baseline_entry.get("status") != "captured"
@@ -1825,6 +2407,12 @@ def _run_candidate_independent_assessment(
                 ],
                 candidate_package_fingerprint=candidate_package_fingerprint,
                 comparison=comparison,
+                baseline_runtime_source_root=baseline_runtime_source_root,
+                candidate_runtime_source_root=(
+                    candidate_package
+                    if baseline_runtime_source_root is not None
+                    else None
+                ),
             )
         except (AgentEvalError, OSError, TypeError, ValueError, KeyError) as exc:
             assessment = {
@@ -1844,11 +2432,14 @@ def _run_candidate_independent_assessment(
             }
         )
         conditions_match = conditions_match and entry["conditions_match"]
-        fixed_candidate_fingerprint = fixed_candidate_fingerprint and (
+        case_fingerprint_fixed = (
             assessment.get("candidate_package_fingerprint")
             == candidate_package_fingerprint
         )
-        if not fixed_candidate_fingerprint:
+        fixed_candidate_fingerprint = (
+            fixed_candidate_fingerprint and case_fingerprint_fixed
+        )
+        if not case_fingerprint_fixed:
             entry["status"] = "review_pending"
             entry["reason"] = "candidate_package_fingerprint_changed"
         cases.append(entry)
@@ -2043,15 +2634,124 @@ def _assess_improvement(
     }
 
 
+def _assess_deterministic_improvement(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    comparison: dict[str, Any],
+    independent_assessment: dict[str, Any] | None = None,
+    contract_test_assessment: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    target_ids = baseline.get("failed_assertion_ids")
+    before = baseline.get("attempts")
+    after = candidate.get("attempts")
+    if (
+        not comparison.get("comparable")
+        or not isinstance(target_ids, list)
+        or not target_ids
+        or not isinstance(before, list)
+        or not isinstance(after, list)
+        or len(before) != 2
+        or len(after) != 2
+        or candidate.get("skill") != baseline.get("skill")
+        or candidate.get("eval_id") != baseline.get("eval_id")
+        or candidate.get("input_fingerprint") != baseline.get("input_fingerprint")
+        or candidate.get("dataset_fingerprint") != baseline.get("dataset_fingerprint")
+    ):
+        return {
+            "target_assertion_statuses": [],
+            "target_progress_consistently": False,
+            "target_improved_consistently": False,
+            "no_critical_regressions": False,
+            "skill_use_observation": {"baseline": [], "candidate": []},
+            "improvement_demonstrated": False,
+            "reason": "deterministic baseline and candidate evidence is not comparable",
+        }
+    target_statuses = []
+    no_regressions = True
+    score = {"fail": 0, "warning": 1, "pass": 2}
+    for left, right in zip(before, after, strict=True):
+        left_snapshot = left["snapshot"]
+        right_snapshot = right["snapshot"]
+        if set(left_snapshot) != set(right_snapshot):
+            no_regressions = False
+            continue
+        if any(
+            score[right_snapshot[key]] < score[left_snapshot[key]]
+            for key in left_snapshot
+        ):
+            no_regressions = False
+        target_statuses.append(
+            {
+                assertion_id: right_snapshot.get(assertion_id)
+                for assertion_id in target_ids
+            }
+        )
+    target_progress = bool(target_statuses) and all(
+        all(
+            isinstance(status, str)
+            and score[status] > score["fail"]
+            for status in row.values()
+        )
+        for row in target_statuses
+    )
+    target_improved = target_progress and all(
+        all(status == "pass" for status in row.values()) for row in target_statuses
+    )
+    target_improved = target_improved and all(
+        row["grade"].get("status") == "pass" for row in after
+    )
+    baseline_use = [row["attempt"]["skill_use_observation"] for row in before]
+    candidate_use = [row["attempt"]["skill_use_observation"] for row in after]
+    skill_use_verified = bool(
+        baseline_use
+        and candidate_use
+        and all(value == "observed" for value in baseline_use + candidate_use)
+    )
+    requirements = _improvement_requirements(
+        target_improved=target_improved,
+        no_critical_regressions=no_regressions,
+        skill_use_verified=skill_use_verified,
+        target_conditions_match=comparison.get("comparable") is True,
+        independent_assessment=independent_assessment,
+        contract_test_assessment=contract_test_assessment,
+    )
+    unmet = [key for key, value in requirements.items() if value is False]
+    return {
+        "target_assertion_ids": target_ids,
+        "target_assertion_statuses": target_statuses,
+        "target_progress_consistently": target_progress,
+        "target_improved_consistently": target_improved,
+        "no_critical_regressions": no_regressions,
+        "skill_use_observation": {"baseline": baseline_use, "candidate": candidate_use},
+        "independent_regression_status": (
+            independent_assessment.get("status", "review_pending")
+            if isinstance(independent_assessment, dict)
+            else "not_run"
+        ),
+        "contract_test_status": (
+            contract_test_assessment.get("status", "review_pending")
+            if isinstance(contract_test_assessment, dict)
+            else "not_run"
+        ),
+        "requirements": requirements,
+        "improvement_demonstrated": requirements["improvement_demonstrated"],
+        "reason": None
+        if requirements["improvement_demonstrated"]
+        else "unmet_improvement_requirements:" + ",".join(unmet),
+    }
+
+
 def _write_analysis_artifacts(case_root: Path, case_record: dict[str, Any]) -> None:
     analysis = case_record.get("analysis", {})
     decision = case_record.get("analysis_decision", {})
+    verified_fixture = case_record.get("verified_judge_fixture")
     saved = {
         "schema_version": 1,
         "criterion": case_record.get("criterion"),
         "status": case_record.get("status"),
         "blocked_reason": case_record.get("blocked_reason"),
-        "verified_judge_fixture": case_record.get("verified_judge_fixture"),
+        "verified_judge_fixture": verified_fixture,
         "observations": case_record.get("observations", []),
         "analysis_status": analysis.get("status"),
         "analysis_prompt_sha256": analysis.get("prompt_sha256"),
@@ -2065,7 +2765,14 @@ def _write_analysis_artifacts(case_root: Path, case_record: dict[str, Any]) -> N
         f"# 改善分析: {case_record.get('criterion', 'unknown')}",
         "",
         f"- 状態: {case_record.get('status', 'unknown')}",
-        f"- Judge検証fixture: {case_record.get('verified_judge_fixture', {}).get('case_id', '未指定')}",
+        "- Judge検証fixture: "
+        + (
+            str(verified_fixture.get("case_id", "未指定"))
+            if isinstance(verified_fixture, dict)
+            else "不要（deterministic-only）"
+            if case_record.get("evidence_basis") == "deterministic_only"
+            else "未指定"
+        ),
         f"- 停止理由: {case_record.get('blocked_reason', 'なし')}",
         "",
         "## 分析Agentの判定",
@@ -2087,28 +2794,1060 @@ def _write_analysis_artifacts(case_root: Path, case_record: dict[str, Any]) -> N
         "",
         *[f"- `{item}`" for item in decision.get("repair_paths", [])],
         "",
-        "原判定、artifact、固定Referenceはこの記録から変更していません。Agent responseはJSON側に安全化済みで保存します。",
+        "原判定、artifact、固定Referenceはこの記録から変更していません。"
+        "Agent responseはJSON側に安全化済みで保存します。",
     ]
     (case_root / "analysis.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def run_improvements(
+def _run_deterministic_improvements(
     *,
     baseline_result: Path,
-    judge_validation_result: Path,
-    target_root: Path,
+    baseline: dict[str, Any],
     profile_path: Path,
     output_root: Path,
-    verifier_image: str,
     max_cases: int,
     max_repairs: int,
     max_seconds: int,
     analyze_only: bool,
 ) -> dict[str, Any]:
     from .compare import compare_runs
-    from .qa_training_store import run as run_qts_evaluation
+
+    started = time.monotonic()
+    run_root = baseline_result.parent.resolve()
+    output_root = Path(os.path.abspath(output_root))
+    profile = load_execution_profile(profile_path)
+    evidence_relative = safe_relative_path(profile["verification"]["evidence_path"])
+    evidence_destination = prepare_run_output_root(
+        output_root,
+        repository_root=REPO_ROOT,
+        evidence_relative_path=profile["verification"]["evidence_path"],
+    )
+    result: dict[str, Any] = {
+        "schema_version": 1,
+        "status": "running",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "baseline_result": str(baseline_result),
+        "suite": "deterministic",
+        "evidence_basis": "deterministic_only",
+        "judge_required": False,
+        "judge_validation_result": None,
+        "evaluator_revision": None,
+        "skill_revision": baseline.get("skill_revision"),
+        "baseline_package_fingerprint": None,
+        "limits": {
+            "max_cases": max_cases,
+            "max_repairs": max_repairs,
+            "max_seconds": max_seconds,
+        },
+        "analyze_only": analyze_only,
+        "repair_attempts_started": 0,
+        "cases": [],
+    }
+
+    def finish_pending(
+        reason: str, *, case_id: str = "baseline-evidence"
+    ) -> dict[str, Any]:
+        result["cases"].append(
+            {
+                "criterion": case_id,
+                "status": "review_pending",
+                "blocked_reason": sanitize_diagnostic(reason, 500),
+                "repair_attempts_started": 0,
+            }
+        )
+        result["status"] = "review_pending_or_unmet"
+        result["finished_at"] = datetime.now(timezone.utc).isoformat()
+        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        atomic_write_json(output_root / "result.json", result)
+        return result
+
+    try:
+        evaluator_revision = assert_clean_checkout(REPO_ROOT)
+        evaluator = baseline.get("evaluator")
+        template = baseline.get("agent_command_template")
+        if (
+            not isinstance(evaluator, dict)
+            or evaluator.get("revision") != evaluator_revision
+            or baseline.get("profile_verification") != "verified"
+            or baseline.get("profile_fingerprint") != profile_fingerprint(profile)
+            or not isinstance(baseline.get("agent"), dict)
+            or baseline["agent"].get("name") != profile["agent"].get("name")
+            or baseline["agent"].get("model") != profile["agent"].get("model")
+            or baseline["agent"].get("cli_version")
+            != profile["agent"].get("cli_version")
+            or baseline.get("judge_command_fingerprint")
+            != canonical_fingerprint(profile["judge"].get("command_argv", []))
+            or not isinstance(baseline.get("isolation"), dict)
+            or baseline["isolation"].get("method")
+            != profile["isolation"].get("method")
+            or baseline["isolation"].get("agent_read_roots")
+            != profile["isolation"].get("agent_read_roots")
+            or baseline["isolation"].get("evaluator_read_blocked")
+            != profile["isolation"].get("evaluator_read_blocked")
+            or not isinstance(baseline.get("skill_revision"), str)
+            or not isinstance(template, list)
+            or not template
+            or baseline.get("agent_command_fingerprint")
+            != canonical_fingerprint(template)
+            or _has_secret_command_argument(template)
+        ):
+            raise AgentEvalError(
+                "deterministic baseline provenance is incomplete or mixed"
+            )
+        evidence_source = _resolve_run_path(
+            run_root, evidence_relative.as_posix()
+        )
+        if not evidence_source.is_file():
+            raise AgentEvalError("deterministic baseline isolation evidence is missing")
+        if not evidence_destination.exists():
+            evidence_destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(evidence_source, evidence_destination)
+        if not verify_profile_evidence(
+            profile, output_root, agent_command_argv=template
+        ):
+            raise AgentEvalError("deterministic baseline isolation is unverified")
+        with tempfile.TemporaryDirectory(
+            prefix="agent-eval-deterministic-baseline-"
+        ) as temporary:
+            trusted_baseline_package = Path(temporary)
+            trusted_manifest = create_skill_workspace(
+                REPO_ROOT, baseline["skill_revision"], trusted_baseline_package
+            )
+            if (
+                baseline.get("skill_package", {}).get("package_fingerprint")
+                != trusted_manifest.get("package_fingerprint")
+                or baseline.get("skill_package", {}).get("skills")
+                != trusted_manifest.get("skills")
+            ):
+                raise AgentEvalError("deterministic baseline Skill package changed")
+            failure = _deterministic_attempt_data(
+                baseline,
+                run_root,
+                runtime_source_root=trusted_baseline_package,
+                expected_package_fingerprint=trusted_manifest[
+                    "package_fingerprint"
+                ],
+            )
+        result["evaluator_revision"] = evaluator_revision
+        result["baseline_package_fingerprint"] = trusted_manifest[
+            "package_fingerprint"
+        ]
+        result["profile_fingerprint"] = profile_fingerprint(profile)
+        result["grader_evidence"] = {
+            "status": "recomputed_match",
+            "recomputed_from_preserved_outputs": True,
+            "input_fingerprint": failure["input_fingerprint"],
+            "dataset_fingerprint": failure["dataset_fingerprint"],
+            "judge_used": False,
+        }
+    except (
+        AgentEvalError,
+        ImportError,
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+    ) as exc:
+        return finish_pending(str(exc))
+
+    if not failure["failed_assertion_ids"]:
+        return finish_pending(
+            "deterministic grader did not reproduce a failing assertion",
+            case_id=f"{failure['skill']}:{failure['eval_id']}",
+        )
+
+    experiment_id = (
+        f"improve-deterministic-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+        f"-{os.urandom(4).hex()}"
+    )
+    experiment_root = output_root / "experiments" / experiment_id
+    experiment_root.mkdir(parents=True, exist_ok=False)
+    case_key = f"{failure['skill']}:{failure['eval_id']}"
+    case_root = experiment_root / sha256_bytes(case_key.encode("utf-8"))[7:23]
+    case_root.mkdir()
+    result["experiment_id"] = experiment_id
+    result["cases"] = []
+    case_record: dict[str, Any] = {
+        "criterion": case_key,
+        "suite": "deterministic",
+        "skill": failure["skill"],
+        "eval_id": failure["eval_id"],
+        "failed_assertion_ids": failure["failed_assertion_ids"],
+        "input_fingerprint": failure["input_fingerprint"],
+        "dataset_fingerprint": failure["dataset_fingerprint"],
+        "evidence_basis": "deterministic_only",
+        "judge_required": False,
+        "verified_judge_fixture": None,
+        "observations": [
+            {
+                "attempt_id": row["attempt"].get("attempt_id"),
+                "repeat": row["attempt"].get("repeat"),
+                "failed_assertion_ids": failure["failed_assertion_ids"],
+            }
+            for row in failure["attempts"]
+        ],
+        "status": "analysis_pending",
+        "repair_trials": [],
+        "skill_use_observation": [
+            row["attempt"]["skill_use_observation"] for row in failure["attempts"]
+        ],
+    }
+    baseline_package = case_root / "baseline-package"
+    try:
+        baseline_manifest = create_skill_workspace(
+            REPO_ROOT, baseline["skill_revision"], baseline_package
+        )
+        if baseline_manifest["package_fingerprint"] != result[
+            "baseline_package_fingerprint"
+        ]:
+            raise AgentEvalError(
+                "deterministic baseline package changed before analysis"
+            )
+        independent_plan = _freeze_independent_eval_plan(
+            skill=failure["skill"],
+            evaluator_revision=evaluator_revision,
+            skill_revision=baseline["skill_revision"],
+            baseline_package_fingerprint=baseline_manifest["package_fingerprint"],
+            profile=profile,
+            agent_command=template,
+        )
+        independent_plan["cases"] = [
+            row
+            for row in independent_plan.get("cases", [])
+            if not (
+                row.get("suite") == "deterministic"
+                and row.get("case_id") == failure["eval_id"]
+            )
+            and row.get("input_fingerprint") != failure["input_fingerprint"]
+        ]
+        deterministic_independent_cases = [
+            row
+            for row in independent_plan["cases"]
+            if row.get("suite") == "deterministic"
+        ]
+        independent_plan["status"] = (
+            "ready"
+            if deterministic_independent_cases and independent_plan["contract_tests"]
+            else "blocked"
+        )
+        independent_plan["block_reason"] = (
+            None
+            if independent_plan["status"] == "ready"
+            else "no_independent_deterministic_case_or_related_contract_test"
+        )
+        for row in independent_plan["cases"]:
+            if row.get("suite") == "semantic":
+                row["verification_status"] = "judge_unverified"
+                row["block_reason"] = (
+                    "semantic_independent_case_requires_verified_judge"
+                )
+        case_record["independent_regression_plan"] = independent_plan
+        case_record["independent_evaluation_isolation"] = {
+            "repair_agent_received_independent_inputs": False,
+            "repair_agent_received_expected_results": False,
+            "independent_results_returned_for_repair": False,
+        }
+        case_record["fixed_evaluator_baseline_package_fingerprint"] = (
+            baseline_manifest["package_fingerprint"]
+        )
+        baseline_contract_assessment = _run_related_contract_tests(
+            independent_plan["contract_tests"],
+            timeout_seconds=max(0, int(max_seconds - (time.monotonic() - started))),
+            evaluator_revision=evaluator_revision,
+            skill=failure["skill"],
+            skill_revision=baseline["skill_revision"],
+            expected_skills=set(baseline_manifest["skills"]),
+            candidate_package=baseline_package,
+            candidate_package_fingerprint=baseline_manifest["package_fingerprint"],
+        )
+        case_record["baseline_contract_test_assessment"] = baseline_contract_assessment
+        if baseline_contract_assessment.get("status") != "pass":
+            raise AgentEvalError(
+                "fixed deterministic grader or related baseline contract test failed"
+            )
+        result["grader_evidence"]["status"] = "verified"
+    except (
+        AgentEvalError,
+        ImportError,
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+    ) as exc:
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = sanitize_diagnostic(str(exc), 500)
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        result["finished_at"] = datetime.now(timezone.utc).isoformat()
+        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        atomic_write_json(output_root / "result.json", result)
+        return result
+
+    analysis_workspace = case_root / "analysis-workspace"
+    analysis_workspace.mkdir()
+    (analysis_workspace / ".qa-eval-output").mkdir()
+    try:
+        evidence_sources, inspected_sources, source_manifest = (
+            _prepare_deterministic_analysis_workspace(
+                workspace=analysis_workspace,
+                failure=failure,
+                package_root=baseline_package,
+            )
+        )
+    except (AgentEvalError, OSError, UnicodeDecodeError) as exc:
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = sanitize_diagnostic(str(exc), 500)
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        result["finished_at"] = datetime.now(timezone.utc).isoformat()
+        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        atomic_write_json(output_root / "result.json", result)
+        return result
+
+    prompt_evidence = {
+        "baseline_run_id": baseline.get("run_id"),
+        "attempt_ids": [
+            row["attempt"].get("attempt_id") for row in failure["attempts"]
+        ],
+        "suite": "deterministic",
+        "failed_assertion_ids": failure["failed_assertion_ids"],
+        "evaluator_revision": evaluator_revision,
+        "skill_revision": baseline["skill_revision"],
+        "grader_status": "fixed_grader_recomputed_and_matched_saved_results",
+        "grader_contract_tests": "pass",
+        "agent_execution_status": "pass",
+        "isolation_status": "verified",
+        "attempt_runtime_evidence": [
+            {
+                "attempt_id": row["attempt"].get("attempt_id"),
+                "exit_code": row["attempt"].get("agent_execution", {}).get(
+                    "exit_code"
+                ),
+                "timed_out": row["attempt"].get("agent_execution", {}).get(
+                    "timed_out"
+                ),
+                "container_cleanup_status": row["attempt"]
+                .get("agent_execution", {})
+                .get("container_cleanup_status"),
+                "trace_status": row["attempt"].get("agent_trace", {}).get(
+                    "status"
+                ),
+                "trace_skill_files_read": [
+                    skill
+                    for command in _load_json(row["trace_path"]).get("commands", [])
+                    if isinstance(command, dict)
+                    and command.get("successful") is True
+                    for skill in command.get("skill_files_read", [])
+                    if isinstance(skill, str)
+                ],
+            }
+            for row in failure["attempts"]
+        ],
+        "skill_use_observations": {
+            failure["skill"]: [
+                row["attempt"]["skill_use_observation"] for row in failure["attempts"]
+            ]
+        },
+        "inspected_sources": source_manifest,
+        "evaluator_only_expected_data": "withheld",
+        "semantic_or_mixed_evidence": "not_used",
+        "judge_validation": "not_required_for_deterministic_only_basis",
+    }
+    analysis_prompt = build_analysis_prompt(
+        case_id=case_key,
+        evidence=json.dumps(prompt_evidence, ensure_ascii=False),
+        skill_excerpt=inspected_sources,
+    )
+    analysis_command = [
+        item.replace("{workspace}", str(analysis_workspace)).replace(
+            "{output_root}", str(analysis_workspace / ".qa-eval-output")
+        )
+        for item in template
+    ]
+    analysis_isolation = verify_agent_docker_command(
+        analysis_command,
+        workspace=analysis_workspace,
+        output_root=analysis_workspace / ".qa-eval-output",
+        evaluator_root=REPO_ROOT,
+    )
+    if analysis_isolation.get("status") != "verified":
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = "analysis_agent_isolation_unverified"
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        atomic_write_json(output_root / "result.json", result)
+        return result
+    analysis_named, analysis_cleanup = named_container_command(
+        analysis_command,
+        name=f"agent-eval-analysis-{experiment_id[-8:]}-deterministic",
+    )
+    analysis_execution_command = analysis_named
+    if profile["agent"]["name"].lower() == "codex":
+        analysis_execution_command = launcher_argv(
+            output_root=analysis_workspace / ".qa-eval-output",
+            model=profile["agent"]["model"],
+            reasoning_effort=profile["agent"]["reasoning_effort"],
+            cli_version=profile["agent"]["cli_version"],
+            sandbox_policy=profile["agent"]["sandbox_policy"],
+            docker_argv=analysis_named,
+        )
+    try:
+        analysis_run = run_command(
+            analysis_execution_command,
+            input_text=analysis_prompt,
+            cwd=analysis_workspace,
+            timeout_seconds=min(
+                profile["agent"]["timeout_seconds"],
+                max(1, int(max_seconds - (time.monotonic() - started))),
+            ),
+            timeout_cleanup_argv=analysis_cleanup,
+        )
+    except (AgentExecutionError, AgentEvalError, OSError) as exc:
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = sanitize_diagnostic(
+            f"analysis_environment_error: {exc}", 500
+        )
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        result["finished_at"] = datetime.now(timezone.utc).isoformat()
+        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        atomic_write_json(output_root / "result.json", result)
+        return result
+    analysis_trace = capture_codex_jsonl_trace(
+        analysis_run.stdout, skill_names=[failure["skill"]]
+    )
+    analysis_safe = sanitize_diagnostic(analysis_trace["final_message"])
+    launcher_unverified = (
+        analysis_trace.get("launcher_observations") is not None
+        and analysis_trace.get("execution_status") != "completed"
+    )
+    analysis_trace_path = None
+    if analysis_trace["trace_summary"].get("status") == "captured":
+        analysis_trace_path = "analysis-trace.json"
+        atomic_write_json(
+            case_root / analysis_trace_path, analysis_trace["trace_summary"]
+        )
+    case_record["analysis"] = {
+        "status": "captured"
+        if not analysis_run.timed_out
+        and analysis_run.exit_code == 0
+        and analysis_run.cleanup_status == "succeeded"
+        and not analysis_trace["redacted"]
+        and not launcher_unverified
+        else "execution_error",
+        "response": analysis_safe,
+        "response_sha256": sha256_bytes(analysis_safe.encode("utf-8")),
+        "trace_format": analysis_trace["format"],
+        "trace_status": analysis_trace["status"],
+        "trace_path": analysis_trace_path,
+        "codex_launcher_evidence": analysis_trace.get("launcher_observations"),
+        "prompt_sha256": sha256_bytes(analysis_prompt.encode("utf-8")),
+        "isolation": analysis_isolation,
+        "container_cleanup_status": analysis_run.cleanup_status,
+    }
+    if case_record["analysis"]["status"] != "captured":
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = "analysis_execution_or_trace_unverified"
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        atomic_write_json(output_root / "result.json", result)
+        return result
+    try:
+        analysis = _validate_analysis(
+            analysis_safe,
+            skill_names={failure["skill"]},
+            criterion=case_key,
+            evidence_sources=evidence_sources,
+        )
+        repair_gate = _analysis_repair_gate(
+            analysis,
+            allowed_skills={failure["skill"]},
+            attempts=failure["attempts"],
+            evidence_sources=evidence_sources,
+            package_root=baseline_package,
+        )
+    except (AgentEvalError, TypeError, ValueError) as exc:
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = sanitize_diagnostic(str(exc), 500)
+        result["cases"].append(case_record)
+        _write_analysis_artifacts(case_root, case_record)
+        atomic_write_json(case_root / "case.json", case_record)
+        result["status"] = "review_pending_or_unmet"
+        atomic_write_json(output_root / "result.json", result)
+        return result
+    case_record["analysis_decision"] = repair_gate
+    if not repair_gate["allowed"]:
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = ";".join(repair_gate["reasons"])
+    elif analyze_only:
+        case_record["status"] = "analysis_complete_review_pending"
+        case_record["blocked_reason"] = "analyze_only_requested"
+    elif independent_plan.get("status") != "ready":
+        case_record["status"] = "review_pending"
+        case_record["blocked_reason"] = independent_plan.get("block_reason")
+    else:
+        chosen_skill = repair_gate["skill"]
+        requested_paths = set(repair_gate["requested_paths"])
+        independent_baseline_results: list[dict[str, Any]] = []
+        independent_baseline_failed = False
+        for independent_case in independent_plan["cases"]:
+            if independent_case.get("suite") == "semantic":
+                independent_baseline_results.append(
+                    {
+                        "case": independent_case,
+                        "status": "review_pending",
+                        "reason": "semantic_independent_case_requires_verified_judge",
+                        "judge_validation_status": "judge_unverified",
+                    }
+                )
+                case_record["independent_baseline_results"] = (
+                    independent_baseline_results
+                )
+                atomic_write_json(case_root / "case.json", case_record)
+                continue
+            key = f"{independent_case['suite']}:{independent_case['case_id']}"
+            safe_key = sha256_bytes(key.encode("utf-8"))[7:23]
+            destination = case_root / "independent-baseline" / safe_key
+            run_status = _run_independent_eval(
+                case=independent_case,
+                baseline=baseline,
+                profile=profile,
+                profile_path=profile_path,
+                evidence_root=output_root,
+                destination=destination,
+                timeout_seconds=max(0, int(max_seconds - (time.monotonic() - started))),
+            )
+            entry = {"case": independent_case, **run_status}
+            if run_status.get("status") == "captured":
+                validation = _validate_independent_run(
+                    Path(run_status["result_path"]),
+                    case=independent_case,
+                    profile=profile,
+                    package_fingerprint=baseline_manifest["package_fingerprint"],
+                    candidate=False,
+                    runtime_source_root=baseline_package,
+                )
+                entry["validation"] = {
+                    "status": validation["status"],
+                    "reason": validation.get("reason"),
+                }
+                if validation["status"] != "pass":
+                    entry["status"] = "review_pending"
+                    entry["reason"] = validation.get("reason")
+            if entry.get("status") != "captured":
+                independent_baseline_failed = True
+            independent_baseline_results.append(entry)
+            case_record["independent_baseline_results"] = independent_baseline_results
+            atomic_write_json(case_root / "case.json", case_record)
+            if independent_baseline_failed:
+                break
+        if independent_baseline_failed:
+            case_record["status"] = "review_pending"
+            case_record["blocked_reason"] = (
+                "independent_deterministic_baseline_evaluation_unavailable_or_invalid"
+            )
+        elif not requested_paths:
+            case_record["status"] = "review_pending"
+            case_record["blocked_reason"] = "analysis_requested_no_repair_path"
+        else:
+            package_path = baseline_package
+            package_manifest = baseline_manifest
+            for repair_index in range(1, max_repairs + 1):
+                if time.monotonic() - started >= max_seconds:
+                    case_record["status"] = "stopped_by_time_limit"
+                    case_record["blocked_reason"] = "time_budget_exhausted"
+                    break
+                required_seconds = 2 * (profile["agent"]["timeout_seconds"] + 60)
+                if max_seconds - (time.monotonic() - started) < required_seconds:
+                    case_record["status"] = "stopped_by_time_limit"
+                    case_record["blocked_reason"] = (
+                        "insufficient_budget_for_two_candidate_attempts"
+                    )
+                    break
+                trial_root = case_root / "repair-trials" / f"trial-{repair_index:02d}"
+                trial_root.mkdir(parents=True)
+                repair_workspace = trial_root / "workspace"
+                (repair_workspace / ".agents" / "skills").mkdir(parents=True)
+                visible_paths = _copy_allowed_skill_files(
+                    package_path, repair_workspace / ".agents" / "skills", chosen_skill
+                )
+                repair_output = repair_workspace / ".qa-eval-output"
+                repair_output.mkdir()
+                skill_root = repair_workspace / ".agents" / "skills" / chosen_skill
+                before = _source_paths(package_path, chosen_skill)
+                allowed_for_prompt = [
+                    f"{chosen_skill}/{path}" for path in sorted(requested_paths)
+                ]
+                repair_prompt = build_repair_prompt(
+                    analysis=json.dumps(analysis, ensure_ascii=False),
+                    allowed_paths=allowed_for_prompt,
+                    baseline_sha=baseline["skill_revision"],
+                )
+                repair_command = [
+                    item.replace("{workspace}", str(repair_workspace)).replace(
+                        "{output_root}", str(repair_output)
+                    )
+                    for item in template
+                ]
+                repair_mount = (
+                    "type=bind,source="
+                    f"{skill_root},target=/workspace/.agents/skills/{chosen_skill}"
+                )
+                repair_command = _insert_mount_before_image(
+                    repair_command, repair_mount
+                )
+                repair_isolation = verify_repair_docker_command(
+                    repair_command,
+                    workspace=repair_workspace,
+                    skill_root=skill_root,
+                    output_root=repair_output,
+                    skill_name=chosen_skill,
+                )
+                trial: dict[str, Any] = {
+                    "trial": repair_index,
+                    "status": "repair_pending",
+                    "allowed_paths": sorted(requested_paths),
+                    "isolation": repair_isolation,
+                    "candidate_evaluation_feedback_to_repair_agent": False,
+                }
+                if repair_isolation.get("status") != "verified":
+                    trial["stop_reason"] = "repair_agent_isolation_unverified"
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                repair_named, repair_cleanup = named_container_command(
+                    repair_command,
+                    name=(
+                        f"agent-eval-repair-{experiment_id[-8:]}-det-"
+                        f"{repair_index:02d}"
+                    ),
+                )
+                repair_attempt_number = result["repair_attempts_started"] + 1
+                result["repair_attempts_started"] = repair_attempt_number
+                case_record["repair_attempts_started"] = repair_attempt_number
+                result["active_case"] = {
+                    "criterion": case_key,
+                    "trial": repair_index,
+                    "global_repair_attempt": repair_attempt_number,
+                    "status": "repair_agent_running",
+                }
+                atomic_write_json(output_root / "result.json", result)
+                repair_execution_command = repair_named
+                if profile["agent"]["name"].lower() == "codex":
+                    repair_execution_command = launcher_argv(
+                        output_root=repair_output,
+                        model=profile["agent"]["model"],
+                        reasoning_effort=profile["agent"]["reasoning_effort"],
+                        cli_version=profile["agent"]["cli_version"],
+                        sandbox_policy=profile["agent"]["sandbox_policy"],
+                        docker_argv=repair_named,
+                        mode="repair",
+                        skill_name=chosen_skill,
+                    )
+                try:
+                    repair_execution = run_command(
+                        repair_execution_command,
+                        input_text=repair_prompt,
+                        cwd=repair_workspace,
+                        timeout_seconds=min(
+                            profile["agent"]["timeout_seconds"],
+                            max(1, int(max_seconds - (time.monotonic() - started))),
+                        ),
+                        timeout_cleanup_argv=repair_cleanup,
+                    )
+                except (AgentExecutionError, AgentEvalError, OSError) as exc:
+                    trial["status"] = "execution_error"
+                    trial["stop_reason"] = sanitize_diagnostic(
+                        f"repair_environment_error: {exc}", 500
+                    )
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                repair_trace = capture_codex_jsonl_trace(repair_execution.stdout)
+                repair_unverified = repair_trace["redacted"] or (
+                    repair_trace.get("launcher_observations") is not None
+                    and repair_trace.get("execution_status") != "completed"
+                )
+                if (
+                    repair_execution.timed_out
+                    or repair_execution.exit_code != 0
+                    or repair_execution.cleanup_status != "succeeded"
+                    or repair_unverified
+                ):
+                    trial["status"] = "execution_error"
+                    trial["stop_reason"] = "repair_agent_execution_or_trace_unverified"
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                try:
+                    changes, _after = _validate_repair_diff(
+                        before,
+                        repair_workspace / ".agents" / "skills",
+                        chosen_skill,
+                        requested_paths,
+                        visible_paths=visible_paths,
+                    )
+                except (AgentEvalError, OSError, UnicodeDecodeError) as exc:
+                    trial["status"] = "invalid_candidate"
+                    trial["stop_reason"] = sanitize_diagnostic(str(exc), 500)
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                patch_text = "".join(
+                    difflib.unified_diff(
+                        (package_path / "skills" / chosen_skill / change["path"])
+                        .read_text(encoding="utf-8")
+                        .splitlines(keepends=True),
+                        (skill_root / change["path"])
+                        .read_text(encoding="utf-8")
+                        .splitlines(keepends=True),
+                        fromfile=f"a/skills/{chosen_skill}/{change['path']}",
+                        tofile=f"b/skills/{chosen_skill}/{change['path']}",
+                    )
+                    for change in changes
+                )
+                (trial_root / "patch.diff").write_text(patch_text, encoding="utf-8")
+                with zipfile.ZipFile(
+                    trial_root / "changed-files.zip",
+                    "w",
+                    compression=zipfile.ZIP_DEFLATED,
+                ) as archive:
+                    for change in changes:
+                        archive.write(
+                            skill_root / change["path"],
+                            arcname=f"skills/{chosen_skill}/{change['path']}",
+                        )
+                trial.update(
+                    {
+                        "status": "candidate_saved",
+                        "candidate_revision_status": "uncommitted_patch",
+                        "candidate_package_parent_revision": baseline[
+                            "skill_revision"
+                        ],
+                        "changes": changes,
+                        "patch_path": "patch.diff",
+                        "changed_files_archive": "changed-files.zip",
+                    }
+                )
+                candidate_package = trial_root / "candidate-package"
+                candidate_manifest_root = trial_root / "candidate-manifest-check"
+                try:
+                    shutil.copytree(package_path, candidate_package)
+                    for change in changes:
+                        destination = (
+                            candidate_package
+                            / "skills"
+                            / chosen_skill
+                            / change["path"]
+                        )
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(skill_root / change["path"], destination)
+                    candidate_manifest = create_skill_workspace_from_root(
+                        candidate_package,
+                        candidate_manifest_root,
+                        expected_skills=set(baseline_manifest["skills"]),
+                        parent_revision=baseline["skill_revision"],
+                    )
+                except (
+                    AgentEvalError,
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    TypeError,
+                ) as exc:
+                    trial["status"] = "evidence_unverified"
+                    trial["stop_reason"] = sanitize_diagnostic(str(exc), 500)
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                finally:
+                    shutil.rmtree(candidate_manifest_root, ignore_errors=True)
+                trial["candidate_package_fingerprint"] = candidate_manifest[
+                    "package_fingerprint"
+                ]
+                if candidate_manifest["package_fingerprint"] == package_manifest[
+                    "package_fingerprint"
+                ]:
+                    trial["status"] = "invalid_candidate"
+                    trial["stop_reason"] = (
+                        "candidate_package_fingerprint_did_not_change"
+                    )
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+
+                result["active_case"]["status"] = "candidate_evaluation_running"
+                result["active_case"]["candidate_package_fingerprint"] = (
+                    candidate_manifest["package_fingerprint"]
+                )
+                atomic_write_json(output_root / "result.json", result)
+                evaluation = _run_deterministic_candidate_eval(
+                    baseline=baseline,
+                    skill=chosen_skill,
+                    eval_id=failure["eval_id"],
+                    profile=profile,
+                    profile_path=profile_path,
+                    evidence_root=output_root,
+                    destination=trial_root / "re-evaluation",
+                    candidate_package=candidate_package,
+                    timeout_seconds=max(
+                        0, int(max_seconds - (time.monotonic() - started))
+                    ),
+                )
+                trial["candidate_run"] = evaluation
+                if evaluation.get("status") != "captured":
+                    trial["status"] = "execution_error"
+                    trial["stop_reason"] = evaluation.get(
+                        "reason", "candidate_deterministic_evaluation_unavailable"
+                    )
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                candidate_result_path = Path(evaluation["result_path"])
+                try:
+                    candidate_run = _load_json(candidate_result_path)
+                    candidate_failure = _deterministic_attempt_data(
+                        candidate_run,
+                        candidate_result_path.parent,
+                        runtime_source_root=candidate_package,
+                        expected_package_fingerprint=candidate_manifest[
+                            "package_fingerprint"
+                        ],
+                        expected_candidate_status="uncommitted_patch",
+                    )
+                    comparison = compare_runs(baseline_result, candidate_result_path)
+                    comparison_path = trial_root / "comparison.json"
+                    atomic_write_json(comparison_path, comparison)
+                    target_assessment = _assess_deterministic_improvement(
+                        failure, candidate_failure, comparison=comparison
+                    )
+                except (
+                    AgentEvalError,
+                    OSError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                ) as exc:
+                    trial["status"] = "evidence_unverified"
+                    trial["stop_reason"] = sanitize_diagnostic(str(exc), 500)
+                    case_record["repair_trials"].append(trial)
+                    atomic_write_json(trial_root / "trial.json", trial)
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = trial["stop_reason"]
+                    break
+                contract_assessment = None
+                independent_assessment = None
+                contract_path = None
+                independent_path = None
+                assessment = target_assessment
+                if target_assessment["target_progress_consistently"]:
+                    contract_assessment = _run_related_contract_tests(
+                        independent_plan["contract_tests"],
+                        timeout_seconds=max(
+                            0, int(max_seconds - (time.monotonic() - started))
+                        ),
+                        evaluator_revision=evaluator_revision,
+                        skill=chosen_skill,
+                        skill_revision=baseline["skill_revision"],
+                        expected_skills=set(candidate_manifest["skills"]),
+                        candidate_package=candidate_package,
+                        candidate_package_fingerprint=candidate_manifest[
+                            "package_fingerprint"
+                        ],
+                    )
+                    contract_path = trial_root / "contract-tests.json"
+                    atomic_write_json(contract_path, contract_assessment)
+                    if target_assessment["target_improved_consistently"]:
+                        if contract_assessment["status"] == "pass":
+                            independent_assessment = (
+                                _run_candidate_independent_assessment(
+                                    plan=independent_plan,
+                                    baseline_results=independent_baseline_results,
+                                    baseline=baseline,
+                                    profile=profile,
+                                    profile_path=profile_path,
+                                    evidence_root=output_root,
+                                    case_root=trial_root,
+                                    candidate_package=candidate_package,
+                                    candidate_package_fingerprint=candidate_manifest[
+                                        "package_fingerprint"
+                                    ],
+                                    baseline_runtime_source_root=baseline_package,
+                                    timeout_seconds=max(
+                                        0,
+                                        int(max_seconds - (time.monotonic() - started)),
+                                    ),
+                                    compare_runs=compare_runs,
+                                )
+                            )
+                        else:
+                            independent_assessment = {
+                                "status": "review_pending",
+                                "planned": len(independent_plan["cases"]),
+                                "cases": [
+                                    {
+                                        "suite": row["suite"],
+                                        "case_id": row["case_id"],
+                                        "status": "review_pending",
+                                        "reason": (
+                                            "candidate_contract_tests_did_not_pass"
+                                        ),
+                                    }
+                                    for row in independent_plan["cases"]
+                                ],
+                                "conditions_match": False,
+                                "candidate_fingerprint_fixed": False,
+                                "expected_inputs_disclosed": False,
+                                "expected_results_disclosed": False,
+                                "feedback_to_repair_agent": False,
+                            }
+                        independent_path = trial_root / "independent-assessment.json"
+                        atomic_write_json(independent_path, independent_assessment)
+                    assessment = _assess_deterministic_improvement(
+                        failure,
+                        candidate_failure,
+                        comparison=comparison,
+                        independent_assessment=independent_assessment,
+                        contract_test_assessment=contract_assessment,
+                    )
+                trial.update(
+                    {
+                        "status": "improvement_demonstrated"
+                        if assessment["improvement_demonstrated"]
+                        else "intermediate_candidate_forward_progress"
+                        if assessment["target_progress_consistently"]
+                        and not assessment["target_improved_consistently"]
+                        and contract_assessment is not None
+                        and contract_assessment.get("status") == "pass"
+                        else "reevaluated_review_pending",
+                        "candidate_result_path": str(candidate_result_path),
+                        "comparison_path": str(comparison_path),
+                        "assessment": assessment,
+                        "target_assessment": target_assessment,
+                        "contract_test_assessment_path": (
+                            str(contract_path) if contract_path else None
+                        ),
+                        "independent_assessment_path": (
+                            str(independent_path) if independent_path else None
+                        ),
+                        "progress_observed": assessment[
+                            "target_progress_consistently"
+                        ],
+                        "candidate_evaluation_feedback_to_repair_agent": False,
+                    }
+                )
+                case_record["repair_trials"].append(trial)
+                atomic_write_json(trial_root / "trial.json", trial)
+                package_path = candidate_package
+                package_manifest = candidate_manifest
+                if assessment["improvement_demonstrated"]:
+                    case_record["status"] = "improvement_demonstrated"
+                    break
+                if not assessment["target_progress_consistently"]:
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = (
+                        "no_verified_deterministic_forward_progress"
+                    )
+                    break
+                if (
+                    contract_assessment is None
+                    or contract_assessment.get("status") != "pass"
+                ):
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = (
+                        "candidate_related_contract_tests_failed_or_unavailable"
+                    )
+                    break
+                if assessment["target_improved_consistently"]:
+                    case_record["status"] = "review_pending"
+                    case_record["blocked_reason"] = (
+                        "target_improved_but_independent_regression_evidence_"
+                        "is_incomplete"
+                    )
+                    break
+                case_record["status"] = "repair_in_progress"
+            if case_record.get("status") == "repair_in_progress":
+                case_record["status"] = "stopped_by_repair_limit"
+                case_record["blocked_reason"] = "global_repair_attempt_limit_reached"
+
+    result["cases"].append(case_record)
+    result.pop("active_case", None)
+    _write_analysis_artifacts(case_root, case_record)
+    atomic_write_json(case_root / "case.json", case_record)
+    result["status"] = (
+        "improvement_demonstrated"
+        if case_record.get("status") == "improvement_demonstrated"
+        else "review_pending_or_unmet"
+    )
+    result["finished_at"] = datetime.now(timezone.utc).isoformat()
+    result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    atomic_write_json(output_root / "result.json", result)
+    return result
+
+
+def run_improvements(
+    *,
+    baseline_result: Path,
+    judge_validation_result: Path | None,
+    target_root: Path | None,
+    profile_path: Path,
+    output_root: Path,
+    verifier_image: str | None,
+    max_cases: int,
+    max_repairs: int,
+    max_seconds: int,
+    analyze_only: bool,
+) -> dict[str, Any]:
+    from .compare import compare_runs
 
     baseline = _load_json(baseline_result)
+    if baseline.get("suite") == "deterministic":
+        return _run_deterministic_improvements(
+            baseline_result=baseline_result,
+            baseline=baseline,
+            profile_path=profile_path,
+            output_root=output_root,
+            max_cases=max_cases,
+            max_repairs=max_repairs,
+            max_seconds=max_seconds,
+            analyze_only=analyze_only,
+        )
+    if judge_validation_result is None:
+        raise AgentEvalError(
+            "semantic or mixed improvement evidence requires a verified Judge "
+            "validation result"
+        )
+    if target_root is None or verifier_image is None:
+        raise AgentEvalError(
+            "QTS semantic improvement requires its fixed target root and verifier image"
+        )
+    from .qa_training_store import run as run_qts_evaluation
+
     run_root = baseline_result.parent.resolve()
     if baseline.get("target_revision") != DEFAULT_TARGET_REVISION:
         raise AgentEvalError(
@@ -2993,11 +4732,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Analyze saved Agent evaluations and make bounded, isolated Skill repair attempts."
     )
     parser.add_argument("--baseline-result", type=Path, required=True)
-    parser.add_argument("--judge-validation-result", type=Path, required=True)
-    parser.add_argument("--target-root", type=Path, required=True)
+    parser.add_argument("--judge-validation-result", type=Path)
+    parser.add_argument("--target-root", type=Path)
     parser.add_argument("--execution-profile", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
-    parser.add_argument("--verifier-image", required=True)
+    parser.add_argument("--verifier-image")
     parser.add_argument("--max-cases", type=int, required=True)
     parser.add_argument("--max-repairs", type=int, required=True)
     parser.add_argument("--max-seconds", type=int, required=True)

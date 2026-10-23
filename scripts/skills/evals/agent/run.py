@@ -101,8 +101,25 @@ else:
 
 MAX_CASES = 10_000
 SECRET_TEXT_RE = re.compile(
-    r"(?i)\b(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+)"
+    r"(?i)\b(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|sk-[A-Za-z0-9_-]{16,}|"
+    r"gh[pousr]_[A-Za-z0-9]{20,}|"
+    r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|token|secret|"
+    r"credential|auth)\s*[:=]\s*[^\s,;]+)"
 )
+SECRET_OPTION_RE = re.compile(
+    r"(?i)^--?(?:api[-_]?key|(?:(?:access|refresh|id|bearer)[-_]?)?token|"
+    r"password|secret|credential|auth|authorization|client[-_]?secret|"
+    r"private[-_]?key)(?:=|$)"
+)
+
+
+def _has_secret_command_argument(argv: list[str]) -> bool:
+    return any(
+        not isinstance(argument, str)
+        or SECRET_TEXT_RE.search(argument)
+        or SECRET_OPTION_RE.match(argument)
+        for argument in argv
+    )
 
 
 def _dataset_fingerprint(files: list[tuple[str, bytes]]) -> str:
@@ -368,7 +385,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--skill must be a normalized Skill name or 'all'")
     if args.skill == "all" and args.eval_id:
         parser.error("--eval-id cannot be combined with --skill all")
-    if any(SECRET_TEXT_RE.search(argument) for argument in args.agent_command):
+    if _has_secret_command_argument(args.agent_command):
         parser.error("--agent-command must not contain secrets")
     return args
 
@@ -496,6 +513,7 @@ def run(argv: list[str] | None = None) -> int:
                 "profile_fingerprint": profile_fingerprint(profile),
                 "profile_verification": "verified",
                 "isolation_evidence": profile["verification"]["evidence_path"],
+                "agent_command_template": list(args.agent_command),
                 "agent_command_fingerprint": canonical_fingerprint(args.agent_command),
                 "judge_command_fingerprint": canonical_fingerprint(
                     profile["judge"]["command_argv"]
@@ -543,7 +561,7 @@ def run(argv: list[str] | None = None) -> int:
                 "timeout_seconds": profile["agent"]["timeout_seconds"],
                 "cases_requested": len(cases),
                 "repeat": args.repeat,
-                "agent_command_saved": False,
+                "agent_command_saved": True,
             }
         )
         atomic_write_json(result_path, record)
@@ -684,16 +702,22 @@ def run(argv: list[str] | None = None) -> int:
                                 )
                                 attempt["status"] = "needs_review"
                             trace_path = None
+                            trace_sha256 = None
                             if trace["trace_summary"].get("status") == "captured":
                                 trace_path = "agent-trace.json"
+                                saved_trace_path = case_dir / trace_path
                                 atomic_write_json(
-                                    case_dir / trace_path, trace["trace_summary"]
+                                    saved_trace_path, trace["trace_summary"]
+                                )
+                                trace_sha256 = sha256_bytes(
+                                    saved_trace_path.read_bytes()
                                 )
                             attempt["agent_trace"] = {
                                 "format": trace["format"],
                                 "status": trace["status"],
                                 "redacted": trace["redacted"],
                                 "path": trace_path,
+                                "sha256": trace_sha256,
                             }
                             attempt["skill_use_observation"] = trace[
                                 "skill_use_observation"

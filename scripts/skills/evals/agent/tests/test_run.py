@@ -9,12 +9,44 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.skills.evals.agent import run
-from scripts.skills.evals.agent.common import atomic_write_text
+from scripts.skills.evals.agent.common import (
+    atomic_write_text,
+    canonical_fingerprint,
+    sha256_bytes,
+)
 from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.tests.test_judge_validation import _profile
 
 
 class CommonRunnerTests(unittest.TestCase):
+    def test_sensitive_agent_command_options_are_rejected(self):
+        base_argv = [
+            "--suite",
+            "deterministic",
+            "--skill",
+            "test-case-design",
+            "--skill-revision",
+            "1" * 40,
+            "--execution-profile",
+            "profile.json",
+            "--output-root",
+            ".agent-eval-runs/secret-command-test",
+            "--agent-name",
+            "fake-agent",
+            "--agent-model",
+            "fake-model",
+            "--agent-command",
+        ]
+        secret_commands = (
+            ["docker", "run", "--api-key", "not-a-real-secret"],
+            ["docker", "run", "--token=not-a-real-secret"],
+            ["docker", "run", "TOKEN=not-a-real-secret"],
+        )
+        for command in secret_commands:
+            with self.subTest(command=command), self.assertRaises(SystemExit) as raised:
+                run.run([*base_argv, *command])
+            self.assertEqual(raised.exception.code, 2)
+
     def _run(
         self,
         *,
@@ -25,6 +57,7 @@ class CommonRunnerTests(unittest.TestCase):
         save_failure=False,
         candidate_package=False,
         candidate_changes_during_run=False,
+        captured_trace=False,
     ):
         run_output_parent = run.REPO_ROOT / ".agent-eval-runs"
         run_output_parent.mkdir(exist_ok=True)
@@ -174,6 +207,27 @@ class CommonRunnerTests(unittest.TestCase):
                 stack.enter_context(
                     patch.object(run, "run_command", side_effect=execute)
                 )
+                if captured_trace:
+                    stack.enter_context(
+                        patch.object(
+                            run,
+                            "capture_codex_jsonl_trace",
+                            return_value={
+                                "format": "codex_exec_jsonl",
+                                "status": "captured",
+                                "final_message": "candidate",
+                                "trace_summary": {
+                                    "format": "codex_exec_jsonl",
+                                    "status": "captured",
+                                    "turn_completed": True,
+                                    "turn_failed": False,
+                                    "commands": [],
+                                },
+                                "redacted": False,
+                                "skill_use_observation": {case["skill"]: "observed"},
+                            },
+                        )
+                    )
                 if save_failure:
                     original_write_text = run.atomic_write_text
 
@@ -258,6 +312,21 @@ class CommonRunnerTests(unittest.TestCase):
                 )
                 exit_code = run.run(argv)
             saved = json.loads((output / "result.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                saved["agent_command_fingerprint"],
+                canonical_fingerprint(saved["agent_command_template"]),
+            )
+            self.assertTrue(saved["agent_command_saved"])
+            if saved["attempts"][0].get("agent_trace", {}).get("status") == "captured":
+                trace_record = saved["attempts"][0]["agent_trace"]
+                output_path = output / saved["attempts"][0]["output"]["path"]
+                trace_path = output_path.parent / trace_record["path"]
+                self.assertEqual(
+                    trace_record["sha256"], sha256_bytes(trace_path.read_bytes())
+                )
+            self.assertEqual(
+                saved["agent_command_template"][0:3], ["docker", "run", "--rm"]
+            )
             if judge_status and judge_status != "completed":
                 saved_attempt = saved["attempts"][0]
                 self.assertIn("grade", saved_attempt)
@@ -292,6 +361,11 @@ class CommonRunnerTests(unittest.TestCase):
     def test_normal_output_is_saved(self):
         exit_code, attempt = self._run()
         self.assertEqual(exit_code, 0, attempt)
+
+    def test_captured_trace_hash_is_saved(self):
+        exit_code, attempt = self._run(captured_trace=True)
+        self.assertEqual(exit_code, 0, attempt)
+        self.assertTrue(attempt["agent_trace"]["sha256"].startswith("sha256:"))
 
     def test_candidate_package_is_used_and_fingerprint_is_recorded(self):
         exit_code, attempt = self._run(candidate_package=True)
