@@ -347,8 +347,10 @@ class JudgeValidationTests(unittest.TestCase):
         *,
         approved: bool,
         candidate: bool,
+        case_id: str = "normal-workflow",
         legacy_approval: bool = False,
         mutate_baseline_after_binding: bool = False,
+        stale_binding: bool = False,
         include_gate: bool = False,
     ) -> dict | tuple[dict, dict, list[dict]]:
         scenario = load_scenario()
@@ -417,10 +419,20 @@ class JudgeValidationTests(unittest.TestCase):
                 output.mkdir()
                 (output / "isolation.json").write_text("{}\n", encoding="utf-8")
                 catalogue = load_fixture_catalogue()
+                selected_definition = next(
+                    row for row in catalogue["cases"] if row["id"] == case_id
+                )
+                ordered_catalogue = {
+                    **catalogue,
+                    "cases": [
+                        selected_definition,
+                        *[row for row in catalogue["cases"] if row["id"] != case_id],
+                    ],
+                }
                 approval = root / "approval.json"
                 approval_path = None
                 if approved:
-                    definition = catalogue["cases"][0]
+                    definition = selected_definition
                     preview_root = root / "approval-preview"
                     preview_root.mkdir()
                     fixture_output, fixture_validation, final_message = (
@@ -475,11 +487,13 @@ class JudgeValidationTests(unittest.TestCase):
                         criteria=criteria,
                         normative_revision=DEFAULT_TARGET_REVISION,
                     )
+                    if stale_binding:
+                        binding["dataset_revision"] = "qts-judge-fixtures-v1"
                     approval_row = {
-                        "case_id": "normal-workflow",
+                        "case_id": definition["id"],
                         "reviewer": "test-only-fixture-reviewer",
                         "approved_at": "2026-10-22T00:00:00Z",
-                        "evidence": "docs/spec/features/checkout-and-payment.md#workflow",
+                        "evidence": f"{definition['references'][0]}#fixture-review",
                     }
                     if not legacy_approval:
                         approval_row["binding"] = binding
@@ -506,13 +520,14 @@ class JudgeValidationTests(unittest.TestCase):
                 original_judge_case = judge_validation._run_judge_case
 
                 def actual_judge(**kwargs):
+                    rating = 1 if selected_definition["expected"] == "rating_1" else 3
                     response = json.dumps(
                         {
                             "criteria": [
                                 {
                                     "id": criterion,
                                     "evaluable": True,
-                                    "rating": 3,
+                                    "rating": rating,
                                     "reason": "Fixed fixture evidence.",
                                     "evidence": ["artifact-00.md"],
                                 }
@@ -538,6 +553,11 @@ class JudgeValidationTests(unittest.TestCase):
 
                 with (
                     patch.object(judge_validation, "REPO_ROOT", repository_root),
+                    patch.object(
+                        judge_validation,
+                        "load_fixture_catalogue",
+                        return_value=ordered_catalogue,
+                    ),
                     patch.object(
                         judge_validation, "assert_clean_checkout", return_value="2" * 40
                     ),
@@ -687,6 +707,131 @@ class JudgeValidationTests(unittest.TestCase):
             _approval_binding_status({"binding": bool_binding_version}, binding),
             "mismatch",
         )
+
+    def test_pixel_parity_fixture_targets_the_unresolved_oracle_without_cart_overlap(
+        self,
+    ) -> None:
+        catalogue = load_fixture_catalogue()
+        definition = next(
+            row for row in catalogue["cases"] if row["id"] == "major-violation-003"
+        )
+
+        self.assertEqual(catalogue["dataset_revision"], "qts-judge-fixtures-v2")
+        self.assertEqual(definition["criteria"], ["QTS-SEM-003"])
+        self.assertEqual(definition["approval_status"], "pending_human_review")
+        self.assertFalse(
+            any(
+                row["id"].startswith("major-violation-")
+                and "QTS-SEM-008" in row["criteria"]
+                for row in catalogue["cases"]
+            )
+        )
+        self.assertEqual(
+            set(definition["references"]),
+            {
+                "docs/spec/README.md",
+                "docs/spec/features/checkout-and-payment.md",
+                "docs/spec/unresolved-specifications.md",
+            },
+        )
+        self.assertEqual(
+            judge_validation.canonical_fingerprint(
+                {
+                    "splits": catalogue["splits"],
+                    "cases": [
+                        row
+                        for row in catalogue["cases"]
+                        if row["id"] != "major-violation-003"
+                    ],
+                }
+            ),
+            "sha256:6b62add8809319e487322aa639fe03a04705726fffe352bcb978027b49b11424",
+        )
+        self.assertNotEqual(
+            judge_validation.canonical_fingerprint(catalogue),
+            "sha256:a747ad74b4ec383afc4427352e349243511861e99460e2af52d1ae2378524da6",
+        )
+        self.assertNotEqual(
+            judge_validation.canonical_fingerprint(definition),
+            "sha256:e6b7f334eb3e3057321a445230725de9d25ca2057312d0f37e759c85ff70fd49",
+        )
+
+        mutation = judge_validation._MUTATIONS[definition["mutation"]]
+        for phrase in (
+            "Cross-platform visual parity beyond shared behavior",
+            "Web and Native Checkout",
+            "pixel-for-pixel visual parity",
+            "Navigation",
+            "Typography",
+            "must FAIL",
+        ):
+            self.assertIn(phrase, mutation)
+        for stale_cart_claim in ("stale Cart", "Cart Version", "price mismatch"):
+            self.assertNotIn(stale_cart_claim, mutation)
+        self.assertNotIn(
+            "promote-unresolved-specification-to-confirmed-oracle",
+            judge_validation._MUTATIONS,
+        )
+
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_output = root / "baseline"
+            self._baseline_output(baseline_output, scenario)
+            fixture_output, validation, _ = _prepare_fixture(
+                definition=definition,
+                baseline_output=baseline_output,
+                fixture_root=root / "fixture",
+                scenario=scenario,
+            )
+            self.assertEqual(validation["status"], "pass")
+            index = json.loads(
+                (fixture_output / "artifact-index.json").read_text(encoding="utf-8")
+            )
+            mutated = next(
+                row
+                for row in index["artifacts"]
+                if row["kind"] in {"test-requirement", "spec-analysis"}
+            )
+            content = (fixture_output / mutated["path"]).read_text(encoding="utf-8")
+            self.assertIn(
+                "Cross-platform visual parity beyond shared behavior", content
+            )
+            self.assertIn("Navigation", content)
+            self.assertIn("Typography", content)
+            self.assertIn("pixel-for-pixel", content)
+            self.assertIn("must FAIL", content)
+            self.assertNotIn("stale Cart", content)
+
+    def test_pixel_parity_fixture_run_requires_fresh_human_approval(self) -> None:
+        unapproved = self._run(
+            approved=False,
+            candidate=False,
+            case_id="major-violation-003",
+        )
+        case = unapproved["cases"][0]
+        self.assertEqual(unapproved["dataset_revision"], "qts-judge-fixtures-v2")
+        self.assertTrue(case["judge_runs"][0]["expectation_matched"])
+        self.assertEqual(case["approval"]["status"], "pending_human_review")
+        self.assertEqual(case["approval"]["binding_status"], "missing")
+        self.assertEqual(case["status"], "review_pending")
+
+        stale_approval = self._run(
+            approved=True,
+            candidate=False,
+            case_id="major-violation-003",
+            stale_binding=True,
+        )["cases"][0]
+        self.assertTrue(stale_approval["judge_runs"][0]["expectation_matched"])
+        self.assertEqual(stale_approval["approval"]["binding_status"], "mismatch")
+        self.assertNotEqual(
+            stale_approval["fixture_fingerprint"],
+            judge_validation.canonical_fingerprint(
+                stale_approval["approval"]["binding"]
+            ),
+        )
+        self.assertEqual(stale_approval["approval"]["status"], "review_pending")
+        self.assertEqual(stale_approval["status"], "review_pending")
 
     def test_unapproved_fixture_remains_pending_even_when_fake_judge_matches(
         self,

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "dataset_revision": "qts-judge-fixtures-v1",
+  "dataset_revision": "qts-judge-fixtures-v2",
   "splits": {
     "tune": [
       "normal-workflow",
@@ -68,10 +68,14 @@
       "id": "major-violation-003",
       "group": "artifacts",
       "criteria": ["QTS-SEM-003"],
-      "mutation": "promote-unresolved-specification-to-confirmed-oracle",
+      "mutation": "promote-unresolved-cross-platform-pixel-parity-to-web-checkout-oracle",
       "expected": "rating_1",
       "approval_status": "pending_human_review",
-      "references": ["docs/spec/README.md", "docs/spec/unresolved-specifications.md"]
+      "references": [
+        "docs/spec/README.md",
+        "docs/spec/features/checkout-and-payment.md",
+        "docs/spec/unresolved-specifications.md"
+      ]
     },
     {
       "id": "major-violation-004",

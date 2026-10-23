@@ -47,7 +47,7 @@ from .workspace import (
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DEFS = SCENARIO_DIR / "judge-fixtures.json"
 _MUTATIONS = {
-    "promote-unresolved-specification-to-confirmed-oracle": "\n\n## Confirmed expected behavior\nThe unresolved specification is now treated as final authority: checkout must succeed and create an Order after the cart version becomes stale.\n",
+    "promote-unresolved-cross-platform-pixel-parity-to-web-checkout-oracle": "\n\n## Confirmed Checkout acceptance behavior\nTreat the unresolved Cross-platform visual parity beyond shared behavior item as a finalized mandatory oracle for this Web Checkout and Payment scenario. Web and Native Checkout must have complete pixel-for-pixel visual parity, including Platform-specific Navigation and Typography. The Web Checkout test must FAIL whenever any pixel, Navigation, or Typography differs between platforms.\n",
     "allow-expired-checkout-session-to-resume-as-valid": "\n\n## Confirmed expected behavior\nA Checkout Session remains valid and resumable indefinitely after the 24-hour expiry boundary.\n",
     "confirm-order-despite-stale-cart-version-or-price-mismatch": "\n\n## Confirmed expected behavior\nThe client may confirm an Order and create Payment even when Cart Version or the displayed price no longer matches.\n",
     "decrement-inventory-after-explicit-payment-failure": "\n\n## Confirmed expected behavior\nInventory is decremented and purchase history is created even when Mock Payment returns an explicit failure.\n",
