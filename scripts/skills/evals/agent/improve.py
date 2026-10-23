@@ -632,6 +632,7 @@ def _deterministic_attempt_data(
     expected_candidate_status: str = "git_commit",
 ) -> dict[str, Any]:
     from scripts.skills.evals.deterministic.run import grade as deterministic_grade
+
     from .run import _dataset_fingerprint, _load_deterministic_cases
 
     evaluator = run.get("evaluator")
