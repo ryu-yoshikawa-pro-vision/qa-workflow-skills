@@ -4,7 +4,7 @@
 
 PR #17 (`feat/agent-eval-runner`) で調査済みだったF02、F03、N03、N04、F04を実装し、既存のN01、N02、N05、N06、F01を現行コードで再確認した。F06としてPR本文冒頭に最新状態をまとめ、従来のDocker/Codespaces記録は履歴として残した。
 
-コード検証対象のHEADは `595a34b75228529951b3a0366a7fbc208bc148e9`。このSHAで5つのGitHub Actions workflowがすべて成功した。作業ブランチは `feat/agent-eval-runner`、PRのbaseは `main`。
+実装変更の検証HEADは `595a34b75228529951b3a0366a7fbc208bc148e9`。その後のレポート整形commit `f0da2f570ed5a553f4191a926c4d0703b4e8751e` は同じ作業ブランチの最新HEADとしてpushし、5つのGitHub Actions workflowすべての成功を確認した。作業ブランチは `feat/agent-eval-runner`、PRのbaseは `main`。
 
 コード上の修正とCI検証は完了した。一方、Windows環境制約とDocker内Codexの隔離障害により、正式な実Agent受入は未達である。Judge fixtureの独立承認と、自動Skill改善の実証も完了していない。これらを成功扱いにしたり、セキュリティ条件を緩めたりしていない。
 
@@ -120,6 +120,14 @@ N03/N04のfocused testは、テスト対象外のvalidator importがPyYAML不足
 
 過去SHAの結果をこのHEADの結果として流用していない。
 
+レポート整形後のHEAD `f0da2f570ed5a553f4191a926c4d0703b4e8751e` も全5 workflowがSUCCESS:
+
+- Validate Agent Skills (run 1390)
+- Validate Deterministic Output Evals (run 1389)
+- Validate Semantic Output Evals (run 1354)
+- Code Quality (run 84)
+- Codex Harness (run 84)
+
 ## 残課題
 
 ### 実Agent受入とDocker隔離
@@ -158,5 +166,6 @@ fixtureは11件あり、approved 0、human review待ち9、deterministic review�
 - N03/N04 formatter: `fac8966a40008f6bdf97163010ee753731cc69b2`
 - F04: `f11e7aec9696078077e38353fd10713ae80ef92b`
 - F04 formatter followups: `0651d7c4da71e25538e4311663cc752aa94b9d99`、`aab9cf7e6479db6f969f0934e0301b593f00f84d`、`0229ec8d8cd841b4a6ac8d1e96a97a90f7226111`、`595a34b75228529951b3a0366a7fbc208bc148e9`
+- 最終レポートと整形修正: `fed5382e0b10ad85684d75f86d53cc5242cf8e77`、`f0da2f570ed5a553f4191a926c4d0703b4e8751e`
 
 このレポートは実Agent/Judgeの未達条件を明示するものであり、それらを完了済みとするものではない。
