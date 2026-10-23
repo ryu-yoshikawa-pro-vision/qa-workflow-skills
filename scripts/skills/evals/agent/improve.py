@@ -15,10 +15,13 @@ from typing import Any
 
 from .common import (
     AgentEvalError,
+    atomic_write_bytes,
     atomic_write_json,
     canonical_fingerprint,
     capture_codex_jsonl_trace,
+    ensure_within,
     prepare_run_output_root,
+    safe_relative_path,
     sanitize_diagnostic,
     sha256_bytes,
 )
@@ -68,6 +71,7 @@ _CRITERION_SKILLS = {
 _SECRET_RE = re.compile(
     r"(?i)\b(?:Bearer\s+\S{12,}|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|(?:api[_-]?key|access[_-]?token|password)\s*[:=]\s*\S+)"
 )
+_MAX_ANALYSIS_SOURCE_BYTES = 250_000
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -321,46 +325,191 @@ def _judge_verification_map(
     return result
 
 
+def _resolve_run_path(run_root: Path, relative: str) -> Path:
+    try:
+        safe = safe_relative_path(relative)
+    except (AgentEvalError, TypeError) as exc:
+        raise AgentEvalError("saved evaluation path is unsafe") from exc
+    root = run_root.resolve(strict=True)
+    candidate = run_root
+    for component in safe.parts:
+        candidate = candidate / component
+        if candidate.is_symlink():
+            raise AgentEvalError("saved evaluation path contains a symlink")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise AgentEvalError("saved evaluation path is missing or escapes its run") from exc
+    return resolved
+
+
 def _attempt_data(run: dict[str, Any], run_root: Path) -> list[dict[str, Any]]:
     if not isinstance(run.get("attempts"), list) or len(run["attempts"]) < 2:
         raise AgentEvalError(
             "Skill repair requires at least two independent baseline attempts"
         )
     collected = []
+    scenario = load_scenario()
+    attempt_ids: set[str] = set()
+    result_roots: set[Path] = set()
     for attempt in run["attempts"]:
+        if not isinstance(attempt, dict):
+            raise AgentEvalError("baseline attempt record is invalid")
         relative = attempt.get("saved_result_root")
         if not isinstance(relative, str):
             raise AgentEvalError("baseline attempt has no preserved run root")
-        root = (run_root / relative).resolve()
-        try:
-            root.relative_to(run_root.resolve())
-        except ValueError as exc:
-            raise AgentEvalError("baseline attempt path escapes its run root") from exc
+        root = _resolve_run_path(run_root, relative)
+        saved_attempt = _load_json(root / "attempt.json")
+        if canonical_fingerprint(saved_attempt) != canonical_fingerprint(attempt):
+            raise AgentEvalError("baseline attempt summary differs from its saved record")
+        attempt_id = attempt.get("attempt_id")
+        if not isinstance(attempt_id, str) or not attempt_id or attempt_id in attempt_ids:
+            raise AgentEvalError("baseline attempts are not independent")
+        if root in result_roots:
+            raise AgentEvalError("baseline attempts reuse a saved result directory")
+        attempt_ids.add(attempt_id)
+        result_roots.add(root)
         judge = _load_json(root / "judge-result.json")
         validation = _load_json(root / "artifact-validation.json")
         runtime = _load_json(root / "runtime-checks.json")
         integrity = _load_json(root / "target-integrity.json")
         if (
-            attempt.get("status") == "execution_error"
+            attempt.get("status") not in {"pass", "fail", "needs_review"}
             or validation.get("status") != "pass"
         ):
             raise AgentEvalError(
                 "baseline has runner, evidence, or artifact-contract errors"
             )
+        agent_isolation = attempt.get("agent_isolation")
+        agent_exit_code = attempt.get("agent_exit_code")
+        workspace_integrity = attempt.get("workspace_integrity")
         if (
-            runtime.get("verifier", {}).get("status") != "pass"
-            or runtime.get("workflow_runtime", {}).get("status") != "pass"
+            not isinstance(agent_isolation, dict)
+            or agent_isolation.get("status") != "verified"
+            or isinstance(agent_exit_code, bool)
+            or agent_exit_code != 0
+            or attempt.get("agent_timed_out") is not False
+            or not isinstance(workspace_integrity, dict)
+            or workspace_integrity.get("unchanged") is not True
+        ):
+            raise AgentEvalError(
+                "baseline Agent execution or isolation evidence is incomplete"
+            )
+        agent_execution = _load_json(root / "agent-execution.json")
+        trace_relative = attempt.get("agent_trace_path")
+        if (
+            attempt.get("agent_trace_status") != "captured"
+            or not isinstance(trace_relative, str)
+            or agent_execution.get("exit_code") != agent_exit_code
+            or agent_execution.get("timed_out") is not False
+            or agent_execution.get("trace_status") != "captured"
+            or agent_execution.get("trace_path") != trace_relative
+            or agent_execution.get("trace_redacted") is not False
+            or agent_execution.get("container_cleanup_status") != "succeeded"
+        ):
+            raise AgentEvalError("baseline Agent trace evidence is incomplete")
+        trace_path = _resolve_run_path(run_root, trace_relative)
+        if trace_path.parent != root or trace_path.name != "agent-trace.json":
+            raise AgentEvalError("baseline Agent trace path does not match its attempt")
+        trace = _load_json(trace_path)
+        trace_commands = trace.get("commands")
+        if (
+            trace.get("format") != "codex_exec_jsonl"
+            or trace.get("status") != "captured"
+            or trace.get("turn_completed") is not True
+            or trace.get("turn_failed") is not False
+            or not isinstance(trace_commands, list)
+        ):
+            raise AgentEvalError("baseline Agent trace is not a complete execution")
+        runtime_verifier = runtime.get("verifier")
+        workflow_runtime = runtime.get("workflow_runtime")
+        if (
+            not isinstance(runtime_verifier, dict)
+            or runtime_verifier.get("status") != "pass"
+            or not isinstance(workflow_runtime, dict)
+            or workflow_runtime.get("status") != "pass"
         ):
             raise AgentEvalError(
                 "baseline has runtime evidence that is missing, failing, or unverified"
             )
+        if attempt.get("runtime_status") != {
+            "verifier": "pass",
+            "workflow_runtime": "pass",
+        }:
+            raise AgentEvalError("baseline runtime status summary does not match its evidence")
         if not integrity.get("unchanged"):
             raise AgentEvalError("baseline target workspace integrity check failed")
+        safety = _load_json(root / "output-safety-scan.json")
+        if safety.get("status") != "clear":
+            raise AgentEvalError("baseline output safety evidence is incomplete")
+        saved_output = attempt.get("saved_output_root")
+        manifest_relative = attempt.get("artifact_manifest")
+        if not isinstance(saved_output, str) or not isinstance(manifest_relative, str):
+            raise AgentEvalError("baseline attempt has no preserved artifact root")
+        output_root = _resolve_run_path(run_root, saved_output)
+        current_validation = validate_artifact_index(output_root, scenario)
+        if (
+            current_validation.get("status") != "pass"
+            or canonical_fingerprint(current_validation)
+            != canonical_fingerprint(validation)
+        ):
+            raise AgentEvalError("baseline artifacts changed after evaluation")
+        current_manifest = build_artifact_manifest(output_root, current_validation)
+        stored_manifest_path = _resolve_run_path(run_root, manifest_relative)
+        stored_manifest = _load_json(stored_manifest_path)
+        if (
+            current_manifest != stored_manifest
+            or any(
+                row.get("classification") == "unsafe_symlink"
+                for row in current_manifest.get("files", [])
+            )
+        ):
+            raise AgentEvalError("baseline artifact manifest is stale or unsafe")
+        skill_observations = attempt.get("skill_use_observation")
+        if not isinstance(skill_observations, dict):
+            raise AgentEvalError("baseline Skill-use observations are missing")
+        routed_skills = {
+            row.get("skill")
+            for row in current_validation.get("routing", [])
+            if isinstance(row, dict) and row.get("status") == "executed"
+        }
+        trace_skills = {
+            skill
+            for command in trace_commands
+            if isinstance(command, dict) and command.get("successful") is True
+            for skill in command.get("skill_files_read", [])
+            if isinstance(skill, str)
+        }
+        expected_skills = {
+            row["skill"] for row in scenario["required_artifacts"]
+        }
+        if set(skill_observations) != expected_skills or any(
+            skill_observations[skill]
+            != ("observed" if skill in routed_skills & trace_skills else "unverified")
+            for skill in expected_skills
+        ):
+            raise AgentEvalError(
+                "baseline Skill-use summary does not match trace and routing evidence"
+            )
         normalized = judge.get("normalized")
-        if not isinstance(normalized, dict) or not isinstance(
-            normalized.get("criteria"), list
+        if (
+            not isinstance(normalized, dict)
+            or not isinstance(normalized.get("criteria"), list)
+            or any(not isinstance(item, dict) for item in normalized["criteria"])
         ):
             raise AgentEvalError("baseline has no normalized fixed-Judge criteria")
+        judge_runs = judge.get("runs")
+        if (
+            attempt.get("judge_status") != judge.get("status")
+            or not isinstance(judge_runs, list)
+            or len(judge_runs) < 2
+            or any(
+                not isinstance(row, dict) or row.get("status") != "pass"
+                for row in judge_runs
+            )
+        ):
+            raise AgentEvalError("baseline Judge execution evidence is incomplete")
         criteria = {
             item.get("id"): item
             for item in normalized["criteria"]
@@ -372,6 +521,9 @@ def _attempt_data(run: dict[str, Any], run_root: Path) -> list[dict[str, Any]]:
                 "root": root,
                 "criteria": criteria,
                 "artifacts": validation.get("artifacts", []),
+                "artifact_validation": validation,
+                "output_root": output_root,
+                "artifact_manifest": current_manifest,
                 "skill_use_observation": attempt.get(
                     "skill_use_observation", "unverified"
                 ),
@@ -416,12 +568,6 @@ def _stable_failures(
     return failures
 
 
-def _skill_excerpt(package_root: Path, skill: str, limit: int = 20_000) -> str:
-    path = package_root / "skills" / skill / "SKILL.md"
-    text = path.read_text(encoding="utf-8")
-    return text[:limit]
-
-
 def _source_paths(package_root: Path, skill: str) -> dict[str, str]:
     manifest: dict[str, str] = {}
     root = package_root / "skills" / skill
@@ -436,7 +582,11 @@ def _source_paths(package_root: Path, skill: str) -> dict[str, str]:
 
 
 def _validate_analysis(
-    raw: str, *, skill_names: set[str], criterion: str
+    raw: str,
+    *,
+    skill_names: set[str],
+    criterion: str,
+    evidence_sources: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     safe = sanitize_diagnostic(raw)
     try:
@@ -469,13 +619,119 @@ def _validate_analysis(
     for field in ("issue", "repair_rationale"):
         if not isinstance(value[field], str) or not value[field].strip():
             raise AgentEvalError(f"analysis Agent {field} is missing")
-    for field in ("evidence", "alternative_causes", "repair_paths"):
+    for field in ("alternative_causes", "repair_paths"):
         if not isinstance(value[field], list) or any(
-            not isinstance(item, str) for item in value[field]
+            not isinstance(item, str) or not item.strip() for item in value[field]
         ):
             raise AgentEvalError(f"analysis Agent {field} must be a string array")
+    if not isinstance(value["evidence"], list) or len(value["evidence"]) < 2:
+        raise AgentEvalError("analysis Agent evidence must cite source text")
+    evidence_kinds: set[str] = set()
+    seen_evidence: set[tuple[str, str, str]] = set()
+    for item in value["evidence"]:
+        if not isinstance(item, dict) or set(item) != {"path", "sha256", "quote"}:
+            raise AgentEvalError("analysis Agent evidence entry schema is invalid")
+        path = item["path"]
+        digest = item["sha256"]
+        quote = item["quote"]
+        if not all(isinstance(item[field], str) for field in ("path", "sha256", "quote")):
+            raise AgentEvalError("analysis Agent evidence fields must be strings")
+        try:
+            normalized_path = safe_relative_path(path).as_posix()
+        except AgentEvalError as exc:
+            raise AgentEvalError("analysis Agent cited an unsafe source path") from exc
+        source = evidence_sources.get(normalized_path)
+        if source is None:
+            raise AgentEvalError("analysis Agent cited a source that was not inspected")
+        if digest != source.get("sha256"):
+            raise AgentEvalError("analysis Agent source hash does not match inspected source")
+        if len(quote.strip()) < 16 or quote not in source.get("text", ""):
+            raise AgentEvalError("analysis Agent quote does not match inspected source text")
+        identity = (normalized_path, digest, quote)
+        if identity in seen_evidence:
+            raise AgentEvalError("analysis Agent repeated an evidence citation")
+        seen_evidence.add(identity)
+        evidence_kinds.add(source.get("kind", ""))
+    if not {"artifact", "skill"}.issubset(evidence_kinds):
+        raise AgentEvalError("analysis Agent must cite both an original artifact and Skill source")
+    if value["classification"] == "skill" and value["skill"] is None:
+        raise AgentEvalError("Skill classification requires one selected Skill")
     value["target_criterion"] = criterion
     return value
+
+
+def _analysis_repair_gate(
+    analysis: dict[str, Any],
+    *,
+    allowed_skills: set[str],
+    attempts: list[dict[str, Any]],
+    evidence_sources: dict[str, dict[str, Any]],
+    package_root: Path,
+) -> dict[str, Any]:
+    reasons: list[str] = []
+    skill = analysis.get("skill")
+    if analysis.get("classification") != "skill" or skill not in allowed_skills:
+        reasons.append("analysis_does_not_attribute_failure_to_one_allowed_skill")
+    if analysis.get("alternative_causes"):
+        reasons.append("alternative_causes_remain_unresolved")
+    if not isinstance(skill, str) or skill not in allowed_skills:
+        skill_evidence = False
+    else:
+        skill_evidence = any(
+            evidence_sources.get(row.get("path"), {}).get("kind") == "skill"
+            and row.get("path", "").startswith(f".agents/skills/{skill}/")
+            for row in analysis.get("evidence", [])
+            if isinstance(row, dict)
+        )
+    artifact_evidence = any(
+        evidence_sources.get(row.get("path"), {}).get("kind") == "artifact"
+        for row in analysis.get("evidence", [])
+        if isinstance(row, dict)
+    )
+    if not skill_evidence or not artifact_evidence:
+        reasons.append("root_cause_is_not_tied_to_verified_artifact_and_skill_text")
+    usage = (
+        [_skill_use_for_attempt(row["attempt"], skill) for row in attempts]
+        if isinstance(skill, str)
+        else []
+    )
+    if len(usage) < 2 or any(value != "observed" for value in usage):
+        reasons.append("selected_skill_use_not_observed_in_every_baseline_attempt")
+    base_allowed_paths = (
+        set(_allowed_repair_paths(skill, package_root))
+        if isinstance(skill, str) and skill in allowed_skills
+        else set()
+    )
+    requested_paths: set[str] = set()
+    raw_paths = analysis.get("repair_paths", [])
+    if not isinstance(raw_paths, list) or not raw_paths:
+        reasons.append("analysis_requested_no_repair_path")
+    else:
+        for raw_path in raw_paths:
+            if not isinstance(raw_path, str):
+                reasons.append("analysis_requested_invalid_repair_path")
+                continue
+            path = PurePosixPath(raw_path)
+            if path.is_absolute() or not path.parts or ".." in path.parts or "\\" in raw_path:
+                reasons.append("analysis_requested_path_outside_single_skill_allowlist")
+                continue
+            candidate = path.as_posix()
+            if isinstance(skill, str) and candidate.startswith(skill + "/"):
+                candidate = candidate[len(skill) + 1 :]
+            if candidate not in base_allowed_paths:
+                reasons.append("analysis_requested_path_outside_single_skill_allowlist")
+                continue
+            requested_paths.add(candidate)
+    return {
+        "allowed": not reasons,
+        "reasons": sorted(set(reasons)),
+        "skill": skill,
+        "skill_use_observations": usage,
+        "requested_paths": sorted(requested_paths),
+        "artifact_evidence_verified": artifact_evidence,
+        "skill_source_evidence_verified": skill_evidence,
+        "alternative_causes_clear": not analysis.get("alternative_causes"),
+    }
 
 
 def _allowed_repair_paths(skill: str, package_root: Path) -> list[str]:
@@ -492,8 +748,212 @@ def _allowed_repair_paths(skill: str, package_root: Path) -> list[str]:
     )
 
 
+def _safe_child_file(root: Path, relative: str) -> Path:
+    try:
+        safe = safe_relative_path(relative)
+    except (AgentEvalError, TypeError) as exc:
+        raise AgentEvalError("analysis evidence path is unsafe") from exc
+    candidate = root
+    for part in safe.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            raise AgentEvalError("analysis evidence may not contain symlinks")
+    try:
+        resolved = ensure_within(candidate, root)
+    except AgentEvalError as exc:
+        raise AgentEvalError("analysis evidence path escapes its root") from exc
+    if not resolved.is_file():
+        raise AgentEvalError("analysis evidence file is missing")
+    return resolved
+
+
+def _add_analysis_source(
+    *,
+    workspace: Path,
+    source_path: str,
+    data: bytes,
+    kind: str,
+    sources: dict[str, dict[str, Any]],
+    prompt_parts: list[str],
+    total_bytes: int,
+) -> int:
+    try:
+        relative = safe_relative_path(source_path).as_posix()
+        text = data.decode("utf-8", errors="strict")
+    except (AgentEvalError, UnicodeDecodeError) as exc:
+        raise AgentEvalError("analysis evidence is not safe UTF-8 text") from exc
+    safe_text = sanitize_diagnostic(text, _MAX_ANALYSIS_SOURCE_BYTES)
+    if safe_text != text or len(data) > _MAX_ANALYSIS_SOURCE_BYTES:
+        raise AgentEvalError("analysis evidence contains secrets or exceeds its limit")
+    next_total = total_bytes + len(data)
+    if next_total > _MAX_ANALYSIS_SOURCE_BYTES:
+        raise AgentEvalError("analysis evidence exceeds the fixed total size limit")
+    digest = sha256_bytes(data)
+    destination = workspace / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(destination, data)
+    sources[relative] = {"sha256": digest, "kind": kind, "text": text}
+    prompt_parts.extend(
+        [f"## {relative} ({digest})", "", text, ""]
+    )
+    return next_total
+
+
+def _prepare_analysis_workspace(
+    *,
+    workspace: Path,
+    attempts: list[dict[str, Any]],
+    allowed_skills: set[str],
+    package_root: Path,
+    target_root: Path,
+) -> tuple[dict[str, dict[str, Any]], str, list[dict[str, str]]]:
+    scenario = load_scenario()
+    source_map: dict[str, dict[str, Any]] = {}
+    prompt_parts: list[str] = []
+    source_manifest: list[dict[str, str]] = []
+    total_bytes = 0
+    for index, attempt in enumerate(attempts, start=1):
+        output_root = attempt["output_root"]
+        attempt_artifacts = [
+            row
+            for row in attempt["artifacts"]
+            if row.get("skill") in allowed_skills
+        ]
+        final_relative = "final-message.md"
+        final_path = output_root / final_relative
+        if final_path.is_file() and not final_path.is_symlink():
+            if final_path.stat().st_size > _MAX_ANALYSIS_SOURCE_BYTES:
+                raise AgentEvalError("final Agent message exceeds its evidence limit")
+            if final_relative not in {row.get("path") for row in attempt_artifacts}:
+                attempt_artifacts.append(
+                    {
+                        "path": final_relative,
+                        "sha256": sha256_bytes(final_path.read_bytes()),
+                        "skill": "agent",
+                        "kind": "final-message",
+                    }
+                )
+        for artifact in sorted(
+            attempt_artifacts, key=lambda row: (row["skill"], row["kind"], row["path"])
+        ):
+            relative = artifact.get("path")
+            if not isinstance(relative, str):
+                raise AgentEvalError("validated artifact has no canonical path")
+            source = _safe_child_file(output_root, relative)
+            data = source.read_bytes()
+            digest = sha256_bytes(data)
+            if digest != artifact.get("sha256"):
+                raise AgentEvalError("original Agent artifact changed after validation")
+            alias = f"original-artifacts/attempt-{index:02d}/{relative}"
+            total_bytes = _add_analysis_source(
+                workspace=workspace,
+                source_path=alias,
+                data=data,
+                kind="artifact",
+                sources=source_map,
+                prompt_parts=prompt_parts,
+                total_bytes=total_bytes,
+            )
+            source_manifest.append({"path": alias, "sha256": digest})
+
+    skills_root = package_root / "skills"
+    (workspace / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
+    for skill in sorted(allowed_skills):
+        skill_root = skills_root / skill
+        if skill_root.is_symlink() or not skill_root.is_dir():
+            raise AgentEvalError("analysis Skill source is missing or unsafe")
+        visible_root = workspace / ".agents" / "skills" / skill
+        for relative in _allowed_repair_paths(skill, package_root):
+            source = _safe_child_file(skill_root, relative)
+            if source.stat().st_size > _MAX_ANALYSIS_SOURCE_BYTES:
+                raise AgentEvalError("Skill source exceeds the analysis evidence limit")
+            data = source.read_bytes()
+            try:
+                data.decode("utf-8", errors="strict")
+            except UnicodeDecodeError:
+                continue
+            alias = f".agents/skills/{skill}/{relative}"
+            total_bytes = _add_analysis_source(
+                workspace=workspace,
+                source_path=alias,
+                data=data,
+                kind="skill",
+                sources=source_map,
+                prompt_parts=prompt_parts,
+                total_bytes=total_bytes,
+            )
+            destination = visible_root / safe_relative_path(relative)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_bytes(destination, data)
+            source_manifest.append(
+                {"path": alias, "sha256": source_map[alias]["sha256"]}
+            )
+
+    scenario_dir = Path(__file__).resolve().parent / "scenarios" / scenario[
+        "scenario_id"
+    ]
+    task_file = scenario_dir / scenario["task"]
+    if task_file.is_file() and not task_file.is_symlink():
+        data = task_file.read_bytes()
+        total_bytes = _add_analysis_source(
+            workspace=workspace,
+            source_path="public-input/task.md",
+            data=data,
+            kind="public_input",
+            sources=source_map,
+            prompt_parts=prompt_parts,
+            total_bytes=total_bytes,
+        )
+        source_manifest.append(
+            {
+                "path": "public-input/task.md",
+                "sha256": source_map["public-input/task.md"]["sha256"],
+            }
+        )
+    references = extract_revision_files(
+        source_root=target_root,
+        revision=DEFAULT_TARGET_REVISION,
+        paths=scenario["reference_paths"],
+    )
+    for relative in sorted(references):
+        alias = f"public-references/{relative}"
+        total_bytes = _add_analysis_source(
+            workspace=workspace,
+            source_path=alias,
+            data=references[relative],
+            kind="public_reference",
+            sources=source_map,
+            prompt_parts=prompt_parts,
+            total_bytes=total_bytes,
+        )
+        source_manifest.append(
+            {"path": alias, "sha256": source_map[alias]["sha256"]}
+        )
+    return source_map, "\n".join(prompt_parts), source_manifest
+
+
+def _copy_allowed_skill_files(
+    source_package: Path, destination_skills_root: Path, skill: str
+) -> set[str]:
+    source_root = source_package / "skills" / skill
+    destination_root = destination_skills_root / skill
+    visible_paths: set[str] = set()
+    for relative in _allowed_repair_paths(skill, source_package):
+        source = _safe_child_file(source_root, relative)
+        destination = destination_root / safe_relative_path(relative)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        visible_paths.add(relative)
+    return visible_paths
+
+
 def _validate_repair_diff(
-    before: dict[str, str], skill_root: Path, skill: str, allowed: set[str]
+    before: dict[str, str],
+    skill_root: Path,
+    skill: str,
+    allowed: set[str],
+    *,
+    visible_paths: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
     after: dict[str, str] = {}
     root = skill_root / skill
@@ -532,7 +992,7 @@ def _validate_repair_diff(
         if not source_path.startswith(skill + "/"):
             continue
         relative = source_path[len(skill) + 1 :]
-        if relative not in after:
+        if (visible_paths is None or relative in visible_paths) and relative not in after:
             raise AgentEvalError("repair Agent deleted an existing Skill file")
     changed_paths = {item["path"] for item in changes}
     if not changed_paths:
@@ -740,7 +1200,6 @@ def run_improvements(
         )
     if baseline.get("profile_verification") != "verified":
         raise AgentEvalError("improvement requires verified baseline isolation")
-    attempts = _attempt_data(baseline, run_root)
     judge_validation = _load_json(judge_validation_result)
     if judge_validation.get("evaluator_revision") != baseline.get(
         "evaluator_revision"
@@ -770,33 +1229,6 @@ def run_improvements(
     if evaluator_sha != baseline["evaluator_revision"]:
         raise AgentEvalError("baseline run uses a different Evaluator revision")
     target_source_sha = assert_clean_checkout(target_root)
-    baseline_attempt = next(
-        (
-            row
-            for row in baseline["attempts"]
-            if row.get("status") in {"pass", "fail", "needs_review"}
-        ),
-        None,
-    )
-    if baseline_attempt is None or not isinstance(
-        baseline_attempt.get("saved_output_root"), str
-    ):
-        raise AgentEvalError("baseline has no preserved Agent artifact directory")
-    baseline_output = (run_root / baseline_attempt["saved_output_root"]).resolve()
-    try:
-        baseline_output.relative_to(run_root.resolve())
-    except ValueError as exc:
-        raise AgentEvalError("baseline output path escapes the run root") from exc
-    baseline_artifact_fingerprint = _artifact_content_fingerprint(baseline_output)
-    judge_verified = _judge_verification_map(
-        judge_validation_result,
-        expected_evaluator_revision=evaluator_sha,
-        expected_target_revision=baseline.get("target_revision"),
-        expected_profile_fingerprint=profile_fingerprint(profile),
-        expected_baseline_artifact_fingerprint=baseline_artifact_fingerprint,
-        target_root=target_root,
-    )
-    failures = _stable_failures(attempts, judge_verified)
     evidence_rel = Path(profile["verification"]["evidence_path"])
     if evidence_rel.is_absolute() or ".." in evidence_rel.parts:
         raise AgentEvalError("execution profile evidence path is unsafe")
@@ -816,6 +1248,41 @@ def run_improvements(
         agent_command_argv=baseline.get("agent_command_template"),
     ):
         raise AgentEvalError("improvement requires verified isolation evidence")
+    try:
+        attempts = _attempt_data(baseline, run_root)
+    except (AgentEvalError, OSError, ValueError, KeyError) as exc:
+        pending = {
+            "schema_version": 1,
+            "status": "review_pending_or_unmet",
+            "baseline_result": str(baseline_result),
+            "evaluator_revision": baseline.get("evaluator_revision"),
+            "target_revision": baseline.get("target_revision"),
+            "baseline_skill_revision": baseline.get("skill_revision"),
+            "cases": [
+                {
+                    "criterion": "baseline-evidence",
+                    "status": "review_pending",
+                    "blocked_reason": sanitize_diagnostic(str(exc), 500),
+                    "repair_attempts_started": 0,
+                }
+            ],
+            "repair_attempts_started": 0,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+        }
+        atomic_write_json(output_root / "result.json", pending)
+        return pending
+    baseline_artifact_fingerprint = _artifact_content_fingerprint(
+        attempts[0]["output_root"]
+    )
+    judge_verified = _judge_verification_map(
+        judge_validation_result,
+        expected_evaluator_revision=evaluator_sha,
+        expected_target_revision=baseline.get("target_revision"),
+        expected_profile_fingerprint=profile_fingerprint(profile),
+        expected_baseline_artifact_fingerprint=baseline_artifact_fingerprint,
+        target_root=target_root,
+    )
+    failures = _stable_failures(attempts, judge_verified)
     experiment_id = f"improve-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.urandom(4).hex()}"
     experiments_root = output_root / "experiments" / experiment_id
     experiments_root.mkdir(parents=True, exist_ok=False)
@@ -870,40 +1337,70 @@ def run_improvements(
             "baseline_package_fingerprint": baseline_manifest["package_fingerprint"],
             "skill_use_observation": [row["skill_use_observation"] for row in attempts],
         }
+        excerpt_candidates = sorted(
+            skill
+            for skill in allowed_skills & skills
+            if all(
+                _skill_use_for_attempt(row["attempt"], skill) == "observed"
+                for row in attempts
+            )
+        )
+        if not excerpt_candidates:
+            case_record["status"] = "review_pending"
+            case_record["blocked_reason"] = "eligible_skill_use_not_observed_in_all_attempts"
+            case_record["analysis_preconditions"] = {
+                "independent_attempts": len(attempts) >= 2,
+                "runtime_and_artifact_evidence": "verified",
+                "judge_criterion": judge_verified.get(criterion, {}).get("status"),
+                "skill_use": "unobserved_or_incomplete",
+            }
+            result["cases"].append(case_record)
+            _write_analysis_artifacts(case_root, case_record)
+            atomic_write_json(case_root / "case.json", case_record)
+            continue
+        analysis_workspace = case_root / "analysis-workspace"
+        analysis_workspace.mkdir()
+        (analysis_workspace / ".qa-eval-output").mkdir()
+        try:
+            evidence_sources, inspected_sources, source_manifest = (
+                _prepare_analysis_workspace(
+                    workspace=analysis_workspace,
+                    attempts=attempts,
+                    allowed_skills=set(excerpt_candidates),
+                    package_root=parent_package,
+                    target_root=target_root,
+                )
+            )
+        except (AgentEvalError, OSError, UnicodeDecodeError) as exc:
+            case_record["status"] = "review_pending"
+            case_record["blocked_reason"] = sanitize_diagnostic(str(exc), 500)
+            result["cases"].append(case_record)
+            _write_analysis_artifacts(case_root, case_record)
+            atomic_write_json(case_root / "case.json", case_record)
+            atomic_write_json(output_root / "result.json", result)
+            continue
         prompt_evidence = {
-            "criterion": criterion,
-            "repeated_fixed_judge_observations": failure["observations"],
             "baseline_run_id": baseline.get("run_id"),
             "attempt_ids": [row["attempt"].get("attempt_id") for row in attempts],
+            "evaluator_revision": baseline.get("evaluator_revision"),
+            "target_revision": baseline.get("target_revision"),
             "runtime_status": "pass",
             "artifact_contract_status": "pass",
             "target_integrity_status": "unchanged",
-            "artifacts": sorted(
-                {
-                    (row.get("path"), row.get("sha256"))
-                    for attempt in attempts
-                    for row in attempt["artifacts"]
-                }
-            ),
+            "skill_use_observations": {
+                skill: [
+                    _skill_use_for_attempt(row["attempt"], skill)
+                    for row in attempts
+                ]
+                for skill in excerpt_candidates
+            },
+            "inspected_sources": source_manifest,
+            "evaluator_only_expected_and_rubric": "withheld",
         }
-        excerpt_candidates = sorted(allowed_skills & skills)
-        analysis_workspace = case_root / "analysis-workspace"
-        analysis_workspace.mkdir()
-        (analysis_workspace / ".agents" / "skills").mkdir(parents=True)
-        (analysis_workspace / ".qa-eval-output").mkdir()
-        excerpt_parts = []
-        for skill_name in excerpt_candidates:
-            shutil.copytree(
-                parent_package / "skills" / skill_name,
-                analysis_workspace / ".agents" / "skills" / skill_name,
-            )
-            excerpt_parts.append(
-                f"## {skill_name}\n{_skill_excerpt(parent_package, skill_name, 8_000)}"
-            )
         analysis_prompt = build_analysis_prompt(
             case_id=criterion,
             evidence=json.dumps(prompt_evidence, ensure_ascii=False),
-            skill_excerpt="\n\n".join(excerpt_parts),
+            skill_excerpt=inspected_sources,
         )
         analysis_command = [
             item.replace("{workspace}", str(analysis_workspace)).replace(
@@ -993,7 +1490,10 @@ def run_improvements(
             continue
         try:
             analysis = _validate_analysis(
-                analysis_safe, skill_names=skills, criterion=criterion
+                analysis_safe,
+                skill_names=set(excerpt_candidates),
+                criterion=criterion,
+                evidence_sources=evidence_sources,
             )
         except AgentEvalError as exc:
             case_record["status"] = "review_pending"
@@ -1003,28 +1503,22 @@ def run_improvements(
             atomic_write_json(case_root / "case.json", case_record)
             continue
         case_record["analysis_decision"] = analysis
+        case_record["analysis_sources"] = source_manifest
         _write_analysis_artifacts(case_root, case_record)
         atomic_write_json(case_root / "case.json", case_record)
         chosen_skill = analysis.get("skill")
-        mechanically_allowed = (
-            analysis["classification"] == "skill"
-            and chosen_skill in allowed_skills
-            and bool(analysis["repair_paths"])
-            and bool(analysis["evidence"])
-            and all(
-                "sha256:" in item
-                and any(
-                    path and digest and path in item and digest in item
-                    for path, digest in prompt_evidence["artifacts"]
-                )
-                for item in analysis["evidence"]
-            )
+        repair_gate = _analysis_repair_gate(
+            analysis,
+            allowed_skills=set(excerpt_candidates),
+            attempts=attempts,
+            evidence_sources=evidence_sources,
+            package_root=parent_package,
         )
+        case_record["repair_gate"] = repair_gate
+        mechanically_allowed = repair_gate["allowed"]
         if not mechanically_allowed:
             case_record["status"] = "review_pending"
-            case_record["blocked_reason"] = (
-                "analysis_does_not_meet_fixed_skill_repair_gate"
-            )
+            case_record["blocked_reason"] = ";".join(repair_gate["reasons"])
         elif analyze_only:
             case_record["status"] = "analysis_complete_review_pending"
             case_record["blocked_reason"] = "analyze_only_requested"
@@ -1032,25 +1526,10 @@ def run_improvements(
             case_record["status"] = "stopped_by_repair_limit"
             case_record["blocked_reason"] = "global_repair_attempt_limit_reached"
         else:
-            base_allowed_paths = _allowed_repair_paths(chosen_skill, parent_package)
-            requested_paths = set()
-            for raw_path in analysis["repair_paths"]:
-                path = PurePosixPath(raw_path)
-                if path.is_absolute() or ".." in path.parts:
-                    mechanically_allowed = False
-                    break
-                candidate = path.as_posix()
-                if candidate.startswith(chosen_skill + "/"):
-                    candidate = candidate[len(chosen_skill) + 1 :]
-                if candidate not in base_allowed_paths:
-                    mechanically_allowed = False
-                    break
-                requested_paths.add(candidate)
-            if not mechanically_allowed:
+            requested_paths = set(repair_gate["requested_paths"])
+            if not requested_paths:
                 case_record["status"] = "review_pending"
-                case_record["blocked_reason"] = (
-                    "analysis_requested_path_outside_single_skill_allowlist"
-                )
+                case_record["blocked_reason"] = "analysis_requested_no_repair_path"
             else:
                 package_path = parent_package
                 package_manifest = baseline_manifest
@@ -1081,8 +1560,11 @@ def run_improvements(
                     trial_root.mkdir(parents=True)
                     repair_workspace = trial_root / "workspace"
                     (repair_workspace / ".agents").mkdir(parents=True)
-                    shutil.copytree(
-                        package_path / "skills", repair_workspace / ".agents" / "skills"
+                    (repair_workspace / ".agents" / "skills").mkdir()
+                    visible_paths = _copy_allowed_skill_files(
+                        package_path,
+                        repair_workspace / ".agents" / "skills",
+                        chosen_skill,
                     )
                     repair_output = repair_workspace / ".qa-eval-output"
                     repair_output.mkdir()
@@ -1213,6 +1695,7 @@ def run_improvements(
                             repair_workspace / ".agents" / "skills",
                             chosen_skill,
                             requested_paths,
+                            visible_paths=visible_paths,
                         )
                     except (AgentEvalError, UnicodeDecodeError) as exc:
                         trial["status"] = "review_pending"
@@ -1222,10 +1705,16 @@ def run_improvements(
                         case_record["status"] = "review_pending"
                         break
                     candidate_package = trial_root / "candidate-package"
-                    shutil.copytree(
-                        repair_workspace / ".agents" / "skills",
-                        candidate_package / "skills",
+                    shutil.copytree(package_path, candidate_package)
+                    candidate_skill_root = candidate_package / "skills" / chosen_skill
+                    repaired_skill_root = (
+                        repair_workspace / ".agents" / "skills" / chosen_skill
                     )
+                    for change in changes:
+                        relative = safe_relative_path(change["path"])
+                        destination = candidate_skill_root / relative
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(repaired_skill_root / relative, destination)
                     candidate_manifest = create_skill_workspace_from_root(
                         candidate_package,
                         trial_root / "candidate-manifest-workspace",

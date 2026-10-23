@@ -17,16 +17,17 @@ def build_generation_prompt(*, skill: str, eval_input: str) -> str:
 
 
 def build_analysis_prompt(*, case_id: str, evidence: str, skill_excerpt: str) -> str:
-    return f"""保存済み評価の原因を分類してください。評価用の正解情報やJudge設定を推測しないでください。
+    return f"""保存済み評価の原因を分類してください。表示された原成果物・公開仕様・実行観測とSkill sourceを照合してください。
+Evaluator-onlyのexpected、rubric、Judge fixture、Reference、正解ラベルは与えられていません。推測・検索しないでください。
 case_id: {case_id}
 
 以下のJSONだけを返してください。
-{{"classification":"skill|agent|evaluator|input|environment|evidence|unknown","skill":"<単一Skill名またはnull>","issue":"<具体的な問題>","evidence":["<元fileとhashを参照する根拠>"],"alternative_causes":["<除外できない代替原因>"],"repair_paths":["<許可path>"],"repair_rationale":"<最小修正方針>"}}
+{{"classification":"skill|agent|evaluator|input|environment|evidence|unknown","skill":"<単一Skill名またはnull>","issue":"<具体的な問題>","evidence":[{{"path":"<表示されたsource path>","sha256":"<表示されたsha256>","quote":"<source本文からの連続した引用>"}}],"alternative_causes":["<解消していない代替原因>"],"repair_paths":["<単一Skillの許可path>"],"repair_rationale":"<最小修正方針>"}}
 
-# Sanitized evaluation evidence
+# Verified execution facts and original artifact / source contents
 {evidence}
 
-# Public Skill source excerpt
+# Source inspection notes
 {skill_excerpt}
 """
 
