@@ -79,6 +79,7 @@ Repair write拒否はCodex設定の追加writable rootが適用されないprofi
 - `fb5945d1ddda2020b3605799c303f1cd2a2d2c56`
 - `7f88133a9d5c602c4db91b21957eab85e8cb648f`
 - `39a08482bf8bbd179b0188c540a00a31943e677b`
+- `9dc7939ad9f4962a5b126b56ff57a5f75a1c63ac`（最終レポート更新）
 
 同HEADに対する指定CIは5件すべてSUCCESS。
 
@@ -87,6 +88,14 @@ Repair write拒否はCodex設定の追加writable rootが適用されないprofi
 - [Validate Semantic Output Evals (run 1373)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618983)
 - [Code Quality (run 103)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079619000)
 - [Codex Harness (run 103)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618986)
+
+最終レポート更新commit `9dc7939ad9f4962a5b126b56ff57a5f75a1c63ac`に対する指定CIも5件すべてSUCCESS:
+
+- [Validate Agent Skills (run 1410)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40080039657)
+- [Validate Deterministic Output Evals (run 1409)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40080039420)
+- [Validate Semantic Output Evals (run 1374)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40080039374)
+- [Code Quality (run 104)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40080039394)
+- [Codex Harness (run 104)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40080039373)
 
 初回の`git fetch origin`はWindows checkoutの`.git/FETCH_HEAD`権限で失敗したが、後続の通常pushはGitHubに受理され、上記CIはpush済みHEADに対して実行された。PR #17はopen、base `main`、head branch `feat/agent-eval-runner`のままであり、merge・close・base変更はしていない。
 
