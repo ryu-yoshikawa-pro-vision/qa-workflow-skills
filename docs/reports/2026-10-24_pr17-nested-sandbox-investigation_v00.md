@@ -17,15 +17,15 @@
 
 ## 2. 実行環境と固定revision
 
-| 項目                 | 確認値                                                                                                      |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Evaluator branch/HEAD | `feat/agent-eval-runner` / `cfb3d26f96e4c394b32e53b7d8ad79188192af28`                                     |
-| WSL                  | Ubuntu 24.04.4、WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`                                             |
-| 実行ユーザー         | uid/gid `1000/1000`、通常ユーザー                                                                           |
-| Python               | system Python `3.12.3`                                                                                      |
-| Codex CLI            | `codex-cli 0.163.0`、Linux x64 npm package                                                                   |
-| package SHA-512      | `bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3` |
-| bwrap                | Codex package内の`codex-resources/bwrap`、表示名`bubblewrap built for Codex`                                 |
+| 項目                  | 確認値                                                                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Evaluator branch/HEAD | `feat/agent-eval-runner` / `cfb3d26f96e4c394b32e53b7d8ad79188192af28`                                                              |
+| WSL                   | Ubuntu 24.04.4、WSL2 kernel `6.18.54.1-microsoft-standard-WSL2`                                                                    |
+| 実行ユーザー          | uid/gid `1000/1000`、通常ユーザー                                                                                                  |
+| Python                | system Python `3.12.3`                                                                                                             |
+| Codex CLI             | `codex-cli 0.163.0`、Linux x64 npm package                                                                                         |
+| package SHA-512       | `bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3` |
+| bwrap                 | Codex package内の`codex-resources/bwrap`、表示名`bubblewrap built for Codex`                                                       |
 
 packageは公開npm tarball `https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-linux-x64.tgz`から取得し、上記SHA-512を照合した。実験用bundleとログはローカルの`.agent-eval-runs/pr17-nested-sandbox-20261024/`に保存した。主な記録は`nested_sandbox_probe.py`、`nested-sandbox-results.json`、`nested-sandbox-results-fd-injected.json`、`package-download.json`である。これらはgitignore対象で、認証情報を含まない。
 
@@ -51,18 +51,18 @@ wsl.exe -d Ubuntu -- /usr/bin/python3 -I -S /mnt/c/Users/sella/Documents/qa-work
 
 ## 4. 外側namespace・pathの結果
 
-| 検査                     | 結果                                                                 |
-| ------------------------ | -------------------------------------------------------------------- |
-| user namespace           | 成功。`uid_map`は`1000 0 1`                                           |
-| PID namespace            | 成功。`/proc/1/comm`は`bwrap`                                         |
-| network namespace        | 成功。外側のTEST-NET接続は`ENETUNREACH`                               |
-| mount namespace / procfs | 成功。`/proc`はprocfsとしてmountされ、`/proc/self`が現在PIDと一致       |
-| root内のentry             | `bin, dev, lib, lib64, opt, proc, tmp, usr, workspace`だけ             |
-| 非許可host path           | `/home`, `/root`, `/mnt`, `/var`はいずれも存在しない                  |
-| 合成input読取             | 成功し、期待markerと一致                                              |
-| outside / Windows sentinel | 直接path・workspace内symlinkの双方で読取不可（`ENOENT`）              |
-| 合成auth marker           | 外側shellから読取可能。値は合成markerのみ                             |
-| output                   | 外側から書込み可能                                                   |
+| 検査                       | 結果                                                              |
+| -------------------------- | ----------------------------------------------------------------- |
+| user namespace             | 成功。`uid_map`は`1000 0 1`                                       |
+| PID namespace              | 成功。`/proc/1/comm`は`bwrap`                                     |
+| network namespace          | 成功。外側のTEST-NET接続は`ENETUNREACH`                           |
+| mount namespace / procfs   | 成功。`/proc`はprocfsとしてmountされ、`/proc/self`が現在PIDと一致 |
+| root内のentry              | `bin, dev, lib, lib64, opt, proc, tmp, usr, workspace`だけ        |
+| 非許可host path            | `/home`, `/root`, `/mnt`, `/var`はいずれも存在しない              |
+| 合成input読取              | 成功し、期待markerと一致                                          |
+| outside / Windows sentinel | 直接path・workspace内symlinkの双方で読取不可（`ENOENT`）          |
+| 合成auth marker            | 外側shellから読取可能。値は合成markerのみ                         |
+| output                     | 外側から書込み可能                                                |
 
 `/proc/1/root`と外側host PIDの`/proc/<pid>/root`を使ったsentinel探索も、outside・Windowsの双方で`ENOENT`だった。実験の各stageでは禁止したhost rootが現れず、他のhost pathもroot直下に見えなかった。
 
@@ -70,18 +70,18 @@ wsl.exe -d Ubuntu -- /usr/bin/python3 -I -S /mnt/c/Users/sella/Documents/qa-work
 
 外側namespaceが3段階すべて成立した後、正確な`:read-only` smokeはexit 0で`sandbox-ok`を出力した。続く`:read-only`と`:workspace` probeも、namespace・procfs・read/write・通信の確認を含めてexit 0だった。
 
-| 検査                         | `:read-only`                              | `:workspace`                                |
-| ---------------------------- | ----------------------------------------- | ------------------------------------------- |
-| 内側user/PID/network/mount namespace | 全て外側と異なるnamespaceを作成            | 全て外側と異なるnamespaceを作成              |
-| procfs                       | 成立。内側の`/proc`も確認                   | 成立。内側の`/proc`も確認                    |
-| input read                   | 許可。合成marker一致                       | 許可。合成marker一致                         |
-| input write                  | 拒否                                        | 拒否。個別read-only mountを維持               |
-| 合成workspace file write     | 拒否                                        | 許可。workspace profileの範囲内               |
-| output write                 | 拒否                                        | 許可                                        |
-| outside/Windows/symlink/proc read | 全て拒否（`ENOENT`）                         | 全て拒否（`ENOENT`）                          |
-| 外部TCP socket作成            | 拒否（`EPERM`、errno 1）                    | 拒否（`EPERM`、errno 1）                     |
-| 合成AF_UNIX socket作成        | 拒否（`EPERM`、errno 1）                    | 拒否（`EPERM`、errno 1）                     |
-| inherited outside FD          | 明示的にFDを渡さない起動では漏出なし         | 明示的にFDを渡さない起動では漏出なし           |
+| 検査                                 | `:read-only`                         | `:workspace`                         |
+| ------------------------------------ | ------------------------------------ | ------------------------------------ |
+| 内側user/PID/network/mount namespace | 全て外側と異なるnamespaceを作成      | 全て外側と異なるnamespaceを作成      |
+| procfs                               | 成立。内側の`/proc`も確認            | 成立。内側の`/proc`も確認            |
+| input read                           | 許可。合成marker一致                 | 許可。合成marker一致                 |
+| input write                          | 拒否                                 | 拒否。個別read-only mountを維持      |
+| 合成workspace file write             | 拒否                                 | 許可。workspace profileの範囲内      |
+| output write                         | 拒否                                 | 許可                                 |
+| outside/Windows/symlink/proc read    | 全て拒否（`ENOENT`）                 | 全て拒否（`ENOENT`）                 |
+| 外部TCP socket作成                   | 拒否（`EPERM`、errno 1）             | 拒否（`EPERM`、errno 1）             |
+| 合成AF_UNIX socket作成               | 拒否（`EPERM`、errno 1）             | 拒否（`EPERM`、errno 1）             |
+| inherited outside FD                 | 明示的にFDを渡さない起動では漏出なし | 明示的にFDを渡さない起動では漏出なし |
 
 外側と内側の両profileで`CODEX_HOME`下の合成auth markerをshellから読めた。これはこの実験で同じpathをCodex commandとsandbox childの両方に見せた結果であり、Codex CLIがmarkerをauthとして使用したことや、実認証情報の挙動を示すものではない。
 
@@ -107,13 +107,13 @@ wsl.exe -d Ubuntu -- /usr/bin/python3 -I -S /mnt/c/Users/sella/Documents/qa-work
 
 ## 9. Docker/Codespaces既存障害との比較
 
-| 実行層                         | 既存記録または今回の実測                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Docker内Codex CLI               | 既存local Docker報告ではnamespace作成時に`No permissions to create a new namespace`。特定拒否syscallは確定していない |
-| Docker内procfs                  | 既存の限定診断記録には、namespace通過後のprocfs mount拒否がある。通常Docker条件の再試行はしていない |
-| Codespaces                      | 過去記録にはnamespace/clone/procfs/uid_map段階の失敗がある。ローカルDockerと同一原因とは断定していない |
-| WSL2 host上のCodex sandbox       | 以前のWSL調査で`:read-only` echo smokeは成功したが、workspace外とWindows sentinelを読めた |
-| WSL2 host bubblewrap + Codex     | 今回のsynthetic outer mount、閉じたFD条件ではinner `:read-only`と`:workspace`が起動。意図的なFD継承ではoutside readが成立 |
+| 実行層                       | 既存記録または今回の実測                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Docker内Codex CLI            | 既存local Docker報告ではnamespace作成時に`No permissions to create a new namespace`。特定拒否syscallは確定していない      |
+| Docker内procfs               | 既存の限定診断記録には、namespace通過後のprocfs mount拒否がある。通常Docker条件の再試行はしていない                       |
+| Codespaces                   | 過去記録にはnamespace/clone/procfs/uid_map段階の失敗がある。ローカルDockerと同一原因とは断定していない                    |
+| WSL2 host上のCodex sandbox   | 以前のWSL調査で`:read-only` echo smokeは成功したが、workspace外とWindows sentinelを読めた                                 |
+| WSL2 host bubblewrap + Codex | 今回のsynthetic outer mount、閉じたFD条件ではinner `:read-only`と`:workspace`が起動。意図的なFD継承ではoutside readが成立 |
 
 今回のWSL host namespaceが使えたことは、Docker内のnamespace/procfs制限が解消した根拠にはならない。Docker設定・権限は変更せず、障害条件も再試行していない。
 
@@ -121,14 +121,14 @@ wsl.exe -d Ubuntu -- /usr/bin/python3 -I -S /mnt/c/Users/sella/Documents/qa-work
 
 現行[Agent evaluation Plan](../plans/2026-10-03_132700_agent-eval-runner.md)はLinux Docker isolationを標準にし、独自sandboxの追加を前提にしていない。また[Agent eval README](../../scripts/skills/evals/agent/README.md)はread-only root/workspace、output-only writable bind、別Judge container等を契約としている。今回の外側bubblewrapはこの構成ではないため、Plan適合の正式環境として扱わない。
 
-| 対象                         | 現行契約                                                                    | 二重bubblewrap採用を検討する場合に必要な設計・検証                            |
-| ---------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `isolation_probe.py`         | Docker image/mount、Evaluator sentinel、workspace/output境界をprobe        | bwrap argv・実効mount・namespace・sentinel・FD closeを同じfingerprintで検証   |
-| `workspace.py`               | direct `docker run`、read-only workspace、output mount等をvalidate           | 外側bwrapの引数・全bind・inner commandのallowlistとFD条件を別契約で定義         |
-| `run.py`                     | Agent/Judge command、named Docker container、timeout/evidenceを管理          | 外側process groupと子孫processのtimeout、signal、cleanup、証拠保存を追加検討    |
-| `qa_training_store.py`       | 固定target、反復、attempt、cleanup/evidenceの契約を維持                     | QTSのAgent/Judge起動にも同一sandbox証拠・cleanup・比較fingerprintを接続         |
-| `codex_docker_launcher.py`   | Agent用一時`CODEX_HOME`、Codex runtimeとauth materialをDockerへ供給         | shellから認証fileを隠す境界とCodex親processの読取を別々に実測                  |
-| `codex_judge_docker_launcher.py` | Judge専用containerと別`CODEX_HOME`を用意                                  | Agent/Judgeの別namespace、別home、限定入出力、独立evidenceを保つ               |
+| 対象                             | 現行契約                                                            | 二重bubblewrap採用を検討する場合に必要な設計・検証                           |
+| -------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `isolation_probe.py`             | Docker image/mount、Evaluator sentinel、workspace/output境界をprobe | bwrap argv・実効mount・namespace・sentinel・FD closeを同じfingerprintで検証  |
+| `workspace.py`                   | direct `docker run`、read-only workspace、output mount等をvalidate  | 外側bwrapの引数・全bind・inner commandのallowlistとFD条件を別契約で定義      |
+| `run.py`                         | Agent/Judge command、named Docker container、timeout/evidenceを管理 | 外側process groupと子孫processのtimeout、signal、cleanup、証拠保存を追加検討 |
+| `qa_training_store.py`           | 固定target、反復、attempt、cleanup/evidenceの契約を維持             | QTSのAgent/Judge起動にも同一sandbox証拠・cleanup・比較fingerprintを接続      |
+| `codex_docker_launcher.py`       | Agent用一時`CODEX_HOME`、Codex runtimeとauth materialをDockerへ供給 | shellから認証fileを隠す境界とCodex親processの読取を別々に実測                |
+| `codex_judge_docker_launcher.py` | Judge専用containerと別`CODEX_HOME`を用意                            | Agent/Judgeの別namespace、別home、限定入出力、独立evidenceを保つ             |
 
 上記は必要な差分の調査であり、今回runner・Plan・trust boundaryは変更していない。Judge分離、Docker mount契約、実行後の証拠、再現性・cleanupを新方式で再設計する判断は、人間によるPlan/security reviewの対象となる。
 
@@ -150,17 +150,17 @@ QTS-SEM-008 fixtureの追加には、固定QTS targetからの実Agent正常base
 
 production sourceや既存testに今回の調査で確定した不具合はなかったため、コード修正・新規回帰testは行っていない。修正したのはローカルone-off probeのsocket error handlingと合成mount配置だけで、`.agent-eval-runs/`に保存した。実験用ログをgitへstageしていない。
 
-| Validation                                          | 結果                                                     |
-| --------------------------------------------------- | -------------------------------------------------------- |
-| package version・SHA-512照合                       | PASS                                                     |
-| outer user/PID/network namespaceとprocfs            | PASS                                                     |
-| Codex `:read-only` exact echo smoke                 | PASS                                                     |
-| Codex `:read-only` boundary probe                   | PASS                                                     |
-| Codex `:workspace` boundary probe                   | PASS                                                     |
-| 意図的なinherited FD negative test                  | FAIL。FD 4経由のoutside sentinel読取を検出                 |
-| production unit tests / Ruff / compileall           | production codeを変更していないため今回未実行             |
-| dprint `0.55.2`                                      | 未実行。ローカルに未導入で、npm registry fetchはsandboxから`EACCES`拒否 |
-| `git diff --check`                                   | stage後に個別実行                                       |
+| Validation                                | 結果                                          |
+| ----------------------------------------- | --------------------------------------------- |
+| package version・SHA-512照合              | PASS                                          |
+| outer user/PID/network namespaceとprocfs  | PASS                                          |
+| Codex `:read-only` exact echo smoke       | PASS                                          |
+| Codex `:read-only` boundary probe         | PASS                                          |
+| Codex `:workspace` boundary probe         | PASS                                          |
+| 意図的なinherited FD negative test        | FAIL。FD 4経由のoutside sentinel読取を検出    |
+| production unit tests / Ruff / compileall | production codeを変更していないため今回未実行 |
+| dprint `0.55.2`                           | PASS。対象報告書を固定versionで整形・check    |
+| `git diff --check`                        | PASS                                          |
 
 Codex `0.163.0`の実装は[Linux sandbox README](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/README.md)、[bwrap builder](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/src/bwrap.rs)、[Landlock implementation](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/sandboxing/src/landlock.rs)を参照した。source確認は今回の実測を置き換えるものではない。
 
