@@ -158,6 +158,7 @@ def capture_codex_judge_output(
                 "status": "unverified",
             }
     safe_response = sanitize_diagnostic(response, MAX_TEXT_BYTES)
+    wsl2_launcher = observations.get("protocol") == "codex_wsl2_bwrap_launcher_v1"
     image = observations.get("image")
     safe_image = None
     if isinstance(image, dict):
@@ -167,15 +168,48 @@ def capture_codex_judge_output(
             if key in {"image_id", "codex_cli_version", "python_version", "ca_bundle"}
             and isinstance(value, str)
         }
+    runtime = observations.get("runtime")
+    safe_runtime = None
+    if wsl2_launcher and isinstance(runtime, dict):
+        safe_runtime = {
+            key: value
+            for key, value in runtime.items()
+            if key in {
+                "package_version",
+                "package_sha512",
+                "codex_sha256",
+                "codex_version",
+                "bwrap_sha256",
+                "bwrap_version",
+                "kernel",
+                "machine",
+                "python_version",
+            }
+            and isinstance(value, (str, int, float))
+        }
     jsonl = observations.get("jsonl")
     safe_jsonl = None
     if isinstance(jsonl, dict):
+        tool_event_count = jsonl.get("tool_event_count", 0)
+        command_count = jsonl.get("command_count", 0)
+        tool_event_count = (
+            tool_event_count
+            if isinstance(tool_event_count, int) and not isinstance(tool_event_count, bool)
+            else 0
+        )
+        command_count = (
+            command_count
+            if isinstance(command_count, int) and not isinstance(command_count, bool)
+            else 0
+        )
         safe_jsonl = {
             "status": jsonl.get("status", "unverified"),
             "event_count": jsonl.get("event_count", 0),
             "event_types": jsonl.get("event_types", {}),
             "item_types": jsonl.get("item_types", {}),
-            "tool_use_detected": jsonl.get("tool_use_detected") is True,
+            "tool_use_detected": jsonl.get("tool_use_detected") is True
+            or tool_event_count > 0
+            or command_count > 0,
             "turn_completed": jsonl.get("turn_completed") is True,
             "turn_failed": jsonl.get("turn_failed") is True,
         }
@@ -188,29 +222,42 @@ def capture_codex_judge_output(
     response_redacted = observations.get("response_redacted") is True or (
         safe_response != response
     )
-    if launcher_status == "completed" and (
+    if wsl2_launcher and launcher_status == "completed" and (
+        not safe_response
+        or safe_jsonl is None
+        or safe_jsonl["status"] != "captured"
+        or safe_jsonl["tool_use_detected"]
+        or observations.get("mode") != "judge"
+        or observations.get("web_search_enabled") is not False
+        or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
+        or observations.get("auth_mode") not in {"temporary_auth_file", "api_key_environment"}
+        or not isinstance(safe_runtime, dict)
+        or safe_runtime.get("package_version") != "0.163.0-linux-x64"
+        or observations.get("outer_exit_code") != 0
+        or response_redacted
+    ):
+        launcher_status = "evidence_unverified"
+    elif not wsl2_launcher and launcher_status == "completed" and (
         not safe_response
         or safe_jsonl is None
         or safe_jsonl["status"] != "captured"
         or safe_jsonl["tool_use_detected"]
         or observations.get("web_search_enabled") is not False
         or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
-        or observations.get("auth_mode")
-        not in {
-            "temporary_auth_file",
-            "api_key_environment",
-        }
+        or observations.get("auth_mode") not in {"temporary_auth_file", "api_key_environment"}
         or safe_image is None
         or observations.get("docker_exit_code") != 0
         or response_redacted
     ):
         launcher_status = "evidence_unverified"
     launcher_observations = {
+        "protocol": observations.get("protocol"),
         "status": launcher_status,
         "auth_mode": observations.get("auth_mode", "unverified"),
         "image": safe_image,
+        "runtime": safe_runtime,
         "jsonl": safe_jsonl,
-        "docker_exit_code": observations.get("docker_exit_code"),
+        "docker_exit_code": observations.get("outer_exit_code", observations.get("docker_exit_code")),
         "model": observations.get("model"),
         "reasoning_effort": observations.get("reasoning_effort"),
         "sandbox_policy": observations.get("sandbox_policy"),
@@ -239,7 +286,8 @@ def capture_codex_jsonl_trace(
         launcher = None
     if (
         isinstance(launcher, dict)
-        and launcher.get("protocol") == "codex_docker_launcher_v1"
+        and launcher.get("protocol")
+        in {"codex_docker_launcher_v1", "codex_wsl2_bwrap_launcher_v1"}
     ):
         observations = launcher.get("observations")
         jsonl_summary = (
@@ -250,7 +298,7 @@ def capture_codex_jsonl_trace(
             or not isinstance(jsonl_summary, dict)
             or not isinstance(launcher.get("final_message"), str)
         ):
-            return _unavailable_trace(skill_names, "codex_docker_launcher_v1")
+            return _unavailable_trace(skill_names, str(launcher.get("protocol")))
         safe_commands: list[dict[str, Any]] = []
         for row in jsonl_summary.get("commands", []):
             if not isinstance(row, dict):
@@ -319,8 +367,18 @@ def capture_codex_jsonl_trace(
                 in {"image_id", "codex_cli_version", "python_version", "ca_bundle"}
                 and isinstance(value, str)
             }
+        runtime = observations.get("runtime")
+        safe_runtime = None
+        if isinstance(runtime, dict):
+            safe_runtime = {
+                key: value
+                for key, value in runtime.items()
+                if key in {"package_version", "package_sha512", "codex_sha256", "codex_version", "bwrap_sha256", "bwrap_version"}
+                and isinstance(value, str)
+            }
+        protocol = str(launcher.get("protocol"))
         return {
-            "format": "codex_docker_launcher_v1",
+            "format": protocol,
             "status": jsonl_summary.get("status", "unverified"),
             "execution_status": observations.get("status", "unverified"),
             "final_message": safe_message,
@@ -329,8 +387,9 @@ def capture_codex_jsonl_trace(
             "launcher_observations": {
                 "status": observations.get("status", "unverified"),
                 "auth_mode": observations.get("auth_mode", "unverified"),
-                "docker_exit_code": launcher.get("exit_code"),
+                "docker_exit_code": launcher.get("exit_code", observations.get("outer_exit_code")),
                 "image": safe_image,
+                "runtime": safe_runtime,
             },
             "redacted": (
                 safe_message != final_message

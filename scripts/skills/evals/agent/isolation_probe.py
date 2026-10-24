@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import re
@@ -21,8 +22,16 @@ from .workspace import (
     assert_clean_checkout,
     load_execution_profile,
     profile_fingerprint,
-    verify_agent_docker_command,
-    verify_judge_docker_command,
+    verify_agent_wsl2_command,
+    verify_judge_wsl2_command,
+    verify_repair_wsl2_command,
+)
+from .tools.codex_wsl2_bwrap_launcher import (
+    PROTOCOL as WSL2_LAUNCHER_PROTOCOL,
+    CodexWsl2LauncherError,
+    sandbox_smoke,
+    timeout_cleanup_smoke,
+    verify_runtime,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -417,16 +426,277 @@ def probe_isolation(
     return evidence
 
 
+def probe_wsl2_isolation(
+    *, profile_path: Path, agent_command_path: Path, output_root: Path
+) -> dict[str, Any]:
+    profile = load_execution_profile(profile_path)
+    output_root = Path(os.path.abspath(output_root))
+    evidence_path = prepare_run_output_root(
+        output_root,
+        repository_root=REPO_ROOT,
+        evidence_relative_path=profile["verification"]["evidence_path"],
+    )
+    command = _read_argv(agent_command_path)
+    required = {
+        "evaluator_read_denied",
+        "host_home_read_denied",
+        "other_attempt_home_read_denied",
+        "windows_filesystem_read_denied",
+        "source_write_denied",
+        "output_write_allowed",
+        "inherited_fd_denied",
+        "symlink_escape_denied",
+        "fresh_procfs",
+        "nested_namespaces",
+        "inner_shell_network_blocked",
+        "extra_tools_disabled",
+        "mounts_reviewed",
+        "agent_judge_separated",
+        "timeout_cleanup",
+    }
+    checks = {key: False for key in required}
+    runtime: dict[str, Any] = {}
+    details: dict[str, Any] = {
+        "protocol": WSL2_LAUNCHER_PROTOCOL,
+        "model_api_used": False,
+        "authentication_shell_visible_risk": True,
+    }
+    mode_evidence: dict[str, Any] = {}
+    timeout_evidence: dict[str, Any] = {}
+    try:
+        if profile.get("schema_version") != 2 or command != ["codex"]:
+            raise AgentEvalError("WSL2 evidence requires schema 2 and the fixed Codex template")
+        agent_contract: dict[str, Any] = {}
+        judge_contract = verify_judge_wsl2_command(
+            profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
+        )
+        runtime = verify_runtime()
+        with tempfile.TemporaryDirectory(prefix="qa-wsl2-isolation-") as temporary:
+            base = Path(temporary)
+            smoke_specs: dict[str, dict[str, Any]] = {}
+            for mode in ("agent", "repair"):
+                workspace = base / mode / "workspace"
+                workspace.mkdir(parents=True)
+                (workspace / "protected.txt").write_text(
+                    "synthetic-source\n", encoding="utf-8"
+                )
+                (workspace / ".agents" / "skills").mkdir(parents=True)
+                (workspace / ".qa-eval-output").mkdir()
+                output = (
+                    workspace / ".qa-eval-output"
+                    if mode == "repair"
+                    else base / mode / "output"
+                )
+                output.mkdir(exist_ok=True)
+                skill_root = None
+                skill_name = None
+                if mode == "agent":
+                    agent_contract = verify_agent_wsl2_command(
+                        command,
+                        workspace=workspace,
+                        output_root=output,
+                        evaluator_root=REPO_ROOT,
+                    )
+                else:
+                    skill_name = "synthetic-skill"
+                    skill_root = workspace / ".agents" / "skills" / skill_name
+                    skill_root.mkdir(parents=True)
+                    (skill_root / "SKILL.md").write_text(
+                        "synthetic skill\n", encoding="utf-8"
+                    )
+                    verify_repair_wsl2_command(
+                        command,
+                        workspace=workspace,
+                        skill_root=skill_root,
+                        output_root=output,
+                        skill_name=skill_name,
+                    )
+                smoke_specs[mode] = {
+                    "mode": mode,
+                    "workspace_root": workspace,
+                    "output_root": output,
+                    "skill_root": skill_root,
+                    "skill_name": skill_name,
+                    "permission_profile": ":workspace",
+                }
+            smoke_specs["judge"] = {
+                "mode": "judge",
+                "workspace_root": None,
+                "output_root": None,
+                "permission_profile": ":read-only",
+            }
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = {
+                    pool.submit(sandbox_smoke, **spec): name
+                    for name, spec in smoke_specs.items()
+                }
+                for future in as_completed(futures):
+                    name = futures[future]
+                    mode_evidence[name] = future.result()
+                    mode_evidence[name]["profile_fingerprint"] = profile_fingerprint(profile)
+
+            timeout_workspace = base / "timeout" / "workspace"
+            timeout_workspace.mkdir(parents=True)
+            (timeout_workspace / "protected.txt").write_text(
+                "synthetic-source\n", encoding="utf-8"
+            )
+            (timeout_workspace / ".agents" / "skills").mkdir(parents=True)
+            (timeout_workspace / ".qa-eval-output").mkdir()
+            timeout_output = base / "timeout" / "output"
+            timeout_output.mkdir()
+            timeout_evidence = timeout_cleanup_smoke(
+                workspace_root=timeout_workspace,
+                output_root=timeout_output,
+            )
+
+        mode_checks = [item.get("checks", {}) for item in mode_evidence.values()]
+        agent_checks = mode_evidence["agent"].get("checks", {})
+        repair_checks = mode_evidence["repair"].get("checks", {})
+        checks.update(
+            {
+                "evaluator_read_denied": all(
+                    c.get("evaluator_sentinel_read_denied") is True
+                    and c.get("evaluator_checkout_unmounted") is True
+                    for c in mode_checks
+                ),
+                "host_home_read_denied": all(
+                    c.get("outer_host_paths_hidden") is True
+                    and c.get("inner_host_paths_hidden") is True
+                    for c in mode_checks
+                ),
+                "other_attempt_home_read_denied": all(
+                    c.get("outer_host_paths_hidden") is True
+                    and c.get("inner_host_paths_hidden") is True
+                    for c in mode_checks
+                ),
+                "windows_filesystem_read_denied": all(
+                    c.get("wsl_interop_blocked") is True for c in mode_checks
+                ),
+                "source_write_denied": agent_checks.get("source_write_denied") is True
+                and repair_checks.get("source_write_denied") is True,
+                "output_write_allowed": agent_checks.get("output_write_allowed") is True
+                and repair_checks.get("output_write_allowed") is True,
+                "inherited_fd_denied": all(
+                    c.get("fd_noninheritance") is True for c in mode_checks
+                ),
+                "symlink_escape_denied": agent_checks.get("symlink_escape_denied") is True
+                and repair_checks.get("symlink_escape_denied") is True,
+                "fresh_procfs": all(
+                    c.get("outer_procfs") is True and c.get("inner_procfs") is True
+                    for c in mode_checks
+                ),
+                "nested_namespaces": all(
+                    c.get("nested_namespaces") is True for c in mode_checks
+                ),
+                "inner_shell_network_blocked": all(
+                    c.get(name) is True
+                    for c in mode_checks
+                    for name in (
+                        "inner_tcp_blocked",
+                        "inner_localhost_blocked",
+                        "inner_af_unix_blocked",
+                        "inner_dns_blocked",
+                        "wsl_interop_blocked",
+                    )
+                ),
+                "extra_tools_disabled": (
+                    profile["agent"]["tools"] == ["shell"]
+                    and profile["agent"]["mcp_servers"] == []
+                    and profile["agent"]["launch_options"] == []
+                    and profile["judge"]["tools"] == []
+                    and profile["judge"]["mcp_servers"] == []
+                    and profile["judge"]["skill_roots"] == []
+                    and profile["judge"]["launch_options"] == []
+                ),
+                "mounts_reviewed": agent_contract.get("execution_method")
+                == "wsl2-dual-bubblewrap"
+                and judge_contract.get("execution_method") == "wsl2-dual-bubblewrap"
+                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("workspace", {}).get("access") == "writable-root-with-read-only-source-children"
+                and ".agents" in mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("workspace", {}).get("read_only_source_entries", [])
+                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("output", {}).get("access") == "read-write"
+                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("codex_scratch", {}).get("attempt_local") is True
+                and mode_evidence.get("repair", {}).get("effective", {}).get("mounts", {}).get("writable_skill") == "synthetic-skill"
+                and mode_evidence.get("judge", {}).get("effective", {}).get("mounts", {}).get("workspace") is None
+                and all(
+                    item.get("effective", {}).get("mounts", {}).get("host_home") is False
+                    and item.get("effective", {}).get("mounts", {}).get("evaluator_checkout") is False
+                    and item.get("effective", {}).get("mounts", {}).get("docker_socket") is False
+                    for item in mode_evidence.values()
+                ),
+                "agent_judge_separated": (
+                    all(
+                        mode_evidence.get(name, {}).get("mode") == name
+                        and mode_evidence.get(name, {}).get("status") == "verified"
+                        and mode_evidence.get(name, {}).get("profile_fingerprint")
+                        == profile_fingerprint(profile)
+                        for name in ("agent", "judge", "repair")
+                    )
+                    and mode_evidence.get("agent", {}).get("effective", {}).get("codex_home_fingerprint")
+                    != mode_evidence.get("judge", {}).get("effective", {}).get("codex_home_fingerprint")
+                    and all(
+                        mode_evidence.get("agent", {}).get("outer", {}).get("namespaces", {}).get(namespace)
+                        != mode_evidence.get("judge", {}).get("outer", {}).get("namespaces", {}).get(namespace)
+                        for namespace in ("user", "pid", "mnt", "ipc", "uts")
+                    )
+                ),
+                "timeout_cleanup": timeout_evidence.get("status") == "verified"
+                and all(timeout_evidence.get("checks", {}).values()),
+            }
+        )
+        details.update(
+            {
+                "agent_contract": agent_contract,
+                "judge_contract": judge_contract,
+                "mode_evidence": mode_evidence,
+                "timeout_evidence": timeout_evidence,
+                "profile_tool_config": {
+                    "agent_tools": profile["agent"]["tools"],
+                    "agent_mcp_servers": profile["agent"]["mcp_servers"],
+                    "judge_tools": profile["judge"]["tools"],
+                    "judge_mcp_servers": profile["judge"]["mcp_servers"],
+                    "web_search": "disabled by WSL2 launcher config",
+                },
+                "network_boundary": "outer Codex parent retains host network; inner shell probes are separate",
+            }
+        )
+    except (AgentEvalError, CodexWsl2LauncherError, OSError, KeyError) as exc:
+        details["probe_error"] = sanitize_diagnostic(
+            f"{type(exc).__name__}: {exc}", 1000
+        )
+    try:
+        evaluator_revision = assert_clean_checkout(REPO_ROOT)
+    except AgentEvalError as exc:
+        evaluator_revision = None
+        details["revision_error"] = sanitize_diagnostic(str(exc), 500)
+    evidence = {
+        "schema_version": 2,
+        "execution_method": "wsl2-dual-bubblewrap",
+        "status": "verified" if all(checks.values()) and evaluator_revision else "unverified",
+        "probe": "scripts/skills/evals/agent/isolation_probe.py",
+        "probe_version": 2,
+        "evaluator_revision": evaluator_revision,
+        "profile_fingerprint": profile_fingerprint(profile),
+        "agent_command_fingerprint": canonical_fingerprint(command),
+        "judge_command_fingerprint": canonical_fingerprint(profile["judge"]["command_argv"]),
+        "runtime": runtime,
+        "checks": checks,
+        "mode_evidence": mode_evidence,
+        "details": details,
+    }
+    atomic_write_json(evidence_path, evidence)
+    return evidence
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Audit Agent and Judge container mount isolation and write run evidence."
+        description="Audit WSL2 dual-bubblewrap isolation and write run evidence."
     )
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--agent-command-json", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        evidence = probe_isolation(
+        evidence = probe_wsl2_isolation(
             profile_path=args.profile,
             agent_command_path=args.agent_command_json,
             output_root=args.output_root,

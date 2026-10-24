@@ -36,12 +36,17 @@ from .target_workspace import (
     prepare_sanitized_target,
     verify_workspace_unchanged,
 )
-from .tools.codex_docker_launcher import launcher_argv
+from .tools.codex_docker_launcher import launcher_argv as legacy_agent_launcher_argv
+from .tools.codex_wsl2_bwrap_launcher import (
+    cleanup_argv as codex_cleanup_argv,
+    judge_launcher_argv_for_profile,
+    launcher_argv,
+)
 from .tools.codex_judge_docker_launcher import (
     is_codex_judge,
 )
 from .tools.codex_judge_docker_launcher import (
-    launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
 )
 from .workspace import (
     assert_clean_checkout,
@@ -53,6 +58,8 @@ from .workspace import (
     resolve_commit,
     verify_agent_docker_command,
     verify_judge_docker_command,
+    verify_agent_wsl2_command,
+    verify_judge_wsl2_command,
     verify_profile_evidence,
 )
 
@@ -604,29 +611,37 @@ def run_independent_judges(
         )
         cwd = judge_root / group
         cwd.mkdir(parents=True, exist_ok=False)
-        isolation = verify_judge_docker_command(
-            profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
-        )
-        judge_name = (
-            "agent-eval-qts-judge-"
-            + group
-            + "-"
-            + sha256_bytes(str(cwd).encode("utf-8"))[7:17]
-        )
-        judge_command, judge_cleanup = named_container_command(
-            profile["judge"]["command_argv"], name=judge_name
-        )
         judge_observations_path = cwd / "launcher-observations.json"
-        codex_judge = is_codex_judge(profile["judge"])
-        judge_execution_command = (
-            judge_launcher_argv_for_profile(
-                profile["judge"],
-                docker_argv=judge_command,
-                observations_path=judge_observations_path,
+        if profile.get("schema_version", 1) == 2:
+            isolation = verify_judge_wsl2_command(
+                profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
             )
-            if codex_judge
-            else judge_command
-        )
+            codex_judge = True
+            judge_execution_command = judge_launcher_argv_for_profile(
+                profile["judge"], observations_path=judge_observations_path
+            )
+            judge_cleanup = codex_cleanup_argv(judge_execution_command)
+        else:
+            isolation = verify_judge_docker_command(
+                profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
+            )
+            judge_command, judge_cleanup = named_container_command(
+                profile["judge"]["command_argv"],
+                name="agent-eval-qts-judge-"
+                + group
+                + "-"
+                + sha256_bytes(str(cwd).encode("utf-8"))[7:17],
+            )
+            codex_judge = is_codex_judge(profile["judge"])
+            judge_execution_command = (
+                legacy_judge_launcher_argv_for_profile(
+                    profile["judge"],
+                    docker_argv=judge_command,
+                    observations_path=judge_observations_path,
+                )
+                if codex_judge
+                else judge_command
+            )
         execution = run_command(
             judge_execution_command,
             input_text=prompt,
@@ -941,19 +956,39 @@ def run(argv: list[str] | None = None) -> int:
                         workspace=target,
                         output_root=target / ".qa-eval-output",
                     )
-                    agent_isolation = verify_agent_docker_command(
-                        agent_command,
-                        workspace=target,
-                        output_root=target / ".qa-eval-output",
-                        evaluator_root=REPO_ROOT,
-                    )
-                    container_name = f"agent-eval-{run_id[-8:]}-{attempt_index:02d}"
-                    agent_command, cleanup_command = named_container_command(
-                        agent_command, name=container_name
-                    )
+                    if profile.get("schema_version", 1) == 2:
+                        agent_isolation = verify_agent_wsl2_command(
+                            agent_command,
+                            workspace=target,
+                            output_root=target / ".qa-eval-output",
+                            evaluator_root=REPO_ROOT,
+                        )
+                        cleanup_command = None
+                    else:
+                        agent_isolation = verify_agent_docker_command(
+                            agent_command,
+                            workspace=target,
+                            output_root=target / ".qa-eval-output",
+                            evaluator_root=REPO_ROOT,
+                        )
+                        agent_command, cleanup_command = named_container_command(
+                            agent_command,
+                            name=f"agent-eval-{run_id[-8:]}-{attempt_index:02d}",
+                        )
                     execution_command = agent_command
-                    if profile["agent"]["name"].lower() == "codex":
+                    if profile.get("schema_version", 1) == 2:
                         execution_command = launcher_argv(
+                            mode="agent",
+                            output_root=target / ".qa-eval-output",
+                            observations_path=attempt_root / "agent-launcher-observations.json",
+                            model=profile["agent"]["model"],
+                            reasoning_effort=profile["agent"]["reasoning_effort"],
+                            sandbox_policy=profile["agent"]["sandbox_policy"],
+                            workspace_root=target,
+                        )
+                        cleanup_command = codex_cleanup_argv(execution_command)
+                    elif profile["agent"]["name"].lower() == "codex":
+                        execution_command = legacy_agent_launcher_argv(
                             output_root=target / ".qa-eval-output",
                             model=profile["agent"]["model"],
                             reasoning_effort=profile["agent"]["reasoning_effort"],

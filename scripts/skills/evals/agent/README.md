@@ -2,120 +2,47 @@
 
 このランナーは、指定した`qa-workflow-skills` Git revisionのSkill packageを一時領域へ展開し、実Agentで生成した結果を固定Evaluatorの既存grader / Judgeで評価します。評価結果と機械判定をattempt単位で保存します。既存Skillの通常実行経路やSkill packageの配置規則は変更しません。
 
-Agent実行にはLinux Docker環境と利用者が用意したAgent / Judgeコマンドが必要です。実行profile、command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。
+Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
 
 ## CLI一覧
 
-| Module                                         | 用途                                                              |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| `scripts.skills.evals.agent.run`               | deterministic / semantic case、Skill単位、明示された`all` batch   |
-| `scripts.skills.evals.agent.isolation_probe`   | Agent / JudgeのDocker設定とAgent workspace mountの隔離検証        |
-| `scripts.skills.evals.agent.qa_training_store` | 固定`qa-training-store` revisionのCheckout / Payment workflow評価 |
-| `scripts.skills.evals.agent.judge_validation`  | 正常例・固定違反例でのJudge独立検証とレビュー用候補比較           |
-| `scripts.skills.evals.agent.compare`           | 条件が一致するrun間のattempt / criterion比較                      |
-| `scripts.skills.evals.agent.improve`           | 保存済みrunの分析、許可path限定修正、同条件での再評価             |
+| Module | 用途 |
+| --- | --- |
+| scripts.skills.evals.agent.run | deterministic / semantic case、Skill単位、明示されたall batch |
+| scripts.skills.evals.agent.isolation_probe | WSL2、outer/inner bubblewrap、固定binary、mount、namespace、FD、network、evidence検証 |
+| scripts.skills.evals.agent.qa_training_store | 固定qa-training-store revisionのCheckout / Payment workflow評価 |
+| scripts.skills.evals.agent.judge_validation | 正常例・固定違反例でのJudge独立検証とレビュー用候補比較 |
+| scripts.skills.evals.agent.compare | 条件が一致するrun間のattempt / criterion比較 |
+| scripts.skills.evals.agent.improve | 保存済みrunの分析、許可path限定修正、同条件での再評価 |
 
 ## 実行前提
 
-- Python 3.11と、既存deterministic validatorが使う`PyYAML==6.0.3`を評価環境へ用意します。
-- 実Codex imageは[`tools/codex-agent.Dockerfile`](tools/codex-agent.Dockerfile)から作り、Codex CLI `0.163.0`、Python 3.11、HTTPS通信用のOS CA bundleを用意します。launcherはimage内のCA bundleもpreflightで確認します。build後に得たimage IDは各launcherが照合・記録し、照合したIDで実行します。
-- 実Agent / Judgeは別々のargv・cwd・実効profileで起動します。どちらも直接`docker run`し、`shell=True`は使いません。
-- Agent containerはread-only root、`/workspace` read-only、`/workspace/.qa-eval-output`のみwrite可能なbind mountにします。Evaluator / Reference / graderをbind mountしません。
-- Judgeは[`tools/codex_judge_docker_launcher.py`](tools/codex_judge_docker_launcher.py)でAgentとは別の使い捨てcontainerに起動します。Judge専用の一時`CODEX_HOME`だけを認証用にmountし、sanitized target・Agent workspace・Evaluator checkoutはmountしません。Judge promptはstdinだけで渡し、stdoutは最終Judge JSONだけにします。
-- Judge containerではMCP、user/global設定、Skill rootを読み込まず、web searchも有効化しません。JSONLにshell等のtool eventがあればJudge出力を採点に使わず`evidence_unverified`にします。安全なevent summaryは各Judge workspaceの`launcher-observations.json`へ保存し、raw JSONLは保存しません。
-- AgentのSkill rootは`/workspace/.agents/skills`だけにします。global config、追加指示、MCP、Web / browser / search toolは無効にします。
-- Codex launcherは`codex exec --help`で確認した`--json`、`--model`、`--sandbox`、`--config`、`--cd`、`--output-last-message`、`--skip-git-repo-check`だけをexecへ渡します。`--no-daemon`、`--strict-config`、`--ask-for-approval never`はroot CLI optionとして`exec`より前に置きます。profileの`agent.cli_version`は`codex-cli 0.163.0`に固定します。
-- Codex JudgeもCLI `0.163.0`に固定し、profileの`judge.sandbox_policy` / `approval_policy`は`read-only` / `never`、`launch_options` / `tools` / `mcp_servers` / `skill_roots`は空配列、`global_config` / `external_instructions`は`disabled`にします。Judge commandには`-i`、`--read-only`、`--cap-drop=ALL`、`--security-opt=no-new-privileges`、`--mount type=tmpfs,target=/tmp`を指定します。
-- run開始前にEvaluator checkoutをcleanにします。固定対象repoもclean working treeにし、Plan記載のGit objectが存在することを確認します。
-- Profile / command JSONとrun出力は異なるdirectoryに置きます。出力rootには事前検証済み`isolation.json`だけを置けます。
+- 評価ランナー本体はWSL2 Ubuntu内のclean Linux checkoutから起動します。Windows Python、Windows開発checkout、/mnt/c上のtarget checkoutは正式実行に使用しません。
+- Python 3.11と既存deterministic validator用PyYAML 6.0.3、Codex CLI Linux x64 0.163.0、そのpackageに同梱されたbwrap、最小runtimeとCA bundleを使います。追加system packageや管理者権限は避けます。
+- Codex packageは公開npm tarball https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-linux-x64.tgz を使い、package name/version `@openai/codex@0.163.0-linux-x64`とSHA-512を照合します。既知tarball SHA-512は `bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3` です。launcherは実行時のCLI version、CLI binary SHA-256、同梱bwrap SHA-256も照合します。system bwrapへ暗黙に切り替えません。
+- Agent、Judge、Repairは、tmpfs rootに必要最小限のruntime、sanitized workspace、attempt output、一時CODEX_HOMEだけをmountするouter bubblewrap内でCodexを起動し、Codex自身のLinux sandboxを内側で有効にします。host root、host home、Evaluator checkout、元target、Windows filesystem、Docker socket、他attemptのpathはAgent/Judgeから見えません。
+- Agent/Judge/Repairごとに独立したprocess、outer namespace、workspace、cwd、一時CODEX_HOMEを作ります。JudgeへAgent workspaceをmountしません。Judge入力はstdinのみ、shell/MCP/追加Skill roots/web searchは無効にし、JSONLのtool eventがあればjudge_unverifiedにします。raw JSONLは保存しません。
+- outer networkはCodex親processのモデルAPI通信に必要なため維持します。inner Codex sandboxのshellはTCP/DNS/AF_UNIX/WSL interop/localhostを使えないよう設定し、正式launcherからnegative testします。TEST-NET等の単一接続失敗を全面egress遮断の根拠にしません。
+- Codex shellは合成認証markerとAPI keyを読めた過去実測があります。一時CODEX_HOME方式では実認証も可視になる可能性があるため残留リスクとして扱います。実認証やモデルAPI送信は、隔離合成検証後に別途承認が確認できるまで行いません。
+- Codex CLI固有設定は固定profileから検証し、MCP、外部指示、global config、追加Skill、web検索を無効にします。秘密値・生認証情報・秘密hashをargv、environment、profile、provenance、raw JSONLへ保存しません。
+- Codex source / 固定targetの既存ファイル・directoryはouter mountで個別にread-only bindします。Codex workspace-writeがsandbox準備で必要とするattempt-local workspace root、`.git`、`.codex`だけは一時領域として分離し、許可outputとRepair対象Skill以外の既存sourceは変更できません。実行前後manifestを比較し、単にworkspace全体をwrite可能にする方式は不適合です。
+- 通常CIは外部LLM、実認証、live Codex execを呼びません。fake Agent/Judge contract testsを実行します。実Codex sandbox smokeはWSL2のformal launcher経由で無認証のsynthetic inputだけに実行します。
 
-実効profileはJSON schema version `1`です。`agent` / `judge`には実際のmodel、version、timeout、launch option、sandbox、approval、network、tool、MCP、Skill root、global configの状態を記録します。`verification`は`status: "verified"`、`method`、`evidence_path`を設定し、probeが同profile fingerprint、Agent command fingerprint、Judge command fingerprint、Evaluator revisionに結び付いた証拠を作成します。probeが`unverified`を返した場合、そのprofileでlive runnerを起動しません。
+実効profileはJSON schema version 2です。Agent / Judge model、timeout、reasoning、sandbox、approval、network、tools、MCP、Skill rootsに加え、runtimeにはWSL2実行mode、Codex package source/version/SHA-512、Codex binaryとbwrapのSHA-256、outer/inner argv・mount・network fingerprint、probe version、evidence fingerprint、依存versionを記録します。secret自体は記録しません。旧Docker profileは読み取り用に保持しますが、新方式と直接比較できません。
 
-Codex smokeはJSONLをlauncherのmemory内だけで解析します。保存する`agent-trace.json`はevent数・event type・終了code・安全化したSkill読取 / verifier実行事実だけを含み、raw command、JSONL本文、認証情報は保存しません。最終応答とstderrも秘密パターンを安全化し、安全化で内容が変わったattemptはJudgeへ渡さず`needs_review`にします。traceにSkill読取事実がない場合は`unverified`を維持し、Skill改修効果を断定しません。
+Profile verificationは同じEvaluator revision、profile、Agent/Judge/Repair mode、binary digest、実効argv・mount/network、probe versionに結び付くisolation.jsonを要求します。evidence欠落、旧Docker evidence、別mode evidence、fingerprint不一致、必須negative test未確認の場合はisolation_unverifiedとして起動を拒否します。
 
-秘密値をprofile・command argvへ直接記載しないでください。認証情報はAgent / Judge imageの実行環境が安全に受け取る方法で供給し、結果・stdout・stderr・provenanceへ出さないでください。
+launcherは既存executor.run_commandを使い、shell=False、固定argv、close_fds=True、未許可pass_fdsなし、stdin/stdout/stderr契約、timeout、POSIX process group cleanup、safe diagnosticsと一時領域cleanupを維持します。失敗時はfail-closedです。
 
 ## 共通case実行
 
-初回のみ、repository rootで固定Codex / Python imageをbuildします。実行時profileはCodex-specific optionや認証値を含めず、`docker run ... codex exec`までのargvを指定します。Agent launcherはCodex CLI引数と一時認証homeを加えます。Judge launcherも同じimageを使いますが、Agentと別container・別一時`CODEX_HOME`で実行します。
-
-```bash
-docker build --tag codex-agent:0.163.0 \
-  --file scripts/skills/evals/agent/tools/codex-agent.Dockerfile .
-```
-
-build後、imageのimmutable IDを取得し、Agent / Judge両方の`command_argv`にその`sha256:...` IDを設定します。launcherはtagの差替えを許さず、profileに記録された同じIDを照合して実行します。
-
-```bash
-docker image inspect --format '{{.Id}}' codex-agent:0.163.0
-```
-
-先に`agent-command.json`へ、実際に使用する`docker run` argvをJSON arrayとして保存します。下記の`{workspace}`と`{output_root}`はprobe / runnerが各run用pathへ置換します。
-
-```json
-[
-  "docker",
-  "run",
-  "--rm",
-  "-i",
-  "--read-only",
-  "--cap-drop=ALL",
-  "--security-opt=no-new-privileges",
-  "--network",
-  "bridge",
-  "--workdir",
-  "/workspace",
-  "--mount",
-  "type=bind,source={workspace},target=/workspace,readonly",
-  "--mount",
-  "type=bind,source={output_root},target=/workspace/.qa-eval-output",
-  "--mount",
-  "type=tmpfs,target=/tmp",
-  "sha256:<build後に取得した64桁image ID>",
-  "codex",
-  "exec"
-]
-```
-
-実Agent commandではtagではなく上記で得たimage IDを指定し、`--cap-drop=ALL`と`--security-opt=no-new-privileges`を含めます。Codex agent profileの`cli_version`は`codex-cli 0.163.0`、`sandbox_policy`は固定値を記録します。Codex launcherは`auth.json`を一時`CODEX_HOME`へ複製するか、`OPENAI_API_KEY`環境変数だけをcontainerへ渡し、終了時に一時領域を削除します。hostのCodex home自体はmountしません。認証値はprofile・argv・run結果へ記載しないでください。image IDとcontainer内Codex / Python versionを確認できないrunはlive評価を開始しません。
-
-Codex Judgeの`judge.command_argv`はAgent commandと分け、stdinを接続できる`-i`を含めます。Judge launcherが認証・固定model・推論設定を加えます。
-
-```json
-[
-  "docker",
-  "run",
-  "--rm",
-  "--read-only",
-  "--cap-drop=ALL",
-  "--security-opt=no-new-privileges",
-  "-i",
-  "--network",
-  "bridge",
-  "--mount",
-  "type=tmpfs,target=/tmp",
-  "sha256:<build後に取得した64桁image ID>",
-  "codex",
-  "exec"
-]
-```
-
-Judge launcherは一時`CODEX_HOME`、`HOME=/tmp`、read-only sandbox、approval `never`を固定し、profileのimage IDを検証します。実行結果は`launcher-observations.json`に安全化して保存します。Codex `--search` optionは渡さず、JSONLからtool eventを検出した場合は判定を未検証にします。
-
-`profile.json`とcommand JSONを作成後、run用directoryに隔離証拠を保存します。
+WSL2 clean checkoutからprofileを指定し、固定Skill revisionを実行します。Codex用launcherや外側bubblewrap argvを利用者が自由入力する必要はありません。profileに指定された固定実行modeだけが利用できます。
 
 ```bash
 python -m scripts.skills.evals.agent.isolation_probe \
   --profile .agent-eval-runs/config/profile.json \
-  --agent-command-json .agent-eval-runs/config/agent-command.json \
-  --output-root .agent-eval-runs/TC-OUT-001
-```
+  --output-root .agent-eval-runs/isolation
 
-probeはDocker engineとAgent / Judge imageを確認し、設定済みAgent mountを使ってworkspace write-denialと評価出力rootのwrite許可を実行検査します。`isolation.json`の全required checkが`true`でない場合、`status`は`unverified`のままです。公開Web資料へのegressを制御できないprofileはその残留リスクを記録します。
-
-実Codex smokeのCLI形:
-
-```bash
 python -m scripts.skills.evals.agent.run \
   --suite deterministic \
   --skill test-case-design \
@@ -124,28 +51,28 @@ python -m scripts.skills.evals.agent.run \
   --execution-profile .agent-eval-runs/config/profile.json \
   --output-root .agent-eval-runs/TC-OUT-001 \
   --agent-name codex \
-  --agent-model <model名> \
-  --agent-command docker run --rm --read-only ...
+  --agent-model <model名>
 ```
 
-受入smokeでは`TC-OUT-001`、`TCN-OUT-001`、`TC-SEM-001`、`WF-SEM-003`を個別に実行します。Semantic caseはJudgeを独立起動し、既存semantic result normalizerで判定します。`--skill all`は明示時だけ使えます。対象revisionに存在しないSkill / caseは理由付きで除外記録へ残します。
+起動前にprofileとfresh isolation evidenceを照合します。合成security testが成立しない限りCodex exec、実Agent/Judge評価へ進めません。正式方式の認証可視性は残留リスクであり、今回の方式移行承認だけを実認証承認として扱いません。
+
+受入smoke対象はTC-OUT-001、TCN-OUT-001、TC-SEM-001、WF-SEM-003です。ケースを個別実行します。Semantic caseはJudgeを別process・別outer bubblewrapで起動し、既存semantic result normalizerで判定します。--skill allは明示時だけ使います。
 
 ## 固定qa-training-store統合評価
 
-この評価は`qa-training-store@84ce165493649550832731a60cf436f8ae29c56b`のsource treeを読み取り、Checkout / Payment Web範囲の固定scenarioを最低2 attemptで実行します。target repoへcheckout、commitその他のGit mutationを行いません。作業treeのHEADは異なっていても、指定revisionがGit objectとして存在し、treeがcleanなら読み取り元として使用できます。
+この評価はWSL2内のclean target checkoutで`qa-training-store@84ce165493649550832731a60cf436f8ae29c56b`のsource treeを読み取り、Checkout / Payment Web範囲の固定scenarioを最低2 attemptで実行します。target repoへcheckout、commitその他のGit mutationを行いません。Codex Agent/JudgeだけをWSL2二重bubblewrapで起動します。Codexを起動しないproduction verifier capture/replayは固定Docker verifier imageと既存`--network none`契約を維持します。
 
 ```bash
 python -m scripts.skills.evals.agent.qa_training_store \
-  --target-root C:/Users/<user>/Documents/qa-training-store \
+  --target-root /home/<user>/src/qa-training-store \
   --skill-revision <40文字のqa-workflow-skills Git SHA> \
   --execution-profile .agent-eval-runs/config/profile.json \
   --verifier-image <固定verifier image digest> \
   --output-root .agent-eval-runs/qts-baseline \
-  --repeat 2 \
-  --agent-command docker run --rm --read-only ...
+  --repeat 2
 ```
 
-Runnerはtarget用sanitized workspace、synthetic baseline、Skill / source manifest、artifact contract、runtime verifier replay、workflow runtime replay、Judge evidence、workspace integrityを保存します。Artifact Judgeはcanonical artifactsと不足placeholderのみを受け取り、routing / final stdout / machine summaryは受け取りません。Workflow Judgeはrouting / final stdoutと固定machine summaryを受け取ります。二つの判定は別container・別cwdで実行します。
+Runnerはtarget用sanitized workspace、synthetic baseline、Skill / source manifest、artifact contract、runtime verifier replay、workflow runtime replay、Judge evidence、workspace integrityを保存します。Artifact Judgeはcanonical artifactsと不足placeholderのみを受け取り、routing / final stdout / machine summaryは受け取りません。Workflow Judgeはrouting / final stdoutと固定machine summaryを受け取ります。二つの判定は別process・別outer bubblewrap namespace・別cwd・別一時`CODEX_HOME`で実行します。`--verifier-image`は既存verifier contractの固定digestを指定し、Codex imageへ置き換えません。
 
 ## Judge検証とSkill改善
 
@@ -156,7 +83,7 @@ Runnerはtarget用sanitized workspace、synthetic baseline、Skill / source mani
 ```bash
 python -m scripts.skills.evals.agent.judge_validation \
   --baseline-result .agent-eval-runs/qts-baseline/result.json \
-  --target-root C:/Users/<user>/Documents/qa-training-store \
+  --target-root /home/<user>/src/qa-training-store \
   --execution-profile .agent-eval-runs/config/profile.json \
   --output-root .agent-eval-runs/judge-validation \
   --approval-file .agent-eval-runs/config/human-approvals.json \
@@ -169,7 +96,7 @@ python -m scripts.skills.evals.agent.judge_validation \
 python -m scripts.skills.evals.agent.improve \
   --baseline-result .agent-eval-runs/qts-baseline/result.json \
   --judge-validation-result .agent-eval-runs/judge-validation/result.json \
-  --target-root C:/Users/<user>/Documents/qa-training-store \
+  --target-root /home/<user>/src/qa-training-store \
   --execution-profile .agent-eval-runs/config/profile.json \
   --output-root .agent-eval-runs/improve-run \
   --verifier-image <固定verifier image digest> \

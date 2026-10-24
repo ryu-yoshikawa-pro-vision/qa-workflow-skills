@@ -14,17 +14,111 @@ from scripts.skills.evals.agent.common import (
     prepare_run_output_root,
 )
 from scripts.skills.evals.agent.isolation_probe import _live_mount_probe
+from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import PACKAGE_SHA512
 from scripts.skills.evals.agent.workspace import (
     prepare_agent_output_mountpoint,
     profile_fingerprint,
+    verify_agent_wsl2_command,
     verify_agent_docker_command,
     verify_judge_docker_command,
     verify_profile_evidence,
     verify_repair_docker_command,
+    _validate_profile,
 )
 
 
 class WorkspaceIsolationTests(unittest.TestCase):
+    @staticmethod
+    def _wsl2_profile() -> dict:
+        network_policy = "codex-parent-host-network-inner-shell-denied"
+        return {
+            "schema_version": 2,
+            "agent": {
+                "name": "codex",
+                "model": "agent-model",
+                "timeout_seconds": 60,
+                "cli_version": "0.163.0",
+                "reasoning_effort": "medium",
+                "launch_options": [],
+                "sandbox_policy": "workspace-write",
+                "approval_policy": "never",
+                "network_policy": network_policy,
+                "tools": ["shell"],
+                "mcp_servers": [],
+                "skill_roots": ["/workspace/.agents/skills"],
+                "external_instructions": "none",
+                "global_config": "none",
+            },
+            "judge": {
+                "model": "judge-model",
+                "command_argv": ["codex"],
+                "cwd": "isolated",
+                "timeout_seconds": 60,
+                "cli_version": "0.163.0",
+                "reasoning_effort": "medium",
+                "launch_options": [],
+                "sandbox_policy": "read-only",
+                "approval_policy": "never",
+                "network_policy": network_policy,
+                "skill_roots": [],
+                "global_config": "none",
+                "tools": [],
+                "mcp_servers": [],
+                "external_instructions": "none",
+            },
+            "isolation": {
+                "method": "wsl2-dual-bubblewrap",
+                "agent_read_roots": ["/workspace"],
+                "evaluator_read_blocked": True,
+            },
+            "verification": {
+                "status": "unverified",
+                "method": "wsl2-dual-bubblewrap",
+                "evidence_path": None,
+            },
+        }
+
+    def test_schema2_profile_fixes_tool_and_network_boundaries(self) -> None:
+        profile = self._wsl2_profile()
+        _validate_profile(profile)
+
+        profile["agent"]["tools"] = ["shell", "browser"]
+        with self.assertRaises(AgentEvalError):
+            _validate_profile(profile)
+
+        profile = self._wsl2_profile()
+        profile["judge"]["network_policy"] = "network-none"
+        with self.assertRaises(AgentEvalError):
+            _validate_profile(profile)
+
+    def test_wsl2_agent_command_allows_only_the_named_output_mount(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evaluator = root / "evaluator"
+            evaluator.mkdir()
+            workspace = root / "workspace"
+            workspace.mkdir()
+            nested_output = workspace / ".qa-eval-output"
+            nested_output.mkdir()
+            self.assertEqual(
+                verify_agent_wsl2_command(
+                    ["codex"],
+                    workspace=workspace,
+                    output_root=nested_output,
+                    evaluator_root=evaluator,
+                )["execution_method"],
+                "wsl2-dual-bubblewrap",
+            )
+            unsafe_output = workspace / "arbitrary-output"
+            unsafe_output.mkdir()
+            with self.assertRaises(AgentEvalError):
+                verify_agent_wsl2_command(
+                    ["codex"],
+                    workspace=workspace,
+                    output_root=unsafe_output,
+                    evaluator_root=evaluator,
+                )
+
     def test_agent_output_mountpoint_is_created_empty_and_rejects_content(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -37,40 +131,83 @@ class WorkspaceIsolationTests(unittest.TestCase):
             with self.assertRaisesRegex(AgentEvalError, "must be empty"):
                 prepare_agent_output_mountpoint(workspace)
 
-    def test_profile_evidence_is_bound_to_command_and_evaluator_revision(self) -> None:
+    def test_legacy_docker_evidence_cannot_authorize_new_profile(self) -> None:
         profile = {
             "agent": {"skill_roots": ["/workspace/.agents/skills"]},
             "judge": {"cwd": "isolated", "command_argv": ["docker", "run", "judge"]},
             "isolation": {"agent_read_roots": ["/workspace"]},
             "verification": {"status": "verified", "evidence_path": "isolation.json"},
         }
-        agent_command = ["docker", "run", "--read-only", "agent"]
-        checks = {
-            "evaluator_read_denied": True,
-            "source_write_denied": True,
-            "extra_tools_disabled": True,
-            "mounts_reviewed": True,
-        }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "isolation.json").write_text(
-                json.dumps(
-                    {
-                        "status": "verified",
-                        "probe": "scripts/skills/evals/agent/isolation_probe.py",
-                        "profile_fingerprint": profile_fingerprint(profile),
-                        "agent_command_fingerprint": canonical_fingerprint(
-                            agent_command
-                        ),
-                        "judge_command_fingerprint": canonical_fingerprint(
-                            profile["judge"]["command_argv"]
-                        ),
-                        "evaluator_revision": "a" * 40,
-                        "checks": checks,
-                    }
+            with patch(
+                "scripts.skills.evals.agent.workspace.assert_clean_checkout",
+                return_value="a" * 40,
+            ):
+                self.assertFalse(verify_profile_evidence(profile, root))
+
+    def test_wsl2_evidence_is_bound_to_mode_command_profile_and_revision(self) -> None:
+        profile = {
+            "schema_version": 2,
+            "agent": {"skill_roots": ["/workspace/.agents/skills"]},
+            "judge": {"cwd": "isolated", "command_argv": ["codex"]},
+            "isolation": {"agent_read_roots": ["/workspace"]},
+            "verification": {"status": "verified", "evidence_path": "isolation.json"},
+        }
+        agent_command = ["codex"]
+        required_checks = {
+            "evaluator_read_denied",
+            "host_home_read_denied",
+            "other_attempt_home_read_denied",
+            "windows_filesystem_read_denied",
+            "source_write_denied",
+            "output_write_allowed",
+            "inherited_fd_denied",
+            "symlink_escape_denied",
+            "fresh_procfs",
+            "nested_namespaces",
+            "inner_shell_network_blocked",
+            "extra_tools_disabled",
+            "mounts_reviewed",
+            "agent_judge_separated",
+            "timeout_cleanup",
+        }
+        fingerprint = profile_fingerprint(profile)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence = {
+                "status": "verified",
+                "schema_version": 2,
+                "execution_method": "wsl2-dual-bubblewrap",
+                "probe": "scripts/skills/evals/agent/isolation_probe.py",
+                "profile_fingerprint": fingerprint,
+                "agent_command_fingerprint": canonical_fingerprint(agent_command),
+                "judge_command_fingerprint": canonical_fingerprint(
+                    profile["judge"]["command_argv"]
                 ),
-                encoding="utf-8",
-            )
+                "evaluator_revision": "a" * 40,
+                "runtime": {
+                    "package_sha512": PACKAGE_SHA512,
+                    "package_version": "0.163.0-linux-x64",
+                    "codex_sha256": "c" * 64,
+                    "bwrap_sha256": "d" * 64,
+                },
+                "mode_evidence": {
+                    mode: {
+                        "status": "verified",
+                        "mode": mode,
+                        "profile_fingerprint": fingerprint,
+                    }
+                    for mode in ("agent", "judge", "repair")
+                },
+                "details": {
+                    "authentication_shell_visible_risk": True,
+                    "model_api_used": False,
+                },
+                "checks": {key: True for key in required_checks},
+            }
+            evidence_path = root / "isolation.json"
+            evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
             with patch(
                 "scripts.skills.evals.agent.workspace.assert_clean_checkout",
                 return_value="a" * 40,
@@ -82,17 +219,26 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 )
                 with self.assertRaises(AgentEvalError):
                     verify_profile_evidence(
-                        profile, root, agent_command_argv=agent_command + ["different"]
+                        profile, root, agent_command_argv=agent_command + ["unsafe"]
+                    )
+                evidence["mode_evidence"]["judge"]["mode"] = "agent"
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+                with self.assertRaises(AgentEvalError):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
                     )
             with patch(
                 "scripts.skills.evals.agent.workspace.assert_clean_checkout",
                 return_value="b" * 40,
             ):
+                evidence["mode_evidence"]["judge"]["mode"] = "judge"
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
                 with self.assertRaises(AgentEvalError):
                     verify_profile_evidence(
                         profile, root, agent_command_argv=agent_command
                     )
 
+    @unittest.skipUnless(os.name == "posix", "requires the Linux Docker probe")
     def test_live_probe_checks_sentinel_control_and_agent_mounts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -146,6 +292,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
         )
         self.assertIn("/workspace/.agent-eval-source-write-probe", agent_argv[-1])
 
+    @unittest.skipUnless(os.name == "posix", "requires the Linux Docker probe")
     def test_live_probe_records_sanitized_failure_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             sentinel = Path(temporary) / "sentinel.txt"

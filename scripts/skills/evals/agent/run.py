@@ -27,12 +27,22 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.agent.executor import AgentExecutionError, run_command
     from scripts.skills.evals.agent.prompt_builder import build_generation_prompt
-    from scripts.skills.evals.agent.tools.codex_docker_launcher import launcher_argv
+    from scripts.skills.evals.agent.tools.codex_docker_launcher import (
+        launcher_argv as legacy_agent_launcher_argv,
+    )
+    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
+        is_codex_judge as legacy_is_codex_judge,
+        launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
+    )
+    from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
+        cleanup_argv as codex_cleanup_argv,
+        launcher_argv,
+    )
     from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
         is_codex_judge,
     )
-    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
-        launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
+        judge_launcher_argv_for_profile,
     )
     from scripts.skills.evals.agent.workspace import (
         assert_clean_checkout,
@@ -45,6 +55,8 @@ if __package__ in {None, ""}:
         resolve_commit,
         verify_agent_docker_command,
         verify_judge_docker_command,
+        verify_agent_wsl2_command,
+        verify_judge_wsl2_command,
         verify_profile_evidence,
     )
     from scripts.skills.evals.semantic.loader import (
@@ -78,12 +90,22 @@ else:
     )
     from .executor import AgentExecutionError, run_command
     from .prompt_builder import build_generation_prompt
-    from .tools.codex_docker_launcher import launcher_argv
+    from .tools.codex_docker_launcher import (
+        launcher_argv as legacy_agent_launcher_argv,
+    )
+    from .tools.codex_judge_docker_launcher import (
+        is_codex_judge as legacy_is_codex_judge,
+        launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
+    )
+    from .tools.codex_wsl2_bwrap_launcher import (
+        cleanup_argv as codex_cleanup_argv,
+        launcher_argv,
+    )
     from .tools.codex_judge_docker_launcher import (
         is_codex_judge,
     )
-    from .tools.codex_judge_docker_launcher import (
-        launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    from .tools.codex_wsl2_bwrap_launcher import (
+        judge_launcher_argv_for_profile,
     )
     from .workspace import (
         assert_clean_checkout,
@@ -96,6 +118,8 @@ else:
         resolve_commit,
         verify_agent_docker_command,
         verify_judge_docker_command,
+        verify_agent_wsl2_command,
+        verify_judge_wsl2_command,
         verify_profile_evidence,
     )
 
@@ -250,26 +274,34 @@ def _render_grade(
         / f"attempt-{case.get('repeat_index', 1):02d}"
     )
     judge_workspace.mkdir(parents=True, exist_ok=False)
-    judge_isolation = verify_judge_docker_command(
-        profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
-    )
-    judge_name = (
-        "agent-eval-judge-" + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23]
-    )
-    judge_command, judge_cleanup = named_container_command(
-        profile["judge"]["command_argv"], name=judge_name
-    )
     judge_observations_path = judge_workspace / "launcher-observations.json"
-    codex_judge = is_codex_judge(profile["judge"])
-    judge_execution_command = (
-        judge_launcher_argv_for_profile(
-            profile["judge"],
-            docker_argv=judge_command,
-            observations_path=judge_observations_path,
+    if profile["schema_version"] == 2:
+        judge_isolation = verify_judge_wsl2_command(
+            profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
         )
-        if codex_judge
-        else judge_command
-    )
+        codex_judge = True
+        judge_execution_command = judge_launcher_argv_for_profile(
+            profile["judge"], observations_path=judge_observations_path
+        )
+        judge_cleanup = codex_cleanup_argv(judge_execution_command)
+    else:
+        judge_isolation = verify_judge_docker_command(
+            profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
+        )
+        judge_command, judge_cleanup = named_container_command(
+            profile["judge"]["command_argv"],
+            name="agent-eval-judge-" + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23],
+        )
+        codex_judge = legacy_is_codex_judge(profile["judge"])
+        judge_execution_command = (
+            legacy_judge_launcher_argv_for_profile(
+                profile["judge"],
+                docker_argv=judge_command,
+                observations_path=judge_observations_path,
+            )
+            if codex_judge
+            else judge_command
+        )
     result = run_command(
         judge_execution_command,
         input_text=prompt,
@@ -609,23 +641,47 @@ def run(argv: list[str] | None = None) -> int:
                         output_root=agent_output_root,
                     )
                     try:
-                        attempt["agent_isolation"] = verify_agent_docker_command(
-                            command,
-                            workspace=agent_workspace,
-                            output_root=agent_output_root,
-                            evaluator_root=REPO_ROOT,
-                        )
-                        container_name = f"agent-eval-{run_id[-8:]}-{attempt_id}"
-                        command, cleanup_command = named_container_command(
-                            command, name=container_name
-                        )
+                        if profile["schema_version"] == 2:
+                            attempt["agent_isolation"] = verify_agent_wsl2_command(
+                                command,
+                                workspace=agent_workspace,
+                                output_root=agent_output_root,
+                                evaluator_root=REPO_ROOT,
+                            )
+                            cleanup_command = None
+                        else:
+                            attempt["agent_isolation"] = verify_agent_docker_command(
+                                command,
+                                workspace=agent_workspace,
+                                output_root=agent_output_root,
+                                evaluator_root=REPO_ROOT,
+                            )
+                            command, cleanup_command = named_container_command(
+                                command,
+                                name=f"agent-eval-{run_id[-8:]}-{attempt_id}",
+                            )
                         attempt["agent_command"] = {
                             "argv": command,
                             "fingerprint": canonical_fingerprint(command),
                         }
                         execution_command = command
-                        if profile["agent"]["name"].lower() == "codex":
+                        if profile["schema_version"] == 2:
                             execution_command = launcher_argv(
+                                mode="agent",
+                                output_root=agent_output_root,
+                                observations_path=case_dir / "agent-launcher-observations.json",
+                                model=profile["agent"]["model"],
+                                reasoning_effort=profile["agent"]["reasoning_effort"],
+                                sandbox_policy=profile["agent"]["sandbox_policy"],
+                                workspace_root=agent_workspace,
+                            )
+                            cleanup_command = codex_cleanup_argv(execution_command)
+                            attempt["codex_launcher"] = {
+                                "protocol": "codex_wsl2_bwrap_launcher_v1",
+                                "status": "used",
+                            }
+                        elif profile["agent"]["name"].lower() == "codex":
+                            execution_command = legacy_agent_launcher_argv(
                                 output_root=agent_output_root,
                                 model=profile["agent"]["model"],
                                 reasoning_effort=profile["agent"]["reasoning_effort"],
@@ -633,10 +689,6 @@ def run(argv: list[str] | None = None) -> int:
                                 sandbox_policy=profile["agent"]["sandbox_policy"],
                                 docker_argv=command,
                             )
-                            attempt["codex_launcher"] = {
-                                "protocol": "codex_docker_launcher_v1",
-                                "status": "used",
-                            }
                         execution = run_command(
                             execution_command,
                             input_text=prompt,

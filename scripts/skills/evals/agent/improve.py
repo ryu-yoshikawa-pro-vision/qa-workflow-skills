@@ -45,7 +45,11 @@ from .qa_training_store import (
 from .run import _has_secret_command_argument
 from .run import run as run_agent_evaluation
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
-from .tools.codex_docker_launcher import launcher_argv
+from .tools.codex_docker_launcher import launcher_argv as legacy_agent_launcher_argv
+from .tools.codex_wsl2_bwrap_launcher import (
+    cleanup_argv as codex_cleanup_argv,
+    launcher_argv,
+)
 from .workspace import (
     assert_clean_checkout,
     create_skill_workspace,
@@ -1450,6 +1454,11 @@ def _validate_repair_diff(
 
 
 def _insert_mount_before_image(argv: list[str], mount: str) -> list[str]:
+    if argv == ["codex"]:
+        expected = "target=/workspace/.agents/skills/"
+        if expected not in mount:
+            raise AgentEvalError("repair Skill mount target is invalid")
+        return list(argv)
     index = 2
     value_options = {
         "--network",
@@ -3170,8 +3179,18 @@ def _run_deterministic_improvements(
         name=f"agent-eval-analysis-{experiment_id[-8:]}-deterministic",
     )
     analysis_execution_command = analysis_named
-    if profile["agent"]["name"].lower() == "codex":
+    if profile.get("schema_version", 1) == 2:
         analysis_execution_command = launcher_argv(
+            output_root=analysis_workspace / ".qa-eval-output",
+            model=profile["agent"]["model"],
+            reasoning_effort=profile["agent"]["reasoning_effort"],
+            cli_version=profile["agent"]["cli_version"],
+            sandbox_policy=profile["agent"]["sandbox_policy"],
+            docker_argv=analysis_named,
+        )
+        analysis_cleanup = codex_cleanup_argv(analysis_execution_command)
+    elif profile["agent"]["name"].lower() == "codex":
+        analysis_execution_command = legacy_agent_launcher_argv(
             output_root=analysis_workspace / ".qa-eval-output",
             model=profile["agent"]["model"],
             reasoning_effort=profile["agent"]["reasoning_effort"],
@@ -3426,8 +3445,20 @@ def _run_deterministic_improvements(
                 }
                 atomic_write_json(output_root / "result.json", result)
                 repair_execution_command = repair_named
-                if profile["agent"]["name"].lower() == "codex":
+                if profile.get("schema_version", 1) == 2:
                     repair_execution_command = launcher_argv(
+                        output_root=repair_output,
+                        model=profile["agent"]["model"],
+                        reasoning_effort=profile["agent"]["reasoning_effort"],
+                        cli_version=profile["agent"]["cli_version"],
+                        sandbox_policy=profile["agent"]["sandbox_policy"],
+                        docker_argv=repair_named,
+                        mode="repair",
+                        skill_name=chosen_skill,
+                    )
+                    repair_cleanup = codex_cleanup_argv(repair_execution_command)
+                elif profile["agent"]["name"].lower() == "codex":
+                    repair_execution_command = legacy_agent_launcher_argv(
                         output_root=repair_output,
                         model=profile["agent"]["model"],
                         reasoning_effort=profile["agent"]["reasoning_effort"],
@@ -4049,8 +4080,18 @@ def run_improvements(
             name=f"agent-eval-analysis-{experiment_id[-8:]}-{case_index:02d}",
         )
         analysis_execution_command = analysis_named
-        if profile["agent"]["name"].lower() == "codex":
+        if profile.get("schema_version", 1) == 2:
             analysis_execution_command = launcher_argv(
+                output_root=analysis_workspace / ".qa-eval-output",
+                model=profile["agent"]["model"],
+                reasoning_effort=profile["agent"]["reasoning_effort"],
+                cli_version=profile["agent"]["cli_version"],
+                sandbox_policy=profile["agent"]["sandbox_policy"],
+                docker_argv=analysis_named,
+            )
+            analysis_cleanup = codex_cleanup_argv(analysis_execution_command)
+        elif profile["agent"]["name"].lower() == "codex":
+            analysis_execution_command = legacy_agent_launcher_argv(
                 output_root=analysis_workspace / ".qa-eval-output",
                 model=profile["agent"]["model"],
                 reasoning_effort=profile["agent"]["reasoning_effort"],
@@ -4315,8 +4356,20 @@ def run_improvements(
                     }
                     atomic_write_json(output_root / "result.json", result)
                     repair_execution_command = repair_named
-                    if profile["agent"]["name"].lower() == "codex":
+                    if profile.get("schema_version", 1) == 2:
                         repair_execution_command = launcher_argv(
+                            output_root=repair_output,
+                            model=profile["agent"]["model"],
+                            reasoning_effort=profile["agent"]["reasoning_effort"],
+                            cli_version=profile["agent"]["cli_version"],
+                            sandbox_policy=profile["agent"]["sandbox_policy"],
+                            docker_argv=repair_named,
+                            mode="repair",
+                            skill_name=chosen_skill,
+                        )
+                        repair_cleanup = codex_cleanup_argv(repair_execution_command)
+                    elif profile["agent"]["name"].lower() == "codex":
+                        repair_execution_command = legacy_agent_launcher_argv(
                             output_root=repair_output,
                             model=profile["agent"]["model"],
                             reasoning_effort=profile["agent"]["reasoning_effort"],

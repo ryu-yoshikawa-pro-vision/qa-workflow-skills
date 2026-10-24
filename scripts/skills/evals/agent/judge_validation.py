@@ -28,11 +28,16 @@ from .qa_training_store import (
     validate_artifact_index,
 )
 from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
+from .tools.codex_wsl2_bwrap_launcher import (
+    cleanup_argv as codex_cleanup_argv,
+    judge_launcher_argv_for_profile,
+    launcher_argv,
+)
 from .tools.codex_judge_docker_launcher import (
     is_codex_judge,
 )
 from .tools.codex_judge_docker_launcher import (
-    launcher_argv_for_profile as judge_launcher_argv_for_profile,
+    launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
 )
 from .workspace import (
     assert_clean_checkout,
@@ -41,6 +46,8 @@ from .workspace import (
     profile_fingerprint,
     resolve_commit,
     verify_judge_docker_command,
+    verify_agent_wsl2_command,
+    verify_judge_wsl2_command,
     verify_profile_evidence,
 )
 
@@ -420,21 +427,29 @@ def _run_judge_case(
 ) -> dict[str, Any]:
     from ..semantic.result import normalize_judge_response
 
-    isolation = verify_judge_docker_command(command_argv, evaluator_root=REPO_ROOT)
-    named, cleanup = named_container_command(
-        command_argv, name="agent-eval-judge-validation-" + run_tag
-    )
     observations_path = cwd / "launcher-observations.json"
     codex_judge = is_codex_judge(judge_profile)
-    execution_command = (
-        judge_launcher_argv_for_profile(
-            judge_profile,
-            docker_argv=named,
-            observations_path=observations_path,
+    if command_argv == ["codex"]:
+        isolation = verify_judge_wsl2_command(command_argv, evaluator_root=REPO_ROOT)
+        codex_judge = True
+        execution_command = judge_launcher_argv_for_profile(
+            judge_profile, observations_path=observations_path
         )
-        if codex_judge
-        else named
-    )
+        cleanup = codex_cleanup_argv(execution_command)
+    else:
+        isolation = verify_judge_docker_command(command_argv, evaluator_root=REPO_ROOT)
+        named, cleanup = named_container_command(
+            command_argv, name="agent-eval-judge-validation-" + run_tag
+        )
+        execution_command = (
+            legacy_judge_launcher_argv_for_profile(
+                judge_profile,
+                docker_argv=named,
+                observations_path=observations_path,
+            )
+            if codex_judge
+            else named
+        )
     execution = run_command(
         execution_command,
         input_text=prompt,
@@ -840,23 +855,44 @@ def run_validation(
                 ensure_ascii=False,
             )
         )
-        if proposal_command[0] == "docker":
+        if profile.get("schema_version", 1) == 2 and proposal_command == ["codex"]:
+            cwd = output_root / "proposal-agent"
+            cwd.mkdir()
+            proposal_output = cwd / ".qa-eval-output"
+            proposal_output.mkdir()
+            isolation = verify_agent_wsl2_command(
+                proposal_command,
+                workspace=cwd,
+                output_root=proposal_output,
+                evaluator_root=REPO_ROOT,
+            )
+            proposal_execution_command = launcher_argv(
+                mode="agent",
+                output_root=proposal_output,
+                observations_path=cwd / "launcher-observations.json",
+                model=profile["agent"]["model"],
+                reasoning_effort=profile["agent"]["reasoning_effort"],
+                sandbox_policy=profile["agent"]["sandbox_policy"],
+                workspace_root=cwd,
+            )
+            cleanup = codex_cleanup_argv(proposal_execution_command)
+        elif proposal_command[0] == "docker":
             isolation = verify_judge_docker_command(
                 proposal_command, evaluator_root=REPO_ROOT
             )
+            named, cleanup = named_container_command(
+                proposal_command,
+                name="agent-eval-judge-proposal-" + os.urandom(4).hex(),
+            )
+            proposal_execution_command = named
         else:
-            raise AgentEvalError("Judge proposal Agent must use isolated docker run")
-        cwd = output_root / "proposal-agent"
-        cwd.mkdir()
-        named, cleanup = named_container_command(
-            proposal_command, name="agent-eval-judge-proposal-" + os.urandom(4).hex()
-        )
+            raise AgentEvalError("Judge proposal Agent must use the verified launcher")
         proposal_timeout = min(
             profile["agent"]["timeout_seconds"],
             max(1, int(max_seconds - (time.monotonic() - start))),
         )
         proposal = run_command(
-            named,
+            proposal_execution_command,
             input_text=proposal_prompt,
             cwd=cwd,
             timeout_seconds=proposal_timeout,

@@ -8,6 +8,19 @@ Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent
 
 `feat/agent-eval-runner`
 
+## 2026-10-24 正式実行方式の更新
+
+この節および[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)を、Agent / Judge / Repairの現行実行方式の正本とする。以下に残るDockerのAgent / Judge起動例、Docker image / containerを隔離境界とする記述は過去実装の説明であり、現在の正式実行手順としては使わない。Codexを起動しない固定verifierのDocker実行だけは従来契約を維持する。
+
+- 正式な実行hostはWSL2 Ubuntu内のLinux clean checkout。Windows Python、Windows開発checkout、`/mnt/c`配下をAgent/Judgeへ公開しない。
+- Agent/Judge/RepairはCodex CLI `0.163.0`とそのpackageに同梱されたbubblewrapを使い、使い捨て外側bubblewrapの内側でCodex Linux sandboxを起動する。CLI package version・配布元・digest・実行binary digest・同梱bwrap digestは実行時に照合する。OS/kernel/Python等は実測して記録し、特定値を固定設定としてハードコードしない。
+- outer bwrapは`--tmpfs /`を基点に必要最小限のruntime、CA bundle、sanitized workspace、attempt output、一時`CODEX_HOME`だけをmountする。host `/`、host home、Windows filesystem、Evaluator checkout、Docker socket、他run領域はmountしない。`close_fds=True`、未許可FD非継承を固定する。
+- Agent/Judge/Repairは毎回別process・別outer namespace・別workspace・別一時`CODEX_HOME`を使う。JudgeへAgent workspaceをmountせず、Judge promptはstdinのみで渡す。
+- outer networkはCodex親processの許可されたモデルAPI通信のため保持する。inner Codex sandboxはshellのTCP/DNS/AF_UNIX/WSL interop等を遮断する。各境界の実効probe結果を分けて保存し、一部の宛先の失敗だけでegress遮断済みと扱わない。
+- inner workspace-writeの要求を満たすため、許可outputと実測で必要な専用一時場所のみを書込み可能にする。候補Skill・固定target sourceはouter mountでも変更不能とし、実行前後manifestを照合する。必要な安全な書込み境界が成立しない実行方式は採用しない。
+- 認証はrun別一時`CODEX_HOME`へ必要最小限を複製する既存契約を維持するが、過去の合成検証でshellからcredential markerを読めた。実認証のshell可視性を残留リスクとして明記し、別途承認なしに実認証/model API評価を開始しない。
+- isolation evidenceはEvaluator revision、固定CLI/bwrap packageとbinary digest、profile、mode、実効argv、mount/network構成、probe versionに結び付ける。どれかの必須検査が欠落・不一致なら`isolation_unverified`としてlive評価を拒否する。旧Docker evidenceは新方式の証拠として再利用しない。
+
 ## 基準
 
 - 対象リポジトリ: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
@@ -302,12 +315,12 @@ Skill-local verifierはSkill本体にも含まれる。runtimeの再実行と共
 - **固定基準の採点**：deterministic / semanticのgrader、expected / rubric / Reference、判定ルールは固定Evaluator revisionを使う。フェーズ2の共通機械判定も固定Evaluatorに置き、候補verifierの`valid`や候補generatorの`can_complete`をそれ単体で合否の根拠にしない。既存`deterministic/runtime_validator.py`の`_source_paths()`は現在Evaluator側`REPO_ROOT`へ固定されているため、`deterministic/run.py`へ任意の`--runtime-source-root`を追加し、`grade()` → `validate_runtime_evidence()` → `_assert_runtime_pair()` → `_source_paths()`へそのpathを明示的に渡す。指定時はEvaluatorが作成した**候補Git tree由来の信頼済みsource root**に一致することをrunner側で検証する。引数省略時は従来のEvaluator側`REPO_ROOT`を使用し、既存CLI・テストの動作を維持する。`run.py`からruntime assertionへ明示的に伝播し、**graderのコードとassertionの意味は固定したまま、実装由来のfingerprint / generator version / static-dataの照合先だけを候補の信頼済みsourceへ切り替える**。従来のgrader CLIは引数省略で従来動作を維持し、一般Skill validatorのimport先・eval datasetは変更しない。Agentが編集できるworkspaceをsource rootに指定しない。
 - **契約非互換**：両revisionで共通に判定できるcriteriaを評価し、schema / 機械契約が実際に互換でない部分だけを`evaluator_incompatible`として扱う。単なるimplementation fingerprint相違は非互換理由にならない。`evaluator_incompatible`を品質FAILへ読み替えず、共通部分のsemantic評価まで破棄しない。出力契約が変わり固定graderで評価できない場合は、両revisionを処理できる共通Evaluatorへ更新後、**旧版・新版の両方をそのEvaluatorで新規に実行・再採点**する。過去の別Evaluator評価を混ぜない。互換adapterの汎用基盤は今回作らない。
 
-候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の指定Git treeを使い、**Evaluator本体のprocess内ではimportも実行もしない**。候補のtracked contentも実行可能コードであり、Git SHAによる出自確認は安全性の証明ではない。既存のDocker方式を使用し、次の固定経路にする。
+候補verifier / generatorの独立再実行は、Agentに見えるworkspaceとは別の指定Git treeを使い、**Evaluator本体のprocess内ではimportも実行もしない**。候補のtracked contentも実行可能コードであり、Git SHAによる出自確認は安全性の証明ではない。これはCodexを起動しない固定verifier用途であり、既存のDocker verifier方式を維持して次の固定経路にする。
 
 1. Evaluatorは候補revisionの**各Skillの`scripts/**`と`assets/**`を元の`skills/<skill>/`相対配置のまま**Git objectから別ディレクトリへ展開する。generatorが参照する同revisionの静的データを含め、相対path・size・SHA-256 manifestを両方検証する。Agent-visible workspaceからの取得や候補側`evals/**`の混入は認めない。必要なsource・静的データが欠落した場合は再実行環境の準備エラーでありSkill品質FAILではない。
-2. `codex_docker_launcher.py`と同じDocker実行基盤・固定imageで、**Python-only検証用の別コンテナ**を`--read-only --cap-drop=ALL --security-opt=no-new-privileges --network none`で起動する。候補sourceと同revisionの`assets/**`は`readonly` bind mountし、requestはEvaluatorが検証した固定byte列をstdinから渡す。書込み可能なのは`/tmp`のtmpfsのみとする。Evaluator checkout、grader、rubric、Reference、認証情報、Docker socket、元target、Agent用`CODEX_HOME`をmountしない。
+2. 固定されたQTS verifier用Docker imageで、**Python-only検証用の別container**を`--read-only --cap-drop=ALL --security-opt=no-new-privileges --network none`で起動する。候補sourceと同revisionの`assets/**`はread-only bind mountし、requestはEvaluatorが検証した固定byte列をstdinから渡す。書込み可能なのは`/tmp`のtmpfsのみとする。Evaluator checkout、grader、rubric、Reference、認証情報、Docker socket、元target、Agent用`CODEX_HOME`をmountしない。Codex Agent/Judge launcherとは分離して管理する。
 3. 候補`runtime_contract.py` / generator / `workflow_runtime.py`を元Skillの相対pathが解決できるcwdと固定argvで直接起動し、stdoutのJSON、終了コード・制限時間、stderr診断をEvaluator側で安全化して回収する。`test-condition-design/scripts/ui_pattern_candidates.py`が`../assets/ui-pattern-catalog.json`を読み込めることを隔離再実行の回帰テストで確認する。任意のPython module import、自由なshell command、ネットワーク通信を許可しない。stdin / stdoutのsource SHA・request SHA・result SHAをprovenanceへ紐付ける。
-4. Docker mount・network・UID・認証情報非公開・source write-denialを実行前に確認し、候補sourceからEvaluator-only sentinelを読み取れないnegative testを用意する。timeout時はコンテナを終了・削除し、そのattemptをrunner / environment errorとする。候補sourceが独自に`valid=false`を返す場合はエラーとして隠さず、その判定を保持する。
+4. Docker verifierのmount・network・UID・認証情報非公開・source write-denialを実行前に確認し、候補sourceからEvaluator-only sentinelを読み取れないnegative testを用意する。timeout時はverifier containerを終了・削除し、そのattemptをrunner / environment errorとする。候補sourceが独自に`valid=false`を返す場合はエラーとして隠さず、その判定を保持する。
 
 この候補再実行は**鮮度と結果再現の検証**であり、固定品質判定の代わりではない。候補が`valid=true`を返しても、固定Evaluatorの共通機械判定・意味Judgeの基準を満たさなければPASSにしない。候補sourceを隔離実行できない環境ではrunner / environment errorとして残し、Skill品質FAILへ変換しない。
 
@@ -330,6 +343,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 最低限、次を記録する。
 
 - `schema_version`、Agent名・model・CLI version、推論設定、実行オプション、sandbox / approval / networkの方針
+- WSL2/Linux実行mode、Codex package source/version/SHA-512、Codex binary SHA-256、同梱bubblewrap SHA-256、outer/inner実効argv fingerprint、mount fingerprint、outer model-API / inner-shell network boundary、probe version/evidence fingerprintと必須check一式
 - Agentが利用できるSkill・tool・MCPの集合、user/globalの設定・指示の扱い、読み取り可能なmount・ファイル範囲、隔離方式
 - 候補Agentと独立Judgeそれぞれの非秘密の起動設定fingerprint、Judge model / version / 推論・tool・指示条件
 - 実効設定の照合方法、根拠への相対path、検証状態（`verified`または`unverified`）。提供側のmodel更新等を確認できなければ不確実性として記載する。許可済みのモデルAPI通信で残る外部アクセス可能性は実行条件・制約として保存し、それ自体を必須隔離の検証失敗とはしない。
@@ -344,7 +358,7 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "agent": {
     "name": "codex",
     "model": "<実際に固定したmodel ID>",
@@ -391,7 +405,9 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 }
 ```
 
-上記`agent.timeout_seconds: 3600`はJSON例であり既定値ではない。live実行では`agent.timeout_seconds`を必須の正の整数として明示し、フェーズ1・2の共通`executor.py`がAgent起動開始から適用する。timeout値はprovenanceと比較条件に含め、Runnerが勝手に別の値へ置換しない。timeout時は子孫processと実行中Dockerコンテナを終了・回収してAgent execution error（exit code 2）とし、Skill品質FAILにはしない。後続caseを実行できるbatchでは続行する。
+schema 2の`runtime`契約はDocker image IDではなく、実行時に照合したWSL2上のCodex/bwrap実体digest、outer/inner sandbox、mount/network条件および固定probe証拠を記録する。Profileがschema 1のDocker方式を読む場合は旧結果として保持するが、schema 2とのrun比較・新方式evidence検証には使用しない。
+
+上記`agent.timeout_seconds: 3600`はJSON例であり既定値ではない。live実行では`agent.timeout_seconds`を必須の正の整数として明示し、フェーズ1・2の共通`executor.py`がAgent起動開始から適用する。timeout値はprovenanceと比較条件に含め、Runnerが勝手に別の値へ置換しない。timeout時はPOSIX process groupとWSL2 launcher配下の子孫processを終了・回収してAgent execution error（exit code 2）とし、Skill品質FAILにはしない。後続caseを実行できるbatchでは続行する。
 
 `<...>`は説明用の占位記号であり、live実行時には実値に置き換える。不明な実効項目は架空の固定値で埋めず、`null`とし`verification.status=unverified`を記録する。`verification.status=verified`を必須とする直接比較では、nullの実効必須項目は許可しない。`verification.status=verified`は自己申告では成立しない。Evaluatorは証拠fileの存在、読み取り拒否probeの結果、非秘密のCLI設定情報との照合を行い、**必須のローカル隔離・起動条件**に不明・不一致があれば`unverified` / `not_comparable`とする。許可済みのモデルAPI通信が残ることのみで`unverified`にはしない。`evaluator_read_blocked=true`も強制境界の代わりにならない。
 
@@ -401,45 +417,23 @@ Live CLIへ`--execution-profile <path/to/execution-profile.json>`を必須追加
 
 EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等による実効読み取り禁止境界**を設ける。Agent subprocessの`cwd`だけでは成立しない。
 
-- Agentが利用できるファイル・mount・tool / MCPにはEvaluator原本のexpected、Reference、rubric、grader、結果、元target checkoutを公開しない。Linuxの隔離コンテナを今回の実Codex smokeの標準構成とし、独自sandboxは実装しない。外部ネットワーク経由で公開評価資料を取得できる可能性は、ファイル隔離だけでは排除できないため、次節のネットワーク・tool条件を別途確認する。
+- Agentが利用できるファイル・mount・tool / MCPにはEvaluator原本のexpected、Reference、rubric、grader、結果、元target checkoutを公開しない。WSL2上のouter bubblewrapとCodexのinner Linux sandboxの二重境界を実Codex smokeの標準構成とする。外部ネットワーク経由で公開評価資料を取得できる可能性は、親processとinner shellの通信境界を別途検証し、残留条件をprofileへ記録する。
 - user/global指示・設定・Skill・MCPを固定された評価条件以外から混入させない。認証情報は必要最小限の別経路で渡し、provenanceに書かない。
 - preflightではEvaluator-only領域の**非秘密sentinel**を、Agentと同一権限・mount・tool構成から読めないことを確認する。fake Agentはrunnerの失敗時動作を検査し、実Codex smokeでは実際の読み取り拒否と余分な設定の混入防止を確認する。
 - Evaluator原本のOS境界、許可mount、意図しないSkill / MCP / web検索の無効化など**必須条件**を確認できないrunは`isolation_unverified`として保持しても、比較可能な品質評価にはしない。許可したモデルAPI通信の残留アクセス可能性は別途記録し、それだけで比較不可としない。stderr等は秘密混入を想定し、出力上限・安全化を行い、安全なログとして保存できない生内容は保存しない。
 
 ### 実Codex smokeで使用する固定実行構成
 
-今回、**Linux Docker Engine上の使い捨て非特権コンテナ**を実Codex smokeの基準環境とする。Windowsから実施するときはDocker Desktop / WSL2等でLinuxコンテナを起動できることを前提条件とする。Dockerを使用できない環境ではfake Agentによるrunner testまでは実行できるが、実Codex評価の完了とはしない。ほかのAgentにも同等の外部argv契約を使うが、隔離と実効条件を確認できたとみなすのはこのCodex実行構成だけとする。
+正式実行はWSL2 Ubuntu内のfixed-revision clean checkoutから行う。Windows PythonやWindows開発checkoutからLinux launcherを起動しない。既存の調査用WSL checkoutやWindows `/mnt/c` checkoutをそのまま評価checkoutとして使わず、固定Evaluator revisionと対象Skill revisionを識別したclean checkoutを準備する。
 
-1. ホストで固定Evaluator checkoutを開き、Evaluator-owned領域で候補Skill tracked contentと（フェーズ2では）sanitized targetを準備する。bind mountは、使い捨てAgent-visible workspace（**読み取り専用**）、その配下の`.qa-eval-output/`へ重ねるattempt専用**書込み可能**出力root、一時`CODEX_HOME`の3箇所に限定する。Evaluator checkout・採点資料・元target checkout・Docker socket・ホストhomeはmountしない。`--privileged`、host PID、host filesystem mountを使わない。
-2. Codex CLIとPythonが入った固定バージョンのLinux imageを使用し、image digest、Codex CLI version、Python versionをrunへ記録する。`docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges`を基本に、`--workdir /workspace`、`--tmpfs /tmp`等の一時書込み領域、`--mount type=bind,src=<Agent-visible workspace>,dst=/workspace,readonly`、`--mount type=bind,src=<attempt専用出力root>,dst=/workspace/.qa-eval-output`、`--mount type=bind,src=<使い捨てCODEX_HOME>,dst=/codex-home`、`-e CODEX_HOME=/codex-home`を指定する。workspaceの`.qa-eval-output/`を事前に作成し、その位置だけ書込み可能mountで覆う。必要なUID/GIDと書込み権限は出力root、最小`CODEX_HOME`、`/tmp`に限定する。source・Skill・評価用設定への書込みはmountで拒否し、post-run差分検査は補助として残す。実行中コンテナへEvaluator資料を`docker cp`しない。
-3. 認証は既存Codexのログイン情報を使い捨て`CODEX_HOME`へ**起動前に必要最小限で複製**する。ホストの本来の`~/.codex`はmountしない。秘密内容・そのhash・container内の生環境変数は永続保存しない。認証情報がAgent側プロセスから参照可能である制約を認識し、信頼できない入力へ広く公開しない。API keyを使う場合も同様に限定し、明示的な承認なく認証方式を変更しない。
-4. コンテナ内の`config.toml`は評価専用の最小値に固定する。`model`、`model_reasoning_effort`、`sandbox_mode`、`approval_policy`を明示し、既定のMCP server / plugins / 追加Skill / user-global指示・memory / web検索などの評価外入力は使用可能な範囲で無効化する。実効CLI引数と非秘密設定のhashを照合し、未確認の項目は`unverified`にする。候補revisionから検出したSkill集合はworkspace側にだけ配置する。Codex CLIが当該設定を無視・拒否したら比較可能として起動しない。
-5. Agentのweb検索・外部資料取得tool / MCPと余分なSkillを無効化し、実効設定と許可toolを照合する。**モデルAPI通信は許可**し、コンテナのネットワーク方式、web機能、既存egress制御の有無を非秘密profileへ記録する。利用可能なproxy / firewallで宛先制限を行う場合はその設定を固定するが、専用egress環境は必須としない。モデルAPI通信を通じて残る外部アクセス可能性は評価の制約として報告し、それだけで`isolation_unverified` / `not_comparable`にはしない。意図しないweb検索・外部資料取得が観測されたrun、必要なtool / MCP設定を確認できないrunは比較不可とする。
-6. ホストEvaluator-onlyの非秘密sentinelをAgentにmountしない。**Agentと同じコンテナ権限のOSコマンド**で該当host-only pathの読み取り不能を確認し、同時にDocker container inspect相当でmount集合・権限・image digestを確認する。LLMによる「見えない」という返答は証拠にならない。意図的にsentinelを追加mountしたnegative fixtureではpreflight失敗を確認する。
-7. 評価用の最小launcher（`scripts/skills/evals/agent/tools/codex_docker_launcher.py`）はDocker CLIへ`subprocess`のargvで接続し、stdin promptをそのまま`codex exec ... -`へ渡す。`--json`のJSONL stdoutを収集し、`--output-last-message`で得た最終応答だけを共通executorへstdoutとして返す。containerで作成した`.qa-eval-output/`内の一時message fileを回収し、元JSONLからコマンド実行などの**非秘密の事実だけ**を安全化してprovenanceへ保存する。launcherはsmoke用だけであり、共通`executor.py`やSkill PackageにCodex固有SDKを追加しない。JSONL全量を無条件に永続化しない。
-8. JudgeはAgentコンテナ**外のEvaluator側**で、生成とは独立したprocess / sessionを使って起動する。Evaluator資料はJudgeにのみ与える。Judge実行環境の固定model・CLI・設定・Reference hashを別に記録し、生成コンテナの一時認証・workspaceを無条件に共有しない。実Codex Judgeは専用`codex_judge_docker_launcher.py`で別の使い捨てcontainer・一時`CODEX_HOME`へ起動し、progress JSONLを保存せず最終Judge JSONだけをexecutorのstdoutへ返す。Judgeの実効profile、CLI・tool event、固定image IDを個別に記録し、shell等のtool eventがあった判定は検証済み扱いしない。
-
-コンテナ起動時の概形は次とし、`<...>`は起動前に固定・検証した値へ置き換える。実装する`codex_docker_launcher.py`がDockerへこれと等価なargvを渡し、利用者に毎回shell手順を組み立てさせない。
-
-```text
-docker run --rm -i --read-only --cap-drop=ALL --security-opt=no-new-privileges
-  --workdir /workspace --tmpfs /tmp
-  --mount type=bind,src=<sanitized-workspace>,dst=/workspace,readonly
-  --mount type=bind,src=<attempt-output-root>,dst=/workspace/.qa-eval-output
-  --mount type=bind,src=<temporary-codex-home>,dst=/codex-home
-  -e CODEX_HOME=/codex-home
-  <pinned-image-digest>
-  codex --no-daemon --strict-config --ask-for-approval never exec
-    --json --model <model-id> --sandbox workspace-write
-    --config model_reasoning_effort=<fixed-effort>
-    --output-last-message /workspace/.qa-eval-output/final-message.md -
-```
-
-上記はargvの構成例であり、shellに貼り付ける逐語的な完成コマンドではない。実際のDocker / Codex CLI引数は`docker run --help`と`codex exec --help`で検証する。フェーズ1の非Git workspaceでは、CodexがGit rootを要求する場合にのみ、そのCLIで確認した`--skip-git-repo-check`相当の正規optionをlauncher側から追加する。ホストでEvaluatorを動かすJudgeはこのコンテナへmountしない。
-
-Codex CLI `0.163.0`では`--json`、`--model`、`--sandbox`、`--config`、`--cd`、`--output-last-message`、`--skip-git-repo-check`を`codex exec --help`で確認し、root optionの`--no-daemon`、`--strict-config`、`--ask-for-approval never`は`exec`より前に置く。profileのcommandにはbuild済みimageのimmutable `sha256:<ID>`を記録し、launcherはそのIDを照合してversion probe・実行へ使う。runごとにtagからimageを変動解決しない。raw JSONLはmemory内で要約し、非秘密のevent事実以外をrunへ保存しない。
-
-`docker version`、イメージ起動、コンテナ内`codex --version` / 認証可否、Python実行、Codex応答、JSONL出力・Skill読取観測、read-denial、source書込み拒否、必要なモデルAPI通信を**実Agent smokeで確認**してから`verified`へ進める。環境未構築・必須のローカル隔離条件未確認なら比較可能なlive評価を完了したとは報告しない。外部egress制御を行えない場合は残留リスクとして記録する。image digest・model ID・実効設定は実行時に取得して固定し、未確認の値をPlanへ作り込まない。
+1. runごとにprivateな一時rootを作り、Agent-visible sanitized workspaceとoutput、最小runtime、Codex CLI/bundled bwrap、CA bundle、一時`CODEX_HOME`だけを配置・mountする。Evaluator checkout / grader / rubric / Reference / expected / result、元target、host home、Windows filesystem、Docker socket、他attemptをmountしない。
+2. launcherはCodex CLI `0.163.0`のLinux x64 package配布元・version・SHA-512を照合し、そのCLI binaryと同梱bwrapの実体・digestを記録する。外側bwrapは使い捨てroot、user/PID/mount namespace、fresh procfs、最小`/dev`、`/tmp` tmpfsを要求する。実効outer argvはlauncher内部で組み立て、profileから任意mount・binary・optionを注入できないよう検証する。
+3. outer network namespaceは作らない。Codex親processは許可されたモデルAPIへ通信する。Codexのinner `workspace-write` sandboxではshell/network accessを無効にし、TCP socket、DNS、AF_UNIX、WSL interop、localhost等をprobeする。Codex設定で内側shellだけを制限できない、またはnegative testが失敗した場合は`isolation_unverified`としてlive評価を拒否する。既存テストの一宛先失敗を全経路遮断の証拠にしない。
+4. workspace sourceと固定Skill/targetはouter mountでread-onlyにする。`.qa-eval-output/`、inner Codex準備に必要と実測した一時領域（必要ならattempt専用`.git`）だけを書込み可能にし、Codex workspace-writeと整合することをformal launcher経路で検証する。準備領域を増やしてもsourceが変更可能ならその構成は不適合とする。Agent開始前後のsource manifestを比較し、変化があれば結果を無効化する。
+5. 一時`CODEX_HOME`には必要最小限の認証だけを複製する。ホストの`~/.codex`、秘密内容・hash、生environmentは公開・保存しない。ただし過去の合成検証ではCodex shellから合成認証を読めたため、実認証も可視となる残留リスクをREADME/profile/reportへ記録する。実認証・model API利用は別途承認を確認するまで実行しない。
+6. Agent/Judge/Repairは同じlauncher実装を使うが、modeごとに別process、別outer bwrap、別workspaceとtemp `CODEX_HOME`を作る。Judge rootにsanitized target・Agent側workspace・Agent側`CODEX_HOME`をmountせず、stdin promptだけを入力とする。Judgeではshell / MCP / Skill roots / web searchを無効化し、JSONL内tool eventは`judge_unverified`にし、raw JSONLは保存しない。
+7. formal launcherとprobe経路に、固定sentinelを使う正常・拒否probeを実装する。FD、path/symlink、mount、namespace、procfs、read/write、network、WSL interop、他mode root、profile/binary/evidence改ざんを確認し、各実観測・exit codeを証拠として保存する。欠落・不一致・cleanup failureはfail-closedとする。
+8. 合成データの全必須negative testが成立し、formal launcherから認証なし`codex sandbox --permission-profile :read-only` smokeが成功した場合に限り、sandbox実行条件を`verified`候補とする。live `codex exec`、実Agent/Judge品質評価、実credential使用は今回の移行と分け、必要な承認がない限り開始しない。
 
 ### 10. Skillの実使用を確認できた範囲で記録する
 
@@ -482,7 +476,7 @@ scripts/skills/evals/agent/
 - stdout / stderr / exit codeを返す
 - `shell=True`を使わない
 - Agentにはprofileの`agent.timeout_seconds`（必須の正の整数）、Judgeには`judge.timeout_seconds`を独立に適用し、timeout / process failureをexecution errorへ正規化する
-- timeout時はPOSIX process group / Windows process treeの子孫とDocker launcherが起動したcontainerを終了・回収し、後続batchへ進む
+- timeout時はPOSIX process groupとouter bwrap配下の子孫を終了・回収し、run別一時rootを回収して後続batchへ進む
 - Agent SDKやCodex固有flagを持たない
 
 ### `run.py`
@@ -564,7 +558,7 @@ promptに含めないもの:
 
 これらはEvaluator側にのみ存在します。`rubric.json`は評価対象Agentへ渡しません。`task.md`には期待するQA成果物の正解を含めません。
 
-独自sandboxは実装せず、実Codex smokeのファイルアクセス隔離は先述したLinux Docker構成に統一します。Codex自身のsandbox設定はその内側で固定し、ホストとの読み取り禁止境界の代わりとしません。
+実Codex smokeのファイルアクセス隔離は先述したWSL2 outer bubblewrapとCodex inner Linux sandboxに統一します。Codex自身のsandbox設定は内側のshell境界として固定し、outer mountによるEvaluator隔離の代わりとしません。
 
 ## CLI契約
 
@@ -676,9 +670,9 @@ v1では生成AgentをCLI末尾の`--agent-command <argv...>`で起動し、Judg
 
 JudgeのcwdはEvaluatorが作成する`evaluator-judge-workspace`に固定する。固定Evaluator版`build_judge_prompt()`で構築したEval Input / Reference / rubric / Candidate OutputをUTF-8 stdinで渡し、stdoutには既存`semantic/result.py`が解釈できるJudge JSONだけを返す。`judge.timeout_seconds`は正の整数で、初回Codex Judgeの既定は600秒とする。終了コード非0・timeout・JSON不正はJudge execution errorにし、生成Skillの品質FAILへ変換しない。
 
-**新ランナーの両フェーズは、既存`semantic/run.py`をsubprocessとして起動しない。** 固定Evaluatorの`build_judge_prompt()`と`normalize_judge_response()`を直接再利用し、共通`executor.py`がJudge subprocessのstdin・stdout・timeoutと終了を管理する。フェーズ1は従来どおり各semantic caseを1回採点する。フェーズ2では同じ固定Judge profile / `judge.command_argv`を使いつつ、`QTS-SEM-001/002`と`QTS-SEM-003..010`を**独立した2回のJudge呼び出し**とし、後者のCandidate Outputには検証済み`qa_artifact`本文と必須成果物欠落表示だけを渡す。`routing[]`・`final-message.md`・固定機械判定要約は`001/002`側だけに渡し、rubricも各呼び出しの対象criterionだけを含める。Linux / POSIXでは`start_new_session=True`でprocess groupを作り、timeout時にgroup全体へTERM・必要ならKILLする。Windowsでは子孫を含むprocess treeを`taskkill /T /F`等のOS機能で終了する。Docker Judgeの場合はlauncherが実行中コンテナを`docker rm -f`で終了・削除する。終了確認、出力サイズ制限、安全化を行い、エラーattemptを保存して次caseを継続する（共通環境自体が実行不能なら停止）。既存の単独用`semantic/run.py`は変更せず、Judgeコマンドのstdin / JSON stdout / result正規化契約を共有する。
+**新ランナーの両フェーズは、既存`semantic/run.py`をsubprocessとして起動しない。** 固定Evaluatorの`build_judge_prompt()`と`normalize_judge_response()`を直接再利用し、共通`executor.py`がJudge subprocessのstdin・stdout・timeoutと終了を管理する。フェーズ1は従来どおり各semantic caseを1回採点する。フェーズ2では同じ固定Judge profileを使いつつ、`QTS-SEM-001/002`と`QTS-SEM-003..010`を**独立した2回のJudge呼び出し**とし、後者のCandidate Outputには検証済み`qa_artifact`本文と必須成果物欠落表示だけを渡す。`routing[]`・`final-message.md`・固定機械判定要約は`001/002`側だけに渡し、rubricも各呼び出しの対象criterionだけを含める。各Judgeは独立したWSL2 outer bwrap namespaceとprocessで起動する。POSIXでは`start_new_session=True`でprocess groupを作り、timeout時にgroup全体へTERM・必要ならKILLする。終了確認、出力サイズ制限、安全化を行い、エラーattemptを保存して次caseを継続する（共通環境自体が実行不能なら停止）。既存の単独用`semantic/run.py`は変更せず、Judgeのstdin / JSON stdout / result正規化契約を共有する。
 
-実Codex smokeのJudgeは**生成Agentとは別の使い捨てDockerコンテナ**に固定する。生成側とは別の一時`CODEX_HOME`に、秘密を含まない固定`config.toml`と必要最小限の認証だけを配置する。固定image digest、Codex CLI version、model ID、推論設定、tool / MCP、sandbox / approval、web検索の無効化をpreflightで照合する。Judgeコンテナにはsanitized target・Agent側workspace・Agent側`CODEX_HOME`・Evaluator checkout・Docker socketをmountせず、stdinで受け取るJudge promptだけを評価入力とする。Judge側に必要な`/tmp`等の一時領域を用意し、モデルAPI以外のtoolは評価に使用しない。Judge専用launcherは`codex exec --json`の進行ログを分離し、最終Judge JSONだけを共通executorのstdoutへ返す。生成launcherと同一のargvやcontainerを流用しない。
+実Codex smokeのJudgeは**生成Agentとは別の使い捨てWSL2 outer bubblewrap**に固定する。生成側とは別の一時`CODEX_HOME`に、秘密を含まない固定`config.toml`と必要最小限の認証だけを配置する。固定Codex/bwrap digest、CLI version、model ID、推論設定、tool / MCP、sandbox / approval、web検索の無効化をpreflightで照合する。Judge rootにsanitized target・Agent側workspace・Agent側`CODEX_HOME`・Evaluator checkout・host homeをmountせず、stdinで受け取るJudge promptだけを評価入力とする。Judge側に必要な`/tmp`等の一時領域を用意し、inner shellをnetwork制限する。Judge launcherは`codex exec --json`の進行ログをmemory内で解析し、最終Judge JSONだけを共通executorのstdoutへ返す。Agentと同じlauncher実装をmode別に使っても、argv・namespace・workspace・認証領域は共有しない。
 
 Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実効tool / MCP・指示の確認根拠、stdout変換、timeout / cleanup結果をprovenanceへ記録する。Judgeの追加Skill・外部指示・MCP等を確実に排除したと確認できないrunは`unverified`として直接比較しない。非公開のprovider-side model更新は確認済み設定と区別して制約として記録する。別モデルを使うときは`judge.command_argv`を含むprofileを明示的に変更し、条件の異なるrunは直接比較しない。
 
@@ -688,7 +682,7 @@ Judgeの非秘密command fingerprint、image / CLI / model / 推論設定、実�
 生成とJudgeの実行は次の独立した経路に固定する。
 
 ```text
-生成: CLI --agent-command → Docker内Agent → output.md / QA成果物
+生成: CLI --agent-command → WSL2 outer bubblewrap → Codex inner sandbox Agent → output.md / QA成果物
 採点: フェーズ1は既存semantic caseを1回Judge評価。フェーズ2はworkflow(001/002)・QA成果物(003..010)の各Judge prompt生成 → 各々profile.judge.command_argv（独立process / session） → criterion集合を個別検証 → 10件を結合 → 既存result.pyで全体判定
 ```
 
@@ -819,7 +813,7 @@ batchは途中1件が失敗しても残りcaseを実行し、最後に全体結�
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/scenario.json`
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/task.md`
 - `scripts/skills/evals/agent/scenarios/qa-training-store-checkout-payment-web-v1/rubric.json`
-- `scripts/skills/evals/agent/tools/codex_docker_launcher.py`（手動の実Codex smoke専用。共通executorからは外部argvとして呼ぶ）
+- `scripts/skills/evals/agent/tools/codex_wsl2_bwrap_launcher.py`（Agent/Judge/Repair共通の固定実行・証拠保存launcher）
 - `scripts/skills/evals/agent/verifier_capture.py`（フェーズ2に配置する評価専用stdin / stdout記録用。Skill本体を変更しない）
 - `scripts/skills/evals/agent/common_runtime_checks.py`（フェーズ2の固定Evaluator共通機械契約。既存validatorの純粋な検査部品を再利用し、候補の`valid`から独立して判定）
 - `scripts/skills/evals/agent/README.md`（実行profile、`artifact-index.json`の`routing[]` / `artifacts[]`、成果物品質比較とSkill改修効果の判断規則、未確認時の報告方法を記載）
@@ -856,7 +850,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 
 - 固定Evaluator SHAと候補Skill SHAを独立に指定でき、dirty Evaluatorを拒否し、候補Git treeから実ファイルを選択する
 - execution profileの必須項目（`agent.timeout_seconds`と`judge.timeout_seconds`は正の整数）・実効設定との不一致・検証不能時の比較不可を確認する
-- fake Agentの無応答・子孫process残存を制限時間で停止し、containerを回収してexecution errorへ分類する。batch後続処理を継続し、Agent timeout値の違うrunは同条件として比較しない
+- fake Agentの無応答・子孫process残存を制限時間で停止し、outer bwrap process treeと一時領域を回収してexecution errorへ分類する。batch後続処理を継続し、Agent timeout値の違うrunは同条件として比較しない
 - Evaluator-only sentinelのread-denial preflightをfake Agentで検証し、`cwd`変更だけでは合格させない
 - Eval Inputがstdin promptへ含まれる
 - 対象Skill名とSkill pathがpromptへ含まれる
@@ -869,7 +863,7 @@ fake Agent subprocessを使って少なくとも次を検証します。
 - batchで1件失敗しても残りcaseを継続する
 - `--repeat`でattemptを独立保存する
 - 候補runtime実装のfingerprintと候補sourceを照合し、固定Evaluator側実装fingerprintへ誤照合しない。既存graderの通常CLIは従来の評価動作を維持する
-- フェーズ1 semanticでは生成用Docker launcherをJudgeとして誤使用せず、profileに定義された独立Judge commandへUTF-8 Judge promptを渡す。Judge JSON不正・非0終了・timeoutを実行エラーとして区別する
+- フェーズ1 semanticでは生成用Agent modeをJudgeとして誤使用せず、profileに定義された独立Judge modeへUTF-8 Judge promptを渡す。Judge JSON不正・非0終了・timeoutを実行エラーとして区別する
 - 入出力証拠の欠落をSkill品質failにせず`evidence_unverified`と分類する。実際の`valid=false`と区別する。semantic passでも必須runtime / artifact分類・workflow判断の証拠が欠ければattemptが`needs_review`・exit 1となり、Runner障害ならexit 2となる
 - 正常・重要欠落・根拠のない動作を含む評価専用fixtureを使い、semantic Judgeの判定方向と根拠を確認する
 - 異なるSkill revisionを同じ固定graderで採点し、比較条件が異なる結果は`not_comparable`にする。比較条件一致・成果物品質差・変更対象Skillの使用証拠の有無を別々に報告し、単発の結果・相反する複数attempt・未使用観測ではSkill改修効果を確定しない
@@ -1024,7 +1018,7 @@ git diff --check
 4. `prompt_builder.py`で生成prompt契約を実装し、Reference / expected / rubricを渡さないtestを追加する
 5. `run.py`へ単一caseのAgent subprocess実行と成果物保存を実装する
 6. deterministic単一caseを既存graderへ接続する
-7. semantic単一caseを固定Evaluator側graderへ接続し、生成用`--agent-command`とprofileの`judge.command_argv`を**別process・別cwd・別Docker環境**で起動する。共通`executor.py`がtimeout時に子孫process / containerを停止し、Judge errorを別軸で保存する。両stageの実効設定を記録する
+7. semantic単一caseを固定Evaluator側graderへ接続し、生成Agent modeとprofileのJudge modeを**別process・別cwd・別outer bwrap namespace**で起動する。共通`executor.py`がtimeout時に子孫processと一時領域を停止・回収し、Judge errorを別軸で保存する。両stageの実効設定を記録する
 8. Skill単位batch、`--skill all`、`--repeat`、結果集計、exit codeと、Evaluator固定・Skill SHA・実効設定profile・隔離preflightによる比較可否判定を追加する
 9. fake Agentを使った共通unit / repository integration testを完成させる
 10. `.gitignore`、`EVALS.md`、`README.md`、`PROJECT_CONTEXT.md`を現在実装へ同期する
@@ -1101,7 +1095,7 @@ native trigger評価は、Skill activationを観測する方法がAgentクライ
 - fake Agentを使うrunner unit / integration testがpassする
 - 既存deterministic / runtime / semantic / trigger testがpassする
 - 通常GitHub Actionsで外部LLMを呼ばない
-- Linux Docker上の実Codex smokeで、image / CLI / 認証・必要なモデルAPI通信・Evaluator-only領域の読み取り拒否とsource / Skillの書込み拒否・Judge独立実行・非秘密実行profileを検証している。公開資料へのegress制御の有無は残留リスクとして記録し、それだけを理由に比較不能としない
+- WSL2 outer bubblewrapとCodex inner sandboxを通る実Codex synthetic smokeで、package / CLI / bwrap digest、認証なしsandbox起動、Evaluator-only read denial、source write denial、許可output write、namespace/procfs、FD、path/symlink、network、Judge独立性、非秘密実行profileを検証している。実認証はshellから参照できる残留リスクとして記録し、承認なしのlive API評価は行わない
 - `TC-OUT-001`、`TCN-OUT-001`、`TC-SEM-001`、`WF-SEM-003`を実Codexで同branch上から実行し、生成・保存・grader起動・結果集計まで完了する
 - 実Codex smokeでrunner起因の未処理エラーが0件
 - 実Codexの非pass結果がある場合、その結果を隠さず保存・報告できる

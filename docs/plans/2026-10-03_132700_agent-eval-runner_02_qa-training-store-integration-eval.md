@@ -8,6 +8,12 @@
 
 初回評価結果はSkill改善のbaselineとして利用します。分析・修正・再評価は親Planの[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)に従い、条件を満たすものだけ自動で進めます。根拠不足や高リスクはレビュー待ちに分け、検証済み候補でも自動採用しません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。リポジトリ内の全Skillの実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
 
+## 2026-10-24 実行方式の更新
+
+Agent、Judge、修正Agentは親PlanのWSL2 Ubuntu上の二重bubblewrap契約を使用する。評価用の実行本体はWSL2 clean checkoutから起動し、Windows開発checkoutや`/mnt/c`をAgent/Judgeへ公開しない。outer bwrapは必要なruntimeとsanitized target、候補Skill、attempt output、mode別一時`CODEX_HOME`だけをmountし、Evaluator原本と固定target sourceはmountしない。targetと固定Skillはouter mountでもread-onlyにし、許可outputとCodexの実行に必要と実測された一時領域だけをwrite可能にする。
+
+QTSのproduction verifier captureとcandidate verifier replayはCodexを実行しないため、既存の固定Docker verifier image、image ID、`--network none`、verifier契約を維持する。QTS Agent/Judgeの実行方式とverifierの実行方式を混同しない。実Agent起動前に固定Evaluator・target revision、候補Skill manifest、profile schema 2と新方式の`verified` evidenceを照合する。1つでも不足・不一致ならattemptを`isolation_unverified`として正式評価に進めない。
+
 ## 対象
 
 - 評価側: `ryu-yoshikawa-pro-vision/qa-workflow-skills`
@@ -192,7 +198,7 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 - Agent-visibleなSkillはEvaluatorが配置した`qa-workflow-skills`の候補revisionから取得したSkill集合だけ
 - 規範仕様の優先順位は`docs/spec/README.md`に従う
 - Product Code、既存Product Test、規範仕様を変更しない
-- 評価成果物の書込みはEvaluatorが指定した`.qa-eval-output/`だけに限定する（source / Skill / 評価用設定はDockerで書込み禁止）
+- 評価成果物の書込みはEvaluatorが指定した`.qa-eval-output/`だけに限定する（target source / 固定Skill / 評価用設定はouter bubblewrapのread-only mountで書込み禁止）
 - `artifact-index.json`の`artifacts[]`に実ファイルを、`routing[]`にSkill / scopeごとの実行・再利用・省略・blocked・未完了判断と理由を登録する形式のみ指示する。正解となるrouting一覧・期待QA成果物本文は与えない
 - commit / push / PR作成等のGit mutationを行わない
 - Evaluator側のReference / expected / rubric / graderを探索しない
@@ -215,9 +221,10 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 sanitized targetは単なるファイルコピーであり、`cwd`の変更だけではEvaluator側Reference / rubricや元targetの秘密情報への読み取りを禁止できません。
 
 - Agent subprocessはsanitized targetを`cwd`にして起動する。評価側の原本・grader・Judge資料・採点結果・元target checkoutを、Agentがアクセス可能なファイルシステム、追加のtool / MCP / mount、ネットワーク経路から隔離する。
-- 親PlanのLinux Docker構成を使用し、Evaluator原本の非mountによる読み取り隔離を維持する。target workspace全体を**読み取り専用mount**にし、`.qa-eval-output/`に重ねるattempt専用mountだけを書込み可能にする。Codex自身のread-only sandboxはホスト側Evaluator隔離の代わりにしない。独自sandboxは実装しない。
-- 同じ権限・mount・tool構成で、Evaluator側に置いた**非秘密の検証用sentinel**の読み取り拒否と、意図しないuser/global Skill・指示・MCPの混入がないことを実Agent smokeで確認し、根拠をrunへ記録する。fake Agentではrunnerの権限分離配線とfail-closeを検証するが、それだけで実Codexの分離成立を証明したとはしない。
-- ローカルEvaluator資料のread-denial、source / Skillのwrite-denial、余分なSkill / MCP / web検索の無効化を確認できないrunは`isolation_unverified`として比較から除外する。モデルAPI通信に必要な外部アクセス可能性だけが残る場合は、profileへ条件・残留リスクを記録し、その理由だけで比較不可にしない。秘密情報はログ・provenanceへ記録しない。JudgeはAgentコンテナ外のEvaluator側で、親Planの独立した`judge.command_argv`と固定cwdで起動する。
+- 親PlanのWSL2 outer bubblewrap + Codex inner Linux sandboxを使う。target workspace sourceをouter mountでread-onlyにし、`.qa-eval-output/`だけにattempt専用write mountを重ねる。inner Codex sandboxはshell境界であり、Evaluator隔離はouter mountが担当する。inner workspace-writeが要求する`.git`等の一時writeについては、必要な専用場所だけを別mountして実測し、sourceをwrite可能にしない。
+- 同じmode・実効mountでEvaluator-onlyの非秘密sentinel、Windows sentinel、他attempt領域のread denial、source write denial、output write許可、FD非継承、namespace/procfsとtool/MCP混入なしをsynthetic probeとformal launcherから確認し、証拠をrunへ記録する。fake Agentだけでは実Codex境界の成立と扱わない。
+- outer networkはCodex親processのmodel API通信用に維持し、inner shellのTCP/DNS/AF_UNIX/WSL interop/localhostを遮断する。試行した宛先1件だけの失敗をegress遮断とみなさない。auth shell可視性は残留リスクとして記録し、実認証・model API評価は別途承認なしに行わない。
+- Evaluator資料のread-denial、source/Skill write-denial、inner shell network制限、余分なSkill/MCP/web検索の無効化を確認できないrunは`isolation_unverified`として比較から除外する。JudgeはAgentとは別process・別outer namespace・別workspace・別一時`CODEX_HOME`で起動し、Agent workspaceをmountしない。秘密情報はログ・provenanceへ記録しない。
 
 ## source変更の扱い
 
@@ -229,7 +236,7 @@ baseline固定のため、sanitized targetでfresh Git repositoryを初期化し
 
 その後、Evaluatorはsanitized targetの`.qa-eval-output/`を空のmount pointとして作成し、別のattempt専用ホストディレクトリをその位置へ書込み可能mountとして重ねます。Agentへの永続書込み先はこの出力rootだけに固定し、sourceへの書込みを許可しません。
 
-Agent実行前に、baseline commitのあるsanitized targetをDocker内で**読み取り専用**にmountします。`.qa-eval-output/`は事前に作成したmount pointへattempt専用の書込み可能rootを重ね、`/tmp`と一時`CODEX_HOME`以外の書込みを禁止します。評価用`AGENTS.md`、`docs/PROJECT_CONTEXT.md`、製品Code / Test / Spec、配置Skill、`.git/`も読み取り専用です。Agentの指示遵守や終了後の差分確認だけに不変性を依存させません。実行中に書いて元へ戻す操作もOS側で拒否します。
+Agent実行前に、baseline commitのあるsanitized targetをouter bwrap内へ**読み取り専用**でmountします。`.qa-eval-output/`は事前作成したmount pointへattempt専用のwrite rootを重ねます。Codex inner workspace-writeの準備に必要な`.git`等の一時領域が実測で必要な場合は、専用attempt領域のみを分離してwrite可能にし、`AGENTS.md`、`docs/PROJECT_CONTEXT.md`、製品Code / Test / Spec、配置Skillはread-onlyを維持します。`/tmp`と一時`CODEX_HOME`を含む全write範囲を明示し、Codexが必要とするmountを理由にsource全体をwrite可能にしません。Agentの指示遵守や終了後の差分確認だけに不変性を依存させません。
 
 終了後はsynthetic baseline commitとのGit差分に加え、Agent-visible workspaceに存在する**tracked / untracked / ignored fileすべて**のrelative path・size・SHA-256・symlinkを開始前manifestと照合します。Gitの`.gitignore`にある`dist/`、`output/`、`test-results/`などを差分検査から除外せず、許可外の追加・変更・削除を検出します。`.qa-eval-output/`の内容は別の成果物回収処理で検証します。許可外変更、Git commit、Git remoteや想定外の書込みmountがあれば有効なSkill比較へ昇格せず、runに根拠を保存します。
 
@@ -483,7 +490,7 @@ scenario定義は現在の`qa-training-store`初回評価を再現するため�
 **候補Skillのproduction verifier再実行と、固定Evaluatorの共通機械判定を別の処理経路とする。** フェーズ2にはSkill-local eval datasetの`expected.json`がないため、`deterministic/run.py`へ架空eval IDを追加しない。
 
 1. Agent実行時には既存Skillの`runtime_contract.py` / `workflow_runtime.py`呼び出しを`verifier_capture.py`で記録し、実際に使われたrequest・result・終了コードを回収する。
-2. Evaluatorは親Planで指定した**別Dockerコンテナ**に候補Git tree由来のsourceを読み取り専用mountして同じrequestを再実行する。Evaluator checkoutやReferenceはmountしない。再実行は候補の鮮度・再現性の確認であり、その`valid`を固定品質基準へ代入しない。
+2. Evaluatorは親Planで指定した**別のnetwork-none Docker verifier container**に候補Git tree由来のsourceをread-only mountして同じrequestを再実行する。Evaluator checkoutやReferenceはmountしない。これはCodexを起動しない従来verifier契約であり、再実行は候補の鮮度・再現性の確認だけに使い、その`valid`を固定品質基準へ代入しない。
 3. **固定Evaluator**の`common_runtime_checks.py`が、回収済みartifact・同一attemptのnormalized input・Runtime Input / Result・Machine Entityを入力として固定schemaと依存・参照・graphの不変条件を検査する。再利用元は固定Evaluatorの`deterministic/runtime_validator.py`の純粋なparser / fingerprint assertionと、固定した`coverage-analysis/scripts/traceability.py`のgraph / closure規則である。候補コードをEvaluator process内でimportせず、候補`valid`を条件分岐に使わない。
 4. 検査項目は、Runtime Input / Result pairのschema・identity・fingerprint再計算、runtime unit / Machine Entityの重複・欠落、stable ID一意性、既存Entity / unitへの依存参照、Authority → TR → TCN → CI → TCの到達・孤立・重複edge、coverage / 未閉鎖、`qa-workflow`の必要scopeと`can_complete`の整合とする。TCNからCIを経る場合と既存契約上の許容edgeは既存fixed graph validatorに従う。`current_structure_state`は保存値と実際のEntity / runtime状態との一致を固定基準で確認する。
 5. フェーズ2の必須範囲はEvaluator側scenarioに固定した`BR-CHECKOUT-001..003`と`AC-CHECKOUT-001..003`および実際のworkflow routingとの照合で決める。Agentがnormalized inputに重要Authorityや工程を記載しなかっただけで期待集合を縮小しない。scope不足・証拠不足・正当なblockedは区別し、未完了を成功にしない。
@@ -607,11 +614,11 @@ Agent executionは、Eval dataset由来のpromptでも、固定対象repo向けp
 6. 元`docs/PROJECT_CONTEXT.md`を除外し、正規stable keyを持つ評価用`AGENTS.md`と評価用`docs/PROJECT_CONTEXT.md`を生成・検証する
 7. 候補`qa-workflow-skills` revisionのSkill集合を`.agents/skills/`へ配置する
 8. sanitized targetをfresh Git repositoryにし、Evaluator-owned synthetic baseline commitを作成する
-9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、`artifact-index.json`の`artifacts[]` / `routing[]`契約、Agentの必須`timeout_seconds` / Judgeの独立Docker profile・timeout条件をrun provenanceへ記録する
+9. `.qa-eval-output/`を作成し、Checkout / Payment評価要求、`artifact-index.json`の`artifacts[]` / `routing[]`契約、Agentの必須`timeout_seconds` / Judgeの独立WSL2 profile・timeout条件をrun provenanceへ記録する
 10. 各repeatの新規target / Agent sessionで実Agentを起動し、分析・設計workflowを実行する。使用証拠の観測可否を記録する
 11. 読み取り専用mountでProduct Code / Test / Spec / Skill / 評価用設定の書込みを拒否したことを検証し、終了後にtracked / untracked / ignoredを含むbaselineとの差分・追加commitを確認する
 12. 固定scenarioの要求結果を基準に`artifact-index.json`の`routing[]`・`artifacts[]`を既存Skill条件と実fileに照合する。QA成果物・runtime証拠・内部fileを分類した`artifact-manifest.json`を作り、routing登録不足・分類不能と実際の未生成を区別して回収する
-13. 固定要求とrouting判断・成果物を照合し、条件付き省略の正当性を検証して、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierをネットワークなしの別Docker内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する
+13. 固定要求とrouting判断・成果物を照合し、条件付き省略の正当性を検証して、捕捉済みartifact・request / result / invocationを対応付ける。候補tracked source版verifierを従来どおりnetwork-none Docker verifier内で再実行し、固定Evaluatorの`common_runtime_checks.py`で独立機械判定する。Codex Agent/Judge launcherはここでは使わない
 14. 固定Judgeを**2回独立に実行**する。`QTS-SEM-001/002`には正規QA成果物・`routing[]`・最終stdout・機械判定要約、`QTS-SEM-003..010`には正規QA成果物のみ（欠落表示を含む）を渡す。各Judge応答を対応criterion集合で検証し、結合結果を既存normalizerで全体判定する。各呼び出しのtimeout・子孫終了・追加tool排除を確認する
 15. workflow / traceability / semantic結果とprovenanceを同じrunへ保存する
 16. runner / environment起因の失敗、Skill品質上のnon-pass、`evidence_unverified`、隔離・実効設定未確認、部分的Evaluator非互換を分けて報告する。必須証拠が未確認ならsemantic passでもattempt `needs_review` / exit 1、Runner障害ならexit 2とする。Skillの内部使用ログだけが`unverified`なら成果物品質比較を妨げない

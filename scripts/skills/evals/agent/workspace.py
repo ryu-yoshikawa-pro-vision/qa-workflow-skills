@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import subprocess
 import tarfile
@@ -126,8 +127,8 @@ def _validate_profile(value: Any) -> None:
     root = _required_object(
         value, {"schema_version", "agent", "judge", "isolation", "verification"}, "root"
     )
-    if root["schema_version"] != 1:
-        raise AgentEvalError("execution profile schema_version must be 1")
+    if isinstance(root["schema_version"], bool) or root["schema_version"] not in {1, 2}:
+        raise AgentEvalError("execution profile schema_version must be 1 or 2")
     agent = _required_object(
         root["agent"],
         {
@@ -216,6 +217,55 @@ def _validate_profile(value: Any) -> None:
         raise AgentEvalError(
             "execution profile must declare evaluator read access blocked"
         )
+    if root["schema_version"] == 2 and isolation["method"] != "wsl2-dual-bubblewrap":
+        raise AgentEvalError(
+            "schema 2 execution profile must use WSL2 dual bubblewrap"
+        )
+    if root["schema_version"] == 2:
+        if agent["name"].strip().lower() != "codex":
+            raise AgentEvalError("schema 2 Agent must use the pinned Codex CLI")
+        if judge["command_argv"] != ["codex"]:
+            raise AgentEvalError("schema 2 Judge command must be the fixed Codex template")
+        for label, value in (("agent", agent["cli_version"]), ("judge", judge["cli_version"])):
+            if not re.search(r"\b0\.163\.0\b", value):
+                raise AgentEvalError(
+                    f"schema 2 {label} CLI version must be Codex 0.163.0"
+                )
+        if agent["sandbox_policy"] != "workspace-write":
+            raise AgentEvalError("schema 2 Agent sandbox must be workspace-write")
+        if judge["sandbox_policy"] != "read-only":
+            raise AgentEvalError("schema 2 Judge sandbox must be read-only")
+        if agent["tools"] != ["shell"]:
+            raise AgentEvalError("schema 2 Agent may use only the sandboxed shell tool")
+        if agent["skill_roots"] != ["/workspace/.agents/skills"]:
+            raise AgentEvalError("schema 2 Agent Skill root must be the sanitized workspace")
+        if any(
+            item["network_policy"] != "codex-parent-host-network-inner-shell-denied"
+            for item in (agent, judge)
+        ):
+            raise AgentEvalError("schema 2 network policy must separate Codex and shell access")
+        if agent["mcp_servers"] or judge["mcp_servers"]:
+            raise AgentEvalError("schema 2 profile may not enable MCP servers")
+        if judge["tools"] or judge["skill_roots"]:
+            raise AgentEvalError("schema 2 Judge may not receive tools or Skills")
+        if agent["launch_options"] or judge["launch_options"]:
+            raise AgentEvalError("schema 2 Codex launch options are launcher-owned")
+        disabled_config = {"none", "disabled", "no-global-config"}
+        disabled_instructions = {
+            "none",
+            "disabled",
+            "no-external-instructions",
+        }
+        if any(
+            str(item.get(field, "")).strip().lower() not in disabled_config
+            for item in (agent, judge)
+            for field in ("global_config",)
+        ) or any(
+            str(item.get("external_instructions", "")).strip().lower()
+            not in disabled_instructions
+            for item in (agent, judge)
+        ):
+            raise AgentEvalError("schema 2 profile must disable host Codex configuration")
 
     verification = _required_object(
         root["verification"], {"status", "method", "evidence_path"}, "verification"
@@ -240,6 +290,8 @@ def verify_profile_evidence(
     verification = profile["verification"]
     if verification["status"] != "verified":
         return False
+    if profile.get("schema_version") != 2:
+        return False
     evidence_path = Path(verification["evidence_path"])
     if evidence_path.is_absolute() or ".." in evidence_path.parts:
         raise AgentEvalError("verification evidence path must stay under output root")
@@ -257,12 +309,25 @@ def verify_profile_evidence(
     checks = evidence.get("checks")
     required = {
         "evaluator_read_denied",
+        "host_home_read_denied",
+        "other_attempt_home_read_denied",
+        "windows_filesystem_read_denied",
         "source_write_denied",
+        "output_write_allowed",
+        "inherited_fd_denied",
+        "symlink_escape_denied",
+        "fresh_procfs",
+        "nested_namespaces",
+        "inner_shell_network_blocked",
         "extra_tools_disabled",
         "mounts_reviewed",
+        "agent_judge_separated",
+        "timeout_cleanup",
     }
     if (
         evidence.get("status") != "verified"
+        or evidence.get("schema_version") != 2
+        or evidence.get("execution_method") != "wsl2-dual-bubblewrap"
         or evidence.get("probe") != "scripts/skills/evals/agent/isolation_probe.py"
         or evidence.get("profile_fingerprint") != profile_fingerprint(profile)
         or evidence.get("judge_command_fingerprint")
@@ -275,6 +340,33 @@ def verify_profile_evidence(
         or not isinstance(checks, dict)
         or not required.issubset(checks)
         or any(checks[key] is not True for key in required)
+        or not isinstance(evidence.get("runtime"), dict)
+        or evidence["runtime"].get("package_sha512")
+        != "bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3"
+        or not isinstance(evidence.get("mode_evidence"), dict)
+        or set(evidence["mode_evidence"]) != {"agent", "judge", "repair"}
+        or any(
+            not isinstance(mode, dict)
+            or mode.get("status") != "verified"
+            or mode.get("mode") not in {"agent", "judge", "repair"}
+            or mode.get("profile_fingerprint") != profile_fingerprint(profile)
+            for mode in evidence["mode_evidence"].values()
+        )
+        or evidence.get("mode_evidence", {}).get("agent", {}).get("mode") != "agent"
+        or evidence.get("mode_evidence", {}).get("judge", {}).get("mode") != "judge"
+        or evidence.get("mode_evidence", {}).get("repair", {}).get("mode") != "repair"
+        or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(evidence.get("runtime", {}).get("codex_sha256", "")),
+        )
+        or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(evidence.get("runtime", {}).get("bwrap_sha256", "")),
+        )
+        or evidence.get("runtime", {}).get("package_version") != "0.163.0-linux-x64"
+        or not isinstance(evidence.get("details"), dict)
+        or evidence.get("details", {}).get("authentication_shell_visible_risk") is not True
+        or evidence.get("details", {}).get("model_api_used") is not False
     ):
         raise AgentEvalError(
             "profile evidence does not verify required isolation checks"
@@ -338,6 +430,13 @@ def verify_agent_docker_command(
     evaluator_root: Path,
 ) -> dict[str, Any]:
     """Require a direct Docker argv with a read-only Agent workspace and one output mount."""
+    if argv == ["codex"]:
+        return verify_agent_wsl2_command(
+            argv,
+            workspace=workspace,
+            output_root=output_root,
+            evaluator_root=evaluator_root,
+        )
     if (
         len(argv) < 3
         or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
@@ -485,6 +584,8 @@ def verify_judge_docker_command(
     argv: list[str], *, evaluator_root: Path
 ) -> dict[str, Any]:
     """Require a fresh Judge container that receives only the prompt over stdin."""
+    if argv == ["codex"]:
+        return verify_judge_wsl2_command(argv, evaluator_root=evaluator_root)
     if (
         len(argv) < 3
         or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
@@ -581,6 +682,14 @@ def verify_repair_docker_command(
     output_root: Path,
     skill_name: str,
 ) -> dict[str, Any]:
+    if argv == ["codex"]:
+        return verify_repair_wsl2_command(
+            argv,
+            workspace=workspace,
+            skill_root=skill_root,
+            output_root=output_root,
+            skill_name=skill_name,
+        )
     if (
         len(argv) < 3
         or Path(argv[0]).name.lower() not in {"docker", "docker.exe"}
@@ -690,6 +799,8 @@ def verify_repair_docker_command(
 def named_container_command(
     argv: list[str], *, name: str
 ) -> tuple[list[str], list[str]]:
+    if argv == ["codex"]:
+        return list(argv), []
     if any(item == "--name" or item.startswith("--name=") for item in argv):
         raise AgentEvalError("runner owns the temporary Docker container name")
     if len(argv) < 3 or argv[1] != "run":
@@ -706,6 +817,112 @@ def _option_value(argv: list[str], name: str) -> str | None:
         if value.startswith(name + "="):
             return value.split("=", 1)[1]
     return None
+
+
+def _verify_codex_command_template(argv: list[str], *, name: str) -> dict[str, Any]:
+    if argv != ["codex"]:
+        raise AgentEvalError(f"schema 2 {name} command must be the fixed codex template")
+    return {
+        "status": "verified",
+        "execution_method": "wsl2-dual-bubblewrap",
+        "command_template": "codex exec",
+        "shell": False,
+        "fd_inheritance": "closed",
+    }
+
+
+def verify_agent_wsl2_command(
+    argv: list[str],
+    *,
+    workspace: Path,
+    output_root: Path,
+    evaluator_root: Path,
+) -> dict[str, Any]:
+    """Validate the fixed Codex template and isolated host-side roots."""
+    _verify_codex_command_template(argv, name="Agent")
+    original_paths = (workspace, output_root, evaluator_root)
+    for path in original_paths:
+        absolute = Path(os.path.abspath(path.expanduser()))
+        current = Path(absolute.anchor)
+        for part in absolute.parts[1:]:
+            current = current / part
+            if current.is_symlink():
+                raise AgentEvalError("Agent isolation roots may not contain symlinks")
+    workspace = workspace.resolve(strict=True)
+    output_root = output_root.resolve(strict=True)
+    evaluator_root = evaluator_root.resolve(strict=True)
+    if workspace == evaluator_root or workspace.is_relative_to(evaluator_root):
+        raise AgentEvalError("Agent workspace may not be inside the Evaluator checkout")
+    if output_root == evaluator_root:
+        raise AgentEvalError("Agent output may not be inside the Evaluator checkout")
+    if output_root == workspace / ".qa-eval-output":
+        pass
+    elif output_root.is_relative_to(workspace):
+        raise AgentEvalError("Agent output must be a separate attempt root")
+    return {
+        "status": "verified",
+        "execution_method": "wsl2-dual-bubblewrap",
+        "existing_source_entries_read_only": True,
+        "attempt_workspace_root_writable": True,
+        "output_writable": True,
+        "evaluator_mounts": 0,
+        "host_home_mounted": False,
+        "windows_filesystem_mounted": False,
+        "outer_network": "codex_parent_only",
+        "inner_shell_network": "restricted_by_codex_sandbox",
+    }
+
+
+def verify_judge_wsl2_command(
+    argv: list[str], *, evaluator_root: Path
+) -> dict[str, Any]:
+    _verify_codex_command_template(argv, name="Judge")
+    absolute = Path(os.path.abspath(evaluator_root.expanduser()))
+    current = Path(absolute.anchor)
+    if any(
+        (current := current / part).is_symlink() for part in absolute.parts[1:]
+    ):
+        raise AgentEvalError("Evaluator checkout path is invalid")
+    return {
+        "status": "verified",
+        "execution_method": "wsl2-dual-bubblewrap",
+        "fresh_outer_namespace": True,
+        "host_bind_mounts": 0,
+        "prompt_transport": "stdin",
+        "shell_tool": "disabled",
+        "mcp_tools": "disabled",
+        "web_search": "disabled",
+        "inner_network": "restricted_by_codex_sandbox",
+    }
+
+
+def verify_repair_wsl2_command(
+    argv: list[str],
+    *,
+    workspace: Path,
+    skill_root: Path,
+    output_root: Path,
+    skill_name: str,
+) -> dict[str, Any]:
+    base = verify_agent_wsl2_command(
+        argv,
+        workspace=workspace,
+        output_root=output_root,
+        evaluator_root=REPO_ROOT,
+    )
+    skill_root = skill_root.resolve(strict=True)
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", skill_name):
+        raise AgentEvalError("repair Skill name is invalid")
+    expected = workspace.resolve() / ".agents" / "skills" / skill_name
+    if expected.is_symlink() or not expected.is_dir():
+        raise AgentEvalError("repair workspace must contain exactly one Skill mountpoint")
+    if expected.resolve(strict=True) != skill_root:
+        raise AgentEvalError("repair may write only the named workspace Skill candidate")
+    return {
+        **base,
+        "single_skill_writable": skill_name,
+        "output_writable": True,
+    }
 
 
 def profile_fingerprint(profile: dict[str, Any]) -> str:

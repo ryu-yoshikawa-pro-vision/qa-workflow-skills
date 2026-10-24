@@ -2,6 +2,12 @@
 
 この文書は[親Plan](./2026-10-03_132700_agent-eval-runner.md)のフェーズ1・フェーズ2に追加する改善工程の実装契約です。対象repo固有の評価仕様は[フェーズ2Plan](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md)を正本とします。既存の評価ランナー・grader・隔離・比較条件を維持して実装します。
 
+## 2026-10-24 改善Agentの実行境界
+
+分析Agent・修正Agentは、親Planの共通WSL2二重bubblewrap launcherから起動する。semantic/mixed案件とdeterministic-only案件の全分析・修正・候補再評価・独立回帰を対象とし、Docker専用起動経路を残さない。各呼出しは別process・別outer namespace・run別workspace・別一時`CODEX_HOME`を使い、固定Evaluatorと元targetをmountしない。profile/evidenceが現行方式で`verified`でなければAgentを起動しない。
+
+修正Agentは単一の許可Skill候補rootだけを書込み可能にする。許可相対pathは`SKILL.md`、`references/**`、`scripts/**`、`assets/**`に限り、他Skill・Evaluator・target・scenario・rubric・Judge fixtureはread-onlyまたは非公開とする。candidate rootはrunごとに作成し、実行前後manifestと許可path diffを検証する。Codex sandboxの要求によって他sourceまで書込み可能にしない。Codex CLI `0.163.0`、bwrap digest、network boundary、FD、namespace/procfs、timeout/cleanupは親Planの証拠契約に従う。認証情報shell可視性は残留リスクとし、実認証・model API利用は別承認なしに行わない。
+
 ## 目的と完了条件
 
 実Agent評価の保存結果から、Agentが問題を分析して根拠を記録し、十分な根拠があるSkill起因の問題だけを隔離環境で修正・再評価します。原因を確定できないもの、変更リスクが高いもの、再評価で改善が確認できないものは**レビュー待ち**として、必要な判断・証拠・候補差分とともに保存します。
@@ -15,7 +21,7 @@
 - 入力は既存ランナーが保存した`result.json`、ケース別`grade.json`、安全化された成果物・失敗根拠・provenance・既存検査結果です。データ欠落・改ざん・検証不能は推測で補いません。
 - **既存grader / Evaluator**: 正規の品質判定、固定Reference・rubric・expectedの管理、評価条件の整合確認、修正前後の再評価を担当します。Judgeを独立検証した結果の正本は[Judge評価・改善Plan](./2026-10-03_132700_agent-eval-runner_04_judge-evaluation-and-improvement.md)に従います。比較する2 revisionは同一の固定Evaluatorで採点します。
 - **分析Agent**: 評価結果・成果物・公開可能なSkill sourceの根拠から問題を分類し、原因仮説と対象箇所・修正方針を記録します。Agentの説明や自称の確信度は事実や合否の根拠になりません。
-- **修正Agent**: 下記の自動修正条件を全て満たした案件だけ、隔離した候補Skill作業領域で最小差分を作ります。Agent subprocessの実行には既存`executor.py`を再利用し、特定SDKへの依存は追加しません。
+- **修正Agent**: 下記の自動修正条件を全て満たした案件だけ、共通WSL2 launcherと既存`executor.py`を使い、隔離した単一候補Skill作業領域で最小差分を作ります。特定SDKやDocker専用Agent launcherへの依存は追加しません。
 - **改善実行の制御**: 既存ランナー結果の検証、機械的な修正可否判定、許可path検査、テスト、再評価、保存を担当します。LLM自身に許可判定を一任しません。
 - **人間**: レビュー待ちの解決、検証済み候補の採用、既存branchへの取り込みを担当します。修正Agentから採用権限を取りません。
 

@@ -70,6 +70,7 @@ def run_command(
     cwd: Path,
     timeout_seconds: int,
     env: Mapping[str, str] | None = None,
+    inherit_environment: bool = True,
     output_limit_bytes: int = MAX_TEXT_BYTES,
     stderr_limit_bytes: int = 64_000,
     timeout_cleanup_argv: Sequence[str] | None = None,
@@ -91,7 +92,7 @@ def run_command(
         else nullcontext(None)
     )
     with temp_context as execution_temp:
-        launch_env = os.environ.copy()
+        launch_env = os.environ.copy() if inherit_environment else {}
         launch_env["PYTHONIOENCODING"] = "utf-8"
         if env is not None:
             launch_env.update(env)
@@ -138,6 +139,7 @@ def run_command(
                         timeout=15,
                         check=False,
                         shell=False,
+                        close_fds=True,
                     )
                     cleanup_status = (
                         "succeeded" if cleanup.returncode == 0 else "failed"

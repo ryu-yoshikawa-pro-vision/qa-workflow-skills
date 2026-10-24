@@ -2,6 +2,12 @@
 
 [親Plan](./2026-10-03_132700_agent-eval-runner.md)のJudge独立評価・改善を定義する。[Skill改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)と[固定対象評価Plan](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md)を補完する。既存の`semantic/prompt_builder.py`、`result.py`、`rubric.json`、`reference.md`とEvaluator-only fixtureを再利用する。新しいJudge採点方式・Agent runtime・DBは作らない。
 
+## 2026-10-24 Judge実行境界
+
+実JudgeとJudge candidateは親Planの共通WSL2二重bubblewrap launcherを独立Judge modeで使う。Agentとは別process、別outer namespace、別cwd/workspace、別一時`CODEX_HOME`とし、Agent workspaceや修正候補領域をmountしない。Judgeに必要な入力だけstdinで渡し、shell、MCP、追加Skill root、web検索は無効化する。JSONLはmemory内でtool eventを検査し、tool eventがあれば`judge_unverified`とし、raw JSONLは保存しない。
+
+Judge run開始前に、固定Evaluator/target revision、Codex CLI/package/bwrap digest、Judge mode、実効argv・mount/network設定、profile schema 2と一致するfresh isolation evidenceを要求する。Docker由来のprofile/evidenceは新方式をverifiedにしない。通常Judge profileの必要最小限の認証は一時`CODEX_HOME`からshellが読める可能性を残留リスクとして記録し、実認証・model API利用は別途承認なしに行わない。QTS production verifierはCodexを起動しないため、親Planで定めた固定Docker verifier契約のまま維持する。
+
 ## 目的と責務
 
 SkillとJudgeをそれぞれ独立に検証・改善する。**Judge自身の判定だけを正解として、そのJudgeを検証したりSkillを自動修正したりしない。**
