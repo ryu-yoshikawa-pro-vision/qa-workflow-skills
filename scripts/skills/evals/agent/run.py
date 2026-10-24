@@ -32,6 +32,8 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
         is_codex_judge as legacy_is_codex_judge,
+    )
+    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
         launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
     )
     from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
@@ -92,6 +94,8 @@ else:
     )
     from .tools.codex_judge_docker_launcher import (
         is_codex_judge as legacy_is_codex_judge,
+    )
+    from .tools.codex_judge_docker_launcher import (
         launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
     )
     from .tools.codex_wsl2_bwrap_launcher import (
