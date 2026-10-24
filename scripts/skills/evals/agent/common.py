@@ -127,10 +127,11 @@ def capture_codex_judge_output(
             observations = None
         response = stdout
         if not isinstance(observations, dict):
+            safe_response = sanitize_diagnostic(stdout, MAX_TEXT_BYTES)
             return {
-                "response": sanitize_diagnostic(stdout, MAX_TEXT_BYTES),
+                "response": safe_response,
                 "launcher_observations": {"status": "unverified"},
-                "redacted": False,
+                "redacted": safe_response != stdout,
                 "status": "unverified",
             }
     else:
@@ -221,8 +222,10 @@ def capture_codex_judge_output(
         if isinstance(envelope, dict)
         else "unverified",
     )
-    response_redacted = observations.get("response_redacted") is True or (
-        safe_response != response
+    response_redacted = (
+        observations.get("response_redacted") is True
+        or observations.get("final_message_redacted") is True
+        or safe_response != response
     )
     if (
         wsl2_launcher
@@ -353,6 +356,11 @@ def capture_codex_jsonl_trace(
             )
         final_message = launcher["final_message"]
         safe_message = sanitize_diagnostic(final_message, MAX_TEXT_BYTES)
+        response_redacted = (
+            safe_message != final_message
+            or observations.get("final_message_redacted") is True
+        )
+        execution_status = observations.get("status", "unverified")
         trace_summary = {
             "format": "codex_exec_jsonl",
             "status": jsonl_summary.get("status", "unverified"),
@@ -363,6 +371,10 @@ def capture_codex_jsonl_trace(
             "turn_completed": jsonl_summary.get("turn_completed") is True,
             "turn_failed": jsonl_summary.get("turn_failed") is True,
         }
+        trace_status = trace_summary["status"]
+        if response_redacted or execution_status != "completed":
+            trace_status = "evidence_unverified"
+            trace_summary["status"] = trace_status
         observed = {
             name: any(
                 row["successful"] and name in row["skill_files_read"]
@@ -400,8 +412,8 @@ def capture_codex_jsonl_trace(
         protocol = str(launcher.get("protocol"))
         return {
             "format": protocol,
-            "status": jsonl_summary.get("status", "unverified"),
-            "execution_status": observations.get("status", "unverified"),
+            "status": trace_status,
+            "execution_status": execution_status,
             "final_message": safe_message,
             "trace_jsonl": None,
             "trace_summary": trace_summary,
@@ -414,10 +426,7 @@ def capture_codex_jsonl_trace(
                 "image": safe_image,
                 "runtime": safe_runtime,
             },
-            "redacted": (
-                safe_message != final_message
-                or observations.get("final_message_redacted") is True
-            ),
+            "redacted": response_redacted,
             "commands": safe_commands,
             "skill_use_observation": {
                 name: "observed" if was_observed else "unverified"

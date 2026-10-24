@@ -1470,6 +1470,7 @@ class ImprovementGateTests(unittest.TestCase):
         alternative_causes: list[str],
         artifact_state: str = "valid",
         trace_skill_observed: bool | None = None,
+        trace_redacted: bool = False,
     ):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1688,12 +1689,24 @@ class ImprovementGateTests(unittest.TestCase):
             def fake_trace(*_args, **_kwargs):
                 return {
                     "final_message": analysis_response,
-                    "redacted": False,
+                    "redacted": trace_redacted,
                     "format": "synthetic-test",
-                    "status": "unwrapped",
-                    "execution_status": "completed",
-                    "launcher_observations": None,
-                    "trace_summary": {"status": "not_captured"},
+                    "status": "evidence_unverified" if trace_redacted else "unwrapped",
+                    "execution_status": "evidence_unverified"
+                    if trace_redacted
+                    else "completed",
+                    "launcher_observations": {
+                        "protocol": "codex_wsl2_bwrap_launcher_v1",
+                        "status": "evidence_unverified",
+                        "response_redacted": True,
+                    }
+                    if trace_redacted
+                    else None,
+                    "trace_summary": {
+                        "status": "evidence_unverified"
+                        if trace_redacted
+                        else "not_captured"
+                    },
                 }
 
             independent_plan = {
@@ -1849,6 +1862,19 @@ class ImprovementGateTests(unittest.TestCase):
         self.assertEqual(
             case["blocked_reason"], "eligible_skill_use_not_observed_in_all_attempts"
         )
+
+    def test_redacted_analysis_blocks_repair_and_has_no_response_hash(self) -> None:
+        result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
+            skill_observation="observed",
+            alternative_causes=[],
+            trace_redacted=True,
+        )
+        case = result["cases"][0]
+        self.assertEqual(run_count, 1)
+        self.assertEqual(result["repair_attempts_started"], 0)
+        self.assertEqual(case["status"], "review_pending")
+        self.assertEqual(case["blocked_reason"], "analysis_output_redacted")
+        self.assertIsNone(case["analysis"]["response_sha256"])
 
     def test_run_improvements_rejects_skill_use_not_supported_by_saved_trace(
         self,

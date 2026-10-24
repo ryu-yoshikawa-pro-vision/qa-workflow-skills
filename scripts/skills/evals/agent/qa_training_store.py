@@ -664,10 +664,13 @@ def run_independent_judges(
             "timed_out": execution.timed_out,
             "duration_seconds": execution.duration_seconds,
             "stderr_status": execution.stderr_status,
-            "response_sha256": sha256_bytes(safe_stdout.encode("utf-8")),
+            "response_sha256": None
+            if judge_capture["redacted"]
+            else sha256_bytes(safe_stdout.encode("utf-8")),
             "evidence_status": "captured"
             if safe_stdout == execution.stdout
             and judge_capture["status"] in {"unwrapped", "completed"}
+            and not judge_capture["redacted"]
             else "evidence_unverified",
             "isolation": isolation,
             "container_cleanup_status": execution.cleanup_status,

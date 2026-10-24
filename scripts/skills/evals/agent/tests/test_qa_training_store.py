@@ -261,6 +261,90 @@ class QATrainingStoreTests(unittest.TestCase):
                 self.assertEqual(result["status"], expected_status)
                 self.assertIsNone(result["normalized"])
 
+    def test_redacted_wsl2_judges_are_not_scored_or_hashed_as_original(self) -> None:
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / "qa-output"
+            output.mkdir()
+            validation = self._valid_output(output, scenario)
+            validation["status"] = "pass"
+            validation["issues"] = []
+            target = root / "target"
+            for relative in scenario["reference_paths"]:
+                path = target / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("Fixed reference fixture.\n", encoding="utf-8")
+            launcher_output = '{"criteria":[],"reason":"[redacted]"}'
+
+            def fake_launcher(_profile, *, observations_path):
+                return ["fake-launcher", "--observations-path", str(observations_path)]
+
+            def fake_judge(argv, **_kwargs):
+                sidecar = Path(argv[argv.index("--observations-path") + 1])
+                sidecar.write_text(
+                    json.dumps(
+                        {
+                            "protocol": "codex_wsl2_bwrap_launcher_v1",
+                            "mode": "judge",
+                            "status": "evidence_unverified",
+                            "final_message_redacted": True,
+                            "response_sha256": None,
+                            "jsonl": {
+                                "status": "captured",
+                                "tool_event_count": 0,
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return ExecutionResult(
+                    0, launcher_output, None, "empty", False, 0.01, "succeeded"
+                )
+
+            profile = {
+                "schema_version": 2,
+                "judge": {"command_argv": ["codex"], "timeout_seconds": 30},
+            }
+            with (
+                patch.object(
+                    qa_training_store,
+                    "verify_judge_wsl2_command",
+                    return_value={"status": "verified"},
+                ),
+                patch.object(
+                    qa_training_store,
+                    "judge_launcher_argv_for_profile",
+                    side_effect=fake_launcher,
+                ),
+                patch.object(qa_training_store, "run_command", side_effect=fake_judge),
+                patch(
+                    "scripts.skills.evals.semantic.result.normalize_judge_response",
+                    side_effect=AssertionError(
+                        "redacted Judge output must not be scored"
+                    ),
+                ),
+            ):
+                result = run_independent_judges(
+                    scenario=scenario,
+                    target_root=target,
+                    output_root=output,
+                    validation=validation,
+                    final_message="Synthetic final response.",
+                    machine_summary={"required_artifacts_present": True},
+                    profile=profile,
+                    judge_root=root / "judge-workspaces",
+                )
+
+        self.assertEqual(result["status"], "needs_review")
+        self.assertIsNone(result["normalized"])
+        self.assertEqual(len(result["runs"]), 2)
+        for row in result["runs"]:
+            self.assertEqual(row["status"], "evidence_unverified")
+            self.assertEqual(row["evidence_status"], "evidence_unverified")
+            self.assertIsNone(row["response_sha256"])
+            self.assertTrue(row["launcher_observations"]["response_redacted"])
+
     def test_fake_agent_and_fake_judge_complete_the_two_attempt_runner(self) -> None:
         self._run_fake_agent()
 

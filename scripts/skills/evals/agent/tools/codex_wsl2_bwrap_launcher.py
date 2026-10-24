@@ -902,6 +902,8 @@ def timeout_cleanup_smoke(
     runtime = verify_runtime(runtime_root)
     home_parent = _private_temp_root()
     home = home_parent / f"{CODEX_HOME_PREFIX}timeout-{uuid.uuid4().hex}"
+    final_name = f".codex-final-{uuid.uuid4().hex}.md"
+    final_path = f"/workspace/.qa-eval-output/{final_name}"
     _prepare_codex_home(
         home,
         mode="agent",
@@ -917,6 +919,8 @@ def timeout_cleanup_smoke(
         str(home_parent),
         "--workspace-root",
         str(workspace_root),
+        "--cleanup-final-messages",
+        str(output_root),
     ]
     try:
         command, effective = _outer_argv(
@@ -933,8 +937,9 @@ def timeout_cleanup_smoke(
                 "--permission-profile",
                 ":workspace",
                 "--",
-                "/bin/sleep",
-                "30",
+                "/bin/sh",
+                "-c",
+                f"printf synthetic-final-message > {final_path}; exec /bin/sleep 30",
             ],
         )
         from scripts.skills.evals.agent.executor import run_command
@@ -959,12 +964,14 @@ def timeout_cleanup_smoke(
         home_removed = not home.exists()
         scratch_removed = not Path(str(home) + ".git").exists()
         workspace_git_removed = not (workspace_root / ".git").exists()
+        final_message_removed = not (output_root / final_name).exists()
         checks = {
             "timed_out": execution.timed_out,
             "cleanup_succeeded": execution.cleanup_status == "succeeded",
             "codex_home_removed": home_removed,
             "git_scratch_removed": scratch_removed,
             "workspace_git_mountpoint_removed": workspace_git_removed,
+            "final_message_removed": final_message_removed,
         }
         return {
             "protocol": PROTOCOL,
@@ -1129,8 +1136,19 @@ def cleanup_argv(execution_argv: Sequence[str]) -> list[str] | None:
         index = execution_argv.index("--workspace-root")
         workspace = execution_argv[index + 1]
     except (ValueError, IndexError):
-        return command
-    command.extend(["--workspace-root", workspace])
+        workspace = None
+    if workspace is not None:
+        command.extend(["--workspace-root", workspace])
+    try:
+        mode_index = execution_argv.index("--mode")
+        mode = execution_argv[mode_index + 1]
+        output_index = execution_argv.index("--output-root")
+        output_root = execution_argv[output_index + 1]
+    except (ValueError, IndexError):
+        mode = None
+        output_root = None
+    if mode in {"agent", "repair"} and output_root is not None:
+        command.extend(["--cleanup-final-messages", output_root])
     return command
 
 
@@ -1259,14 +1277,9 @@ def launch(
     }
     if api_key:
         child_env["OPENAI_API_KEY"] = api_key
-    if auth_path is not None:
-        copied = home_path / "auth.json"
-        if not _regular_file(copied) or copied.stat().st_mode & 0o077:
-            raise CodexWsl2LauncherError(
-                "temporary Codex authentication file is insecure"
-            )
     status = "execution_error"
     response = ""
+    completed_returncode = 2
     observations: dict[str, Any] = {
         "protocol": PROTOCOL,
         "mode": mode,
@@ -1278,6 +1291,11 @@ def launch(
         "status": status,
         "jsonl": None,
         "response_sha256": None,
+        "final_message_redacted": False,
+        "final_message_cleanup_status": (
+            "isolated_tmpfs" if mode == "judge" else "pending"
+        ),
+        "codex_home_cleanup_status": "pending",
         "authentication_shell_visible_risk": True,
         "web_search_enabled": False,
         "tool_policy": "no_cli_tools_or_mcp_configured",
@@ -1285,6 +1303,12 @@ def launch(
         "approval_policy": "never",
     }
     try:
+        if auth_path is not None:
+            copied = home_path / "auth.json"
+            if not _regular_file(copied) or copied.stat().st_mode & 0o077:
+                raise CodexWsl2LauncherError(
+                    "temporary Codex authentication file is insecure"
+                )
         completed = subprocess.run(
             command,
             input=prompt.encode("utf-8"),
@@ -1306,6 +1330,7 @@ def launch(
         observations["jsonl"] = jsonl
         observations["outer_exit_code"] = completed.returncode
         observations["docker_exit_code"] = completed.returncode
+        completed_returncode = completed.returncode
         observations["status"] = (
             "completed" if completed.returncode == 0 else "execution_error"
         )
@@ -1313,38 +1338,96 @@ def launch(
             observations["status"] = "evidence_unverified"
         if jsonl.get("status") != "captured" or not response:
             observations["status"] = "evidence_unverified"
-        response = _sanitize(response)
+        raw_response = response
+        response = _sanitize(raw_response)
+        response_redacted = response != raw_response
+        observations["final_message_redacted"] = response_redacted
+        if response_redacted:
+            observations["status"] = "evidence_unverified"
+        status = observations["status"]
         observations["response_sha256"] = (
-            hashlib.sha256(response.encode("utf-8")).hexdigest() if response else None
+            hashlib.sha256(response.encode("utf-8")).hexdigest()
+            if response and not response_redacted
+            else None
         )
-        observations["status"] = observations["status"]
-        if mode == "judge":
-            _write_observations(observations_path, observations)
-            sys.stdout.write(response)
-            if response and not response.endswith("\n"):
-                sys.stdout.write("\n")
-        else:
-            envelope = {
-                "protocol": PROTOCOL,
-                "exit_code": completed.returncode,
-                "final_message": response,
-                "observations": observations,
-            }
-            sys.stdout.write(
-                json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n"
-            )
-        return 0 if observations["status"] == "completed" else 2
-    except (OSError, subprocess.SubprocessError) as exc:
-        observations["status"] = "execution_error"
+    except (CodexWsl2LauncherError, OSError, subprocess.SubprocessError) as exc:
+        status = "execution_error"
+        observations["status"] = status
         observations["error"] = type(exc).__name__
-        _write_observations(observations_path, observations)
-        return 2
     finally:
-        cleanup_codex_home(
-            home_path,
-            allowed_parent=home_path.parent,
-            workspace_root=workspace_root,
+        if mode != "judge":
+            try:
+                removed = _cleanup_final_message_file(output_root, final_name)
+                observations["final_message_cleanup_status"] = (
+                    "removed" if removed else "not_present"
+                )
+            except (OSError, CodexWsl2LauncherError):
+                observations["final_message_cleanup_status"] = "failed"
+                observations["error"] = "final_message_cleanup_failed"
+                status = "execution_error"
+        try:
+            cleanup_codex_home(
+                home_path,
+                allowed_parent=home_path.parent,
+                workspace_root=workspace_root,
+            )
+            observations["codex_home_cleanup_status"] = "succeeded"
+        except (OSError, CodexWsl2LauncherError):
+            observations["codex_home_cleanup_status"] = "failed"
+            observations["error"] = "codex_home_cleanup_failed"
+            status = "execution_error"
+
+    observations["status"] = status or observations.get("status", "execution_error")
+    if mode == "judge":
+        try:
+            _write_observations(observations_path, observations)
+        except (OSError, CodexWsl2LauncherError):
+            sys.stderr.write("Codex WSL2 launcher could not save observations\n")
+            return 2
+        sys.stdout.write(response)
+        if response and not response.endswith("\n"):
+            sys.stdout.write("\n")
+    else:
+        envelope = {
+            "protocol": PROTOCOL,
+            "exit_code": completed_returncode,
+            "final_message": response,
+            "observations": observations,
+        }
+        sys.stdout.write(
+            json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n"
         )
+    return 0 if observations["status"] == "completed" else 2
+
+
+def _cleanup_final_message_file(output_root: Path, final_name: str) -> bool:
+    """Remove Codex's temporary final-message file without following links."""
+    if not re.fullmatch(r"\.codex-final-[0-9a-f]{32}\.md", final_name):
+        raise CodexWsl2LauncherError("temporary final-message name is invalid")
+    root = Path(output_root)
+    if root.is_symlink() or not root.is_dir():
+        raise CodexWsl2LauncherError("temporary final-message root is invalid")
+    path = root / final_name
+    if path.parent.resolve(strict=True) != root.resolve(strict=True):
+        raise CodexWsl2LauncherError("temporary final-message path escaped output root")
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return False
+    if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
+        raise CodexWsl2LauncherError("temporary final-message is not a regular file")
+    path.unlink()
+    return True
+
+
+def _cleanup_temporary_final_messages(output_root: Path) -> None:
+    """Remove only launcher-reserved final-message files from an attempt output."""
+    root = Path(output_root)
+    if root.is_symlink() or not root.is_dir():
+        raise CodexWsl2LauncherError("temporary final-message root is invalid")
+    for path in root.iterdir():
+        if re.fullmatch(r"\.codex-final-[0-9a-f]{32}\.md", path.name):
+            _cleanup_final_message_file(root, path.name)
 
 
 def _sanitize(value: str) -> str:
@@ -1521,6 +1604,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--codex-home", type=Path)
     parser.add_argument("--cleanup-home", type=Path)
     parser.add_argument("--allowed-parent", type=Path)
+    parser.add_argument("--cleanup-final-messages", type=Path)
     return parser
 
 
@@ -1535,14 +1619,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.allowed_parent is None:
             print("cleanup requires --allowed-parent", file=sys.stderr)
             return 2
+        cleanup_error = None
         try:
             cleanup_codex_home(
                 args.cleanup_home,
                 allowed_parent=args.allowed_parent,
                 workspace_root=args.workspace_root,
             )
-        except CodexWsl2LauncherError as exc:
-            print(f"Codex home cleanup failed: {exc}", file=sys.stderr)
+        except (OSError, CodexWsl2LauncherError) as exc:
+            cleanup_error = type(exc).__name__
+        if args.cleanup_final_messages is not None:
+            try:
+                _cleanup_temporary_final_messages(args.cleanup_final_messages)
+            except (OSError, CodexWsl2LauncherError) as exc:
+                cleanup_error = cleanup_error or type(exc).__name__
+        if cleanup_error is not None:
+            print(f"Codex launcher cleanup failed: {cleanup_error}", file=sys.stderr)
             return 2
         return 0
     if (

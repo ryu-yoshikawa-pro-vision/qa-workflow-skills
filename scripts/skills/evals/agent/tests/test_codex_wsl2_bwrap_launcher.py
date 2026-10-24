@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import inspect
+import io
 import json
 import os
 import platform
+import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.skills.evals.agent.tools import codex_wsl2_bwrap_launcher
 from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
     CODEX_HOME_PREFIX,
     PACKAGE_SHA512,
@@ -17,8 +22,10 @@ from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
     CodexWsl2LauncherError,
     _codex_exec_argv,
     _prepare_codex_home,
+    cleanup_argv,
     cleanup_codex_home,
     judge_launcher_argv_for_profile,
+    launch,
     launcher_argv,
     sandbox_smoke,
     timeout_cleanup_smoke,
@@ -33,6 +40,142 @@ RUN_WSL2_INTEGRATION = IS_WSL2 and os.environ.get("QAEVAL_RUN_WSL2_INTEGRATION")
 
 
 class CodexWsl2LauncherUnitTests(unittest.TestCase):
+    def test_launch_redaction_is_unverified_and_raw_message_file_is_removed(
+        self,
+    ) -> None:
+        secret = "sk-syntheticsecret012345678901"
+        for mode, redact in (
+            ("agent", False),
+            ("agent", True),
+            ("judge", True),
+            ("repair", True),
+        ):
+            with (
+                self.subTest(mode=mode, redact=redact),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                output_root = root / "output"
+                output_root.mkdir()
+                workspace_root = root / "workspace" if mode != "judge" else None
+                if workspace_root is not None:
+                    workspace_root.mkdir()
+                    (workspace_root / ".qa-eval-output").mkdir()
+                codex_home_parent = root / "homes"
+                codex_home_parent.mkdir(mode=0o700)
+                codex_home = codex_home_parent / f"{CODEX_HOME_PREFIX}{mode}-test"
+                observations_path = root / "launcher-observations.json"
+                response = f"Answer {secret}" if redact else "Ordinary answer"
+                events = (
+                    json.dumps(
+                        {
+                            "type": "item.completed",
+                            "item": {"type": "agent_message", "text": response},
+                        }
+                    )
+                    + "\n"
+                    + json.dumps({"type": "turn.completed"})
+                    + "\n"
+                ).encode("utf-8")
+
+                def fake_subprocess(command, **_kwargs):
+                    output_index = command.index("--output-last-message") + 1
+                    output_message = command[output_index]
+                    if output_message.startswith("/workspace/.qa-eval-output/"):
+                        (output_root / output_message.rsplit("/", 1)[-1]).write_text(
+                            response, encoding="utf-8"
+                        )
+                    stderr = (
+                        f"API_KEY={secret}\n" if redact else "safe diagnostic\n"
+                    ).encode("utf-8")
+                    return subprocess.CompletedProcess(
+                        command, 0, stdout=events, stderr=stderr
+                    )
+
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "verify_runtime",
+                        return_value={"runtime": "synthetic"},
+                    ),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "_auth_material",
+                        return_value=(None, None, "api_key_environment"),
+                    ),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "_outer_argv",
+                        side_effect=lambda **kwargs: (
+                            list(kwargs["codex_argv"]),
+                            {"mode": kwargs["mode"]},
+                        ),
+                    ),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher.subprocess,
+                        "run",
+                        side_effect=fake_subprocess,
+                    ),
+                    redirect_stdout(stdout),
+                    redirect_stderr(stderr),
+                ):
+                    exit_code = launch(
+                        mode=mode,
+                        output_root=output_root,
+                        prompt="synthetic prompt",
+                        observations_path=observations_path,
+                        model="synthetic-model",
+                        reasoning_effort="low",
+                        sandbox_policy=(
+                            "read-only" if mode == "judge" else "workspace-write"
+                        ),
+                        workspace_root=workspace_root,
+                        skill_name="synthetic-skill" if mode == "repair" else None,
+                        codex_home=codex_home,
+                        runtime_root=root,
+                    )
+
+                if mode == "judge":
+                    final_message = stdout.getvalue().strip()
+                    observations = json.loads(
+                        observations_path.read_text(encoding="utf-8")
+                    )
+                else:
+                    envelope = json.loads(stdout.getvalue())
+                    final_message = envelope["final_message"]
+                    observations = envelope["observations"]
+                if redact:
+                    self.assertEqual(exit_code, 2)
+                    self.assertEqual(final_message, "Answer [redacted]")
+                    self.assertTrue(observations["final_message_redacted"])
+                    self.assertEqual(observations["status"], "evidence_unverified")
+                    self.assertIsNone(observations["response_sha256"])
+                    self.assertNotIn(secret, stdout.getvalue())
+                    self.assertNotIn(secret, stderr.getvalue())
+                else:
+                    self.assertEqual(exit_code, 0)
+                    self.assertEqual(final_message, response)
+                    self.assertFalse(observations["final_message_redacted"])
+                    self.assertEqual(observations["status"], "completed")
+                    self.assertEqual(
+                        observations["response_sha256"],
+                        hashlib.sha256(response.encode("utf-8")).hexdigest(),
+                    )
+                self.assertEqual(
+                    observations["final_message_cleanup_status"],
+                    "isolated_tmpfs" if mode == "judge" else "removed",
+                )
+                self.assertEqual(observations["codex_home_cleanup_status"], "succeeded")
+                self.assertFalse(any(output_root.iterdir()))
+                self.assertFalse(codex_home.exists())
+                persisted = b"".join(
+                    path.read_bytes() for path in root.rglob("*") if path.is_file()
+                )
+                self.assertNotIn(secret.encode("utf-8"), persisted)
+
     def test_exec_argv_uses_embedded_runtime_strict_config_and_fixed_sandbox(
         self,
     ) -> None:
@@ -97,6 +240,12 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             self.assertEqual(Path(command[1]).name, "codex_wsl2_bwrap_launcher.py")
             self.assertIn("--workspace-root", command)
             self.assertEqual(command[command.index("--model") + 1], "model-test")
+            cleanup = cleanup_argv(command)
+            self.assertIsNotNone(cleanup)
+            self.assertEqual(
+                cleanup[cleanup.index("--cleanup-final-messages") + 1],
+                str(output),
+            )
 
     def test_launcher_argv_rejects_arbitrary_commands_and_versions(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -142,6 +291,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             )
             self.assertIn("--mode", command)
             self.assertEqual(command[command.index("--mode") + 1], "judge")
+            self.assertNotIn("--cleanup-final-messages", cleanup_argv(command))
             for key, value in (("tools", ["shell"]), ("mcp_servers", ["test"])):
                 invalid = {**profile, key: value}
                 with self.assertRaises(CodexWsl2LauncherError):
@@ -185,6 +335,19 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             outsider.mkdir()
             with self.assertRaises(CodexWsl2LauncherError):
                 cleanup_codex_home(outsider, allowed_parent=home_parent)
+
+    def test_timeout_cleanup_removes_only_reserved_final_message_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            final_message = output / (".codex-final-" + "a" * 32 + ".md")
+            final_message.write_text("synthetic final message", encoding="utf-8")
+            unrelated = output / "agent-output.md"
+            unrelated.write_text("keep", encoding="utf-8")
+
+            codex_wsl2_bwrap_launcher._cleanup_temporary_final_messages(output)
+
+            self.assertFalse(final_message.exists())
+            self.assertEqual(unrelated.read_text(encoding="utf-8"), "keep")
 
     def test_repair_codex_home_allows_only_the_selected_skill_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

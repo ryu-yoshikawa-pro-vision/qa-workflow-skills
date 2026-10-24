@@ -466,7 +466,9 @@ def _run_judge_case(
     safe = judge_capture["response"]
     row: dict[str, Any] = {
         "prompt_sha256": sha256_bytes(prompt.encode("utf-8")),
-        "response_sha256": sha256_bytes(safe.encode("utf-8")),
+        "response_sha256": None
+        if judge_capture["redacted"]
+        else sha256_bytes(safe.encode("utf-8")),
         "exit_code": execution.exit_code,
         "timed_out": execution.timed_out,
         "duration_seconds": execution.duration_seconds,
@@ -475,6 +477,7 @@ def _run_judge_case(
         "evidence_status": "captured"
         if safe == execution.stdout
         and judge_capture["status"] in {"unwrapped", "completed"}
+        and not judge_capture["redacted"]
         else "evidence_unverified",
         "response": safe,
         "launcher_observations": judge_capture["launcher_observations"],

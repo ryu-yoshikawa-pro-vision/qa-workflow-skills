@@ -3247,7 +3247,9 @@ def _run_deterministic_improvements(
         and not launcher_unverified
         else "execution_error",
         "response": analysis_safe,
-        "response_sha256": sha256_bytes(analysis_safe.encode("utf-8")),
+        "response_sha256": None
+        if analysis_trace["redacted"] or launcher_unverified
+        else sha256_bytes(analysis_safe.encode("utf-8")),
         "trace_format": analysis_trace["format"],
         "trace_status": analysis_trace["status"],
         "trace_path": analysis_trace_path,
@@ -4133,7 +4135,9 @@ def run_improvements(
             and not analysis_launcher_unverified
             else "execution_error",
             "response": analysis_safe,
-            "response_sha256": sha256_bytes(analysis_safe.encode("utf-8")),
+            "response_sha256": None
+            if analysis_trace["redacted"] or analysis_launcher_unverified
+            else sha256_bytes(analysis_safe.encode("utf-8")),
             "trace_format": analysis_trace["format"],
             "trace_status": analysis_trace["status"],
             "trace_path": analysis_trace_path,

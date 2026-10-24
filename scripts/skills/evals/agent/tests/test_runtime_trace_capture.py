@@ -11,6 +11,7 @@ from unittest.mock import patch
 from scripts.skills.evals.agent import common_runtime_checks
 from scripts.skills.evals.agent.common import (
     capture_codex_jsonl_trace,
+    capture_codex_judge_output,
     trace_confirms_capture_invocation,
 )
 from scripts.skills.evals.agent.verifier_capture import capture_invocation
@@ -97,6 +98,52 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
         self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
         self.assertIsNone(captured["trace_jsonl"])
         self.assertNotIn('"command":', json.dumps(captured["trace_summary"]))
+
+    def test_wsl2_redaction_flag_makes_trace_and_judge_evidence_unverified(
+        self,
+    ) -> None:
+        observations = {
+            "protocol": "codex_wsl2_bwrap_launcher_v1",
+            "mode": "agent",
+            "status": "evidence_unverified",
+            "final_message_redacted": True,
+            "response_sha256": None,
+            "jsonl": {
+                "status": "captured",
+                "event_count": 2,
+                "event_types": {"item.completed": 1, "turn.completed": 1},
+                "tool_event_count": 0,
+                "command_count": 0,
+                "turn_completed": True,
+                "turn_failed": False,
+                "commands": [],
+            },
+        }
+        envelope = {
+            "protocol": "codex_wsl2_bwrap_launcher_v1",
+            "exit_code": 0,
+            "final_message": "Answer [redacted]",
+            "observations": observations,
+        }
+        trace = capture_codex_jsonl_trace(json.dumps(envelope))
+        self.assertTrue(trace["redacted"])
+        self.assertEqual(trace["status"], "evidence_unverified")
+        self.assertEqual(trace["execution_status"], "evidence_unverified")
+        self.assertEqual(trace["trace_summary"]["status"], "evidence_unverified")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            sidecar = Path(temporary) / "launcher-observations.json"
+            sidecar.write_text(
+                json.dumps({**observations, "mode": "judge"}), encoding="utf-8"
+            )
+            judge = capture_codex_judge_output(
+                "Answer [redacted]", observations_path=sidecar
+            )
+        self.assertTrue(judge["redacted"])
+        self.assertEqual(judge["status"], "evidence_unverified")
+        self.assertEqual(
+            judge["launcher_observations"]["status"], "evidence_unverified"
+        )
 
     def test_jsonl_with_unknown_event_type_is_not_saved_as_candidate_output(
         self,

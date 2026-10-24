@@ -311,6 +311,88 @@ class JudgeValidationTests(unittest.TestCase):
         self.assertEqual(result["status"], "evidence_unverified")
         self.assertNotIn("normalized", result)
 
+    def test_redacted_wsl2_judge_response_is_not_scored_or_hashed(self) -> None:
+        scenario = load_scenario()
+        judge_profile = _profile()["judge"]
+        judge_profile.update(
+            {
+                "cli_version": "codex-cli 0.163.0",
+                "sandbox_policy": "read-only",
+            }
+        )
+        criterion = scenario["rubric"][0]["id"]
+        response = json.dumps(
+            {
+                "criteria": [
+                    {
+                        "id": criterion,
+                        "evaluable": True,
+                        "rating": 3,
+                        "reason": "Safe synthetic response.",
+                        "evidence": ["artifact-00.md"],
+                    }
+                ]
+            }
+        )
+
+        def fake_launcher(_profile, *, observations_path):
+            return ["fake-launcher", "--observations-path", str(observations_path)]
+
+        def fake_run(argv, **_kwargs):
+            sidecar = Path(argv[argv.index("--observations-path") + 1])
+            sidecar.write_text(
+                json.dumps(
+                    {
+                        "protocol": "codex_wsl2_bwrap_launcher_v1",
+                        "mode": "judge",
+                        "status": "evidence_unverified",
+                        "final_message_redacted": True,
+                        "response_sha256": None,
+                        "jsonl": {"status": "captured", "tool_event_count": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return ExecutionResult(0, response, None, "empty", False, 0.01)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            cwd = Path(temporary) / "judge"
+            cwd.mkdir()
+            with (
+                patch.object(
+                    judge_validation,
+                    "verify_judge_wsl2_command",
+                    return_value={"status": "verified"},
+                ),
+                patch.object(
+                    judge_validation,
+                    "judge_launcher_argv_for_profile",
+                    side_effect=fake_launcher,
+                ),
+                patch.object(judge_validation, "run_command", side_effect=fake_run),
+                patch(
+                    "scripts.skills.evals.semantic.result.normalize_judge_response",
+                    side_effect=AssertionError(
+                        "redacted Judge response must not be scored"
+                    ),
+                ),
+            ):
+                result = judge_validation._run_judge_case(
+                    command_argv=["codex"],
+                    judge_profile=judge_profile,
+                    prompt="fixed prompt",
+                    cwd=cwd,
+                    timeout=30,
+                    run_tag="redacted-wsl2-response",
+                    criteria=[criterion],
+                    scenario=scenario,
+                )
+
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertEqual(result["evidence_status"], "evidence_unverified")
+        self.assertIsNone(result["response_sha256"])
+        self.assertNotIn("normalized", result)
+
     def _baseline_output(self, output: Path, scenario: dict) -> None:
         output.mkdir(parents=True)
         artifacts = []

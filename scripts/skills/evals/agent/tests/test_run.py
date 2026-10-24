@@ -58,6 +58,7 @@ class CommonRunnerTests(unittest.TestCase):
         candidate_package=False,
         candidate_changes_during_run=False,
         captured_trace=False,
+        redacted_trace=False,
     ):
         run_output_parent = run.REPO_ROOT / ".agent-eval-runs"
         run_output_parent.mkdir(exist_ok=True)
@@ -214,16 +215,30 @@ class CommonRunnerTests(unittest.TestCase):
                             "capture_codex_jsonl_trace",
                             return_value={
                                 "format": "codex_exec_jsonl",
-                                "status": "captured",
+                                "status": "evidence_unverified"
+                                if redacted_trace
+                                else "captured",
                                 "final_message": "candidate",
                                 "trace_summary": {
                                     "format": "codex_exec_jsonl",
-                                    "status": "captured",
+                                    "status": "evidence_unverified"
+                                    if redacted_trace
+                                    else "captured",
                                     "turn_completed": True,
                                     "turn_failed": False,
                                     "commands": [],
                                 },
-                                "redacted": False,
+                                "redacted": redacted_trace,
+                                "execution_status": "evidence_unverified"
+                                if redacted_trace
+                                else "completed",
+                                "launcher_observations": {
+                                    "protocol": "codex_wsl2_bwrap_launcher_v1",
+                                    "status": "evidence_unverified",
+                                    "response_redacted": redacted_trace,
+                                }
+                                if redacted_trace
+                                else None,
                                 "skill_use_observation": {case["skill"]: "observed"},
                             },
                         )
@@ -366,6 +381,91 @@ class CommonRunnerTests(unittest.TestCase):
         exit_code, attempt = self._run(captured_trace=True)
         self.assertEqual(exit_code, 0, attempt)
         self.assertTrue(attempt["agent_trace"]["sha256"].startswith("sha256:"))
+
+    def test_redacted_wsl2_agent_response_needs_review_without_grading(self):
+        exit_code, attempt = self._run(
+            captured_trace=True,
+            redacted_trace=True,
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(attempt["status"], "needs_review")
+        self.assertEqual(attempt["evidence_status"], "evidence_unverified")
+        self.assertEqual(attempt["evidence_reason"], "agent_trace_was_redacted")
+        self.assertNotIn("grade", attempt)
+
+    def test_redacted_wsl2_judge_response_is_not_normalized(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            case = run._load_semantic_cases("test-case-design", "TC-SEM-001")[0]
+            case_record = {
+                **case,
+                "suite": "semantic",
+                "eval_id": case["id"],
+                "repeat_index": 1,
+            }
+            output_path = root / "candidate.md"
+            output_path.write_text("Synthetic candidate output.\n", encoding="utf-8")
+            profile = _profile()
+            profile["schema_version"] = 2
+            profile["judge"]["command_argv"] = ["codex"]
+            valid_response = json.dumps({"criteria": []})
+
+            def fake_launcher(_profile, *, observations_path):
+                return ["fake-launcher", "--observations-path", str(observations_path)]
+
+            def fake_judge(argv, **_kwargs):
+                destination = Path(argv[argv.index("--observations-path") + 1])
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    json.dumps(
+                        {
+                            "protocol": "codex_wsl2_bwrap_launcher_v1",
+                            "mode": "judge",
+                            "status": "evidence_unverified",
+                            "final_message_redacted": True,
+                            "response_sha256": None,
+                            "jsonl": {"status": "captured", "tool_event_count": 0},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return ExecutionResult(0, valid_response, None, "empty", False, 0.01)
+
+            with (
+                patch.object(
+                    run,
+                    "verify_judge_wsl2_command",
+                    return_value={"status": "verified"},
+                ),
+                patch.object(
+                    run,
+                    "judge_launcher_argv_for_profile",
+                    side_effect=fake_launcher,
+                ),
+                patch.object(run, "run_command", side_effect=fake_judge),
+                patch.object(
+                    run,
+                    "normalize_judge_response",
+                    side_effect=AssertionError(
+                        "redacted Judge response must not be scored"
+                    ),
+                ),
+            ):
+                grade, judge_runs = run._render_grade(
+                    case=case_record,
+                    output_path=output_path,
+                    runtime_source_root=root,
+                    profile=profile,
+                    output_root=root / "run-output",
+                )
+
+        self.assertEqual(
+            grade, {"status": "needs_review", "reason": "judge_evidence_unverified"}
+        )
+        self.assertEqual(len(judge_runs), 1)
+        self.assertEqual(
+            judge_runs[0]["launcher_observations"]["status"], "evidence_unverified"
+        )
 
     def test_candidate_package_is_used_and_fingerprint_is_recorded(self):
         exit_code, attempt = self._run(candidate_package=True)
