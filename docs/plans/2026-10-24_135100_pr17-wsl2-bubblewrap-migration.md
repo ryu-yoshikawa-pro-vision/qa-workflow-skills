@@ -38,18 +38,18 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 ### 検証結果
 
-| 検証 | 結果 |
-| --- | --- |
-| WSL2 Agent tests（sandbox integration有効） | PASS、106 tests、1 skipped |
-| WSL2 Runner / Agent API | PASS、4 tests |
-| WSL2 Semantic Eval | PASS、27 tests |
-| WSL2 Deterministic Eval | PASS、293 tests |
-| WSL2 formal Agent/Judge/Repair sandbox integration | PASS、1 test |
-| WSL2 `compileall` | PASS |
-| Ruff `0.16.8` `format_tracked.py check` | PASS |
-| Windows workspace cleanup + launcher tests | PASS、23 tests、3 skipped |
-| WSL2/Windows `git diff --check` | PASS |
-| `isolation_probe.py` formal evidence generation | PASS、全15 required checks true |
+| 検証                                                 | 結果                            |
+| -------------------------------------------------- | ----------------------------- |
+| WSL2 Agent tests（sandbox integration有効）            | PASS、106 tests、1 skipped      |
+| WSL2 Runner / Agent API                            | PASS、4 tests                  |
+| WSL2 Semantic Eval                                 | PASS、27 tests                 |
+| WSL2 Deterministic Eval                            | PASS、293 tests                |
+| WSL2 formal Agent/Judge/Repair sandbox integration | PASS、1 test                   |
+| WSL2 `compileall`                                  | PASS                          |
+| Ruff `0.16.8` `format_tracked.py check`            | PASS                          |
+| Windows workspace cleanup + launcher tests         | PASS、23 tests、3 skipped       |
+| WSL2/Windows `git diff --check`                    | PASS                          |
+| `isolation_probe.py` formal evidence generation    | PASS、全15 required checks true |
 
 - Formal synthetic evidence: `~/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/checkout-final/.agent-eval-runs/pr17-wsl2-synthetic-probe-20261024-02/isolation.json`。Agent、Judge、Repairの各mode evidenceも`verified`。fresh procfs、nested user/PID/mount/network/IPC namespaces、Evaluator/host/other-attempt/Windows path隔離、FD非継承、existing source entry write拒否、専用output write許可、Repair選択Skill write許可、symlink/network/socket/WSL interop拒否、timeout cleanupを記録した。内側Codex sandboxはouter UTS namespaceを共有する実測であり、他の必須inner namespaceは分離された。
 - Probeは合成sentinel/profileのみを使った。`model_api_used=false`。一時`CODEX_HOME`内の実認証fileがinner shellから読めないことは確認しておらず、evidenceは`authentication_shell_visible_risk=true`を保持する。実認証、live Codex exec、Agent/Judge品質評価、Judge fixture承認、候補Skill採用は行っていない。

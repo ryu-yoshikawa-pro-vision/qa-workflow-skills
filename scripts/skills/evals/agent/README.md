@@ -6,14 +6,14 @@ Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動し�
 
 ## CLI一覧
 
-| Module | 用途 |
-| --- | --- |
-| scripts.skills.evals.agent.run | deterministic / semantic case、Skill単位、明示されたall batch |
-| scripts.skills.evals.agent.isolation_probe | WSL2、outer/inner bubblewrap、固定binary、mount、namespace、FD、network、evidence検証 |
-| scripts.skills.evals.agent.qa_training_store | 固定qa-training-store revisionのCheckout / Payment workflow評価 |
-| scripts.skills.evals.agent.judge_validation | 正常例・固定違反例でのJudge独立検証とレビュー用候補比較 |
-| scripts.skills.evals.agent.compare | 条件が一致するrun間のattempt / criterion比較 |
-| scripts.skills.evals.agent.improve | 保存済みrunの分析、許可path限定修正、同条件での再評価 |
+| Module                                       | 用途                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| scripts.skills.evals.agent.run               | deterministic / semantic case、Skill単位、明示されたall batch                       |
+| scripts.skills.evals.agent.isolation_probe   | WSL2、outer/inner bubblewrap、固定binary、mount、namespace、FD、network、evidence検証 |
+| scripts.skills.evals.agent.qa_training_store | 固定qa-training-store revisionのCheckout / Payment workflow評価                 |
+| scripts.skills.evals.agent.judge_validation  | 正常例・固定違反例でのJudge独立検証とレビュー用候補比較                                             |
+| scripts.skills.evals.agent.compare           | 条件が一致するrun間のattempt / criterion比較                                          |
+| scripts.skills.evals.agent.improve           | 保存済みrunの分析、許可path限定修正、同条件での再評価                                             |
 
 ## 実行前提
 
