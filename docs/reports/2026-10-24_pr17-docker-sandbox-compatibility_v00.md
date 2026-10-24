@@ -17,6 +17,8 @@ Docker標準seccompを維持したままの起動は未達である。標準prof
 
 今回Docker設定、Agent/Judge command、Docker Desktop/daemon、capability、profile、sandbox modeは変更していない。実Agent、Judge、credential、API/model通信も使っていない。
 
+一時`CODEX_HOME`を使う現行方式では、Agent shellから認証情報を参照できるリスクを現行Planの残留リスクとして扱う。今回は実credentialもAPI通信も使っておらず、露出がない、または解消済みとは主張しない。独立broker/proxyやCodex parentとshellを別mountへ分離する新機構は作らない。
+
 ## 2. 作業範囲と確認資料
 
 - 作業開始時は`feat/agent-eval-runner`、HEAD `35ea3b274d22f0d47104c6fbaa777303d9090281`、tracked差分なし。既存の未追跡Docker報告2件は保持した。
