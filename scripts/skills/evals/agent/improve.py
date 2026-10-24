@@ -60,8 +60,10 @@ from .workspace import (
     named_container_command,
     profile_fingerprint,
     verify_agent_docker_command,
+    verify_agent_wsl2_command,
     verify_profile_evidence,
     verify_repair_docker_command,
+    verify_repair_wsl2_command,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -427,7 +429,8 @@ def _attempt_data(run: dict[str, Any], run_root: Path) -> list[dict[str, Any]]:
             or agent_execution.get("trace_status") != "captured"
             or agent_execution.get("trace_path") != trace_relative
             or agent_execution.get("trace_redacted") is not False
-            or agent_execution.get("container_cleanup_status") != "succeeded"
+            or agent_execution.get("container_cleanup_status")
+            not in ("succeeded", "not_needed")
         ):
             raise AgentEvalError("baseline Agent trace evidence is incomplete")
         trace_path = _resolve_run_path(run_root, trace_relative)
@@ -736,7 +739,8 @@ def _deterministic_attempt_data(
             or isinstance(execution.get("exit_code"), bool)
             or execution.get("exit_code") != 0
             or execution.get("timed_out") is not False
-            or execution.get("container_cleanup_status") != "succeeded"
+            or execution.get("container_cleanup_status")
+            not in ("succeeded", "not_needed")
             or not isinstance(isolation, dict)
             or isolation.get("status") != "verified"
             or not isinstance(command, dict)
@@ -2139,7 +2143,8 @@ def _validate_independent_run(
                 or isinstance(execution.get("exit_code"), bool)
                 or execution.get("exit_code") != 0
                 or execution.get("timed_out") is not False
-                or execution.get("container_cleanup_status") != "succeeded"
+                or execution.get("container_cleanup_status")
+                not in ("succeeded", "not_needed")
                 or not isinstance(isolation, dict)
                 or isolation.get("status") != "verified"
                 or not isinstance(trace, dict)
@@ -2204,7 +2209,8 @@ def _validate_independent_run(
                         or isinstance(judge.get("exit_code"), bool)
                         or judge.get("exit_code") != 0
                         or judge.get("timed_out") is not False
-                        or judge.get("container_cleanup_status") != "succeeded"
+                        or judge.get("container_cleanup_status")
+                        not in ("succeeded", "not_needed")
                         for judge in judges
                     )
                 ):
@@ -3161,12 +3167,21 @@ def _run_deterministic_improvements(
         )
         for item in template
     ]
-    analysis_isolation = verify_agent_docker_command(
-        analysis_command,
-        workspace=analysis_workspace,
-        output_root=analysis_workspace / ".qa-eval-output",
-        evaluator_root=REPO_ROOT,
-    )
+    analysis_output_root = analysis_workspace / ".qa-eval-output"
+    if profile.get("schema_version", 1) == 2:
+        analysis_isolation = verify_agent_wsl2_command(
+            analysis_command,
+            workspace=analysis_workspace,
+            output_root=analysis_output_root,
+            evaluator_root=REPO_ROOT,
+        )
+    else:
+        analysis_isolation = verify_agent_docker_command(
+            analysis_command,
+            workspace=analysis_workspace,
+            output_root=analysis_output_root,
+            evaluator_root=REPO_ROOT,
+        )
     if analysis_isolation.get("status") != "verified":
         case_record["status"] = "review_pending"
         case_record["blocked_reason"] = "analysis_agent_isolation_unverified"
@@ -3176,30 +3191,34 @@ def _run_deterministic_improvements(
         result["status"] = "review_pending_or_unmet"
         atomic_write_json(output_root / "result.json", result)
         return result
-    analysis_named, analysis_cleanup = named_container_command(
-        analysis_command,
-        name=f"agent-eval-analysis-{experiment_id[-8:]}-deterministic",
-    )
-    analysis_execution_command = analysis_named
     if profile.get("schema_version", 1) == 2:
         analysis_execution_command = launcher_argv(
-            output_root=analysis_workspace / ".qa-eval-output",
+            mode="agent",
+            workspace_root=analysis_workspace,
+            output_root=analysis_output_root,
+            observations_path=case_root / "analysis-launcher-observations.json",
             model=profile["agent"]["model"],
             reasoning_effort=profile["agent"]["reasoning_effort"],
             cli_version=profile["agent"]["cli_version"],
             sandbox_policy=profile["agent"]["sandbox_policy"],
-            docker_argv=analysis_named,
+            docker_argv=analysis_command,
         )
         analysis_cleanup = codex_cleanup_argv(analysis_execution_command)
-    elif profile["agent"]["name"].lower() == "codex":
-        analysis_execution_command = legacy_agent_launcher_argv(
-            output_root=analysis_workspace / ".qa-eval-output",
-            model=profile["agent"]["model"],
-            reasoning_effort=profile["agent"]["reasoning_effort"],
-            cli_version=profile["agent"]["cli_version"],
-            sandbox_policy=profile["agent"]["sandbox_policy"],
-            docker_argv=analysis_named,
+    else:
+        analysis_named, analysis_cleanup = named_container_command(
+            analysis_command,
+            name=f"agent-eval-analysis-{experiment_id[-8:]}-deterministic",
         )
+        analysis_execution_command = analysis_named
+        if profile["agent"]["name"].lower() == "codex":
+            analysis_execution_command = legacy_agent_launcher_argv(
+                output_root=analysis_output_root,
+                model=profile["agent"]["model"],
+                reasoning_effort=profile["agent"]["reasoning_effort"],
+                cli_version=profile["agent"]["cli_version"],
+                sandbox_policy=profile["agent"]["sandbox_policy"],
+                docker_argv=analysis_named,
+            )
     try:
         analysis_run = run_command(
             analysis_execution_command,
@@ -3242,7 +3261,7 @@ def _run_deterministic_improvements(
         "status": "captured"
         if not analysis_run.timed_out
         and analysis_run.exit_code == 0
-        and analysis_run.cleanup_status == "succeeded"
+        and analysis_run.cleanup_status in ("succeeded", "not_needed")
         and not analysis_trace["redacted"]
         and not launcher_unverified
         else "execution_error",
@@ -3404,20 +3423,29 @@ def _run_deterministic_improvements(
                     )
                     for item in template
                 ]
-                repair_mount = (
-                    "type=bind,source="
-                    f"{skill_root},target=/workspace/.agents/skills/{chosen_skill}"
-                )
-                repair_command = _insert_mount_before_image(
-                    repair_command, repair_mount
-                )
-                repair_isolation = verify_repair_docker_command(
-                    repair_command,
-                    workspace=repair_workspace,
-                    skill_root=skill_root,
-                    output_root=repair_output,
-                    skill_name=chosen_skill,
-                )
+                if profile.get("schema_version", 1) == 2:
+                    repair_isolation = verify_repair_wsl2_command(
+                        repair_command,
+                        workspace=repair_workspace,
+                        skill_root=skill_root,
+                        output_root=repair_output,
+                        skill_name=chosen_skill,
+                    )
+                else:
+                    repair_mount = (
+                        "type=bind,source="
+                        f"{skill_root},target=/workspace/.agents/skills/{chosen_skill}"
+                    )
+                    repair_command = _insert_mount_before_image(
+                        repair_command, repair_mount
+                    )
+                    repair_isolation = verify_repair_docker_command(
+                        repair_command,
+                        workspace=repair_workspace,
+                        skill_root=skill_root,
+                        output_root=repair_output,
+                        skill_name=chosen_skill,
+                    )
                 trial: dict[str, Any] = {
                     "trial": repair_index,
                     "status": "repair_pending",
@@ -3432,12 +3460,6 @@ def _run_deterministic_improvements(
                     case_record["status"] = "review_pending"
                     case_record["blocked_reason"] = trial["stop_reason"]
                     break
-                repair_named, repair_cleanup = named_container_command(
-                    repair_command,
-                    name=(
-                        f"agent-eval-repair-{experiment_id[-8:]}-det-{repair_index:02d}"
-                    ),
-                )
                 repair_attempt_number = result["repair_attempts_started"] + 1
                 result["repair_attempts_started"] = repair_attempt_number
                 case_record["repair_attempts_started"] = repair_attempt_number
@@ -3448,30 +3470,42 @@ def _run_deterministic_improvements(
                     "status": "repair_agent_running",
                 }
                 atomic_write_json(output_root / "result.json", result)
-                repair_execution_command = repair_named
                 if profile.get("schema_version", 1) == 2:
                     repair_execution_command = launcher_argv(
+                        mode="repair",
+                        workspace_root=repair_workspace,
+                        skill_root=skill_root,
+                        skill_name=chosen_skill,
                         output_root=repair_output,
+                        observations_path=trial_root
+                        / "repair-launcher-observations.json",
                         model=profile["agent"]["model"],
                         reasoning_effort=profile["agent"]["reasoning_effort"],
                         cli_version=profile["agent"]["cli_version"],
                         sandbox_policy=profile["agent"]["sandbox_policy"],
-                        docker_argv=repair_named,
-                        mode="repair",
-                        skill_name=chosen_skill,
+                        docker_argv=repair_command,
                     )
                     repair_cleanup = codex_cleanup_argv(repair_execution_command)
-                elif profile["agent"]["name"].lower() == "codex":
-                    repair_execution_command = legacy_agent_launcher_argv(
-                        output_root=repair_output,
-                        model=profile["agent"]["model"],
-                        reasoning_effort=profile["agent"]["reasoning_effort"],
-                        cli_version=profile["agent"]["cli_version"],
-                        sandbox_policy=profile["agent"]["sandbox_policy"],
-                        docker_argv=repair_named,
-                        mode="repair",
-                        skill_name=chosen_skill,
+                else:
+                    repair_named, repair_cleanup = named_container_command(
+                        repair_command,
+                        name=(
+                            f"agent-eval-repair-{experiment_id[-8:]}-det-"
+                            f"{repair_index:02d}"
+                        ),
                     )
+                    repair_execution_command = repair_named
+                    if profile["agent"]["name"].lower() == "codex":
+                        repair_execution_command = legacy_agent_launcher_argv(
+                            output_root=repair_output,
+                            model=profile["agent"]["model"],
+                            reasoning_effort=profile["agent"]["reasoning_effort"],
+                            cli_version=profile["agent"]["cli_version"],
+                            sandbox_policy=profile["agent"]["sandbox_policy"],
+                            docker_argv=repair_named,
+                            mode="repair",
+                            skill_name=chosen_skill,
+                        )
                 try:
                     repair_execution = run_command(
                         repair_execution_command,
@@ -3493,6 +3527,7 @@ def _run_deterministic_improvements(
                     case_record["status"] = "review_pending"
                     case_record["blocked_reason"] = trial["stop_reason"]
                     break
+                trial["container_cleanup_status"] = repair_execution.cleanup_status
                 repair_trace = capture_codex_jsonl_trace(repair_execution.stdout)
                 repair_unverified = repair_trace["redacted"] or (
                     repair_trace.get("launcher_observations") is not None
@@ -3501,7 +3536,8 @@ def _run_deterministic_improvements(
                 if (
                     repair_execution.timed_out
                     or repair_execution.exit_code != 0
-                    or repair_execution.cleanup_status != "succeeded"
+                    or repair_execution.cleanup_status
+                    not in ("succeeded", "not_needed")
                     or repair_unverified
                 ):
                     trial["status"] = "execution_error"
@@ -4073,36 +4109,49 @@ def run_improvements(
             )
             for item in baseline["agent_command_template"]
         ]
-        analysis_isolation = verify_agent_docker_command(
-            analysis_command,
-            workspace=analysis_workspace,
-            output_root=analysis_workspace / ".qa-eval-output",
-            evaluator_root=REPO_ROOT,
-        )
-        analysis_named, analysis_cleanup = named_container_command(
-            analysis_command,
-            name=f"agent-eval-analysis-{experiment_id[-8:]}-{case_index:02d}",
-        )
-        analysis_execution_command = analysis_named
+        analysis_output_root = analysis_workspace / ".qa-eval-output"
+        if profile.get("schema_version", 1) == 2:
+            analysis_isolation = verify_agent_wsl2_command(
+                analysis_command,
+                workspace=analysis_workspace,
+                output_root=analysis_output_root,
+                evaluator_root=REPO_ROOT,
+            )
+        else:
+            analysis_isolation = verify_agent_docker_command(
+                analysis_command,
+                workspace=analysis_workspace,
+                output_root=analysis_output_root,
+                evaluator_root=REPO_ROOT,
+            )
         if profile.get("schema_version", 1) == 2:
             analysis_execution_command = launcher_argv(
-                output_root=analysis_workspace / ".qa-eval-output",
+                mode="agent",
+                workspace_root=analysis_workspace,
+                output_root=analysis_output_root,
+                observations_path=case_root / "analysis-launcher-observations.json",
                 model=profile["agent"]["model"],
                 reasoning_effort=profile["agent"]["reasoning_effort"],
                 cli_version=profile["agent"]["cli_version"],
                 sandbox_policy=profile["agent"]["sandbox_policy"],
-                docker_argv=analysis_named,
+                docker_argv=analysis_command,
             )
             analysis_cleanup = codex_cleanup_argv(analysis_execution_command)
-        elif profile["agent"]["name"].lower() == "codex":
-            analysis_execution_command = legacy_agent_launcher_argv(
-                output_root=analysis_workspace / ".qa-eval-output",
-                model=profile["agent"]["model"],
-                reasoning_effort=profile["agent"]["reasoning_effort"],
-                cli_version=profile["agent"]["cli_version"],
-                sandbox_policy=profile["agent"]["sandbox_policy"],
-                docker_argv=analysis_named,
+        else:
+            analysis_named, analysis_cleanup = named_container_command(
+                analysis_command,
+                name=f"agent-eval-analysis-{experiment_id[-8:]}-{case_index:02d}",
             )
+            analysis_execution_command = analysis_named
+            if profile["agent"]["name"].lower() == "codex":
+                analysis_execution_command = legacy_agent_launcher_argv(
+                    output_root=analysis_output_root,
+                    model=profile["agent"]["model"],
+                    reasoning_effort=profile["agent"]["reasoning_effort"],
+                    cli_version=profile["agent"]["cli_version"],
+                    sandbox_policy=profile["agent"]["sandbox_policy"],
+                    docker_argv=analysis_named,
+                )
         analysis_run = run_command(
             analysis_execution_command,
             input_text=analysis_prompt,
@@ -4131,6 +4180,7 @@ def run_improvements(
             "status": "captured"
             if not analysis_run.timed_out
             and analysis_run.exit_code == 0
+            and analysis_run.cleanup_status in ("succeeded", "not_needed")
             and not analysis_trace["redacted"]
             and not analysis_launcher_unverified
             else "execution_error",
@@ -4149,7 +4199,7 @@ def run_improvements(
         if (
             analysis_run.timed_out
             or analysis_run.exit_code != 0
-            or analysis_run.cleanup_status == "failed"
+            or analysis_run.cleanup_status not in ("succeeded", "not_needed")
             or analysis_trace["redacted"]
             or analysis_launcher_unverified
         ):
@@ -4337,21 +4387,34 @@ def run_improvements(
                         )
                         for item in baseline["agent_command_template"]
                     ]
-                    repair_mount = f"type=bind,source={skill_root},target=/workspace/.agents/skills/{chosen_skill}"
-                    repair_command = _insert_mount_before_image(
-                        repair_command, repair_mount
-                    )
-                    repair_isolation = verify_repair_docker_command(
-                        repair_command,
-                        workspace=repair_workspace,
-                        skill_root=skill_root,
-                        output_root=repair_output,
-                        skill_name=chosen_skill,
-                    )
-                    repair_named, repair_cleanup = named_container_command(
-                        repair_command,
-                        name=f"agent-eval-repair-{experiment_id[-8:]}-{case_index:02d}-{repair_index:02d}",
-                    )
+                    if profile.get("schema_version", 1) == 2:
+                        repair_isolation = verify_repair_wsl2_command(
+                            repair_command,
+                            workspace=repair_workspace,
+                            skill_root=skill_root,
+                            output_root=repair_output,
+                            skill_name=chosen_skill,
+                        )
+                    else:
+                        repair_mount = f"type=bind,source={skill_root},target=/workspace/.agents/skills/{chosen_skill}"
+                        repair_command = _insert_mount_before_image(
+                            repair_command, repair_mount
+                        )
+                        repair_isolation = verify_repair_docker_command(
+                            repair_command,
+                            workspace=repair_workspace,
+                            skill_root=skill_root,
+                            output_root=repair_output,
+                            skill_name=chosen_skill,
+                        )
+                    repair_named = repair_command
+                    repair_cleanup = None
+                    if profile.get("schema_version", 1) != 2:
+                        repair_named, repair_cleanup = named_container_command(
+                            repair_command,
+                            name=f"agent-eval-repair-{experiment_id[-8:]}-"
+                            f"{case_index:02d}-{repair_index:02d}",
+                        )
                     repair_attempts_started += 1
                     result["repair_attempts_started"] = repair_attempts_started
                     result["active_case"] = {
@@ -4364,14 +4427,18 @@ def run_improvements(
                     repair_execution_command = repair_named
                     if profile.get("schema_version", 1) == 2:
                         repair_execution_command = launcher_argv(
+                            mode="repair",
+                            workspace_root=repair_workspace,
+                            skill_root=skill_root,
+                            skill_name=chosen_skill,
                             output_root=repair_output,
+                            observations_path=trial_root
+                            / "repair-launcher-observations.json",
                             model=profile["agent"]["model"],
                             reasoning_effort=profile["agent"]["reasoning_effort"],
                             cli_version=profile["agent"]["cli_version"],
                             sandbox_policy=profile["agent"]["sandbox_policy"],
-                            docker_argv=repair_named,
-                            mode="repair",
-                            skill_name=chosen_skill,
+                            docker_argv=repair_command,
                         )
                         repair_cleanup = codex_cleanup_argv(repair_execution_command)
                     elif profile["agent"]["name"].lower() == "codex":
@@ -4405,7 +4472,8 @@ def run_improvements(
                         "status": "execution_error"
                         if repair_execution.timed_out
                         or repair_execution.exit_code != 0
-                        or repair_execution.cleanup_status == "failed"
+                        or repair_execution.cleanup_status
+                        not in ("succeeded", "not_needed")
                         else "review_pending"
                         if repair_output_unverified
                         else "running",

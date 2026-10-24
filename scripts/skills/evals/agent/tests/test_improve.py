@@ -6,6 +6,7 @@ import sys
 import tempfile
 import types
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -42,7 +43,11 @@ from scripts.skills.evals.agent.qa_training_store import (
     validate_artifact_index,
 )
 from scripts.skills.evals.agent.target_workspace import DEFAULT_TARGET_REVISION
-from scripts.skills.evals.agent.workspace import profile_fingerprint
+from scripts.skills.evals.agent.workspace import (
+    profile_fingerprint,
+    verify_agent_wsl2_command,
+    verify_repair_wsl2_command,
+)
 
 
 def _write_baseline_output(output: Path, scenario: dict) -> None:
@@ -479,6 +484,371 @@ class ImprovementGateTests(unittest.TestCase):
                 expected_package_fingerprint="baseline-package-fingerprint",
             )
 
+    def _run_deterministic_wsl2_route(
+        self,
+        *,
+        allow_repair: bool,
+        trace_redacted: bool | list[bool] = False,
+        runner_results: list[SimpleNamespace] | None = None,
+        baseline_cleanup_status: str = "succeeded",
+    ):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_path, baseline, case, run_root = _write_deterministic_baseline(
+                root
+            )
+            for attempt in baseline["attempts"]:
+                attempt["agent_execution"]["container_cleanup_status"] = (
+                    baseline_cleanup_status
+                )
+            template = ["codex"]
+            baseline["agent_command_template"] = template
+            baseline["agent_command_fingerprint"] = canonical_fingerprint(template)
+            baseline["agent"] = {
+                "name": "codex",
+                "model": "synthetic-model",
+                "cli_version": "Codex CLI 0.163.0",
+            }
+            baseline["isolation"] = {
+                "method": "wsl2-dual-bubblewrap",
+                "agent_read_roots": [],
+                "evaluator_read_blocked": True,
+            }
+            for attempt in baseline["attempts"]:
+                attempt["agent_command"] = {
+                    "argv": template,
+                    "fingerprint": canonical_fingerprint(template),
+                }
+            baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+            (run_root / "isolation.json").write_text("verified\n", encoding="utf-8")
+            failure_attempts = []
+            for repeat, attempt in enumerate(baseline["attempts"], start=1):
+                trace_path = (
+                    run_root
+                    / "deterministic"
+                    / case["skill"]
+                    / case["id"]
+                    / f"attempt-{repeat:02d}"
+                    / "agent-trace.json"
+                )
+                failure_attempts.append({"attempt": attempt, "trace_path": trace_path})
+            failure = {
+                "skill": case["skill"],
+                "eval_id": case["id"],
+                "failed_assertion_ids": ["DT-ASSERT-001"],
+                "input_fingerprint": baseline["attempts"][0]["input_fingerprint"],
+                "dataset_fingerprint": baseline["dataset_fingerprint"],
+                "attempts": failure_attempts,
+            }
+            profile = {
+                "schema_version": 2,
+                "agent": {
+                    "name": "codex",
+                    "model": "synthetic-model",
+                    "reasoning_effort": "medium",
+                    "sandbox_policy": "workspace-write",
+                    "cli_version": "Codex CLI 0.163.0",
+                    "timeout_seconds": 30,
+                },
+                "judge": {"command_argv": []},
+                "isolation": baseline["isolation"],
+                "verification": {"evidence_path": "isolation.json"},
+            }
+            output_root = root / "improvement"
+            independent_plan = {
+                "status": "ready" if allow_repair else "blocked",
+                "cases": [
+                    {
+                        "suite": "deterministic",
+                        "skill": case["skill"],
+                        "case_id": "TC-DT-INDEPENDENT",
+                        "input_fingerprint": "e" * 64,
+                    }
+                ]
+                if allow_repair
+                else [],
+                "contract_tests": [{"path": "tests/test_skill.py", "sha256": "c" * 64}],
+                "block_reason": None,
+            }
+            create_workspace_calls: list[Path] = []
+
+            def fake_create_workspace(_repo, _revision, destination):
+                destination = Path(destination)
+                create_workspace_calls.append(destination)
+                skill_file = destination / "skills" / case["skill"] / "SKILL.md"
+                skill_file.parent.mkdir(parents=True, exist_ok=True)
+                skill_file.write_text(
+                    "Synthetic Skill instructions.\n", encoding="utf-8"
+                )
+                return {
+                    "skills": [case["skill"]],
+                    "package_fingerprint": "baseline-package-fingerprint",
+                }
+
+            redactions = (
+                list(trace_redacted) if isinstance(trace_redacted, list) else None
+            )
+
+            def fake_trace(*_args, **_kwargs):
+                redacted = redactions.pop(0) if redactions else trace_redacted
+                return {
+                    "final_message": "synthetic model response",
+                    "redacted": redacted,
+                    "format": "synthetic-test",
+                    "status": "evidence_unverified" if redacted else "not_captured",
+                    "execution_status": "evidence_unverified"
+                    if redacted
+                    else "completed",
+                    "launcher_observations": {"status": "evidence_unverified"}
+                    if redacted
+                    else None,
+                    "trace_summary": {"status": "not_captured"},
+                }
+
+            original_launcher_argv = improve_module.launcher_argv
+            launcher_calls: list[dict] = []
+
+            def recording_launcher_argv(**kwargs):
+                launcher_calls.append(dict(kwargs))
+                mode = kwargs.setdefault("mode", "agent")
+                output = Path(kwargs["output_root"])
+                kwargs.setdefault("workspace_root", output.parent)
+                kwargs.setdefault(
+                    "observations_path",
+                    output.parent / f"{mode}-launcher-observations.json",
+                )
+                if mode == "repair" and kwargs.get("skill_root") is None:
+                    kwargs["skill_root"] = (
+                        Path(kwargs["workspace_root"])
+                        / ".agents"
+                        / "skills"
+                        / kwargs["skill_name"]
+                    )
+                return original_launcher_argv(**kwargs)
+
+            run_calls: list = []
+            available_results = list(runner_results or [])
+            default_result = SimpleNamespace(
+                stdout="synthetic stdout",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="succeeded",
+            )
+
+            def fake_run_command(*args, **kwargs):
+                run_calls.append((args, kwargs))
+                return available_results.pop(0) if available_results else default_result
+
+            mount_calls: list[list[str]] = []
+
+            def record_mount(argv, _mount):
+                mount_calls.append(list(argv))
+                return list(argv)
+
+            def pass_independent_eval(*, destination, **_kwargs):
+                destination = Path(destination)
+                destination.mkdir(parents=True, exist_ok=True)
+                result_path = destination / "result.json"
+                result_path.write_text("{}\n", encoding="utf-8")
+                return {"status": "captured", "result_path": str(result_path)}
+
+            with ExitStack() as stack:
+                stack.enter_context(
+                    patch.object(
+                        improve_module, "load_execution_profile", return_value=profile
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module, "assert_clean_checkout", return_value="1" * 40
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "profile_fingerprint",
+                        return_value="profile-fingerprint",
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "prepare_run_output_root",
+                        side_effect=lambda output, **_kwargs: (
+                            Path(output).mkdir(parents=True, exist_ok=True)
+                            or Path(output) / "isolation.json"
+                        ),
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module, "verify_profile_evidence", return_value=True
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "create_skill_workspace",
+                        side_effect=fake_create_workspace,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_deterministic_attempt_data",
+                        return_value=failure,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_freeze_independent_eval_plan",
+                        return_value=independent_plan,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_run_related_contract_tests",
+                        return_value={"status": "pass", "results": []},
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_prepare_deterministic_analysis_workspace",
+                        return_value=({}, "synthetic Skill excerpt", {}),
+                    )
+                )
+                docker_agent_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_agent_docker_command",
+                        wraps=improve_module.verify_agent_docker_command,
+                    )
+                )
+                docker_repair_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_repair_docker_command",
+                        wraps=improve_module.verify_repair_docker_command,
+                    )
+                )
+                named_container_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "named_container_command",
+                        wraps=improve_module.named_container_command,
+                    )
+                )
+                mount_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_insert_mount_before_image",
+                        side_effect=record_mount,
+                    )
+                )
+                wsl_agent_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_agent_wsl2_command",
+                        wraps=verify_agent_wsl2_command,
+                        create=True,
+                    )
+                )
+                wsl_repair_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_repair_wsl2_command",
+                        wraps=verify_repair_wsl2_command,
+                        create=True,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "capture_codex_jsonl_trace",
+                        side_effect=fake_trace,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_validate_analysis",
+                        return_value={
+                            "classification": "skill",
+                            "skill": case["skill"],
+                        },
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_analysis_repair_gate",
+                        return_value={
+                            "allowed": True,
+                            "skill": case["skill"],
+                            "requested_paths": ["SKILL.md"],
+                            "reasons": [],
+                        },
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "launcher_argv",
+                        side_effect=recording_launcher_argv,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_run_independent_eval",
+                        side_effect=pass_independent_eval
+                        if allow_repair
+                        else improve_module._run_independent_eval,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_validate_independent_run",
+                        return_value={"status": "pass"},
+                    )
+                )
+                run_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "run_command",
+                        side_effect=fake_run_command,
+                    )
+                )
+                result = improve_module.run_improvements(
+                    baseline_result=baseline_path,
+                    judge_validation_result=None,
+                    target_root=None,
+                    profile_path=root / "profile.json",
+                    output_root=output_root,
+                    verifier_image=None,
+                    max_cases=1,
+                    max_repairs=1,
+                    max_seconds=3600 if allow_repair else 600,
+                    analyze_only=not allow_repair,
+                )
+            return {
+                "result": result,
+                "run_calls": run_calls,
+                "launcher_calls": launcher_calls,
+                "docker_agent_spy": docker_agent_spy,
+                "docker_repair_spy": docker_repair_spy,
+                "named_container_spy": named_container_spy,
+                "mount_spy": mount_spy,
+                "mount_calls": mount_calls,
+                "wsl_agent_spy": wsl_agent_spy,
+                "wsl_repair_spy": wsl_repair_spy,
+                "run_spy": run_spy,
+            }
+
     def test_independent_eval_plan_freezes_all_existing_cases_without_expected_data(
         self,
     ) -> None:
@@ -690,6 +1060,193 @@ class ImprovementGateTests(unittest.TestCase):
             trace_path.write_text('{"status":"captured"}\n', encoding="utf-8")
             with self.assertRaisesRegex(AgentEvalError, "trace changed"):
                 self._validate_deterministic_fixture(run, case, run_root)
+
+    def test_schema2_deterministic_analysis_uses_agent_wsl2_launcher(self) -> None:
+        route = self._run_deterministic_wsl2_route(allow_repair=False)
+        result = route["result"]
+        self.assertEqual(len(route["run_calls"]), 1)
+        self.assertEqual(result["evidence_basis"], "deterministic_only")
+        self.assertFalse(result["judge_required"])
+        self.assertEqual(result["cases"][0]["analysis"]["status"], "captured")
+        self.assertEqual(route["docker_agent_spy"].call_count, 0)
+        self.assertEqual(route["named_container_spy"].call_count, 0)
+        self.assertEqual(route["wsl_agent_spy"].call_count, 1)
+        self.assertEqual(len(route["launcher_calls"]), 1)
+        launch = route["launcher_calls"][0]
+        self.assertEqual(launch["mode"], "agent")
+        self.assertEqual(launch["docker_argv"], ["codex"])
+        self.assertEqual(launch["workspace_root"], route["run_calls"][0][1]["cwd"])
+        self.assertEqual(
+            launch["observations_path"],
+            launch["workspace_root"].parent / "analysis-launcher-observations.json",
+        )
+        self.assertEqual(
+            launch["output_root"], route["run_calls"][0][1]["cwd"] / ".qa-eval-output"
+        )
+        self.assertEqual(launch["model"], "synthetic-model")
+        self.assertEqual(launch["reasoning_effort"], "medium")
+        self.assertEqual(launch["sandbox_policy"], "workspace-write")
+        self.assertEqual(
+            route["run_calls"][0][1]["timeout_cleanup_argv"],
+            improve_module.codex_cleanup_argv(route["run_calls"][0][0][0]),
+        )
+
+    def test_schema2_deterministic_repair_uses_single_skill_launcher(self) -> None:
+        route = self._run_deterministic_wsl2_route(allow_repair=True)
+        self.assertEqual(len(route["run_calls"]), 2)
+        self.assertEqual(route["result"]["repair_attempts_started"], 1)
+        self.assertEqual(route["docker_agent_spy"].call_count, 0)
+        self.assertEqual(route["docker_repair_spy"].call_count, 0)
+        self.assertEqual(route["named_container_spy"].call_count, 0)
+        self.assertEqual(route["mount_spy"].call_count, 0)
+        self.assertEqual(route["wsl_agent_spy"].call_count, 1)
+        self.assertEqual(route["wsl_repair_spy"].call_count, 1)
+        self.assertEqual(
+            [row["mode"] for row in route["launcher_calls"]], ["agent", "repair"]
+        )
+        analysis, repair = route["launcher_calls"]
+        self.assertTrue(
+            all(row["docker_argv"] == ["codex"] for row in (analysis, repair))
+        )
+        self.assertEqual(repair["skill_name"], "test-case-design")
+        self.assertEqual(
+            repair["skill_root"],
+            repair["workspace_root"] / ".agents" / "skills" / "test-case-design",
+        )
+        self.assertEqual(
+            repair["observations_path"],
+            repair["workspace_root"].parent / "repair-launcher-observations.json",
+        )
+        self.assertEqual(
+            repair["output_root"], repair["workspace_root"] / ".qa-eval-output"
+        )
+        self.assertNotEqual(analysis["observations_path"], repair["observations_path"])
+        self.assertEqual(
+            route["run_calls"][1][1]["timeout_cleanup_argv"],
+            improve_module.codex_cleanup_argv(route["run_calls"][1][0][0]),
+        )
+
+    def test_schema2_deterministic_normal_cleanup_not_needed_is_accepted(self) -> None:
+        normal_completion = SimpleNamespace(
+            stdout="synthetic response",
+            timed_out=False,
+            exit_code=0,
+            cleanup_status="not_needed",
+        )
+        route = self._run_deterministic_wsl2_route(
+            allow_repair=True,
+            baseline_cleanup_status="not_needed",
+            runner_results=[normal_completion, normal_completion],
+        )
+        self.assertEqual(len(route["run_calls"]), 2)
+        case = route["result"]["cases"][0]
+        self.assertEqual(case["analysis"]["status"], "captured")
+        self.assertEqual(
+            case["repair_trials"][0]["container_cleanup_status"], "not_needed"
+        )
+        self.assertNotEqual(case["repair_trials"][0]["status"], "execution_error")
+
+    def test_schema2_deterministic_timeout_cleanup_and_redaction_fail_closed(
+        self,
+    ) -> None:
+        for failed_run in (
+            SimpleNamespace(
+                stdout="synthetic stdout",
+                timed_out=True,
+                exit_code=-15,
+                cleanup_status="succeeded",
+            ),
+            SimpleNamespace(
+                stdout="synthetic stdout",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="failed",
+            ),
+        ):
+            with self.subTest(
+                timed_out=failed_run.timed_out, cleanup=failed_run.cleanup_status
+            ):
+                route = self._run_deterministic_wsl2_route(
+                    allow_repair=False,
+                    runner_results=[failed_run],
+                )
+                self.assertEqual(len(route["run_calls"]), 1)
+                self.assertEqual(route["result"]["repair_attempts_started"], 0)
+                self.assertEqual(
+                    route["result"]["cases"][0]["status"], "review_pending"
+                )
+                self.assertEqual(
+                    route["result"]["cases"][0]["analysis"]["status"],
+                    "execution_error",
+                )
+
+        for failed_repair in (
+            SimpleNamespace(
+                stdout="synthetic repair response",
+                timed_out=True,
+                exit_code=-15,
+                cleanup_status="succeeded",
+            ),
+            SimpleNamespace(
+                stdout="synthetic repair response",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="failed",
+            ),
+        ):
+            with self.subTest(
+                repair_timed_out=failed_repair.timed_out,
+                repair_cleanup=failed_repair.cleanup_status,
+            ):
+                route = self._run_deterministic_wsl2_route(
+                    allow_repair=True,
+                    runner_results=[
+                        SimpleNamespace(
+                            stdout="synthetic analysis response",
+                            timed_out=False,
+                            exit_code=0,
+                            cleanup_status="succeeded",
+                        ),
+                        failed_repair,
+                    ],
+                )
+                self.assertEqual(len(route["run_calls"]), 2)
+                self.assertEqual(route["result"]["repair_attempts_started"], 1)
+                case = route["result"]["cases"][0]
+                self.assertEqual(case["status"], "review_pending")
+                trial = case["repair_trials"][0]
+                self.assertEqual(trial["status"], "execution_error")
+                self.assertEqual(
+                    trial["stop_reason"],
+                    "repair_agent_execution_or_trace_unverified",
+                )
+                self.assertEqual(
+                    trial["container_cleanup_status"], failed_repair.cleanup_status
+                )
+                self.assertNotIn("candidate_package_fingerprint", trial)
+
+        redacted_analysis = self._run_deterministic_wsl2_route(
+            allow_repair=False,
+            trace_redacted=True,
+        )
+        self.assertEqual(redacted_analysis["result"]["repair_attempts_started"], 0)
+        self.assertIsNone(
+            redacted_analysis["result"]["cases"][0]["analysis"]["response_sha256"]
+        )
+
+        redacted_repair = self._run_deterministic_wsl2_route(
+            allow_repair=True,
+            trace_redacted=[False, True],
+        )
+        self.assertEqual(len(redacted_repair["run_calls"]), 2)
+        self.assertEqual(redacted_repair["result"]["repair_attempts_started"], 1)
+        self.assertEqual(
+            redacted_repair["result"]["cases"][0]["status"], "review_pending"
+        )
+        self.assertEqual(
+            redacted_repair["result"]["cases"][0]["repair_trials"][0]["status"],
+            "execution_error",
+        )
 
     def test_run_improvements_enters_deterministic_path_without_judge_validation(
         self,
@@ -1470,7 +2027,15 @@ class ImprovementGateTests(unittest.TestCase):
         alternative_causes: list[str],
         artifact_state: str = "valid",
         trace_skill_observed: bool | None = None,
-        trace_redacted: bool = False,
+        trace_redacted: bool | list[bool] = False,
+        schema_version: int = 1,
+        baseline_suite: str = "semantic",
+        baseline_cleanup_status: str = "succeeded",
+        allow_repair: bool = False,
+        runner_results: list[SimpleNamespace] | None = None,
+        runner_calls: list | None = None,
+        launcher_calls: list | None = None,
+        routing_spies: dict | None = None,
     ):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1572,7 +2137,7 @@ class ImprovementGateTests(unittest.TestCase):
                             "trace_status": "captured",
                             "trace_path": trace_relative,
                             "trace_redacted": False,
-                            "container_cleanup_status": "succeeded",
+                            "container_cleanup_status": baseline_cleanup_status,
                         }
                     ),
                     encoding="utf-8",
@@ -1609,6 +2174,7 @@ class ImprovementGateTests(unittest.TestCase):
                 attempts.append(attempt_record)
             baseline = {
                 "schema_version": 1,
+                "suite": "semantic",
                 "run_id": "baseline-run",
                 "status": "needs_review",
                 "target_revision": DEFAULT_TARGET_REVISION,
@@ -1642,6 +2208,20 @@ class ImprovementGateTests(unittest.TestCase):
                 "judge": {"timeout_seconds": 30, "command_argv": ["judge"]},
                 "verification": {"evidence_path": "isolation.json"},
             }
+            if schema_version == 2:
+                baseline["schema_version"] = 2
+                baseline["suite"] = baseline_suite
+                baseline["agent_command_template"] = ["codex"]
+                profile["schema_version"] = 2
+                profile["agent"].update(
+                    {
+                        "name": "codex",
+                        "reasoning_effort": "medium",
+                        "sandbox_policy": "workspace-write",
+                        "cli_version": "Codex CLI 0.163.0",
+                    }
+                )
+                baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
             artifact_source = run_root / "attempt-01" / "qa-output" / artifact_path
             artifact_bytes = (
                 artifact_source.read_bytes()
@@ -1687,27 +2267,122 @@ class ImprovementGateTests(unittest.TestCase):
                 }
 
             def fake_trace(*_args, **_kwargs):
+                if isinstance(trace_redacted, list):
+                    redacted = trace_redacted.pop(0) if trace_redacted else False
+                else:
+                    redacted = trace_redacted
                 return {
                     "final_message": analysis_response,
-                    "redacted": trace_redacted,
+                    "redacted": redacted,
                     "format": "synthetic-test",
-                    "status": "evidence_unverified" if trace_redacted else "unwrapped",
+                    "status": "evidence_unverified" if redacted else "unwrapped",
                     "execution_status": "evidence_unverified"
-                    if trace_redacted
+                    if redacted
                     else "completed",
                     "launcher_observations": {
                         "protocol": "codex_wsl2_bwrap_launcher_v1",
                         "status": "evidence_unverified",
                         "response_redacted": True,
                     }
-                    if trace_redacted
+                    if redacted
                     else None,
                     "trace_summary": {
-                        "status": "evidence_unverified"
-                        if trace_redacted
-                        else "not_captured"
+                        "status": "evidence_unverified" if redacted else "not_captured"
                     },
                 }
+
+            original_launcher_argv = improve_module.launcher_argv
+
+            def recording_launcher_argv(**kwargs):
+                if launcher_calls is not None:
+                    launcher_calls.append(dict(kwargs))
+                mode = kwargs.setdefault("mode", "agent")
+                output = Path(kwargs["output_root"])
+                kwargs.setdefault("workspace_root", output.parent)
+                kwargs.setdefault(
+                    "observations_path",
+                    output.parent / f"{mode}-launcher-observations.json",
+                )
+                if mode == "repair" and kwargs.get("skill_root") is None:
+                    kwargs["skill_root"] = (
+                        Path(kwargs["workspace_root"])
+                        / ".agents"
+                        / "skills"
+                        / kwargs["skill_name"]
+                    )
+                return original_launcher_argv(**kwargs)
+
+            recorded_run_calls: list = []
+            available_runner_results = list(runner_results or [])
+            default_runner_result = SimpleNamespace(
+                stdout="agent response",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="succeeded",
+            )
+
+            def fake_run_command(*args, **kwargs):
+                row = (args, kwargs)
+                recorded_run_calls.append(row)
+                if runner_calls is not None:
+                    runner_calls.append(row)
+                if available_runner_results:
+                    return available_runner_results.pop(0)
+                return default_runner_result
+
+            original_independent_eval = improve_module._run_independent_eval
+
+            def pass_independent_eval(*, destination, **_kwargs):
+                destination = Path(destination)
+                destination.mkdir(parents=True, exist_ok=True)
+                result_path = destination / "result.json"
+                result_path.write_text("{}\n", encoding="utf-8")
+                return {"status": "captured", "result_path": str(result_path)}
+
+            def record_mount(argv, _mount):
+                if routing_spies is not None:
+                    routing_spies.setdefault("mount_calls", []).append(list(argv))
+                return list(argv)
+
+            docker_agent_patch = (
+                patch.object(
+                    improve_module,
+                    "verify_agent_docker_command",
+                    wraps=improve_module.verify_agent_docker_command,
+                )
+                if schema_version == 2
+                else patch.object(
+                    improve_module,
+                    "verify_agent_docker_command",
+                    return_value={"status": "verified"},
+                )
+            )
+            docker_repair_patch = (
+                patch.object(
+                    improve_module,
+                    "verify_repair_docker_command",
+                    wraps=improve_module.verify_repair_docker_command,
+                )
+                if schema_version == 2
+                else patch.object(
+                    improve_module,
+                    "verify_repair_docker_command",
+                    return_value={"status": "verified"},
+                )
+            )
+            named_container_patch = (
+                patch.object(
+                    improve_module,
+                    "named_container_command",
+                    wraps=improve_module.named_container_command,
+                )
+                if schema_version == 2
+                else patch.object(
+                    improve_module,
+                    "named_container_command",
+                    return_value=(["docker", "run", "image"], []),
+                )
+            )
 
             independent_plan = {
                 "schema_version": 1,
@@ -1735,87 +2410,152 @@ class ImprovementGateTests(unittest.TestCase):
                 "block_reason": None,
             }
 
-            with (
-                patch.object(
-                    improve_module,
-                    "_judge_verification_map",
-                    return_value={
-                        "QTS-SEM-006": {
-                            "status": "verified",
-                            "verified_fixture_ids": ["fixture-006"],
-                        }
-                    },
-                ),
-                patch.object(
-                    improve_module, "load_execution_profile", return_value=profile
-                ),
-                patch.object(
-                    improve_module, "profile_fingerprint", return_value="test-profile"
-                ),
-                patch.object(
-                    improve_module,
-                    "assert_clean_checkout",
-                    side_effect=lambda path: (
-                        "1" * 40
-                        if Path(path) == improve_module.REPO_ROOT
-                        else "target-sha"
-                    ),
-                ),
-                patch.object(
-                    improve_module,
-                    "prepare_run_output_root",
-                    side_effect=lambda output, **_kwargs: (
-                        Path(output).mkdir(parents=True, exist_ok=True)
-                        or Path(output) / "isolation.json"
-                    ),
-                ),
-                patch.object(
-                    improve_module, "verify_profile_evidence", return_value=True
-                ),
-                patch.object(
-                    improve_module,
-                    "create_skill_workspace",
-                    side_effect=fake_create_skill_workspace,
-                ),
-                patch.object(
-                    improve_module,
-                    "_freeze_independent_eval_plan",
-                    return_value=independent_plan,
-                ),
-                patch.object(
-                    improve_module, "extract_revision_files", return_value=public_refs
-                ),
-                patch.object(
-                    improve_module,
-                    "verify_agent_docker_command",
-                    return_value={"status": "verified"},
-                ),
-                patch.object(
-                    improve_module,
-                    "named_container_command",
-                    return_value=(["docker", "run", "image"], []),
-                ),
-                patch.object(
-                    improve_module, "capture_codex_jsonl_trace", side_effect=fake_trace
-                ),
-                patch.object(
-                    improve_module,
-                    "run_agent_evaluation",
-                    side_effect=AgentEvalError(
-                        "synthetic independent evaluation unavailable"
-                    ),
-                ),
-                patch.object(
-                    improve_module,
-                    "run_command",
-                    return_value=SimpleNamespace(
-                        stdout="agent response",
-                        timed_out=False,
-                        exit_code=0,
-                        cleanup_status="succeeded",
-                    ),
-                ) as run_spy,
-            ):
+            with ExitStack() as stack:
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_judge_verification_map",
+                        return_value={
+                            "QTS-SEM-006": {
+                                "status": "verified",
+                                "verified_fixture_ids": ["fixture-006"],
+                            }
+                        },
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module, "load_execution_profile", return_value=profile
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "profile_fingerprint",
+                        return_value="test-profile",
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "assert_clean_checkout",
+                        side_effect=lambda path: (
+                            "1" * 40
+                            if Path(path) == improve_module.REPO_ROOT
+                            else "target-sha"
+                        ),
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "prepare_run_output_root",
+                        side_effect=lambda output, **_kwargs: (
+                            Path(output).mkdir(parents=True, exist_ok=True)
+                            or Path(output) / "isolation.json"
+                        ),
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module, "verify_profile_evidence", return_value=True
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "create_skill_workspace",
+                        side_effect=fake_create_skill_workspace,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_freeze_independent_eval_plan",
+                        return_value=independent_plan,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "extract_revision_files",
+                        return_value=public_refs,
+                    )
+                )
+                docker_agent_spy = stack.enter_context(docker_agent_patch)
+                docker_repair_spy = stack.enter_context(docker_repair_patch)
+                named_container_spy = stack.enter_context(named_container_patch)
+                wsl_agent_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_agent_wsl2_command",
+                        wraps=verify_agent_wsl2_command,
+                        create=True,
+                    )
+                )
+                wsl_repair_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "verify_repair_wsl2_command",
+                        wraps=verify_repair_wsl2_command,
+                        create=True,
+                    )
+                )
+                mount_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_insert_mount_before_image",
+                        side_effect=record_mount,
+                    )
+                )
+                launcher_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "launcher_argv",
+                        side_effect=recording_launcher_argv,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "capture_codex_jsonl_trace",
+                        side_effect=fake_trace,
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "run_agent_evaluation",
+                        side_effect=AgentEvalError(
+                            "synthetic independent evaluation unavailable"
+                        ),
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_run_independent_eval",
+                        side_effect=(
+                            pass_independent_eval
+                            if allow_repair
+                            else original_independent_eval
+                        ),
+                    )
+                )
+                stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "_validate_independent_run",
+                        return_value={"status": "pass"},
+                    )
+                )
+                run_spy = stack.enter_context(
+                    patch.object(
+                        improve_module,
+                        "run_command",
+                        side_effect=fake_run_command,
+                    )
+                )
                 result = improve_module.run_improvements(
                     baseline_result=baseline_path,
                     judge_validation_result=judge_validation_path,
@@ -1825,12 +2565,24 @@ class ImprovementGateTests(unittest.TestCase):
                     verifier_image="verifier-image",
                     max_cases=1,
                     max_repairs=1,
-                    max_seconds=600,
+                    max_seconds=3600 if allow_repair else 600,
                     analyze_only=False,
                 )
             prompt = (
-                run_spy.call_args.kwargs["input_text"] if run_spy.call_count else None
+                recorded_run_calls[0][1]["input_text"] if recorded_run_calls else None
             )
+            if routing_spies is not None:
+                routing_spies.update(
+                    {
+                        "docker_agent_verifier": docker_agent_spy,
+                        "docker_repair_verifier": docker_repair_spy,
+                        "named_container": named_container_spy,
+                        "wsl_agent": wsl_agent_spy,
+                        "wsl_repair": wsl_repair_spy,
+                        "mount": mount_spy,
+                        "launcher": launcher_spy,
+                    }
+                )
             return result, run_spy.call_count, output_root, prompt
 
     def test_run_improvements_never_starts_repair_when_alternative_cause_remains(
@@ -1875,6 +2627,255 @@ class ImprovementGateTests(unittest.TestCase):
         self.assertEqual(case["status"], "review_pending")
         self.assertEqual(case["blocked_reason"], "analysis_output_redacted")
         self.assertIsNone(case["analysis"]["response_sha256"])
+
+    def test_schema2_semantic_and_mixed_analysis_use_agent_wsl2_launcher(self) -> None:
+        for suite in ("semantic", "mixed"):
+            with self.subTest(suite=suite):
+                runner_calls: list = []
+                launcher_calls: list = []
+                spies: dict = {}
+                result, run_count, _output_root, _prompt = (
+                    self._run_integrated_qts_gate(
+                        skill_observation="observed",
+                        alternative_causes=[],
+                        schema_version=2,
+                        baseline_suite=suite,
+                        runner_calls=runner_calls,
+                        launcher_calls=launcher_calls,
+                        routing_spies=spies,
+                    )
+                )
+                self.assertEqual(run_count, 1)
+                self.assertEqual(result["cases"][0]["analysis"]["status"], "captured")
+                self.assertEqual(spies["docker_agent_verifier"].call_count, 0)
+                self.assertEqual(spies["named_container"].call_count, 0)
+                self.assertEqual(spies["wsl_agent"].call_count, 1)
+                self.assertEqual(len(launcher_calls), 1)
+                launch = launcher_calls[0]
+                self.assertEqual(launch["mode"], "agent")
+                self.assertEqual(launch["docker_argv"], ["codex"])
+                self.assertEqual(launch["workspace_root"], runner_calls[0][1]["cwd"])
+                self.assertEqual(
+                    launch["observations_path"],
+                    launch["workspace_root"].parent
+                    / "analysis-launcher-observations.json",
+                )
+                self.assertEqual(
+                    launch["output_root"], runner_calls[0][1]["cwd"] / ".qa-eval-output"
+                )
+                self.assertEqual(launch["model"], "fake-model")
+                self.assertEqual(launch["reasoning_effort"], "medium")
+                self.assertEqual(launch["sandbox_policy"], "workspace-write")
+                self.assertEqual(
+                    runner_calls[0][1]["timeout_cleanup_argv"],
+                    improve_module.codex_cleanup_argv(runner_calls[0][0][0]),
+                )
+
+    def test_schema2_mixed_repair_uses_single_skill_repair_launcher(self) -> None:
+        runner_calls: list = []
+        launcher_calls: list = []
+        spies: dict = {}
+        result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
+            skill_observation="observed",
+            alternative_causes=[],
+            schema_version=2,
+            baseline_suite="mixed",
+            allow_repair=True,
+            runner_calls=runner_calls,
+            launcher_calls=launcher_calls,
+            routing_spies=spies,
+        )
+        self.assertEqual(run_count, 2)
+        self.assertEqual(result["repair_attempts_started"], 1)
+        self.assertEqual(spies["docker_agent_verifier"].call_count, 0)
+        self.assertEqual(spies["docker_repair_verifier"].call_count, 0)
+        self.assertEqual(spies["named_container"].call_count, 0)
+        self.assertEqual(spies["mount"].call_count, 0)
+        self.assertEqual(spies["wsl_agent"].call_count, 1)
+        self.assertEqual(spies["wsl_repair"].call_count, 1)
+        self.assertEqual([row["mode"] for row in launcher_calls], ["agent", "repair"])
+        self.assertTrue(all(row["docker_argv"] == ["codex"] for row in launcher_calls))
+        repair = launcher_calls[1]
+        self.assertEqual(repair["skill_name"], "test-case-design")
+        self.assertEqual(
+            repair["skill_root"],
+            repair["workspace_root"] / ".agents" / "skills" / "test-case-design",
+        )
+        self.assertEqual(
+            repair["observations_path"],
+            repair["workspace_root"].parent / "repair-launcher-observations.json",
+        )
+        self.assertEqual(
+            repair["output_root"], repair["workspace_root"] / ".qa-eval-output"
+        )
+        self.assertNotEqual(
+            launcher_calls[0]["observations_path"], repair["observations_path"]
+        )
+        self.assertEqual(
+            runner_calls[1][1]["timeout_cleanup_argv"],
+            improve_module.codex_cleanup_argv(runner_calls[1][0][0]),
+        )
+
+    def test_schema2_semantic_and_mixed_normal_cleanup_not_needed_is_accepted(
+        self,
+    ) -> None:
+        normal_completion = SimpleNamespace(
+            stdout="synthetic response",
+            timed_out=False,
+            exit_code=0,
+            cleanup_status="not_needed",
+        )
+        for suite in ("semantic", "mixed"):
+            with self.subTest(suite=suite):
+                result, run_count, _output_root, _prompt = (
+                    self._run_integrated_qts_gate(
+                        skill_observation="observed",
+                        alternative_causes=[],
+                        schema_version=2,
+                        baseline_suite=suite,
+                        baseline_cleanup_status="not_needed",
+                        allow_repair=True,
+                        runner_results=[normal_completion, normal_completion],
+                    )
+                )
+                self.assertEqual(run_count, 2)
+                case = result["cases"][0]
+                self.assertEqual(case["analysis"]["status"], "captured")
+                self.assertEqual(
+                    case["repair_trials"][0]["container_cleanup_status"],
+                    "not_needed",
+                )
+                self.assertNotEqual(
+                    case["repair_trials"][0]["status"], "execution_error"
+                )
+
+    def test_schema2_mixed_repair_timeout_and_cleanup_failure_stop_safely(
+        self,
+    ) -> None:
+        for failed_repair in (
+            SimpleNamespace(
+                stdout="synthetic repair response",
+                timed_out=True,
+                exit_code=-15,
+                cleanup_status="succeeded",
+            ),
+            SimpleNamespace(
+                stdout="synthetic repair response",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="failed",
+            ),
+        ):
+            with self.subTest(
+                repair_timed_out=failed_repair.timed_out,
+                repair_cleanup=failed_repair.cleanup_status,
+            ):
+                runner_calls: list = []
+                result, run_count, _output_root, _prompt = (
+                    self._run_integrated_qts_gate(
+                        skill_observation="observed",
+                        alternative_causes=[],
+                        schema_version=2,
+                        baseline_suite="mixed",
+                        allow_repair=True,
+                        runner_results=[
+                            SimpleNamespace(
+                                stdout="synthetic analysis response",
+                                timed_out=False,
+                                exit_code=0,
+                                cleanup_status="succeeded",
+                            ),
+                            failed_repair,
+                        ],
+                        runner_calls=runner_calls,
+                    )
+                )
+                self.assertEqual(run_count, 2)
+                self.assertEqual(result["repair_attempts_started"], 1)
+                case = result["cases"][0]
+                self.assertEqual(case["status"], "review_pending")
+                trial = case["repair_trials"][0]
+                self.assertEqual(trial["status"], "execution_error")
+                self.assertEqual(trial["stop_reason"], "repair_agent_execution_error")
+                self.assertEqual(
+                    trial["container_cleanup_status"], failed_repair.cleanup_status
+                )
+                self.assertNotIn("candidate_package_fingerprint", trial)
+                self.assertEqual(
+                    runner_calls[1][1]["timeout_cleanup_argv"],
+                    improve_module.codex_cleanup_argv(runner_calls[1][0][0]),
+                )
+
+    def test_schema2_analysis_timeout_cleanup_failure_and_redaction_stop_safely(
+        self,
+    ) -> None:
+        failed_runs = [
+            SimpleNamespace(
+                stdout="synthetic response",
+                timed_out=True,
+                exit_code=-15,
+                cleanup_status="succeeded",
+            ),
+            SimpleNamespace(
+                stdout="synthetic response",
+                timed_out=False,
+                exit_code=0,
+                cleanup_status="failed",
+            ),
+        ]
+        for failed_run in failed_runs:
+            with self.subTest(
+                timed_out=failed_run.timed_out, cleanup=failed_run.cleanup_status
+            ):
+                result, run_count, _output_root, _prompt = (
+                    self._run_integrated_qts_gate(
+                        skill_observation="observed",
+                        alternative_causes=[],
+                        schema_version=2,
+                        runner_results=[failed_run],
+                    )
+                )
+                self.assertEqual(run_count, 1)
+                self.assertEqual(result["repair_attempts_started"], 0)
+                self.assertEqual(result["cases"][0]["status"], "review_pending")
+                self.assertEqual(
+                    result["cases"][0]["analysis"]["status"], "execution_error"
+                )
+
+        redacted, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
+            skill_observation="observed",
+            alternative_causes=[],
+            schema_version=2,
+            trace_redacted=True,
+        )
+        self.assertEqual(run_count, 1)
+        self.assertEqual(redacted["repair_attempts_started"], 0)
+        self.assertEqual(redacted["cases"][0]["status"], "review_pending")
+        self.assertIsNone(redacted["cases"][0]["analysis"]["response_sha256"])
+
+    def test_schema1_semantic_path_keeps_legacy_docker_launcher(self) -> None:
+        runner_calls: list = []
+        spies: dict = {}
+        normal_completion = SimpleNamespace(
+            stdout="synthetic response",
+            timed_out=False,
+            exit_code=0,
+            cleanup_status="not_needed",
+        )
+        result, run_count, _output_root, _prompt = self._run_integrated_qts_gate(
+            skill_observation="observed",
+            alternative_causes=[],
+            schema_version=1,
+            baseline_cleanup_status="not_needed",
+            runner_results=[normal_completion],
+            runner_calls=runner_calls,
+            routing_spies=spies,
+        )
+        self.assertEqual(run_count, 1)
+        self.assertEqual(result["cases"][0]["analysis"]["status"], "captured")
+        self.assertEqual(runner_calls[0][0][0], ["docker", "run", "image"])
+        self.assertEqual(spies["docker_agent_verifier"].call_count, 1)
+        self.assertEqual(spies["named_container"].call_count, 1)
 
     def test_run_improvements_rejects_skill_use_not_supported_by_saved_trace(
         self,

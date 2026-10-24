@@ -549,6 +549,15 @@ def run_validation(
     if not baseline_output.is_dir():
         raise AgentEvalError("baseline QA artifacts were not preserved")
     profile = load_execution_profile(profile_path)
+    if profile.get("schema_version", 1) == 2:
+        if candidate_judge_command is not None and candidate_judge_command != ["codex"]:
+            raise AgentEvalError(
+                "schema 2 candidate Judge must use the fixed codex command template"
+            )
+        if proposal_command is not None and proposal_command != ["codex"]:
+            raise AgentEvalError(
+                "schema 2 proposal Agent must use the fixed codex command template"
+            )
     output_root = Path(os.path.abspath(output_root))
     prepare_run_output_root(
         output_root,
@@ -879,6 +888,8 @@ def run_validation(
                 reasoning_effort=profile["agent"]["reasoning_effort"],
                 sandbox_policy=profile["agent"]["sandbox_policy"],
                 workspace_root=cwd,
+                cli_version=profile["agent"]["cli_version"],
+                docker_argv=proposal_command,
             )
             cleanup = codex_cleanup_argv(proposal_execution_command)
         elif proposal_command[0] == "docker":

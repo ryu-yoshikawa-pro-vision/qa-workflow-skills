@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.skills.evals.agent import judge_validation
+from scripts.skills.evals.agent import compare, judge_validation
+from scripts.skills.evals.agent.common import AgentEvalError
 from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.judge_validation import (
     _approval_binding_status,
@@ -86,6 +87,56 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_schema2_rejects_docker_candidate_judge_and_proposal_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_root = root / "baseline-run"
+            (run_root / "attempt-01" / "qa-output").mkdir(parents=True)
+            baseline = {
+                "profile_verification": "verified",
+                "attempts": [
+                    {
+                        "status": "pass",
+                        "saved_output_root": "attempt-01/qa-output",
+                    }
+                ],
+            }
+            docker_argv = ["docker", "run", "candidate"]
+            for field, message in (
+                ("candidate_judge_command", "schema 2 candidate Judge"),
+                ("proposal_command", "schema 2 proposal Agent"),
+            ):
+                arguments = {
+                    "candidate_judge_command": None,
+                    "proposal_command": None,
+                }
+                arguments[field] = docker_argv
+                with self.subTest(field=field):
+                    with (
+                        patch.object(
+                            compare,
+                            "_load_result",
+                            return_value=(baseline, run_root),
+                        ),
+                        patch.object(
+                            judge_validation,
+                            "load_execution_profile",
+                            return_value={"schema_version": 2},
+                        ),
+                        self.assertRaisesRegex(AgentEvalError, message),
+                    ):
+                        run_validation(
+                            baseline_result=run_root / "result.json",
+                            target_root=root,
+                            profile_path=root / "profile.json",
+                            output_root=root / "output",
+                            approval_path=None,
+                            max_cases=1,
+                            max_seconds=60,
+                            repeat=2,
+                            **arguments,
+                        )
+
     def test_real_normalizer_matches_normal_violation_and_not_evaluable(self) -> None:
         scenario = load_scenario()
         criteria = [item["id"] for item in scenario["rubric"][:2]]
