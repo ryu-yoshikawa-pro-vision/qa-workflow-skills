@@ -20,6 +20,7 @@ from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
     PACKAGE_SHA512,
     PACKAGE_VERSION,
     CodexWsl2LauncherError,
+    _auth_material,
     _codex_exec_argv,
     _prepare_codex_home,
     cleanup_argv,
@@ -64,7 +65,13 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 codex_home_parent = root / "homes"
                 codex_home_parent.mkdir(mode=0o700)
                 codex_home = codex_home_parent / f"{CODEX_HOME_PREFIX}{mode}-test"
+                source_home = root / "source-home"
+                source_home.mkdir()
+                auth_file = source_home / "auth.json"
+                auth_file.write_text("SYNTHETIC_CHATGPT_AUTH_MARKER", encoding="utf-8")
                 observations_path = root / "launcher-observations.json"
+                child_environments = []
+                login_status_environments = []
                 response = f"Answer {secret}" if redact else "Ordinary answer"
                 events = (
                     json.dumps(
@@ -78,7 +85,16 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     + "\n"
                 ).encode("utf-8")
 
-                def fake_subprocess(command, **_kwargs):
+                def fake_subprocess(command, **kwargs):
+                    if command[1:] == ["login", "status"]:
+                        login_status_environments.append(kwargs["env"])
+                        return subprocess.CompletedProcess(
+                            command,
+                            0,
+                            stdout=b"",
+                            stderr=b"Logged in using ChatGPT\n",
+                        )
+                    child_environments.append(kwargs["env"])
                     output_index = command.index("--output-last-message") + 1
                     output_message = command[output_index]
                     if output_message.startswith("/workspace/.qa-eval-output/"):
@@ -99,12 +115,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     patch.object(
                         codex_wsl2_bwrap_launcher,
                         "verify_runtime",
-                        return_value={"runtime": "synthetic"},
-                    ),
-                    patch.object(
-                        codex_wsl2_bwrap_launcher,
-                        "_auth_material",
-                        return_value=(None, None, "api_key_environment"),
+                        return_value={
+                            "runtime": "synthetic",
+                            "codex_path": "/fixed/runtime/codex",
+                            "codex_version": "codex-cli 0.163.0",
+                        },
                     ),
                     patch.object(
                         codex_wsl2_bwrap_launcher,
@@ -118,6 +133,14 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                         codex_wsl2_bwrap_launcher.subprocess,
                         "run",
                         side_effect=fake_subprocess,
+                    ),
+                    patch.dict(
+                        os.environ,
+                        {
+                            "CODEX_HOME": str(source_home),
+                            "OPENAI_API_KEY": "sk-synthetic-api-key",
+                            "CODEX_API_KEY": "synthetic-codex-api-key",
+                        },
                     ),
                     redirect_stdout(stdout),
                     redirect_stderr(stderr),
@@ -147,6 +170,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     envelope = json.loads(stdout.getvalue())
                     final_message = envelope["final_message"]
                     observations = envelope["observations"]
+                self.assertEqual(
+                    observations["authentication_method"], "chatgpt_login"
+                )
                 if redact:
                     self.assertEqual(exit_code, 2)
                     self.assertEqual(final_message, "Answer [redacted]")
@@ -169,12 +195,355 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     "isolated_tmpfs" if mode == "judge" else "removed",
                 )
                 self.assertEqual(observations["codex_home_cleanup_status"], "succeeded")
+                self.assertEqual(observations["authentication_method"], "chatgpt_login")
+                self.assertEqual(observations["authentication_check_status"], "verified")
+                self.assertEqual(observations["codex_cli_version"], "0.163.0")
+                self.assertTrue(child_environments)
+                self.assertTrue(login_status_environments)
+                self.assertNotIn("OPENAI_API_KEY", login_status_environments[0])
+                self.assertNotIn("CODEX_API_KEY", login_status_environments[0])
+                for child_environment in child_environments:
+                    self.assertNotIn("OPENAI_API_KEY", child_environment)
+                    self.assertNotIn("CODEX_API_KEY", child_environment)
+                self.assertNotIn(
+                    "SYNTHETIC_CHATGPT_AUTH_MARKER", json.dumps(observations)
+                )
+                self.assertNotIn("SYNTHETIC_CHATGPT_AUTH_MARKER", stdout.getvalue())
+                self.assertNotIn("SYNTHETIC_CHATGPT_AUTH_MARKER", stderr.getvalue())
                 self.assertFalse(any(output_root.iterdir()))
                 self.assertFalse(codex_home.exists())
                 persisted = b"".join(
                     path.read_bytes() for path in root.rglob("*") if path.is_file()
                 )
                 self.assertNotIn(secret.encode("utf-8"), persisted)
+
+    def test_auth_material_accepts_only_official_chatgpt_login_status(self) -> None:
+        cases = (
+            (b"", b"Logged in using ChatGPT\n", 0, "chatgpt_login"),
+            (
+                b"",
+                b"Logged in using an API key - sk-synthetic-secret\n",
+                0,
+                "api_key",
+            ),
+            (b"", b"Not logged in\n", 1, "not_logged_in"),
+            (b"", b"Logged in using an access token\n", 0, "unknown"),
+            (
+                b"",
+                b"Error checking login status: synthetic-secret\n",
+                1,
+                "check_failed",
+            ),
+        )
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        for stdout, stderr, returncode, expected_status in cases:
+            with self.subTest(expected_status=expected_status):
+                with tempfile.TemporaryDirectory() as temporary:
+                    source_home = Path(temporary) / "codex-home"
+                    source_home.mkdir()
+                    auth_file = source_home / "auth.json"
+                    auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="utf-8")
+                    process = subprocess.CompletedProcess(
+                        [runtime["codex_path"], "login", "status"],
+                        returncode,
+                        stdout=stdout,
+                        stderr=stderr,
+                    )
+                    with (
+                        patch.dict(
+                            os.environ,
+                            {
+                                "CODEX_HOME": str(source_home),
+                                "OPENAI_API_KEY": "sk-parent-synthetic",
+                                "CODEX_API_KEY": "parent-synthetic-codex-key",
+                            },
+                            clear=True,
+                        ),
+                        patch.object(
+                            codex_wsl2_bwrap_launcher.subprocess,
+                            "run",
+                            return_value=process,
+                        ) as run,
+                    ):
+                        auth, status = _auth_material(runtime)
+
+                    expected_auth = (
+                        auth_file if expected_status == "chatgpt_login" else None
+                    )
+                    self.assertEqual(auth, expected_auth)
+                    self.assertEqual(status, expected_status)
+                    self.assertEqual(
+                        run.call_args.args[0],
+                        [runtime["codex_path"], "login", "status"],
+                    )
+                    child_env = run.call_args.kwargs["env"]
+                    self.assertNotIn("OPENAI_API_KEY", child_env)
+                    self.assertNotIn("CODEX_API_KEY", child_env)
+                    self.assertFalse(run.call_args.kwargs["shell"])
+                    self.assertTrue(run.call_args.kwargs["close_fds"])
+                    self.assertNotIn("sk-synthetic-secret", status)
+                    self.assertNotIn("synthetic-secret", status)
+
+    def test_auth_material_ignores_api_key_environment_without_auth_file(self) -> None:
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            process = subprocess.CompletedProcess(
+                [runtime["codex_path"], "login", "status"],
+                1,
+                stdout=b"",
+                stderr=b"Not logged in\n",
+            )
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "CODEX_HOME": str(source_home),
+                        "OPENAI_API_KEY": "sk-environment-only",
+                        "CODEX_API_KEY": "codex-environment-only",
+                    },
+                    clear=True,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess,
+                    "run",
+                    return_value=process,
+                ) as run,
+            ):
+                auth, status = _auth_material(runtime)
+
+        self.assertIsNone(auth)
+        self.assertEqual(status, "not_logged_in")
+        self.assertNotIn("OPENAI_API_KEY", run.call_args.kwargs["env"])
+        self.assertNotIn("CODEX_API_KEY", run.call_args.kwargs["env"])
+
+    def test_auth_material_rejects_chatgpt_marker_with_failed_status_exit(self) -> None:
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            (source_home / "auth.json").write_text(
+                "SYNTHETIC_AUTH", encoding="utf-8"
+            )
+            process = subprocess.CompletedProcess(
+                [runtime["codex_path"], "login", "status"],
+                1,
+                stdout=b"Logged in using ChatGPT\n",
+                stderr=b"status command failed\n",
+            )
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess,
+                    "run",
+                    return_value=process,
+                ),
+            ):
+                auth, status = _auth_material(runtime)
+
+        self.assertIsNone(auth)
+        self.assertEqual(status, "check_failed")
+
+    def test_auth_material_rejects_chatgpt_status_without_copyable_auth_file(self) -> None:
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            process = subprocess.CompletedProcess(
+                [runtime["codex_path"], "login", "status"],
+                0,
+                stdout=b"",
+                stderr=b"Logged in using ChatGPT\n",
+            )
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess,
+                    "run",
+                    return_value=process,
+                ),
+            ):
+                auth, status = _auth_material(runtime)
+
+        self.assertIsNone(auth)
+        self.assertEqual(status, "unsupported_auth_store")
+
+    def test_auth_material_rejects_invalid_auth_file_before_status_check(self) -> None:
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            (source_home / "auth.json").write_bytes(b"x" * 1_000_001)
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess, "run"
+                ) as run,
+            ):
+                auth, status = _auth_material(runtime)
+
+        self.assertIsNone(auth)
+        self.assertEqual(status, "invalid_auth_file")
+        run.assert_not_called()
+
+    def test_auth_material_classifies_login_status_timeout_without_details(self) -> None:
+        runtime = {
+            "codex_path": "/fixed/runtime/codex",
+            "codex_version": "codex-cli 0.163.0",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            (source_home / "auth.json").write_text(
+                "SYNTHETIC_AUTH", encoding="utf-8"
+            )
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess,
+                    "run",
+                    side_effect=subprocess.TimeoutExpired(
+                        [runtime["codex_path"], "login", "status"], 15
+                    ),
+                ),
+            ):
+                auth, status = _auth_material(runtime)
+
+        self.assertIsNone(auth)
+        self.assertEqual(status, "check_failed")
+
+    def test_auth_material_rejects_windows_home_and_pinned_version_mismatch(self) -> None:
+        with (
+            patch.dict(
+                os.environ, {"CODEX_HOME": r"C:\Users\person\.codex"}, clear=True
+            ),
+            patch.object(codex_wsl2_bwrap_launcher, "_is_wsl2", return_value=True),
+        ):
+            auth, status = _auth_material(
+                {
+                    "codex_path": "/fixed/runtime/codex",
+                    "codex_version": "codex-cli 0.163.0",
+                }
+            )
+        self.assertIsNone(auth)
+        self.assertEqual(status, "unsupported_auth_store")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source_home = Path(temporary) / "codex-home"
+            source_home.mkdir()
+            (source_home / "auth.json").write_text(
+                "SYNTHETIC_AUTH", encoding="utf-8"
+            )
+            with (
+                patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.subprocess, "run"
+                ) as run,
+            ):
+                auth, status = _auth_material(
+                    {
+                        "codex_path": "/wrong/runtime/codex",
+                        "codex_version": "codex-cli 0.162.0",
+                    }
+                )
+        self.assertIsNone(auth)
+        self.assertEqual(status, "cli_version_mismatch")
+        run.assert_not_called()
+
+    def test_launch_rejects_api_key_status_before_codex_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output_root = root / "output"
+            output_root.mkdir()
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / ".qa-eval-output").mkdir()
+            observations_path = root / "observations.json"
+            codex_home = root / "homes" / f"{CODEX_HOME_PREFIX}agent-rejected"
+            codex_home.parent.mkdir(mode=0o700)
+            with (
+                patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "verify_runtime",
+                    return_value={"runtime": "synthetic"},
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_auth_material",
+                    return_value=(None, "api_key"),
+                ),
+                patch.object(codex_wsl2_bwrap_launcher.subprocess, "run") as run,
+                patch.dict(
+                    os.environ,
+                    {
+                        "OPENAI_API_KEY": "sk-synthetic-forbidden",
+                        "CODEX_API_KEY": "synthetic-forbidden",
+                    },
+                ),
+            ):
+                exit_code = launch(
+                    mode="agent",
+                    output_root=output_root,
+                    prompt="synthetic prompt",
+                    observations_path=observations_path,
+                    model="synthetic-model",
+                    reasoning_effort="medium",
+                    sandbox_policy="workspace-write",
+                    workspace_root=workspace,
+                    codex_home=codex_home,
+                    runtime_root=root,
+                )
+
+            observations = json.loads(observations_path.read_text(encoding="utf-8"))
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(observations["authentication_method"], "api_key")
+            self.assertEqual(observations["authentication_check_status"], "rejected")
+            self.assertEqual(observations["error"], "authentication_rejected")
+            self.assertNotIn("sk-synthetic-forbidden", json.dumps(observations))
+            self.assertFalse(codex_home.exists())
+            run.assert_not_called()
+
+    def test_auth_status_only_outputs_sanitized_chatgpt_classification(self) -> None:
+        stdout = io.StringIO()
+        synthetic_auth = "SYNTHETIC_AUTH_SECRET_MARKER"
+        with (
+            patch.object(
+                codex_wsl2_bwrap_launcher,
+                "verify_runtime",
+                return_value={"codex_version": "codex-cli 0.163.0"},
+            ),
+            patch.object(
+                codex_wsl2_bwrap_launcher,
+                "_auth_material",
+                return_value=(Path(synthetic_auth), "chatgpt_login"),
+            ),
+            patch("sys.stdout", stdout),
+        ):
+            exit_code = codex_wsl2_bwrap_launcher.main(["--auth-status-only"])
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["authentication_method"], "chatgpt_login")
+        self.assertEqual(result["codex_cli_version"], "0.163.0")
+        self.assertEqual(result["runtime_digest_status"], "verified")
+        self.assertNotIn(synthetic_auth, stdout.getvalue())
 
     def test_exec_argv_uses_embedded_runtime_strict_config_and_fixed_sandbox(
         self,

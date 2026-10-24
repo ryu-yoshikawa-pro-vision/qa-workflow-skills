@@ -38,6 +38,7 @@ BWRAP_RELATIVE_PATH = PurePosixPath(
 PROTOCOL = "codex_wsl2_bwrap_launcher_v1"
 RUNTIME_ENV = "QAEVAL_CODEX_RUNTIME_ROOT"
 CODEX_HOME_PREFIX = ".qa-codex-home-"
+AUTH_STATUS_TIMEOUT_SECONDS = 15
 _SAFE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 
 
@@ -997,27 +998,113 @@ def _fingerprint(value: Any) -> str:
     return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _auth_material() -> tuple[Path | None, str | None, str]:
-    configured_home = os.environ.get("CODEX_HOME")
-    source_home = (
-        Path(configured_home).expanduser()
-        if configured_home
-        else Path.home() / ".codex"
-    )
-    auth = source_home / "auth.json"
-    if auth.exists():
-        _reject_symlink_components(auth)
-        if not _regular_file(auth) or auth.stat().st_size > 1_000_000:
-            raise CodexWsl2LauncherError("Codex authentication file is invalid")
-        if auth.resolve().is_relative_to(REPO_ROOT.resolve()):
-            raise CodexWsl2LauncherError(
-                "Codex credentials may not be read from the repository"
+def _windows_mount_contains(path: Path) -> bool:
+    absolute = Path(os.path.abspath(path))
+    if absolute == Path("/mnt") or Path("/mnt") in absolute.parents:
+        return True
+    try:
+        mountinfo = Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    for line in mountinfo.splitlines():
+        try:
+            before, after = line.split(" - ", 1)
+            fields = before.split()
+            mountpoint = Path(
+                re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), fields[4])
             )
-        return auth, None, "temporary_auth_file"
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        return None, api_key, "api_key_environment"
-    return None, None, "unavailable"
+            filesystem, source, *options = after.split()
+        except (IndexError, ValueError):
+            continue
+        is_windows_mount = filesystem.lower() == "drvfs" or (
+            filesystem.lower() == "9p"
+            and ("drvfs" in " ".join(options).lower() or re.match(r"^[a-z]:\\", source, re.I))
+        )
+        if is_windows_mount and (absolute == mountpoint or mountpoint in absolute.parents):
+            return True
+    return False
+
+
+def _codex_login_status(runtime: dict[str, Any], source_home: Path) -> str:
+    version = str(runtime.get("codex_version", ""))
+    if not re.search(r"\b0\.163\.0\b", version):
+        return "cli_version_mismatch"
+    codex_path = runtime.get("codex_path")
+    if not isinstance(codex_path, str) or not codex_path:
+        return "check_failed"
+    environment = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": "/tmp",
+        "CODEX_HOME": str(source_home),
+        "TMPDIR": "/tmp",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+    }
+    try:
+        result = subprocess.run(
+            [codex_path, "login", "status"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+            timeout=AUTH_STATUS_TIMEOUT_SECONDS,
+            check=False,
+            shell=False,
+            close_fds=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "check_failed"
+    output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
+    markers = [
+        method
+        for method, phrase in (
+            ("chatgpt_login", "Logged in using ChatGPT"),
+            ("api_key", "Logged in using an API key"),
+            ("not_logged_in", "Not logged in"),
+        )
+        if phrase in output
+    ]
+    if len(markers) != 1:
+        return "unknown" if result.returncode == 0 else "check_failed"
+    if markers[0] == "chatgpt_login" and result.returncode == 0:
+        return "chatgpt_login"
+    if markers[0] == "chatgpt_login":
+        return "check_failed"
+    return markers[0]
+
+
+def _auth_material(runtime: dict[str, Any]) -> tuple[Path | None, str]:
+    configured_home = os.environ.get("CODEX_HOME")
+    if _is_wsl2() and configured_home and re.match(
+        r"^[a-z]:[\\/]", configured_home, re.I
+    ):
+        return None, "unsupported_auth_store"
+    source_home = Path(configured_home).expanduser() if configured_home else Path.home() / ".codex"
+    try:
+        source_home = _reject_symlink_components(source_home, allow_leaf=True)
+    except CodexWsl2LauncherError:
+        return None, "invalid_auth_store"
+    if (
+        (_is_wsl2() and _windows_mount_contains(source_home))
+        or source_home.is_relative_to(REPO_ROOT.resolve())
+    ):
+        return None, "unsupported_auth_store"
+    if source_home.exists() and not source_home.is_dir():
+        return None, "invalid_auth_store"
+    auth = source_home / "auth.json"
+    if auth.exists() or auth.is_symlink():
+        try:
+            _reject_symlink_components(auth)
+        except CodexWsl2LauncherError:
+            return None, "invalid_auth_file"
+        if not _regular_file(auth) or auth.stat().st_size > 1_000_000:
+            return None, "invalid_auth_file"
+    auth_status = _codex_login_status(runtime, source_home)
+    if auth_status != "chatgpt_login":
+        return None, auth_status
+    if not _regular_file(auth):
+        return None, "unsupported_auth_store"
+    return auth, "chatgpt_login"
 
 
 def _prepare_codex_home(
@@ -1214,14 +1301,17 @@ def launch(
         raise CodexWsl2LauncherError("observations path may not be a symlink")
     runtime_root = runtime_root or runtime_root_from_environment()
     runtime = verify_runtime(runtime_root)
-    auth_path, api_key, auth_mode = _auth_material()
-    if auth_mode == "unavailable":
+    auth_path, auth_mode = _auth_material(runtime)
+    if auth_mode != "chatgpt_login":
         _write_observations(
             observations_path,
             {
                 "protocol": PROTOCOL,
                 "status": "execution_error",
-                "error": "authentication_unavailable",
+                "error": "authentication_rejected",
+                "authentication_method": auth_mode,
+                "authentication_check_status": "rejected",
+                "codex_cli_version": "0.163.0",
                 "mode": mode,
             },
         )
@@ -1275,8 +1365,6 @@ def launch(
         "LC_ALL": "C.UTF-8",
         "TERM": "dumb",
     }
-    if api_key:
-        child_env["OPENAI_API_KEY"] = api_key
     status = "execution_error"
     response = ""
     completed_returncode = 2
@@ -1285,7 +1373,10 @@ def launch(
         "mode": mode,
         "model": model,
         "reasoning_effort": reasoning_effort,
-        "auth_mode": auth_mode,
+        "auth_mode": "chatgpt_login",
+        "authentication_method": "chatgpt_login",
+        "authentication_check_status": "verified",
+        "codex_cli_version": "0.163.0",
         "runtime": runtime,
         "effective": effective,
         "status": status,
@@ -1305,7 +1396,9 @@ def launch(
     try:
         if auth_path is not None:
             copied = home_path / "auth.json"
-            if not _regular_file(copied) or copied.stat().st_mode & 0o077:
+            if not _regular_file(copied) or (
+                os.name == "posix" and copied.stat().st_mode & 0o077
+            ):
                 raise CodexWsl2LauncherError(
                     "temporary Codex authentication file is insecure"
                 )
@@ -1591,6 +1684,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run Codex through the WSL2 dual-bubblewrap contract."
     )
+    parser.add_argument(
+        "--auth-status-only",
+        action="store_true",
+        help="verify ChatGPT login with the pinned Codex CLI without launching a model",
+    )
     parser.add_argument("--mode", choices=("agent", "judge", "repair"))
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--observations-path", type=Path)
@@ -1606,6 +1704,41 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--allowed-parent", type=Path)
     parser.add_argument("--cleanup-final-messages", type=Path)
     return parser
+
+
+def _authentication_status(runtime_root: Path | None) -> tuple[dict[str, str], int]:
+    try:
+        runtime = verify_runtime(runtime_root or runtime_root_from_environment())
+    except (CodexWsl2LauncherError, OSError, ValueError) as exc:
+        return (
+            {
+                "status": "check_failed",
+                "authentication_method": "unknown",
+                "authentication_check_status": "failed",
+                "runtime_digest_status": "unverified",
+                "codex_cli_version": "unknown",
+                "error_class": type(exc).__name__,
+            },
+            2,
+        )
+    try:
+        _auth_path, auth_method = _auth_material(runtime)
+    except (CodexWsl2LauncherError, OSError, ValueError) as exc:
+        auth_method = "check_failed"
+        error_class = type(exc).__name__
+    else:
+        error_class = ""
+    verified = auth_method == "chatgpt_login"
+    result = {
+        "status": "verified" if verified else "rejected",
+        "authentication_method": auth_method,
+        "authentication_check_status": "verified" if verified else "rejected",
+        "runtime_digest_status": "verified",
+        "codex_cli_version": "0.163.0",
+    }
+    if error_class:
+        result["error_class"] = error_class
+    return result, 0 if verified else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1637,6 +1770,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Codex launcher cleanup failed: {cleanup_error}", file=sys.stderr)
             return 2
         return 0
+    if args.auth_status_only:
+        result, exit_code = _authentication_status(args.runtime_root)
+        print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+        return exit_code
     if (
         args.codex_home is None
         or args.mode is None

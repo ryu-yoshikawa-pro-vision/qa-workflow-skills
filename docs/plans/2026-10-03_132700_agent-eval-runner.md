@@ -18,7 +18,7 @@ Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent
 - Agent/Judge/Repairは毎回別process・別outer namespace・別workspace・別一時`CODEX_HOME`を使う。JudgeへAgent workspaceをmountせず、Judge promptはstdinのみで渡す。
 - outer networkはCodex親processの許可されたモデルAPI通信のため保持する。inner Codex sandboxはshellのTCP/DNS/AF_UNIX/WSL interop等を遮断する。各境界の実効probe結果を分けて保存し、一部の宛先の失敗だけでegress遮断済みと扱わない。
 - inner workspace-writeの要求を満たすため、許可outputと実測で必要な専用一時場所のみを書込み可能にする。候補Skill・固定target sourceはouter mountでも変更不能とし、実行前後manifestを照合する。必要な安全な書込み境界が成立しない実行方式は採用しない。
-- 認証はrun別一時`CODEX_HOME`へ必要最小限を複製する既存契約を維持するが、過去の合成検証でshellからcredential markerを読めた。実認証のshell可視性を残留リスクとして明記し、別途承認なしに実認証/model API評価を開始しない。
+- 認証方式はChatGPTアカウントでサインインしたCodex CLIに限定する。schema 2 launcherは固定runtimeの`codex login status`でChatGPT方式を確認し、API Key、未ログイン、不明・失敗、未確認store、固定CLI version不一致を拒否する。`OPENAI_API_KEY` / `CODEX_API_KEY` fallbackとWindows側の認証探索・コピーは禁止する。Agent/Judge/Repairごとに必要な認証fileだけを独立一時`CODEX_HOME`へ複製する。過去の合成検証でshellからcredential markerを読めたため、認証方式の限定後も`authentication_shell_visible_risk=true`を維持し、実モデル利用は隔離残留リスク・ChatGPT利用枠・別途の明示承認を確認するまで開始しない。
 - isolation evidenceはEvaluator revision、固定CLI/bwrap packageとbinary digest、profile、mode、実効argv、mount/network構成、probe versionに結び付ける。どれかの必須検査が欠落・不一致なら`isolation_unverified`としてlive評価を拒否する。旧Docker evidenceは新方式の証拠として再利用しない。
 
 ## 基準

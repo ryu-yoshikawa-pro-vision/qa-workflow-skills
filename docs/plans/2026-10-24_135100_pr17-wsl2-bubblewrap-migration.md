@@ -6,6 +6,10 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 このPlanは利用者が2026-10-24に承認した実行方式変更を具体化する。実認証・モデルAPI利用、Judge fixture承認、候補Skill自動採用、merge、closeは含まない。
 
+## 2026-10-24 ChatGPT認証限定の追加指示
+
+後続の明示依頼により、schema 2 launcherの認証をChatGPT loginだけに限定し、固定Codex CLIの`codex login status`で状態を確認する変更を追加する。この追加指示は本Planの「認証全面変更を含まない」という除外を、ChatGPT方式確認とAPI Key fallback廃止の範囲だけ上書きする。ログイン操作、認証情報の移動・復元、実モデル/API呼び出しは許可しない。ChatGPT loginでもCodex shellから認証fileが見える残留リスクは維持し、`authentication_shell_visible_risk=true`を変更しない。
+
 ## Baseline at start of implementation
 
 - Windows開発checkoutは`feat/agent-eval-runner`、HEAD `be574cbaf457a49d2f51a08c1cdc7838e75abd5c`。tracked差分なし。未追跡Docker調査報告2件と既存`.agent-eval-runs/`を保持する。
