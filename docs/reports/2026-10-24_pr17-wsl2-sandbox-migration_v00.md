@@ -19,7 +19,7 @@ Agent、Judge、RepairをWSL2 Ubuntuの外側bubblewrapとCodex CLI Linux sandbo
 
 ## WSL2 runtime
 
-| 項目                         | 実測                                                                                                                                                              |
+| 項目                       | 実測                                                                                                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OS / kernel                | Ubuntu on WSL2 / `6.18.54.1-microsoft-standard-WSL2`                                                                                                            |
 | Python                     | `3.11.17`                                                                                                                                                       |
@@ -53,18 +53,18 @@ Repair write拒否はCodex設定の追加writable rootが適用されないprofi
 
 すべて個別に実行・判定した。
 
-| Command / suite                                                                               | 結果                             |
-| --------------------------------------------------------------------------------------------- | ------------------------------ |
-| WSL2 `unittest discover -s scripts/skills/evals/agent/tests -p 'test_*.py' -q`（integration有効） | PASS: 106 tests、1 skipped      |
-| WSL2 `unittest discover -s tests/skills/evals/agent -p 'test_*.py' -q`                        | PASS: 4 tests                  |
-| WSL2 `unittest discover -s scripts/skills/evals/semantic/tests -p 'test_*.py' -q`             | PASS: 27 tests                 |
-| WSL2 `unittest discover -s tests/skills/evals/deterministic -p 'test_*.py' -q`                | PASS: 293 tests                |
-| WSL2 explicit formal Agent/Judge/Repair launcher integration                                  | PASS: 1 test                   |
-| WSL2 `python -m compileall -q scripts/skills/evals/agent`                                     | PASS                           |
-| WSL2 `python scripts/format_tracked.py check`                                                 | PASS with Ruff 0.16.8          |
-| WSL2 `git diff --check`                                                                       | PASS                           |
-| Windows workspace cleanup + WSL2 launcher unit tests                                          | PASS: 23 tests、3 skipped       |
-| Windows `git diff --check`                                                                    | PASS（GitはREADMEのCRLF/LFについて警告） |
+| Command / suite                                                                                   | 結果                                     |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| WSL2 `unittest discover -s scripts/skills/evals/agent/tests -p 'test_*.py' -q`（integration有効） | PASS: 106 tests、1 skipped               |
+| WSL2 `unittest discover -s tests/skills/evals/agent -p 'test_*.py' -q`                            | PASS: 4 tests                            |
+| WSL2 `unittest discover -s scripts/skills/evals/semantic/tests -p 'test_*.py' -q`                 | PASS: 27 tests                           |
+| WSL2 `unittest discover -s tests/skills/evals/deterministic -p 'test_*.py' -q`                    | PASS: 293 tests                          |
+| WSL2 explicit formal Agent/Judge/Repair launcher integration                                      | PASS: 1 test                             |
+| WSL2 `python -m compileall -q scripts/skills/evals/agent`                                         | PASS                                     |
+| WSL2 `python scripts/format_tracked.py check`                                                     | PASS with Ruff 0.16.8                    |
+| WSL2 `git diff --check`                                                                           | PASS                                     |
+| Windows workspace cleanup + WSL2 launcher unit tests                                              | PASS: 23 tests、3 skipped                |
+| Windows `git diff --check`                                                                        | PASS（GitはREADMEのCRLF/LFについて警告） |
 
 最初のformatter実行は一時venvにRuffがなく起動できなかった。CI指定の`ruff==0.16.8`をその一時venvへ導入後、checkを再実行してPASSを得た。
 
