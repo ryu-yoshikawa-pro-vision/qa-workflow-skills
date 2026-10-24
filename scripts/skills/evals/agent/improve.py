@@ -48,6 +48,8 @@ from .target_workspace import DEFAULT_TARGET_REVISION, extract_revision_files
 from .tools.codex_docker_launcher import launcher_argv as legacy_agent_launcher_argv
 from .tools.codex_wsl2_bwrap_launcher import (
     cleanup_argv as codex_cleanup_argv,
+)
+from .tools.codex_wsl2_bwrap_launcher import (
     launcher_argv,
 )
 from .workspace import (

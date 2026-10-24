@@ -37,16 +37,18 @@ from .target_workspace import (
     verify_workspace_unchanged,
 )
 from .tools.codex_docker_launcher import launcher_argv as legacy_agent_launcher_argv
-from .tools.codex_wsl2_bwrap_launcher import (
-    cleanup_argv as codex_cleanup_argv,
-    judge_launcher_argv_for_profile,
-    launcher_argv,
-)
 from .tools.codex_judge_docker_launcher import (
     is_codex_judge,
 )
 from .tools.codex_judge_docker_launcher import (
     launcher_argv_for_profile as legacy_judge_launcher_argv_for_profile,
+)
+from .tools.codex_wsl2_bwrap_launcher import (
+    cleanup_argv as codex_cleanup_argv,
+)
+from .tools.codex_wsl2_bwrap_launcher import (
+    judge_launcher_argv_for_profile,
+    launcher_argv,
 )
 from .workspace import (
     assert_clean_checkout,
@@ -57,8 +59,8 @@ from .workspace import (
     profile_fingerprint,
     resolve_commit,
     verify_agent_docker_command,
-    verify_judge_docker_command,
     verify_agent_wsl2_command,
+    verify_judge_docker_command,
     verify_judge_wsl2_command,
     verify_profile_evidence,
 )

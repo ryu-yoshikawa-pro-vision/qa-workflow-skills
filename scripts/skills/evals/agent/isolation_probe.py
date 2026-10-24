@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -18,20 +19,24 @@ from .common import (
     prepare_run_output_root,
     sanitize_diagnostic,
 )
-from .workspace import (
-    assert_clean_checkout,
-    load_execution_profile,
-    profile_fingerprint,
-    verify_agent_wsl2_command,
-    verify_judge_wsl2_command,
-    verify_repair_wsl2_command,
-)
 from .tools.codex_wsl2_bwrap_launcher import (
     PROTOCOL as WSL2_LAUNCHER_PROTOCOL,
+)
+from .tools.codex_wsl2_bwrap_launcher import (
     CodexWsl2LauncherError,
     sandbox_smoke,
     timeout_cleanup_smoke,
     verify_runtime,
+)
+from .workspace import (
+    assert_clean_checkout,
+    load_execution_profile,
+    profile_fingerprint,
+    verify_agent_docker_command,
+    verify_agent_wsl2_command,
+    verify_judge_docker_command,
+    verify_judge_wsl2_command,
+    verify_repair_wsl2_command,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]

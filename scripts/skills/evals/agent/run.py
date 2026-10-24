@@ -36,13 +36,10 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
         cleanup_argv as codex_cleanup_argv,
-        launcher_argv,
-    )
-    from scripts.skills.evals.agent.tools.codex_judge_docker_launcher import (
-        is_codex_judge,
     )
     from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
         judge_launcher_argv_for_profile,
+        launcher_argv,
     )
     from scripts.skills.evals.agent.workspace import (
         assert_clean_checkout,
@@ -54,8 +51,8 @@ if __package__ in {None, ""}:
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
-        verify_judge_docker_command,
         verify_agent_wsl2_command,
+        verify_judge_docker_command,
         verify_judge_wsl2_command,
         verify_profile_evidence,
     )
@@ -99,13 +96,10 @@ else:
     )
     from .tools.codex_wsl2_bwrap_launcher import (
         cleanup_argv as codex_cleanup_argv,
-        launcher_argv,
-    )
-    from .tools.codex_judge_docker_launcher import (
-        is_codex_judge,
     )
     from .tools.codex_wsl2_bwrap_launcher import (
         judge_launcher_argv_for_profile,
+        launcher_argv,
     )
     from .workspace import (
         assert_clean_checkout,
@@ -117,8 +111,8 @@ else:
         profile_fingerprint,
         resolve_commit,
         verify_agent_docker_command,
-        verify_judge_docker_command,
         verify_agent_wsl2_command,
+        verify_judge_docker_command,
         verify_judge_wsl2_command,
         verify_profile_evidence,
     )

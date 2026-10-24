@@ -351,7 +351,6 @@ def _mount_tree(
                 mounts.extend(["--dir", parent])
             mounts.extend(["--dir", target])
             mounts.extend(["--ro-bind", str(source), target])
-    codex_path = "/opt/codex-runtime/" + CODEX_RELATIVE_PATH.as_posix()
     mount_summary: dict[str, Any] = {
         "root": "tmpfs",
         "system": ["/usr", "/bin", "/lib", "/lib64", "/etc/ssl/certs", "/etc/resolv.conf"],
@@ -570,7 +569,6 @@ def sandbox_smoke(
         for name in ("user", "pid", "mnt", "net", "ipc", "uts")
     }
     codex = "/opt/codex-runtime/" + CODEX_RELATIVE_PATH.as_posix()
-    inner_profile = ":read-only" if mode == "judge" else ":workspace"
     inner_script = r'''import errno,json,os,socket,stat,subprocess,sys,threading
 mode,outer_ns_json,host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path = sys.argv[1:8]
 outer_ns=json.loads(outer_ns_json)
