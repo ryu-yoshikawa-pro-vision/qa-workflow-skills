@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from scripts.skills.evals.deterministic.run import grade
@@ -1396,6 +1398,54 @@ class RegressionRuntimeTests(unittest.TestCase):
                 regression.scan_activity_files(root, listing_complete=False)["complete"]
             )
 
+    def test_activity_scan_requires_confirmed_directory_and_complete_listing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            empty = base / "empty"
+            empty.mkdir()
+            self.assertEqual(
+                regression.scan_activity_files(empty),
+                {"activity_refs": [], "complete": True, "unresolved": []},
+            )
+
+            missing = regression.scan_activity_files(base / "missing")
+            self.assertFalse(missing["complete"])
+            self.assertIn("history_root_missing", missing["unresolved"])
+
+            file_root = base / "history.json"
+            file_root.write_text("{}", encoding="utf-8")
+            not_directory = regression.scan_activity_files(file_root)
+            self.assertFalse(not_directory["complete"])
+            self.assertIn("history_root_not_directory", not_directory["unresolved"])
+
+            truncated = regression.scan_activity_files(empty, listing_complete=False)
+            self.assertFalse(truncated["complete"])
+            self.assertIn("listing_incomplete_or_truncated", truncated["unresolved"])
+
+    def test_activity_scan_reports_access_and_mid_scan_failures(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original_scandir = os.scandir
+            with patch.object(regression.os, "scandir", side_effect=PermissionError):
+                denied = regression.scan_activity_files(root)
+            self.assertFalse(denied["complete"])
+            self.assertIn("scan_failed:PermissionError", denied["unresolved"])
+
+            nested = root / "nested"
+            nested.mkdir()
+            (root / "ACT-ROOT.json").write_text("{}", encoding="utf-8")
+
+            def fail_nested(path):
+                if Path(path) == nested:
+                    raise PermissionError("test access failure")
+                return original_scandir(path)
+
+            with patch.object(regression.os, "scandir", side_effect=fail_nested):
+                partial = regression.scan_activity_files(root)
+            self.assertEqual(partial["activity_refs"], ["ACT-ROOT"])
+            self.assertFalse(partial["complete"])
+            self.assertIn("scan_failed:PermissionError", partial["unresolved"])
+
 
 class ExploratoryRuntimeTests(unittest.TestCase):
     def charter(self):
@@ -1456,11 +1506,45 @@ class ExploratoryRuntimeTests(unittest.TestCase):
                 charter,
                 target_url="https://staging.example.test",
                 operation="invalidate_session",
-                prior_side_effect_attempts=1,
+                prior_side_effect_attempts=0,
                 uncertain_previous_attempt=True,
             )["reason"],
-            "side_effect_limit_reached",
+            "state_check_required",
         )
+        charter["side_effect_maximum"] = 2
+        read_only_authorization = exploratory.authorize_operation(
+            charter,
+            target_url="https://staging.example.test",
+            operation="navigate",
+            prior_side_effect_attempts=0,
+            uncertain_previous_attempt=True,
+        )
+        self.assertEqual(read_only_authorization["status"], "allowed")
+        self.assertTrue(read_only_authorization["retryable"])
+        retry_authorization = exploratory.authorize_operation(
+            charter,
+            target_url="https://staging.example.test",
+            operation="invalidate_session",
+            prior_side_effect_attempts=0,
+            uncertain_previous_attempt=True,
+            state_check_result="not_applied",
+        )
+        self.assertEqual(retry_authorization["status"], "allowed")
+        self.assertTrue(retry_authorization["state_check_complete"])
+        self.assertTrue(retry_authorization["retryable"])
+        already_applied = exploratory.authorize_operation(
+            charter,
+            target_url="https://staging.example.test",
+            operation="invalidate_session",
+            prior_side_effect_attempts=0,
+            uncertain_previous_attempt=True,
+            state_check_result="applied",
+        )
+        self.assertEqual(
+            already_applied["reason"], "previous_side_effect_already_applied"
+        )
+        self.assertFalse(already_applied["retryable"])
+        charter["side_effect_maximum"] = 1
         attempt = {
             "attempt_ref": "ATT-1",
             "operation": "invalidate_session",
@@ -1468,7 +1552,10 @@ class ExploratoryRuntimeTests(unittest.TestCase):
             "outcome": "unknown",
         }
         recorded = exploratory.record_attempt(charter, [], attempt)
-        self.assertTrue(recorded["retry_without_state_check"])
+        self.assertEqual(recorded["operation_outcome"], "unknown")
+        self.assertFalse(recorded["state_check_complete"])
+        self.assertFalse(recorded["retryable"])
+        self.assertFalse(recorded["retry_without_state_check"])
         self.assertEqual(recorded["side_effect_count"], 1)
         attempt2 = {
             "attempt_ref": "ATT-2",
@@ -1476,12 +1563,106 @@ class ExploratoryRuntimeTests(unittest.TestCase):
             "side_effect": True,
             "outcome": "completed",
         }
+        blocked_retry = exploratory.record_attempt(
+            charter, recorded["attempts"], attempt2
+        )
+        self.assertEqual(blocked_retry["reason"], "state_check_required")
+        state_check = {
+            "attempt_ref": "ATT-CHECK-1",
+            "operation": "navigate",
+            "side_effect": False,
+            "outcome": "completed",
+            "state_check_for": "ATT-1",
+            "state_check_result": "not_applied",
+        }
+        checked = exploratory.record_attempt(charter, recorded["attempts"], state_check)
+        self.assertTrue(checked["state_check_complete"])
+        self.assertTrue(checked["retryable"])
         self.assertEqual(
-            exploratory.record_attempt(charter, recorded["attempts"], attempt2)[
+            exploratory.record_attempt(charter, checked["attempts"], attempt2)[
                 "reason"
             ],
             "side_effect_limit_reached",
         )
+
+    def test_unknown_side_effect_can_retry_only_after_not_applied_state_check(self):
+        charter = self.charter()
+        charter["side_effect_maximum"] = 3
+        unknown = {
+            "attempt_ref": "ATT-UNKNOWN",
+            "operation": "invalidate_session",
+            "side_effect": True,
+            "outcome": "unknown",
+        }
+        recorded = exploratory.record_attempt(charter, [], unknown)
+        retry = {
+            "attempt_ref": "ATT-RETRY",
+            "operation": "invalidate_session",
+            "side_effect": True,
+            "outcome": "completed",
+        }
+        self.assertEqual(
+            exploratory.record_attempt(charter, recorded["attempts"], retry)["reason"],
+            "state_check_required",
+        )
+        failed_check = {
+            "attempt_ref": "ATT-CHECK-FAILED",
+            "operation": "navigate",
+            "side_effect": False,
+            "outcome": "failed",
+            "state_check_for": "ATT-UNKNOWN",
+            "state_check_result": "inconclusive",
+        }
+        failed_check_result = exploratory.record_attempt(
+            charter, recorded["attempts"], failed_check
+        )
+        self.assertFalse(failed_check_result["state_check_complete"])
+        self.assertFalse(failed_check_result["retryable"])
+        self.assertEqual(
+            exploratory.record_attempt(charter, failed_check_result["attempts"], retry)[
+                "reason"
+            ],
+            "state_check_required",
+        )
+        check = {
+            "attempt_ref": "ATT-CHECK",
+            "operation": "navigate",
+            "side_effect": False,
+            "outcome": "completed",
+            "state_check_for": "ATT-UNKNOWN",
+            "state_check_result": "applied",
+        }
+        checked = exploratory.record_attempt(charter, recorded["attempts"], check)
+        self.assertTrue(checked["state_check_complete"])
+        self.assertEqual(checked["resolved_attempt_outcome"], "succeeded")
+        self.assertFalse(checked["retryable"])
+        self.assertEqual(
+            exploratory.record_attempt(charter, checked["attempts"], retry)["reason"],
+            "previous_side_effect_already_applied",
+        )
+        not_applied_check = dict(check)
+        not_applied_check["attempt_ref"] = "ATT-CHECK-NOT-APPLIED"
+        not_applied_check["state_check_result"] = "not_applied"
+        retryable_check = exploratory.record_attempt(
+            charter, failed_check_result["attempts"], not_applied_check
+        )
+        self.assertEqual(retryable_check["resolved_attempt_ref"], "ATT-UNKNOWN")
+        self.assertEqual(retryable_check["resolved_attempt_outcome"], "failed")
+        retry_allowed = exploratory.record_attempt(
+            charter, retryable_check["attempts"], retry
+        )
+        self.assertEqual(retry_allowed["status"], "recorded")
+        self.assertEqual(retry_allowed["operation_outcome"], "succeeded")
+
+        failed_attempt = {
+            "attempt_ref": "ATT-FAILED",
+            "operation": "invalidate_session",
+            "side_effect": True,
+            "outcome": "failed",
+        }
+        failed = exploratory.record_attempt(charter, [], failed_attempt)
+        self.assertEqual(failed["operation_outcome"], "failed")
+        self.assertTrue(failed["retryable"])
 
     def test_cleanup_block_resume_and_completed_immutability(self):
         session = {

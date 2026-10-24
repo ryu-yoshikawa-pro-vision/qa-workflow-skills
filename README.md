@@ -350,6 +350,8 @@ python scripts/skills/evals/semantic/run.py \
 
 Agent実行と評価対象出力の生成は決定論的 / 意味評価ランタイムの責務外です。詳細な評価契約、評価データセット、CLI、Judge契約、決定論的評価 / 意味評価の境界は`EVALS.md`を正本とします。
 
+固定EvaluatorからSkill revisionを選んで実Agent実行・評価する共通ランナーと、固定した`qa-training-store`対象の統合評価・Judge検証・限定的なSkill改善検証は[`scripts/skills/evals/agent/README.md`](scripts/skills/evals/agent/README.md)を参照してください。外部Agent / Judgeを使う評価は手動の隔離環境だけで実行し、通常CIではfake Agent / Judgeによる契約検証を行います。
+
 ## qa-workflowのランタイム前提
 
 同一のAgentクライアント上でrepositoryの全Skillが利用可能で、Agentが必要なSkillを追加で読み込み / 利用できる環境を前提とします。Agent Skills Specificationが共通Skill-to-Skill APIを保証するとは扱いません。
