@@ -1331,8 +1331,7 @@ def launch(
                 "observations": observations,
             }
             sys.stdout.write(
-                json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
-                + "\n"
+                json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n"
             )
         return 0 if observations["status"] == "completed" else 2
     except (OSError, subprocess.SubprocessError) as exc:
