@@ -316,6 +316,8 @@ def verify_profile_evidence(
     if not isinstance(evidence, dict):
         raise AgentEvalError("profile evidence must be a JSON object")
     checks = evidence.get("checks")
+    expected_exec_fingerprints = expected_codex_exec_argv_fingerprints(profile)
+    mode_evidence = evidence.get("mode_evidence")
     required = {
         "evaluator_read_denied",
         "host_home_read_denied",
@@ -355,6 +357,12 @@ def verify_profile_evidence(
         or not isinstance(evidence.get("mode_evidence"), dict)
         or set(evidence["mode_evidence"]) != {"agent", "judge", "repair"}
         or any(
+            not isinstance(mode_evidence.get(mode), dict)
+            or mode_evidence[mode].get("codex_exec_argv_fingerprint")
+            != expected_exec_fingerprints[mode]
+            for mode in ("agent", "judge", "repair")
+        )
+        or any(
             not isinstance(mode, dict)
             or mode.get("status") != "verified"
             or mode.get("mode") not in {"agent", "judge", "repair"}
@@ -386,6 +394,35 @@ def verify_profile_evidence(
             "profile evidence belongs to a different Evaluator revision"
         )
     return True
+
+
+def expected_codex_exec_argv_fingerprints(profile: dict[str, Any]) -> dict[str, str]:
+    from .tools.codex_wsl2_bwrap_launcher import (
+        expected_codex_exec_argv_fingerprint,
+    )
+
+    agent = profile["agent"]
+    judge = profile["judge"]
+    return {
+        "agent": expected_codex_exec_argv_fingerprint(
+            mode="agent",
+            model=agent["model"],
+            reasoning_effort=agent["reasoning_effort"],
+            sandbox_policy=agent["sandbox_policy"],
+        ),
+        "repair": expected_codex_exec_argv_fingerprint(
+            mode="repair",
+            model=agent["model"],
+            reasoning_effort=agent["reasoning_effort"],
+            sandbox_policy=agent["sandbox_policy"],
+        ),
+        "judge": expected_codex_exec_argv_fingerprint(
+            mode="judge",
+            model=judge["model"],
+            reasoning_effort=judge["reasoning_effort"],
+            sandbox_policy=judge["sandbox_policy"],
+        ),
+    }
 
 
 def _codex_home_from_argv(argv: list[str]) -> str | None:

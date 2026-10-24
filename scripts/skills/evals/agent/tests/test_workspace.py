@@ -17,6 +17,7 @@ from scripts.skills.evals.agent.isolation_probe import _live_mount_probe
 from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import PACKAGE_SHA512
 from scripts.skills.evals.agent.workspace import (
     _validate_profile,
+    expected_codex_exec_argv_fingerprints,
     prepare_agent_output_mountpoint,
     profile_fingerprint,
     verify_agent_docker_command,
@@ -149,8 +150,19 @@ class WorkspaceIsolationTests(unittest.TestCase):
     def test_wsl2_evidence_is_bound_to_mode_command_profile_and_revision(self) -> None:
         profile = {
             "schema_version": 2,
-            "agent": {"skill_roots": ["/workspace/.agents/skills"]},
-            "judge": {"cwd": "isolated", "command_argv": ["codex"]},
+            "agent": {
+                "model": "agent-model",
+                "reasoning_effort": "medium",
+                "sandbox_policy": "workspace-write",
+                "skill_roots": ["/workspace/.agents/skills"],
+            },
+            "judge": {
+                "model": "judge-model",
+                "reasoning_effort": "high",
+                "sandbox_policy": "read-only",
+                "cwd": "isolated",
+                "command_argv": ["codex"],
+            },
             "isolation": {"agent_read_roots": ["/workspace"]},
             "verification": {"status": "verified", "evidence_path": "isolation.json"},
         }
@@ -173,6 +185,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
             "timeout_cleanup",
         }
         fingerprint = profile_fingerprint(profile)
+        exec_fingerprints = expected_codex_exec_argv_fingerprints(profile)
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             evidence = {
@@ -197,6 +210,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
                         "status": "verified",
                         "mode": mode,
                         "profile_fingerprint": fingerprint,
+                        "codex_exec_argv_fingerprint": exec_fingerprints[mode],
                     }
                     for mode in ("agent", "judge", "repair")
                 },
@@ -217,6 +231,16 @@ class WorkspaceIsolationTests(unittest.TestCase):
                         profile, root, agent_command_argv=agent_command
                     )
                 )
+                bad_evidence = json.loads(json.dumps(evidence))
+                bad_evidence["mode_evidence"]["repair"][
+                    "codex_exec_argv_fingerprint"
+                ] = exec_fingerprints["judge"]
+                evidence_path.write_text(json.dumps(bad_evidence), encoding="utf-8")
+                with self.assertRaises(AgentEvalError):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
                 with self.assertRaises(AgentEvalError):
                     verify_profile_evidence(
                         profile, root, agent_command_argv=agent_command + ["unsafe"]

@@ -1280,9 +1280,42 @@ def _codex_exec_argv(
     if mode == "judge":
         command.extend(["--cd", "/tmp", "--skip-git-repo-check"])
     else:
-        command.extend(["--cd", "/workspace"])
+        command.extend(["--cd", "/workspace", "--skip-git-repo-check"])
     command.extend(["--output-last-message", output_message_path, "-"])
     return command
+
+
+def codex_exec_argv_fingerprint(argv: Sequence[str], *, mode: str) -> str:
+    """Fingerprint the fixed exec argv while normalizing its attempt-local output path."""
+    if mode not in {"agent", "repair", "judge"}:
+        raise CodexWsl2LauncherError("Codex exec mode is invalid")
+    command = list(argv)
+    expected_cwd = "/tmp" if mode == "judge" else "/workspace"
+    output_root = "/tmp" if mode == "judge" else "/workspace/.qa-eval-output"
+    if command.count("--cd") != 1 or command.count("--output-last-message") != 1:
+        raise CodexWsl2LauncherError("Codex exec argv is missing fixed path options")
+    if command[command.index("--cd") + 1] != expected_cwd:
+        raise CodexWsl2LauncherError("Codex exec cwd does not match its mode")
+    output_index = command.index("--output-last-message") + 1
+    if PurePosixPath(command[output_index]).parent.as_posix() != output_root:
+        raise CodexWsl2LauncherError("Codex exec output path does not match its mode")
+    command[output_index] = f"{output_root}/<attempt-final-message>"
+    return _fingerprint(command)
+
+
+def expected_codex_exec_argv_fingerprint(
+    *, mode: str, model: str, reasoning_effort: str, sandbox_policy: str
+) -> str:
+    """Return the normalized argv fingerprint production launch will use for a profile."""
+    output_root = "/tmp" if mode == "judge" else "/workspace/.qa-eval-output"
+    argv = _codex_exec_argv(
+        mode=mode,
+        model=model,
+        reasoning_effort=reasoning_effort,
+        sandbox_policy=sandbox_policy,
+        output_message_path=f"{output_root}/.codex-final-template.md",
+    )
+    return codex_exec_argv_fingerprint(argv, mode=mode)
 
 
 def launch(
@@ -1393,6 +1426,9 @@ def launch(
         "codex_cli_version": "0.163.0",
         "runtime": runtime,
         "effective": effective,
+        "codex_exec_argv_fingerprint": codex_exec_argv_fingerprint(
+            codex_argv, mode=mode
+        ),
         "status": status,
         "jsonl": None,
         "response_sha256": None,

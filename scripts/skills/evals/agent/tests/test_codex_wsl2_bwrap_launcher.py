@@ -25,6 +25,7 @@ from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
     _prepare_codex_home,
     cleanup_argv,
     cleanup_codex_home,
+    codex_exec_argv_fingerprint,
     judge_launcher_argv_for_profile,
     launch,
     launcher_argv,
@@ -71,6 +72,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 auth_file.write_text("SYNTHETIC_CHATGPT_AUTH_MARKER", encoding="utf-8")
                 observations_path = root / "launcher-observations.json"
                 child_environments = []
+                child_commands = []
                 login_status_environments = []
                 response = f"Answer {secret}" if redact else "Ordinary answer"
                 events = (
@@ -95,6 +97,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                             stderr=b"Logged in using ChatGPT\n",
                         )
                     child_environments.append(kwargs["env"])
+                    child_commands.append(command)
                     output_index = command.index("--output-last-message") + 1
                     output_message = command[output_index]
                     if output_message.startswith("/workspace/.qa-eval-output/"):
@@ -171,6 +174,12 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     final_message = envelope["final_message"]
                     observations = envelope["observations"]
                 self.assertEqual(observations["authentication_method"], "chatgpt_login")
+                self.assertEqual(len(child_commands), 1)
+                self.assertEqual(child_commands[0].count("--skip-git-repo-check"), 1)
+                self.assertEqual(
+                    observations["codex_exec_argv_fingerprint"],
+                    codex_exec_argv_fingerprint(child_commands[0], mode=mode),
+                )
                 if redact:
                     self.assertEqual(exit_code, 2)
                     self.assertEqual(final_message, "Answer [redacted]")
@@ -563,9 +572,28 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 self.assertEqual(
                     command[command.index("--sandbox") + 1], sandbox_policy
                 )
+                self.assertEqual(
+                    command[command.index("--cd") + 1],
+                    "/tmp" if mode == "judge" else "/workspace",
+                )
+                self.assertEqual(command.count("--skip-git-repo-check"), 1)
+                self.assertEqual(
+                    command[command.index("--ask-for-approval") + 1], "never"
+                )
+                self.assertEqual(command[command.index("--model") + 1], "model-test")
+                self.assertIn('model_reasoning_effort="medium"', command)
+                self.assertIn('web_search="disabled"', command)
+                self.assertEqual(
+                    command[command.index("--output-last-message") + 1],
+                    "/tmp/final.md"
+                    if mode == "judge"
+                    else "/workspace/.qa-eval-output/final.md",
+                )
                 self.assertIn("exec", command)
                 self.assertNotIn("--profile", command)
                 self.assertNotIn("--mcp-config", command)
+                self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+                self.assertNotIn("--yolo", command)
 
     def test_embedded_outer_and_inner_probe_scripts_parse(self) -> None:
         tree = ast.parse(inspect.getsource(sandbox_smoke))
@@ -580,6 +608,39 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         self.assertEqual(len(scripts), 2)
         for script in scripts:
             compile(script, "<sandbox-probe>", "exec")
+
+    def test_exec_argv_fingerprint_covers_mode_and_normalizes_attempt_output(
+        self,
+    ) -> None:
+        for mode, sandbox_policy, output_root in (
+            ("agent", "workspace-write", "/workspace/.qa-eval-output"),
+            ("repair", "workspace-write", "/workspace/.qa-eval-output"),
+            ("judge", "read-only", "/tmp"),
+        ):
+            with self.subTest(mode=mode):
+                first = _codex_exec_argv(
+                    mode=mode,
+                    model="model-test",
+                    reasoning_effort="medium",
+                    sandbox_policy=sandbox_policy,
+                    output_message_path=f"{output_root}/.codex-final-first.md",
+                )
+                second = _codex_exec_argv(
+                    mode=mode,
+                    model="model-test",
+                    reasoning_effort="medium",
+                    sandbox_policy=sandbox_policy,
+                    output_message_path=f"{output_root}/.codex-final-second.md",
+                )
+                self.assertEqual(
+                    codex_exec_argv_fingerprint(first, mode=mode),
+                    codex_exec_argv_fingerprint(second, mode=mode),
+                )
+                second[second.index("--model") + 1] = "different-model"
+                self.assertNotEqual(
+                    codex_exec_argv_fingerprint(first, mode=mode),
+                    codex_exec_argv_fingerprint(second, mode=mode),
+                )
 
     def test_launcher_argv_uses_fixed_python_launcher_and_codex_template(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

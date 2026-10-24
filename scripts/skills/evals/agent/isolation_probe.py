@@ -23,6 +23,7 @@ from .tools.codex_wsl2_bwrap_launcher import (
 )
 from .tools.codex_wsl2_bwrap_launcher import (
     CodexWsl2LauncherError,
+    expected_codex_exec_argv_fingerprint,
     sandbox_smoke,
     timeout_cleanup_smoke,
     verify_runtime,
@@ -541,6 +542,17 @@ def probe_wsl2_isolation(
                     mode_evidence[name] = future.result()
                     mode_evidence[name]["profile_fingerprint"] = profile_fingerprint(
                         profile
+                    )
+                    command_profile = (
+                        profile["judge"] if name == "judge" else profile["agent"]
+                    )
+                    mode_evidence[name]["codex_exec_argv_fingerprint"] = (
+                        expected_codex_exec_argv_fingerprint(
+                            mode=name,
+                            model=command_profile["model"],
+                            reasoning_effort=command_profile["reasoning_effort"],
+                            sandbox_policy=command_profile["sandbox_policy"],
+                        )
                     )
 
             timeout_workspace = base / "timeout" / "workspace"
