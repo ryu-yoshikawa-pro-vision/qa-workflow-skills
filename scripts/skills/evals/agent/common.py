@@ -174,7 +174,8 @@ def capture_codex_judge_output(
         safe_runtime = {
             key: value
             for key, value in runtime.items()
-            if key in {
+            if key
+            in {
                 "package_version",
                 "package_sha512",
                 "codex_sha256",
@@ -194,7 +195,8 @@ def capture_codex_judge_output(
         command_count = jsonl.get("command_count", 0)
         tool_event_count = (
             tool_event_count
-            if isinstance(tool_event_count, int) and not isinstance(tool_event_count, bool)
+            if isinstance(tool_event_count, int)
+            and not isinstance(tool_event_count, bool)
             else 0
         )
         command_count = (
@@ -222,32 +224,42 @@ def capture_codex_judge_output(
     response_redacted = observations.get("response_redacted") is True or (
         safe_response != response
     )
-    if wsl2_launcher and launcher_status == "completed" and (
-        not safe_response
-        or safe_jsonl is None
-        or safe_jsonl["status"] != "captured"
-        or safe_jsonl["tool_use_detected"]
-        or observations.get("mode") != "judge"
-        or observations.get("web_search_enabled") is not False
-        or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
-        or observations.get("auth_mode") not in {"temporary_auth_file", "api_key_environment"}
-        or not isinstance(safe_runtime, dict)
-        or safe_runtime.get("package_version") != "0.163.0-linux-x64"
-        or observations.get("outer_exit_code") != 0
-        or response_redacted
+    if (
+        wsl2_launcher
+        and launcher_status == "completed"
+        and (
+            not safe_response
+            or safe_jsonl is None
+            or safe_jsonl["status"] != "captured"
+            or safe_jsonl["tool_use_detected"]
+            or observations.get("mode") != "judge"
+            or observations.get("web_search_enabled") is not False
+            or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
+            or observations.get("auth_mode")
+            not in {"temporary_auth_file", "api_key_environment"}
+            or not isinstance(safe_runtime, dict)
+            or safe_runtime.get("package_version") != "0.163.0-linux-x64"
+            or observations.get("outer_exit_code") != 0
+            or response_redacted
+        )
     ):
         launcher_status = "evidence_unverified"
-    elif not wsl2_launcher and launcher_status == "completed" and (
-        not safe_response
-        or safe_jsonl is None
-        or safe_jsonl["status"] != "captured"
-        or safe_jsonl["tool_use_detected"]
-        or observations.get("web_search_enabled") is not False
-        or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
-        or observations.get("auth_mode") not in {"temporary_auth_file", "api_key_environment"}
-        or safe_image is None
-        or observations.get("docker_exit_code") != 0
-        or response_redacted
+    elif (
+        not wsl2_launcher
+        and launcher_status == "completed"
+        and (
+            not safe_response
+            or safe_jsonl is None
+            or safe_jsonl["status"] != "captured"
+            or safe_jsonl["tool_use_detected"]
+            or observations.get("web_search_enabled") is not False
+            or observations.get("tool_policy") != "no_cli_tools_or_mcp_configured"
+            or observations.get("auth_mode")
+            not in {"temporary_auth_file", "api_key_environment"}
+            or safe_image is None
+            or observations.get("docker_exit_code") != 0
+            or response_redacted
+        )
     ):
         launcher_status = "evidence_unverified"
     launcher_observations = {
@@ -257,7 +269,9 @@ def capture_codex_judge_output(
         "image": safe_image,
         "runtime": safe_runtime,
         "jsonl": safe_jsonl,
-        "docker_exit_code": observations.get("outer_exit_code", observations.get("docker_exit_code")),
+        "docker_exit_code": observations.get(
+            "outer_exit_code", observations.get("docker_exit_code")
+        ),
         "model": observations.get("model"),
         "reasoning_effort": observations.get("reasoning_effort"),
         "sandbox_policy": observations.get("sandbox_policy"),
@@ -284,11 +298,10 @@ def capture_codex_jsonl_trace(
         launcher = json.loads(stdout)
     except json.JSONDecodeError:
         launcher = None
-    if (
-        isinstance(launcher, dict)
-        and launcher.get("protocol")
-        in {"codex_docker_launcher_v1", "codex_wsl2_bwrap_launcher_v1"}
-    ):
+    if isinstance(launcher, dict) and launcher.get("protocol") in {
+        "codex_docker_launcher_v1",
+        "codex_wsl2_bwrap_launcher_v1",
+    }:
         observations = launcher.get("observations")
         jsonl_summary = (
             observations.get("jsonl") if isinstance(observations, dict) else None
@@ -373,7 +386,15 @@ def capture_codex_jsonl_trace(
             safe_runtime = {
                 key: value
                 for key, value in runtime.items()
-                if key in {"package_version", "package_sha512", "codex_sha256", "codex_version", "bwrap_sha256", "bwrap_version"}
+                if key
+                in {
+                    "package_version",
+                    "package_sha512",
+                    "codex_sha256",
+                    "codex_version",
+                    "bwrap_sha256",
+                    "bwrap_version",
+                }
                 and isinstance(value, str)
             }
         protocol = str(launcher.get("protocol"))
@@ -387,7 +408,9 @@ def capture_codex_jsonl_trace(
             "launcher_observations": {
                 "status": observations.get("status", "unverified"),
                 "auth_mode": observations.get("auth_mode", "unverified"),
-                "docker_exit_code": launcher.get("exit_code", observations.get("outer_exit_code")),
+                "docker_exit_code": launcher.get(
+                    "exit_code", observations.get("outer_exit_code")
+                ),
                 "image": safe_image,
                 "runtime": safe_runtime,
             },

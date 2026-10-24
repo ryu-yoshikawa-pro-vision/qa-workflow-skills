@@ -469,7 +469,9 @@ def probe_wsl2_isolation(
     timeout_evidence: dict[str, Any] = {}
     try:
         if profile.get("schema_version") != 2 or command != ["codex"]:
-            raise AgentEvalError("WSL2 evidence requires schema 2 and the fixed Codex template")
+            raise AgentEvalError(
+                "WSL2 evidence requires schema 2 and the fixed Codex template"
+            )
         agent_contract: dict[str, Any] = {}
         judge_contract = verify_judge_wsl2_command(
             profile["judge"]["command_argv"], evaluator_root=REPO_ROOT
@@ -537,7 +539,9 @@ def probe_wsl2_isolation(
                 for future in as_completed(futures):
                     name = futures[future]
                     mode_evidence[name] = future.result()
-                    mode_evidence[name]["profile_fingerprint"] = profile_fingerprint(profile)
+                    mode_evidence[name]["profile_fingerprint"] = profile_fingerprint(
+                        profile
+                    )
 
             timeout_workspace = base / "timeout" / "workspace"
             timeout_workspace.mkdir(parents=True)
@@ -583,7 +587,8 @@ def probe_wsl2_isolation(
                 "inherited_fd_denied": all(
                     c.get("fd_noninheritance") is True for c in mode_checks
                 ),
-                "symlink_escape_denied": agent_checks.get("symlink_escape_denied") is True
+                "symlink_escape_denied": agent_checks.get("symlink_escape_denied")
+                is True
                 and repair_checks.get("symlink_escape_denied") is True,
                 "fresh_procfs": all(
                     c.get("outer_procfs") is True and c.get("inner_procfs") is True
@@ -615,16 +620,49 @@ def probe_wsl2_isolation(
                 "mounts_reviewed": agent_contract.get("execution_method")
                 == "wsl2-dual-bubblewrap"
                 and judge_contract.get("execution_method") == "wsl2-dual-bubblewrap"
-                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("workspace", {}).get("access") == "writable-root-with-read-only-source-children"
-                and ".agents" in mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("workspace", {}).get("read_only_source_entries", [])
-                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("output", {}).get("access") == "read-write"
-                and mode_evidence.get("agent", {}).get("effective", {}).get("mounts", {}).get("codex_scratch", {}).get("attempt_local") is True
-                and mode_evidence.get("repair", {}).get("effective", {}).get("mounts", {}).get("writable_skill") == "synthetic-skill"
-                and mode_evidence.get("judge", {}).get("effective", {}).get("mounts", {}).get("workspace") is None
+                and mode_evidence.get("agent", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("workspace", {})
+                .get("access")
+                == "writable-root-with-read-only-source-children"
+                and ".agents"
+                in mode_evidence.get("agent", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("workspace", {})
+                .get("read_only_source_entries", [])
+                and mode_evidence.get("agent", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("output", {})
+                .get("access")
+                == "read-write"
+                and mode_evidence.get("agent", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("codex_scratch", {})
+                .get("attempt_local")
+                is True
+                and mode_evidence.get("repair", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("writable_skill")
+                == "synthetic-skill"
+                and mode_evidence.get("judge", {})
+                .get("effective", {})
+                .get("mounts", {})
+                .get("workspace")
+                is None
                 and all(
-                    item.get("effective", {}).get("mounts", {}).get("host_home") is False
-                    and item.get("effective", {}).get("mounts", {}).get("evaluator_checkout") is False
-                    and item.get("effective", {}).get("mounts", {}).get("docker_socket") is False
+                    item.get("effective", {}).get("mounts", {}).get("host_home")
+                    is False
+                    and item.get("effective", {})
+                    .get("mounts", {})
+                    .get("evaluator_checkout")
+                    is False
+                    and item.get("effective", {}).get("mounts", {}).get("docker_socket")
+                    is False
                     for item in mode_evidence.values()
                 ),
                 "agent_judge_separated": (
@@ -635,11 +673,21 @@ def probe_wsl2_isolation(
                         == profile_fingerprint(profile)
                         for name in ("agent", "judge", "repair")
                     )
-                    and mode_evidence.get("agent", {}).get("effective", {}).get("codex_home_fingerprint")
-                    != mode_evidence.get("judge", {}).get("effective", {}).get("codex_home_fingerprint")
+                    and mode_evidence.get("agent", {})
+                    .get("effective", {})
+                    .get("codex_home_fingerprint")
+                    != mode_evidence.get("judge", {})
+                    .get("effective", {})
+                    .get("codex_home_fingerprint")
                     and all(
-                        mode_evidence.get("agent", {}).get("outer", {}).get("namespaces", {}).get(namespace)
-                        != mode_evidence.get("judge", {}).get("outer", {}).get("namespaces", {}).get(namespace)
+                        mode_evidence.get("agent", {})
+                        .get("outer", {})
+                        .get("namespaces", {})
+                        .get(namespace)
+                        != mode_evidence.get("judge", {})
+                        .get("outer", {})
+                        .get("namespaces", {})
+                        .get(namespace)
                         for namespace in ("user", "pid", "mnt", "ipc", "uts")
                     )
                 ),
@@ -675,13 +723,17 @@ def probe_wsl2_isolation(
     evidence = {
         "schema_version": 2,
         "execution_method": "wsl2-dual-bubblewrap",
-        "status": "verified" if all(checks.values()) and evaluator_revision else "unverified",
+        "status": "verified"
+        if all(checks.values()) and evaluator_revision
+        else "unverified",
         "probe": "scripts/skills/evals/agent/isolation_probe.py",
         "probe_version": 2,
         "evaluator_revision": evaluator_revision,
         "profile_fingerprint": profile_fingerprint(profile),
         "agent_command_fingerprint": canonical_fingerprint(command),
-        "judge_command_fingerprint": canonical_fingerprint(profile["judge"]["command_argv"]),
+        "judge_command_fingerprint": canonical_fingerprint(
+            profile["judge"]["command_argv"]
+        ),
         "runtime": runtime,
         "checks": checks,
         "mode_evidence": mode_evidence,

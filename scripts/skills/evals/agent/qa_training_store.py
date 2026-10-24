@@ -982,7 +982,8 @@ def run(argv: list[str] | None = None) -> int:
                         execution_command = launcher_argv(
                             mode="agent",
                             output_root=target / ".qa-eval-output",
-                            observations_path=attempt_root / "agent-launcher-observations.json",
+                            observations_path=attempt_root
+                            / "agent-launcher-observations.json",
                             model=profile["agent"]["model"],
                             reasoning_effort=profile["agent"]["reasoning_effort"],
                             sandbox_policy=profile["agent"]["sandbox_policy"],

@@ -218,15 +218,18 @@ def _validate_profile(value: Any) -> None:
             "execution profile must declare evaluator read access blocked"
         )
     if root["schema_version"] == 2 and isolation["method"] != "wsl2-dual-bubblewrap":
-        raise AgentEvalError(
-            "schema 2 execution profile must use WSL2 dual bubblewrap"
-        )
+        raise AgentEvalError("schema 2 execution profile must use WSL2 dual bubblewrap")
     if root["schema_version"] == 2:
         if agent["name"].strip().lower() != "codex":
             raise AgentEvalError("schema 2 Agent must use the pinned Codex CLI")
         if judge["command_argv"] != ["codex"]:
-            raise AgentEvalError("schema 2 Judge command must be the fixed Codex template")
-        for label, value in (("agent", agent["cli_version"]), ("judge", judge["cli_version"])):
+            raise AgentEvalError(
+                "schema 2 Judge command must be the fixed Codex template"
+            )
+        for label, value in (
+            ("agent", agent["cli_version"]),
+            ("judge", judge["cli_version"]),
+        ):
             if not re.search(r"\b0\.163\.0\b", value):
                 raise AgentEvalError(
                     f"schema 2 {label} CLI version must be Codex 0.163.0"
@@ -238,12 +241,16 @@ def _validate_profile(value: Any) -> None:
         if agent["tools"] != ["shell"]:
             raise AgentEvalError("schema 2 Agent may use only the sandboxed shell tool")
         if agent["skill_roots"] != ["/workspace/.agents/skills"]:
-            raise AgentEvalError("schema 2 Agent Skill root must be the sanitized workspace")
+            raise AgentEvalError(
+                "schema 2 Agent Skill root must be the sanitized workspace"
+            )
         if any(
             item["network_policy"] != "codex-parent-host-network-inner-shell-denied"
             for item in (agent, judge)
         ):
-            raise AgentEvalError("schema 2 network policy must separate Codex and shell access")
+            raise AgentEvalError(
+                "schema 2 network policy must separate Codex and shell access"
+            )
         if agent["mcp_servers"] or judge["mcp_servers"]:
             raise AgentEvalError("schema 2 profile may not enable MCP servers")
         if judge["tools"] or judge["skill_roots"]:
@@ -265,7 +272,9 @@ def _validate_profile(value: Any) -> None:
             not in disabled_instructions
             for item in (agent, judge)
         ):
-            raise AgentEvalError("schema 2 profile must disable host Codex configuration")
+            raise AgentEvalError(
+                "schema 2 profile must disable host Codex configuration"
+            )
 
     verification = _required_object(
         root["verification"], {"status", "method", "evidence_path"}, "verification"
@@ -365,7 +374,8 @@ def verify_profile_evidence(
         )
         or evidence.get("runtime", {}).get("package_version") != "0.163.0-linux-x64"
         or not isinstance(evidence.get("details"), dict)
-        or evidence.get("details", {}).get("authentication_shell_visible_risk") is not True
+        or evidence.get("details", {}).get("authentication_shell_visible_risk")
+        is not True
         or evidence.get("details", {}).get("model_api_used") is not False
     ):
         raise AgentEvalError(
@@ -821,7 +831,9 @@ def _option_value(argv: list[str], name: str) -> str | None:
 
 def _verify_codex_command_template(argv: list[str], *, name: str) -> dict[str, Any]:
     if argv != ["codex"]:
-        raise AgentEvalError(f"schema 2 {name} command must be the fixed codex template")
+        raise AgentEvalError(
+            f"schema 2 {name} command must be the fixed codex template"
+        )
     return {
         "status": "verified",
         "execution_method": "wsl2-dual-bubblewrap",
@@ -879,9 +891,7 @@ def verify_judge_wsl2_command(
     _verify_codex_command_template(argv, name="Judge")
     absolute = Path(os.path.abspath(evaluator_root.expanduser()))
     current = Path(absolute.anchor)
-    if any(
-        (current := current / part).is_symlink() for part in absolute.parts[1:]
-    ):
+    if any((current := current / part).is_symlink() for part in absolute.parts[1:]):
         raise AgentEvalError("Evaluator checkout path is invalid")
     return {
         "status": "verified",
@@ -915,9 +925,13 @@ def verify_repair_wsl2_command(
         raise AgentEvalError("repair Skill name is invalid")
     expected = workspace.resolve() / ".agents" / "skills" / skill_name
     if expected.is_symlink() or not expected.is_dir():
-        raise AgentEvalError("repair workspace must contain exactly one Skill mountpoint")
+        raise AgentEvalError(
+            "repair workspace must contain exactly one Skill mountpoint"
+        )
     if expected.resolve(strict=True) != skill_root:
-        raise AgentEvalError("repair may write only the named workspace Skill candidate")
+        raise AgentEvalError(
+            "repair may write only the named workspace Skill candidate"
+        )
     return {
         **base,
         "single_skill_writable": skill_name,

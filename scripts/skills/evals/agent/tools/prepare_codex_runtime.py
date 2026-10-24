@@ -17,12 +17,8 @@ from typing import Any
 
 PACKAGE_NAME = "@openai/codex"
 PACKAGE_VERSION = "0.163.0-linux-x64"
-PACKAGE_URL = (
-    "https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-linux-x64.tgz"
-)
-PACKAGE_SHA512 = (
-    "bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3"
-)
+PACKAGE_URL = "https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-linux-x64.tgz"
+PACKAGE_SHA512 = "bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3"
 MAX_PACKAGE_BYTES = 200 * 1024 * 1024
 MAX_UNPACKED_BYTES = 1_000_000_000
 CODEX_RELATIVE_PATH = PurePosixPath(
@@ -53,15 +49,18 @@ def _download_package(destination: Path) -> dict[str, Any]:
         headers={"User-Agent": "qa-workflow-skills-runtime-preflight/1"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response, destination.open(
-            "xb"
-        ) as target:
+        with (
+            urllib.request.urlopen(request, timeout=60) as response,
+            destination.open("xb") as target,
+        ):
             if response.status != 200:
                 raise RuntimePreparationError("Codex package download was not HTTP 200")
             while block := response.read(1024 * 1024):
                 total += len(block)
                 if total > MAX_PACKAGE_BYTES:
-                    raise RuntimePreparationError("Codex package exceeds the byte limit")
+                    raise RuntimePreparationError(
+                        "Codex package exceeds the byte limit"
+                    )
                 digest.update(block)
                 target.write(block)
     except (OSError, TimeoutError) as exc:
@@ -134,15 +133,22 @@ def _read_package_metadata(package_root: Path) -> dict[str, Any]:
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimePreparationError("Codex package metadata is missing or invalid") from exc
-    if metadata.get("name") != PACKAGE_NAME or metadata.get("version") != PACKAGE_VERSION:
+        raise RuntimePreparationError(
+            "Codex package metadata is missing or invalid"
+        ) from exc
+    if (
+        metadata.get("name") != PACKAGE_NAME
+        or metadata.get("version") != PACKAGE_VERSION
+    ):
         raise RuntimePreparationError("Codex package name or version mismatch")
     return metadata
 
 
 def _verify_executable(path: Path, *, version_args: list[str], expected: str) -> str:
     if path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK):
-        raise RuntimePreparationError("Codex runtime binary is missing or not executable")
+        raise RuntimePreparationError(
+            "Codex runtime binary is missing or not executable"
+        )
     try:
         result = subprocess.run(
             [str(path), *version_args],

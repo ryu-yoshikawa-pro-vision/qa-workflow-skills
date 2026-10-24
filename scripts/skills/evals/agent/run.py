@@ -288,7 +288,8 @@ def _render_grade(
         )
         judge_command, judge_cleanup = named_container_command(
             profile["judge"]["command_argv"],
-            name="agent-eval-judge-" + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23],
+            name="agent-eval-judge-"
+            + sha256_bytes(str(judge_workspace).encode("utf-8"))[7:23],
         )
         codex_judge = legacy_is_codex_judge(profile["judge"])
         judge_execution_command = (
@@ -667,7 +668,8 @@ def run(argv: list[str] | None = None) -> int:
                             execution_command = launcher_argv(
                                 mode="agent",
                                 output_root=agent_output_root,
-                                observations_path=case_dir / "agent-launcher-observations.json",
+                                observations_path=case_dir
+                                / "agent-launcher-observations.json",
                                 model=profile["agent"]["model"],
                                 reasoning_effort=profile["agent"]["reasoning_effort"],
                                 sandbox_policy=profile["agent"]["sandbox_policy"],

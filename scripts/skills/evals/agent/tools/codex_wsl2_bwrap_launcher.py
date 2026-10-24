@@ -161,15 +161,17 @@ def verify_runtime(runtime_root: Path | None = None) -> dict[str, Any]:
         or manifest.get("bwrap_relative_path") != BWRAP_RELATIVE_PATH.as_posix()
     ):
         raise CodexWsl2LauncherError("Codex runtime manifest does not match the pin")
-    codex_path = _reject_symlink_components(
-        root.joinpath(*CODEX_RELATIVE_PATH.parts)
-    )
-    bwrap_path = _reject_symlink_components(
-        root.joinpath(*BWRAP_RELATIVE_PATH.parts)
-    )
+    codex_path = _reject_symlink_components(root.joinpath(*CODEX_RELATIVE_PATH.parts))
+    bwrap_path = _reject_symlink_components(root.joinpath(*BWRAP_RELATIVE_PATH.parts))
     for binary in (codex_path, bwrap_path):
-        if binary.is_symlink() or not _regular_file(binary) or not os.access(binary, os.X_OK):
-            raise CodexWsl2LauncherError("Codex runtime binary is not a regular executable")
+        if (
+            binary.is_symlink()
+            or not _regular_file(binary)
+            or not os.access(binary, os.X_OK)
+        ):
+            raise CodexWsl2LauncherError(
+                "Codex runtime binary is not a regular executable"
+            )
     codex_digest = _sha256(codex_path)
     bwrap_digest = _sha256(bwrap_path)
     if (
@@ -244,7 +246,11 @@ def _validate_workspace_mounts(
     skill_name: str | None,
 ) -> tuple[Path | None, Path | None, Path | None]:
     if mode == "judge":
-        if workspace_root is not None or output_root is not None or skill_root is not None:
+        if (
+            workspace_root is not None
+            or output_root is not None
+            or skill_root is not None
+        ):
             raise CodexWsl2LauncherError("Judge mode may not receive Agent mounts")
         return None, None, None
     if workspace_root is None or output_root is None:
@@ -254,10 +260,14 @@ def _validate_workspace_mounts(
     _directory(workspace / ".agents" / "skills")
     output = _directory(output_root, writable=True)
     nested_output = output == workspace / ".qa-eval-output"
-    if output.is_symlink() or output == workspace or (
-        workspace in output.parents and not nested_output
+    if (
+        output.is_symlink()
+        or output == workspace
+        or (workspace in output.parents and not nested_output)
     ):
-        raise CodexWsl2LauncherError("output root must be separate or the named output directory")
+        raise CodexWsl2LauncherError(
+            "output root must be separate or the named output directory"
+        )
     if any(output.iterdir()):
         raise CodexWsl2LauncherError("attempt output root must be empty before launch")
     output_mountpoint = workspace / ".qa-eval-output"
@@ -270,7 +280,9 @@ def _validate_workspace_mounts(
         raise CodexWsl2LauncherError("workspace may not contain an existing .git entry")
     codex_mountpoint = workspace / ".codex"
     if codex_mountpoint.is_symlink() or codex_mountpoint.exists():
-        raise CodexWsl2LauncherError("workspace may not contain an existing .codex entry")
+        raise CodexWsl2LauncherError(
+            "workspace may not contain an existing .codex entry"
+        )
     if mode == "repair":
         if (
             skill_root is None
@@ -353,7 +365,14 @@ def _mount_tree(
             mounts.extend(["--ro-bind", str(source), target])
     mount_summary: dict[str, Any] = {
         "root": "tmpfs",
-        "system": ["/usr", "/bin", "/lib", "/lib64", "/etc/ssl/certs", "/etc/resolv.conf"],
+        "system": [
+            "/usr",
+            "/bin",
+            "/lib",
+            "/lib64",
+            "/etc/ssl/certs",
+            "/etc/resolv.conf",
+        ],
         "runtime": "/opt/codex-runtime",
         "codex_home": "/codex-home",
         "workspace": None,
@@ -371,16 +390,18 @@ def _mount_tree(
         workspace = workspace_root.resolve()
         output = output_root.resolve()
         mounts.extend(["--bind", str(workspace), "/workspace"])
-        mounts.extend(
-            ["--bind", str(output), "/workspace/.qa-eval-output"]
-        )
+        mounts.extend(["--bind", str(output), "/workspace/.qa-eval-output"])
         git_scratch = Path(str(codex_home) + ".git")
         if git_scratch.exists() or git_scratch.is_symlink():
-            raise CodexWsl2LauncherError("workspace contains an unexpected scratch entry")
+            raise CodexWsl2LauncherError(
+                "workspace contains an unexpected scratch entry"
+            )
         git_scratch.mkdir(mode=0o700)
         codex_scratch = Path(str(codex_home) + ".workspace-codex")
         if codex_scratch.exists() or codex_scratch.is_symlink():
-            raise CodexWsl2LauncherError("workspace contains an unexpected Codex scratch entry")
+            raise CodexWsl2LauncherError(
+                "workspace contains an unexpected Codex scratch entry"
+            )
         codex_scratch.mkdir(mode=0o700)
         # Codex's workspace-write sandbox prepares .git; the only writable Git metadata
         # is this empty attempt-local scratch directory, mounted over an empty mountpoint.
@@ -491,7 +512,9 @@ def _outer_argv(
         "--chdir",
         "/workspace" if mode in {"agent", "repair"} else "/tmp",
     ]
-    command = list(codex_argv) if outer_binary is not None else [executable, *codex_argv]
+    command = (
+        list(codex_argv) if outer_binary is not None else [executable, *codex_argv]
+    )
     result = [*prefix, "--", *command]
     effective = {
         "protocol": PROTOCOL,
@@ -569,7 +592,7 @@ def sandbox_smoke(
         for name in ("user", "pid", "mnt", "net", "ipc", "uts")
     }
     codex = "/opt/codex-runtime/" + CODEX_RELATIVE_PATH.as_posix()
-    inner_script = r'''import errno,json,os,socket,stat,subprocess,sys,threading
+    inner_script = r"""import errno,json,os,socket,stat,subprocess,sys,threading
 mode,outer_ns_json,host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path = sys.argv[1:8]
 outer_ns=json.loads(outer_ns_json)
 r={"mode":mode,"pid":os.getpid(),"procfs":os.path.ismount("/proc"),"namespaces":{},"nested_namespaces":{},"paths":{},"fd_marker_absent":True,"source_write_denied":None,"output_write_allowed":None,"repair_skill_write_allowed":None,"network":{}}
@@ -633,8 +656,8 @@ try:
  r["network"]["windows_command_denied"]=False
 except OSError:r["network"]["windows_command_denied"]=True
 print(json.dumps(r,separators=(",",":")))
-'''.replace("synthetic-skill", skill_name or "synthetic-skill")
-    outer_script = r'''import json,os,subprocess,sys
+""".replace("synthetic-skill", skill_name or "synthetic-skill")
+    outer_script = r"""import json,os,subprocess,sys
 codex,host_ns_json,inner_script,host_sentinel,fd_marker,mode,evaluator_root,other_home,unix_socket_path=sys.argv[1:10]
 host=json.loads(host_ns_json)
 outer={"pid":os.getpid(),"uid":os.getuid(),"gid":os.getgid(),"uid_map":open("/proc/self/uid_map").read().strip(),"gid_map":open("/proc/self/gid_map").read().strip(),"procfs":os.path.ismount("/proc"),"namespaces":{},"paths":{}}
@@ -658,7 +681,7 @@ try:inner=json.loads(probe.stdout.decode("utf-8",errors="strict").splitlines()[-
 except (UnicodeDecodeError,ValueError,IndexError):inner={"parse_error":True}
 result={"smoke_exit_code":smoke.returncode,"smoke_stdout":smoke.stdout.decode("utf-8",errors="replace").strip()[:1000],"smoke_stderr":smoke.stderr.decode("utf-8",errors="replace")[:1000],"probe_exit_code":probe.returncode,"probe_stdout":probe.stdout.decode("utf-8",errors="replace")[-4000:],"probe_stderr":probe.stderr.decode("utf-8",errors="replace")[:1000],"outer":outer,"inner":inner}
 print(json.dumps(result,separators=(",",":")))
-'''
+"""
     host_ns_json = json.dumps(host_namespaces, separators=(",", ":"))
     outer_argv = [
         "/usr/bin/python3",
@@ -726,7 +749,9 @@ print(json.dumps(result,separators=(",",":")))
                 close_fds=True,
             )
         try:
-            result = json.loads(completed.stdout.decode("utf-8", errors="strict").splitlines()[-1])
+            result = json.loads(
+                completed.stdout.decode("utf-8", errors="strict").splitlines()[-1]
+            )
         except (UnicodeDecodeError, json.JSONDecodeError, IndexError):
             result = {"outer": {}, "inner": {}, "parse_error": True}
         outer = result.get("outer", {})
@@ -735,32 +760,65 @@ print(json.dumps(result,separators=(",",":")))
             name: outer.get("namespaces", {}).get(name) != host_namespaces.get(name)
             for name in ("user", "pid", "mnt", "ipc", "uts")
         }
-        namespace_checks["outer_net_inherited"] = outer.get("network_parent_in_host_namespace") is True
+        namespace_checks["outer_net_inherited"] = (
+            outer.get("network_parent_in_host_namespace") is True
+        )
         namespace_checks["inner_namespaces_unshared"] = all(
             inner.get("nested_namespaces", {}).get(name) is True
             for name in ("user", "pid", "mnt", "net", "ipc")
         )
-        namespace_checks["inner_uts_matches_outer"] = (
-            inner.get("namespaces", {}).get("uts")
-            == outer.get("namespaces", {}).get("uts")
-        )
+        namespace_checks["inner_uts_matches_outer"] = inner.get("namespaces", {}).get(
+            "uts"
+        ) == outer.get("namespaces", {}).get("uts")
         source_expected = mode == "judge" or inner.get("source_write_denied") is True
         output_expected = mode == "judge" or inner.get("output_write_allowed") is True
-        repair_expected = mode != "repair" or inner.get("repair_skill_write_allowed") is True
+        repair_expected = (
+            mode != "repair" or inner.get("repair_skill_write_allowed") is True
+        )
         network = inner.get("network", {})
         tcp = network.get("tcp_socket", {})
         local = network.get("localhost", {})
         unix = network.get("af_unix", {})
         checks = {
-            "inner_smoke": result.get("smoke_exit_code") == 0 and result.get("smoke_stdout") == "sandbox-ok",
+            "inner_smoke": result.get("smoke_exit_code") == 0
+            and result.get("smoke_stdout") == "sandbox-ok",
             "outer_procfs": outer.get("procfs") is True,
             "inner_procfs": inner.get("procfs") is True,
-            "outer_host_paths_hidden": all(outer.get("paths", {}).get(path) is True for path in ("/home", "/root", "/mnt", "/run/docker.sock", "/var/run/docker.sock")) and outer.get("paths", {}).get("other_attempt_home_absent") is True,
-            "inner_host_paths_hidden": all(inner.get("paths", {}).get(path) is True for path in ("/home", "/root", "/mnt", "/run/docker.sock", "/var/run/docker.sock")) and inner.get("paths", {}).get("other_attempt_home_absent") is True,
-            "evaluator_sentinel_read_denied": outer.get("paths", {}).get("evaluator_sentinel_absent") is True and inner.get("paths", {}).get("evaluator_sentinel_absent") is True,
-            "evaluator_checkout_unmounted": outer.get("paths", {}).get("evaluator_checkout_absent") is True and inner.get("paths", {}).get("evaluator_checkout_absent") is True,
+            "outer_host_paths_hidden": all(
+                outer.get("paths", {}).get(path) is True
+                for path in (
+                    "/home",
+                    "/root",
+                    "/mnt",
+                    "/run/docker.sock",
+                    "/var/run/docker.sock",
+                )
+            )
+            and outer.get("paths", {}).get("other_attempt_home_absent") is True,
+            "inner_host_paths_hidden": all(
+                inner.get("paths", {}).get(path) is True
+                for path in (
+                    "/home",
+                    "/root",
+                    "/mnt",
+                    "/run/docker.sock",
+                    "/var/run/docker.sock",
+                )
+            )
+            and inner.get("paths", {}).get("other_attempt_home_absent") is True,
+            "evaluator_sentinel_read_denied": outer.get("paths", {}).get(
+                "evaluator_sentinel_absent"
+            )
+            is True
+            and inner.get("paths", {}).get("evaluator_sentinel_absent") is True,
+            "evaluator_checkout_unmounted": outer.get("paths", {}).get(
+                "evaluator_checkout_absent"
+            )
+            is True
+            and inner.get("paths", {}).get("evaluator_checkout_absent") is True,
             "fd_noninheritance": inner.get("fd_marker_absent") is True,
-            "symlink_escape_denied": mode == "judge" or inner.get("paths", {}).get("symlink_escape_denied") is True,
+            "symlink_escape_denied": mode == "judge"
+            or inner.get("paths", {}).get("symlink_escape_denied") is True,
             "source_write_denied": source_expected,
             "output_write_allowed": output_expected,
             "repair_skill_write_allowed": repair_expected,
@@ -768,9 +826,14 @@ print(json.dumps(result,separators=(",",":")))
             "inner_tcp_blocked": tcp.get("connect") != "connected",
             "inner_localhost_blocked": local.get("connect") != "connected",
             "inner_af_unix_blocked": unix.get("connect") != "connected",
-            "unmounted_unix_path_hidden": outer.get("paths", {}).get(str(host_unix_socket)) is True and inner.get("paths", {}).get(str(host_unix_socket)) is True,
+            "unmounted_unix_path_hidden": outer.get("paths", {}).get(
+                str(host_unix_socket)
+            )
+            is True
+            and inner.get("paths", {}).get(str(host_unix_socket)) is True,
             "inner_dns_blocked": network.get("dns", {}).get("resolved") is False,
-            "wsl_interop_blocked": network.get("wsl_interop_absent") is True and network.get("windows_command_denied") is True,
+            "wsl_interop_blocked": network.get("wsl_interop_absent") is True
+            and network.get("windows_command_denied") is True,
         }
         return {
             "protocol": PROTOCOL,
@@ -789,8 +852,12 @@ print(json.dumps(result,separators=(",",":")))
                 "probe_stderr": _sanitize(str(result.get("probe_stderr", "")))[:1000],
             },
             "checks": checks,
-            "status": "verified" if completed.returncode == 0 and all(checks.values()) else "unverified",
-            "stderr": _sanitize(completed.stderr.decode("utf-8", errors="replace"))[:4096],
+            "status": "verified"
+            if completed.returncode == 0 and all(checks.values())
+            else "unverified",
+            "stderr": _sanitize(completed.stderr.decode("utf-8", errors="replace"))[
+                :4096
+            ],
         }
     except (OSError, subprocess.SubprocessError) as exc:
         return {
@@ -828,7 +895,9 @@ def timeout_cleanup_smoke(
     """Exercise the regular process-group timeout and Codex-home cleanup path."""
     _require_wsl2()
     if timeout_seconds < 1 or timeout_seconds > 10:
-        raise CodexWsl2LauncherError("timeout smoke duration is outside the allowed range")
+        raise CodexWsl2LauncherError(
+            "timeout smoke duration is outside the allowed range"
+        )
     runtime_root = runtime_root or runtime_root_from_environment()
     runtime = verify_runtime(runtime_root)
     home_parent = _private_temp_root()
@@ -915,20 +984,28 @@ def timeout_cleanup_smoke(
 
 
 def _fingerprint(value: Any) -> str:
-    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _auth_material() -> tuple[Path | None, str | None, str]:
     configured_home = os.environ.get("CODEX_HOME")
-    source_home = Path(configured_home).expanduser() if configured_home else Path.home() / ".codex"
+    source_home = (
+        Path(configured_home).expanduser()
+        if configured_home
+        else Path.home() / ".codex"
+    )
     auth = source_home / "auth.json"
     if auth.exists():
         _reject_symlink_components(auth)
         if not _regular_file(auth) or auth.stat().st_size > 1_000_000:
             raise CodexWsl2LauncherError("Codex authentication file is invalid")
         if auth.resolve().is_relative_to(REPO_ROOT.resolve()):
-            raise CodexWsl2LauncherError("Codex credentials may not be read from the repository")
+            raise CodexWsl2LauncherError(
+                "Codex credentials may not be read from the repository"
+            )
         return auth, None, "temporary_auth_file"
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
@@ -947,7 +1024,11 @@ def _prepare_codex_home(
     parent = _reject_symlink_components(path.parent)
     if not parent.is_dir() or not os.access(parent, os.W_OK):
         raise CodexWsl2LauncherError("Codex home parent must be a writable directory")
-    if not path.name.startswith(CODEX_HOME_PREFIX) or path.exists() or path.is_symlink():
+    if (
+        not path.name.startswith(CODEX_HOME_PREFIX)
+        or path.exists()
+        or path.is_symlink()
+    ):
         raise CodexWsl2LauncherError("Codex home path is invalid or already exists")
     if mode == "repair":
         if skill_name is None or not _SAFE_NAME_RE.fullmatch(skill_name):
@@ -1006,19 +1087,27 @@ def cleanup_codex_home(
             scratch.unlink()
         elif scratch.exists():
             if not stat.S_ISDIR(scratch.lstat().st_mode):
-                raise CodexWsl2LauncherError("Codex scratch cleanup target is not a directory")
+                raise CodexWsl2LauncherError(
+                    "Codex scratch cleanup target is not a directory"
+                )
             shutil.rmtree(scratch)
     if workspace_root is not None:
         workspace = _directory(workspace_root)
         for name in (".git", ".codex"):
             mountpoint = workspace / name
             if mountpoint.is_symlink():
-                raise CodexWsl2LauncherError(f"refusing to clean a symlinked workspace {name}")
+                raise CodexWsl2LauncherError(
+                    f"refusing to clean a symlinked workspace {name}"
+                )
             if mountpoint.exists():
                 if not stat.S_ISDIR(mountpoint.lstat().st_mode):
-                    raise CodexWsl2LauncherError(f"workspace {name} cleanup target is not a directory")
+                    raise CodexWsl2LauncherError(
+                        f"workspace {name} cleanup target is not a directory"
+                    )
                 if any(mountpoint.iterdir()):
-                    raise CodexWsl2LauncherError(f"workspace {name} mountpoint is unexpectedly non-empty")
+                    raise CodexWsl2LauncherError(
+                        f"workspace {name} mountpoint is unexpectedly non-empty"
+                    )
                 mountpoint.rmdir()
 
 
@@ -1111,7 +1200,12 @@ def launch(
     if auth_mode == "unavailable":
         _write_observations(
             observations_path,
-            {"protocol": PROTOCOL, "status": "execution_error", "error": "authentication_unavailable", "mode": mode},
+            {
+                "protocol": PROTOCOL,
+                "status": "execution_error",
+                "error": "authentication_unavailable",
+                "mode": mode,
+            },
         )
         return 2
     home_path = codex_home
@@ -1168,7 +1262,9 @@ def launch(
     if auth_path is not None:
         copied = home_path / "auth.json"
         if not _regular_file(copied) or copied.stat().st_mode & 0o077:
-            raise CodexWsl2LauncherError("temporary Codex authentication file is insecure")
+            raise CodexWsl2LauncherError(
+                "temporary Codex authentication file is insecure"
+            )
     status = "execution_error"
     response = ""
     observations: dict[str, Any] = {
@@ -1203,18 +1299,24 @@ def launch(
         stdout = completed.stdout
         stderr = completed.stderr.decode("utf-8", errors="replace")
         if stderr:
-            sys.stderr.write(_sanitize(stderr) + ("" if stderr.endswith("\n") else "\n"))
+            sys.stderr.write(
+                _sanitize(stderr) + ("" if stderr.endswith("\n") else "\n")
+            )
         jsonl, response = _summarize_jsonl(stdout)
         observations["jsonl"] = jsonl
         observations["outer_exit_code"] = completed.returncode
         observations["docker_exit_code"] = completed.returncode
-        observations["status"] = "completed" if completed.returncode == 0 else "execution_error"
+        observations["status"] = (
+            "completed" if completed.returncode == 0 else "execution_error"
+        )
         if mode == "judge" and jsonl.get("tool_event_count", 0) > 0:
             observations["status"] = "evidence_unverified"
         if jsonl.get("status") != "captured" or not response:
             observations["status"] = "evidence_unverified"
         response = _sanitize(response)
-        observations["response_sha256"] = hashlib.sha256(response.encode("utf-8")).hexdigest() if response else None
+        observations["response_sha256"] = (
+            hashlib.sha256(response.encode("utf-8")).hexdigest() if response else None
+        )
         observations["status"] = observations["status"]
         if mode == "judge":
             _write_observations(observations_path, observations)
@@ -1228,7 +1330,10 @@ def launch(
                 "final_message": response,
                 "observations": observations,
             }
-            sys.stdout.write(json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n")
+            sys.stdout.write(
+                json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
+                + "\n"
+            )
         return 0 if observations["status"] == "completed" else 2
     except (OSError, subprocess.SubprocessError) as exc:
         observations["status"] = "execution_error"
@@ -1290,7 +1395,10 @@ def _write_observations(path: Path, value: dict[str, Any]) -> None:
         raise CodexWsl2LauncherError("observations path may not be a symlink")
     temporary = path.with_name(path.name + f".tmp-{uuid.uuid4().hex}")
     try:
-        temporary.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        temporary.write_text(
+            json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
     finally:
@@ -1327,7 +1435,9 @@ def launcher_argv(
         skill_root = _reject_symlink_components(Path(skill_root))
     if mode in {"agent", "repair"} and workspace_root is None:
         if output.name != ".qa-eval-output":
-            raise CodexWsl2LauncherError("workspace root is required for this output path")
+            raise CodexWsl2LauncherError(
+                "workspace root is required for this output path"
+            )
         workspace_root = output.parent
     if mode == "repair" and skill_root is None and skill_name:
         assert workspace_root is not None
@@ -1359,7 +1469,9 @@ def launcher_argv(
     if skill_name is not None:
         command.extend(["--skill-name", skill_name])
     if runtime_root is not None:
-        command.extend(["--runtime-root", str(_reject_symlink_components(Path(runtime_root)))])
+        command.extend(
+            ["--runtime-root", str(_reject_symlink_components(Path(runtime_root)))]
+        )
     return command
 
 
@@ -1378,7 +1490,9 @@ def judge_launcher_argv_for_profile(
         or str(judge_profile.get("external_instructions", "")).strip().lower()
         not in {"none", "disabled", "no-external-instructions"}
     ):
-        raise CodexWsl2LauncherError("Judge profile enables an unapproved tool or config source")
+        raise CodexWsl2LauncherError(
+            "Judge profile enables an unapproved tool or config source"
+        )
     output_root = observations_path.parent
     return launcher_argv(
         mode="judge",
@@ -1392,7 +1506,9 @@ def judge_launcher_argv_for_profile(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run Codex through the WSL2 dual-bubblewrap contract.")
+    parser = argparse.ArgumentParser(
+        description="Run Codex through the WSL2 dual-bubblewrap contract."
+    )
     parser.add_argument("--mode", choices=("agent", "judge", "repair"))
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--observations-path", type=Path)
@@ -1411,7 +1527,10 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     if os.name == "posix":
-        signal.signal(signal.SIGTERM, lambda _signum, _frame: (_ for _ in ()).throw(SystemExit(143)))
+        signal.signal(
+            signal.SIGTERM,
+            lambda _signum, _frame: (_ for _ in ()).throw(SystemExit(143)),
+        )
     args, remainder = _parser().parse_known_args(argv)
     if args.cleanup_home is not None:
         if args.allowed_parent is None:
@@ -1427,8 +1546,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Codex home cleanup failed: {exc}", file=sys.stderr)
             return 2
         return 0
-    if args.codex_home is None or args.mode is None or args.output_root is None or args.observations_path is None or args.model is None or args.reasoning_effort is None or args.sandbox_policy is None:
-        _parser().error("launcher requires mode, output, observations, model, reasoning, sandbox, and home")
+    if (
+        args.codex_home is None
+        or args.mode is None
+        or args.output_root is None
+        or args.observations_path is None
+        or args.model is None
+        or args.reasoning_effort is None
+        or args.sandbox_policy is None
+    ):
+        _parser().error(
+            "launcher requires mode, output, observations, model, reasoning, sandbox, and home"
+        )
     prompt = sys.stdin.read()
     try:
         return launch(

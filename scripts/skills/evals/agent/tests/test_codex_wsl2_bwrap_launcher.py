@@ -33,7 +33,9 @@ RUN_WSL2_INTEGRATION = IS_WSL2 and os.environ.get("QAEVAL_RUN_WSL2_INTEGRATION")
 
 
 class CodexWsl2LauncherUnitTests(unittest.TestCase):
-    def test_exec_argv_uses_embedded_runtime_strict_config_and_fixed_sandbox(self) -> None:
+    def test_exec_argv_uses_embedded_runtime_strict_config_and_fixed_sandbox(
+        self,
+    ) -> None:
         for mode, sandbox_policy in (
             ("agent", "workspace-write"),
             ("repair", "workspace-write"),
@@ -50,7 +52,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     else "/workspace/.qa-eval-output/final.md",
                 )
                 self.assertEqual(command[:2], ["--no-daemon", "--strict-config"])
-                self.assertEqual(command[command.index("--sandbox") + 1], sandbox_policy)
+                self.assertEqual(
+                    command[command.index("--sandbox") + 1], sandbox_policy
+                )
                 self.assertIn("exec", command)
                 self.assertNotIn("--profile", command)
                 self.assertNotIn("--mcp-config", command)
