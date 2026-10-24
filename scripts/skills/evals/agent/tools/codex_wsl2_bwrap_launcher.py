@@ -1011,16 +1011,25 @@ def _windows_mount_contains(path: Path) -> bool:
             before, after = line.split(" - ", 1)
             fields = before.split()
             mountpoint = Path(
-                re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), fields[4])
+                re.sub(
+                    r"\\([0-7]{3})",
+                    lambda match: chr(int(match.group(1), 8)),
+                    fields[4],
+                )
             )
             filesystem, source, *options = after.split()
         except (IndexError, ValueError):
             continue
         is_windows_mount = filesystem.lower() == "drvfs" or (
             filesystem.lower() == "9p"
-            and ("drvfs" in " ".join(options).lower() or re.match(r"^[a-z]:\\", source, re.I))
+            and (
+                "drvfs" in " ".join(options).lower()
+                or re.match(r"^[a-z]:\\", source, re.I)
+            )
         )
-        if is_windows_mount and (absolute == mountpoint or mountpoint in absolute.parents):
+        if is_windows_mount and (
+            absolute == mountpoint or mountpoint in absolute.parents
+        ):
             return True
     return False
 
@@ -1075,19 +1084,24 @@ def _codex_login_status(runtime: dict[str, Any], source_home: Path) -> str:
 
 def _auth_material(runtime: dict[str, Any]) -> tuple[Path | None, str]:
     configured_home = os.environ.get("CODEX_HOME")
-    if _is_wsl2() and configured_home and re.match(
-        r"^[a-z]:[\\/]", configured_home, re.I
+    if (
+        _is_wsl2()
+        and configured_home
+        and re.match(r"^[a-z]:[\\/]", configured_home, re.I)
     ):
         return None, "unsupported_auth_store"
-    source_home = Path(configured_home).expanduser() if configured_home else Path.home() / ".codex"
+    source_home = (
+        Path(configured_home).expanduser()
+        if configured_home
+        else Path.home() / ".codex"
+    )
     try:
         source_home = _reject_symlink_components(source_home, allow_leaf=True)
     except CodexWsl2LauncherError:
         return None, "invalid_auth_store"
     if (
-        (_is_wsl2() and _windows_mount_contains(source_home))
-        or source_home.is_relative_to(REPO_ROOT.resolve())
-    ):
+        _is_wsl2() and _windows_mount_contains(source_home)
+    ) or source_home.is_relative_to(REPO_ROOT.resolve()):
         return None, "unsupported_auth_store"
     if source_home.exists() and not source_home.is_dir():
         return None, "invalid_auth_store"

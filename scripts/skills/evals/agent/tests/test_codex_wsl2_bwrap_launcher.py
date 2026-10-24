@@ -170,9 +170,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     envelope = json.loads(stdout.getvalue())
                     final_message = envelope["final_message"]
                     observations = envelope["observations"]
-                self.assertEqual(
-                    observations["authentication_method"], "chatgpt_login"
-                )
+                self.assertEqual(observations["authentication_method"], "chatgpt_login")
                 if redact:
                     self.assertEqual(exit_code, 2)
                     self.assertEqual(final_message, "Answer [redacted]")
@@ -196,7 +194,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 )
                 self.assertEqual(observations["codex_home_cleanup_status"], "succeeded")
                 self.assertEqual(observations["authentication_method"], "chatgpt_login")
-                self.assertEqual(observations["authentication_check_status"], "verified")
+                self.assertEqual(
+                    observations["authentication_check_status"], "verified"
+                )
                 self.assertEqual(observations["codex_cli_version"], "0.163.0")
                 self.assertTrue(child_environments)
                 self.assertTrue(login_status_environments)
@@ -332,9 +332,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source_home = Path(temporary) / "codex-home"
             source_home.mkdir()
-            (source_home / "auth.json").write_text(
-                "SYNTHETIC_AUTH", encoding="utf-8"
-            )
+            (source_home / "auth.json").write_text("SYNTHETIC_AUTH", encoding="utf-8")
             process = subprocess.CompletedProcess(
                 [runtime["codex_path"], "login", "status"],
                 1,
@@ -354,7 +352,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         self.assertIsNone(auth)
         self.assertEqual(status, "check_failed")
 
-    def test_auth_material_rejects_chatgpt_status_without_copyable_auth_file(self) -> None:
+    def test_auth_material_rejects_chatgpt_status_without_copyable_auth_file(
+        self,
+    ) -> None:
         runtime = {
             "codex_path": "/fixed/runtime/codex",
             "codex_version": "codex-cli 0.163.0",
@@ -392,9 +392,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             (source_home / "auth.json").write_bytes(b"x" * 1_000_001)
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
-                patch.object(
-                    codex_wsl2_bwrap_launcher.subprocess, "run"
-                ) as run,
+                patch.object(codex_wsl2_bwrap_launcher.subprocess, "run") as run,
             ):
                 auth, status = _auth_material(runtime)
 
@@ -402,7 +400,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         self.assertEqual(status, "invalid_auth_file")
         run.assert_not_called()
 
-    def test_auth_material_classifies_login_status_timeout_without_details(self) -> None:
+    def test_auth_material_classifies_login_status_timeout_without_details(
+        self,
+    ) -> None:
         runtime = {
             "codex_path": "/fixed/runtime/codex",
             "codex_version": "codex-cli 0.163.0",
@@ -410,9 +410,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source_home = Path(temporary) / "codex-home"
             source_home.mkdir()
-            (source_home / "auth.json").write_text(
-                "SYNTHETIC_AUTH", encoding="utf-8"
-            )
+            (source_home / "auth.json").write_text("SYNTHETIC_AUTH", encoding="utf-8")
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
                 patch.object(
@@ -428,7 +426,9 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         self.assertIsNone(auth)
         self.assertEqual(status, "check_failed")
 
-    def test_auth_material_rejects_windows_home_and_pinned_version_mismatch(self) -> None:
+    def test_auth_material_rejects_windows_home_and_pinned_version_mismatch(
+        self,
+    ) -> None:
         with (
             patch.dict(
                 os.environ, {"CODEX_HOME": r"C:\Users\person\.codex"}, clear=True
@@ -447,14 +447,10 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source_home = Path(temporary) / "codex-home"
             source_home.mkdir()
-            (source_home / "auth.json").write_text(
-                "SYNTHETIC_AUTH", encoding="utf-8"
-            )
+            (source_home / "auth.json").write_text("SYNTHETIC_AUTH", encoding="utf-8")
             with (
                 patch.dict(os.environ, {"CODEX_HOME": str(source_home)}, clear=True),
-                patch.object(
-                    codex_wsl2_bwrap_launcher.subprocess, "run"
-                ) as run,
+                patch.object(codex_wsl2_bwrap_launcher.subprocess, "run") as run,
             ):
                 auth, status = _auth_material(
                     {
