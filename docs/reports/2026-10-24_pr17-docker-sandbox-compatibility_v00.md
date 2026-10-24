@@ -31,11 +31,17 @@ Docker標準seccompを維持したままの起動は未達である。標準prof
 
 ## 3. Docker障害の証拠と確定範囲
 
-| 環境・条件 | 記録されている結果 | 確定できること | 確定できないこと |
-| --- | --- | --- | --- |
-| Docker Desktop 4.96.2 / Engine 29.9.2、Ubuntu 24.04.4 WSL2、Codex 0.163.0 | API応答後、Codex shellが起動前に拒否。bubblewrapは`No permissions to create a new namespace`。WSL hostの`unshare --user --map-root-user true`は成功 | host kernel上のuser namespace機能自体は利用可能。Docker container内ではsandbox起動できなかった | この実行で拒否された個別syscall、seccomp以外の寄与、AppArmor等の実効LSM状態 |
-| Codespaces Docker Engine 29.8.0-1、built-in seccomp、`--cap-drop=ALL`、`no-new-privileges`、read-only root | 保存済み診断で、namespace flag付き`clone`が`EPERM`。後続の限定profileでnamespace・tmpfs mountが通り、`mount("proc", "/newroot/proc", "proc", MS_NOSUID|MS_NODEV|MS_NOEXEC, NULL)`が`EPERM` | このCodespaces実行ではnamespace cloneとprocfs mountの両方に別の障害段階があった | CodespacesとDocker Desktopのローカル実行が同じ原因であること。procfs拒否が全Docker hostで再現すること |
-| WSL2 host-native Codex/bwrap | user/PID/network namespace、procfs mountが成功した過去記録あり | WSL2 host側でのbwrap起動条件 | Dockerのcontainer seccomp、mount mask、UID/GID mappingを通過できること |
+| 環境・条件                                                                                                 | 記録されている結果                                                                                                                                  | 確定できること                                                                                 | 確定できないこと                                                                                      |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Docker Desktop 4.96.2 / Engine 29.9.2、Ubuntu 24.04.4 WSL2、Codex 0.163.0                                  | API応答後、Codex shellが起動前に拒否。bubblewrapは`No permissions to create a new namespace`。WSL hostの`unshare --user --map-root-user true`は成功 | host kernel上のuser namespace機能自体は利用可能。Docker container内ではsandbox起動できなかった | この実行で拒否された個別syscall、seccomp以外の寄与、AppArmor等の実効LSM状態                           |
+| Codespaces Docker Engine 29.8.0-1、built-in seccomp、`--cap-drop=ALL`、`no-new-privileges`、read-only root | namespace flag付き`clone`が`EPERM`。限定profileでnamespace・tmpfs mount後、procfs mountも`EPERM`                                                    | namespace cloneとprocfs mountの両方に別の障害段階があった                                      | CodespacesとDocker Desktopのローカル実行が同じ原因であること。procfs拒否が全Docker hostで再現すること |
+| WSL2 host-native Codex/bwrap                                                                               | user/PID/network namespace、procfs mountが成功した過去記録あり                                                                                      | WSL2 host側でのbwrap起動条件                                                                   | Dockerのcontainer seccomp、mount mask、UID/GID mappingを通過できること                                |
+
+当該traceに保存されたprocfs mount syscallは次のとおり。
+
+```text
+mount("proc", "/newroot/proc", "proc", MS_NOSUID|MS_NODEV|MS_NOEXEC, NULL) = EPERM
+```
 
 2026-10-23ローカルDockerの実行はmodel API応答とsandboxed shell実行を区別している。API応答だけをCodex shell成功や隔離成立とは扱わない。既存isolation probeのsentinel・mount結果もDocker mount境界の証拠であり、Codex内bwrapの証拠ではない。
 
@@ -55,13 +61,13 @@ Codex公式tag [`linux_run_main.rs`](https://github.com/openai/codex/blob/rust-v
 
 ### syscallの確認範囲
 
-| syscall / 操作 | 記録・sourceから分かること | 判定 |
-| --- | --- | --- |
-| `clone` | Codespaces診断で複数の`CLONE_NEW*`を含む呼出しと`EPERM`を記録。Codex sourceのbwrap argvはuser/IPC/PIDとpolicy依存network namespaceを要求 | そのCodespaces実行では拒否確認。ローカルDockerの拒否syscallとしては未確定 |
-| `clone3` | Docker標準profileは、capability条件に応じて`ENOSYS`を返しglibc等の`clone` fallbackを可能にする仕様がある | 対象smokeでの実呼出し・拒否は記録されていない。今回の原因とは断定しない |
-| `unshare` | userns/namespaceを組み立てる機能上の関連はあるが、対象Codex実行の拒否syscallとして記録されていない。hostの`unshare`成功とcontainer内のbwrap syscallは別 | 必要性・拒否は未確定。traceなしに許可対象へ加えない |
-| `mount` | 限定profileの診断にtmpfs mount成功とprocfs mount `EPERM`の記録。Codex sourceはtmpfs・bind・ro-bind・proc・maskを要求 | mount系permissionが必要。ただしDocker seccomp変更だけでprocfsが直る証拠はない |
-| `umount2`、`setns`、`pivot_root`等 | 既存ログに該当する失敗の記録なし | 必要とも拒否原因とも断定しない。追加するなら新しい診断実行で実syscallを記録する |
+| syscall / 操作                     | 記録・sourceから分かること                                                                                                                              | 判定                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `clone`                            | Codespaces診断で複数の`CLONE_NEW*`を含む呼出しと`EPERM`を記録。Codex sourceのbwrap argvはuser/IPC/PIDとpolicy依存network namespaceを要求                | そのCodespaces実行では拒否確認。ローカルDockerの拒否syscallとしては未確定       |
+| `clone3`                           | Docker標準profileは、capability条件に応じて`ENOSYS`を返しglibc等の`clone` fallbackを可能にする仕様がある                                                | 対象smokeでの実呼出し・拒否は記録されていない。今回の原因とは断定しない         |
+| `unshare`                          | userns/namespaceを組み立てる機能上の関連はあるが、対象Codex実行の拒否syscallとして記録されていない。hostの`unshare`成功とcontainer内のbwrap syscallは別 | 必要性・拒否は未確定。traceなしに許可対象へ加えない                             |
+| `mount`                            | 限定profileの診断にtmpfs mount成功とprocfs mount `EPERM`の記録。Codex sourceはtmpfs・bind・ro-bind・proc・maskを要求                                    | mount系permissionが必要。ただしDocker seccomp変更だけでprocfsが直る証拠はない   |
+| `umount2`、`setns`、`pivot_root`等 | 既存ログに該当する失敗の記録なし                                                                                                                        | 必要とも拒否原因とも断定しない。追加するなら新しい診断実行で実syscallを記録する |
 
 ## 5. Docker制約との照合
 
@@ -112,15 +118,15 @@ Codex公式tag [`linux_run_main.rs`](https://github.com/openai/codex/blob/rust-v
 
 現headでコード変更が必要な不具合は見つけていない。以下の対象ファイルは今回変更しない。
 
-| ファイル | 今回 | 後日seccomp診断を正式化する場合の確認点 |
-| --- | --- | --- |
-| `codex-agent.Dockerfile` | 変更なし | image内容とCLI versionは不変。seccomp profileはDocker実行時条件なのでimageへ埋め込まない |
-| `codex_docker_launcher.py` | 変更なし | Agent commandだけへ承認済みprofileを加えるなら、profile path/hashと`--security-opt`の許可値を厳密照合。秘密や任意profile pathをargvへ受け入れない |
+| ファイル                         | 今回     | 後日seccomp診断を正式化する場合の確認点                                                                                                                              |
+| -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codex-agent.Dockerfile`         | 変更なし | image内容とCLI versionは不変。seccomp profileはDocker実行時条件なのでimageへ埋め込まない                                                                             |
+| `codex_docker_launcher.py`       | 変更なし | Agent commandだけへ承認済みprofileを加えるなら、profile path/hashと`--security-opt`の許可値を厳密照合。秘密や任意profile pathをargvへ受け入れない                    |
 | `codex_judge_docker_launcher.py` | 変更なし | Judgeはtools/shell無効契約。Agent向けのnamespace/mount拡張をJudgeに共有しない。Judge実行にbwrapが不要なことを実証できなければ、標準profile維持のまま別途停止判断する |
-| `isolation_probe.py` | 変更なし | 承認済みprofile hash、Engine、seccomp/capability/NNP、namespace/procfsと既存mount negative testを同一command fingerprintへ結び付ける |
-| `workspace.py` | 変更なし | 今は`cap-drop=ALL`、NNP、read-only、mount集合をstrictに検証する。将来も既知profileだけ許可し、`unconfined`やsystempaths解除を拒否する |
-| `executor.py` | 変更なし | `close_fds=True`、空の`pass_fds`、POSIX process group、Windows run専用TEMP root cleanupを維持 |
-| `README.md` | 変更なし | security review後に正式採用となる場合だけ、profile hash・必要Engine条件・Agent/Judge差を記述 |
+| `isolation_probe.py`             | 変更なし | 承認済みprofile hash、Engine、seccomp/capability/NNP、namespace/procfsと既存mount negative testを同一command fingerprintへ結び付ける                                 |
+| `workspace.py`                   | 変更なし | 今は`cap-drop=ALL`、NNP、read-only、mount集合をstrictに検証する。将来も既知profileだけ許可し、`unconfined`やsystempaths解除を拒否する                                |
+| `executor.py`                    | 変更なし | `close_fds=True`、空の`pass_fds`、POSIX process group、Windows run専用TEMP root cleanupを維持                                                                        |
+| `README.md`                      | 変更なし | security review後に正式採用となる場合だけ、profile hash・必要Engine条件・Agent/Judge差を記述                                                                         |
 
 既存修正の関連経路を静的に再確認した。
 
