@@ -68,12 +68,45 @@ Repair write拒否はCodex設定の追加writable rootが適用されないprofi
 
 最初のformatter実行は一時venvにRuffがなく起動できなかった。CI指定の`ruff==0.16.8`をその一時venvへ導入後、checkを再実行してPASSを得た。
 
-## 未完了事項
+## 最終commit・push・CI
 
-- `git fetch origin`はWindows checkoutの`.git/FETCH_HEAD`書込み権限で失敗した。remote branchを同期済みとは扱わない。
-- この報告作成時点で対象feature branchへのcommit/push、push後の5 CI確認、PR本文更新は未完了。過去のHEADに対するCI successを今回の変更へ流用しない。
-- 実Agent / Judge / QTS評価、Judge fixtureの人間承認、改善再評価は実認証/API利用の別承認まで未実施。
+実装と文書整形の最終検証対象HEADは`39a08482bf8bbd179b0188c540a00a31943e677b`。以下のcommitを`feat/agent-eval-runner`へ通常pushした。
+
+- `40a3462bd593e38027117570ed900e6e9f504c66`
+- `1250cac9325fc39a1e8409948fbeebf3f9075557`
+- `ccc63e516d23086bd3110ea4eaca90a16eb442df`
+- `2c3b2fc681ac2f4db426db5615b57e3ffd177025`
+- `fb5945d1ddda2020b3605799c303f1cd2a2d2c56`
+- `7f88133a9d5c602c4db91b21957eab85e8cb648f`
+- `39a08482bf8bbd179b0188c540a00a31943e677b`
+
+同HEADに対する指定CIは5件すべてSUCCESS。
+
+- [Validate Agent Skills (run 1409)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618996)
+- [Validate Deterministic Output Evals (run 1408)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618991)
+- [Validate Semantic Output Evals (run 1373)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618983)
+- [Code Quality (run 103)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079619000)
+- [Codex Harness (run 103)](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40079618986)
+
+初回の`git fetch origin`はWindows checkoutの`.git/FETCH_HEAD`権限で失敗したが、後続の通常pushはGitHubに受理され、上記CIはpush済みHEADに対して実行された。PR #17はopen、base `main`、head branch `feat/agent-eval-runner`のままであり、merge・close・base変更はしていない。
+
+## 受入判定
+
+- WSL2二重bubblewrap方式への実装・4つのAgent evaluation Plan・README更新: **PASS**。
+- Agent/Judge/Repair起動経路、QTS Agent接続、固定Docker deterministic verifier契約の維持: **PASS**。
+- 単体・repository contract・semantic・deterministic・Windows launcher関連テスト、compileall、formatter、diff check: **PASS**。上記の件数と個別結果はRepository validationを参照。
+- 合成環境の隔離検証: **PASS**。15 required checks、Agent/Judge/Repair evidenceがすべてverified。
+- 実Codex CLI 0.163.0のsandbox smoke: **PASS**。合成データで起動し、認証・モデルAPIは使用していない。
+- 実Agent共通品質評価、QTS live Agent評価、独立Judge評価、Skill改善実証、改善後の独立回帰: **未実施**。
+- PR #17全体の実Agent正式受入: **未完了**。実認証/APIを使う評価の別承認とJudge fixture承認が残っている。
+
+## 残る判断・実行条件
+
+- Synthetic probeのevidenceは独立clean checkout snapshot `60198301ae4989800a699c56e994eb2814870ac4`に固定されている。live runを行う場合は、対象の固定Evaluator revisionに対してprofileとevidenceを新規生成し、source revision bindingを再確認する。
+- Probeは`model_api_used=false`。実認証fileのinner shell可視性は検証しておらず、`authentication_shell_visible_risk=true`を残している。実認証・モデルAPI通信を伴う評価は未実施。
+- Judge fixture候補11件は承認済み0件。2件は決定論的レビュー待ち、9件は人間レビュー待ち。
+- 実Agent共通評価、QTSの独立attempt、Judgeの承認済みfixture評価、改善候補の修正・再評価・採用は行っていない。Judge承認と実認証/API利用について必要な判断を得てから実施する。
 
 ## 結論
 
-WSL2の二重bubblewrap runtime、固定launcher経路、Agent/Judge/Repairのsynthetic isolation evidence、指定repository suiteと整形検証はPASSした。実認証を伴う評価とPR #17の最終CI/PR更新はまだ完了していない。
+承認されたWSL2二重bubblewrapへの実装移行と合成環境の隔離検証は完了した。指定suiteとpush済み実装HEADの5 CIもすべてPASSした。認証・人間承認を要する実Agent/Judge品質評価は未実施であり、PR #17全体の正式受入とは区別する。
