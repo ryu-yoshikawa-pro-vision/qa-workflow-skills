@@ -73,3 +73,10 @@ Codex `AuthManager`内のsemaphoreは別processと共有されず、file storage
 3. auth persistence、全process競合、inner shell可視性が解消・検証されるまで実認証評価を再開しない。
 
 この報告作成時点では作業変更はlocal working treeのみで、PR #17へのpush、5 CIの変更後SHAでの実行、PR本文更新はまだ行っていない。`73328d4237a5c1ab913938ed83f980ee9b5a9a37`に対して以前確認した5 CI successは今回の修正を含まない。
+
+## 2026-10-26 commit後の追記
+
+- 上記の修正内容をcommit `32294d24b776df4ec3f50c103b62672131ede873`に記録した。このcommitのparentは検証基準の`73328d4237a5c1ab913938ed83f980ee9b5a9a37`であり、検証後に実装treeの変更は加えていない。
+- PR branchのremote HEADは`73328d4237a5c1ab913938ed83f980ee9b5a9a37`のままで、作業commitは未push。clean cloneでのcherry-pickはPreToolUse Hookがcanonical repository root条件で拒否したため停止した。別のdirty worktreeは変更していない。
+- PR本文の冒頭をremote HEAD、同HEADの5件のCI、未push修正、未達の隔離・認証条件に合わせて更新し、それ以前の本文は保持した。
+- 現在の5 CI successはremote HEAD `73328d4237a5c1ab913938ed83f980ee9b5a9a37`に対するもので、commit `32294d24b776df4ec3f50c103b62672131ede873`のCI結果ではない。
