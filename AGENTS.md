@@ -8,6 +8,8 @@
 - 変更前に関連するIssue、PR、Plan、code、test、CIを必要な範囲で確認します。Plan本文のscope、実装順序、検証、blocked条件、完了条件を正本とし、重要な制約を独自判断で変えません。
 - QA Skillの仕様はREADME.md、EVALS.md、対象skills/<name>/SKILL.mdを正本として扱います。
 - 新しい抽象化を加える前に、既存runtime、validator、helper、標準機能を確認します。
+- ドキュメントと既存コードの書き方（命名、構成、記述パターン）が食い違う場合は、関連する既存コードの書き方に従う。仕様・要件・セキュリティ・公開契約・テストとの不整合は、この規則で正当化せず、関連する正本と照合する。
+- 作業中に発見したドキュメントと既存コードの食い違いは、修正の有無にかかわらず最終返答ですべて列挙する。対象ファイル、相違内容、対応内容または未対応の理由を示す。発見しなかった場合はその旨を報告する。
 - default branchへの直接commit / push、force push、branch削除、merge、releaseは、ユーザーの明示指示なしに行いません。protected branchから作業する場合は、Plan所定のliteral canonical root形式で、現在のHEADから新しい非protected branchへ移るgit switch -c <branch>、または既存local非protected branchへ移るgit switch <branch>だけを使います。追加option、別start-point、破棄操作は使わず、execpolicyの承認を必要とします。
 - file delete、rename、moveは、ユーザーが明示した対象範囲だけで行います。
 - formatter、lint、関連test、CI契約を完了前に確認します。完了判定に使う独立validationは個別に実行・判定し、複数commandをまとめたaggregate exit codeだけでPASSにしません。
