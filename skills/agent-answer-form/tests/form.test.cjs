@@ -25,14 +25,19 @@ function makeForm() {
     output: { heading: "QA回答", filename: "qa-answers.md" },
     questions: [
       {
-        id: "Q-017", number: "No.1", group: "環境",
+        id: "Q-017",
+        number: "No.1",
+        group: "環境",
         title: "検証環境を指定してください",
         context: "未確定の実行条件",
         choices: [{ id: "A", label: "試験環境" }, { id: "B", label: "本番相当" }],
       },
       {
-        id: "Q-018", number: "No.2", group: "環境",
-        title: "補足事項はありますか？", choices: [],
+        id: "Q-018",
+        number: "No.2",
+        group: "環境",
+        title: "補足事項はありますか？",
+        choices: [],
       },
     ],
   };
@@ -46,7 +51,10 @@ function generatedForm(source) {
     fs.writeFileSync(input, JSON.stringify(source), "utf8");
     const run = spawnSync("python", [
       path.join(ROOT, "scripts", "build_form.py"),
-      "--input", input, "--output", output,
+      "--input",
+      input,
+      "--output",
+      output,
     ], { encoding: "utf8" });
     assert.equal(run.status, 0, run.stderr);
     const html = fs.readFileSync(output, "utf8");
@@ -73,14 +81,23 @@ function harness(form, storage = new Map(), opts = {}) {
     },
     createElement() {
       return {
-        value: "", style: {}, setAttribute() {}, focus() {}, select() {}, remove() {},
+        value: "",
+        style: {},
+        setAttribute() {},
+        focus() {},
+        select() {},
+        remove() {},
       };
     },
     body: { append() {} },
     activeElement: { focus() {} },
-    execCommand() { return opts.execCopy ?? false; },
+    execCommand() {
+      return opts.execCopy ?? false;
+    },
   };
-  el("export-dialog").showModal = () => { modalOpened = true; };
+  el("export-dialog").showModal = () => {
+    modalOpened = true;
+  };
   const localStorage = {
     getItem(key) {
       if (opts.storageBlocked) throw Error("storage disabled");
@@ -92,10 +109,19 @@ function harness(form, storage = new Map(), opts = {}) {
     },
   };
   const sandbox = {
-    document, localStorage, setTimeout() { return 1; }, clearTimeout() {},
+    document,
+    localStorage,
+    setTimeout() {
+      return 1;
+    },
+    clearTimeout() {},
     navigator: {
       clipboard: opts.clipboard
-        ? { async writeText(text) { copiedText = text; } }
+        ? {
+          async writeText(text) {
+            copiedText = text;
+          },
+        }
         : undefined,
     },
     window: { isSecureContext: Boolean(opts.clipboard) },

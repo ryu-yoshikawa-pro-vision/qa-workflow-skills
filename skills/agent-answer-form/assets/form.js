@@ -69,8 +69,7 @@
         };
       }
       if (skipped) {
-        byId("storage-note").textContent =
-          skipped + "問の質問定義が変更されたため、その回答を自動復元しませんでした。";
+        byId("storage-note").textContent = skipped + "問の質問定義が変更されたため、その回答を自動復元しませんでした。";
       }
     } catch (_) {
       byId("storage-note").textContent = "以前の回答を読み込めません。新しく入力した回答は保存を試みます。";
@@ -318,7 +317,8 @@
     for (const q of selected) {
       const answer = state[q.id];
       output.push(
-        "## " + oneLine(q.number || q.id) + " 【" + [q.priority, q.group].filter(Boolean).map(oneLine).join("／") + "】 " + oneLine(q.title),
+        "## " + oneLine(q.number || q.id) + " 【" + [q.priority, q.group].filter(Boolean).map(oneLine).join("／")
+          + "】 " + oneLine(q.title),
         "",
         "- 質問ID：" + q.id,
         "- 回答状況：" + answerStatus(q),
