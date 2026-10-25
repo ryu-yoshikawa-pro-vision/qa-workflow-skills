@@ -46,16 +46,38 @@ Codex CLI rust-v0.163.0の公式ソースを確認した。
 
 ## 方式比較
 
-| 観点 | 案A: 共有app-server | 案B: supervisorから独立app-server | 案C: app-server認証 + 既存codex exec |
-| --- | --- | --- | --- |
-| 公式仕様上の可否 | 複数threadを扱うRPC自体はある。threadごとの設定を外側process隔離とみなす根拠はない。 | app-server processを別々に起動すること自体は可能。ただし認証・socket・隔離条件を合わせた構成は未検証。 | 認証を別codex execへ公式に委譲するRPCは確認できない。 |
-| 認証refreshの責任主体 | 1つのapp-server内のAuthManager。 | 各app-server processのAuthManager。 | app-serverとcodex execが別々に認証処理を持つ。 |
-| refresh競合 | 1 app-server内での同一AuthManagerの処理は直列化される。 | 調査したrefresh mutexはAuthManager instance単位。複数process間の排他を示す根拠はなく、共有auth storeでは競合を排除できない。 | 別process間の排他根拠がない。 |
-| process / filesystem可視範囲 | serverは1つのouter bwrap内にあり、threadごとに独立したouter bwrapを作る仕様ではない。 | 各serverを独立bwrapへ置ける可能性はあるが、Codexが起動する内側shell、socket、mountの実効範囲を未検証。 | 既存launcherのbwrapは維持できるが、serverからexecへ認証状態を安全に渡す公式経路がない。 |
-| Agent shellからの認証・socket可視性 | same-UIDのsocket接続とthread横断境界は未実証。認証shell可視性リスクも残る。 | bwrap外のcredential mount、inner shellからのcredential/socket到達性、FD伝播を未実証。 | token抽出、store copy、同期なしでは接続できると確認できない。これらは今回の許可範囲外。 |
-| Judge独立性 | thread独立だけでは既存の独立process / outer bwrap契約を満たさない。 | 独立server / bwrapで構成可能そうだが、Judge shellからAgent領域やserver socketへの到達拒否が未実証。 | 既存launcherは維持可能だが認証委譲が未解決。 |
-| Repair制限 | thread sandboxだけで単一Skillの外側書込制限を保証できない。 | 別bwrapと単一Skill mountで実現できる可能性はあるが、実測なし。 | 既存Repair境界は維持可能だが認証委譲が未解決。 |
-| 判定 | **不採用** | **候補に留める。安全性未確認のため実装しない。** | **不採用** |
+### 案A: 手動起動した1つのapp-serverを共有
+
+- **公式仕様上の可否:** 複数threadを扱うRPCはある。threadごとの設定を外側process隔離とみなす根拠はない。
+- **認証refreshの責任主体:** 1つのapp-server内のAuthManager。調査したrefresh mutexは同一AuthManager内の処理を直列化する。
+- **実行processとfilesystem:** server processは1つ。threadごとに独立したouter bwrapを作る仕様ではない。
+- **Agent shellからの認証・socket可視性:** same-UIDのsocket接続とthread横断境界は未実証。認証shell可視性リスクも残る。
+- **Judge / Repair:** thread独立だけではJudgeの独立process / outer bwrapを満たさない。thread sandboxだけでRepairの単一Skill書込範囲を保証できない。
+- **実装範囲:** thread設定だけで既存契約へ接続する案。
+- **残留リスク:** Evaluator-only資料、Judge workspace、認証情報、app-server socketへのアクセスをthread単位で拒否できる証拠がない。
+- **判定:** **不採用。**
+
+### 案B: 1回のユーザー操作から独立app-serverを起動
+
+- **公式仕様上の可否:** app-server processを別々に起動すること自体は可能。認証・socket・隔離条件を合わせた構成は未検証。
+- **認証refreshの責任主体:** 各app-server processが持つAuthManager。refresh mutexはAuthManager instance単位で、複数process間の排他を示す根拠はない。
+- **実行processとfilesystem:** 各serverを独立bwrapへ置ける可能性はあるが、Codexが起動する内側shell、socket、mountの実効範囲を未検証。
+- **Agent shellからの認証・socket可視性:** bwrap外のcredential mount、inner shellからのcredential/socket到達性、FD伝播を未実証。
+- **Judge / Repair:** 独立server / bwrapと単一Skill mountで構成できる可能性はある。Judge shellからAgent領域、Repairから対象外Skill、各modeからserver socketへの到達拒否は未実証。
+- **実装範囲:** supervisor、起動中processの識別、認証storeの所有者、socket管理、interrupt、終了、cleanupを整合させる必要がある。
+- **残留リスク:** 共有auth storeでは外部のCodex processも含むrefresh競合を排除できる根拠がない。same-UIDのsocket接続も未検証。
+- **判定:** **候補に留める。安全性未確認のため実装しない。**
+
+### 案C: app-serverを認証管理に使い、既存codex execへ委譲
+
+- **公式仕様上の可否:** 認証状態やrefresh結果を別codex execへ委譲するRPCは確認できない。
+- **認証refreshの責任主体:** app-serverとcodex execが別々に認証処理を持つ。
+- **実行processとfilesystem:** 既存launcherのbwrapは維持できるが、serverからexecへ認証状態を安全に渡す公式経路がない。
+- **Agent shellからの認証・socket可視性:** token抽出、store copy、同期なしでは接続できると確認できない。これらは今回の許可範囲外。
+- **Judge / Repair:** 既存の独立境界は維持可能だが、認証委譲が未解決。
+- **実装範囲:** 独自のtoken transferやauth proxyなしで実現できる範囲は確認できない。
+- **残留リスク:** app-server側とcodex exec側のrefresh競合、auth file複製・書戻しの必要性が残る。
+- **判定:** **不採用。**
 
 案Bを成立させるには、少なくとも、同一UIDの無関係なCodex processを含むrefresh競合の排除、更新後auth storeの公式な永続性、Agent shellからsocketとcredentialへの到達拒否、Agent / Judge / Repairごとの独立bwrapとmode別mountを実測する必要がある。manager内のmutexはprocess間lockの代用にならない。専用CODEX_HOMEへ公式loginする案も、現時点ではユーザーが使用中のlogin storeとの関係、運用、shell可視性を確認しておらず、既存loginのコピーやtoken同期で穴埋めしない。
 
