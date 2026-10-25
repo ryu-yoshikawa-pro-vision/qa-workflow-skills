@@ -55,6 +55,19 @@ probe setupでhost AF_UNIX bindが失敗したとき一時auth home、other-atte
 
 変更後の個別suite結果、未実施のCodex source refresh harness、認証競合・残留risk、および再開条件は[認証調査報告 v05](../reports/2026-10-26_pr17-chatgpt-auth-recovery_v05.md)に記録する。
 
+## 2026-10-26 HEAD e87a489のfresh WSL2合成検証
+
+GitHub PR #17のHEAD `e87a4890514af6bff09b90bb180e4dcd9c3fddb7`に一致するclean作業treeで、Python 3.11.17、PyYAML 6.0.3、固定Codex runtime `0.163.0`と同梱bubblewrapを検証した。以下はこのrevisionで新たに実行した結果であり、過去のevidenceを流用していない。
+
+- Deterministic repository suiteは293件PASS。Codex sandbox既定実行ではAF_UNIX `EPERM`と一時directoryが`/tmp/.git`配下になる問題が発生した。`TMPDIR=/var/tmp`にしてhost WSL実行した場合は、同じsuiteが全件PASSした。テスト条件やsandboxは変更していない。
+- 固定runtimeを使うformal launcher integrationは、Codex sandbox内ではhost AF_UNIX bindの`EPERM`で失敗した。host WSL実行ではAgent/Judge/Repairのsynthetic auth marker checkまで到達し、`authentication_store_read_denied=false`のため拒否された。host AF_UNIX bind単体はPASS。
+- READMEの正式手順に従い、新規run root `.agent-eval-runs/pr17-isolation-e87a489-20261025T234245Z`へfresh schema 2 evidenceを生成した。`agent-command.json=["codex"]`、`verification.evidence_path="isolation.json"`、`gpt-6-luna`、reasoning `max`、timeout 900秒、固定runtimeを使用した。evaluator revisionはHEADと一致し、profile fingerprintは`sha256:10d3a666dd26c19123cf8ed2cfff1ea4914f14f9f3f5aa15a6316e73c38175d4`、3 mode command fingerprintは`sha256:e25eaf648dc7039953915d93cac78cc23b21b780b60f562ff1aaa53086f25364`。固定runtime digest照合は成功した。
+- 16 required checksのうち14件はtrue。`authentication_shell_read_denied=false`と、mode evidenceがverifiedでないことに由来する`agent_judge_separated=false`により、Agent/Judge/Repairはすべて`unverified`、evidence全体も`unverified`。model API、実認証、`codex exec`は使用していない。
+- Agent suite 138 PASS / 2 SKIP、Agent repository contract 4 PASS、Semantic suite 27 PASS、Codex Harness 57 PASS / 8 SKIP、`compileall` PASS。Deterministicの293 PASSは上記の`TMPDIR=/var/tmp`を使ったhost WSL実行結果。
+- Ruff 0.16.8 checkとtracked Python 239 fileのformat check、およびdprint 0.55.2による今回変更した3文書とfull tracked formatterはPASS。HEAD e87に対するCode Quality CIはSUCCESSだが、この後の文書差分を含むCI結果ではない。
+
+このprobeは認証marker readを拒否できない実装状態を実証したので、15+1 checksの受入条件は未達である。marker値はevidence/logへ出していない。全実行modeで既存fail-closedを維持し、認証の更新・保存・競合・shell非可視性の安全な解決方式が実証されるまでは実Agent評価を停止する。
+
 ## Baseline at start of implementation
 
 - Windows開発checkoutは`feat/agent-eval-runner`、HEAD `be574cbaf457a49d2f51a08c1cdc7838e75abd5c`。tracked差分なし。未追跡Docker調査報告2件と既存`.agent-eval-runs/`を保持する。

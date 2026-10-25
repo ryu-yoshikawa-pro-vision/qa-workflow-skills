@@ -49,7 +49,7 @@ Profile verificationは同じEvaluator revision、profile、Agent/Judge/Repair m
 
 ## WSL2通常ターミナルでの検証とfresh evidence
 
-Codex開発sandbox内でWSLのAF_UNIX socket bindやrepository testが`EPERM`になる場合、隔離やHookを変更せず、通常のWSL2 Ubuntuターミナルで次を個別に実行します。利用者は前の実装revisionについてDeterministic repository suite 293件、formal launcher integration 1件、host AF_UNIX bindのPASSを報告しました。今回のformal integration再試行はCodex sandbox内のhost AF_UNIX bindで`EPERM`となり、新しい認証marker checkには到達していません。この旧PASSを追加checkを含む現在の実装の証拠として扱いません。
+Codex開発sandbox内でWSLのAF_UNIX socket bindやrepository testが`EPERM`になる場合、隔離やHookを変更せず、通常のWSL2 Ubuntuターミナル相当のhost WSL実行環境で次を個別に実行します。2026-10-26のHEAD `e87a4890514af6bff09b90bb180e4dcd9c3fddb7`では、既定sandboxのDeterministic suiteにAF_UNIX `EPERM`と一時root選択の失敗がありました。一時rootを`.git`が存在しない`/var/tmp`に指定した同じ293件はPASSしました。正式launcher integrationは既定sandboxではAF_UNIX `EPERM`でしたが、host WSLからの実行では合成認証markerがinner shellから読めることを検出して失敗しました。host側AF_UNIX bind自体はPASSしました。これらの結果は、後述するfresh evidence条件を緩める根拠にはなりません。詳細なsuite結果とprobe evidenceは[認証調査報告v05](../../../docs/reports/2026-10-26_pr17-chatgpt-auth-recovery_v05.md)を参照してください。
 
 ```bash
 cd /home/sella/src/qa-workflow-skills-pr17-auth-20261025
@@ -57,8 +57,8 @@ source ~/.venvs/qa-workflow-skills/bin/activate
 export QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final
 python --version
 python -c 'import yaml; print(yaml.__version__)'
-python -m unittest discover -s tests/skills/evals/deterministic -p 'test_*.py' -q
-QAEVAL_RUN_WSL2_INTEGRATION=1 python -m unittest scripts.skills.evals.agent.tests.test_codex_wsl2_bwrap_launcher.CodexWsl2LauncherIntegrationTests.test_formal_launcher_modes_fd_network_paths_and_timeout_cleanup -v
+TMPDIR=/var/tmp python -m unittest discover -s tests/skills/evals/deterministic -p 'test_*.py' -q
+TMPDIR=/var/tmp QAEVAL_RUN_WSL2_INTEGRATION=1 python -m unittest scripts.skills.evals.agent.tests.test_codex_wsl2_bwrap_launcher.CodexWsl2LauncherIntegrationTests.test_formal_launcher_modes_fd_network_paths_and_timeout_cleanup -v
 python -c 'import pathlib,socket,tempfile; d=tempfile.TemporaryDirectory(); s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); p=pathlib.Path(d.name)/"host.sock"; s.bind(str(p)); print("host AF_UNIX bind: PASS"); s.close(); d.cleanup()'
 ```
 
@@ -90,6 +90,8 @@ python -m scripts.skills.evals.agent.isolation_probe \
 ```
 
 実行前に固定runtime path、Codex CLI/package digest、bundled bwrap digestが`verify_runtime()`で一致することが必要です。probeは`codex sandbox`によるAgent/Judge/Repair smoke、従来の15件と追加した認証可視性checkの計16 required checks、modeごとのargv/profile fingerprintを記録します。`model_api_used=false`かつ`authentication_shell_visible_risk=true`を維持し、認証status確認・`codex exec`・モデルAPIは呼びません。evidenceの`evaluator_revision`はclean checkoutのHEADと一致し、全required checkと3 mode evidenceが`verified`でなければ実runに使えません。さらに認証可視性riskが未解消の間はlauncher自体も全modeを拒否します。profile statusだけでevidenceを承認しません。
+
+2026-10-26にHEAD `e87a4890514af6bff09b90bb180e4dcd9c3fddb7`でfresh probeを行いました。schema 2 profile、`agent-command.json=["codex"]`、`verification.evidence_path="isolation.json"`、固定runtimeを使用し、profileとruntimeの検証は成功しました。evidenceは14/16 checks true、`authentication_shell_read_denied=false`、`agent_judge_separated=false`、全mode `unverified`、status `unverified`でした。Agent/Judge/Repairすべてで合成markerのread拒否が成立せず、受入条件を満たしていません。Codex CLI 0.163.0のsandbox smoke以外に`codex exec`やモデルAPIは起動していません。evidenceは`.agent-eval-runs/pr17-isolation-e87a489-20261025T234245Z/isolation.json`にあります。この証拠は記録されたHEADにだけ結び付き、後続のrevisionの受入には使いません。
 
 ## 合成認証データによる検証範囲
 
