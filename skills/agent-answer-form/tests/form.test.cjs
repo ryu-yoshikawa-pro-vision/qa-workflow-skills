@@ -227,7 +227,10 @@ test("旧v3は読み取れるが上書きせず、v2は自動適用しない", (
     answers: {
       "Q-017": {
         definitionHash: original.questions[0]._definitionHash,
-        multiple: false, choices: ["B"], note: "", held: false,
+        multiple: false,
+        choices: ["B"],
+        note: "",
+        held: false,
       },
     },
   });

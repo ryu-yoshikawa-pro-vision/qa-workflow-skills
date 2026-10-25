@@ -39,8 +39,10 @@
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.version === 3 && parsed.answers && typeof parsed.answers === "object"
-            && !Array.isArray(parsed.answers)) {
+          if (
+            parsed && parsed.version === 3 && parsed.answers && typeof parsed.answers === "object"
+            && !Array.isArray(parsed.answers)
+          ) {
             previous = parsed.answers;
           } else {
             unreadable = true;
@@ -62,8 +64,10 @@
         if (rawCurrent !== null) {
           try {
             const stored = JSON.parse(rawCurrent);
-            if (!stored || stored.version !== 4 || !stored.answer || typeof stored.answer !== "object"
-              || Array.isArray(stored.answer)) {
+            if (
+              !stored || stored.version !== 4 || !stored.answer || typeof stored.answer !== "object"
+              || Array.isArray(stored.answer)
+            ) {
               unreadable = true;
               continue;
             }
@@ -96,11 +100,10 @@
         };
       }
       if (unreadable) {
-        byId("storage-note").textContent =
-          "一部の保存データを読み込めませんでした。元データは変更せず保持しています。";
+        byId("storage-note").textContent = "一部の保存データを読み込めませんでした。元データは変更せず保持しています。";
       } else if (skipped) {
-        byId("storage-note").textContent =
-          skipped + "問の定義が変更されたため、旧回答は復元していません。変更前のHTMLがあれば回収できます。";
+        byId("storage-note").textContent = skipped
+          + "問の定義が変更されたため、旧回答は復元していません。変更前のHTMLがあれば回収できます。";
       } else if (legacyExists && !previous) {
         byId("storage-note").textContent =
           "旧形式の回答は自動復元しません。必要な回答は以前のHTMLからコピーしてください。";
@@ -121,17 +124,22 @@
         try {
           saved = JSON.parse(previous);
         } catch (_) { /* 破損データは上書きしない。 */ }
-        if (!saved || saved.version !== 4 || !saved.answer || typeof saved.answer !== "object"
-          || Array.isArray(saved.answer)) {
+        if (
+          !saved || saved.version !== 4 || !saved.answer || typeof saved.answer !== "object"
+          || Array.isArray(saved.answer)
+        ) {
           byId("storage-note").textContent =
             "この質問の保存データを確認できないため、上書きしません。回答をコピーするか、明示的に初期化してください。";
           return;
         }
       }
-      localStorage.setItem(key, JSON.stringify({
-        version: 4,
-        answer: { ...state[q.id] },
-      }));
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          version: 4,
+          answer: { ...state[q.id] },
+        }),
+      );
       byId("storage-note").textContent = "このブラウザ内に自動保存しました。";
     } catch (_) {
       canPersist = false;
@@ -151,8 +159,7 @@
       byId("storage-note").textContent = "このフォームの保存済み回答を初期化しました。";
     } catch (_) {
       canPersist = false;
-      byId("storage-note").textContent =
-        "保存データの初期化に失敗しました。回答は画面上のみ初期化されています。";
+      byId("storage-note").textContent = "保存データの初期化に失敗しました。回答は画面上のみ初期化されています。";
     }
   }
   function isFilled(q) {
