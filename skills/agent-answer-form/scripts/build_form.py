@@ -28,9 +28,7 @@ def obj(value: object, path: str) -> dict:
     return value
 
 
-def txt(
-    value: object, path: str, *, optional: bool = False, limit: int = 20000
-) -> str:
+def txt(value: object, path: str, *, optional: bool = False, limit: int = 20000) -> str:
     if value is None and optional:
         return ""
     if not isinstance(value, str) or (not optional and not value.strip()):
@@ -131,8 +129,8 @@ def main() -> int:
             print(f"検証成功: {len(form['questions'])}問")
             return 0
         if (
-            args.output.resolve() in
-            (args.input.resolve(), TEMPLATE.resolve(), APPLICATION.resolve())
+            args.output.resolve()
+            in (args.input.resolve(), TEMPLATE.resolve(), APPLICATION.resolve())
             or args.output.suffix.lower() != ".html"
         ):
             raise FormError("--outputは入力やテンプレートと異なる.htmlを指定")

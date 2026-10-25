@@ -7,7 +7,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("build_form", ROOT / "scripts/build_form.py")
+SPEC = importlib.util.spec_from_file_location(
+    "build_form", ROOT / "scripts/build_form.py"
+)
 assert SPEC and SPEC.loader
 mod = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(mod)

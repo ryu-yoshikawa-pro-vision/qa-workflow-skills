@@ -1,0 +1,29 @@
+{
+  "skill": "agent-answer-form",
+  "criteria": [
+    {
+      "id": "SEM-FORM-001",
+      "title": "質問の同一性と忠実性",
+      "description": "元の質問ID・質問文・選択肢・根拠を勝手に変更せず、回答者に提示する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-FORM-002",
+      "title": "QA責務の分離",
+      "description": "質問分類、正式承認、SPEC/DECISION/ASMの正規化やワークフロー再開を回答フォームだけで決定しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-FORM-003",
+      "title": "回答可能性",
+      "description": "回答者が必要な背景を理解し、単一選択・複数選択・自由記述・保留を適切に利用できる。",
+      "critical": false
+    },
+    {
+      "id": "SEM-FORM-004",
+      "title": "ダミーと個人情報の扱い",
+      "description": "ダミー質問を実務へ流用せず、秘密情報や個人情報をフォームへの入力として要求しない。",
+      "critical": true
+    }
+  ]
+}
