@@ -275,6 +275,10 @@ test("壊れたv3・v4は他質問の保存で上書きしない", () => {
   h.api.save(form.questions[1]);
   assert.equal(storage.get("answer-form:qa-review:v3"), badV3);
   assert.equal(storage.get(badV4Key), "{ invalid current JSON");
+  h.api.state["Q-017"].choices = ["A"];
+  h.api.save(form.questions[0]);
+  assert.equal(storage.get(badV4Key), "{ invalid current JSON", "破損データは直接編集でも保護");
+  assert.match(h.node("storage-note").textContent, /上書きしません/);
 });
 
 test("全回答の明示的初期化ではv3と各定義のv4を削除する", () => {

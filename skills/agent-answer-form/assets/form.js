@@ -49,6 +49,13 @@
           unreadable = true;
         }
       }
+      const previousRevisions = new Set();
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) {
+          previousRevisions.add(key.slice(STORAGE_PREFIX.length).split(":")[0]);
+        }
+      }
       for (const q of questions) {
         const rawCurrent = localStorage.getItem(answerKey(q));
         let answer;
@@ -73,6 +80,8 @@
               continue;
             }
             answer = older;
+          } else if (previousRevisions.has(q.id)) {
+            skipped++;
           }
         }
         if (!answer) continue;
@@ -91,7 +100,7 @@
           "一部の保存データを読み込めませんでした。元データは変更せず保持しています。";
       } else if (skipped) {
         byId("storage-note").textContent =
-          skipped + "問の定義が変更されたため、旧回答は復元していません。変更前のHTMLから回収できます。";
+          skipped + "問の定義が変更されたため、旧回答は復元していません。変更前のHTMLがあれば回収できます。";
       } else if (legacyExists && !previous) {
         byId("storage-note").textContent =
           "旧形式の回答は自動復元しません。必要な回答は以前のHTMLからコピーしてください。";
@@ -105,7 +114,21 @@
   function save(q) {
     if (!canPersist) return;
     try {
-      localStorage.setItem(answerKey(q), JSON.stringify({
+      const key = answerKey(q);
+      const previous = localStorage.getItem(key);
+      if (previous !== null) {
+        let saved;
+        try {
+          saved = JSON.parse(previous);
+        } catch (_) { /* 破損データは上書きしない。 */ }
+        if (!saved || saved.version !== 4 || !saved.answer || typeof saved.answer !== "object"
+          || Array.isArray(saved.answer)) {
+          byId("storage-note").textContent =
+            "この質問の保存データを確認できないため、上書きしません。回答をコピーするか、明示的に初期化してください。";
+          return;
+        }
+      }
+      localStorage.setItem(key, JSON.stringify({
         version: 4,
         answer: { ...state[q.id] },
       }));
