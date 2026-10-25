@@ -14,7 +14,7 @@ const end = "  setup();\n})();";
 assert.ok(JS.endsWith(end + "\n"), "production code shape changed");
 const INSTRUMENTED = JS.replace(
   end,
-  "  globalThis.formTest = { state, load, save, answerStatus, exportMarkdown, copyAnswer };\n})();",
+  "  globalThis.formTest = { state, load, save, resetSavedAnswers, answerStatus, exportMarkdown, copyAnswer };\n})();",
 );
 
 function makeForm() {
@@ -99,6 +99,18 @@ function harness(form, storage = new Map(), opts = {}) {
     modalOpened = true;
   };
   const localStorage = {
+    get length() {
+      if (opts.storageBlocked) throw Error("storage disabled");
+      return storage.size;
+    },
+    key(index) {
+      if (opts.storageBlocked) throw Error("storage disabled");
+      return [...storage.keys()][index] ?? null;
+    },
+    removeItem(key) {
+      if (opts.storageBlocked) throw Error("storage disabled");
+      storage.delete(key);
+    },
     getItem(key) {
       if (opts.storageBlocked) throw Error("storage disabled");
       return storage.get(key) ?? null;
@@ -171,49 +183,128 @@ test("記入済みと全問を区別し、保留と自由記述を判定する",
   assert.match(h.api.exportMarkdown(false), /- 質問ID：Q-018/);
 });
 
-test("質問の意味が変わった回答だけを除外し、無関係な回答を維持する", () => {
+test("変更前の回答を保存したまま、無関係な回答だけを更新できる", () => {
   const first = generatedForm(makeForm());
   const storage = new Map();
-  const h1 = harness(first, storage);
-  h1.api.state["Q-017"].choices = ["A"];
-  h1.api.state["Q-018"].note = "変更不要の回答";
-  h1.api.save();
-  const saved = JSON.parse(storage.get("answer-form:qa-review:v3"));
-  assert.equal(saved.version, 3);
-  assert.equal(saved.answers["Q-017"].definitionHash, first.questions[0]._definitionHash);
+  const old = harness(first, storage);
+  old.api.state["Q-017"].choices = ["A"];
+  old.api.state["Q-018"].note = "変更不要の回答";
+  old.api.save(first.questions[0]);
+  old.api.save(first.questions[1]);
+  const oldKey = "answer-form:qa-review:v4:Q-017:" + first.questions[0]._definitionHash;
+  assert.ok(storage.has(oldKey));
+
   const input = makeForm();
   input.questions[0].choices[0].label = "選択肢の意味を変更";
-  const second = generatedForm(input);
-  const h2 = harness(second, storage);
-  h2.api.load();
-  assert.equal(h2.api.state["Q-017"].choices.length, 0);
-  assert.equal(h2.api.state["Q-018"].note, "変更不要の回答");
-  assert.match(h2.node("storage-note").textContent, /1問の質問定義が変更/);
+  const changed = generatedForm(input);
+  const updated = harness(changed, storage);
+  updated.api.load();
+  assert.deepEqual(Array.from(updated.api.state["Q-017"].choices), []);
+  assert.equal(updated.api.state["Q-018"].note, "変更不要の回答");
+  updated.api.state["Q-018"].note = "編集した回答";
+  updated.api.save(changed.questions[1]);
+  assert.deepEqual(JSON.parse(storage.get(oldKey)).answer.choices, ["A"]);
+
+  const oldAgain = harness(first, storage);
+  oldAgain.api.load();
+  assert.deepEqual(Array.from(oldAgain.api.state["Q-017"].choices), ["A"]);
+  const newAgain = harness(changed, storage);
+  newAgain.api.load();
+  assert.equal(newAgain.api.state["Q-018"].note, "編集した回答");
+  newAgain.api.state["Q-017"].choices = ["B"];
+  newAgain.api.save(changed.questions[0]);
+  assert.ok(storage.has(oldKey), "再回答しても変更前の回答は残す");
+  const oldOnceMore = harness(first, storage);
+  oldOnceMore.api.load();
+  assert.deepEqual(Array.from(oldOnceMore.api.state["Q-017"].choices), ["A"]);
 });
 
-test("表示番号のみ変更時は復元でき、旧形式は保持して自動適用しない", () => {
+test("旧v3は読み取れるが上書きせず、v2は自動適用しない", () => {
   const input = makeForm();
   const original = generatedForm(input);
-  const storage = new Map();
-  const h1 = harness(original, storage);
-  h1.api.state["Q-017"].choices = ["B"];
-  h1.api.save();
+  const oldV3 = JSON.stringify({
+    version: 3,
+    answers: {
+      "Q-017": {
+        definitionHash: original.questions[0]._definitionHash,
+        multiple: false, choices: ["B"], note: "", held: false,
+      },
+    },
+  });
+  const storage = new Map([["answer-form:qa-review:v3", oldV3]]);
+  const h = harness(original, storage);
+  h.api.load();
+  assert.deepEqual(Array.from(h.api.state["Q-017"].choices), ["B"]);
+  h.api.state["Q-017"].note = "回答を更新";
+  h.api.save(original.questions[0]);
+  assert.equal(storage.get("answer-form:qa-review:v3"), oldV3);
+
   input.questions[0].number = "No.9";
   const revised = generatedForm(input);
   assert.equal(original.questions[0]._definitionHash, revised.questions[0]._definitionHash);
   const h2 = harness(revised, storage);
   h2.api.load();
-  assert.equal(h2.api.state["Q-017"].choices[0], "B");
+  assert.deepEqual(Array.from(h2.api.state["Q-017"].choices), ["B"]);
+  assert.equal(h2.api.state["Q-017"].note, "回答を更新");
+
   const legacy = new Map([[
     "answer-form:qa-review",
     JSON.stringify({ version: 2, answers: { "Q-017": { choices: ["A"] } } }),
   ]]);
   const h3 = harness(revised, legacy);
   h3.api.load();
-  assert.equal(h3.api.state["Q-017"].choices.length, 0);
+  assert.deepEqual(Array.from(h3.api.state["Q-017"].choices), []);
   assert.match(h3.node("storage-note").textContent, /以前のHTMLからコピー/);
-  h3.api.save();
-  assert.ok(legacy.has("answer-form:qa-review"), "旧形式を上書きしない");
+  h3.api.state["Q-017"].choices = ["B"];
+  h3.api.save(revised.questions[0]);
+  assert.ok(legacy.has("answer-form:qa-review"));
+});
+
+test("壊れたv3・v4は他質問の保存で上書きしない", () => {
+  const form = generatedForm(makeForm());
+  const badV3 = "{ invalid saved JSON";
+  const badV4Key = "answer-form:qa-review:v4:Q-017:" + form.questions[0]._definitionHash;
+  const storage = new Map([
+    ["answer-form:qa-review:v3", badV3],
+    [badV4Key, "{ invalid current JSON"],
+  ]);
+  const h = harness(form, storage);
+  h.api.load();
+  assert.match(h.node("storage-note").textContent, /保存データを読み込めません/);
+  h.api.state["Q-018"].note = "有効な新規回答";
+  h.api.save(form.questions[1]);
+  assert.equal(storage.get("answer-form:qa-review:v3"), badV3);
+  assert.equal(storage.get(badV4Key), "{ invalid current JSON");
+});
+
+test("全回答の明示的初期化ではv3と各定義のv4を削除する", () => {
+  const oldForm = generatedForm(makeForm());
+  const storage = new Map();
+  const first = harness(oldForm, storage);
+  first.api.state["Q-017"].choices = ["A"];
+  first.api.save(oldForm.questions[0]);
+  const changedInput = makeForm();
+  changedInput.questions[0].title = "変更後の質問";
+  const changedForm = generatedForm(changedInput);
+  const next = harness(changedForm, storage);
+  next.api.state["Q-017"].choices = ["B"];
+  next.api.save(changedForm.questions[0]);
+  storage.set("answer-form:qa-review:v3", "corrupted old data");
+  storage.set("answer-form:qa-review", "legacy v2 snapshot");
+  next.api.resetSavedAnswers();
+  assert.equal([...storage.keys()].filter((key) => key.startsWith("answer-form:qa-review:v4:")).length, 0);
+  assert.equal(storage.has("answer-form:qa-review:v3"), false);
+  assert.equal(storage.get("answer-form:qa-review"), "legacy v2 snapshot");
+});
+
+test("自由記述の先頭インデントをMarkdown出力で保持する", () => {
+  const form = generatedForm(makeForm());
+  const h = harness(form);
+  h.api.state["Q-018"].note = "    if active:\n        return True\n";
+  const markdown = h.api.exportMarkdown(false);
+  assert.match(markdown, /^ {12}if active:$/m);
+  assert.match(markdown, /^ {16}return True$/m);
+  assert.match(markdown, /^ {8}$/m);
 });
 
 test("安全なクリップボードでは直接コピーし、失敗時もダイアログを開かない", async () => {
@@ -265,7 +356,7 @@ test("保存領域が利用できない場合は回答を受け付けられる",
   const h = harness(form, new Map(), { storageBlocked: true });
   h.api.load();
   h.api.state["Q-017"].choices = ["B"];
-  h.api.save();
+  h.api.save(form.questions[0]);
   assert.match(h.api.exportMarkdown(false), /- 質問ID：Q-017/);
   assert.match(h.node("storage-note").textContent, /保存を利用できません/);
 });

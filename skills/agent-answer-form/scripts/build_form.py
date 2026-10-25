@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -48,6 +49,17 @@ def _unique_keys(pairs: list[tuple[str, object]]) -> dict:
     return result
 
 
+def _finite_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise FormError("JSONの数値は有限でなければなりません")
+    return parsed
+
+
+def _reject_constant(value: str) -> None:
+    raise FormError(f"JSONの非標準数値は指定できません: {value}")
+
+
 def _question_hash(question: dict) -> str:
     # 表示番号だけの変更では回答の意味を変えない。
     relevant = {
@@ -64,7 +76,7 @@ def _question_hash(question: dict) -> str:
         )
     }
     canonical = json.dumps(
-        relevant, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        relevant, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 
@@ -141,7 +153,7 @@ def build(form: dict) -> str:
             for question in form["questions"]
         ],
     }
-    payload = json.dumps(embedded, ensure_ascii=False, separators=(",", ":"))
+    payload = json.dumps(embedded, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     for old, new in (
         ("<", r"\u003c"),
         (">", r"\u003e"),
@@ -166,6 +178,8 @@ def main() -> int:
             json.loads(
                 args.input.read_text(encoding="utf-8-sig"),
                 object_pairs_hook=_unique_keys,
+                parse_float=_finite_float,
+                parse_constant=_reject_constant,
             )
         )
         if args.validate_only:

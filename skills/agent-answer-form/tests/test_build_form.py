@@ -117,6 +117,34 @@ class FormBuilderTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("JSONキーが重複", proc.stderr)
 
+    def test_reject_non_finite_numbers_in_validation_and_generation(self):
+        source = json.dumps(sample(), ensure_ascii=False)
+        for bad in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999"):
+            with self.subTest(value=bad), tempfile.TemporaryDirectory() as root:
+                folder = Path(root)
+                input_path = folder / "questions.json"
+                output_path = folder / "answers.html"
+                input_path.write_text(
+                    source[:-1] + ', "extra": ' + bad + "}",
+                    encoding="utf-8",
+                )
+                command = [
+                    sys.executable,
+                    str(ROOT / "scripts/build_form.py"),
+                    "--input",
+                    str(input_path),
+                ]
+                for mode in (["--validate-only"], ["--output", str(output_path)]):
+                    proc = subprocess.run(
+                        command + mode,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertIn("JSON", proc.stderr)
+                self.assertFalse(output_path.exists())
+
     def test_per_question_fingerprint_not_changed_by_number(self):
         form = sample()
         form["questions"][0]["id"] = "Q-017"

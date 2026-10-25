@@ -5,7 +5,9 @@
   const questions = form.questions;
   // v1/v2の保存領域を残し、fingerprintのない回答を誤って復元しない。
   const STORAGE_KEY = "answer-form:" + form.formId + ":v3";
+  const STORAGE_PREFIX = "answer-form:" + form.formId + ":v4:";
   const LEGACY_STORAGE_KEY = "answer-form:" + form.formId;
+  const answerKey = (q) => STORAGE_PREFIX + q.id + ":" + q._definitionHash;
   const initial = (q) => ({ multiple: q.defaultMultiple === true, choices: [], note: "", held: false });
   const state = Object.fromEntries(questions.map((q) => [q.id, initial(q)]));
   let canPersist = true;
@@ -27,37 +29,53 @@
     }, 2700);
   }
   function load() {
-    let raw;
+    let previous = null;
+    let legacyExists = false;
+    let unreadable = false;
+    let skipped = 0;
     try {
-      raw = localStorage.getItem(STORAGE_KEY);
-    } catch (_) {
-      canPersist = false;
-      byId("storage-note").textContent = "ブラウザ内の保存を利用できません。回答をコピーまたは保存してください。";
-      return;
-    }
-    if (!raw) {
-      try {
-        if (localStorage.getItem(LEGACY_STORAGE_KEY)) {
-          byId("storage-note").textContent =
-            "旧形式の回答は定義を確認できないため自動復元しません。必要な回答は以前のHTMLからコピーしてください。";
+      const raw = localStorage.getItem(STORAGE_KEY);
+      legacyExists = Boolean(localStorage.getItem(LEGACY_STORAGE_KEY));
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.version === 3 && parsed.answers && typeof parsed.answers === "object"
+            && !Array.isArray(parsed.answers)) {
+            previous = parsed.answers;
+          } else {
+            unreadable = true;
+          }
+        } catch (_) {
+          unreadable = true;
         }
-      } catch (_) { /* 保存領域が利用できなくても、フォームの入力は続行する。 */ }
-      return;
-    }
-    try {
-      const stored = JSON.parse(raw);
-      if (!stored || stored.version !== 3 || !stored.answers || typeof stored.answers !== "object") {
-        byId("storage-note").textContent = "保存形式を確認できないため、以前の回答を復元しません。";
-        return;
       }
-      let skipped = 0;
       for (const q of questions) {
-        const answer = stored.answers[q.id];
-        if (!answer || typeof answer !== "object") continue;
-        if (answer.definitionHash !== q._definitionHash) {
-          skipped++;
-          continue;
+        const rawCurrent = localStorage.getItem(answerKey(q));
+        let answer;
+        if (rawCurrent !== null) {
+          try {
+            const stored = JSON.parse(rawCurrent);
+            if (!stored || stored.version !== 4 || !stored.answer || typeof stored.answer !== "object"
+              || Array.isArray(stored.answer)) {
+              unreadable = true;
+              continue;
+            }
+            answer = stored.answer;
+          } catch (_) {
+            unreadable = true;
+            continue;
+          }
+        } else {
+          const older = previous && previous[q.id];
+          if (older && typeof older === "object") {
+            if (older.definitionHash !== q._definitionHash) {
+              skipped++;
+              continue;
+            }
+            answer = older;
+          }
         }
+        if (!answer) continue;
         const ids = new Set(q.choices.map((c) => c.id));
         const picked = Array.isArray(answer.choices) ? answer.choices.filter((id) => ids.has(id)) : [];
         const multiple = answer.multiple === true;
@@ -68,25 +86,50 @@
           held: answer.held === true,
         };
       }
-      if (skipped) {
-        byId("storage-note").textContent = skipped + "問の質問定義が変更されたため、その回答を自動復元しませんでした。";
+      if (unreadable) {
+        byId("storage-note").textContent =
+          "一部の保存データを読み込めませんでした。元データは変更せず保持しています。";
+      } else if (skipped) {
+        byId("storage-note").textContent =
+          skipped + "問の定義が変更されたため、旧回答は復元していません。変更前のHTMLから回収できます。";
+      } else if (legacyExists && !previous) {
+        byId("storage-note").textContent =
+          "旧形式の回答は自動復元しません。必要な回答は以前のHTMLからコピーしてください。";
       }
     } catch (_) {
-      byId("storage-note").textContent = "以前の回答を読み込めません。新しく入力した回答は保存を試みます。";
+      canPersist = false;
+      byId("storage-note").textContent = "ブラウザ内の保存を利用できません。回答をコピーまたは保存してください。";
     }
   }
-  function save() {
+  // 変更した質問だけを保存する。別の質問の旧定義回答や破損データは上書きしない。
+  function save(q) {
     if (!canPersist) return;
     try {
-      const answers = Object.fromEntries(questions.map((q) => [
-        q.id,
-        { ...state[q.id], definitionHash: q._definitionHash },
-      ]));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, answers }));
+      localStorage.setItem(answerKey(q), JSON.stringify({
+        version: 4,
+        answer: { ...state[q.id] },
+      }));
       byId("storage-note").textContent = "このブラウザ内に自動保存しました。";
     } catch (_) {
       canPersist = false;
       byId("storage-note").textContent = "自動保存できません。回答をコピーまたはMarkdown保存してください。";
+    }
+  }
+  function resetSavedAnswers() {
+    if (!canPersist) return;
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key);
+      }
+      keys.push(STORAGE_KEY);
+      for (const key of keys) localStorage.removeItem(key);
+      byId("storage-note").textContent = "このフォームの保存済み回答を初期化しました。";
+    } catch (_) {
+      canPersist = false;
+      byId("storage-note").textContent =
+        "保存データの初期化に失敗しました。回答は画面上のみ初期化されています。";
     }
   }
   function isFilled(q) {
@@ -158,7 +201,7 @@
         }
         answer.choices = q.choices.filter((c) => answer.choices.includes(c.id)).map((c) => c.id);
         updateChoiceState(card, q);
-        save();
+        save(q);
         updateProgress();
       });
       container.append(row);
@@ -211,13 +254,13 @@
         answer.multiple = check.checked;
         buildChoiceRows(card, q, choicesContainer);
         updateChoiceState(card, q);
-        save();
+        save(q);
         updateProgress();
       });
       clear.addEventListener("click", () => {
         answer.choices = [];
         updateChoiceState(card, q);
-        save();
+        save(q);
         updateProgress();
       });
       buildChoiceRows(card, q, choicesContainer);
@@ -234,7 +277,7 @@
     holdToggle.addEventListener("change", () => {
       answer.held = holdToggle.checked;
       updateChoiceState(card, q);
-      save();
+      save(q);
       updateProgress();
     });
     left.append(holdLabel);
@@ -250,7 +293,7 @@
     note.addEventListener("input", () => {
       answer.note = note.value;
       updateChoiceState(card, q);
-      save();
+      save(q);
       updateProgress();
     });
     right.append(noteLabel, note);
@@ -332,7 +375,7 @@
       if (answer.note.trim()) {
         output.push("- 補足：", "");
         // 8スペースのコードブロックに収め、回答本文の ## 等を別の質問見出しにしない。
-        output.push(...answer.note.trim().split(/\r\n|\r|\n|\u2028|\u2029/).map((line) => "        " + line));
+        output.push(...answer.note.split(/\r\n|\r|\n|\u2028|\u2029/).map((line) => "        " + line));
       }
       if (all && !isFilled(q)) output.push("- 回答：未記入");
       output.push("");
@@ -434,7 +477,7 @@
     byId("reset").addEventListener("click", () => {
       if (!confirm(questions.length + "問の回答・補足・複数選択設定をすべて初期化しますか？")) return;
       for (const q of questions) state[q.id] = initial(q);
-      save();
+      resetSavedAnswers();
       render();
       notify("回答を初期化しました");
     });
