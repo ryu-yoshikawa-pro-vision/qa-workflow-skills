@@ -1,0 +1,50 @@
+[
+  {
+    "query": "未解決事項を10件に整理済みです。担当者向けにオフライン回答用HTMLを生成してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "Q-001～Q-007の確認事項をJSONでフォーム化してMarkdown回答を回収したいです。",
+    "should_trigger": true
+  },
+  {
+    "query": "question-analysisの質問一覧から、人が回答できる単一HTMLの質問票を作成して。",
+    "should_trigger": true
+  },
+  {
+    "query": "仕様確認の選択肢と自由記述をブラウザ上で回答できるようにしてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "複数質問にチェックして回答し、全問をMarkdownでコピーできるページを生成して。",
+    "should_trigger": true
+  },
+  {
+    "query": "確認事項のJSONを渡すので、共通テンプレートからHTML回答シートを作ってください。",
+    "should_trigger": true
+  },
+  {
+    "query": "この不明点はブロッカーかどうか分類してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "Q-002の回答をDECISIONとして確定できるか判定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様書を読み込んでテスト条件を設計してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "既存HTMLの配色をレビューして。",
+    "should_trigger": false
+  },
+  {
+    "query": "質問文を英語に翻訳してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "最新のQAワークフローの進行状態を整理して。",
+    "should_trigger": false
+  }
+]
