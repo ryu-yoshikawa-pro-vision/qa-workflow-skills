@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "formId": "example-answer-form",
+  "title": "【サンプル】回答フォーム",
+  "description": "これは動作確認用のダミー質問です。実際の案件や判断には使用しません。",
+  "output": {
+    "heading": "【サンプル】回答結果",
+    "filename": "sample-answers.md"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "number": "No.1",
+      "group": "例題",
+      "title": "【ダミー質問】よく飲む飲み物はどれですか？",
+      "context": "選択肢の動作を確認するための質問です。",
+      "choices": [
+        {
+          "id": "A",
+          "label": "水"
+        },
+        {
+          "id": "B",
+          "label": "お茶"
+        },
+        {
+          "id": "C",
+          "label": "コーヒー"
+        },
+        {
+          "id": "D",
+          "label": "その他"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "number": "No.2",
+      "group": "例題",
+      "title": "【ダミー質問】補足事項があれば記入してください。",
+      "context": "自由記述欄の動作を確認するための質問です。",
+      "choices": []
+    }
+  ]
+}

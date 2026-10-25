@@ -1,0 +1,34 @@
+[
+  {
+    "query": "人への確認が複数あるので、オフラインの回答フォームをHTMLで作ってください。",
+    "should_trigger": true
+  },
+  {
+    "query": "質問JSONから単一HTMLを作り、保留・コピー機能で回答できるようにして。",
+    "should_trigger": true
+  },
+  {
+    "query": "Q-011とQ-012をそのままのIDで回答用画面へ並べてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "追加の確認質問をフォームにして、回答をMarkdownとして回収したいです。",
+    "should_trigger": true
+  },
+  {
+    "query": "未確定事項をブロッカー・要確認に仕分けしてください。",
+    "should_trigger": false
+  },
+  {
+    "query": "質問へ返ってきた回答をSPECに正規化できるか検討して。",
+    "should_trigger": false
+  },
+  {
+    "query": "プロダクトリスクを分析してテスト優先度を決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "このJavaScriptのエラー原因を調べてください。",
+    "should_trigger": false
+  }
+]

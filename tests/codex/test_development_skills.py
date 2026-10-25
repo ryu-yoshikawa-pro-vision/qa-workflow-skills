@@ -82,7 +82,7 @@ class DevelopmentSkillTests(unittest.TestCase):
             for path in (ROOT / "skills").iterdir()
             if path.is_dir() and (path / "SKILL.md").is_file()
         }
-        self.assertEqual(len(qa_skills), 22)
+        self.assertEqual(len(qa_skills), 23)
         self.assertTrue(EXPECTED.isdisjoint(qa_skills))
         self.assertFalse((ROOT / "skills" / "feature-plan").exists())
         self.assertFalse((ROOT / "skills" / "code-review").exists())

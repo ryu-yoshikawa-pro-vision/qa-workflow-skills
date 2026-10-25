@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>質問への回答</title>
+<style>
+
+:root{--bg:#f5f7f6;--panel:#fff;--ink:#122f38;--muted:#647780;--border:#dce5e4;--accent:#087f76;--accent-dark:#05695f;--soft:#e9f6f2;--warm:#fff5e3;--warn:#a05b13;--shadow:0 9px 32px rgba(21,60,62,.05)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;color:var(--ink);font-size:14px;line-height:1.7}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.6}a{color:inherit}input,select,textarea{color:var(--ink)}:focus-visible{outline:3px solid #6bcab8;outline-offset:3px}
+.top{background:#143d46;color:#fff;padding:29px max(20px,calc((100vw - 1480px)/2 + 28px)) 25px;position:relative;overflow:hidden}.top:after{content:"";position:absolute;right:-150px;top:-240px;width:630px;height:470px;border-radius:50%;border:80px solid rgba(255,255,255,.045);pointer-events:none}.top-inner{position:relative;z-index:1}.eyebrow{font-size:11px;letter-spacing:.17em;color:#9bceca;font-weight:700}.top h1{font-size:clamp(23px,3vw,32px);letter-spacing:.02em;line-height:1.35;margin:8px 0 10px}.top p{max-width:800px;color:#d4e7e6;font-size:13px;margin:0}
+.shell{max-width:1480px;margin:0 auto;padding:24px 27px 100px;display:grid;grid-template-columns:266px minmax(0,1fr);gap:24px;align-items:start}.sidebar{position:sticky;top:19px;max-height:calc(100vh - 38px);overflow:auto}.side-card,.main-toolbar,.question-card,.summary-box,.zero,.info-banner{background:var(--panel);border:1px solid var(--border);border-radius:15px;box-shadow:var(--shadow)}.side-card{padding:21px}.side-heading{font-size:11px;color:#627981;font-weight:800;letter-spacing:.07em;margin:0 0 15px}.progress-numbers{display:flex;align-items:baseline;gap:4px}.progress-numbers strong{font-size:35px;letter-spacing:-.06em;color:var(--ink);line-height:1}.progress-numbers span{font-size:12px;color:var(--muted)}.bar{height:7px;background:#e8efec;border-radius:999px;overflow:hidden;margin:14px 0 8px}.bar span{height:100%;background:var(--accent);display:block;border-radius:inherit;transition:width .22s}.progress-foot{font-size:11px;color:var(--muted)}.side-divider{height:1px;background:var(--border);margin:19px 0}.side-link{border:0;background:none;text-align:left;display:flex;width:100%;align-items:center;justify-content:space-between;padding:8px 9px;margin:1px -9px;color:#37555e;border-radius:9px;font-size:12px;font-weight:650}.side-link:hover{background:#eff7f4}.side-link span:last-child{font-size:11px;font-weight:550;color:#82979b}.side-tip{font-size:11px;color:var(--muted);line-height:1.8;margin:15px 0 0}
+.main{min-width:0}.main-toolbar{padding:18px 20px;margin-bottom:17px}.toolbar-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.search{position:relative;flex:1 1 260px}.search input{border:1px solid var(--border);border-radius:9px;padding:10px 13px;width:100%;background:#fafdfc;outline-offset:2px}.filter{border:1px solid var(--border);background:#fff;border-radius:9px;padding:10px 12px;min-width:130px;max-width:100%}.countline{font-size:12px;color:var(--muted);margin-top:10px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}.btn{border:1px solid #cadbd8;background:#fff;border-radius:9px;font-weight:750;color:#22515a;padding:9px 14px;white-space:nowrap;font-size:12px;min-height:39px}.btn:hover{background:#eef8f5}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent-dark)}.btn.quiet{color:#7e5660}.subtext{font-size:11px;color:var(--muted);margin-top:10px}.info-banner{padding:13px 17px;color:#4b625f;font-size:12px;background:#f8fbf9;margin-bottom:17px}.info-banner strong{color:var(--ink)}
+.group-header{scroll-margin-top:12px;display:flex;justify-content:space-between;gap:8px;align-items:end;margin:29px 0 13px;padding:0 3px}.group-header h2{font-size:17px;margin:0;color:#1d424a;letter-spacing:.01em}.group-header p{font-size:11px;margin:3px 0 0;color:var(--muted)}.group-header .group-count{color:var(--muted);font-size:12px;white-space:nowrap}.question-card{padding:21px 23px;margin-bottom:12px;scroll-margin-top:16px}.card-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.num{font-weight:850;font-size:14px;color:#27646c;font-variant-numeric:tabular-nums}.pill{border-radius:6px;font-size:10px;font-weight:750;padding:3px 8px;background:#f0f4f4;color:#55717a}.pill.high{background:#fff0dc;color:#9d6018}.pill.done{background:#e5f5ed;color:#1c755b}.pill.partial{background:#fff3dc;color:#915d19}.pill.todo{background:#f0f3f4;color:#667780}.pill.verify{background:#e7effc;color:#476a9d}.question-card h3{font-size:16px;line-height:1.55;margin:0 0 15px;letter-spacing:.005em}.choice-list{display:grid;gap:7px}.choice{display:flex;align-items:flex-start;gap:11px;padding:10px 12px;border-radius:9px;border:1px solid #dfe7e5;cursor:pointer;background:#fff;transition:background .1s,border-color .1s}.choice:hover{border-color:#9bc7bb;background:#f8fcfb}.choice.chosen{background:#edf8f3;border-color:#55ada0}.choice input{accent-color:var(--accent);flex-shrink:0;margin:4px 0 0}.choice b{color:#27746d;min-width:18px}.choice span{font-size:13px;flex:1}.input-grid{display:grid;grid-template-columns:176px minmax(0,1fr);gap:14px;margin-top:16px}.field-label{font-size:11px;font-weight:800;color:#60747a;display:block;margin-bottom:5px}.memo{width:100%;resize:vertical;min-height:60px;border:1px solid #d5e2df;border-radius:8px;padding:10px 11px;font-size:12px;line-height:1.65;background:#fff}
+footer{margin:30px 0;color:var(--muted);font-size:11px;text-align:center}.toast{position:fixed;bottom:22px;right:22px;background:#163d44;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 10px 35px #163d4440;z-index:30;font-size:12px;max-width:calc(100vw - 44px)}.toast[hidden]{display:none}.zero{padding:34px;text-align:center;color:#617983}.zero[hidden]{display:none}
+dialog{border:0;border-radius:16px;box-shadow:0 24px 80px #142d3545;max-width:920px;width:calc(100vw - 24px);max-height:calc(100vh - 38px);padding:0;color:var(--ink)}dialog::backdrop{background:#102c36a8}.dialog-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;gap:8px;justify-content:space-between;align-items:center}.dialog-head h2{font-size:18px;margin:0}.dialog-main{padding:18px 22px}.dialog-main p{font-size:12px;color:var(--muted);margin:0 0 10px}.dialog-footer{padding:12px 22px 18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.visually-hidden{position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden}
+@media (max-width:950px){.shell{grid-template-columns:1fr;padding:16px 18px 65px}.sidebar{position:static;max-height:none}.side-card{padding:15px}.side-links{display:flex;flex-wrap:wrap;gap:6px}.side-link{width:auto;margin:0;padding:5px 8px;gap:7px;border:1px solid var(--border)}.side-divider,.side-tip{display:none}.side-heading{margin-bottom:8px}.top{padding:26px 20px}}
+@media (max-width:550px){.shell{padding:12px 10px 50px}.question-card{padding:17px 14px}.main-toolbar{padding:14px}.input-grid{grid-template-columns:1fr;gap:8px}.top{padding:23px 15px}.group-header h2{font-size:15px}.toolbar-line>*{flex:1 1 120px}.search{flex-basis:100%}.actions .btn{flex:1 1 130px}.dialog-head,.dialog-main,.dialog-footer{padding-left:13px;padding-right:13px}}
+
+/* 質問フォーム */
+.top{padding-top:35px;padding-bottom:28px}.meta-note{font-size:12px;margin:0 0 11px;color:#526d72;line-height:1.7}
+.question-card .card-top{margin-bottom:7px}.context{font-size:12px;color:#566e73;background:#f3f7f6;border-radius:9px;padding:11px 13px;margin:0 0 15px;border:1px solid #e5eeea}
+.choice-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 9px}.choice-row h4{font-size:12px;color:#365a60;margin:0}
+.multi-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:700;color:#31565e;user-select:none}
+.multi-toggle input{width:18px;height:18px;margin:0;accent-color:var(--accent)}.switch-label{padding:3px 9px;border-radius:999px;background:#f0f3f3;color:#607478;min-width:39px;text-align:center}.switch-label.on{background:#dff4ed;color:#006b59}
+.choice b{min-width:20px}.choice input{width:16px;height:16px}
+.recommendation{background:#f6f9f7;border-left:3px solid #7db8aa;border-radius:0 8px 8px 0;padding:11px 13px;margin:14px 0;font-size:12px;color:#426169}
+.meta-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px}.text-btn{border:0;background:none;color:var(--accent-dark);text-decoration:underline;font-size:11px;padding:5px}
+.hold-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#365a60;cursor:pointer;margin-top:4px;padding:9px 2px}.hold-toggle input{width:17px;height:17px;accent-color:var(--accent);margin:0}
+
+.alert{background:#fffaed;border:1px solid #eedcb7;border-radius:10px;padding:11px 13px;color:#775d2b;font-size:12px;margin-bottom:12px}
+.output-modal{width:min(900px,calc(100vw - 24px));border:0;border-radius:15px;max-height:90vh;box-shadow:0 25px 75px #123b4533;padding:0;color:var(--ink)}.output-modal::backdrop{background:#14323ba6}
+.dialog-head{display:flex;align-items:center;justify-content:space-between;padding:16px 19px;border-bottom:1px solid var(--border)}.dialog-head h2{margin:0;font-size:16px}.dialog-main{padding:17px 19px}.output-text{display:block;width:100%;height:50vh;min-height:210px;white-space:pre-wrap;resize:vertical;padding:12px;background:#f8fbf9;border-radius:9px;border:1px solid var(--border);font-family:ui-monospace,monospace;font-size:12px;line-height:1.55}
+.dialog-footer{padding:12px 19px;display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.visually-hidden{position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden}
+@media(max-width:550px){.meta-actions{align-items:flex-start}.choice-row{align-items:flex-start}.question-card h3{font-size:16px}.actions .btn{min-width:125px}}
+
+</style>
+</head>
+<body>
+<header class="top"><div class="top-inner">
+  <div class="eyebrow" id="form-eyebrow"></div>
+  <h1 id="form-title">質問への回答</h1>
+  <p id="form-description"></p>
+</div></header>
+<div class="shell">
+<aside class="sidebar"><div class="side-card"><p class="side-heading">回答の進捗</p>
+  <div class="progress-numbers"><strong id="progress-count">0</strong><span id="progress-total"></span></div>
+  <div class="bar"><span id="progress-bar" style="width:0"></span></div><div class="progress-foot" id="progress-detail"></div>
+  <div class="side-divider"></div><p class="side-heading">質問分野</p><nav id="group-nav" class="side-links"></nav>
+  <div class="side-divider"></div><p class="side-tip">回答はこのブラウザ内に自動保存します。プライベートモードや一部の file:// 環境では保存できない場合があります。回答後はMarkdownをコピーまたは保存してください。</p>
+</div></aside>
+<main class="main"><div class="main-toolbar">
+  <div class="toolbar-line">
+    <label class="search"><span class="visually-hidden">質問を検索</span><input id="search" type="search" placeholder="番号・質問・選択肢・補足から検索" autocomplete="off"></label>
+    <select class="filter" id="answer-filter" aria-label="回答有無で絞り込み"><option value="all">すべて表示</option><option value="blank">未記入のみ</option><option value="filled">回答あり・保留のみ</option></select>
+    <select class="filter" id="priority-filter" aria-label="優先度で絞り込み"><option value="all">優先度：すべて</option></select>
+  </div><p id="shown-count" class="countline"></p>
+  <div class="actions">
+    <button class="btn primary" type="button" id="copy-filled">記入した回答をコピー</button>
+    <button class="btn" type="button" id="copy-all">全問をコピー</button>
+    <button class="btn" type="button" id="show-md">出力内容を確認</button>
+    <button class="btn" type="button" id="save-md">Markdown保存</button>
+    <button class="btn quiet" type="button" id="reset">全回答を初期化</button>
+  </div><p id="storage-note" class="subtext">ブラウザ内に自動保存します。</p>
+</div>
+<div class="alert" id="form-notice" hidden></div>
+<div id="questions"></div>
+<div class="zero" id="empty" hidden>条件に一致する質問がありません。</div>
+<footer id="form-footer">このファイルから外部サービスへの通信は行いません。</footer>
+</main></div>
+<dialog id="export-dialog" class="output-modal" aria-labelledby="preview-title"><div class="dialog-head"><h2 id="preview-title">Markdown回答の確認</h2><button class="btn" type="button" id="close-dialog">閉じる</button></div><div class="dialog-main"><p class="meta-note">コピーに失敗する場合は、以下の文章を選択して手動でコピーしてください。</p><textarea id="export-text" class="output-text" aria-label="出力するMarkdown"></textarea></div><div class="dialog-footer"><button class="btn" type="button" id="select-all">すべて選択</button><button class="btn primary" type="button" id="copy-dialog">表示中の内容をコピー</button></div></dialog>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+<script id="questions-json" type="application/json">__QUESTIONNAIRE_JSON__</script>
+<script>
+__FORM_APP_JS__</script>
+</body></html>
