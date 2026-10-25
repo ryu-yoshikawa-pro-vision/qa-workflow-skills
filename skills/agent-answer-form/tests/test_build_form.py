@@ -2,6 +2,9 @@
 
 import importlib.util
 import json
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -91,6 +94,50 @@ class FormBuilderTests(unittest.TestCase):
         form["questions"][0]["id"] = "Q-001"
         html = mod.build(mod.validate(form))
         self.assertIn('"id":"Q-001"', html)
+
+    def test_reject_duplicate_json_object_keys_at_cli(self):
+        form = sample()
+        raw = json.dumps(form, ensure_ascii=False)
+        raw = raw.replace('"formId":', '"formId": "duplicate", "formId":', 1)
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "duplicate.json"
+            path.write_text(raw, encoding="utf-8")
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/build_form.py"),
+                    "--input",
+                    str(path),
+                    "--validate-only",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("JSONキーが重複", proc.stderr)
+
+    def test_per_question_fingerprint_not_changed_by_number(self):
+        form = sample()
+        form["questions"][0]["id"] = "Q-017"
+        base = mod._question_hash(form["questions"][0])
+        form["questions"][0]["number"] = "No.99"
+        self.assertEqual(base, mod._question_hash(form["questions"][0]))
+        form["questions"][0]["choices"][0]["label"] = "意味が変わった選択肢"
+        self.assertNotEqual(base, mod._question_hash(form["questions"][0]))
+
+    def test_generated_html_embeds_question_definition_hash(self):
+        html = mod.build(mod.validate(sample()))
+        match = re.search(
+            r'<script id="questions-json" type="application/json">(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        embedded = json.loads(match.group(1))
+        for question in embedded["questions"]:
+            self.assertEqual(len(question["_definitionHash"]), 64)
+            self.assertEqual(question["_definitionHash"], mod._question_hash(question))
 
     def test_write_output_outside_skill(self):
         with tempfile.TemporaryDirectory() as root:

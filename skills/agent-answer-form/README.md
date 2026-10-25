@@ -17,6 +17,6 @@ python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --
 python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --output "./answer-form.html"
 ```
 
-完成したHTMLでは、回答状況の自動表示、保留チェック、単一・複数選択、自由記述、検索、記入済みまたは全問のMarkdown直接コピー・保存ができます。コピー失敗時だけ確認画面から手動コピーします。ブラウザの保存機能は環境依存です。
+完成したHTMLでは、回答状況の自動表示、保留チェック、単一・複数選択、自由記述、検索、記入済みまたは全問のMarkdown直接コピー・保存ができます。コピー失敗時だけ確認画面から手動コピーします。ブラウザの保存機能は環境依存です。保存時は質問定義を質問単位で照合し、意味が変更された質問の回答だけを復元しません。旧形式の回答は自動復元せず、旧版HTMLと保存領域を保持します。
 
 QAの場合、question-analysis が質問を判断し Q-xxx を割り当てます。本Skillは表示・回収だけを担当します。返却された回答は question-analysis の契約に従って処理してください。

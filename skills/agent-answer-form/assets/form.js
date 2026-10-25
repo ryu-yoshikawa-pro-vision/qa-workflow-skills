@@ -3,7 +3,9 @@
   const byId = (id) => document.getElementById(id);
   const form = JSON.parse(byId("questions-json").textContent);
   const questions = form.questions;
-  const STORAGE_KEY = "answer-form:" + form.formId;
+  // v1/v2の保存領域を残し、fingerprintのない回答を誤って復元しない。
+  const STORAGE_KEY = "answer-form:" + form.formId + ":v3";
+  const LEGACY_STORAGE_KEY = "answer-form:" + form.formId;
   const initial = (q) => ({ multiple: q.defaultMultiple === true, choices: [], note: "", held: false });
   const state = Object.fromEntries(questions.map((q) => [q.id, initial(q)]));
   let canPersist = true;
@@ -33,13 +35,29 @@
       byId("storage-note").textContent = "ブラウザ内の保存を利用できません。回答をコピーまたは保存してください。";
       return;
     }
-    if (!raw) return;
+    if (!raw) {
+      try {
+        if (localStorage.getItem(LEGACY_STORAGE_KEY)) {
+          byId("storage-note").textContent =
+            "旧形式の回答は定義を確認できないため自動復元しません。必要な回答は以前のHTMLからコピーしてください。";
+        }
+      } catch (_) { /* 保存領域が利用できなくても、フォームの入力は続行する。 */ }
+      return;
+    }
     try {
       const stored = JSON.parse(raw);
-      if (!stored || ![1, 2].includes(stored.version) || !stored.answers || typeof stored.answers !== "object") return;
+      if (!stored || stored.version !== 3 || !stored.answers || typeof stored.answers !== "object") {
+        byId("storage-note").textContent = "保存形式を確認できないため、以前の回答を復元しません。";
+        return;
+      }
+      let skipped = 0;
       for (const q of questions) {
         const answer = stored.answers[q.id];
         if (!answer || typeof answer !== "object") continue;
+        if (answer.definitionHash !== q._definitionHash) {
+          skipped++;
+          continue;
+        }
         const ids = new Set(q.choices.map((c) => c.id));
         const picked = Array.isArray(answer.choices) ? answer.choices.filter((id) => ids.has(id)) : [];
         const multiple = answer.multiple === true;
@@ -47,8 +65,12 @@
           multiple,
           choices: multiple ? [...new Set(picked)] : picked.slice(0, 1),
           note: typeof answer.note === "string" ? answer.note.slice(0, 10000) : "",
-          held: answer.held === true || (stored.version === 1 && ["保留", "検証待ち"].includes(answer.status)),
+          held: answer.held === true,
         };
+      }
+      if (skipped) {
+        byId("storage-note").textContent =
+          skipped + "問の質問定義が変更されたため、その回答を自動復元しませんでした。";
       }
     } catch (_) {
       byId("storage-note").textContent = "以前の回答を読み込めません。新しく入力した回答は保存を試みます。";
@@ -57,7 +79,11 @@
   function save() {
     if (!canPersist) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, answers: state }));
+      const answers = Object.fromEntries(questions.map((q) => [
+        q.id,
+        { ...state[q.id], definitionHash: q._definitionHash },
+      ]));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, answers }));
       byId("storage-note").textContent = "このブラウザ内に自動保存しました。";
     } catch (_) {
       canPersist = false;
@@ -275,12 +301,16 @@
     byId("empty").hidden = count !== 0;
     updateProgress();
   }
+  // JSONの改行が質問見出しや選択肢から別のMarkdownブロックを作らないようにする。
+  function oneLine(value) {
+    return String(value).replace(/[\r\n\u2028\u2029]+/g, " ").replace(/[\t ]+/g, " ").trim();
+  }
   function exportMarkdown(all) {
     const selected = questions.filter((q) => all || isFilled(q));
     const output = [
-      "# " + form.output.heading,
+      "# " + oneLine(form.output.heading),
       "",
-      "- 対象：" + (form.output.context || form.title),
+      "- 対象：" + oneLine(form.output.context || form.title),
       "- 出力対象：" + (all ? "全" + questions.length + "問" : "回答または保留のある質問のみ"),
       "- 注記：推奨案は回答に含まれません。",
       "",
@@ -288,16 +318,22 @@
     for (const q of selected) {
       const answer = state[q.id];
       output.push(
-        "## " + (q.number || q.id) + " 【" + [q.priority, q.group].filter(Boolean).join("／") + "】 " + q.title,
+        "## " + oneLine(q.number || q.id) + " 【" + [q.priority, q.group].filter(Boolean).map(oneLine).join("／") + "】 " + oneLine(q.title),
         "",
+        "- 質問ID：" + q.id,
         "- 回答状況：" + answerStatus(q),
       );
       if (q.choices.length) {
-        const chosen = q.choices.filter((c) => answer.choices.includes(c.id)).map((c) => c.id + ". " + c.label);
+        const chosen = q.choices.filter((c) => answer.choices.includes(c.id))
+          .map((c) => c.id + ". " + oneLine(c.label));
         output.push("- 選択方式：" + (answer.multiple ? "複数選択" : "単一選択"));
         output.push("- 選択：" + (chosen.length ? chosen.join(" / ") : "未選択"));
       }
-      if (answer.note.trim()) output.push("- 補足：" + answer.note.trim().replace(/\n/g, "\n  "));
+      if (answer.note.trim()) {
+        output.push("- 補足：", "");
+        // 8スペースのコードブロックに収め、回答本文の ## 等を別の質問見出しにしない。
+        output.push(...answer.note.trim().split(/\r\n|\r|\n|\u2028|\u2029/).map((line) => "        " + line));
+      }
       if (all && !isFilled(q)) output.push("- 回答：未記入");
       output.push("");
     }

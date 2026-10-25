@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -36,6 +37,36 @@ def txt(value: object, path: str, *, optional: bool = False, limit: int = 20000)
     if len(value) > limit:
         raise FormError(f"{path}: {limit}文字以内で指定してください")
     return value
+
+
+def _unique_keys(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise FormError(f"JSONキーが重複しています: {key}")
+        result[key] = value
+    return result
+
+
+def _question_hash(question: dict) -> str:
+    # 表示番号だけの変更では回答の意味を変えない。
+    relevant = {
+        key: question.get(key)
+        for key in (
+            "id",
+            "title",
+            "group",
+            "priority",
+            "context",
+            "recommendation",
+            "defaultMultiple",
+            "choices",
+        )
+    }
+    canonical = json.dumps(
+        relevant, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def validate(data: object) -> dict:
@@ -103,7 +134,14 @@ def build(form: dict) -> str:
         raise FormError("HTMLテンプレートの埋め込み位置が不正です")
     if "</script" in script.lower():
         raise FormError("form.jsにscript終了タグがあります")
-    payload = json.dumps(form, ensure_ascii=False, separators=(",", ":"))
+    embedded = {
+        **form,
+        "questions": [
+            {**question, "_definitionHash": _question_hash(question)}
+            for question in form["questions"]
+        ],
+    }
+    payload = json.dumps(embedded, ensure_ascii=False, separators=(",", ":"))
     for old, new in (
         ("<", r"\u003c"),
         (">", r"\u003e"),
@@ -124,7 +162,12 @@ def main() -> int:
     if not args.validate_only and args.output is None:
         parser.error("--outputまたは--validate-onlyが必要です")
     try:
-        form = validate(json.loads(args.input.read_text(encoding="utf-8-sig")))
+        form = validate(
+            json.loads(
+                args.input.read_text(encoding="utf-8-sig"),
+                object_pairs_hook=_unique_keys,
+            )
+        )
         if args.validate_only:
             print(f"検証成功: {len(form['questions'])}問")
             return 0
