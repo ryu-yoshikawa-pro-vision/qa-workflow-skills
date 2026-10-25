@@ -65,7 +65,7 @@ skills/
 | `qa-workflow`                 | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了                                 |
 | `spec-analysis`               | 仕様分類 / 現在有効な仕様根拠                                                                  |
 | `question-analysis`           | 未解決事項分類 / 仮定 / 回答正規化                                                             |
-| `agent-answer-form`           | JSONからの回答用HTML生成・Markdown回答回収（分類・正規化はしない）                                        |
+| `agent-answer-form`           | JSONからの回答用HTML生成・Markdown回答回収（分類・正規化はしない）                             |
 | `test-analysis`               | プロダクトリスク / 重点 / 深度                                                                 |
 | `test-requirement-design`     | テスト要求としての検証責務                                                                     |
 | `test-condition-design`       | テスト条件 / カバレッジ基準 / カバレッジ項目                                                   |

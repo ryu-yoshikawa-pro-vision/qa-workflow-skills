@@ -12,10 +12,10 @@
 
 作業ディレクトリへ質問JSONを作り、Skillを変更せず次で検証・生成します。
 
-~~~bash
+```bash
 python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --validate-only
 python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --output "./answer-form.html"
-~~~
+```
 
 完成したHTMLでは、回答状況の自動表示、保留チェック、単一・複数選択、自由記述、検索、記入済みまたは全問のMarkdown直接コピー・保存ができます。コピー失敗時だけ確認画面から手動コピーします。ブラウザの保存機能は環境依存です。
 

@@ -16,10 +16,10 @@ compatibility: Python 3.9以上。追加ライブラリ不要。
 4. 選択肢や推奨案を表示する場合は、情報源や既存の決定に基づく内容だけを使う。推奨案は自動選択せず、未回答や「保留」を承認とみなさない。秘密情報を回答フォームに含めない。
 5. Skillディレクトリは読み取り専用とし、作業ディレクトリで次を実行する。<Skillの配置先> を実際のSkillパスに置き換える。
 
-   ~~~bash
+   ```bash
    python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --validate-only
    python "<Skillの配置先>/scripts/build_form.py" --input "./questions.json" --output "./answer-form.html"
-   ~~~
+   ```
 
 6. JSON検証とHTML生成が成功したことを確認し、可能な環境ではブラウザで回答・保留・コピー・Markdown出力も動作確認する。生成したHTMLと質問JSONを依頼者へ渡す。
 7. 回答が返された場合は元の質問IDと照合し、元の担当Skillへ引き渡す。QAの回答の分類・正規化・再開先判断は question-analysis と qa-workflow の既存契約に従う。本SkillだけでQA工程を再開しない。
@@ -33,6 +33,6 @@ compatibility: Python 3.9以上。追加ライブラリ不要。
 
 ## 検証
 
-~~~bash
+```bash
 python -m unittest discover -s "<Skillの配置先>/tests" -v
-~~~
+```
