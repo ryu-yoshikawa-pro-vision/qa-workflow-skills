@@ -50,28 +50,28 @@ Codex `0.163.0`の既存`auth_tests.rs`にはsynthetic auth fileに対する`per
 
 全コマンドは個別に実行した。ここでは外部LLMを呼んでいない。
 
-| 検証 | 結果 |
-| --- | --- |
-| Agent suite | PASS: 135 tests、2 skipped |
-| Agent repository contract | PASS: 4 tests |
-| WSL2 launcher unit tests | PASS: 21 tests、1 skipped |
-| Runtime trace capture | PASS: 11 tests |
-| Executor tests | PASS: 4 tests、1 skipped |
-| Semantic runner tests | PASS: 27 tests |
-| Semantic repository tests | PASS: 13 tests |
-| Deterministic runner unit tests | PASS: 13 tests |
-| Deterministic repository suite | PASS: 293 tests（通常WSL2ターミナルでの利用者報告）。Codex sandbox内の先行実行では4 failures・1 errorだったが通常WSL2では再現しなかった |
-| WSL2 formal launcher integration | PASS: 1 test（通常WSL2ターミナルでの利用者報告）。Codex sandbox内の先行実行ではAF_UNIX bindがEPERMだった |
-| Host AF_UNIX socket bind | PASS（通常WSL2ターミナルでの利用者報告）。inner shellからの接続拒否とは別の検査 |
-| Codex Hook tests | PASS: 32 tests |
-| Codex execpolicy CLI tests | PASS: 8 tests using the fixed runtime CLI `0.163.0`; the first invocation resolved the Windows npm shim and failed before test setup, then passed after prepending the fixed runtime binary directory to `PATH` |
-| Codex config tests | PASS: 5 tests |
-| README内profile / command JSON schema check | PASS: schema 2 profileと`["codex"]`が現行validatorに適合 |
-| Hook JavaScript syntax | PASS: `node --check .codex/hooks/pre_tool_use_policy.mjs` |
-| `compileall` (Agent scripts/tests) | PASS |
-| Ruff check/format | BLOCKED: `format_tracked.py check`を実行したが`ruff` executableがなく起動できない。依存追加なし |
-| `dprint check` | BLOCKED: optional Linux binary未導入。取得はDNS失敗と`sandbox`の`spawnSync curl EPERM`で完了せず、再インストールなし |
-| `git diff --check` | PASS: tracked文書差分。新規reportも`git diff --no-index --check`で空白errorなし |
+| 検証                                        | 結果                                                                                                                                                                                                            |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent suite                                 | PASS: 135 tests、2 skipped                                                                                                                                                                                      |
+| Agent repository contract                   | PASS: 4 tests                                                                                                                                                                                                   |
+| WSL2 launcher unit tests                    | PASS: 21 tests、1 skipped                                                                                                                                                                                       |
+| Runtime trace capture                       | PASS: 11 tests                                                                                                                                                                                                  |
+| Executor tests                              | PASS: 4 tests、1 skipped                                                                                                                                                                                        |
+| Semantic runner tests                       | PASS: 27 tests                                                                                                                                                                                                  |
+| Semantic repository tests                   | PASS: 13 tests                                                                                                                                                                                                  |
+| Deterministic runner unit tests             | PASS: 13 tests                                                                                                                                                                                                  |
+| Deterministic repository suite              | PASS: 293 tests（通常WSL2ターミナルでの利用者報告）。Codex sandbox内の先行実行では4 failures・1 errorだったが通常WSL2では再現しなかった                                                                         |
+| WSL2 formal launcher integration            | PASS: 1 test（通常WSL2ターミナルでの利用者報告）。Codex sandbox内の先行実行ではAF_UNIX bindがEPERMだった                                                                                                        |
+| Host AF_UNIX socket bind                    | PASS（通常WSL2ターミナルでの利用者報告）。inner shellからの接続拒否とは別の検査                                                                                                                                 |
+| Codex Hook tests                            | PASS: 32 tests                                                                                                                                                                                                  |
+| Codex execpolicy CLI tests                  | PASS: 8 tests using the fixed runtime CLI `0.163.0`; the first invocation resolved the Windows npm shim and failed before test setup, then passed after prepending the fixed runtime binary directory to `PATH` |
+| Codex config tests                          | PASS: 5 tests                                                                                                                                                                                                   |
+| README内profile / command JSON schema check | PASS: schema 2 profileと`["codex"]`が現行validatorに適合                                                                                                                                                        |
+| Hook JavaScript syntax                      | PASS: `node --check .codex/hooks/pre_tool_use_policy.mjs`                                                                                                                                                       |
+| `compileall` (Agent scripts/tests)          | PASS                                                                                                                                                                                                            |
+| Ruff check/format                           | BLOCKED: `format_tracked.py check`を実行したが`ruff` executableがなく起動できない。依存追加なし                                                                                                                 |
+| `dprint check`                              | BLOCKED: optional Linux binary未導入。取得はDNS失敗と`sandbox`の`spawnSync curl EPERM`で完了せず、再インストールなし                                                                                            |
+| `git diff --check`                          | PASS: tracked文書差分。新規reportも`git diff --no-index --check`で空白errorなし                                                                                                                                 |
 
 先行するCodex開発sandbox内のDeterministic suiteでは、SQLite workflow testの一時rootが`/tmp`に作られ、その親`/tmp/.git` markerを`artifact_graph._local_sqlite_path()`がGit worktree判定して拒否する4 failureと、static server testのsocket bind EPERMによる1 errorが発生した。別のCodex sandbox実行ではformal launcher integrationの`sandbox_smoke()`がhost AF_UNIX bind時にEPERMとなった。これらの実行結果はそのsandbox環境内の制約を示す。
 
