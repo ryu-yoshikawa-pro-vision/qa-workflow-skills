@@ -389,7 +389,19 @@ function splitCommands(input, shell) {
 }
 function readOnlyGit(name, args) {
   const op = name.toLowerCase(), a = args.map(x => x.value.toLowerCase());
-  if (["status", "rev-parse", "ls-files", "check-ignore", "cat-file", "blame", "version", "help"].includes(op)) {
+  if (
+    [
+      "status",
+      "rev-parse",
+      "ls-files",
+      "check-ignore",
+      "cat-file",
+      "blame",
+      "show-ref",
+      "version",
+      "help",
+    ].includes(op)
+  ) {
     return true;
   }
   if (["diff", "log", "show"].includes(op)) {

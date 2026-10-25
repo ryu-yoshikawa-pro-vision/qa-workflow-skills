@@ -462,6 +462,43 @@ class HookTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_hook_allows(command)
 
+    def test_git_show_ref_queries_are_read_only(self) -> None:
+        for command in (
+            "git show-ref",
+            self.posix_prefix + "git show-ref",
+            self.posix_prefix
+            + "git show-ref --verify --quiet refs/heads/feature/existing",
+            self.posix_prefix
+            + "git show-ref --verify --quiet -- refs/heads/feature/existing",
+            self.posix_prefix + "git show-ref --head",
+            self.posix_prefix + "git show-ref --branches --tags",
+            self.ps_prefix + "git.exe show-ref --head --tags",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+    def test_forbidden_git_mutations_keep_existing_hook_and_execpolicy_guards(
+        self,
+    ) -> None:
+        for command in (
+            "git update-ref -d refs/heads/feature/existing",
+            "git clean -fd",
+            "git rm tracked.txt",
+            "git push --force origin feature/existing",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+        # These canonical forms reach execpolicy, which keeps their existing
+        # forbidden decisions in test_execpolicy_cli.py.
+        for command in (
+            self.posix_prefix + "git update-ref -d refs/heads/feature/existing",
+            self.posix_prefix + "git clean -fd",
+            self.posix_prefix + "git rm tracked.txt",
+        ):
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
     def test_protected_branch_mutations_are_denied_except_two_switch_forms(
         self,
     ) -> None:

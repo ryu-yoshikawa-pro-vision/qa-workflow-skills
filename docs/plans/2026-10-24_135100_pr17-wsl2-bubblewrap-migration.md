@@ -10,6 +10,39 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 後続の明示依頼により、schema 2 launcherの認証をChatGPT loginだけに限定し、固定Codex CLIの`codex login status`で状態を確認する変更を追加する。この追加指示は本Planの「認証全面変更を含まない」という除外を、ChatGPT方式確認とAPI Key fallback廃止の範囲だけ上書きする。ログイン操作、認証情報の移動・復元、実モデル/API呼び出しは許可しない。ChatGPT loginでもCodex shellから認証fileが見える残留リスクは維持し、`authentication_shell_visible_risk=true`を変更しない。
 
+## 2026-10-25 refresh token調査の追記
+
+現行経路は元storeの`auth.json`をattempt専用`CODEX_HOME`へ複製し、Codex終了時にその一時`CODEX_HOME`を削除する。固定CLI `0.163.0`はrefreshに成功すると選択中のauth storageへtokenを書き戻すため、一時storeでrefreshした結果は次attemptまで残らない可能性がある。次attemptが失効済みの元tokenを再利用し、`refresh_token_reused`になる筋道はあるが、過去の失敗記録を確認できていないため直接原因とは確定しない。
+
+CLIのrefresh semaphoreは同一`AuthManager`内の排他であり、別プロセス間では共有されない。file backendにもCLI横断のlockはなく、別attemptの一時copy、または同じ元storeを指定した外部Codex processとのrefresh競合を防止できない。固定CLIの公式実装は[auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)、[token persistence](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)、[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)で確認する。
+
+評価専用の永続`CODEX_HOME`をユーザーが公式Codex CLIで管理する案は、refresh結果を同じstoreに保存する点では候補となる。しかし、Agent shellからの認証file可視性は解決せず、同storeを利用する非協調プロセスの競合もrunner内lockだけでは防げない。新しい方式で認証情報の露出を増やさないこと、競合時にfail-closedとなること、連続attemptで更新結果を安全に使えることを合成検証できていないため、未検証の回避策は採用しない。`authentication_shell_visible_risk=true`と二重bubblewrapは維持し、実認証を使う評価は停止する。
+
+2026-10-25の`--auth-status-only`は固定runtimeでChatGPT loginを確認したが、refresh保存、競合防止、実認証fileのshell可視性は検証していない。詳細、現環境でのsuite結果、実行再開条件は[調査・検証報告 v04](../reports/2026-10-25_pr17-chatgpt-auth-recovery_v04.md)に記録する。古いevidenceを新しいrevisionの受入根拠に流用しない。
+
+## 2026-10-25 通常WSL2ターミナルでの再検証とfresh evidence条件
+
+利用者から、通常のWSL2 UbuntuターミナルでDeterministic repository suite 293件、WSL2 formal launcher integration 1件、AF_UNIX socket bindがすべてPASSし、Codex開発sandbox内の`EPERM`とDeterministic test failureは再現しなかったとの報告を受けた。以前のCodex sandbox実行で発生した4 failures / 1 errorとAF_UNIX bind EPERMはそのsandbox環境での結果として保持する。テスト条件、Hook、execpolicy、sandboxの設定は変更しない。通常WSL2の再検証はsandbox固有の障害をコード不具合と分類しない根拠になるが、fresh formal isolation evidenceの代わりにはならない。
+
+formal probeは次の条件を満たしたclean evaluator revision上で改めて実行する。
+
+- Commit後のclean checkoutとHEAD SHAを基準にする。working treeがdirty、profile/evidenceが別revision、またはevidenceが古い場合は使用しない。
+- schema 2 profileは最終run条件に一致させ、AgentはCodex CLI `0.163.0`、`gpt-6-luna`、reasoning `max`、timeout 900秒、`workspace-write`、shellのみ、MCPなしを指定する。Judge configも必須で、`command_argv=["codex"]`、sandbox `read-only`。deterministic runのJudge disabledは保持するが、probeは隔離確認用のJudge sandbox smokeも実行する。
+- agent command JSONは`["codex"]`のみ。これはtemplate fingerprint用で、本番`codex exec`やモデル通信を起動する引数ではない。
+- `QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final`を指定し、Codex package/CLI/bundled bwrap digestとversionを現行launcherで再照合する。
+- profileは`verification.evidence_path="isolation.json"`とし、fresh run IDのoutput rootをprobeと後続runで共用する。15 required checks全てtrue、Agent/Judge/Repair mode evidence verified、profile/command/runtime fingerprint一致を確認する。`model_api_used=false`、`authentication_shell_visible_risk=true`を維持する。
+- Probeはfixed runtimeの`codex sandbox` smokeとsynthetic filesystem/network sentinelだけを使う。auth fileは渡さず、login status、refresh、`codex exec`、モデルAPIを呼ばない。
+
+通常WSL2でのdeterministic suite、launcher integration、host AF_UNIX bindの個別コマンド、およびfresh evidenceコマンド例はAgent READMEの「WSL2通常ターミナルでの検証とfresh evidence」に記録する。
+
+## 合成認証検証とfail-closed条件
+
+現行unit testのsynthetic auth markerはlogin status分類、API key environment除外、ログredaction、temporary CODEX_HOME cleanupを検査するが、Codex refresh後のstore永続化、process間競合、inner shellからのmarker読み取り拒否は検証しない。現在はsource `auth.json`をattempt専用homeにcopyし、Codex終了後にそのhomeを削除するため、fake childがcopy側を書き換えるunit testで次attemptへの更新非継承を再現できる。ただし、これは保存喪失経路の検査であり、本番の直接原因確定ではない。
+
+将来の永続化変更を評価する際は、実認証を使わずsynthetic markerでrunnerの保存先・attempt間引継ぎを確認し、別processをbarrierで起動して共通lockの直列化またはfail-closedを確認する。Agent/Judge/Repairのinner shell可視性は、実auth fileではなく合成markerを`/codex-home/auth.json`へ置き、値を表示せずread可否booleanをformal launcherから確認する。markerが読めた場合は不合格とする。
+
+固定Codex CLI `0.163.0`の公式実装で確認できるrefresh mutexは同一`AuthManager`内に限られ、file backendは選択された`CODEX_HOME/auth.json`へtruncate/write/flushする。Codex CLIには`CODEX_REFRESH_TOKEN_URL_OVERRIDE`があるが、固定CLIの`login status`は保存済みmodeを判定するだけでrefreshしない。loopback mock endpointを使うCodex source testなら、synthetic tokenのrefresh・persist・reloadを外部モデル通信なしで検査できる。ただしこのoverrideはsource上でtest-onlyに制限されず、production launcherでは使わない。Codex CLIを使う外部processがrunner独自lockを取得する公式契約はない。よってrunner内lockのsynthetic testだけで非協調processとの競合を解消したと扱わない。shell marker可視性またはprocess競合が解決できない場合は認証方式を変えず、`authentication_shell_visible_risk=true`を維持し、実認証runをfail-closedにする。根拠は[Codex 0.163.0 auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)および[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)。
+
 ## Baseline at start of implementation
 
 - Windows開発checkoutは`feat/agent-eval-runner`、HEAD `be574cbaf457a49d2f51a08c1cdc7838e75abd5c`。tracked差分なし。未追跡Docker調査報告2件と既存`.agent-eval-runs/`を保持する。

@@ -4,6 +4,18 @@
 
 Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
 
+## 2026-10-25 認証更新の再調査
+
+現行launcherは認証元の`auth.json`をattempt専用の一時`CODEX_HOME`へ複製し、その一時領域をattempt終了時に削除します。Codex CLIがattempt中にrefreshしたtokenをこの一時storeへ保存した場合、保存結果はcleanupで失われ、次のattemptは元storeのtokenから再開します。これは`refresh_token_reused`を説明し得る経路ですが、既存の失敗記録から直接原因と確定できたわけではありません。
+
+固定Codex CLI `0.163.0`は、同一プロセス内の`AuthManager`でrefreshを直列化し、更新tokenを選択中のstorage backendへ保存します。file backendは`auth.json`を書き換えますが、CLIのfile storageには別プロセス間の排他制御がありません。したがって、attemptごとの一時copyは更新を次回へ引き継がず、同時に同じ元storeから開始したcopy同士も相互排他しません。詳細は[認証調査報告 v04](../../../../docs/reports/2026-10-25_pr17-chatgpt-auth-recovery_v04.md)を参照してください。
+
+2026-10-25の`--auth-status-only`は固定runtime `0.163.0`でChatGPT loginを確認しました。この確認は認証方式と状態だけを返し、認証fileの内容・hashを出力せず、モデルAPIも呼びません。これは永続化・競合防止・Agent shellからの認証情報読み取り拒否を証明しません。永続専用`CODEX_HOME`はCodex自身の公式storageへ更新を保存できますが、現行の合成marker検証ではshellからの可視性が残り、同じstoreを使う外部Codex processとの競合も排除できません。安全な方法が確定するまで実認証runを停止し、`authentication_shell_visible_risk=true`とfail-closed条件を維持します。
+
+Codex CLI `0.163.0`のauth manager sourceには`CODEX_REFRESH_TOKEN_URL_OVERRIDE`があり、未設定時は公式OAuth refresh endpointを使います。これはsource上のprocess environment overrideであり、test-onlyに制限される仕組みではありません。Codex自身のrefresh保存をsynthetic dataで試験する場合に限り、固定revisionのsource test process内でこの値をloopback mock endpointへ向け、synthetic `CODEX_HOME`だけを使い、他のnetwork egressを遮断してrefresh・store reload・次のrefreshを確認する方法があります。環境変数をproduction launcher/profileへ渡してはいけません。
+
+固定CLIの`codex login status`は`load_auth()`で保存済みmodeを判定するだけでrefreshを呼びません。そのため既存の`--auth-status-only`は保存試験を代替しません。通常の`codex exec`からrefreshを誘発する試験はモデルrequestと切り離せないため、TC-OUT-001の承認前に実行しません。CLI本体での保存・競合検証は固定`0.163.0`のCodex source test harnessからのみ行い、現在の評価runner unit testはcopy/cleanup配線とsynthetic marker可視性だけを検査します。loopback mockを使った単一process成功は別process競合の解決を意味しません。
+
 ## CLI一覧
 
 | Module                                       | 用途                                                                                  |
@@ -35,6 +47,57 @@ Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動し�
 
 Profile verificationは同じEvaluator revision、profile、Agent/Judge/Repair mode、binary digest、実効argv・mount/network、probe versionに結び付くisolation.jsonを要求します。Agent/Judge/Repairそれぞれの本番`codex exec` argvもfingerprintし、attemptごとに変わる`--output-last-message`のファイル名だけを正規化します。probeは本番`codex exec`やモデル通信を実行しません。evidence欠落、旧Docker evidence、別mode evidence、fingerprint不一致、必須negative test未確認の場合はisolation_unverifiedとして起動を拒否します。
 
+## WSL2通常ターミナルでの検証とfresh evidence
+
+Codex開発sandbox内でWSLのAF_UNIX socket bindやrepository testが`EPERM`になる場合、隔離やHookを変更せず、通常のWSL2 Ubuntuターミナルで次を個別に実行します。作業時点の報告ではDeterministic repository suite 293件、formal launcher integration 1件、host AF_UNIX bindがすべてPASSし、Codex sandbox内だけで見られた`EPERM`は通常ターミナルで再現しませんでした。
+
+```bash
+cd /home/sella/src/qa-workflow-skills-pr17-auth-20261025
+source ~/.venvs/qa-workflow-skills/bin/activate
+export QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final
+python --version
+python -c 'import yaml; print(yaml.__version__)'
+python -m unittest discover -s tests/skills/evals/deterministic -p 'test_*.py' -q
+QAEVAL_RUN_WSL2_INTEGRATION=1 python -m unittest scripts.skills.evals.agent.tests.test_codex_wsl2_bwrap_launcher.CodexWsl2LauncherIntegrationTests.test_formal_launcher_modes_fd_network_paths_and_timeout_cleanup -v
+python -c 'import pathlib,socket,tempfile; d=tempfile.TemporaryDirectory(); s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); p=pathlib.Path(d.name)/"host.sock"; s.bind(str(p)); print("host AF_UNIX bind: PASS"); s.close(); d.cleanup()'
+```
+
+`host AF_UNIX bind`はWSL hostでlistenerを作れる確認です。inner shellからそのsocketへ接続できないことはformal launcher integration/probeが別途確認します。
+
+正式probeには、commit済みでcleanなEvaluator checkout、同checkout revision用の新しいschema 2 profile、固定argv template JSONが必要です。profileは`agent.name=codex`、`agent.model=gpt-6-luna`、`agent.reasoning_effort=max`、timeout 900、Codex CLI `0.163.0`、`workspace-write`、shellのみ、MCPなし、既定のWSL2二重bubblewrap isolation契約を持ちます。Judge fieldsもschema上必要で、`judge.command_argv`は`["codex"]`、Judge sandboxは`read-only`です。deterministic runはJudgeを起動しませんが、probeは3 modeのsandbox smokeを行います。profileの`verification.evidence_path`は`isolation.json`にし、profileのほかの値は後続runで使うものと一致させます。
+
+`agent-command.json`のJSON本文は固定の`["codex"]`です。probeが本番`codex exec`を起動する指定ではなく、Codex executable/templateの契約を照合するためのargv arrayです。新しいrun IDのoutput directoryをprobeと後続runで共用します。これによりprofileのevidence pathとrunnerが読む`<output-root>/isolation.json`が一致し、既存run/evidenceを上書きしません。
+
+```bash
+source ~/.venvs/qa-workflow-skills/bin/activate
+export QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final
+git status --short --branch  # cleanであることを確認
+git rev-parse HEAD           # evidence対象revisionを記録
+mkdir -p .agent-eval-runs/config
+cat > .agent-eval-runs/config/profile.json <<'JSON'
+{"schema_version":2,"agent":{"name":"codex","model":"gpt-6-luna","timeout_seconds":900,"cli_version":"0.163.0","reasoning_effort":"max","launch_options":[],"sandbox_policy":"workspace-write","approval_policy":"never","network_policy":"codex-parent-host-network-inner-shell-denied","tools":["shell"],"mcp_servers":[],"skill_roots":["/workspace/.agents/skills"],"external_instructions":"none","global_config":"none"},"judge":{"model":"gpt-6-luna","command_argv":["codex"],"cwd":"isolated","timeout_seconds":900,"cli_version":"0.163.0","reasoning_effort":"max","launch_options":[],"sandbox_policy":"read-only","approval_policy":"never","network_policy":"codex-parent-host-network-inner-shell-denied","skill_roots":[],"global_config":"none","tools":[],"mcp_servers":[],"external_instructions":"none"},"isolation":{"method":"wsl2-dual-bubblewrap","agent_read_roots":["/workspace"],"evaluator_read_blocked":true},"verification":{"status":"verified","method":"wsl2-dual-bubblewrap","evidence_path":"isolation.json"}}
+JSON
+cat > .agent-eval-runs/config/agent-command.json <<'JSON'
+["codex"]
+JSON
+RUN_ID="tc-out-001-isolation-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)"
+OUT_ROOT=".agent-eval-runs/$RUN_ID"
+python -m scripts.skills.evals.agent.isolation_probe \
+  --profile .agent-eval-runs/config/profile.json \
+  --agent-command-json .agent-eval-runs/config/agent-command.json \
+  --output-root "$OUT_ROOT"
+```
+
+実行前に固定runtime path、Codex CLI/package digest、bundled bwrap digestが`verify_runtime()`で一致することが必要です。probeは`codex sandbox`によるAgent/Judge/Repair smoke、15件のrequired isolation checks、modeごとのargv/profile fingerprintを記録します。`model_api_used=false`かつ`authentication_shell_visible_risk=true`を維持し、認証status確認・`codex exec`・モデルAPIは呼びません。evidenceの`evaluator_revision`はclean checkoutのHEADと一致し、全required checkと3 mode evidenceが`verified`でなければ実runに使えません。profile statusだけでevidenceを承認しません。
+
+## 合成認証データによる検証範囲
+
+launcher unit testはsynthetic `auth.json` markerのcopy、permission、cleanup、出力redaction、ChatGPT login statusの分類を検証します。これはCodexのrefresh保存、複数process間lock、inner shellからのmarker読取り拒否を証明しません。現在の`_prepare_codex_home()`はsource `auth.json`をattempt専用homeへcopyし、cleanup時にそのhomeを削除します。refresh結果がcopy側へ書かれれば次attemptへ残らないため、更新成功を次attemptで使える保証はありません。
+
+この範囲を合成データで検証するなら、(1)固定CLIを呼ばないunit testでsource markerとattempt copyを作り、fake childがcopyだけを更新した後にcleanupと次attemptを行い、source markerが不変で更新が引き継がれないことを確認する、(2)runnerが導入する協調lockをmultiprocessで競合させ、同時refresh要求を直列化するか後続をfail-closedにすることを確認する、(3)formal launcherの同じ`/codex-home/auth.json` mountへsynthetic markerを置き、Agent/Judge/Repairのinner shellから内容を取得できないことを秘密値自体を出力せずbooleanだけで記録する、という段階を分けます。fake childによる更新試験はrunner配線のみを検証し、固定Codex CLIのOAuth refreshや外部processとの排他の証明にはなりません。実auth fileや実tokenを使う試験はしません。
+
+固定Codex CLI `0.163.0`の公式実装ではrefreshのmutexは同一`AuthManager`内で、成功tokenは選択したstorage backendへ保存されます。file storageは`auth.json`をtruncate/write/flushしますが、CLI横断のprocess lockはありません。そのためsynthetic storeのrunner内lock testだけでは、同じstoreを使う非協調のCodex processとの競合を閉じられません。`refresh_token_reused`の直接原因も確定していません。既存のCodex shellからsynthetic auth markerが見えた実測と合わせ、専用persistent `CODEX_HOME`へ変更してもshell可視性と競合を解決できるまでは採用せず、`authentication_shell_visible_risk=true`とfail-closed条件を維持します。
+
 launcherは既存executor.run_commandを使い、shell=False、固定argv、close_fds=True、未許可pass_fdsなし、stdin/stdout/stderr契約、timeout、POSIX process group cleanup、safe diagnosticsと一時領域cleanupを維持します。失敗時はfail-closedです。
 
 ## 共通case実行
@@ -44,9 +107,13 @@ WSL2 clean checkoutからprofileを指定し、固定Skill revisionを実行し�
 ```bash
 python -c 'import sys, yaml; assert sys.version_info[:2] == (3, 11), sys.version; assert yaml.__version__ == "6.0.3", yaml.__version__; print(f"Python {sys.version.split()[0]}, PyYAML {yaml.__version__}")'
 
+# isolation evidenceとrun成果物を同じ新規output rootに保存する。
+RUN_ID="tc-out-001-isolation-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)"
+OUT_ROOT=".agent-eval-runs/$RUN_ID"
 python -m scripts.skills.evals.agent.isolation_probe \
   --profile .agent-eval-runs/config/profile.json \
-  --output-root .agent-eval-runs/isolation
+  --agent-command-json .agent-eval-runs/config/agent-command.json \
+  --output-root "$OUT_ROOT"
 
 python -m scripts.skills.evals.agent.run \
   --suite deterministic \
@@ -54,7 +121,7 @@ python -m scripts.skills.evals.agent.run \
   --eval-id TC-OUT-001 \
   --skill-revision <40文字のSkill Git SHA> \
   --execution-profile .agent-eval-runs/config/profile.json \
-  --output-root .agent-eval-runs/TC-OUT-001 \
+  --output-root "$OUT_ROOT" \
   --agent-name codex \
   --agent-model <model名>
 ```
