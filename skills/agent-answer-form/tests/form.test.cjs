@@ -228,6 +228,38 @@ test("安全なクリップボードでは直接コピーし、失敗時もダ�
   assert.match(fallback.node("toast").textContent, /手動でコピー/);
 });
 
+test("question-analysisの既存質問からQ IDと背景を維持して回答を返せる", () => {
+  const artifact = fs.readFileSync(
+    path.resolve(ROOT, "..", "question-analysis", "evals", "output", "cases", "case-001", "input.md"),
+    "utf8",
+  );
+  const match = artifact.match(/\bQ-\d{3}\b/);
+  assert.ok(match, "既存の質問成果物にQ IDが必要");
+  const originalId = match[0];
+  const row = artifact.split("\n").find((line) => line.startsWith(originalId + ":"));
+  assert.ok(row, "既存の質問本文が必要");
+
+  const json = makeForm();
+  json.questions = [{
+    id: originalId,
+    number: "No.1",
+    title: row.slice(originalId.length + 1).trim(),
+    group: "仕様確認",
+    context: artifact,
+    choices: [],
+  }];
+  const form = generatedForm(json);
+  assert.equal(form.questions[0].id, originalId);
+  assert.equal(form.questions[0].context, artifact);
+
+  const h = harness(form);
+  h.api.state[originalId].note = "担当者が確認した正式な回答";
+  const markdown = h.api.exportMarkdown(false);
+  assert.ok(markdown.includes("- 質問ID：" + originalId));
+  assert.ok(markdown.includes("担当者が確認した正式な回答"));
+  assert.equal(h.api.answerStatus(form.questions[0]), "回答済み");
+});
+
 test("保存領域が利用できない場合は回答を受け付けられる", () => {
   const form = generatedForm(makeForm());
   const h = harness(form, new Map(), { storageBlocked: true });
