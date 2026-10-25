@@ -169,6 +169,7 @@ class WorkspaceIsolationTests(unittest.TestCase):
         agent_command = ["codex"]
         required_checks = {
             "evaluator_read_denied",
+            "authentication_shell_read_denied",
             "host_home_read_denied",
             "other_attempt_home_read_denied",
             "windows_filesystem_read_denied",
@@ -231,6 +232,14 @@ class WorkspaceIsolationTests(unittest.TestCase):
                         profile, root, agent_command_argv=agent_command
                     )
                 )
+                bad_evidence = json.loads(json.dumps(evidence))
+                bad_evidence["checks"]["authentication_shell_read_denied"] = False
+                evidence_path.write_text(json.dumps(bad_evidence), encoding="utf-8")
+                with self.assertRaises(AgentEvalError):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
                 bad_evidence = json.loads(json.dumps(evidence))
                 bad_evidence["mode_evidence"]["repair"][
                     "codex_exec_argv_fingerprint"

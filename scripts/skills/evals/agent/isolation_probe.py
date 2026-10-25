@@ -444,6 +444,7 @@ def probe_wsl2_isolation(
     command = _read_argv(agent_command_path)
     required = {
         "evaluator_read_denied",
+        "authentication_shell_read_denied",
         "host_home_read_denied",
         "other_attempt_home_read_denied",
         "windows_filesystem_read_denied",
@@ -577,6 +578,19 @@ def probe_wsl2_isolation(
                 "evaluator_read_denied": all(
                     c.get("evaluator_sentinel_read_denied") is True
                     and c.get("evaluator_checkout_unmounted") is True
+                    for c in mode_checks
+                ),
+                "authentication_shell_read_denied": all(
+                    all(
+                        c.get(check) is True
+                        for check in (
+                            "authentication_store_read_denied",
+                            "authentication_store_host_path_hidden",
+                            "other_attempt_auth_store_hidden",
+                            "authentication_marker_absent_from_environment",
+                            "authentication_marker_absent_from_process_fds",
+                        )
+                    )
                     for c in mode_checks
                 ),
                 "host_home_read_denied": all(

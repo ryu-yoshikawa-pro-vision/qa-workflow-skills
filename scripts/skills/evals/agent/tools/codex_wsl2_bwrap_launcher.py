@@ -39,6 +39,9 @@ PROTOCOL = "codex_wsl2_bwrap_launcher_v1"
 RUNTIME_ENV = "QAEVAL_CODEX_RUNTIME_ROOT"
 CODEX_HOME_PREFIX = ".qa-codex-home-"
 AUTH_STATUS_TIMEOUT_SECONDS = 15
+# Keep live execution disabled until synthetic-marker tests prove the Agent
+# shell cannot read the authentication store.
+AUTHENTICATION_SHELL_VISIBLE_RISK = True
 _SAFE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 
 
@@ -563,40 +566,138 @@ def sandbox_smoke(
     _require_wsl2()
     runtime_root = runtime_root or runtime_root_from_environment()
     runtime = verify_runtime(runtime_root)
-    home_parent = _private_temp_root()
-    home = home_parent / f"{CODEX_HOME_PREFIX}{mode}-{uuid.uuid4().hex}"
-    _prepare_codex_home(
-        home,
-        mode=mode,
-        reasoning_effort="medium",
-        auth=None,
-        skill_name=skill_name,
-    )
-    outside_root = Path(tempfile.mkdtemp(prefix="qa-wsl2-probe-outside-"))
-    outside_sentinel = outside_root / "evaluator-only.txt"
-    other_home = home_parent / f"{CODEX_HOME_PREFIX}other-{uuid.uuid4().hex}"
-    other_home.mkdir(mode=0o700)
-    other_sentinel = other_home / "synthetic-other-attempt.txt"
-    other_sentinel.write_text("other-attempt-sentinel", encoding="utf-8")
-    os.chmod(other_home, 0o700)
-    os.chmod(other_sentinel, 0o600)
-    host_unix_socket = outside_root / "host-only.sock"
-    unix_server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    unix_server.bind(str(host_unix_socket))
-    unix_server.listen(1)
-    fd_marker = "synthetic-fd-sentinel-" + uuid.uuid4().hex
-    outside_sentinel.write_text(fd_marker, encoding="utf-8")
-    os.chmod(outside_root, 0o700)
-    os.chmod(outside_sentinel, 0o600)
     host_namespaces = {
         name: os.readlink(f"/proc/self/ns/{name}")
         for name in ("user", "pid", "mnt", "net", "ipc", "uts")
     }
+    home_parent = _private_temp_root()
+    home = home_parent / f"{CODEX_HOME_PREFIX}{mode}-{uuid.uuid4().hex}"
+    auth_source = home_parent / f"{CODEX_HOME_PREFIX}source-{uuid.uuid4().hex}"
+    outside_root: Path | None = None
+    other_home: Path | None = None
+    unix_server: socket.socket | None = None
+    fd_marker = "synthetic-fd-sentinel-" + uuid.uuid4().hex
+
+    def cleanup_setup_failure() -> None:
+        cleanup_errors: list[BaseException] = []
+        if unix_server is not None:
+            try:
+                unix_server.close()
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        for path in (auth_source, other_home, outside_root):
+            if path is None:
+                continue
+            try:
+                if path.is_symlink():
+                    path.unlink()
+                elif path.exists():
+                    shutil.rmtree(path)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if home.exists():
+            try:
+                cleanup_codex_home(
+                    home,
+                    allowed_parent=home_parent,
+                    workspace_root=workspace_root,
+                )
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if workspace_root is not None:
+            escape = workspace_root / "synthetic-escape"
+            if escape.is_symlink():
+                try:
+                    escape.unlink()
+                except BaseException as exc:
+                    cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise CodexWsl2LauncherError(
+                "synthetic isolation setup cleanup failed"
+            ) from cleanup_errors[0]
+
+    try:
+        auth_source.mkdir(mode=0o700)
+        auth_file = auth_source / "auth.json"
+        auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="utf-8")
+        os.chmod(auth_file, 0o600)
+        _prepare_codex_home(
+            home,
+            mode=mode,
+            reasoning_effort="medium",
+            auth=auth_file,
+            skill_name=skill_name,
+        )
+    except BaseException:
+        cleanup_setup_failure()
+        raise
+    try:
+        if auth_source.is_symlink():
+            auth_source.unlink()
+        elif auth_source.exists():
+            shutil.rmtree(auth_source)
+    except BaseException as exc:
+        cleanup_setup_failure()
+        raise CodexWsl2LauncherError("synthetic auth source cleanup failed") from exc
+
+    try:
+        outside_root = Path(tempfile.mkdtemp(prefix="qa-wsl2-probe-outside-"))
+    except BaseException:
+        cleanup_setup_failure()
+        raise
+    outside_sentinel = outside_root / "evaluator-only.txt"
+    other_home = home_parent / f"{CODEX_HOME_PREFIX}other-{uuid.uuid4().hex}"
+    try:
+        other_home.mkdir(mode=0o700)
+        other_sentinel = other_home / "synthetic-other-attempt.txt"
+        other_sentinel.write_text("other-attempt-sentinel", encoding="utf-8")
+        other_auth = other_home / "auth.json"
+        other_auth.write_text("SYNTHETIC_AUTH_MARKER", encoding="utf-8")
+        os.chmod(other_home, 0o700)
+        os.chmod(other_sentinel, 0o600)
+        os.chmod(other_auth, 0o600)
+        host_unix_socket = outside_root / "host-only.sock"
+        outside_sentinel.write_text(fd_marker, encoding="utf-8")
+        os.chmod(outside_root, 0o700)
+        os.chmod(outside_sentinel, 0o600)
+        unix_server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        unix_server.bind(str(host_unix_socket))
+        unix_server.listen(1)
+    except BaseException:
+        cleanup_setup_failure()
+        raise
+    assert unix_server is not None
+    assert other_home is not None
+    assert outside_root is not None
     codex = "/opt/codex-runtime/" + CODEX_RELATIVE_PATH.as_posix()
     inner_script = r"""import errno,json,os,socket,stat,subprocess,sys,threading
-mode,outer_ns_json,host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path = sys.argv[1:8]
+mode,outer_ns_json,host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path,auth_store_path,auth_host_path,other_auth_path = sys.argv[1:11]
 outer_ns=json.loads(outer_ns_json)
-r={"mode":mode,"pid":os.getpid(),"procfs":os.path.ismount("/proc"),"namespaces":{},"nested_namespaces":{},"paths":{},"fd_marker_absent":True,"source_write_denied":None,"output_write_allowed":None,"repair_skill_write_allowed":None,"network":{}}
+r={"mode":mode,"pid":os.getpid(),"procfs":os.path.ismount("/proc"),"namespaces":{},"nested_namespaces":{},"paths":{},"fd_marker_absent":True,"authentication_store_read_denied":None,"authentication_store_host_path_hidden":None,"other_attempt_auth_store_hidden":None,"authentication_marker_absent_from_environment":None,"authentication_marker_absent_from_process_fds":None,"source_write_denied":None,"output_write_allowed":None,"repair_skill_write_allowed":None,"network":{}}
+def read_denied(path):
+ try:
+  with open(path,"rb") as auth_store: auth_store.read(1)
+  return False
+ except OSError:
+  return True
+r["authentication_store_read_denied"]=read_denied(auth_store_path)
+r["authentication_store_host_path_hidden"]=read_denied(auth_host_path)
+r["other_attempt_auth_store_hidden"]=read_denied(other_auth_path)
+marker=b"SYNTHETIC_AUTH_MARKER"
+r["authentication_marker_absent_from_environment"]=all(marker not in value.encode(errors="replace") for value in os.environ.values())
+auth_targets={auth_store_path,auth_host_path,auth_host_path+" (deleted)",other_auth_path,other_auth_path+" (deleted)"}
+auth_fd_visible=False
+try:
+ for process in os.listdir("/proc"):
+  if not process.isdigit(): continue
+  try: descriptors=os.listdir("/proc/"+process+"/fd")
+  except OSError: continue
+  for descriptor in descriptors:
+   try:
+    if os.readlink("/proc/"+process+"/fd/"+descriptor) in auth_targets: auth_fd_visible=True
+   except OSError: pass
+except OSError: pass
+r["authentication_marker_absent_from_process_fds"]=not auth_fd_visible
 for name in ("user","pid","mnt","net","ipc","uts"):
  try:r["namespaces"][name]=os.readlink("/proc/self/ns/"+name)
  except OSError:r["namespaces"][name]=None
@@ -659,7 +760,7 @@ except OSError:r["network"]["windows_command_denied"]=True
 print(json.dumps(r,separators=(",",":")))
 """.replace("synthetic-skill", skill_name or "synthetic-skill")
     outer_script = r"""import json,os,subprocess,sys
-codex,host_ns_json,inner_script,host_sentinel,fd_marker,mode,evaluator_root,other_home,unix_socket_path=sys.argv[1:10]
+codex,host_ns_json,inner_script,host_sentinel,fd_marker,mode,evaluator_root,other_home,unix_socket_path,auth_host_path,other_auth_path=sys.argv[1:12]
 host=json.loads(host_ns_json)
 outer={"pid":os.getpid(),"uid":os.getuid(),"gid":os.getgid(),"uid_map":open("/proc/self/uid_map").read().strip(),"gid_map":open("/proc/self/gid_map").read().strip(),"procfs":os.path.ismount("/proc"),"namespaces":{},"paths":{}}
 for name in ("user","pid","mnt","net","ipc","uts"):
@@ -677,7 +778,7 @@ except OSError:outer["paths"]["evaluator_checkout_absent"]=True
 outer["network_parent_in_host_namespace"]=outer["namespaces"].get("net")==host.get("net")
 profile_args=["--permission-profile",":read-only"] if mode=="judge" else ["--config",'sandbox_mode="workspace-write"']
 smoke=subprocess.run([codex,"sandbox","--permission-profile",":read-only","--","/bin/echo","sandbox-ok"],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
-probe=subprocess.run([codex,"sandbox",*profile_args,"--","/usr/bin/python3","-I","-S","-c",inner_script,mode,json.dumps(outer["namespaces"],separators=(",",":")),host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
+probe=subprocess.run([codex,"sandbox",*profile_args,"--","/usr/bin/python3","-I","-S","-c",inner_script,mode,json.dumps(outer["namespaces"],separators=(",",":")),host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path,"/codex-home/auth.json",auth_host_path,other_auth_path],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
 try:inner=json.loads(probe.stdout.decode("utf-8",errors="strict").splitlines()[-1])
 except (UnicodeDecodeError,ValueError,IndexError):inner={"parse_error":True}
 result={"smoke_exit_code":smoke.returncode,"smoke_stdout":smoke.stdout.decode("utf-8",errors="replace").strip()[:1000],"smoke_stderr":smoke.stderr.decode("utf-8",errors="replace")[:1000],"probe_exit_code":probe.returncode,"probe_stdout":probe.stdout.decode("utf-8",errors="replace")[-4000:],"probe_stderr":probe.stderr.decode("utf-8",errors="replace")[:1000],"outer":outer,"inner":inner}
@@ -699,6 +800,8 @@ print(json.dumps(result,separators=(",",":")))
         str(REPO_ROOT),
         str(other_home),
         str(host_unix_socket),
+        str(home / "auth.json"),
+        str(other_home / "auth.json"),
     ]
     try:
         command, effective = _outer_argv(
@@ -817,6 +920,26 @@ print(json.dumps(result,separators=(",",":")))
             )
             is True
             and inner.get("paths", {}).get("evaluator_checkout_absent") is True,
+            "authentication_store_read_denied": inner.get(
+                "authentication_store_read_denied"
+            )
+            is True,
+            "authentication_store_host_path_hidden": inner.get(
+                "authentication_store_host_path_hidden"
+            )
+            is True,
+            "other_attempt_auth_store_hidden": inner.get(
+                "other_attempt_auth_store_hidden"
+            )
+            is True,
+            "authentication_marker_absent_from_environment": inner.get(
+                "authentication_marker_absent_from_environment"
+            )
+            is True,
+            "authentication_marker_absent_from_process_fds": inner.get(
+                "authentication_marker_absent_from_process_fds"
+            )
+            is True,
             "fd_noninheritance": inner.get("fd_marker_absent") is True,
             "symlink_escape_denied": mode == "judge"
             or inner.get("paths", {}).get("symlink_escape_denied") is True,
@@ -1346,6 +1469,21 @@ def launch(
         raise CodexWsl2LauncherError("output root must be a regular directory")
     if observations_path.is_symlink():
         raise CodexWsl2LauncherError("observations path may not be a symlink")
+    if AUTHENTICATION_SHELL_VISIBLE_RISK:
+        _write_observations(
+            observations_path,
+            {
+                "protocol": PROTOCOL,
+                "status": "execution_error",
+                "error": "authentication_shell_visible_risk",
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "codex_cli_version": "0.163.0",
+                "authentication_shell_visible_risk": True,
+                "mode": mode,
+            },
+        )
+        return 2
     runtime_root = runtime_root or runtime_root_from_environment()
     runtime = verify_runtime(runtime_root)
     auth_path, auth_mode = _auth_material(runtime)

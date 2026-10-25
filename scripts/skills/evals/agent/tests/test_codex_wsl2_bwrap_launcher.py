@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts.skills.evals.agent.tools import codex_wsl2_bwrap_launcher
 from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import (
@@ -115,6 +115,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 stderr = io.StringIO()
                 with (
                     patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "AUTHENTICATION_SHELL_VISIBLE_RISK",
+                        False,
+                    ),
                     patch.object(
                         codex_wsl2_bwrap_launcher,
                         "verify_runtime",
@@ -225,6 +230,72 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     path.read_bytes() for path in root.rglob("*") if path.is_file()
                 )
                 self.assertNotIn(secret.encode("utf-8"), persisted)
+
+    def test_launch_fails_closed_for_unresolved_auth_shell_visibility(self) -> None:
+        marker = "SYNTHETIC_AUTH_VISIBILITY_MARKER"
+        for mode in ("agent", "judge", "repair"):
+            with (
+                self.subTest(mode=mode),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                output_root = root / "output"
+                output_root.mkdir()
+                workspace_root = root / "workspace" if mode != "judge" else None
+                if workspace_root is not None:
+                    workspace_root.mkdir()
+                    (workspace_root / ".qa-eval-output").mkdir()
+                auth_source = root / "source-home"
+                auth_source.mkdir()
+                (auth_source / "auth.json").write_text(marker, encoding="utf-8")
+                codex_home_parent = root / "homes"
+                codex_home_parent.mkdir(mode=0o700)
+                codex_home = codex_home_parent / f"{CODEX_HOME_PREFIX}{mode}-blocked"
+                observations_path = root / "launcher-observations.json"
+
+                with (
+                    patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "verify_runtime",
+                        return_value={"runtime": "synthetic"},
+                    ) as verify,
+                    patch.object(
+                        codex_wsl2_bwrap_launcher.subprocess, "run"
+                    ) as subprocess_run,
+                    patch.dict(os.environ, {"CODEX_HOME": str(auth_source)}),
+                ):
+                    exit_code = launch(
+                        mode=mode,
+                        output_root=output_root,
+                        prompt="synthetic prompt",
+                        observations_path=observations_path,
+                        model="gpt-6-luna",
+                        reasoning_effort="max",
+                        sandbox_policy=(
+                            "read-only" if mode == "judge" else "workspace-write"
+                        ),
+                        workspace_root=workspace_root,
+                        skill_name="synthetic-skill" if mode == "repair" else None,
+                        codex_home=codex_home,
+                        runtime_root=root,
+                    )
+
+                observations = json.loads(observations_path.read_text(encoding="utf-8"))
+                self.assertEqual(exit_code, 2)
+                self.assertEqual(observations["status"], "execution_error")
+                self.assertEqual(
+                    observations["error"], "authentication_shell_visible_risk"
+                )
+                self.assertEqual(observations["authentication_method"], "not_checked")
+                self.assertEqual(observations["authentication_check_status"], "blocked")
+                self.assertTrue(observations["authentication_shell_visible_risk"])
+                self.assertEqual(observations["mode"], mode)
+                self.assertNotIn(marker, observations_path.read_text(encoding="utf-8"))
+                self.assertFalse(codex_home.exists())
+                self.assertFalse(any(output_root.iterdir()))
+                verify.assert_not_called()
+                subprocess_run.assert_not_called()
 
     def test_auth_material_accepts_only_official_chatgpt_login_status(self) -> None:
         cases = (
@@ -484,6 +555,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             codex_home.parent.mkdir(mode=0o700)
             with (
                 patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_SHELL_VISIBLE_RISK",
+                    False,
+                ),
                 patch.object(
                     codex_wsl2_bwrap_launcher,
                     "verify_runtime",
@@ -762,6 +838,52 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             with self.assertRaises(CodexWsl2LauncherError):
                 cleanup_codex_home(outsider, allowed_parent=home_parent)
 
+    def test_attempt_refresh_copy_is_lost_at_cleanup_and_not_reused(self) -> None:
+        old_marker = "SYNTHETIC_AUTH_STATE_OLD"
+        refreshed_marker = "SYNTHETIC_AUTH_STATE_REFRESHED"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home_parent = root / "homes"
+            home_parent.mkdir(mode=0o700)
+            source_home = root / "source-home"
+            source_home.mkdir(mode=0o700)
+            auth_source = source_home / "auth.json"
+            auth_source.write_text(old_marker, encoding="utf-8")
+            first_home = home_parent / f"{CODEX_HOME_PREFIX}agent-first"
+            second_home = home_parent / f"{CODEX_HOME_PREFIX}agent-second"
+
+            _prepare_codex_home(
+                first_home,
+                mode="agent",
+                reasoning_effort="max",
+                auth=auth_source,
+            )
+
+            def fake_child_refresh(attempt_home: Path) -> None:
+                (attempt_home / "auth.json").write_text(
+                    refreshed_marker, encoding="utf-8"
+                )
+
+            fake_child_refresh(first_home)
+            self.assertEqual(
+                (first_home / "auth.json").read_text(encoding="utf-8"),
+                refreshed_marker,
+            )
+            cleanup_codex_home(first_home, allowed_parent=home_parent)
+            self.assertFalse(first_home.exists())
+
+            _prepare_codex_home(
+                second_home,
+                mode="agent",
+                reasoning_effort="max",
+                auth=auth_source,
+            )
+            self.assertEqual(
+                (second_home / "auth.json").read_text(encoding="utf-8"), old_marker
+            )
+            self.assertEqual(auth_source.read_text(encoding="utf-8"), old_marker)
+            cleanup_codex_home(second_home, allowed_parent=home_parent)
+
     def test_timeout_cleanup_removes_only_reserved_final_message_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
@@ -801,6 +923,57 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     auth=None,
                     skill_name="../outside",
                 )
+
+    def test_sandbox_smoke_cleans_temporary_auth_and_paths_when_socket_bind_fails(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home_parent = root / "homes"
+            home_parent.mkdir(mode=0o700)
+            outside_root = root / "outside"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / ".qa-eval-output").mkdir()
+            output_root = root / "output"
+            output_root.mkdir()
+            outside_root.mkdir()
+            server = Mock()
+            server.bind.side_effect = PermissionError("synthetic EPERM")
+
+            with (
+                patch.object(codex_wsl2_bwrap_launcher, "_require_wsl2"),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "verify_runtime",
+                    return_value={"runtime": "synthetic"},
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_private_temp_root",
+                    return_value=home_parent,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.tempfile,
+                    "mkdtemp",
+                    return_value=str(outside_root),
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher.socket, "socket", return_value=server
+                ),
+            ):
+                with self.assertRaisesRegex(PermissionError, "synthetic EPERM"):
+                    sandbox_smoke(
+                        mode="agent",
+                        workspace_root=workspace,
+                        output_root=output_root,
+                        permission_profile=":workspace",
+                    )
+
+            self.assertEqual(list(home_parent.iterdir()), [])
+            self.assertFalse(outside_root.exists())
+            self.assertFalse((workspace / "synthetic-escape").exists())
+            server.close.assert_called_once()
 
     def test_runtime_pin_mismatch_fails_before_binary_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -862,17 +1035,12 @@ class CodexWsl2LauncherIntegrationTests(unittest.TestCase):
                     skill_name=skill_name,
                     permission_profile=":workspace",
                 )
-                self.assertEqual(
-                    result["status"],
-                    "verified",
-                    {
-                        "mode": mode,
-                        "inner": result.get("inner"),
-                        "checks": result.get("checks"),
-                        "diagnostics": result.get("diagnostics"),
-                    },
+                self.assertTrue(
+                    all(result["checks"].values()),
+                    {"mode": mode, "checks": result["checks"]},
                 )
-                self.assertTrue(all(result["checks"].values()), result["checks"])
+                self.assertEqual(result["status"], "verified", result)
+                self.assertNotIn("SYNTHETIC_AUTH_MARKER", json.dumps(result))
                 self.assertFalse((workspace / ".git").exists())
                 self.assertFalse((workspace / ".codex").exists())
                 self.assertFalse((workspace / "synthetic-escape").exists())
@@ -887,8 +1055,9 @@ class CodexWsl2LauncherIntegrationTests(unittest.TestCase):
                 output_root=None,
                 permission_profile=":read-only",
             )
-            self.assertEqual(judge["status"], "verified", judge)
             self.assertTrue(all(judge["checks"].values()), judge["checks"])
+            self.assertEqual(judge["status"], "verified", judge)
+            self.assertNotIn("SYNTHETIC_AUTH_MARKER", json.dumps(judge))
 
             timeout_workspace = root / "timeout" / "workspace"
             timeout_workspace.mkdir(parents=True)

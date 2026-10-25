@@ -30,18 +30,30 @@ formal probeは次の条件を満たしたclean evaluator revision上で改め�
 - schema 2 profileは最終run条件に一致させ、AgentはCodex CLI `0.163.0`、`gpt-6-luna`、reasoning `max`、timeout 900秒、`workspace-write`、shellのみ、MCPなしを指定する。Judge configも必須で、`command_argv=["codex"]`、sandbox `read-only`。deterministic runのJudge disabledは保持するが、probeは隔離確認用のJudge sandbox smokeも実行する。
 - agent command JSONは`["codex"]`のみ。これはtemplate fingerprint用で、本番`codex exec`やモデル通信を起動する引数ではない。
 - `QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final`を指定し、Codex package/CLI/bundled bwrap digestとversionを現行launcherで再照合する。
-- profileは`verification.evidence_path="isolation.json"`とし、fresh run IDのoutput rootをprobeと後続runで共用する。15 required checks全てtrue、Agent/Judge/Repair mode evidence verified、profile/command/runtime fingerprint一致を確認する。`model_api_used=false`、`authentication_shell_visible_risk=true`を維持する。
-- Probeはfixed runtimeの`codex sandbox` smokeとsynthetic filesystem/network sentinelだけを使う。auth fileは渡さず、login status、refresh、`codex exec`、モデルAPIを呼ばない。
+- profileは`verification.evidence_path="isolation.json"`とし、fresh run IDのoutput rootをprobeと後続runで共用する。従来の15件と合成auth marker可視性checkを加えた16 required checks全てtrue、Agent/Judge/Repair mode evidence verified、profile/command/runtime fingerprint一致を確認する。`model_api_used=false`、`authentication_shell_visible_risk=true`を維持する。
+- Probeはfixed runtimeの`codex sandbox` smokeとsynthetic filesystem/network sentinelを使う。実auth fileは渡さず、markerだけを持つ合成`auth.json`でinner shellのread拒否を検査する。login status、refresh、`codex exec`、モデルAPIは呼ばない。
 
 通常WSL2でのdeterministic suite、launcher integration、host AF_UNIX bindの個別コマンド、およびfresh evidenceコマンド例はAgent READMEの「WSL2通常ターミナルでの検証とfresh evidence」に記録する。
 
 ## 合成認証検証とfail-closed条件
 
-現行unit testのsynthetic auth markerはlogin status分類、API key environment除外、ログredaction、temporary CODEX_HOME cleanupを検査するが、Codex refresh後のstore永続化、process間競合、inner shellからのmarker読み取り拒否は検証しない。現在はsource `auth.json`をattempt専用homeにcopyし、Codex終了後にそのhomeを削除するため、fake childがcopy側を書き換えるunit testで次attemptへの更新非継承を再現できる。ただし、これは保存喪失経路の検査であり、本番の直接原因確定ではない。
+現行unit testのsynthetic auth markerはlogin status分類、API key environment除外、ログredaction、temporary CODEX_HOME cleanup、copy/delete方式におけるfake child更新のattempt間喪失を検査する。fake child testはrunnerのfile操作だけを検証し、Codex refresh成功や本番の直接原因を確定しない。固定Codex CLI source harnessでのrefresh/persist/reloadは未実施である。
 
-将来の永続化変更を評価する際は、実認証を使わずsynthetic markerでrunnerの保存先・attempt間引継ぎを確認し、別processをbarrierで起動して共通lockの直列化またはfail-closedを確認する。Agent/Judge/Repairのinner shell可視性は、実auth fileではなく合成markerを`/codex-home/auth.json`へ置き、値を表示せずread可否booleanをformal launcherから確認する。markerが読めた場合は不合格とする。
+追加したformal smokeはAgent/Judge/Repairそれぞれで合成markerを`/codex-home/auth.json`へ置き、store本体、host側store path、他attempt store、environment、可視process FDに関するread可否・存在情報を値を出さずbooleanで検査する。markerが見えればmodeと全体evidenceをverifiedにしない。非協調processを含む全store競合の方式はまだ確立していないため、runner lockだけで解決済みとは扱わない。
 
 固定Codex CLI `0.163.0`の公式実装で確認できるrefresh mutexは同一`AuthManager`内に限られ、file backendは選択された`CODEX_HOME/auth.json`へtruncate/write/flushする。Codex CLIには`CODEX_REFRESH_TOKEN_URL_OVERRIDE`があるが、固定CLIの`login status`は保存済みmodeを判定するだけでrefreshしない。loopback mock endpointを使うCodex source testなら、synthetic tokenのrefresh・persist・reloadを外部モデル通信なしで検査できる。ただしこのoverrideはsource上でtest-onlyに制限されず、production launcherでは使わない。Codex CLIを使う外部processがrunner独自lockを取得する公式契約はない。よってrunner内lockのsynthetic testだけで非協調processとの競合を解消したと扱わない。shell marker可視性またはprocess競合が解決できない場合は認証方式を変えず、`authentication_shell_visible_risk=true`を維持し、実認証runをfail-closedにする。根拠は[Codex 0.163.0 auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)および[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)。
+
+## 2026-10-26 認証可視性checkと実行停止
+
+作業開始HEAD `73328d4237a5c1ab913938ed83f980ee9b5a9a37`を基準に、launcherの現行copy/cleanup経路でfake childがattempt専用`auth.json`だけを更新し、cleanup後のattempt 2が元の古いmarkerを読む回帰testを追加した。このtestはrunnerのfile操作で更新結果を失うことを示すもので、Codex CLI自身のOAuth refresh成功や既発生の`refresh_token_reused`の直接原因を証明しない。固定CLI本体のrefresh/persist/reload source harnessは本repositoryにないため実行していない。
+
+正式な`sandbox_smoke()`は合成auth markerをattempt homeへ置き、各Agent/Judge/Repairのinner shellから`/codex-home/auth.json`、host側のstore path、他attemptのauth pathを開けないこと、markerがenvironmentに含まれないこと、可視process FDのtargetにauth storeが現れないことを値を出力せず確認する。既存15 required checksに認証可視性checkを加え、合計16件すべてをprofile evidenceの必須条件とする。marker readが可能な場合はmode evidenceと全体evidenceをverifiedにせず、`authentication_shell_visible_risk=true`を維持する。
+
+認証更新・全process競合・shell可視性を同時に満たす実装方法はまだ確定していない。このため`launch()`は同riskがtrueの間、Agent/Judge/Repairいずれも`_auth_material()`、auth file copy、Codex起動より前に`execution_error`で停止する。専用persistent `CODEX_HOME`、runner内だけのOS lock、file permission変更は非協調のCodex processやinner shell可視性を解決しないため導入しない。`authentication_shell_visible_risk=true`は残し、TC-OUT-001を含む実モデル通信を開始しない。
+
+probe setupでhost AF_UNIX bindが失敗したとき一時auth home、other-attempt home、outside sentinel、socketをcleanupする経路を追加し、cleanup failureを隠さず専用safe errorとして返す。Codex開発sandboxではformal launcher integrationがAF_UNIX bind時に`EPERM`で停止したため、新しいmarker checkまで到達していない。通常WSL2ターミナルからの前回293件Deterministic suite / 1件integration / host socket PASSはその前の実装revisionの報告であり、新checkを含む現在の実装証拠として流用しない。現在のrevision向け通常WSL2 commandとfresh evidence手順はAgent READMEに記録し、probe成功・fresh evidence生成までは未完了とする。
+
+変更後の個別suite結果、未実施のCodex source refresh harness、認証競合・残留risk、および再開条件は[認証調査報告 v05](../reports/2026-10-26_pr17-chatgpt-auth-recovery_v05.md)に記録する。
 
 ## Baseline at start of implementation
 

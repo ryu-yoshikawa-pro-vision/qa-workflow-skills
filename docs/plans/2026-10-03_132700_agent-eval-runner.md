@@ -21,6 +21,12 @@ Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent
 - 認証方式はChatGPTアカウントでサインインしたCodex CLIに限定する。schema 2 launcherは固定runtimeの`codex login status`でChatGPT方式を確認し、API Key、未ログイン、不明・失敗、未確認store、固定CLI version不一致を拒否する。`OPENAI_API_KEY` / `CODEX_API_KEY` fallbackとWindows側の認証探索・コピーは禁止する。Agent/Judge/Repairごとに必要な認証fileだけを独立一時`CODEX_HOME`へ複製する。過去の合成検証でshellからcredential markerを読めたため、認証方式の限定後も`authentication_shell_visible_risk=true`を維持し、実モデル利用は隔離残留リスク・ChatGPT利用枠・別途の明示承認を確認するまで開始しない。
 - isolation evidenceはEvaluator revision、固定CLI/bwrap packageとbinary digest、profile、mode、実効argv、mount/network構成、probe versionに結び付ける。どれかの必須検査が欠落・不一致なら`isolation_unverified`としてlive評価を拒否する。旧Docker evidenceは新方式の証拠として再利用しない。
 
+## 2026-10-26 認証・隔離の安全停止追記
+
+fixed Codex CLI `0.163.0`のrefresh storage保存だけでは、attempt copy後の更新喪失、非協調processとの競合、inner shellからのauth marker可視性を解決しない。合成fake child testで現行copy/delete方式のattempt間更新喪失を再現し、formal smokeにAgent/Judge/Repair別のsynthetic auth marker negative checksを追加した。既存15 checksに認証可視性checkを加えた16項目すべてをfresh evidenceに要求する。
+
+可視性と競合を解決する安全な方式は未確定のため、launcherは`authentication_shell_visible_risk=true`の間、全modeでauth確認・copy・Codex起動前にfail-closedする。ChatGPT login限定、API Key fallback禁止、二重bubblewrap、既存評価契約は維持する。TC-OUT-001や他の実モデル通信は停止条件が解消されるまで開始しない。fresh formal evidenceの通常WSL2実行条件は[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)と[Agent README](../../scripts/skills/evals/agent/README.md)を参照する。
+
 ## 基準
 
 - 対象リポジトリ: `ryu-yoshikawa-pro-vision/qa-workflow-skills`

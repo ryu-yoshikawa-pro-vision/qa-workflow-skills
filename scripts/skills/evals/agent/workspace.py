@@ -320,6 +320,7 @@ def verify_profile_evidence(
     mode_evidence = evidence.get("mode_evidence")
     required = {
         "evaluator_read_denied",
+        "authentication_shell_read_denied",
         "host_home_read_denied",
         "other_attempt_home_read_denied",
         "windows_filesystem_read_denied",
