@@ -76,7 +76,11 @@ def _question_hash(question: dict) -> str:
         )
     }
     canonical = json.dumps(
-        relevant, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+        relevant,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 
@@ -153,7 +157,9 @@ def build(form: dict) -> str:
             for question in form["questions"]
         ],
     }
-    payload = json.dumps(embedded, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    payload = json.dumps(
+        embedded, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    )
     for old, new in (
         ("<", r"\u003c"),
         (">", r"\u003e"),
