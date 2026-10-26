@@ -39,14 +39,41 @@ PROTOCOL = "codex_wsl2_bwrap_launcher_v1"
 RUNTIME_ENV = "QAEVAL_CODEX_RUNTIME_ROOT"
 CODEX_HOME_PREFIX = ".qa-codex-home-"
 AUTH_STATUS_TIMEOUT_SECONDS = 15
-# Keep live execution disabled until synthetic-marker tests prove the Agent
-# shell cannot read the authentication store.
-AUTHENTICATION_SHELL_VISIBLE_RISK = True
+# Named Codex permission profiles deny the authentication file in the inner
+# sandbox while preserving the outer mode-specific filesystem boundary.
+AUTHENTICATION_SHELL_VISIBLE_RISK = False
+# The attempt-local auth copy still loses a Codex refresh, and Codex's file and
+# keyring stores do not coordinate refreshes across independent processes.
+AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED = True
+AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED = True
 _SAFE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
+_PERMISSION_PROFILE_BY_MODE = {
+    "agent": "qa_eval_agent",
+    "judge": "qa_eval_judge",
+    "repair": "qa_eval_repair",
+}
 
 
 class CodexWsl2LauncherError(RuntimeError):
     pass
+
+
+def _permission_profile_for_mode(mode: str) -> str:
+    try:
+        return _PERMISSION_PROFILE_BY_MODE[mode]
+    except KeyError:
+        raise CodexWsl2LauncherError("execution mode is invalid") from None
+
+
+def _authentication_execution_blockers() -> list[str]:
+    blockers: list[str] = []
+    if AUTHENTICATION_SHELL_VISIBLE_RISK:
+        blockers.append("authentication_shell_visible_risk")
+    if AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED:
+        blockers.append("authentication_refresh_persistence_unresolved")
+    if AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED:
+        blockers.append("authentication_process_concurrency_unresolved")
+    return blockers
 
 
 def _sha256(path: Path) -> str:
@@ -533,7 +560,9 @@ def _outer_argv(
             else []
         ),
         "inner_sandbox_argv": list(codex_argv) if outer_binary is None else None,
-        "outer_diagnostic_argv": list(codex_argv) if outer_binary is not None else None,
+        "outer_diagnostic_argv_fingerprint": (
+            _fingerprint(list(codex_argv)) if outer_binary is not None else None
+        ),
         "outer_program": executable,
         "codex_path": codex,
         "codex_home_fingerprint": _fingerprint({"temporary_home": str(codex_home)}),
@@ -550,15 +579,18 @@ def sandbox_smoke(
     skill_root: Path | None = None,
     skill_name: str | None = None,
     runtime_root: Path | None = None,
-    permission_profile: str = ":read-only",
+    permission_profile: str | None = None,
 ) -> dict[str, Any]:
     """Run the pinned Codex sandbox without a prompt, credentials, or model API."""
-    if permission_profile not in {":read-only", ":workspace"}:
-        raise CodexWsl2LauncherError("sandbox smoke profile is not allowed")
     if mode not in {"agent", "judge", "repair"}:
         raise CodexWsl2LauncherError("sandbox smoke mode is invalid")
-    if mode == "judge" and permission_profile != ":read-only":
-        raise CodexWsl2LauncherError("Judge smoke must use the read-only profile")
+    expected_permission_profile = _permission_profile_for_mode(mode)
+    if (
+        permission_profile is not None
+        and permission_profile != expected_permission_profile
+    ):
+        raise CodexWsl2LauncherError("sandbox smoke profile does not match its mode")
+    permission_profile = expected_permission_profile
     if workspace_root is not None:
         escape = workspace_root / "synthetic-escape"
         if escape.exists() or escape.is_symlink():
@@ -628,6 +660,7 @@ def sandbox_smoke(
             auth=auth_file,
             skill_name=skill_name,
         )
+        (home / "auth-alias.json").symlink_to("auth.json")
     except BaseException:
         cleanup_setup_failure()
         raise
@@ -673,7 +706,7 @@ def sandbox_smoke(
     inner_script = r"""import errno,json,os,socket,stat,subprocess,sys,threading
 mode,outer_ns_json,host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path,auth_store_path,auth_host_path,other_auth_path = sys.argv[1:11]
 outer_ns=json.loads(outer_ns_json)
-r={"mode":mode,"pid":os.getpid(),"procfs":os.path.ismount("/proc"),"namespaces":{},"nested_namespaces":{},"paths":{},"fd_marker_absent":True,"authentication_store_read_denied":None,"authentication_store_host_path_hidden":None,"other_attempt_auth_store_hidden":None,"authentication_marker_absent_from_environment":None,"authentication_marker_absent_from_process_fds":None,"source_write_denied":None,"output_write_allowed":None,"repair_skill_write_allowed":None,"network":{}}
+r={"mode":mode,"pid":os.getpid(),"procfs":os.path.ismount("/proc"),"namespaces":{},"nested_namespaces":{},"paths":{},"fd_marker_absent":True,"authentication_store_read_denied":None,"authentication_store_symlink_read_denied":None,"authentication_store_proc_root_read_denied":None,"authentication_store_proc1_root_read_denied":None,"authentication_store_host_path_hidden":None,"other_attempt_auth_store_hidden":None,"authentication_marker_absent_from_environment":None,"authentication_marker_absent_from_process_fds":None,"source_write_denied":None,"output_write_allowed":None,"repair_skill_write_allowed":None,"network":{}}
 def read_denied(path):
  try:
   with open(path,"rb") as auth_store: auth_store.read(1)
@@ -681,11 +714,22 @@ def read_denied(path):
  except OSError:
   return True
 r["authentication_store_read_denied"]=read_denied(auth_store_path)
+r["authentication_store_symlink_read_denied"]=read_denied("/codex-home/auth-alias.json")
+r["authentication_store_proc_root_read_denied"]=read_denied("/proc/self/root/codex-home/auth.json")
+r["authentication_store_proc1_root_read_denied"]=read_denied("/proc/1/root/codex-home/auth.json")
 r["authentication_store_host_path_hidden"]=read_denied(auth_host_path)
 r["other_attempt_auth_store_hidden"]=read_denied(other_auth_path)
 marker=b"SYNTHETIC_AUTH_MARKER"
-r["authentication_marker_absent_from_environment"]=all(marker not in value.encode(errors="replace") for value in os.environ.values())
-auth_targets={auth_store_path,auth_host_path,auth_host_path+" (deleted)",other_auth_path,other_auth_path+" (deleted)"}
+environment_marker_visible=False
+try:
+ for process in os.listdir("/proc"):
+  if not process.isdigit(): continue
+  try:
+   if marker in open("/proc/"+process+"/environ","rb").read(): environment_marker_visible=True
+  except OSError: pass
+except OSError: pass
+r["authentication_marker_absent_from_environment"]=not environment_marker_visible
+auth_targets={auth_store_path,"/codex-home/auth-alias.json",auth_host_path,auth_host_path+" (deleted)",other_auth_path,other_auth_path+" (deleted)"}
 auth_fd_visible=False
 try:
  for process in os.listdir("/proc"):
@@ -763,6 +807,10 @@ print(json.dumps(r,separators=(",",":")))
 codex,host_ns_json,inner_script,host_sentinel,fd_marker,mode,evaluator_root,other_home,unix_socket_path,auth_host_path,other_auth_path=sys.argv[1:12]
 host=json.loads(host_ns_json)
 outer={"pid":os.getpid(),"uid":os.getuid(),"gid":os.getgid(),"uid_map":open("/proc/self/uid_map").read().strip(),"gid_map":open("/proc/self/gid_map").read().strip(),"procfs":os.path.ismount("/proc"),"namespaces":{},"paths":{}}
+try:
+ with open("/codex-home/auth.json","rb") as auth_store: auth_store.read(1)
+ outer["codex_home_readable_by_outer_process"]=True
+except OSError:outer["codex_home_readable_by_outer_process"]=False
 for name in ("user","pid","mnt","net","ipc","uts"):
  try:outer["namespaces"][name]=os.readlink("/proc/self/ns/"+name)
  except OSError:outer["namespaces"][name]=None
@@ -776,12 +824,13 @@ except OSError:outer["paths"]["evaluator_sentinel_absent"]=True
 try:os.stat(evaluator_root); outer["paths"]["evaluator_checkout_absent"]=False
 except OSError:outer["paths"]["evaluator_checkout_absent"]=True
 outer["network_parent_in_host_namespace"]=outer["namespaces"].get("net")==host.get("net")
-profile_args=["--permission-profile",":read-only"] if mode=="judge" else ["--config",'sandbox_mode="workspace-write"']
+profile_args=["--permission-profile",{"agent":"qa_eval_agent","judge":"qa_eval_judge","repair":"qa_eval_repair"}[mode],"--config",'default_permissions="'+{"agent":"qa_eval_agent","judge":"qa_eval_judge","repair":"qa_eval_repair"}[mode]+'"']
 smoke=subprocess.run([codex,"sandbox","--permission-profile",":read-only","--","/bin/echo","sandbox-ok"],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
+invalid_profile=subprocess.run([codex,"sandbox","--permission-profile","qa_eval_unapproved","--","/bin/true"],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
 probe=subprocess.run([codex,"sandbox",*profile_args,"--","/usr/bin/python3","-I","-S","-c",inner_script,mode,json.dumps(outer["namespaces"],separators=(",",":")),host_sentinel,fd_marker,evaluator_root,other_home,unix_socket_path,"/codex-home/auth.json",auth_host_path,other_auth_path],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,check=False,close_fds=True)
 try:inner=json.loads(probe.stdout.decode("utf-8",errors="strict").splitlines()[-1])
 except (UnicodeDecodeError,ValueError,IndexError):inner={"parse_error":True}
-result={"smoke_exit_code":smoke.returncode,"smoke_stdout":smoke.stdout.decode("utf-8",errors="replace").strip()[:1000],"smoke_stderr":smoke.stderr.decode("utf-8",errors="replace")[:1000],"probe_exit_code":probe.returncode,"probe_stdout":probe.stdout.decode("utf-8",errors="replace")[-4000:],"probe_stderr":probe.stderr.decode("utf-8",errors="replace")[:1000],"outer":outer,"inner":inner}
+result={"smoke_exit_code":smoke.returncode,"smoke_stdout":smoke.stdout.decode("utf-8",errors="replace").strip()[:1000],"smoke_stderr":smoke.stderr.decode("utf-8",errors="replace")[:1000],"invalid_profile_exit_code":invalid_profile.returncode,"invalid_profile_rejected":invalid_profile.returncode != 0 and b"undefined profile" in invalid_profile.stderr,"probe_exit_code":probe.returncode,"probe_stdout":probe.stdout.decode("utf-8",errors="replace")[-4000:],"probe_stderr":probe.stderr.decode("utf-8",errors="replace")[:1000],"outer":outer,"inner":inner}
 print(json.dumps(result,separators=(",",":")))
 """
     host_ns_json = json.dumps(host_namespaces, separators=(",", ":"))
@@ -886,6 +935,10 @@ print(json.dumps(result,separators=(",",":")))
         checks = {
             "inner_smoke": result.get("smoke_exit_code") == 0
             and result.get("smoke_stdout") == "sandbox-ok",
+            "unknown_permission_profile_rejected": result.get(
+                "invalid_profile_rejected"
+            )
+            is True,
             "outer_procfs": outer.get("procfs") is True,
             "inner_procfs": inner.get("procfs") is True,
             "outer_host_paths_hidden": all(
@@ -923,7 +976,14 @@ print(json.dumps(result,separators=(",",":")))
             "authentication_store_read_denied": inner.get(
                 "authentication_store_read_denied"
             )
-            is True,
+            is True
+            and outer.get("codex_home_readable_by_outer_process") is True,
+            "authentication_store_aliases_denied": inner.get(
+                "authentication_store_symlink_read_denied"
+            )
+            is True
+            and inner.get("authentication_store_proc_root_read_denied") is True
+            and inner.get("authentication_store_proc1_root_read_denied") is True,
             "authentication_store_host_path_hidden": inner.get(
                 "authentication_store_host_path_hidden"
             )
@@ -1264,25 +1324,32 @@ def _prepare_codex_home(
     if mode == "repair":
         if skill_name is None or not _SAFE_NAME_RE.fullmatch(skill_name):
             raise CodexWsl2LauncherError("repair Codex home requires one fixed Skill")
-        writable_roots = [f"/workspace/.agents/skills/{skill_name}"]
     elif skill_name is not None:
         raise CodexWsl2LauncherError("only Repair may add a writable Skill root")
-    else:
-        writable_roots = []
+    permission_profile = _permission_profile_for_mode(mode)
     path.mkdir(mode=0o700)
     try:
         os.chmod(path, 0o700)
         config = (
             'approval_policy = "never"\n'
-            f'sandbox_mode = "{"read-only" if mode == "judge" else "workspace-write"}"\n'
+            f"default_permissions = {json.dumps(permission_profile)}\n"
             'web_search = "disabled"\n'
             f"model_reasoning_effort = {json.dumps(reasoning_effort)}\n"
-            "[sandbox_workspace_write]\n"
-            "network_access = false\n"
-            f"writable_roots = {json.dumps(writable_roots)}\n"
-            "[features]\n"
-            f"shell_tool = {'false' if mode == 'judge' else 'true'}\n"
-            "code_mode = false\n"
+            f"[permissions.{permission_profile}]\n"
+            f'extends = "{":read-only" if mode == "judge" else ":workspace"}"\n'
+            f"[permissions.{permission_profile}.network]\n"
+            "enabled = false\n"
+            f"[permissions.{permission_profile}.filesystem]\n"
+            '"/codex-home/auth.json" = "deny"\n'
+            + (
+                "[permissions.qa_eval_repair.workspace_roots]\n"
+                f'"/workspace/.agents/skills/{skill_name}" = true\n'
+                if mode == "repair"
+                else ""
+            )
+            + "[features]\n"
+            + f"shell_tool = {'false' if mode == 'judge' else 'true'}\n"
+            + "code_mode = false\n"
         )
         config_path = path / "config.toml"
         config_path.write_text(config, encoding="utf-8")
@@ -1384,6 +1451,12 @@ def _codex_exec_argv(
     sandbox_policy: str,
     output_message_path: str,
 ) -> list[str]:
+    expected_sandbox_policy = "read-only" if mode == "judge" else "workspace-write"
+    if (
+        mode not in _PERMISSION_PROFILE_BY_MODE
+        or sandbox_policy != expected_sandbox_policy
+    ):
+        raise CodexWsl2LauncherError("Codex sandbox policy does not match its mode")
     command = [
         "--no-daemon",
         "--strict-config",
@@ -1393,8 +1466,8 @@ def _codex_exec_argv(
         "--json",
         "--model",
         model,
-        "--sandbox",
-        sandbox_policy,
+        "--config",
+        f"default_permissions={json.dumps(_permission_profile_for_mode(mode))}",
         "--config",
         f"model_reasoning_effort={json.dumps(reasoning_effort)}",
         "--config",
@@ -1469,17 +1542,30 @@ def launch(
         raise CodexWsl2LauncherError("output root must be a regular directory")
     if observations_path.is_symlink():
         raise CodexWsl2LauncherError("observations path may not be a symlink")
-    if AUTHENTICATION_SHELL_VISIBLE_RISK:
+    blockers = _authentication_execution_blockers()
+    if blockers:
+        error = (
+            "authentication_shell_visible_risk"
+            if AUTHENTICATION_SHELL_VISIBLE_RISK
+            else "authentication_execution_safety_unresolved"
+        )
         _write_observations(
             observations_path,
             {
                 "protocol": PROTOCOL,
                 "status": "execution_error",
-                "error": "authentication_shell_visible_risk",
+                "error": error,
                 "authentication_method": "not_checked",
                 "authentication_check_status": "blocked",
                 "codex_cli_version": "0.163.0",
-                "authentication_shell_visible_risk": True,
+                "authentication_shell_visible_risk": AUTHENTICATION_SHELL_VISIBLE_RISK,
+                "authentication_refresh_persistence_unresolved": (
+                    AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED
+                ),
+                "authentication_process_concurrency_unresolved": (
+                    AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED
+                ),
+                "authentication_execution_blockers": blockers,
                 "mode": mode,
             },
         )
@@ -1575,7 +1661,13 @@ def launch(
             "isolated_tmpfs" if mode == "judge" else "pending"
         ),
         "codex_home_cleanup_status": "pending",
-        "authentication_shell_visible_risk": True,
+        "authentication_shell_visible_risk": AUTHENTICATION_SHELL_VISIBLE_RISK,
+        "authentication_refresh_persistence_unresolved": (
+            AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED
+        ),
+        "authentication_process_concurrency_unresolved": (
+            AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED
+        ),
         "web_search_enabled": False,
         "tool_policy": "no_cli_tools_or_mcp_configured",
         "sandbox_policy": sandbox_policy,
@@ -1715,9 +1807,10 @@ def _sanitize(value: str) -> str:
     try:
         from scripts.skills.evals.agent.common import sanitize_diagnostic
 
-        return sanitize_diagnostic(value, 2_000_000)
+        sanitized = sanitize_diagnostic(value, 2_000_000)
     except (ImportError, ValueError):
-        return value[:2_000_000]
+        sanitized = value[:2_000_000]
+    return sanitized.replace("SYNTHETIC_AUTH_MARKER", "<synthetic-marker-redacted>")
 
 
 def _summarize_jsonl(data: bytes) -> tuple[dict[str, Any], str]:

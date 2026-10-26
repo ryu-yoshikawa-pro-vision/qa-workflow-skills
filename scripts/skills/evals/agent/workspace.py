@@ -384,6 +384,14 @@ def verify_profile_evidence(
         or evidence.get("runtime", {}).get("package_version") != "0.163.0-linux-x64"
         or not isinstance(evidence.get("details"), dict)
         or evidence.get("details", {}).get("authentication_shell_visible_risk")
+        is not False
+        or evidence.get("details", {}).get(
+            "authentication_refresh_persistence_unresolved"
+        )
+        is not True
+        or evidence.get("details", {}).get(
+            "authentication_process_concurrency_unresolved"
+        )
         is not True
         or evidence.get("details", {}).get("model_api_used") is not False
     ):

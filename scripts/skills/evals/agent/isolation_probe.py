@@ -466,6 +466,8 @@ def probe_wsl2_isolation(
         "protocol": WSL2_LAUNCHER_PROTOCOL,
         "model_api_used": False,
         "authentication_shell_visible_risk": True,
+        "authentication_refresh_persistence_unresolved": True,
+        "authentication_process_concurrency_unresolved": True,
     }
     mode_evidence: dict[str, Any] = {}
     timeout_evidence: dict[str, Any] = {}
@@ -525,13 +527,15 @@ def probe_wsl2_isolation(
                     "output_root": output,
                     "skill_root": skill_root,
                     "skill_name": skill_name,
-                    "permission_profile": ":workspace",
+                    "permission_profile": "qa_eval_agent"
+                    if mode == "agent"
+                    else "qa_eval_repair",
                 }
             smoke_specs["judge"] = {
                 "mode": "judge",
                 "workspace_root": None,
                 "output_root": None,
-                "permission_profile": ":read-only",
+                "permission_profile": "qa_eval_judge",
             }
             with ThreadPoolExecutor(max_workers=3) as pool:
                 futures = {
@@ -585,6 +589,7 @@ def probe_wsl2_isolation(
                         c.get(check) is True
                         for check in (
                             "authentication_store_read_denied",
+                            "authentication_store_aliases_denied",
                             "authentication_store_host_path_hidden",
                             "other_attempt_auth_store_hidden",
                             "authentication_marker_absent_from_environment",
@@ -723,6 +728,9 @@ def probe_wsl2_isolation(
         )
         details.update(
             {
+                "authentication_shell_visible_risk": not checks[
+                    "authentication_shell_read_denied"
+                ],
                 "agent_contract": agent_contract,
                 "judge_contract": judge_contract,
                 "mode_evidence": mode_evidence,

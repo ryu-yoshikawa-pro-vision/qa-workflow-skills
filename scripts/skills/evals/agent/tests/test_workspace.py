@@ -216,7 +216,9 @@ class WorkspaceIsolationTests(unittest.TestCase):
                     for mode in ("agent", "judge", "repair")
                 },
                 "details": {
-                    "authentication_shell_visible_risk": True,
+                    "authentication_shell_visible_risk": False,
+                    "authentication_refresh_persistence_unresolved": True,
+                    "authentication_process_concurrency_unresolved": True,
                     "model_api_used": False,
                 },
                 "checks": {key: True for key in required_checks},
@@ -234,6 +236,24 @@ class WorkspaceIsolationTests(unittest.TestCase):
                 )
                 bad_evidence = json.loads(json.dumps(evidence))
                 bad_evidence["checks"]["authentication_shell_read_denied"] = False
+                evidence_path.write_text(json.dumps(bad_evidence), encoding="utf-8")
+                with self.assertRaises(AgentEvalError):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+                bad_evidence = json.loads(json.dumps(evidence))
+                bad_evidence["details"]["authentication_shell_visible_risk"] = True
+                evidence_path.write_text(json.dumps(bad_evidence), encoding="utf-8")
+                with self.assertRaises(AgentEvalError):
+                    verify_profile_evidence(
+                        profile, root, agent_command_argv=agent_command
+                    )
+                evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+                bad_evidence = json.loads(json.dumps(evidence))
+                bad_evidence["details"][
+                    "authentication_process_concurrency_unresolved"
+                ] = False
                 evidence_path.write_text(json.dumps(bad_evidence), encoding="utf-8")
                 with self.assertRaises(AgentEvalError):
                     verify_profile_evidence(

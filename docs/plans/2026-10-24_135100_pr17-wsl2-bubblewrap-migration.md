@@ -10,6 +10,27 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 後続の明示依頼により、schema 2 launcherの認証をChatGPT loginだけに限定し、固定Codex CLIの`codex login status`で状態を確認する変更を追加する。この追加指示は本Planの「認証全面変更を含まない」という除外を、ChatGPT方式確認とAPI Key fallback廃止の範囲だけ上書きする。ログイン操作、認証情報の移動・復元、実モデル/API呼び出しは許可しない。ChatGPT loginでもCodex shellから認証fileが見える残留リスクは維持し、`authentication_shell_visible_risk=true`を変更しない。
 
+## 2026-10-26 固定CLI permissions profileによるshell read拒否
+
+固定Codex CLI rust-v0.163.0のsourceを確認し、従来の「shellから認証fileが見えるリスク」は、内側Codex sandboxのnamed permissions profileに対する合成実測で見直す。permissions.<profile>.extendsは親builtin profileを先に解決し、child設定をmergeする。Agent/Repairは:workspace、Judgeは:read-onlyを親にし、3 modeともfilesystem."/codex-home/auth.json" = "deny"、network.enabled = falseとする。Repairだけ対象Skillをworkspace rootに追加し、外側bubblewrapのwrite mountも従来どおり当該Skillへ限定する。[profile resolver](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/config/src/permissions_toml.rs)、[permission compilation](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/config/permissions.rs)、[Linux bwrap deny masks](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/src/bwrap.rs)を根拠とする。
+
+固定CLIは--sandbox workspace-writeまたはread-onlyを渡すとlegacy sandbox modeを構成し、named default_permissions profileを使わない。このため本番argvから--sandboxを外し、一時CODEX_HOME/config.tomlと--config default_permissions="qa_eval_<mode>"で同じmode profileを選択する。Agent/Repairのworkspace-write、Judgeのread-only、inner shell network拒否を維持する。合成smokeはstore path、symlink alias、/proc/self/root、/proc/1/root、host path、他attempt path、environment、process FDからのread拒否をmodeごとに検査し、親process側のstore read可否も確認する。[fixed CLI permissions](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/config/permissions.rs)と[fixed bwrap](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/src/bwrap.rs)を参照する。
+
+2026-10-26の通常WSL2 host上のformal launcher integration testはAgent/Judge/RepairすべてでPASSした。これは合成markerとlauncher smokeの証拠であり、commit済みclean HEADに対するfresh schema 2 full probe、実認証file、Codex親processの実モデル通信まで証明するものではない。full probeでは16 checksすべてtrue、全mode verified、revision/profile/command/runtime fingerprint一致、model_api_used=falseを別途確認する。auth read拒否testが失敗・未実行ならauthentication_shell_visible_risk=trueを維持する。
+
+### 認証storage modeの比較と未解決条件
+
+固定CLIの[storage.rs](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)および[manager.rs](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)の契約は次のとおり。
+
+| Mode      | Refresh後の永続性                                  | auto fallback                             | process競合とshell境界                                                                                                   | 判定                                                           |
+| --------- | -------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| file      | 選択中のCODEX_HOME/auth.jsonへtruncate/write/flush | なし                                      | process間lock・atomic replaceなし。同じOS userのprocessからstoreを隔離しない                                             | attempt copyでは更新がcleanupで失われる。永続store単独も不採用 |
+| keyring   | keyring backendへ保存。CODEX_HOME由来keyで識別     | なし                                      | refresh全体のprocess間lockなし。同一OS identityからのkeyring利用も分離しない。WSL outer mount内でのbackend可用性は未確認 | 直接file fallbackは避けるが競合を解決しないため不採用          |
+| auto      | keyring成功時はkeyringへ保存                       | keyring load/save error時にfileへfallback | file fallbackでは平文storeと同じ可視性・競合条件                                                                         | fail-closed storeとして不適合                                  |
+| ephemeral | process内memory store                              | なし                                      | Codex process終了後の次attemptへ残らない                                                                                 | 更新永続化要件に不適合                                         |
+
+現行launcherはattempt-local auth.json copyを削除するため、Codex refreshがcopyを書き換えても次attemptへ反映しない。固定CLIのrefresh mutexは同じAuthManager内だけで、別attempt・runner外Codex processと共有されない。したがってnamed profileでshell read-denyを実証しても、refresh persistenceと非協調process競合は未解決であり、production launcherは全Agent/Judge/Repairをfail-closedにする。専用永続CODEX_HOMEだけでは競合を排除できない。全ての利用processを制御する専用OS identity、Codex公式のprocess横断排他、または別の認証brokerが必要になるが、OS user/brokerは管理者権限やPlan対象外の運用設計を要するため今回追加しない。
+
 ## 2026-10-25 refresh token調査の追記
 
 現行経路は元storeの`auth.json`をattempt専用`CODEX_HOME`へ複製し、Codex終了時にその一時`CODEX_HOME`を削除する。固定CLI `0.163.0`はrefreshに成功すると選択中のauth storageへtokenを書き戻すため、一時storeでrefreshした結果は次attemptまで残らない可能性がある。次attemptが失効済みの元tokenを再利用し、`refresh_token_reused`になる筋道はあるが、過去の失敗記録を確認できていないため直接原因とは確定しない。
@@ -30,7 +51,7 @@ formal probeは次の条件を満たしたclean evaluator revision上で改め�
 - schema 2 profileは最終run条件に一致させ、AgentはCodex CLI `0.163.0`、`gpt-6-luna`、reasoning `max`、timeout 900秒、`workspace-write`、shellのみ、MCPなしを指定する。Judge configも必須で、`command_argv=["codex"]`、sandbox `read-only`。deterministic runのJudge disabledは保持するが、probeは隔離確認用のJudge sandbox smokeも実行する。
 - agent command JSONは`["codex"]`のみ。これはtemplate fingerprint用で、本番`codex exec`やモデル通信を起動する引数ではない。
 - `QAEVAL_CODEX_RUNTIME_ROOT=/home/sella/.cache/qa-workflow-skills/pr17-wsl2-migration-20261024-a/runtime-final`を指定し、Codex package/CLI/bundled bwrap digestとversionを現行launcherで再照合する。
-- profileは`verification.evidence_path="isolation.json"`とし、fresh run IDのoutput rootをprobeと後続runで共用する。従来の15件と合成auth marker可視性checkを加えた16 required checks全てtrue、Agent/Judge/Repair mode evidence verified、profile/command/runtime fingerprint一致を確認する。`model_api_used=false`、`authentication_shell_visible_risk=true`を維持する。
+- profileは`verification.evidence_path="isolation.json"`とし、fresh run IDのoutput rootをprobeと後続runで共用する。従来の15件と合成auth marker可視性checkを加えた16 required checks全てtrue、Agent/Judge/Repair mode evidence verified、profile/command/runtime fingerprint一致を確認する。`model_api_used=false`を必須とし、全auth read-deny check成功時のみ`authentication_shell_visible_risk=false`とする。失敗または未実行ならtrueを維持する。refresh persistenceとprocess concurrency unresolved flagsは別にtrueであり、production実行を拒否する。
 - Probeはfixed runtimeの`codex sandbox` smokeとsynthetic filesystem/network sentinelを使う。実auth fileは渡さず、markerだけを持つ合成`auth.json`でinner shellのread拒否を検査する。login status、refresh、`codex exec`、モデルAPIは呼ばない。
 
 通常WSL2でのdeterministic suite、launcher integration、host AF_UNIX bindの個別コマンド、およびfresh evidenceコマンド例はAgent READMEの「WSL2通常ターミナルでの検証とfresh evidence」に記録する。

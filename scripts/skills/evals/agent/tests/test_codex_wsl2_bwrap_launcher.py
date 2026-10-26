@@ -9,6 +9,7 @@ import os
 import platform
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -122,6 +123,16 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     ),
                     patch.object(
                         codex_wsl2_bwrap_launcher,
+                        "AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED",
+                        False,
+                    ),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
+                        "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                        False,
+                    ),
+                    patch.object(
+                        codex_wsl2_bwrap_launcher,
                         "verify_runtime",
                         return_value={
                             "runtime": "synthetic",
@@ -231,7 +242,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 )
                 self.assertNotIn(secret.encode("utf-8"), persisted)
 
-    def test_launch_fails_closed_for_unresolved_auth_shell_visibility(self) -> None:
+    def test_launch_fails_closed_for_unresolved_auth_state_safety(self) -> None:
         marker = "SYNTHETIC_AUTH_VISIBILITY_MARKER"
         for mode in ("agent", "judge", "repair"):
             with (
@@ -285,11 +296,24 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 self.assertEqual(exit_code, 2)
                 self.assertEqual(observations["status"], "execution_error")
                 self.assertEqual(
-                    observations["error"], "authentication_shell_visible_risk"
+                    observations["error"], "authentication_execution_safety_unresolved"
                 )
                 self.assertEqual(observations["authentication_method"], "not_checked")
                 self.assertEqual(observations["authentication_check_status"], "blocked")
-                self.assertTrue(observations["authentication_shell_visible_risk"])
+                self.assertFalse(observations["authentication_shell_visible_risk"])
+                self.assertTrue(
+                    observations["authentication_refresh_persistence_unresolved"]
+                )
+                self.assertTrue(
+                    observations["authentication_process_concurrency_unresolved"]
+                )
+                self.assertEqual(
+                    observations["authentication_execution_blockers"],
+                    [
+                        "authentication_refresh_persistence_unresolved",
+                        "authentication_process_concurrency_unresolved",
+                    ],
+                )
                 self.assertEqual(observations["mode"], mode)
                 self.assertNotIn(marker, observations_path.read_text(encoding="utf-8"))
                 self.assertFalse(codex_home.exists())
@@ -562,6 +586,16 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 ),
                 patch.object(
                     codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
                     "verify_runtime",
                     return_value={"runtime": "synthetic"},
                 ),
@@ -645,8 +679,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     else "/workspace/.qa-eval-output/final.md",
                 )
                 self.assertEqual(command[:2], ["--no-daemon", "--strict-config"])
+                profile = f"qa_eval_{mode}"
+                self.assertNotIn("--sandbox", command)
                 self.assertEqual(
-                    command[command.index("--sandbox") + 1], sandbox_policy
+                    command[command.index("--config") + 1],
+                    f'default_permissions="{profile}"',
                 )
                 self.assertEqual(
                     command[command.index("--cd") + 1],
@@ -670,6 +707,61 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 self.assertNotIn("--mcp-config", command)
                 self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
                 self.assertNotIn("--yolo", command)
+
+    def test_named_permission_profiles_deny_auth_without_changing_mode_rights(
+        self,
+    ) -> None:
+        for mode in ("agent", "judge", "repair"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                home_parent = root / "homes"
+                home_parent.mkdir(mode=0o700)
+                home = home_parent / f"{CODEX_HOME_PREFIX}{mode}-profile"
+                skill_name = "synthetic-skill" if mode == "repair" else None
+                _prepare_codex_home(
+                    home,
+                    mode=mode,
+                    reasoning_effort="max",
+                    auth=None,
+                    skill_name=skill_name,
+                )
+
+                config_text = (home / "config.toml").read_text(encoding="utf-8")
+                config = tomllib.loads(config_text)
+                profile_name = f"qa_eval_{mode}"
+                profile = config["permissions"][profile_name]
+                self.assertEqual(config["default_permissions"], profile_name)
+                self.assertEqual(
+                    profile["extends"],
+                    ":read-only" if mode == "judge" else ":workspace",
+                )
+                self.assertFalse(profile["network"]["enabled"])
+                self.assertEqual(profile["filesystem"]["/codex-home/auth.json"], "deny")
+                self.assertNotIn("sandbox_mode", config)
+                self.assertNotIn("sandbox_workspace_write", config)
+                self.assertEqual(config["features"]["shell_tool"], mode != "judge")
+                self.assertFalse(config["features"]["code_mode"])
+                if mode == "repair":
+                    self.assertEqual(
+                        profile["workspace_roots"],
+                        {"/workspace/.agents/skills/synthetic-skill": True},
+                    )
+                else:
+                    self.assertNotIn("workspace_roots", profile)
+                self.assertNotIn("SYNTHETIC_AUTH_MARKER", config_text)
+                self.assertEqual((home.stat().st_mode & 0o777), 0o700)
+                self.assertEqual((home / "config.toml").stat().st_mode & 0o777, 0o600)
+
+    def test_sandbox_smoke_rejects_builtin_or_cross_mode_permission_profiles(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(CodexWsl2LauncherError, "does not match its mode"):
+            sandbox_smoke(
+                mode="agent",
+                workspace_root=None,
+                output_root=None,
+                permission_profile=":workspace",
+            )
 
     def test_embedded_outer_and_inner_probe_scripts_parse(self) -> None:
         tree = ast.parse(inspect.getsource(sandbox_smoke))
@@ -813,7 +905,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             config = (home / "config.toml").read_text(encoding="utf-8")
             self.assertIn('approval_policy = "never"', config)
             self.assertIn('web_search = "disabled"', config)
-            self.assertIn("writable_roots = []", config)
+            self.assertIn('default_permissions = "qa_eval_agent"', config)
+            self.assertIn('extends = ":workspace"', config)
+            self.assertIn('"/codex-home/auth.json" = "deny"', config)
+            self.assertIn("enabled = false", config)
+            self.assertNotIn("sandbox_mode", config)
             self.assertNotIn("auth.json", {path.name for path in home.iterdir()})
             scratch = Path(str(home) + ".git")
             scratch.mkdir()
@@ -911,9 +1007,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             )
             config = (home / "config.toml").read_text(encoding="utf-8")
             self.assertIn(
-                'writable_roots = ["/workspace/.agents/skills/synthetic-skill"]',
+                '"/workspace/.agents/skills/synthetic-skill" = true',
                 config,
             )
+            self.assertIn('extends = ":workspace"', config)
+            self.assertIn('"/codex-home/auth.json" = "deny"', config)
             cleanup_codex_home(home, allowed_parent=home_parent)
             with self.assertRaises(CodexWsl2LauncherError):
                 _prepare_codex_home(
@@ -967,7 +1065,7 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                         mode="agent",
                         workspace_root=workspace,
                         output_root=output_root,
-                        permission_profile=":workspace",
+                        permission_profile="qa_eval_agent",
                     )
 
             self.assertEqual(list(home_parent.iterdir()), [])
@@ -1033,7 +1131,7 @@ class CodexWsl2LauncherIntegrationTests(unittest.TestCase):
                     output_root=output,
                     skill_root=skill_root,
                     skill_name=skill_name,
-                    permission_profile=":workspace",
+                    permission_profile=f"qa_eval_{mode}",
                 )
                 self.assertTrue(
                     all(result["checks"].values()),
@@ -1053,7 +1151,7 @@ class CodexWsl2LauncherIntegrationTests(unittest.TestCase):
                 mode="judge",
                 workspace_root=None,
                 output_root=None,
-                permission_profile=":read-only",
+                permission_profile="qa_eval_judge",
             )
             self.assertTrue(all(judge["checks"].values()), judge["checks"])
             self.assertEqual(judge["status"], "verified", judge)
