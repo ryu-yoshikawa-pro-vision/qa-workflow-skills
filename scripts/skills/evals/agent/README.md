@@ -6,7 +6,7 @@ Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動し�
 
 ## 2026-10-27 現在の認証・隔離状態
 
-commit `2f997bc55beb90d54b09ae6d8386f3ac78fce59b`に対するfresh schema 2 formal probeで、persistent auth bind後もsynthetic markerのshell読取りが拒否されることを確認しました。16 required checksすべてがtrue、Agent/Judge/Repairが各26/26 subchecksで`verified`、`model_api_used=false`でした。この合成証拠に基づき`authentication_shell_visible_risk=false`とします。証拠は`.agent-eval-runs/pr17-auth-isolation-20261027T0031JST/isolation.json`です。これは実認証fileやrefreshを検証した結果ではありません。次のcommitではclean HEADに対してfresh probeを再実行します。
+commit `079c29ec49c7f074fb16dcbb045f0d89a844226e`に対するfresh schema 2 formal probeで、persistent auth bind後もsynthetic markerのshell読取りが拒否されることを確認しました。16 required checksすべてがtrue、Agent/Judge/Repairが各26/26 subchecksで`verified`、`model_api_used=false`でした。この合成証拠に基づき`authentication_shell_visible_risk=false`とします。証拠は`.agent-eval-runs/pr17-auth-isolation-079c29e-20261026T154336Z/isolation.json`です。これは実認証fileやrefreshを検証した結果ではありません。後続の文書commitではclean HEADに対してfresh probeを再実行します。
 
 固定CLIのfile backendは選択中の`CODEX_HOME/auth.json`をtruncate/write/flushし、process間lockやatomic replacementを持ちません。runnerは専用store、非blocking `flock`、同じ専用UIDで既に動いているprocessの検査、Codex終了後のfile/directory `fsync`、異常終了時に残す不確定状態markerを実装しました。これはrunner内の協調と既存process検出を行うもので、同UIDを任意に使える管理者やrootを制限するものではありません。
 
@@ -170,7 +170,7 @@ python -m scripts.skills.evals.agent.isolation_probe \
 
 launcher unit testは、auth sourceをattempt homeへcopyせずempty mountpointを作ること、Codex CLIが更新する想定の同一persistent pathを次attemptが再利用すること、mode `file`、owner/mode検査、store内容を読まない`fsync`、lock競合、不確定marker、operator loginのfail-closed動作をsyntheticデータで検証します。fake writeはCodex CLI自身のOAuth refreshを証明しません。固定Codex sourceのloopback refresh/persist/reload harnessは実行していません。
 
-fresh formal evidenceではsynthetic markerをpersistent pathから`/codex-home/auth.json`へbindし、Agent/Judge/Repair shellのdirect/alias/proc/host/other-attempt/environment/FD read拒否を検査します。commit `2f997bc55beb90d54b09ae6d8386f3ac78fce59b`のevidenceは16/16 required checksと3 modeすべてverifiedで、`model_api_used=false`でした。現行commit向けevidenceはclean HEADで再生成します。runnerの`flock`は協調process間だけを直列化し、process inventoryは起動前に存在する専用UID processを拒否します。同じUIDを任意に使えるtrusted administrator/rootを制限しないため、OS process-start境界の実環境確認なしにrefresh競合を解決済みとは扱いません。専用account未作成、source harness未実施、管理者境界未検証のため、三modeのproduction launchはfail-closedです。
+fresh formal evidenceではsynthetic markerをpersistent pathから`/codex-home/auth.json`へbindし、Agent/Judge/Repair shellのdirect/alias/proc/host/other-attempt/environment/FD read拒否を検査します。commit `079c29ec49c7f074fb16dcbb045f0d89a844226e`のevidenceは16/16 required checksと3 modeすべてverifiedで、`model_api_used=false`でした。文書更新後の新しいclean HEADに対するevidenceは再生成が必要です。runnerの`flock`は協調process間だけを直列化し、process inventoryは起動前に存在する専用UID processを拒否します。同じUIDを任意に使えるtrusted administrator/rootを制限しないため、OS process-start境界の実環境確認なしにrefresh競合を解決済みとは扱いません。専用account未作成、source harness未実施、管理者境界未検証のため、三modeのproduction launchはfail-closedです。
 
 launcherは既存executor.run_commandを使い、shell=False、固定argv、close_fds=True、未許可pass_fdsなし、stdin/stdout/stderr契約、timeout、POSIX process group cleanup、safe diagnosticsと一時領域cleanupを維持します。失敗時はfail-closedです。
 
