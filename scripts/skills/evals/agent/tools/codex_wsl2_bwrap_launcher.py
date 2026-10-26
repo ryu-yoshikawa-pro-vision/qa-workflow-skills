@@ -46,9 +46,9 @@ AUTH_STATE_RELATIVE = Path(".local/state/qa-workflow-skills")
 AUTH_STORE_LOCK_NAME = "codex-auth.lock"
 AUTH_STATE_UNCERTAIN_NAME = "codex-auth-state-uncertain"
 AUTH_STATUS_TIMEOUT_SECONDS = 15
-# Named Codex permission profiles deny the authentication file in the inner
-# sandbox while preserving the outer mode-specific filesystem boundary.
-AUTHENTICATION_SHELL_VISIBLE_RISK = True
+# The pinned CLI's named profiles deny the persistent authentication file in
+# all three inner sandboxes; the current synthetic formal probe verified this.
+AUTHENTICATION_SHELL_VISIBLE_RISK = False
 # The persistent-store path is implemented, but the dedicated OS identity and
 # its process-start boundary have not been provisioned and verified.
 AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED = True

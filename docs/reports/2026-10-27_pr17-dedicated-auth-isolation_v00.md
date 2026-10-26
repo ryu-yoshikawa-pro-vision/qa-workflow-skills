@@ -4,9 +4,9 @@
 
 2026-10-27 JSTに、PR #17の基準HEAD `0e4722b1603884e30ff590659c03866f7470e5e4`から専用OS identityと永続認証storeを使うfail-closed経路を実装した。PR #17のGitHub stateはopen、base `main`、head `feat/agent-eval-runner`で、確認時のHEADは基準SHAと一致した。この基準HEADの5 GitHub ActionsはすべてSUCCESSだった。
 
-実装treeの単体・repository suiteと固定runtime formal launcher integrationはPASSした。fresh schema 2 isolation evidenceは、この報告を含む変更をcommitしてcleanにした後、`.agent-eval-runs/pr17-auth-isolation-20261027T0031JST/isolation.json`へ新規生成する。以前のHEADの証拠は再利用しない。
+commit `2f997bc55beb90d54b09ae6d8386f3ac78fce59b`のclean treeに対するfresh schema 2 isolation evidenceを`.agent-eval-runs/pr17-auth-isolation-20261027T0031JST/isolation.json`へ生成した。required checksは16/16 true、Agent/Judge/Repair各modeは26/26 subchecksで`verified`、evaluator revision/profile/command/runtime fingerprintが一致し、`model_api_used=false`だった。synthetic markerは各shellから読めず、これを根拠として次の実装commitではshell visibility risk flagをfalseにする。今回の文書・テスト・flag変更を含む後続clean HEADには、この古いevidenceを流用せず、fresh evidenceを別run IDで生成する。
 
-専用OS userは未作成で、Codex source harnessによるrefresh/save/reloadも未実施である。よって認証refresh永続化と非協調process競合の受入条件は未達で、実Agent/Judge/Repairを開始できない。コード上の3つのauthentication unresolved/risk flagはtrueのまま維持する。
+専用OS userは未作成で、Codex source harnessによるrefresh/save/reloadも未実施である。よって認証refresh永続化と非協調process競合の受入条件は未達で、実Agent/Judge/Repairを開始できない。現在、`authentication_shell_visible_risk=false`は上記合成隔離evidenceで検証済みだが、`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`は維持する。
 
 ## 環境と権限
 
@@ -38,22 +38,22 @@ Codex source checkoutおよび`rustc`/`cargo`はこのWSL環境に見つから�
 
 Python 3.11.17、PyYAML 6.0.3、固定Codex CLI 0.163.0/bundled bubblewrap、Ruff 0.16.8、dprint 0.55.2を使用した。launcher integration、Deterministic repository suiteのhost再試験はCodex sandbox外の通常WSL2で実行した。表のほかのsuiteと品質checkはCodex sandbox内で実行した。すべて実認証、token、モデルAPIを使用していない。
 
-| 検証 | 結果 |
-| --- | --- |
-| Launcher auth-focused unit tests | 38 tests、PASS、1 SKIP |
-| Agent suite | 152 tests、PASS、2 SKIP |
-| Agent repository contracts | 4 tests、PASS |
-| Semantic suite | 27 tests、PASS |
-| Semantic repository contracts | 13 tests、PASS |
-| Semantic validator | 22 skills / 163 cases、PASS |
-| Deterministic unit suite | 13 tests、PASS |
-| Deterministic repository suite、通常WSL2 | 293 tests、PASS |
-| Codex Harness、CLI 0.163.0をPATH指定 | 59 tests、PASS、8 SKIP（Windows専用） |
-| Formal launcher integration、固定runtime、通常WSL2 | 1 test、PASS |
-| `compileall -q scripts/skills/evals/agent` | PASS |
-| `format_tracked.py format` | 2 Python files formatted、237 unchanged |
-| `format_tracked.py check` | PASS、Ruff 0.16.8 / dprint 0.55.2、239 tracked files |
-| `git diff --check` | PASS |
+| 検証                                               | 結果                                                 |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| Launcher auth-focused unit tests                   | 38 tests、PASS、1 SKIP                               |
+| Agent suite                                        | 152 tests、PASS、2 SKIP                              |
+| Agent repository contracts                         | 4 tests、PASS                                        |
+| Semantic suite                                     | 27 tests、PASS                                       |
+| Semantic repository contracts                      | 13 tests、PASS                                       |
+| Semantic validator                                 | 22 skills / 163 cases、PASS                          |
+| Deterministic unit suite                           | 13 tests、PASS                                       |
+| Deterministic repository suite、通常WSL2           | 293 tests、PASS                                      |
+| Codex Harness、CLI 0.163.0をPATH指定               | 59 tests、PASS、8 SKIP（Windows専用）                |
+| Formal launcher integration、固定runtime、通常WSL2 | 1 test、PASS                                         |
+| `compileall -q scripts/skills/evals/agent`         | PASS                                                 |
+| `format_tracked.py format`                         | 2 Python files formatted、237 unchanged              |
+| `format_tracked.py check`                          | PASS、Ruff 0.16.8 / dprint 0.55.2、239 tracked files |
+| `git diff --check`                                 | PASS                                                 |
 
 Codex development sandbox内のDeterministic repository suiteは、host localhost socket `EPERM`と権限制約による4 failure / 1 errorだった。同じ293 testsを通常WSL2で再実行し全件PASSした。formal launcher integrationもsandbox内ではAF_UNIX bind `EPERM`、通常WSL2の承認済み実行経路ではPASSした。検証条件やsandboxを緩和していない。
 

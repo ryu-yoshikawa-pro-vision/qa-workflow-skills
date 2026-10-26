@@ -18,7 +18,7 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 実装中の共通launcherは`qa-agent-eval` identity、専用home/`.codex`、`cli_auth_credentials_store="file"`、persistent auth file bind、nonblocking cross-process `flock`、既存same-UID process scanを要求する。Codex起動前にmode 0600のuncertain markerとdirectory entryをsyncし、通常終了、temporary home cleanup、persistent auth fileとdirectoryの`fsync`が成功したときだけmarkerを消す。中断・失敗時はmarkerを残して次回を止める。各attemptのmode config/homeは一時領域で別のまま、inner named profileは`/codex-home/auth.json`をdenyする。
 
-専用accountを作っただけではprocess競合を解消しない。非runner processが同じUIDで既に存在すればscannerが停止する。runner lockは協調processだけを直列化し、trusted root/WSL administratorはfile・process境界を越えられる。専用UIDを任意に使える主体を管理者とrunner/login入口に限定するOS policyはまだ配置されていない。Codex CLI source harnessのsynthetic refresh/persist/reloadも未実施である。したがって`authentication_shell_visible_risk=true`、`authentication_refresh_persistence_unresolved=true`、`authentication_process_concurrency_unresolved=true`を維持し、fresh formal probe・source harness・OS process-start policyの実証までは全Agent/Judge/Repairをfail-closedにする。
+専用accountを作っただけではprocess競合を解消しない。非runner processが同じUIDで既に存在すればscannerが停止する。runner lockは協調processだけを直列化し、trusted root/WSL administratorはfile・process境界を越えられる。専用UIDを任意に使える主体を管理者とrunner/login入口に限定するOS policyはまだ配置されていない。Codex CLI source harnessのsynthetic refresh/persist/reloadも未実施である。commit `2f997bc55beb90d54b09ae6d8386f3ac78fce59b`に対するfresh formal probeではsynthetic auth markerのshell read-denyを16/16 checks、Agent/Judge/Repair全mode verifiedで確認したため、`authentication_shell_visible_risk=false`とする。refresh永続化とprocess競合は引き続き未解決で、`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`を維持し、production launchをfail-closedにする。
 
 ## 2026-10-24 ChatGPT認証限定の追加指示
 

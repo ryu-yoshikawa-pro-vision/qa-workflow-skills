@@ -338,11 +338,12 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 self.assertEqual(exit_code, 2)
                 self.assertEqual(observations["status"], "execution_error")
                 self.assertEqual(
-                    observations["error"], "authentication_shell_visible_risk"
+                    observations["error"],
+                    "authentication_execution_safety_unresolved",
                 )
                 self.assertEqual(observations["authentication_method"], "not_checked")
                 self.assertEqual(observations["authentication_check_status"], "blocked")
-                self.assertTrue(observations["authentication_shell_visible_risk"])
+                self.assertFalse(observations["authentication_shell_visible_risk"])
                 self.assertTrue(
                     observations["authentication_refresh_persistence_unresolved"]
                 )
@@ -352,7 +353,6 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 self.assertEqual(
                     observations["authentication_execution_blockers"],
                     [
-                        "authentication_shell_visible_risk",
                         "authentication_refresh_persistence_unresolved",
                         "authentication_process_concurrency_unresolved",
                     ],
