@@ -6,11 +6,19 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 このPlanは利用者が2026-10-24に承認した実行方式変更を具体化する。実認証・モデルAPI利用、Judge fixture承認、候補Skill自動採用、merge、closeは含まない。
 
-## 2026-10-26 現在状態
+## 2026-10-26時点の状態（履歴）
 
 最新の検証対象HEADは`a960f8728bb2e2c14e282d639170ffed6af11e9a`です。このHEADのfresh schema 2 probeは16/16 required checks true、Agent/Judge/Repairの各mode verified、profile・command・runtime fingerprint一致、`model_api_used=false`でした。synthetic auth markerのread拒否は正式二重sandbox経路で確認済みです。文書更新後に作成するcommitでは、READMEの手順に従いclean final HEADに対するprobeを再生成します。
 
 認証refresh後の更新永続化と、非協調Codex processを含むprocess間競合は未解決です。attempt-local auth copyのrefresh結果は次attemptへ保持されず、CLI内部のlockは別processと共有されません。この2条件のいずれかが未解決なら共通launcherはAgent/Judge/Repairを認証確認・copy・Codex起動前にfail-closedにします。したがって現時点で実Agent、Judge、QTS評価を実行できません。evidence・試験環境・最新5 CIの詳細は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)を参照してください。以降の日付付き実行記録は各記録の対象HEAD時点の履歴です。
+
+## 2026-10-27 専用OS identityによる認証管理
+
+利用者は、評価専用WSL2 OS userと永続`CODEX_HOME`を第一候補にする設計を承認した。この指示により、元Planの「OS user作成を対象外」とする記述は、本認証分離・永続化・競合防止の範囲で supersede される。OS account作成や管理者設定をCodex sandboxから実行できるとは扱わず、sudo/root操作は現環境では保留する。
+
+実装中の共通launcherは`qa-agent-eval` identity、専用home/`.codex`、`cli_auth_credentials_store="file"`、persistent auth file bind、nonblocking cross-process `flock`、既存same-UID process scanを要求する。Codex起動前にmode 0600のuncertain markerとdirectory entryをsyncし、通常終了、temporary home cleanup、persistent auth fileとdirectoryの`fsync`が成功したときだけmarkerを消す。中断・失敗時はmarkerを残して次回を止める。各attemptのmode config/homeは一時領域で別のまま、inner named profileは`/codex-home/auth.json`をdenyする。
+
+専用accountを作っただけではprocess競合を解消しない。非runner processが同じUIDで既に存在すればscannerが停止する。runner lockは協調processだけを直列化し、trusted root/WSL administratorはfile・process境界を越えられる。専用UIDを任意に使える主体を管理者とrunner/login入口に限定するOS policyはまだ配置されていない。Codex CLI source harnessのsynthetic refresh/persist/reloadも未実施である。したがって`authentication_shell_visible_risk=true`、`authentication_refresh_persistence_unresolved=true`、`authentication_process_concurrency_unresolved=true`を維持し、fresh formal probe・source harness・OS process-start policyの実証までは全Agent/Judge/Repairをfail-closedにする。
 
 ## 2026-10-24 ChatGPT認証限定の追加指示
 
@@ -35,7 +43,7 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 | auto      | keyring成功時はkeyringへ保存                       | keyring load/save error時にfileへfallback | file fallbackでは平文storeと同じ可視性・競合条件                                                                         | fail-closed storeとして不適合                                  |
 | ephemeral | process内memory store                              | なし                                      | Codex process終了後の次attemptへ残らない                                                                                 | 更新永続化要件に不適合                                         |
 
-現行launcherはattempt-local auth.json copyを削除するため、Codex refreshがcopyを書き換えても次attemptへ反映しない。固定CLIのrefresh mutexは同じAuthManager内だけで、別attempt・runner外Codex processと共有されない。したがってnamed profileでshell read-denyを実証しても、refresh persistenceと非協調process競合は未解決であり、production launcherは全Agent/Judge/Repairをfail-closedにする。専用永続CODEX_HOMEだけでは競合を排除できない。全ての利用processを制御する専用OS identity、Codex公式のprocess横断排他、または別の認証brokerが必要になるが、OS user/brokerは管理者権限やPlan対象外の運用設計を要するため今回追加しない。
+当時のattempt-local auth.json copyはCodex refresh結果を次attemptへ残さなかった。固定CLIのrefresh mutexは同じAuthManager内だけで、別attempt・runner外Codex processと共有されない。このcopy/delete方式を廃止し、2026-10-27の指示に基づき専用OS identityと永続store bindを候補実装した。専用identity単独では競合防止の証明にならず、runner lock単独も非協調processを止めない。OS user作成・root-owned runtime/source配置・許可されたprocess起動元の制限、および固定CLI source harnessのsynthetic refresh testが未達なら本番では使わず、fail-closedを維持する。
 
 ## 2026-10-25 refresh token調査の追記
 
@@ -166,7 +174,7 @@ GitHub PR #17のHEAD `e87a4890514af6bff09b90bb180e4dcd9c3fddb7`に一致するcl
 
 ### Excluded
 
-- 管理者権限やOS設定変更、新規VM/クラウド、有料利用、Docker権限緩和、Codex sandbox無効化、auth broker/proxy、認証全面変更。
+- 新規VM/クラウド、有料利用、Docker権限緩和、Codex sandbox無効化、auth broker/proxy、認証全面変更。専用WSL2 OS identityの準備は後続明示指示でこのPlanの範囲に追加されたが、管理者認証が必要なOS変更は管理者が通常WSL terminalで実行するまで保留する。
 - 実認証・モデルAPI送信、実Agent/Judge品質評価、Judge fixture承認、`QTS-SEM-008`専用fixture追加、改善候補の自動採用。
 - Docker verifierの移行、既存評価結果の削除、PR base変更、merge/close、force push。
 

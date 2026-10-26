@@ -4,15 +4,17 @@
 
 Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
 
-## 2026-10-26 現在の認証・隔離状態
+## 2026-10-27 現在の認証・隔離状態
 
-固定Codex CLI `0.163.0`のnamed permissions profileを使う正式な合成launcher経路では、Agent/Judge/Repair shellからsynthetic `auth.json` markerを直接・alias・procfs・host path・他attempt path・environment・FD経由で読めず、親Codex processからは読めることを確認しました。現行コードの`authentication_shell_visible_risk=false`はこの合成境界検証だけを示し、実認証fileを使った試験や実モデル通信の証明ではありません。
+前回のfresh evidenceでは、Codex CLI `0.163.0`のnamed permissions profileがAgent/Judge/Repair shellからsynthetic auth markerを隠し、親Codex processにはstoreを見せることを確認しました。この証拠は当時のHEADに限られます。今回、認証storeを一時`CODEX_HOME`へ複製せず、専用の永続storeをouter bubblewrap内の`/codex-home/auth.json`へbindする共通経路を実装中です。変更後のread-denyはfresh formal probeが終わるまで未検証です。
 
-認証storeは今もattempt専用`CODEX_HOME`へcopy後、終了時にcleanupします。Codex CLIがrefresh後の状態をこのcopyへ保存しても次attemptへ引き継がれないことをsynthetic fake-child testで再現しています。固定CLIのrefresh排他は同一`AuthManager`内です。`file`にはprocess間lock・atomic replacementがなく、`keyring`もprocess横断refresh lockを提供せず、`auto`はkeyring error時fileへfallbackし、`ephemeral`はprocess終了後に残りません。専用永続`CODEX_HOME`やrunner内lockだけでは、外部の非協調Codex processとの競合を解決しません。
+固定CLIのfile backendは選択中の`CODEX_HOME/auth.json`をtruncate/write/flushし、process間lockやatomic replacementを持ちません。runnerは専用store、非blocking `flock`、同じ専用UIDで既に動いているprocessの検査、Codex終了後のfile/directory `fsync`、異常終了時に残す不確定状態markerを実装しました。これはrunner内の協調と既存process検出を行うもので、同UIDを任意に使える管理者やrootを制限するものではありません。
 
-したがって`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`を維持し、launcherはAgent/Judge/Repairを認証確認・copy・Codex起動前にfail-closedにします。過去の`refresh_token_reused`の直接原因は確定していません。固定CLIの保存実装は[auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)と[storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)、現状と停止条件は[調査・検証報告 v06](../../../../docs/reports/2026-10-26_pr17-chatgpt-auth-recovery_v06.md)および[PR #17 現在状態報告](../../../../docs/reports/2026-10-26_pr17-current-status_v00.md)を参照してください。
+WSL2環境には専用`qa-agent-eval`ユーザーがなく、管理者操作も実施できていません。専用UIDのhome、固定runtime、clean runner checkoutとPython環境を配置し、同UID processの起動元を信頼済み管理者・runnerのみに限定するOS境界は未構築です。Codex source harnessによるsynthetic OAuth refresh/persist/reloadも未実施です。したがって`authentication_shell_visible_risk`は現行差分のfresh formal probe完了までtrueとして扱い、`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`を維持します。Agent/Judge/Repairはfail-closedです。
 
-`codex login status`は保存済み認証状態を読み取るだけでrefreshを呼びません。Codex source harnessを使う合成refresh試験はまだ実施していません。通常の`codex exec`からrefreshを誘発する試験はmodel requestと切り離せないため行わず、実認証、login、モデルAPI、TC-OUT-001も安全条件と明示承認が揃うまで実施しません。
+過去の`refresh_token_reused`の直接原因は確定していません。`file`を明示するのは永続化方式を固定し、keyring不可時のfallbackを避けるためです。`auto`はkeyring error時にfileへfallbackし、`ephemeral`はprocess終了後に残らず、keyringもprocess横断refresh lockを提供しません。選択理由と環境確認の記録は[PR #17 現在状態報告](../../../../docs/reports/2026-10-26_pr17-current-status_v00.md)を参照してください。
+
+`codex login status`は保存済み状態の判定であり、refresh永続化やprocess競合を証明しません。固定CLI sourceではChatGPT login経路が既存authをclear/revokeしてからログイン処理へ進むため、通常ユーザーの既存storeへ使ってはいけません。後述の手順は、管理者が専用storeを新規作成し、利用者本人がその専用identityでChatGPTログインを完了する段階まで保留します。実認証、実モデル通信、`TC-OUT-001`は安全条件と利用者の明示承認が揃うまで実施しません。
 
 ## CLI一覧
 
@@ -32,16 +34,87 @@ Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動し�
 - 評価開始前に、利用する既存Python環境のversionとPyYAMLを確認します。importに失敗する環境ではrun/probeを開始せず、固定依存が準備された既存環境へ切り替えます。
 - Codex packageは公開npm tarball https://registry.npmjs.org/@openai/codex/-/codex-0.163.0-linux-x64.tgz を使い、package name/version `@openai/codex@0.163.0-linux-x64`とSHA-512を照合します。既知tarball SHA-512は `bb045a3acad8a202d085cc4033f1a8796af0d1021610c468edcf6033cb0a02f89591940796ef6444b2793e4b9f6d5f800468f2660230885749d0b089d0de9ef3` です。launcherは実行時のCLI version、CLI binary SHA-256、同梱bwrap SHA-256も照合します。system bwrapへ暗黙に切り替えません。
 - Agent、Judge、Repairは、tmpfs rootに必要最小限のruntime、sanitized workspace、attempt output、一時CODEX_HOMEだけをmountするouter bubblewrap内でCodexを起動し、Codex自身のLinux sandboxを内側で有効にします。host root、host home、Evaluator checkout、元target、Windows filesystem、Docker socket、他attemptのpathはAgent/Judgeから見えません。
-- Agent/Judge/Repairごとに独立したprocess、outer namespace、workspace、cwd、一時CODEX_HOMEを作ります。JudgeへAgent workspaceをmountしません。Judge入力はstdinのみ、shell/MCP/追加Skill roots/web searchは無効にし、JSONLのtool eventがあればjudge_unverifiedにします。raw JSONLは保存しません。
+- Agent/Judge/Repairごとに独立したprocess、outer namespace、workspace、cwd、mode別の一時設定用`CODEX_HOME`を作ります。専用ユーザーの永続`auth.json`はattemptへcopyせず、Codex親processに必要なouter mountだけで`/codex-home/auth.json`へbindします。inner named profileはこのpathをdenyし、host側store pathや他attemptはmountしません。JudgeへAgent workspaceをmountせず、Judge入力はstdinのみ、shell/MCP/追加Skill roots/web searchを無効にします。JSONLのtool eventがあれば`judge_unverified`にし、raw JSONLは保存しません。
 - outer networkはCodex親processのモデルAPI通信に必要なため維持します。inner Codex sandboxのshellはTCP/DNS/AF_UNIX/WSL interop/localhostを使えないよう設定し、正式launcherからnegative testします。TEST-NET等の単一接続失敗を全面egress遮断の根拠にしません。
 - schema 2の認証方式は、ChatGPTアカウントでサインインしたCodex CLIだけです。固定runtimeの`codex login status`が`Logged in using ChatGPT`を返し、認証fileがWSL2内の正規`auth.json`であることを確認します。API Key、未ログイン、不明・確認失敗、方式を確認できないstore、固定CLI version不一致はfail-closedです。`OPENAI_API_KEY`と`CODEX_API_KEY`は確認・起動environmentへ渡さず、API Keyへfallbackしません。Windows filesystemやrepository内の`CODEX_HOME`を探索・利用しません。
-- ログイン状態だけを安全に確認するには、WSL2 clean checkoutから`python -m scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher --auth-status-only`を実行します。固定CLI/version/digestを先に照合し、方式・成功状態・CLI version・秘密を含まないerror classだけを表示します。認証file本文やhashは表示・保存せず、モデルAPIは呼びません。このcommandはログイン操作を開始しないため、未ログインの場合は利用者自身がWSL2でChatGPT loginを完了するまで停止します。
+- ログイン状態だけを安全に確認する`--auth-status-only`も、専用`qa-agent-eval` UID、固定`HOME`/`CODEX_HOME`、process lockを確認してから実行します。現在のWSL2には専用UIDがなく、一般ユーザーの開発環境からはstatus commandを実行できません。認証file本文やhashは表示・保存せず、モデルAPIを呼びません。不確定markerがあれば、ChatGPT login statusが成功しても`state_uncertain`で停止します。
 - 固定Codex CLI 0.163.0のinner sandboxにはmodeごとのnamed permissions profileを使います。Agent/Repairは`:workspace`、Judgeは`:read-only`を継承し、全modeで`/codex-home/auth.json`を`deny`、networkを無効にします。Repairのworkspace rootは対象Skillだけです。`codex exec --sandbox ...`はlegacy sandbox設定を優先してnamed profileを上書きするため付けず、`default_permissions=qa_eval_<mode>`を一時`config.toml`とCLI `--config`の両方で指定します。fixed CLIのprofile inheritanceとbwrap deny maskを使い、実効shellからのread拒否を確認します。[permissions resolver](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/config/src/permissions_toml.rs)と[Linux sandbox](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/src/bwrap.rs)を参照してください。
 - formal smokeはsynthetic `auth.json`を用い、Agent/Judge/Repairそれぞれでstore path、symlink alias、`/proc/self/root`、`/proc/1/root`、host側store path、他attempt store、environment、可視process FD経由のreadを値を出さずbooleanだけで検査します。外側Codex親processからstoreを読めることも別に確認します。HEAD `a960f8728bb2e2c14e282d639170ffed6af11e9a`のfresh schema 2 evidenceでは、read拒否を含む16 required checksがすべてtrueで3 modeすべてverifiedでした。これは実認証fileの検証ではありません。
-- attempt専用`CODEX_HOME`へのauth copyと終了時cleanupは維持しています。refresh後のcopy更新が次attemptへ残らないことはfake-child unit testで再現済みです。固定CLI file backendは同じ`CODEX_HOME/auth.json`へtruncate/write/flushしますが、process横断lockやatomic replacementを持たず、refresh mutexも同一`AuthManager`内です。`file`は部分更新と競合、`keyring`はprocess間refresh lock欠如、`auto`はkeyring load/save error時のfile fallback、`ephemeral`はprocess終了後の消失という制約があります。専用永続storeやkeyringへ切り替えていません。refresh永続化と非協調process競合は未解決のためproduction launchは全mode fail-closedです。詳細は[調査報告v06](../../../../docs/reports/2026-10-26_pr17-chatgpt-auth-recovery_v06.md)および[現在状態報告](../../../../docs/reports/2026-10-26_pr17-current-status_v00.md)を参照してください。
+- launcherはすべての認証照会・Agent/Judge/Repairで同じ専用`flock`をnonblocking取得し、`/proc`で専用UIDを有する既存processが別にいれば停止します。Codex起動前に不確定markerを永続化し、CLIの正常終了・一時home cleanup・認証storeとhome directoryの`fsync`が揃った場合だけmarkerを消します。失敗、timeout、終了待ち、cleanup、syncの不確定状態ではmarkerを残し、次回は実行を拒否します。lockはこれに参加しないprocessを止めないため、専用UIDを使える範囲は信頼済み管理者とlock付きrunner/login操作に限定します。root/WSL管理者は常にこの境界を越えられる信頼主体です。
+- 認証の継続実行は未許可です。`authentication_shell_visible_risk=true`、`authentication_refresh_persistence_unresolved=true`、`authentication_process_concurrency_unresolved=true`を維持し、Agent/Judge/Repairはfail-closedです。現在の環境には`qa-agent-eval` accountがなく、管理者権限での作成・runtime配置も実施していません。検証記録と操作待ち条件は[現在状態報告](../../../../docs/reports/2026-10-26_pr17-current-status_v00.md)を参照してください。
 - Codex CLI固有設定は固定profileから検証し、MCP、外部指示、global config、追加Skill、web検索を無効にします。秘密値・生認証情報・秘密hashをargv、environment、profile、provenance、raw JSONLへ保存しません。
 - Codex source / 固定targetの既存ファイル・directoryはouter mountで個別にread-only bindします。Codex workspace-writeがsandbox準備で必要とするattempt-local workspace root、`.git`、`.codex`だけは一時領域として分離し、許可outputとRepair対象Skill以外の既存sourceは変更できません。実行前後manifestを比較し、単にworkspace全体をwrite可能にする方式は不適合です。
 - 通常CIは外部LLM、実認証、live Codex execを呼びません。fake Agent/Judge contract testsを実行します。実Codex sandbox smokeはWSL2のformal launcher経由で無認証のsynthetic inputだけに実行します。
+
+## 専用WSL2ユーザーの準備と本人ログイン
+
+専用account名は`qa-agent-eval`、homeの提案pathは`/var/lib/qa-agent-eval`です。これらは実環境に作成済みの値ではありません。2026-10-27のCodex実行環境ではWSL2 Ubuntu 24.04.4、通常ユーザー`sella` (UID/GID 1000)、専用accountなしを確認しました。`/home/sella`は他UIDからtraverseできず、固定runtimeと既存venvもその配下にあるため、service UIDから直接利用できません。`/etc/passwd`、既定WSLユーザー、systemd、通常ユーザーhome、認証storeは変更していません。管理者権限が得られなかったので、account・runtime・clean source checkout・専用Python環境の作成は保留です。
+
+専用accountが必要になったら、WSL2 Ubuntuの通常terminalで先に同名user/groupがないことを確認します。既存entryがあれば再利用・変更せず停止します。
+
+```bash
+getent passwd qa-agent-eval
+getent group qa-agent-eval
+```
+
+両方が未登録のときだけ、管理者が次を実行します。`useradd --system --user-group`が未使用UID/GIDを割り当てます。結果を記録し、追加groupやsudo権限がないことを確認します。
+
+```bash
+sudo useradd --system --user-group --create-home \
+  --home-dir /var/lib/qa-agent-eval --shell /usr/sbin/nologin qa-agent-eval
+sudo chmod 0700 /var/lib/qa-agent-eval
+sudo install -d -o qa-agent-eval -g qa-agent-eval -m 0700 \
+  /var/lib/qa-agent-eval/.codex \
+  /var/lib/qa-agent-eval/.local/state/qa-workflow-skills
+sudo -u qa-agent-eval -- env \
+  HOME=/var/lib/qa-agent-eval \
+  CODEX_HOME=/var/lib/qa-agent-eval/.codex \
+  sh -c 'umask 077; printf "%s\n" "cli_auth_credentials_store = \"file\"" > "$CODEX_HOME/config.toml"; chmod 0600 "$CODEX_HOME/config.toml"; : > "$HOME/.local/state/qa-workflow-skills/codex-auth.lock"; chmod 0600 "$HOME/.local/state/qa-workflow-skills/codex-auth.lock"'
+getent passwd qa-agent-eval
+id qa-agent-eval
+sudo -l -U qa-agent-eval
+stat -c '%U:%G %a %n' /var/lib/qa-agent-eval \
+  /var/lib/qa-agent-eval/.codex \
+  /var/lib/qa-agent-eval/.codex/config.toml \
+  /var/lib/qa-agent-eval/.local/state/qa-workflow-skills
+```
+
+このaccountのshellは`nologin`で、専用home/storeを他UIDから読めないmodeにします。通常の`sella`の`.codex`からファイルをコピーしません。固定Codex runtime、clean evaluator checkout、Python 3.11環境は別途`/opt/qa-agent-eval/`のroot所有・service UID読取専用領域へ配置し、digestとsource revisionを照合してから使います。実行outputだけをservice UIDが書けるようにします。root/WSL管理者は認証storeを読め、専用UIDで任意processを開始できます。管理者は信頼境界であり、runnerの`flock`はそれを制限しません。runnerは起動直前に同UID processを検査して既存の非runner processを拒否しますが、管理者が同時に別processを起動することまでは防げません。管理者は専用UIDをrunnerと明示的なlogin recoveryにのみ使い、同時起動を避けます。
+
+### 利用者本人が戻った後のログイン
+
+以下はOS account、root-owned runtime/source/venv、profileのfresh synthetic probeが準備された後だけの手順です。`/opt/qa-agent-eval/...`は提案pathであり、現在は配置されていません。Windows側のCodex、通常ユーザーの`CODEX_HOME`、既存tokenは使いません。
+
+```bash
+RUNTIME_ROOT=/opt/qa-agent-eval/runtime-final
+SOURCE_ROOT=/opt/qa-agent-eval/source
+PYTHON=/opt/qa-agent-eval/venv/bin/python
+sudo -u qa-agent-eval -- env \
+  HOME=/var/lib/qa-agent-eval \
+  CODEX_HOME=/var/lib/qa-agent-eval/.codex \
+  QAEVAL_CODEX_RUNTIME_ROOT="$RUNTIME_ROOT" \
+  PYTHONPATH="$SOURCE_ROOT" \
+  "$PYTHON" -m scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher \
+  --operator-login
+```
+
+`--operator-login`は専用storeの`flock`を保持し、固定CLI 0.163.0の`codex login --device-auth`をTTYへ直接接続します。CLIはlogin前に既存authをclear/revokeする実装なので、この入口は新規の空storeに対してだけ使います。利用者本人が公式ChatGPT画面を確認してloginを完了し、表示されたdevice codeやURLを会話・PR・logへ貼りません。CLI失敗、中断、または保存・status・`fsync`に不確定があればstate markerが残り、Agent/Judge/Repairは停止したままです。この操作はモデルAPIを呼びませんが、本人のChatGPT認証操作なので自動実行しません。
+
+成功後はstatusのみを確認します。
+
+```bash
+sudo -u qa-agent-eval -- env \
+  HOME=/var/lib/qa-agent-eval \
+  CODEX_HOME=/var/lib/qa-agent-eval/.codex \
+  QAEVAL_CODEX_RUNTIME_ROOT=/opt/qa-agent-eval/runtime-final \
+  PYTHONPATH=/opt/qa-agent-eval/source \
+  /opt/qa-agent-eval/venv/bin/python \
+  -m scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher --auth-status-only
+```
+
+status成功は現在のlogin方式だけを確認します。refresh更新が次attemptで有効なことや、固定CLI本体の異常時保存を証明しません。fresh formal isolation probe、Codex sourceのsynthetic refresh test、OS process-start条件の確認も別々に必要です。どれか一つでも未達なら実Agentを起動しません。
+
+account作成を取り消す必要があり、まだ認証していない場合は、管理者が`sudo userdel qa-agent-eval`でaccountを削除できます。このcommandはhomeを残します。認証後は認証状態を無断削除せず、利用者が状態と必要なcredential revokeを確認した後に管理者がsecure dispositionを決めます。既定WSLユーザーや元の開発環境には変更がないため、復元操作はありません。
 
 実効profileはJSON schema version 2です。Agent / Judge model、timeout、reasoning、sandbox、approval、network、tools、MCP、Skill rootsに加え、runtimeにはWSL2実行mode、Codex package source/version/SHA-512、Codex binaryとbwrapのSHA-256、outer/inner argv・mount・network fingerprint、probe version、evidence fingerprint、依存versionを記録します。secret自体は記録しません。認証方式はprofileから切替できず、launcherがChatGPT loginに固定します。run observationsには認証方式・確認状態・CLI versionだけを記録し、認証fileの内容やhashは記録しません。旧Docker profileは読み取り用に保持しますが、新方式と直接比較できません。
 
@@ -95,11 +168,9 @@ python -m scripts.skills.evals.agent.isolation_probe \
 
 ## 合成認証データによる検証範囲
 
-launcher unit testはsynthetic `auth.json` markerのcopy、permission、cleanup、出力redaction、ChatGPT login statusの分類を検証します。copy/delete方式でfake childがattempt側だけを更新しても次attemptに継承されないことを再現します。これはCodex CLI自身のrefresh成功を証明しません。fresh formal evidenceではnamed profileによりsynthetic markerのread拒否をAgent/Judge/Repairの正式二重sandbox経路で検査し、read可能、alias/proc rootから到達可能、host/other-attempt path visible、environment/FD leakageのいずれかで失敗した場合はmodeをunverifiedにします。`_prepare_codex_home()`はsource `auth.json`をattempt専用homeへcopyし、cleanup時にそのhomeを削除するため、refresh後のcopy更新が次attemptへ残る保証はありません。
+launcher unit testは、auth sourceをattempt homeへcopyせずempty mountpointを作ること、Codex CLIが更新する想定の同一persistent pathを次attemptが再利用すること、mode `file`、owner/mode検査、store内容を読まない`fsync`、lock競合、不確定marker、operator loginのfail-closed動作をsyntheticデータで検証します。fake writeはCodex CLI自身のOAuth refreshを証明しません。固定Codex sourceのloopback refresh/persist/reload harnessは実行していません。
 
-合成検証では、固定CLIを呼ばないunit testでsource markerとattempt copyを作り、fake childがcopyだけを更新した後のcleanupと次attemptで、source markerが不変かつ更新が引き継がれないことを再現しています。formal launcherは同じ`/codex-home/auth.json` mountのsynthetic markerを使い、Agent/Judge/Repairのinner shellからのread拒否をbooleanだけで記録します。runner内協調lockは外部の非協調Codex processを制御できないため追加していません。fake child試験はrunner file操作のみを検証し、固定Codex CLI自身のOAuth refreshやprocess間排他の証明にはなりません。実auth fileや実tokenは使いません。
-
-固定Codex CLI `0.163.0`の公式実装ではrefreshの同期は同一`AuthManager`内で、成功tokenは選択中のstorage backendへ保存後reloadされます。file storageは`auth.json`をtruncate/write/flushし、process横断lockやatomic replacementを持ちません。keyring modeはkeyringへ保存し、`auto`はkeyring操作失敗時にfileへfallbackし、`ephemeral`はprocess内memory storeです。いずれも非協調Codex processとのrefresh競合を解決しません。attempt-local copyによる更新喪失はsynthetic runner testで確認しましたが、`refresh_token_reused`の直接原因は未確定です。named profileによるsynthetic shell read-denyはformal evidenceで確認済みです。更新永続化と全process競合が未解決なのでlauncherは全modeをfail-closedにします。
+fresh formal evidenceではsynthetic markerをpersistent pathから`/codex-home/auth.json`へbindし、Agent/Judge/Repair shellのdirect/alias/proc/host/other-attempt/environment/FD read拒否を検査します。今回のbind経路変更後のformal probeは未実行です。既存のHEAD `a960f872...`の16/16 evidenceはこの差分に流用せず、`authentication_shell_visible_risk=true`を維持します。runnerの`flock`は協調process間だけを直列化し、process inventoryは起動前に存在する専用UID processを拒否します。同じUIDを任意に使えるtrusted administrator/rootを制限しないため、OS process-start境界の実環境確認なしにrefresh競合を解決済みとは扱いません。専用account未作成、source harness未実施、管理者境界未検証のため、三modeのproduction launchはfail-closedです。
 
 launcherは既存executor.run_commandを使い、shell=False、固定argv、close_fds=True、未許可pass_fdsなし、stdin/stdout/stderr契約、timeout、POSIX process group cleanup、safe diagnosticsと一時領域cleanupを維持します。失敗時はfail-closedです。
 

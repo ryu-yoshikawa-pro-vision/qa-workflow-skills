@@ -13,9 +13,12 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 if str(REPO_ROOT) not in sys.path:
@@ -38,12 +41,16 @@ BWRAP_RELATIVE_PATH = PurePosixPath(
 PROTOCOL = "codex_wsl2_bwrap_launcher_v1"
 RUNTIME_ENV = "QAEVAL_CODEX_RUNTIME_ROOT"
 CODEX_HOME_PREFIX = ".qa-codex-home-"
+EVALUATION_SERVICE_ACCOUNT = "qa-agent-eval"
+AUTH_STATE_RELATIVE = Path(".local/state/qa-workflow-skills")
+AUTH_STORE_LOCK_NAME = "codex-auth.lock"
+AUTH_STATE_UNCERTAIN_NAME = "codex-auth-state-uncertain"
 AUTH_STATUS_TIMEOUT_SECONDS = 15
 # Named Codex permission profiles deny the authentication file in the inner
 # sandbox while preserving the outer mode-specific filesystem boundary.
-AUTHENTICATION_SHELL_VISIBLE_RISK = False
-# The attempt-local auth copy still loses a Codex refresh, and Codex's file and
-# keyring stores do not coordinate refreshes across independent processes.
+AUTHENTICATION_SHELL_VISIBLE_RISK = True
+# The persistent-store path is implemented, but the dedicated OS identity and
+# its process-start boundary have not been provisioned and verified.
 AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED = True
 AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED = True
 _SAFE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
@@ -157,6 +164,318 @@ def _private_temp_root() -> Path:
             base.mkdir(mode=0o700)
         os.chmod(base, 0o700)
     return base
+
+
+@dataclass(frozen=True)
+class AuthExecutionPaths:
+    uid: int
+    home: Path
+    codex_home: Path
+    auth_file: Path
+    state_dir: Path
+    lock_file: Path
+    uncertain_file: Path
+
+
+class AuthExecutionBlocked(CodexWsl2LauncherError):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _owned_private_path(path: Path, *, uid: int, mode: int, directory: bool) -> bool:
+    try:
+        metadata = path.lstat()
+    except OSError:
+        return False
+    return (
+        not stat.S_ISLNK(metadata.st_mode)
+        and (
+            stat.S_ISDIR(metadata.st_mode)
+            if directory
+            else stat.S_ISREG(metadata.st_mode)
+        )
+        and metadata.st_uid == uid
+        and stat.S_IMODE(metadata.st_mode) == mode
+    )
+
+
+def _evaluation_auth_paths() -> AuthExecutionPaths:
+    if os.name != "posix" or not _is_wsl2():
+        raise AuthExecutionBlocked("authentication_execution_requires_wsl2")
+    try:
+        import pwd
+
+        account = pwd.getpwnam(EVALUATION_SERVICE_ACCOUNT)
+    except (ImportError, KeyError, OSError):
+        raise AuthExecutionBlocked("evaluation_service_account_unavailable") from None
+    uid = account.pw_uid
+    if (
+        uid == 0
+        or os.geteuid() != uid
+        or os.getgid() != account.pw_gid
+        or any(group != account.pw_gid for group in os.getgroups())
+        or account.pw_shell not in {"/usr/sbin/nologin", "/sbin/nologin"}
+    ):
+        raise AuthExecutionBlocked("evaluation_service_identity_invalid")
+    home = Path(account.pw_dir)
+    codex_home = home / ".codex"
+    configured_home = os.environ.get("HOME")
+    configured_codex_home = os.environ.get("CODEX_HOME")
+    if (
+        not home.is_absolute()
+        or configured_home != str(home)
+        or configured_codex_home != str(codex_home)
+    ):
+        raise AuthExecutionBlocked("evaluation_auth_home_mismatch")
+    try:
+        _reject_symlink_components(home)
+        _reject_symlink_components(codex_home)
+    except CodexWsl2LauncherError:
+        raise AuthExecutionBlocked("evaluation_auth_home_path_invalid") from None
+    if not _owned_private_path(home, uid=uid, mode=0o700, directory=True):
+        raise AuthExecutionBlocked("evaluation_auth_home_permissions_invalid")
+    if not _owned_private_path(codex_home, uid=uid, mode=0o700, directory=True):
+        raise AuthExecutionBlocked("evaluation_codex_home_permissions_invalid")
+    config_path = codex_home / "config.toml"
+    if not _owned_private_path(config_path, uid=uid, mode=0o600, directory=False):
+        raise AuthExecutionBlocked("evaluation_codex_config_permissions_invalid")
+    try:
+        with config_path.open("rb") as stream:
+            config = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
+        raise AuthExecutionBlocked("evaluation_codex_config_invalid") from None
+    if config.get("cli_auth_credentials_store") != "file":
+        raise AuthExecutionBlocked("evaluation_auth_store_mode_invalid")
+    if config.get("forced_login_method") not in {None, "chatgpt"}:
+        raise AuthExecutionBlocked("evaluation_login_method_invalid")
+    auth_file = codex_home / "auth.json"
+    if auth_file.exists() or auth_file.is_symlink():
+        if not _owned_private_path(auth_file, uid=uid, mode=0o600, directory=False):
+            raise AuthExecutionBlocked("evaluation_auth_file_permissions_invalid")
+    state_dir = home / AUTH_STATE_RELATIVE
+    for directory in (state_dir.parents[1], state_dir.parent, state_dir):
+        if directory.exists() or directory.is_symlink():
+            if not _owned_private_path(directory, uid=uid, mode=0o700, directory=True):
+                raise AuthExecutionBlocked("evaluation_auth_state_permissions_invalid")
+        else:
+            try:
+                directory.mkdir(mode=0o700)
+            except FileExistsError:
+                pass
+            except OSError:
+                raise AuthExecutionBlocked(
+                    "evaluation_auth_state_unavailable"
+                ) from None
+            if not _owned_private_path(directory, uid=uid, mode=0o700, directory=True):
+                raise AuthExecutionBlocked("evaluation_auth_state_permissions_invalid")
+    return AuthExecutionPaths(
+        uid=uid,
+        home=home,
+        codex_home=codex_home,
+        auth_file=auth_file,
+        state_dir=state_dir,
+        lock_file=state_dir / AUTH_STORE_LOCK_NAME,
+        uncertain_file=state_dir / AUTH_STATE_UNCERTAIN_NAME,
+    )
+
+
+def _assert_no_other_service_processes(
+    uid: int, *, proc_root: Path = Path("/proc")
+) -> None:
+    allowed: set[int] = set()
+    current = os.getpid()
+    while current > 1 and current not in allowed:
+        allowed.add(current)
+        try:
+            status = (proc_root / str(current) / "status").read_text(encoding="ascii")
+        except OSError:
+            break
+        parent_line = next(
+            (line for line in status.splitlines() if line.startswith("PPid:")), None
+        )
+        if parent_line is None:
+            break
+        try:
+            current = int(parent_line.split()[1])
+        except (IndexError, ValueError):
+            break
+    try:
+        entries = tuple(proc_root.iterdir())
+    except OSError:
+        raise AuthExecutionBlocked("service_process_list_unavailable") from None
+    for entry in entries:
+        if not entry.name.isdecimal():
+            continue
+        try:
+            pid = int(entry.name)
+            status = (entry / "status").read_text(encoding="ascii")
+        except FileNotFoundError:
+            continue
+        except (OSError, ValueError):
+            raise AuthExecutionBlocked("service_process_identity_unavailable") from None
+        uid_line = next(
+            (line for line in status.splitlines() if line.startswith("Uid:")), None
+        )
+        if uid_line is None:
+            raise AuthExecutionBlocked("service_process_identity_unavailable")
+        try:
+            process_uids = {int(value) for value in uid_line.split()[1:]}
+        except ValueError:
+            raise AuthExecutionBlocked("service_process_identity_unavailable") from None
+        if uid in process_uids and pid not in allowed:
+            raise AuthExecutionBlocked("unexpected_service_identity_process")
+
+
+@contextmanager
+def _authentication_execution_context(
+    *, allow_uncertain_state: bool = False
+) -> Iterator[AuthExecutionPaths]:
+    try:
+        import fcntl
+    except ImportError:
+        raise AuthExecutionBlocked("authentication_process_lock_unavailable") from None
+    paths = _evaluation_auth_paths()
+    flags = os.O_CREAT | os.O_RDWR
+    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        lock_fd = os.open(paths.lock_file, flags, 0o600)
+    except OSError:
+        raise AuthExecutionBlocked("authentication_process_lock_unavailable") from None
+    try:
+        if not _owned_private_path(
+            paths.lock_file, uid=paths.uid, mode=0o600, directory=False
+        ):
+            raise AuthExecutionBlocked(
+                "authentication_process_lock_permissions_invalid"
+            )
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise AuthExecutionBlocked("authentication_process_lock_busy") from None
+        _assert_no_other_service_processes(paths.uid)
+        if paths.uncertain_file.exists() or paths.uncertain_file.is_symlink():
+            if not allow_uncertain_state:
+                raise AuthExecutionBlocked("authentication_state_uncertain")
+            if not _owned_private_path(
+                paths.uncertain_file, uid=paths.uid, mode=0o600, directory=False
+            ):
+                raise AuthExecutionBlocked("authentication_state_marker_invalid")
+        yield paths
+    finally:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        os.close(lock_fd)
+
+
+def _mark_auth_state_uncertain(paths: AuthExecutionPaths) -> None:
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(paths.uncertain_file, flags, 0o600)
+    except OSError:
+        raise AuthExecutionBlocked(
+            "authentication_state_marker_create_failed"
+        ) from None
+    try:
+        if not _owned_private_path(
+            paths.uncertain_file, uid=paths.uid, mode=0o600, directory=False
+        ):
+            raise AuthExecutionBlocked(
+                "authentication_state_marker_permissions_invalid"
+            )
+        marker = memoryview(b"codex_attempt_incomplete\n")
+        while marker:
+            written = os.write(fd, marker)
+            if written <= 0:
+                raise OSError("authentication state marker write failed")
+            marker = marker[written:]
+        os.fsync(fd)
+        directory_fd = os.open(
+            paths.state_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        )
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        os.close(fd)
+
+
+def _clear_auth_state_uncertain(paths: AuthExecutionPaths) -> None:
+    if not paths.uncertain_file.exists() and not paths.uncertain_file.is_symlink():
+        return
+    if not _owned_private_path(
+        paths.uncertain_file, uid=paths.uid, mode=0o600, directory=False
+    ):
+        raise AuthExecutionBlocked("authentication_state_marker_invalid")
+    paths.uncertain_file.unlink()
+    directory_fd = os.open(paths.state_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        try:
+            os.fsync(directory_fd)
+        except OSError:
+            try:
+                _mark_auth_state_uncertain(paths)
+            except (OSError, AuthExecutionBlocked):
+                raise AuthExecutionBlocked(
+                    "authentication_state_marker_restore_failed"
+                ) from None
+            raise AuthExecutionBlocked(
+                "authentication_state_marker_clear_failed"
+            ) from None
+    finally:
+        os.close(directory_fd)
+
+
+def _sync_auth_store(paths: AuthExecutionPaths) -> None:
+    """Durably sync the opaque Codex store without reading its contents."""
+    try:
+        auth_file = _reject_symlink_components(paths.auth_file)
+        if not _owned_private_path(
+            auth_file, uid=paths.uid, mode=0o600, directory=False
+        ):
+            raise AuthExecutionBlocked("authentication_auth_file_permissions_invalid")
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        auth_fd = os.open(auth_file, flags)
+    except (OSError, CodexWsl2LauncherError) as exc:
+        if isinstance(exc, AuthExecutionBlocked):
+            raise
+        raise AuthExecutionBlocked("authentication_store_sync_failed") from None
+    try:
+        metadata = os.fstat(auth_fd)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != paths.uid
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise AuthExecutionBlocked("authentication_auth_file_permissions_invalid")
+        os.fsync(auth_fd)
+        if not _owned_private_path(
+            paths.codex_home, uid=paths.uid, mode=0o700, directory=True
+        ):
+            raise AuthExecutionBlocked("evaluation_codex_home_permissions_invalid")
+        directory_fd = os.open(
+            paths.codex_home,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError:
+        raise AuthExecutionBlocked("authentication_store_sync_failed") from None
+    finally:
+        os.close(auth_fd)
+
+
+def _finalize_auth_state(paths: AuthExecutionPaths) -> None:
+    """Clear the uncertainty marker only after the child identity has exited."""
+    _assert_no_other_service_processes(paths.uid)
+    _sync_auth_store(paths)
+    _clear_auth_state_uncertain(paths)
 
 
 def runtime_root_from_environment() -> Path:
@@ -344,6 +663,7 @@ def _mount_tree(
     skill_root: Path | None,
     skill_name: str | None,
     codex_home: Path,
+    auth_store_path: Path | None = None,
 ) -> tuple[list[str], dict[str, Any]]:
     mounts = [
         "--tmpfs",
@@ -385,15 +705,6 @@ def _mount_tree(
         "--proc",
         "/proc",
     ]
-    for source, target in _system_mounts():
-        if target == "/etc/resolv.conf":
-            mounts.extend(["--ro-bind", str(source), target])
-        else:
-            parent = str(PurePosixPath(target).parent)
-            if parent != "/":
-                mounts.extend(["--dir", parent])
-            mounts.extend(["--dir", target])
-            mounts.extend(["--ro-bind", str(source), target])
     mount_summary: dict[str, Any] = {
         "root": "tmpfs",
         "system": [
@@ -414,6 +725,28 @@ def _mount_tree(
         "evaluator_checkout": False,
         "docker_socket": False,
     }
+    if auth_store_path is not None:
+        auth_store_path = _reject_symlink_components(auth_store_path)
+        if not _regular_file(auth_store_path) or not _regular_file(
+            codex_home / "auth.json"
+        ):
+            raise CodexWsl2LauncherError("persistent Codex auth mount is invalid")
+        mounts.extend(["--bind", str(auth_store_path), "/codex-home/auth.json"])
+        mount_summary["auth_store"] = {
+            "path": "/codex-home/auth.json",
+            "access": "read-write-codex-parent-only",
+            "persistent": True,
+            "inner_shell_read": "denied-by-named-permission-profile",
+        }
+    for source, target in _system_mounts():
+        if target == "/etc/resolv.conf":
+            mounts.extend(["--ro-bind", str(source), target])
+        else:
+            parent = str(PurePosixPath(target).parent)
+            if parent != "/":
+                mounts.extend(["--dir", parent])
+            mounts.extend(["--dir", target])
+            mounts.extend(["--ro-bind", str(source), target])
     if mode == "judge":
         mounts.extend(["--tmpfs", "/var/tmp"])
     else:
@@ -503,6 +836,7 @@ def _outer_argv(
     codex_home: Path,
     codex_argv: Sequence[str],
     outer_binary: str | None = None,
+    auth_store_path: Path | None = None,
 ) -> tuple[list[str], dict[str, Any]]:
     workspace, output, skill = _validate_workspace_mounts(
         mode=mode,
@@ -519,6 +853,7 @@ def _outer_argv(
         skill_root=skill,
         skill_name=skill_name,
         codex_home=codex_home,
+        auth_store_path=auth_store_path,
     )
     bwrap = runtime["bwrap_path"]
     codex = "/opt/codex-runtime/" + CODEX_RELATIVE_PATH.as_posix()
@@ -664,15 +999,6 @@ def sandbox_smoke(
     except BaseException:
         cleanup_setup_failure()
         raise
-    try:
-        if auth_source.is_symlink():
-            auth_source.unlink()
-        elif auth_source.exists():
-            shutil.rmtree(auth_source)
-    except BaseException as exc:
-        cleanup_setup_failure()
-        raise CodexWsl2LauncherError("synthetic auth source cleanup failed") from exc
-
     try:
         outside_root = Path(tempfile.mkdtemp(prefix="qa-wsl2-probe-outside-"))
     except BaseException:
@@ -849,7 +1175,7 @@ print(json.dumps(result,separators=(",",":")))
         str(REPO_ROOT),
         str(other_home),
         str(host_unix_socket),
-        str(home / "auth.json"),
+        str(auth_file),
         str(other_home / "auth.json"),
     ]
     try:
@@ -864,6 +1190,7 @@ print(json.dumps(result,separators=(",",":")))
             codex_home=home,
             codex_argv=outer_argv,
             outer_binary="/usr/bin/python3",
+            auth_store_path=auth_file,
         )
     except BaseException:
         cleanup_codex_home(
@@ -871,6 +1198,7 @@ print(json.dumps(result,separators=(",",":")))
             allowed_parent=home_parent,
             workspace_root=workspace_root,
         )
+        shutil.rmtree(auth_source, ignore_errors=True)
         unix_server.close()
         shutil.rmtree(other_home, ignore_errors=True)
         shutil.rmtree(outside_root, ignore_errors=True)
@@ -1060,6 +1388,7 @@ print(json.dumps(result,separators=(",",":")))
                 workspace_root=workspace_root,
             )
         finally:
+            shutil.rmtree(auth_source, ignore_errors=True)
             unix_server.close()
             shutil.rmtree(other_home, ignore_errors=True)
             shutil.rmtree(outside_root, ignore_errors=True)
@@ -1332,6 +1661,7 @@ def _prepare_codex_home(
         os.chmod(path, 0o700)
         config = (
             'approval_policy = "never"\n'
+            'cli_auth_credentials_store = "file"\n'
             f"default_permissions = {json.dumps(permission_profile)}\n"
             'web_search = "disabled"\n'
             f"model_reasoning_effort = {json.dumps(reasoning_effort)}\n"
@@ -1355,9 +1685,11 @@ def _prepare_codex_home(
         config_path.write_text(config, encoding="utf-8")
         os.chmod(config_path, 0o600)
         if auth is not None:
-            copied = path / "auth.json"
-            shutil.copyfile(auth, copied)
-            os.chmod(copied, 0o600)
+            if not _regular_file(auth) or auth.is_symlink():
+                raise CodexWsl2LauncherError("persistent Codex auth file is invalid")
+            mountpoint = path / "auth.json"
+            mountpoint.touch(mode=0o600, exist_ok=False)
+            os.chmod(mountpoint, 0o600)
     except BaseException:
         shutil.rmtree(path, ignore_errors=True)
         raise
@@ -1514,7 +1846,7 @@ def expected_codex_exec_argv_fingerprint(
     return codex_exec_argv_fingerprint(argv, mode=mode)
 
 
-def launch(
+def _launch_locked(
     *,
     mode: str,
     output_root: Path,
@@ -1528,6 +1860,7 @@ def launch(
     skill_name: str | None = None,
     codex_home: Path,
     runtime_root: Path | None = None,
+    auth_execution: AuthExecutionPaths | None = None,
 ) -> int:
     _require_wsl2()
     if mode not in {"agent", "judge", "repair"}:
@@ -1570,6 +1903,8 @@ def launch(
             },
         )
         return 2
+    if auth_execution is None:
+        raise AuthExecutionBlocked("authentication_execution_lease_required")
     runtime_root = runtime_root or runtime_root_from_environment()
     runtime = verify_runtime(runtime_root)
     auth_path, auth_mode = _auth_material(runtime)
@@ -1587,6 +1922,8 @@ def launch(
             },
         )
         return 2
+    if auth_path != auth_execution.auth_file:
+        raise AuthExecutionBlocked("evaluation_auth_store_mismatch")
     home_path = codex_home
     _prepare_codex_home(
         home_path,
@@ -1619,6 +1956,7 @@ def launch(
             skill_name=skill_name,
             codex_home=home_path,
             codex_argv=codex_argv,
+            auth_store_path=auth_path,
         )
     except BaseException:
         cleanup_codex_home(
@@ -1639,6 +1977,7 @@ def launch(
     status = "execution_error"
     response = ""
     completed_returncode = 2
+    auth_state_marker_created = False
     observations: dict[str, Any] = {
         "protocol": PROTOCOL,
         "mode": mode,
@@ -1675,13 +2014,18 @@ def launch(
     }
     try:
         if auth_path is not None:
-            copied = home_path / "auth.json"
-            if not _regular_file(copied) or (
-                os.name == "posix" and copied.stat().st_mode & 0o077
+            mountpoint = home_path / "auth.json"
+            if (
+                not _regular_file(auth_path)
+                or not _regular_file(mountpoint)
+                or (os.name == "posix" and mountpoint.stat().st_mode & 0o077)
             ):
                 raise CodexWsl2LauncherError(
-                    "temporary Codex authentication file is insecure"
+                    "persistent Codex authentication mount is insecure"
                 )
+        if auth_execution is not None:
+            _mark_auth_state_uncertain(auth_execution)
+            auth_state_marker_created = True
         completed = subprocess.run(
             command,
             input=prompt.encode("utf-8"),
@@ -1750,6 +2094,20 @@ def launch(
             observations["error"] = "codex_home_cleanup_failed"
             status = "execution_error"
 
+    if (
+        auth_execution is not None
+        and auth_state_marker_created
+        and completed_returncode == 0
+        and observations.get("codex_home_cleanup_status") == "succeeded"
+    ):
+        try:
+            _finalize_auth_state(auth_execution)
+            observations["authentication_state_persistence"] = "fsynced"
+        except (OSError, AuthExecutionBlocked):
+            observations["authentication_state_persistence"] = "uncertain"
+            observations["error"] = "authentication_state_cleanup_failed"
+            status = "execution_error"
+
     observations["status"] = status or observations.get("status", "execution_error")
     if mode == "judge":
         try:
@@ -1771,6 +2129,77 @@ def launch(
             json.dumps(envelope, ensure_ascii=False, separators=(",", ":")) + "\n"
         )
     return 0 if observations["status"] == "completed" else 2
+
+
+def launch(
+    *,
+    mode: str,
+    output_root: Path,
+    prompt: str,
+    observations_path: Path,
+    model: str,
+    reasoning_effort: str,
+    sandbox_policy: str,
+    workspace_root: Path | None,
+    skill_root: Path | None = None,
+    skill_name: str | None = None,
+    codex_home: Path,
+    runtime_root: Path | None = None,
+) -> int:
+    blockers = _authentication_execution_blockers()
+    if blockers:
+        return _launch_locked(
+            mode=mode,
+            output_root=output_root,
+            prompt=prompt,
+            observations_path=observations_path,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            sandbox_policy=sandbox_policy,
+            workspace_root=workspace_root,
+            skill_root=skill_root,
+            skill_name=skill_name,
+            codex_home=codex_home,
+            runtime_root=runtime_root,
+        )
+    try:
+        with _authentication_execution_context() as auth_execution:
+            return _launch_locked(
+                mode=mode,
+                output_root=output_root,
+                prompt=prompt,
+                observations_path=observations_path,
+                model=model,
+                reasoning_effort=reasoning_effort,
+                sandbox_policy=sandbox_policy,
+                workspace_root=workspace_root,
+                skill_root=skill_root,
+                skill_name=skill_name,
+                codex_home=codex_home,
+                runtime_root=runtime_root,
+                auth_execution=auth_execution,
+            )
+    except AuthExecutionBlocked as exc:
+        _write_observations(
+            observations_path,
+            {
+                "protocol": PROTOCOL,
+                "status": "execution_error",
+                "error": exc.reason,
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "authentication_shell_visible_risk": AUTHENTICATION_SHELL_VISIBLE_RISK,
+                "authentication_refresh_persistence_unresolved": (
+                    AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED
+                ),
+                "authentication_process_concurrency_unresolved": (
+                    AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED
+                ),
+                "authentication_execution_blockers": [exc.reason],
+                "mode": mode,
+            },
+        )
+        return 2
 
 
 def _cleanup_final_message_file(output_root: Path, final_name: str) -> bool:
@@ -1970,6 +2399,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="verify ChatGPT login with the pinned Codex CLI without launching a model",
     )
+    parser.add_argument(
+        "--operator-login",
+        action="store_true",
+        help="run the fixed Codex CLI ChatGPT device login under the dedicated-store lock",
+    )
     parser.add_argument("--mode", choices=("agent", "judge", "repair"))
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--observations-path", type=Path)
@@ -1988,6 +2422,34 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _authentication_status(runtime_root: Path | None) -> tuple[dict[str, str], int]:
+    try:
+        with _authentication_execution_context(allow_uncertain_state=True) as paths:
+            result, exit_code = _authentication_status_locked(runtime_root)
+            result["authentication_store"] = "dedicated_persistent_file"
+            state_uncertain = paths.uncertain_file.exists()
+            result["authentication_state_uncertain"] = state_uncertain
+            if state_uncertain:
+                result["status"] = "state_uncertain"
+                result["authentication_check_status"] = "blocked"
+                exit_code = 2
+            return result, exit_code
+    except AuthExecutionBlocked as exc:
+        return (
+            {
+                "status": "check_failed",
+                "authentication_method": "unknown",
+                "authentication_check_status": "blocked",
+                "runtime_digest_status": "unverified",
+                "codex_cli_version": "unknown",
+                "error": exc.reason,
+            },
+            2,
+        )
+
+
+def _authentication_status_locked(
+    runtime_root: Path | None,
+) -> tuple[dict[str, str], int]:
     try:
         runtime = verify_runtime(runtime_root or runtime_root_from_environment())
     except (CodexWsl2LauncherError, OSError, ValueError) as exc:
@@ -2022,6 +2484,112 @@ def _authentication_status(runtime_root: Path | None) -> tuple[dict[str, str], i
     return result, 0 if verified else 1
 
 
+def _operator_login(runtime_root: Path | None) -> tuple[dict[str, Any], int]:
+    try:
+        with _authentication_execution_context() as paths:
+            try:
+                runtime = verify_runtime(
+                    runtime_root or runtime_root_from_environment()
+                )
+            except (CodexWsl2LauncherError, OSError, ValueError) as exc:
+                return (
+                    {
+                        "status": "check_failed",
+                        "authentication_method": "unknown",
+                        "authentication_check_status": "blocked",
+                        "runtime_digest_status": "unverified",
+                        "codex_cli_version": "unknown",
+                        "error_class": type(exc).__name__,
+                    },
+                    2,
+                )
+            if paths.auth_file.exists() or paths.auth_file.is_symlink():
+                return (
+                    {
+                        "status": "login_blocked",
+                        "authentication_method": "not_checked",
+                        "authentication_check_status": "blocked",
+                        "authentication_state_uncertain": False,
+                        "error": "operator_login_requires_empty_auth_store",
+                    },
+                    2,
+                )
+            _mark_auth_state_uncertain(paths)
+            environment = {
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+                "HOME": str(paths.home),
+                "CODEX_HOME": str(paths.codex_home),
+                "TMPDIR": "/tmp",
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+            }
+            try:
+                login = subprocess.run(
+                    [runtime["codex_path"], "login", "--device-auth"],
+                    stdin=None,
+                    stdout=None,
+                    stderr=None,
+                    env=environment,
+                    check=False,
+                    shell=False,
+                    close_fds=True,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                return (
+                    {
+                        "status": "login_failed",
+                        "authentication_method": "not_verified",
+                        "authentication_check_status": "uncertain",
+                        "authentication_state_uncertain": True,
+                        "error_class": type(exc).__name__,
+                    },
+                    2,
+                )
+            if login.returncode != 0:
+                return (
+                    {
+                        "status": "login_failed",
+                        "authentication_method": "not_verified",
+                        "authentication_check_status": "uncertain",
+                        "authentication_state_uncertain": True,
+                        "codex_cli_exit_code": login.returncode,
+                    },
+                    1,
+                )
+            result, exit_code = _authentication_status_locked(runtime_root)
+            if exit_code != 0 or result.get("authentication_method") != "chatgpt_login":
+                result["authentication_state_uncertain"] = True
+                return result, 1
+            _sync_auth_store(paths)
+            _clear_auth_state_uncertain(paths)
+            return (
+                {
+                    "status": "verified",
+                    "authentication_method": "chatgpt_login",
+                    "authentication_check_status": "verified",
+                    "authentication_store": "dedicated_persistent_file",
+                    "authentication_state_uncertain": False,
+                    "runtime_digest_status": "verified",
+                    "codex_cli_version": "0.163.0",
+                },
+                0,
+            )
+    except (AuthExecutionBlocked, OSError) as exc:
+        reason = (
+            exc.reason if isinstance(exc, AuthExecutionBlocked) else type(exc).__name__
+        )
+        return (
+            {
+                "status": "check_failed",
+                "authentication_method": "unknown",
+                "authentication_check_status": "blocked",
+                "authentication_state_uncertain": True,
+                "error": reason,
+            },
+            2,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     if os.name == "posix":
         signal.signal(
@@ -2053,6 +2621,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.auth_status_only:
         result, exit_code = _authentication_status(args.runtime_root)
+        print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+        return exit_code
+    if args.operator_login:
+        result, exit_code = _operator_login(args.runtime_root)
         print(json.dumps(result, ensure_ascii=True, sort_keys=True))
         return exit_code
     if (
