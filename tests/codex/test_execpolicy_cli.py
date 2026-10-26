@@ -142,6 +142,8 @@ class ExecpolicyCliTests(unittest.TestCase):
         cases = (
             ("git", "push", "origin", "feature"),
             ("git.exe", "push", "origin", "HEAD:feature"),
+            ("git", "push", "origin", "HEAD:feature/target"),
+            ("git.exe", "push", "origin", "feature/current:feature/target"),
             ("git", "push", "-u", "origin", "feature"),
             ("git.exe", "push", "--set-upstream", "origin", "feature"),
         )

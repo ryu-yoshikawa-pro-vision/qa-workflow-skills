@@ -287,6 +287,18 @@ function branchExists(root, name) {
     return false;
   }
 }
+function remoteTrackingBranchExists(root, remote, name) {
+  try {
+    execFileSync(
+      "git",
+      ["-C", root, "show-ref", "--verify", "--quiet", `refs/remotes/${remote}/${name}`],
+      { stdio: "ignore", windowsHide: true },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 function validBranch(root, name) {
   if (!name || ["-", "HEAD", "@{-1}"].includes(name) || name.startsWith("refs/")) return false;
   try {
@@ -564,14 +576,17 @@ function pushSafetyError(args, root, context) {
   if (isProtectedRef(destination, new Set([defaultBranch.branch]))) {
     return "An explicit push to a protected branch is blocked.";
   }
-  if (destination !== context.current) {
-    return "Push destination must be the current branch.";
-  }
   if (source !== "HEAD" && source !== context.current) {
     return "Push source must be the current branch or HEAD.";
   }
+  if (parts.length === 1 && source !== context.current) {
+    return "A single-name refspec must name the current branch.";
+  }
   if (!validBranch(root, destination)) {
     return "Push destination must be one explicit branch name.";
+  }
+  if (!branchExists(root, destination) && !remoteTrackingBranchExists(root, remote, destination)) {
+    return "Push destination must name a known local or remote-tracking branch.";
   }
 
   return pushConfigurationError(root, remote);

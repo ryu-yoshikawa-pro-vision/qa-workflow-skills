@@ -705,6 +705,40 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git push -u origin feature/existing"
         )
 
+    def test_push_allows_an_explicit_refspec_to_a_known_nonprotected_branch(
+        self,
+    ) -> None:
+        allowed = (
+            self.posix_prefix + "git push origin HEAD:feature/target",
+            self.posix_prefix + "git push origin feature/existing:feature/target",
+            self.ps_prefix + "git.exe push --set-upstream origin HEAD:feature/target",
+        )
+        for command in allowed:
+            with self.subTest(command=command):
+                self.assert_hook_allows(command)
+
+        for command in (
+            self.posix_prefix + "git push origin HEAD:feature/not-known",
+            self.posix_prefix + "git push origin feature/target:feature/existing",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+    def test_push_allows_a_known_remote_tracking_destination(self) -> None:
+        subprocess.run(
+            [
+                "git",
+                "update-ref",
+                "refs/remotes/origin/feature/tracked-only",
+                "HEAD",
+            ],
+            cwd=self.repo,
+            check=True,
+        )
+        self.assert_hook_allows(
+            self.posix_prefix + "git push origin HEAD:feature/tracked-only"
+        )
+
     def test_push_uses_the_named_remote_default_branch(self) -> None:
         self.add_remote("secondary", default_branch="develop")
         self.assert_hook_allows(
@@ -799,7 +833,6 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git push origin",
             self.posix_prefix + "git push origin HEAD",
             self.posix_prefix + "git push origin feature/target",
-            self.posix_prefix + "git push origin HEAD:feature/target",
             self.posix_prefix + "git push origin feature/existing feature/target",
             self.posix_prefix
             + "git push origin HEAD:feature/existing HEAD:feature/target",
