@@ -116,7 +116,7 @@ Ruffは固定0.16.8を使い`format_tracked.py ruff-check`とtracked Python全fi
 
 READMEの正式なschema 2 profile、`agent-command.json=["codex"]`、`verification.evidence_path="isolation.json"`、`gpt-6-luna`、reasoning `max`、timeout 900秒、固定Codex runtimeを使い、run root `.agent-eval-runs/pr17-isolation-e87a489-20261025T234245Z`へ新しいevidenceを作成した。固定package / CLI / bwrap digest照合は成功し、evaluator revisionはHEADと一致した。
 
-- Evidence: [isolation.json](../../.agent-eval-runs/pr17-isolation-e87a489-20261025T234245Z/isolation.json)（ignored runtime artifact。repositoryにはcommitしない）
+- Evidence path: `.agent-eval-runs/pr17-isolation-e87a489-20261025T234245Z/isolation.json`（ignored runtime artifact。repositoryにはcommitしない）
 - Profile fingerprint: `sha256:10d3a666dd26c19123cf8ed2cfff1ea4914f14f9f3f5aa15a6316e73c38175d4`
 - Agent/Judge/Repair command fingerprint: `sha256:e25eaf648dc7039953915d93cac78cc23b21b780b60f562ff1aaa53086f25364`
 - Required checks: 14/16 true。`authentication_shell_read_denied=false`、`agent_judge_separated=false`
