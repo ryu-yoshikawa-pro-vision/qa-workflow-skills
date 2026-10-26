@@ -6,7 +6,7 @@
 
 分析Agent・修正Agentは、親Planの共通WSL2二重bubblewrap launcherから起動する。semantic/mixed案件とdeterministic-only案件の全分析・修正・候補再評価・独立回帰を対象とし、Docker専用起動経路を残さない。各呼出しは別process・別outer namespace・run別workspace・別一時`CODEX_HOME`を使い、固定Evaluatorと元targetをmountしない。profile/evidenceが現行方式で`verified`でなければAgentを起動しない。
 
-修正Agentは単一の許可Skill候補rootだけを書込み可能にする。許可相対pathは`SKILL.md`、`references/**`、`scripts/**`、`assets/**`に限り、他Skill・Evaluator・target・scenario・rubric・Judge fixtureはread-onlyまたは非公開とする。candidate rootはrunごとに作成し、実行前後manifestと許可path diffを検証する。Codex sandboxの要求によって他sourceまで書込み可能にしない。Codex CLI `0.163.0`、bwrap digest、network boundary、FD、namespace/procfs、timeout/cleanupは親Planの証拠契約に従う。認証情報shell可視性は残留リスクとし、実認証・model API利用は別承認なしに行わない。
+修正Agentは単一の許可Skill候補rootだけを書込み可能にする。許可相対pathは`SKILL.md`、`references/**`、`scripts/**`、`assets/**`に限り、他Skill・Evaluator・target・scenario・rubric・Judge fixtureはread-onlyまたは非公開とする。candidate rootはrunごとに作成し、実行前後manifestと許可path diffを検証する。Codex sandboxの要求によって他sourceまで書込み可能にしない。Codex CLI `0.163.0`、bwrap digest、network boundary、FD、namespace/procfs、timeout/cleanupは親Planの証拠契約に従う。synthetic markerのinner shell read-denyはfresh evidenceでverifiedだが、実認証fileでは検証していない。refresh永続化とprocess間競合は未解決で、launcherは全modeをfail-closedにし、実認証・model API利用も別承認なしに行わない。
 
 ## 目的と完了条件
 

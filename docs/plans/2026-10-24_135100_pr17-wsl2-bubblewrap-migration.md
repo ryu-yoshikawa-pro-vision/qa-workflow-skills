@@ -6,9 +6,15 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 このPlanは利用者が2026-10-24に承認した実行方式変更を具体化する。実認証・モデルAPI利用、Judge fixture承認、候補Skill自動採用、merge、closeは含まない。
 
+## 2026-10-26 現在状態
+
+最新の検証対象HEADは`a960f8728bb2e2c14e282d639170ffed6af11e9a`です。このHEADのfresh schema 2 probeは16/16 required checks true、Agent/Judge/Repairの各mode verified、profile・command・runtime fingerprint一致、`model_api_used=false`でした。synthetic auth markerのread拒否は正式二重sandbox経路で確認済みです。文書更新後に作成するcommitでは、READMEの手順に従いclean final HEADに対するprobeを再生成します。
+
+認証refresh後の更新永続化と、非協調Codex processを含むprocess間競合は未解決です。attempt-local auth copyのrefresh結果は次attemptへ保持されず、CLI内部のlockは別processと共有されません。この2条件のいずれかが未解決なら共通launcherはAgent/Judge/Repairを認証確認・copy・Codex起動前にfail-closedにします。したがって現時点で実Agent、Judge、QTS評価を実行できません。evidence・試験環境・最新5 CIの詳細は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)を参照してください。以降の日付付き実行記録は各記録の対象HEAD時点の履歴です。
+
 ## 2026-10-24 ChatGPT認証限定の追加指示
 
-後続の明示依頼により、schema 2 launcherの認証をChatGPT loginだけに限定し、固定Codex CLIの`codex login status`で状態を確認する変更を追加する。この追加指示は本Planの「認証全面変更を含まない」という除外を、ChatGPT方式確認とAPI Key fallback廃止の範囲だけ上書きする。ログイン操作、認証情報の移動・復元、実モデル/API呼び出しは許可しない。ChatGPT loginでもCodex shellから認証fileが見える残留リスクは維持し、`authentication_shell_visible_risk=true`を変更しない。
+後続の明示依頼により、schema 2 launcherの認証をChatGPT loginだけに限定し、固定Codex CLIの`codex login status`で状態を確認する変更を追加する。この追加指示は本Planの「認証全面変更を含まない」という除外を、ChatGPT方式確認とAPI Key fallback廃止の範囲だけ上書きする。ログイン操作、認証情報の移動・復元、実モデル/API呼び出しは許可しない。後続のnamed permissions profileとsynthetic marker試験ではshell read-denyを確認したが、実認証fileは使用していない。refresh永続化とprocess間競合は未解決で、実Agent runはfail-closedにする。
 
 ## 2026-10-26 固定CLI permissions profileによるshell read拒否
 
@@ -16,7 +22,7 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 固定CLIは--sandbox workspace-writeまたはread-onlyを渡すとlegacy sandbox modeを構成し、named default_permissions profileを使わない。このため本番argvから--sandboxを外し、一時CODEX_HOME/config.tomlと--config default_permissions="qa_eval_<mode>"で同じmode profileを選択する。Agent/Repairのworkspace-write、Judgeのread-only、inner shell network拒否を維持する。合成smokeはstore path、symlink alias、/proc/self/root、/proc/1/root、host path、他attempt path、environment、process FDからのread拒否をmodeごとに検査し、親process側のstore read可否も確認する。[fixed CLI permissions](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/config/permissions.rs)と[fixed bwrap](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/linux-sandbox/src/bwrap.rs)を参照する。
 
-2026-10-26の通常WSL2 host上のformal launcher integration testはAgent/Judge/RepairすべてでPASSした。これは合成markerとlauncher smokeの証拠であり、commit済みclean HEADに対するfresh schema 2 full probe、実認証file、Codex親processの実モデル通信まで証明するものではない。full probeでは16 checksすべてtrue、全mode verified、revision/profile/command/runtime fingerprint一致、model_api_used=falseを別途確認する。auth read拒否testが失敗・未実行ならauthentication_shell_visible_risk=trueを維持する。
+2026-10-26の通常WSL2 host上のformal launcher integration testはAgent/Judge/RepairすべてでPASSした。HEAD `a960f8728bb2e2c14e282d639170ffed6af11e9a`に対するfresh schema 2 full probeも別途実行し、16 checksすべてtrue、全mode verified、revision/profile/command/runtime fingerprint一致、`model_api_used=false`を確認した。これは合成marker read-denyを示すが、実認証fileやCodex親processの実モデル通信を検証していない。後続の最終commitには再度fresh evidenceを生成する。
 
 ### 認証storage modeの比較と未解決条件
 
@@ -37,7 +43,7 @@ PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codex�
 
 CLIのrefresh semaphoreは同一`AuthManager`内の排他であり、別プロセス間では共有されない。file backendにもCLI横断のlockはなく、別attemptの一時copy、または同じ元storeを指定した外部Codex processとのrefresh競合を防止できない。固定CLIの公式実装は[auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)、[token persistence](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)、[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)で確認する。
 
-評価専用の永続`CODEX_HOME`をユーザーが公式Codex CLIで管理する案は、refresh結果を同じstoreに保存する点では候補となる。しかし、Agent shellからの認証file可視性は解決せず、同storeを利用する非協調プロセスの競合もrunner内lockだけでは防げない。新しい方式で認証情報の露出を増やさないこと、競合時にfail-closedとなること、連続attemptで更新結果を安全に使えることを合成検証できていないため、未検証の回避策は採用しない。`authentication_shell_visible_risk=true`と二重bubblewrapは維持し、実認証を使う評価は停止する。
+評価専用の永続`CODEX_HOME`をユーザーが公式Codex CLIで管理する案は、refresh結果を同じstoreに保存する点では候補となる。しかし、同storeを利用する非協調processとの競合はrunner内lockだけでは防げず、永続store単独で評価shellと外部processの安全境界を作れない。現行named permissions profileはsynthetic markerをinner shellから隠すことを実測したが、実認証を使った保存・連続attempt・process競合検証は行っていない。未検証の回避策は採用せず、二重bubblewrapを維持して実認証評価を停止する。
 
 2026-10-25の`--auth-status-only`は固定runtimeでChatGPT loginを確認したが、refresh保存、競合防止、実認証fileのshell可視性は検証していない。詳細、現環境でのsuite結果、実行再開条件は[調査・検証報告 v04](../reports/2026-10-25_pr17-chatgpt-auth-recovery_v04.md)に記録する。古いevidenceを新しいrevisionの受入根拠に流用しない。
 
@@ -62,19 +68,19 @@ formal probeは次の条件を満たしたclean evaluator revision上で改め�
 
 追加したformal smokeはAgent/Judge/Repairそれぞれで合成markerを`/codex-home/auth.json`へ置き、store本体、host側store path、他attempt store、environment、可視process FDに関するread可否・存在情報を値を出さずbooleanで検査する。markerが見えればmodeと全体evidenceをverifiedにしない。非協調processを含む全store競合の方式はまだ確立していないため、runner lockだけで解決済みとは扱わない。
 
-固定Codex CLI `0.163.0`の公式実装で確認できるrefresh mutexは同一`AuthManager`内に限られ、file backendは選択された`CODEX_HOME/auth.json`へtruncate/write/flushする。Codex CLIには`CODEX_REFRESH_TOKEN_URL_OVERRIDE`があるが、固定CLIの`login status`は保存済みmodeを判定するだけでrefreshしない。loopback mock endpointを使うCodex source testなら、synthetic tokenのrefresh・persist・reloadを外部モデル通信なしで検査できる。ただしこのoverrideはsource上でtest-onlyに制限されず、production launcherでは使わない。Codex CLIを使う外部processがrunner独自lockを取得する公式契約はない。よってrunner内lockのsynthetic testだけで非協調processとの競合を解消したと扱わない。shell marker可視性またはprocess競合が解決できない場合は認証方式を変えず、`authentication_shell_visible_risk=true`を維持し、実認証runをfail-closedにする。根拠は[Codex 0.163.0 auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)および[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)。
+固定Codex CLI `0.163.0`の公式実装で確認できるrefresh mutexは同一`AuthManager`内に限られ、file backendは選択された`CODEX_HOME/auth.json`へtruncate/write/flushする。Codex CLIには`CODEX_REFRESH_TOKEN_URL_OVERRIDE`があるが、固定CLIの`login status`は保存済みmodeを判定するだけでrefreshしない。loopback mock endpointを使うCodex source testなら、synthetic tokenのrefresh・persist・reloadを外部モデル通信なしで検査できる。ただしこのoverrideはsource上でtest-onlyに制限されず、production launcherでは使わない。Codex CLIを使う外部processがrunner独自lockを取得する公式契約はない。よってrunner内lockのsynthetic testだけで非協調processとの競合を解消したと扱わない。synthetic shell marker read-denyはfresh probeでverifiedだが、更新永続化・process競合は未解決のため、launcherは全modeをfail-closedにする。根拠は[Codex 0.163.0 auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)および[file storage](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/storage.rs)。
 
-## 2026-10-26 認証可視性checkと実行停止
+## 2026-10-26 認証可視性checkと実行停止（HEAD 73328d4時点）
 
 作業開始HEAD `73328d4237a5c1ab913938ed83f980ee9b5a9a37`を基準に、launcherの現行copy/cleanup経路でfake childがattempt専用`auth.json`だけを更新し、cleanup後のattempt 2が元の古いmarkerを読む回帰testを追加した。このtestはrunnerのfile操作で更新結果を失うことを示すもので、Codex CLI自身のOAuth refresh成功や既発生の`refresh_token_reused`の直接原因を証明しない。固定CLI本体のrefresh/persist/reload source harnessは本repositoryにないため実行していない。
 
 正式な`sandbox_smoke()`は合成auth markerをattempt homeへ置き、各Agent/Judge/Repairのinner shellから`/codex-home/auth.json`、host側のstore path、他attemptのauth pathを開けないこと、markerがenvironmentに含まれないこと、可視process FDのtargetにauth storeが現れないことを値を出力せず確認する。既存15 required checksに認証可視性checkを加え、合計16件すべてをprofile evidenceの必須条件とする。marker readが可能な場合はmode evidenceと全体evidenceをverifiedにせず、`authentication_shell_visible_risk=true`を維持する。
 
-認証更新・全process競合・shell可視性を同時に満たす実装方法はまだ確定していない。このため`launch()`は同riskがtrueの間、Agent/Judge/Repairいずれも`_auth_material()`、auth file copy、Codex起動より前に`execution_error`で停止する。専用persistent `CODEX_HOME`、runner内だけのOS lock、file permission変更は非協調のCodex processやinner shell可視性を解決しないため導入しない。`authentication_shell_visible_risk=true`は残し、TC-OUT-001を含む実モデル通信を開始しない。
+当該HEAD時点ではshell read-denyも未解決だった。後続のnamed permissions profileとsynthetic marker試験では、全modeのshell read-denyをformal evidenceで確認した。現行launcherは`authentication_refresh_persistence_unresolved`または`authentication_process_concurrency_unresolved`のいずれかがtrueなら、Agent/Judge/Repairいずれも`_auth_material()`、auth file copy、Codex起動より前に`execution_error`で停止する。専用persistent `CODEX_HOME`、runner内だけのOS lock、file permission変更は非協調Codex processとの競合を解決しないため導入しない。refresh永続化とprocess競合が解決されるまで、TC-OUT-001を含む実モデル通信を開始しない。
 
-probe setupでhost AF_UNIX bindが失敗したとき一時auth home、other-attempt home、outside sentinel、socketをcleanupする経路を追加し、cleanup failureを隠さず専用safe errorとして返す。Codex開発sandboxではformal launcher integrationがAF_UNIX bind時に`EPERM`で停止したため、新しいmarker checkまで到達していない。通常WSL2ターミナルからの前回293件Deterministic suite / 1件integration / host socket PASSはその前の実装revisionの報告であり、新checkを含む現在の実装証拠として流用しない。現在のrevision向け通常WSL2 commandとfresh evidence手順はAgent READMEに記録し、probe成功・fresh evidence生成までは未完了とする。
+probe setupでhost AF_UNIX bindが失敗したとき一時auth home、other-attempt home、outside sentinel、socketをcleanupする経路を追加し、cleanup failureを隠さず専用safe errorとして返す。HEAD `73328d4`時点のCodex開発sandboxではformal launcher integrationがAF_UNIX bind時に`EPERM`で停止したが、この失敗は通常WSL2 hostでは再現しなかった。後続HEAD `a960f87`で通常WSL2上のDeterministic repository suite 293件、formal integration 1件、fresh full probe 16/16がPASSした。これらのevidenceは各対象revisionに限る。検証環境・fresh evidence pathとfingerprintの現状は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)を参照する。
 
-変更後の個別suite結果、未実施のCodex source refresh harness、認証競合・残留risk、および再開条件は[認証調査報告 v05](../reports/2026-10-26_pr17-chatgpt-auth-recovery_v05.md)に記録する。
+当該時点の個別suiteと認証調査は[認証調査報告 v05](../reports/2026-10-26_pr17-chatgpt-auth-recovery_v05.md)および[v06](../reports/2026-10-26_pr17-chatgpt-auth-recovery_v06.md)に記録する。現在状態は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)を参照する。
 
 ## 2026-10-26 HEAD e87a489のfresh WSL2合成検証
 
@@ -107,7 +113,7 @@ GitHub PR #17のHEAD `e87a4890514af6bff09b90bb180e4dcd9c3fddb7`に一致するcl
 - Agent / Judgeは別process、別outer bwrap、別作業領域、別一時`CODEX_HOME`とする。Judge入力はstdinのみ、shell/MCP/web/Skill rootは無効、JSONLにtool eventがあれば`judge_unverified`を維持し、raw JSONLは保存しない。
 - `executor.run_command()`のargv起動、`shell=False`、`close_fds=True`、timeout、process-tree cleanup、safe diagnostic、既存stdin/stdout/stderr契約を再利用する。
 - 旧Docker結果は保持するが、新profileとの品質比較には使用しない。必須隔離条件が1つでも未確認のrunは`isolation_unverified`となり、正式評価に進めない。
-- 実認証は今回の方式変更承認に含まれない。合成markerで実認証の安全性を推定しない。認証がshellから見える残留リスクを記録し、隔離受入が成立しても実認証評価を開始しない。
+- 実認証は今回の方式変更承認に含まれない。synthetic markerでinner shell read-denyは検証済みだが、実認証の保存・read boundaryは試験していない。refresh永続化とprocess競合が未解決でlauncherがfail-closedの間は、隔離probeがverifiedでも実認証評価を開始しない。
 
 ## 実行記録（2026-10-24）
 

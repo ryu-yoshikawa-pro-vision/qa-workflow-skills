@@ -8,6 +8,10 @@
 
 初回評価結果はSkill改善のbaselineとして利用します。分析・修正・再評価は親Planの[改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)に従い、条件を満たすものだけ自動で進めます。根拠不足や高リスクはレビュー待ちに分け、検証済み候補でも自動採用しません。比較対象は明示的に使用を要求したSkillによる**分析・設計workflowの成果物品質**です。リポジトリ内の全Skillの実環境動作、native trigger精度、ブラウザE2Eの品質まで保証したとは扱いません。
 
+## 2026-10-26 現在の実行ゲート
+
+固定QTS revision、scenario、verifier契約、11件のJudge fixtureは変更していません。PR #17の共通launcherはsynthetic shell read-denyとWSL2 isolation probeを通過していますが、attempt-local auth copyでrefresh更新が失われる問題と、非協調Codex processを含むrefresh競合は未解決です。launcherがAgent/Judgeをfail-closedにするため、QTS実Agent attempt、artifact評価、Judge実行は開始していません。fixtureはpendingのまま保持し、状態と個別レビュー根拠は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)を参照します。
+
 ## 2026-10-24 実行方式の更新
 
 Agent、Judge、修正Agentは親PlanのWSL2 Ubuntu上の二重bubblewrap契約を使用する。評価用の実行本体はWSL2 clean checkoutから起動し、Windows開発checkoutや`/mnt/c`をAgent/Judgeへ公開しない。outer bwrapは必要なruntimeとsanitized target、候補Skill、attempt output、mode別一時`CODEX_HOME`だけをmountし、Evaluator原本と固定target sourceはmountしない。targetと固定Skillはouter mountでもread-onlyにし、許可outputとCodexの実行に必要と実測された一時領域だけをwrite可能にする。
@@ -223,7 +227,7 @@ sanitized targetは単なるファイルコピーであり、`cwd`の変更だ�
 - Agent subprocessはsanitized targetを`cwd`にして起動する。評価側の原本・grader・Judge資料・採点結果・元target checkoutを、Agentがアクセス可能なファイルシステム、追加のtool / MCP / mount、ネットワーク経路から隔離する。
 - 親PlanのWSL2 outer bubblewrap + Codex inner Linux sandboxを使う。target workspace sourceをouter mountでread-onlyにし、`.qa-eval-output/`だけにattempt専用write mountを重ねる。inner Codex sandboxはshell境界であり、Evaluator隔離はouter mountが担当する。inner workspace-writeが要求する`.git`等の一時writeについては、必要な専用場所だけを別mountして実測し、sourceをwrite可能にしない。
 - 同じmode・実効mountでEvaluator-onlyの非秘密sentinel、Windows sentinel、他attempt領域のread denial、source write denial、output write許可、FD非継承、namespace/procfsとtool/MCP混入なしをsynthetic probeとformal launcherから確認し、証拠をrunへ記録する。fake Agentだけでは実Codex境界の成立と扱わない。
-- outer networkはCodex親processのmodel API通信用に維持し、inner shellのTCP/DNS/AF_UNIX/WSL interop/localhostを遮断する。試行した宛先1件だけの失敗をegress遮断とみなさない。auth shell可視性は残留リスクとして記録し、実認証・model API評価は別途承認なしに行わない。
+- outer networkはCodex親processのmodel API通信用に維持し、inner shellのTCP/DNS/AF_UNIX/WSL interop/localhostを遮断する。試行した宛先1件だけの失敗をegress遮断とみなさない。synthetic auth markerのshell read-denyはfresh isolation evidenceで確認したが、実認証fileは使用していない。refresh永続化とprocess間競合が未解決のため実Agent/Judge runはfail-closedとし、実認証・model API評価は安全条件と別途承認が成立するまで行わない。
 - Evaluator資料のread-denial、source/Skill write-denial、inner shell network制限、余分なSkill/MCP/web検索の無効化を確認できないrunは`isolation_unverified`として比較から除外する。JudgeはAgentとは別process・別outer namespace・別workspace・別一時`CODEX_HOME`で起動し、Agent workspaceをmountしない。秘密情報はログ・provenanceへ記録しない。
 
 ## source変更の扱い

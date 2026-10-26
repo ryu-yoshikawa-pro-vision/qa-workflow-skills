@@ -2,11 +2,15 @@
 
 [親Plan](./2026-10-03_132700_agent-eval-runner.md)のJudge独立評価・改善を定義する。[Skill改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)と[固定対象評価Plan](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md)を補完する。既存の`semantic/prompt_builder.py`、`result.py`、`rubric.json`、`reference.md`とEvaluator-only fixtureを再利用する。新しいJudge採点方式・Agent runtime・DBは作らない。
 
+## 2026-10-26 fixtureの現在状態
+
+QTS target revision `84ce165493649550832731a60cf436f8ae29c56b`の11 fixtureは、`pending_deterministic_review`が2件、`pending_human_review`が9件、`approved`が0件です。001/002 mutationはsynthetic baselineで既存deterministic validatorに入力し、required routing/artifactの欠落・incompleteを検知することを確認しましたが、実baseline artifactと承認bindingがないためrating 1のgold labelへは昇格していません。人間レビュー用の規範根拠・推奨・質問は[PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)に整理しました。未承認fixtureによるJudge評価は停止し、他の独立deterministic workは継続可能です。
+
 ## 2026-10-24 Judge実行境界
 
 実JudgeとJudge candidateは親Planの共通WSL2二重bubblewrap launcherを独立Judge modeで使う。Agentとは別process、別outer namespace、別cwd/workspace、別一時`CODEX_HOME`とし、Agent workspaceや修正候補領域をmountしない。Judgeに必要な入力だけstdinで渡し、shell、MCP、追加Skill root、web検索は無効化する。JSONLはmemory内でtool eventを検査し、tool eventがあれば`judge_unverified`とし、raw JSONLは保存しない。
 
-Judge run開始前に、固定Evaluator/target revision、Codex CLI/package/bwrap digest、Judge mode、実効argv・mount/network設定、profile schema 2と一致するfresh isolation evidenceを要求する。Docker由来のprofile/evidenceは新方式をverifiedにしない。通常Judge profileの必要最小限の認証は一時`CODEX_HOME`からshellが読める可能性を残留リスクとして記録し、実認証・model API利用は別途承認なしに行わない。QTS production verifierはCodexを起動しないため、親Planで定めた固定Docker verifier契約のまま維持する。
+Judge run開始前に、固定Evaluator/target revision、Codex CLI/package/bwrap digest、Judge mode、実効argv・mount/network設定、profile schema 2と一致するfresh isolation evidenceを要求する。Docker由来のprofile/evidenceは新方式をverifiedにしない。fresh evidenceではsynthetic auth markerのinner shell read-denyを確認しているが、実認証fileは試験していない。refresh永続化と非協調processとの競合は未解決のため、共通launcherはJudgeを含む全modeをfail-closedにする。実認証・model API利用は別途の安全条件・承認なしに行わない。QTS production verifierはCodexを起動しないため、親Planで定めた固定Docker verifier契約のまま維持する。
 
 ## 目的と責務
 

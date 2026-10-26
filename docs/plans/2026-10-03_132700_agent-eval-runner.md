@@ -18,14 +18,14 @@ Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent
 - Agent/Judge/Repairは毎回別process・別outer namespace・別workspace・別一時`CODEX_HOME`を使う。JudgeへAgent workspaceをmountせず、Judge promptはstdinのみで渡す。
 - outer networkはCodex親processの許可されたモデルAPI通信のため保持する。inner Codex sandboxはshellのTCP/DNS/AF_UNIX/WSL interop等を遮断する。各境界の実効probe結果を分けて保存し、一部の宛先の失敗だけでegress遮断済みと扱わない。
 - inner workspace-writeの要求を満たすため、許可outputと実測で必要な専用一時場所のみを書込み可能にする。候補Skill・固定target sourceはouter mountでも変更不能とし、実行前後manifestを照合する。必要な安全な書込み境界が成立しない実行方式は採用しない。
-- 認証方式はChatGPTアカウントでサインインしたCodex CLIに限定する。schema 2 launcherは固定runtimeの`codex login status`でChatGPT方式を確認し、API Key、未ログイン、不明・失敗、未確認store、固定CLI version不一致を拒否する。`OPENAI_API_KEY` / `CODEX_API_KEY` fallbackとWindows側の認証探索・コピーは禁止する。Agent/Judge/Repairごとに必要な認証fileだけを独立一時`CODEX_HOME`へ複製する。過去の合成検証でshellからcredential markerを読めたため、認証方式の限定後も`authentication_shell_visible_risk=true`を維持し、実モデル利用は隔離残留リスク・ChatGPT利用枠・別途の明示承認を確認するまで開始しない。
+- 認証方式はChatGPTアカウントでサインインしたCodex CLIに限定する。schema 2 launcherは固定runtimeの`codex login status`でChatGPT方式を確認し、API Key、未ログイン、不明・失敗、未確認store、固定CLI version不一致を拒否する。`OPENAI_API_KEY` / `CODEX_API_KEY` fallbackとWindows側の認証探索・コピーは禁止する。Agent/Judge/Repairごとに必要な認証fileだけを独立一時`CODEX_HOME`へ複製する。固定Codex CLI named permissions profileの正式合成検査で、inner shellからauth markerを読む経路をAgent/Judge/Repair別に拒否できることを確認した。`authentication_shell_visible_risk=false`はこの合成検査に限り、実認証fileを使った確認ではない。refresh永続化と非協調process競合は未解決で、両方がtrueの間は実モデル利用を開始しない。
 - isolation evidenceはEvaluator revision、固定CLI/bwrap packageとbinary digest、profile、mode、実効argv、mount/network構成、probe versionに結び付ける。どれかの必須検査が欠落・不一致なら`isolation_unverified`としてlive評価を拒否する。旧Docker evidenceは新方式の証拠として再利用しない。
 
 ## 2026-10-26 認証・隔離の安全停止追記
 
-fixed Codex CLI `0.163.0`のrefresh storage保存だけでは、attempt copy後の更新喪失、非協調processとの競合、inner shellからのauth marker可視性を解決しない。合成fake child testで現行copy/delete方式のattempt間更新喪失を再現し、formal smokeにAgent/Judge/Repair別のsynthetic auth marker negative checksを追加した。既存15 checksに認証可視性checkを加えた16項目すべてをfresh evidenceに要求する。
+fixed Codex CLI `0.163.0`のrefresh storage保存だけでは、attempt copy後の更新喪失と非協調processとの競合を解決しない。合成fake child testで現行copy/delete方式のattempt間更新喪失を再現し、formal smokeにAgent/Judge/Repair別のsynthetic auth marker negative checksを追加した。既存15 checksに認証可視性checkを加えた16項目すべてをfresh evidenceに要求する。HEAD `a960f8728bb2e2c14e282d639170ffed6af11e9a`では16/16 checksと3 mode verifiedを確認したが、文書更新後のcommitに対するprobeを最終根拠とする。
 
-可視性と競合を解決する安全な方式は未確定のため、launcherは`authentication_shell_visible_risk=true`の間、全modeでauth確認・copy・Codex起動前にfail-closedする。ChatGPT login限定、API Key fallback禁止、二重bubblewrap、既存評価契約は維持する。TC-OUT-001や他の実モデル通信は停止条件が解消されるまで開始しない。fresh formal evidenceの通常WSL2実行条件は[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)と[Agent README](../../scripts/skills/evals/agent/README.md)を参照する。
+launcherはrefresh永続化またはprocess間競合のいずれかが未解決なら、全modeでauth確認・copy・Codex起動前にfail-closedする。ChatGPT login限定、API Key fallback禁止、二重bubblewrap、既存評価契約は維持する。TC-OUT-001や他の実モデル通信は停止条件と必要な利用承認が揃うまで開始しない。fresh formal evidenceの通常WSL2手順は[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)と[Agent README](../../scripts/skills/evals/agent/README.md)を参照する。
 
 ## 基準
 
@@ -436,7 +436,7 @@ EvaluatorとAgentの間に、ディレクトリ分割だけでなく**OS等に�
 2. launcherはCodex CLI `0.163.0`のLinux x64 package配布元・version・SHA-512を照合し、そのCLI binaryと同梱bwrapの実体・digestを記録する。外側bwrapは使い捨てroot、user/PID/mount namespace、fresh procfs、最小`/dev`、`/tmp` tmpfsを要求する。実効outer argvはlauncher内部で組み立て、profileから任意mount・binary・optionを注入できないよう検証する。
 3. outer network namespaceは作らない。Codex親processは許可されたモデルAPIへ通信する。Codexのinner `workspace-write` sandboxではshell/network accessを無効にし、TCP socket、DNS、AF_UNIX、WSL interop、localhost等をprobeする。Codex設定で内側shellだけを制限できない、またはnegative testが失敗した場合は`isolation_unverified`としてlive評価を拒否する。既存テストの一宛先失敗を全経路遮断の証拠にしない。
 4. workspace sourceと固定Skill/targetはouter mountでread-onlyにする。`.qa-eval-output/`、inner Codex準備に必要と実測した一時領域（必要ならattempt専用`.git`）だけを書込み可能にし、Codex workspace-writeと整合することをformal launcher経路で検証する。準備領域を増やしてもsourceが変更可能ならその構成は不適合とする。Agent開始前後のsource manifestを比較し、変化があれば結果を無効化する。
-5. 一時`CODEX_HOME`には必要最小限の認証だけを複製する。ホストの`~/.codex`、秘密内容・hash、生environmentは公開・保存しない。ただし過去の合成検証ではCodex shellから合成認証を読めたため、実認証も可視となる残留リスクをREADME/profile/reportへ記録する。実認証・model API利用は別途承認を確認するまで実行しない。
+5. 一時`CODEX_HOME`には必要最小限の認証だけを複製する。ホストの`~/.codex`、秘密内容・hash、生environmentは公開・保存しない。固定Codex CLI named permissions profileのformal synthetic probeではAgent/Judge/Repair shellからauth markerを読めず、親Codex processからは読めることを確認した。この結果は実認証fileの検証ではない。refresh永続化とprocess間競合をREADME/profile/reportへ未解決として記録し、全modeをfail-closedにする。実認証・model API利用は技術条件と別途承認を満たすまで実行しない。
 6. Agent/Judge/Repairは同じlauncher実装を使うが、modeごとに別process、別outer bwrap、別workspaceとtemp `CODEX_HOME`を作る。Judge rootにsanitized target・Agent側workspace・Agent側`CODEX_HOME`をmountせず、stdin promptだけを入力とする。Judgeではshell / MCP / Skill roots / web searchを無効化し、JSONL内tool eventは`judge_unverified`にし、raw JSONLは保存しない。
 7. formal launcherとprobe経路に、固定sentinelを使う正常・拒否probeを実装する。FD、path/symlink、mount、namespace、procfs、read/write、network、WSL interop、他mode root、profile/binary/evidence改ざんを確認し、各実観測・exit codeを証拠として保存する。欠落・不一致・cleanup failureはfail-closedとする。
 8. 合成データの全必須negative testが成立し、formal launcherから認証なし`codex sandbox --permission-profile :read-only` smokeが成功した場合に限り、sandbox実行条件を`verified`候補とする。live `codex exec`、実Agent/Judge品質評価、実credential使用は今回の移行と分け、必要な承認がない限り開始しない。
