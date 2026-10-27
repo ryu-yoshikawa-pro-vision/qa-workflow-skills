@@ -10,6 +10,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import unittest
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
@@ -985,7 +986,20 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             root = Path(temporary)
             codex_home = root / "service-home" / ".codex"
             codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="ascii")
+            os.chmod(auth_file, 0o600)
             paths = synthetic_auth_paths(root, codex_home)
+            child_home = root / "child-home"
+            child_tmp = root / "child-tmp"
+            child_home.mkdir(mode=0o700)
+            child_tmp.mkdir(mode=0o700)
+            child_env = {
+                "PATH": os.environ.get("PATH", os.defpath),
+                "HOME": str(child_home),
+                "CODEX_HOME": str(child_home / ".codex"),
+                "TMPDIR": str(child_tmp),
+            }
             patches = (
                 patch.object(
                     codex_wsl2_bwrap_launcher,
@@ -1014,6 +1028,29 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     )
                     self.assertEqual(child.returncode, 17)
 
+                    # A process started after the inventory check and ignoring
+                    # flock can still read a same-UID store. This is a synthetic
+                    # demonstration of the lock's cooperation boundary.
+                    read_marker = subprocess.run(
+                        [
+                            sys.executable,
+                            "-c",
+                            "from pathlib import Path; import sys; "
+                            "print(Path(sys.argv[1]).read_text(encoding='ascii') "
+                            "== 'SYNTHETIC_AUTH_MARKER')",
+                            str(auth_file),
+                        ],
+                        env=child_env,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        timeout=10,
+                        check=False,
+                        close_fds=True,
+                    )
+                    self.assertEqual(read_marker.returncode, 0)
+                    self.assertEqual(read_marker.stdout.strip(), b"True")
+
                 codex_wsl2_bwrap_launcher._mark_auth_state_uncertain(paths)
                 self.assertEqual(
                     paths.uncertain_file.read_text(encoding="ascii"),
@@ -1030,6 +1067,99 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     pass
                 codex_wsl2_bwrap_launcher._clear_auth_state_uncertain(paths)
                 self.assertFalse(paths.uncertain_file.exists())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process and flock behavior")
+    def test_timed_out_attempt_keeps_uncertain_marker_and_refuses_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            child_home = root / "child-home"
+            child_home.mkdir(mode=0o700)
+            codex_home = child_home / ".codex"
+            codex_home.mkdir(mode=0o700)
+            paths = synthetic_auth_paths(root, codex_home)
+            child_tmp = root / "child-tmp"
+            child_tmp.mkdir(mode=0o700)
+            child_env = {
+                "PATH": os.environ.get("PATH", os.defpath),
+                "HOME": str(child_home),
+                "CODEX_HOME": str(codex_home),
+                "TMPDIR": str(child_tmp),
+                "PYTHONPATH": str(codex_wsl2_bwrap_launcher.REPO_ROOT),
+            }
+            child_code = "\n".join(
+                (
+                    "import os,sys,time",
+                    "from pathlib import Path",
+                    "from scripts.skills.evals.agent.tools import "
+                    "codex_wsl2_bwrap_launcher as launcher",
+                    "from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher "
+                    "import AuthExecutionPaths",
+                    "paths=AuthExecutionPaths(",
+                    "uid=os.geteuid(),",
+                    "home=Path(sys.argv[1]),",
+                    "codex_home=Path(sys.argv[2]),",
+                    "auth_file=Path(sys.argv[3]),",
+                    "state_dir=Path(sys.argv[4]),",
+                    "lock_file=Path(sys.argv[5]),",
+                    "uncertain_file=Path(sys.argv[6]))",
+                    "launcher._evaluation_auth_paths=lambda:paths",
+                    "launcher._assert_no_other_service_processes=lambda _uid:None",
+                    "with launcher._authentication_execution_context():",
+                    " launcher._mark_auth_state_uncertain(paths)",
+                    " time.sleep(60)",
+                )
+            )
+            child = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    child_code,
+                    str(child_home),
+                    str(codex_home),
+                    str(paths.auth_file),
+                    str(paths.state_dir),
+                    str(paths.lock_file),
+                    str(paths.uncertain_file),
+                ],
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+            try:
+                deadline = time.monotonic() + 10
+                while (
+                    not paths.uncertain_file.exists()
+                    and child.poll() is None
+                    and time.monotonic() < deadline
+                ):
+                    time.sleep(0.01)
+                self.assertTrue(paths.uncertain_file.exists())
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    child.wait(timeout=0.05)
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                child.wait(timeout=5)
+
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher, "_assert_no_other_service_processes"
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    AuthExecutionBlocked, "authentication_state_uncertain"
+                ):
+                    with codex_wsl2_bwrap_launcher._authentication_execution_context():
+                        self.fail("timed-out auth attempt must refuse retry")
+                codex_wsl2_bwrap_launcher._clear_auth_state_uncertain(paths)
+            self.assertFalse(paths.uncertain_file.exists())
 
     def test_service_process_inventory_blocks_unexpected_codex_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1408,6 +1538,16 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             auth_source = source_home / "auth.json"
             auth_source.write_text(old_marker, encoding="utf-8")
             os.chmod(auth_source, 0o600)
+            child_home = root / "child-home"
+            child_tmp = root / "child-tmp"
+            child_home.mkdir(mode=0o700)
+            child_tmp.mkdir(mode=0o700)
+            child_env = {
+                "PATH": os.environ.get("PATH", os.defpath),
+                "HOME": str(child_home),
+                "CODEX_HOME": str(source_home),
+                "TMPDIR": str(child_tmp),
+            }
             first_home = home_parent / f"{CODEX_HOME_PREFIX}agent-first"
             second_home = home_parent / f"{CODEX_HOME_PREFIX}agent-second"
 
@@ -1423,9 +1563,28 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 'cli_auth_credentials_store = "file"',
                 (first_home / "config.toml").read_text(encoding="utf-8"),
             )
-            # This synthetic write models the parent Codex process persisting to
-            # the bind-mounted store. It does not test Codex CLI refresh itself.
-            auth_source.write_text(refreshed_marker, encoding="utf-8")
+            # Separate fake child processes model writes to and reloads from the
+            # persistent bind source. This does not test Codex CLI refresh itself.
+            update_child = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "from pathlib import Path; import sys; "
+                    "Path(sys.argv[1]).write_text(sys.argv[2], encoding='utf-8'); "
+                    "print('updated')",
+                    str(auth_source),
+                    refreshed_marker,
+                ],
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+                close_fds=True,
+            )
+            self.assertEqual(update_child.returncode, 0)
+            self.assertEqual(update_child.stdout.strip(), b"updated")
             cleanup_codex_home(first_home, allowed_parent=home_parent)
             self.assertFalse(first_home.exists())
 
@@ -1436,7 +1595,25 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                 auth=auth_source,
             )
             self.assertEqual((second_home / "auth.json").read_bytes(), b"")
-            self.assertEqual(auth_source.read_text(encoding="utf-8"), refreshed_marker)
+            reload_child = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "from pathlib import Path; import sys; "
+                    "print(Path(sys.argv[1]).read_text(encoding='utf-8') == sys.argv[2])",
+                    str(auth_source),
+                    refreshed_marker,
+                ],
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+                close_fds=True,
+            )
+            self.assertEqual(reload_child.returncode, 0)
+            self.assertEqual(reload_child.stdout.strip(), b"True")
             cleanup_codex_home(second_home, allowed_parent=home_parent)
 
     def test_persistent_auth_store_mount_is_read_write_for_parent_mount_only(

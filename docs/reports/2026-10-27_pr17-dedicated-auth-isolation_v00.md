@@ -67,3 +67,13 @@ commit `079c29e`に対するformal launcher integrationとfresh schema 2 evidenc
 - 合成shell markerはcommit `079c29e`のfresh schema 2 probeでAgent/Judge/Repairすべてから読取り拒否された。実auth fileを用いた読取り試験はしていない。今回の文書追記commitに対するfresh evidenceは別に生成する。
 - Judge fixture 11件は従来どおり承認済み0件、human review待ち9件、deterministic review待ち2件。人間承認の代行はしていない。
 - 実Agent、Judge品質評価、QTS統合評価、Skill改善比較、実モデルAPIは未実施。認証条件と利用承認が満たされるまで停止する。
+
+## 2026-10-27 一時store実験（開始HEAD `4991bb6b22185acdcd79460658b100525170ef14`）
+
+認証fileは`TemporaryDirectory`配下に新規作成した合成markerだけを使い、実`HOME`、実`CODEX_HOME`、通常ユーザーの認証storeは読み取り・変更していない。attempt 1のfake childがpersistent auth pathを書き換え、cleanup後に別processのattempt 2が更新後markerを読み取れた。これはrunner file plumbingの検証で、Codex CLI refreshの証明ではない。launcher test suiteはこの別process経路を追加後39 tests PASS、1 SKIP。
+
+同じ一時storeで、親が`flock`を保持しても、lockを使わずlock取得後に起動した同UID processからsynthetic markerを読めた。これはOS起動境界がない状態での想定どおりの失敗であり、runner内lock単独では競合を防げない。専用UID process inventoryは検査時点のprocessを拒否するが、検査後の同UID process起動は防止しない。今回の通常ユーザー実行でもinventoryは`unexpected_service_identity_process`で停止したため、このユーザーでは専用認証storeの実行条件を満たさない。
+
+合成attempt processにlock取得とuncertain marker作成を行わせ、親からtimeout後にkillした。kernelによるlock解放を確認し、markerが残るため次attempt contextが`authentication_state_uncertain`で拒否することを確認した。markerは一時directoryのcleanup時にのみ除去した。
+
+固定binaryはisolated `HOME`/`CODEX_HOME`でversion `codex-cli 0.163.0`を返した。固定sourceではrefresh URL overrideとapp-server `getAuthStatus(refreshToken=true)`経路があるため、localhost mockによる実binaryのrefresh/save/reload試験はモデル要求なしで構成できる。ただし本Codex sandboxではTCP socket作成が`EPERM`、bundled bubblewrapのisolated network namespace設定が`NETLINK_ROUTE EPERM`となり、mock serverを起動できなかった。`cargo`、`rustc`、source checkoutもなくsource harnessは実行していない。token、実認証、モデルAPIは使っていない。`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`は維持し、launcherのfail-closedを変えていない。
