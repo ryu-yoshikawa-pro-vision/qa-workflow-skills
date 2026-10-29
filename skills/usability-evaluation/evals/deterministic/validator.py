@@ -324,9 +324,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
         forbidden_values = expected.get("forbidden_output_values", [])
         forbidden_values_found = [token for token in forbidden_values if token in text]
-        fabricated_refs = sorted(
-            set(re.findall(r"\b(?:FND|EVAL)-\d{3,}\b", text))
-        )
+        fabricated_refs = sorted(set(re.findall(r"\b(?:FND|EVAL)-\d{3,}\b", text)))
         no_machine_sections = all(table is None for table in found.values())
         blocked = (
             "INCOMPLETE" in text

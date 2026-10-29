@@ -68,9 +68,7 @@ def parse_tables(text: str) -> list[MarkdownTable]:
             continue
         if stripped.startswith("|"):
             separator_index = i + 1
-            while separator_index < len(lines) and not lines[
-                separator_index
-            ].strip():
+            while separator_index < len(lines) and not lines[separator_index].strip():
                 separator_index += 1
             if (
                 separator_index > i + 1

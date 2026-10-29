@@ -88,11 +88,14 @@ class MarkdownParserTests(unittest.TestCase):
             shutil.copyfile(canonical_regression_output, regression_path)
 
             stdout = io.StringIO()
-            with patch.object(
-                sys,
-                "argv",
-                ["run.py", "--skill", "all", "--output-root", str(output_root)],
-            ), redirect_stdout(stdout):
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    ["run.py", "--skill", "all", "--output-root", str(output_root)],
+                ),
+                redirect_stdout(stdout),
+            ):
                 return_code = run.main()
 
             payload = json.loads(stdout.getvalue())
@@ -102,9 +105,7 @@ class MarkdownParserTests(unittest.TestCase):
             malformed = results[("question-analysis", "QUESTION-OUT-002")]
             self.assertEqual(return_code, 1)
             self.assertEqual(malformed["status"], "fail")
-            self.assertEqual(
-                malformed["assertions"][0]["id"], "OUTPUT-MD-TABLE-001"
-            )
+            self.assertEqual(malformed["assertions"][0]["id"], "OUTPUT-MD-TABLE-001")
             self.assertIn(("regression-testing", "REG-OUT-002"), results)
 
 

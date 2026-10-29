@@ -457,7 +457,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "E2E-IMPL-D023",
             bool(targets) and not unblocked_targets,
             "入力に実装対象sourceがないfixtureでは全対象を実装前blockとして扱うこと",
-            evidence={"missing_targets": not targets, "unblocked_targets": unblocked_targets}
+            evidence={
+                "missing_targets": not targets,
+                "unblocked_targets": unblocked_targets,
+            }
             if not targets or unblocked_targets
             else None,
         )

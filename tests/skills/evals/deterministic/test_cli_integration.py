@@ -38,9 +38,7 @@ def valid_risk_runtime_evidence() -> str:
                     "kind": "repository-default",
                     "scheme_key": "risk-scheme-v1",
                 },
-                "risks": [
-                    {"risk_id": "RISK-001", "impact": 4, "likelihood": 2}
-                ],
+                "risks": [{"risk_id": "RISK-001", "impact": 4, "likelihood": 2}],
             },
         ),
         (
@@ -153,9 +151,7 @@ def valid_risk_runtime_evidence() -> str:
                     {
                         "skill": "test-analysis",
                         "runtime_unit_key": envelope["runtime_unit_key"],
-                        "generation_fingerprint": envelope[
-                            "generation_fingerprint"
-                        ],
+                        "generation_fingerprint": envelope["generation_fingerprint"],
                     }
                     for envelope in (risk_envelope, candidate_envelope)
                 ],
@@ -207,7 +203,7 @@ def valid_risk_runtime_evidence() -> str:
     return (
         "\n"
         + "\n".join(blocks)
-        + '\n### Machine Entities: test-analysis\n\n'
+        + "\n### Machine Entities: test-analysis\n\n"
         + '```json\n{"entities":[],"schema_version":"entity-state-v2",'
         + '"skill":"test-analysis"}\n```\n'
         + "\n## 最終runtime evidence gate\n\n"

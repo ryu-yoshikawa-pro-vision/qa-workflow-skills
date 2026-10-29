@@ -11,8 +11,7 @@ VALIDATORS = load_validators()
 def blocked_report(*, count: int = 2) -> str:
     refs = [f"input-{index:03d}" for index in range(1, count + 1)]
     mappings = "\n".join(
-        f"| {ref} | なし | {index} | なし |"
-        for index, ref in enumerate(refs, 1)
+        f"| {ref} | なし | {index} | なし |" for index, ref in enumerate(refs, 1)
     )
     conditions = "\n".join(
         f"| {ref} | 未提供 | 未提供 | 未提供 | 未提供 | 未提供 | 未提供 | 開始不可 |"
@@ -21,9 +20,7 @@ def blocked_report(*, count: int = 2) -> str:
     preconditions = "\n".join(
         f"| {ref} | 未提供 | なし | 必要なTC入力が不足 |" for ref in refs
     )
-    results = "\n".join(
-        f"| {ref} | 未開始 | 未実行 |  |  |  |  |" for ref in refs
-    )
+    results = "\n".join(f"| {ref} | 未開始 | 未実行 |  |  |  |  |" for ref in refs)
     unexecuted = "\n".join(
         f"| {ref} | 未実行 | TC本文が未提供 | 元TC本文と対象環境 | 必須入力を確認後 |"
         for ref in refs
@@ -38,7 +35,7 @@ def blocked_report(*, count: int = 2) -> str:
 | テストケース入力元 / 成果物参照 | 入力依頼 | input.md |
 | TC revision / content identity | なし | input.md |
 | snapshot固定方法 | 未生成（TC本文が入力にない） | input.md |
-| 今回の実行対象 test_case_ref 集合 | {', '.join(refs)}（依頼slot。TC snapshot未生成） | input.md |
+| 今回の実行対象 test_case_ref 集合 | {", ".join(refs)}（依頼slot。TC snapshot未生成） | input.md |
 | 前回実行成果物参照 | なし | input.md |
 | 実行日時 | 2026-10-29 | execution environment |
 | 使用した実行手段 | 未実行 | execution preflight |
@@ -223,18 +220,24 @@ cleanup: []
         self.assertIn("TEX-D015", failed, result)
 
     def test_missing_previous_artifact_is_a_valid_preflight_block(self) -> None:
-        text = blocked_report(count=1).replace(
-            "| TC revision / content identity | なし | input.md |",
-            "| TC revision / content identity | tcset-r10 | input.md |",
-        ).replace(
-            "| snapshot固定方法 | 未生成（TC本文が入力にない） | input.md |",
-            "| snapshot固定方法 | 未生成（前回TC情報が入力にない） | input.md |",
-        ).replace(
-            "| 前回実行成果物参照 | なし | input.md |",
-            "| 前回実行成果物参照 | 未提供 | input.md |",
-        ).replace(
-            "| input-001 | なし | 1 | なし |",
-            "| input-001 | 未提供 | 1 | 未提供 |",
+        text = (
+            blocked_report(count=1)
+            .replace(
+                "| TC revision / content identity | なし | input.md |",
+                "| TC revision / content identity | tcset-r10 | input.md |",
+            )
+            .replace(
+                "| snapshot固定方法 | 未生成（TC本文が入力にない） | input.md |",
+                "| snapshot固定方法 | 未生成（前回TC情報が入力にない） | input.md |",
+            )
+            .replace(
+                "| 前回実行成果物参照 | なし | input.md |",
+                "| 前回実行成果物参照 | 未提供 | input.md |",
+            )
+            .replace(
+                "| input-001 | なし | 1 | なし |",
+                "| input-001 | 未提供 | 1 | 未提供 |",
+            )
         )
         expected = {
             "source_identity_present": True,
@@ -252,9 +255,7 @@ cleanup: []
             "| input-001 | 未提供 | 1 | 未提供 |",
             "| input-001 | TC-OLD-001 | 1 | TC-OLD-001 |",
         )
-        result = VALIDATORS["test-execution"](
-            inconsistent, expected, "TEX-PREFLIGHT"
-        )
+        result = VALIDATORS["test-execution"](inconsistent, expected, "TEX-PREFLIGHT")
         assertion = next(item for item in result.assertions if item.id == "TEX-D006")
         self.assertEqual(assertion.status, "fail", result.to_dict())
 

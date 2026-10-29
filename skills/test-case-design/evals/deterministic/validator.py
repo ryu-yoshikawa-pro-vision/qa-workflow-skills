@@ -132,9 +132,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=missing_auth or None,
     )
 
-    disposed_ids = {
-        ref for row in disposed for ref in ids_in(row.get("上流ID", ""))
-    }
+    disposed_ids = {ref for row in disposed for ref in ids_in(row.get("上流ID", ""))}
     disposition_known = set()
     if tcn_spec:
         disposition_known |= known_tcn
@@ -354,7 +352,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for upstream_id in sorted(blocked_upstream_ids):
             row = blocked_rows.get(upstream_id)
             if row is None:
-                blocked_issues.append({"id": upstream_id, "reason": "missing block disposition"})
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "missing block disposition"}
+                )
             elif clean(row.get("扱い", "")) != "ブロック中":
                 blocked_issues.append(
                     {

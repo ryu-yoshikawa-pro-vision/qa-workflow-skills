@@ -409,11 +409,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     update_table = _table(tables, "今回の更新", ("対象種別", "対象キー", "更新区分"))
     update_rows = _rows(update_table)
-    update_missing = expected.get("require_update_table") is True and update_table is None
+    update_missing = (
+        expected.get("require_update_table") is True and update_table is None
+    )
     update_values = [_value(row, "更新区分") for row in update_rows]
     invalid_updates = [value for value in update_values if value not in UPDATE_STATES]
-    unexpected_new_artifact_updates = (
-        expected.get("new_artifact") is True and bool(update_rows)
+    unexpected_new_artifact_updates = expected.get("new_artifact") is True and bool(
+        update_rows
     )
     update_issues = {
         "missing_table": update_missing,
@@ -716,8 +718,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 or _value(row, "要素キー / 状態キー"),
             }
             for section, row in observation_rows
-            if section == "構造証跡"
-            or _value(row, "確認状態") == "確認済み"
+            if section == "構造証跡" or _value(row, "確認状態") == "確認済み"
         ]
         result.add(
             "TTI-D016",
@@ -731,7 +732,11 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         explanation_issues = [
             {
                 "row": index,
-                "missing": [field for field in ("対象", "状態", "理由", "後続への影響") if not _nonempty(_value(row, field))],
+                "missing": [
+                    field
+                    for field in ("対象", "状態", "理由", "後続への影響")
+                    if not _nonempty(_value(row, field))
+                ],
             }
             for index, row in enumerate(explanation_rows)
             if any(

@@ -95,7 +95,11 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         "symptom" in condition.casefold() or "hypothesis" in condition.casefold()
         for condition in block_conditions
     )
-    inv_ok = doc.get("mode") != "investigation" or has_symptom_or_hypothesis or blocked_for_missing_symptom
+    inv_ok = (
+        doc.get("mode") != "investigation"
+        or has_symptom_or_hypothesis
+        or blocked_for_missing_symptom
+    )
     result.add(
         "EXP-D003",
         inv_ok,

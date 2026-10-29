@@ -98,9 +98,7 @@ class ClosureExclusivityRegressionTests(unittest.TestCase):
             text, expected, "CLOSURE-EXCLUSIVITY"
         ).to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
-        self.assertEqual(
-            assertions["TC-D007"]["status"], "pass", assertions["TC-D007"]
-        )
+        self.assertEqual(assertions["TC-D007"]["status"], "pass", assertions["TC-D007"])
 
 
 if __name__ == "__main__":

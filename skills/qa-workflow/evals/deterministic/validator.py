@@ -100,7 +100,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 )
         elif target not in {"", "-", "—", "N/A", "n/a"}:
             invalid_targets.append(
-                {"skill": skill, "target": target, "allowed": ["<空欄>"], "state": state}
+                {
+                    "skill": skill,
+                    "target": target,
+                    "allowed": ["<空欄>"],
+                    "state": state,
+                }
             )
     add_duplicate_assertion(
         result, "WF-D012", scoped_keys, "ワークフローのSkill + 対象 / 実行範囲"

@@ -30,7 +30,9 @@ class E2EContractTests(unittest.TestCase):
         self.assertIn("理由を括弧書きなどで付け加えません", template)
         self.assertIn("preflight blockでは`確認不能`、`未開始`、`なし`", template)
 
-    def test_result_analysis_template_keeps_enum_and_skill_id_cells_canonical(self) -> None:
+    def test_result_analysis_template_keeps_enum_and_skill_id_cells_canonical(
+        self,
+    ) -> None:
         template = (
             REPO_ROOT / "skills/e2e-test-result-analysis/assets/output-template.md"
         ).read_text(encoding="utf-8")
@@ -544,19 +546,21 @@ class E2EContractTests(unittest.TestCase):
             "| result-2 | 判定可能 | 異常なし | 未確認 | execution.md |",
         )
         self.assert_pass("e2e-test-result-analysis", analysis_multiple_results, {})
-        analysis_unavailable_reference = analysis.replace(
-            "| E2E実装参照 | tests/auth/login.spec.ts > login succeeds | implementation.md |",
-            "| E2E実装参照 | 未提供 | input.md |",
-        ).replace(
-            "| resolved primary TestCase / 実行結果参照 | result-1 | execution.md |",
-            "| resolved primary TestCase / 実行結果参照 | 実行結果未提供 | input.md |",
-        ).replace(
-            "| result-1 | 判定可能 | 異常なし | 未確認 | execution.md |",
-            "| 実行結果未提供 | 判定不能 | 実行結果参照が未提供 | 未確認 | input.md |",
+        analysis_unavailable_reference = (
+            analysis.replace(
+                "| E2E実装参照 | tests/auth/login.spec.ts > login succeeds | implementation.md |",
+                "| E2E実装参照 | 未提供 | input.md |",
+            )
+            .replace(
+                "| resolved primary TestCase / 実行結果参照 | result-1 | execution.md |",
+                "| resolved primary TestCase / 実行結果参照 | 実行結果未提供 | input.md |",
+            )
+            .replace(
+                "| result-1 | 判定可能 | 異常なし | 未確認 | execution.md |",
+                "| 実行結果未提供 | 判定不能 | 実行結果参照が未提供 | 未確認 | input.md |",
+            )
         )
-        self.assert_pass(
-            "e2e-test-result-analysis", analysis_unavailable_reference, {}
-        )
+        self.assert_pass("e2e-test-result-analysis", analysis_unavailable_reference, {})
         self.assert_fails(
             "e2e-test-result-analysis",
             analysis.replace(
@@ -2303,12 +2307,30 @@ class E2EContractTests(unittest.TestCase):
                 "| app | 今回runが起動 | 今回runが所有 | 新規起動 | 対象 | Playwright起動時のprocess確認 |\n",
                 "",
             )
-            .replace("| Playwright run全体status | passed | reporter | raw fact |", "| Playwright run全体status | 未確認 | 未実施 | raw fact |")
-            .replace("| CLI process exit code | 0 | process | raw fact |", "| CLI process exit code | 未実施 | process | raw fact |")
-            .replace("| run-level / global error | なし | reporter | raw fact |", "| run-level / global error | 未実施 | process | raw fact |")
-            .replace("| runner開始 | はい | execution | raw fact |", "| runner開始 | いいえ | execution | raw fact |")
-            .replace("| result artifactの今回run生成・更新 | はい | filesystem | raw fact |", "| result artifactの今回run生成・更新 | 未生成 | execution | raw fact |")
-            .replace("| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 1 |  |", "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 0 | preflight blockのためresolvedなし |")
+            .replace(
+                "| Playwright run全体status | passed | reporter | raw fact |",
+                "| Playwright run全体status | 未確認 | 未実施 | raw fact |",
+            )
+            .replace(
+                "| CLI process exit code | 0 | process | raw fact |",
+                "| CLI process exit code | 未実施 | process | raw fact |",
+            )
+            .replace(
+                "| run-level / global error | なし | reporter | raw fact |",
+                "| run-level / global error | 未実施 | process | raw fact |",
+            )
+            .replace(
+                "| runner開始 | はい | execution | raw fact |",
+                "| runner開始 | いいえ | execution | raw fact |",
+            )
+            .replace(
+                "| result artifactの今回run生成・更新 | はい | filesystem | raw fact |",
+                "| result artifactの今回run生成・更新 | 未生成 | execution | raw fact |",
+            )
+            .replace(
+                "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 1 |  |",
+                "| login-flow | tests/auth/login.spec.ts > login succeeds / TC-101 | 0 | preflight blockのためresolvedなし |",
+            )
             .replace(
                 "| result-1 | login-flow | tests/auth/login.spec.ts > login succeeds | chromium | 0 | 開始 | passed | passed | expected |\n",
                 "",
@@ -2317,7 +2339,10 @@ class E2EContractTests(unittest.TestCase):
                 "| result-1 | 1 | 要求primary test | tests/auth/login.spec.ts > login succeeds | chromium | 0 | passed | 0 | 10ms |  |\n",
                 "",
             )
-            .replace("| runner管理 | 成功 | 残存なし | reporter |", "| runner管理 | 未確認 | runner未開始 | execution |")
+            .replace(
+                "| runner管理 | 成功 | 残存なし | reporter |",
+                "| runner管理 | 未確認 | runner未開始 | execution |",
+            )
             .replace("- 実行成果物状態: 完了", "- 実行成果物状態: ブロック中")
             .replace(
                 "- ブロック中: なし",
@@ -2356,9 +2381,7 @@ class E2EContractTests(unittest.TestCase):
                 "| run外cleanup対象 / 方法 | 対象なし | repo | raw fact |",
                 "| run外cleanup対象 / 方法 | 未確認 | staged input | raw fact |",
             )
-            .replace(
-                "| run外処理 | 対象なし | run外準備なし | execution |\n", ""
-            )
+            .replace("| run外処理 | 対象なし | run外準備なし | execution |\n", "")
         )
         self.assert_pass("e2e-test-execution", unknown_external_obligation, expected)
         self.assert_fails(

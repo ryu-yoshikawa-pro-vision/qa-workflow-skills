@@ -68,8 +68,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     approved_assumption_ids = {
         clean(row.get("正式ASM ID", ""))
         for row in assumptions
-        if clean(row.get("状態", "")) == "承認済み"
-        and clean(row.get("正式ASM ID", ""))
+        if clean(row.get("状態", "")) == "承認済み" and clean(row.get("正式ASM ID", ""))
     }
 
     def no_restart_for_approved_assumption(row: dict[str, str]) -> bool:

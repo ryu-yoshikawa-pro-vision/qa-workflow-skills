@@ -175,9 +175,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     blocked_before_snapshot = expected.get("require_preflight_block") is True
     if blocked_before_snapshot:
         unexpected_yaml_errors = [
-            error
-            for error in yaml_errors
-            if error != "no fenced YAML execution plans"
+            error for error in yaml_errors if error != "no fenced YAML execution plans"
         ]
         if unexpected_yaml_errors:
             yaml_issues.extend(unexpected_yaml_errors)
@@ -401,9 +399,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     absent_previous = previous_marker in NONE | UNAVAILABLE_REFS | {"初回"}
     if blocked_before_snapshot and unavailable_previous:
         if actual_previous_refs:
-            previous_issues.append(
-                {"unexpected_previous_refs": actual_previous_refs}
-            )
+            previous_issues.append({"unexpected_previous_refs": actual_previous_refs})
     elif absent_previous or not _nonempty(previous):
         if actual_previous_refs:
             previous_issues.append({"unexpected_previous_refs": actual_previous_refs})
@@ -805,8 +801,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 }
             )
         if any(
-            _value(row, "状態") != "未実行"
-            or _value(row, "実行開始") != "未開始"
+            _value(row, "状態") != "未実行" or _value(row, "実行開始") != "未開始"
             for row in results
         ):
             blocked_issues.append("all requested work must remain unstarted")

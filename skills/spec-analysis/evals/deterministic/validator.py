@@ -66,21 +66,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     def package_file_present(relative: str) -> bool:
         if f"<!-- FILE: {relative} -->" in text:
             return True
-        match = re.search(
-            rf"(?m)^### Package file: {re.escape(relative)}\s*$", text
-        )
+        match = re.search(rf"(?m)^### Package file: {re.escape(relative)}\s*$", text)
         if match is None:
             match = re.search(rf"(?m)^### {re.escape(relative)}\s*$", text)
         if match is None:
             match = re.search(rf"(?m)^## {re.escape(relative)}\s*$", text)
         if match is None:
-            match = re.search(
-                rf"(?m)^## File: {re.escape(relative)}\s*$", text
-            )
+            match = re.search(rf"(?m)^## File: {re.escape(relative)}\s*$", text)
         if match is None:
-            match = re.search(
-                rf"(?m)^## File: `{re.escape(relative)}`\s*$", text
-            )
+            match = re.search(rf"(?m)^## File: `{re.escape(relative)}`\s*$", text)
         if match is None:
             return False
         next_file = re.search(
@@ -95,9 +89,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         return bool(text[match.end() : body_end].strip())
 
     missing_files = [
-        relative
-        for relative in required_files
-        if not package_file_present(relative)
+        relative for relative in required_files if not package_file_present(relative)
     ]
     result.add(
         "SPEC-D020",

@@ -26,9 +26,7 @@ class FalsePassRegressionTests(unittest.TestCase):
                 if not lines[index - 1].strip().startswith("|"):
                     continue
                 cells = line.strip().strip("|").split("|")
-                if cells and all(
-                    re.fullmatch(r"\s*:?-+:?\s*", cell) for cell in cells
-                ):
+                if cells and all(re.fullmatch(r"\s*:?-+:?\s*", cell) for cell in cells):
                     if any(cell.count("-") < 1 for cell in cells):
                         malformed.append(f"{path.relative_to(repo_root)}:{index + 1}")
 
@@ -243,9 +241,7 @@ class FalsePassRegressionTests(unittest.TestCase):
                     "| 状態遷移 | 保存状態 |",
                     f"| {label} | 保存状態 |",
                 )
-                result = VALIDATORS["test-analysis"](
-                    text, {}, "REGRESSION"
-                ).to_dict()
+                result = VALIDATORS["test-analysis"](text, {}, "REGRESSION").to_dict()
                 assertion = next(
                     a for a in result["assertions"] if a["id"] == "RISK-D008"
                 )
@@ -267,7 +263,9 @@ class FalsePassRegressionTests(unittest.TestCase):
         helper = VALIDATORS["test-analysis"].__globals__[
             "_is_expected_blocked_gate_outcome"
         ]
-        explicit_state = VALIDATORS["test-analysis"].__globals__["_has_explicit_gate_state"]
+        explicit_state = VALIDATORS["test-analysis"].__globals__[
+            "_has_explicit_gate_state"
+        ]
         expected_status = {
             identity: {"runtime_status": "invalid_input", "result_status": "blocked"}
         }
@@ -657,9 +655,7 @@ class FalsePassRegressionTests(unittest.TestCase):
             "| bva:upper:101 | integer adjacent | 101 | ブロック中 | current Authority未解決 |\n",
             "",
         )
-        self.assert_fails(
-            "test-condition-design", missing_value, expected, "TCN-D017"
-        )
+        self.assert_fails("test-condition-design", missing_value, expected, "TCN-D017")
         wrong_disposition = text.replace(
             "| bva:upper:101 | integer adjacent | 101 | ブロック中 | current Authority未解決 |",
             "| bva:upper:101 | integer adjacent | 101 | 対象外 | current Authority未解決 |",
@@ -674,9 +670,7 @@ class FalsePassRegressionTests(unittest.TestCase):
             "| state:draft-publish | draft --publish--> published | ブロック中 | current Authority未解決 |\n",
             "",
         )
-        self.assert_fails(
-            "test-condition-design", missing_target, expected, "TCN-D016"
-        )
+        self.assert_fails("test-condition-design", missing_target, expected, "TCN-D016")
         wrong_transition = text.replace(
             "draft --publish--> published", "draft --archive--> archived"
         )
@@ -702,9 +696,7 @@ class FalsePassRegressionTests(unittest.TestCase):
         result = VALIDATORS["test-condition-design"](
             text, expected, "REGRESSION"
         ).to_dict()
-        assertion = next(
-            row for row in result["assertions"] if row["id"] == "TCN-D014"
-        )
+        assertion = next(row for row in result["assertions"] if row["id"] == "TCN-D014")
         self.assertEqual(assertion["status"], "pass", result)
 
     def test_pairwise_factor_order_is_canonical(self):
@@ -932,7 +924,10 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_passes("test-case-design", combined_ids, tc_expected)
         self.assert_fails(
             "test-case-design",
-            tc_block.replace("TCN-001-CI01 | カバレッジ項目 | ブロック中", "TCN-001-CI01 | カバレッジ項目 | 対象外"),
+            tc_block.replace(
+                "TCN-001-CI01 | カバレッジ項目 | ブロック中",
+                "TCN-001-CI01 | カバレッジ項目 | 対象外",
+            ),
             tc_expected,
             "TC-D015",
         )
@@ -941,9 +936,7 @@ class FalsePassRegressionTests(unittest.TestCase):
             "| TC-001 | invented test | TCN-001 | TCN-001-CI01 | TR-001 | 高 | start | data | action | saved | 期待結果1→SPEC-001 | |\n"
             "## テストケースへ展開しないカバレッジ項目 / テスト条件",
         )
-        self.assert_fails(
-            "test-case-design", invented_case, tc_expected, "TC-D015"
-        )
+        self.assert_fails("test-case-design", invented_case, tc_expected, "TC-D015")
 
         tr_block = """# TR
 ## テスト要求一覧
@@ -965,7 +958,9 @@ class FalsePassRegressionTests(unittest.TestCase):
         self.assert_passes("test-requirement-design", tr_block, tr_expected)
         self.assert_fails(
             "test-requirement-design",
-            tr_block.replace("SPEC-001 | 仕様根拠 | ブロック中", "SPEC-001 | 仕様根拠 | 対象外"),
+            tr_block.replace(
+                "SPEC-001 | 仕様根拠 | ブロック中", "SPEC-001 | 仕様根拠 | 対象外"
+            ),
             tr_expected,
             "TR-D018",
         )
@@ -1118,9 +1113,7 @@ class FalsePassRegressionTests(unittest.TestCase):
                 }
             ],
         }
-        base = self._review_base().replace(
-            "仕様根拠参照なし", "存在しないAuthority ID"
-        )
+        base = self._review_base().replace("仕様根拠参照なし", "存在しないAuthority ID")
         self.assert_passes("adversarial-review", base, expected)
 
         severity_mismatch = (
@@ -1205,9 +1198,7 @@ class FalsePassRegressionTests(unittest.TestCase):
             "qa-knowledge",
             "usability-inspection",
         ):
-            match = re.search(
-                rf"(?m)^\|\s*{re.escape(skill)}\s*\|([^|]*)\|", template
-            )
+            match = re.search(rf"(?m)^\|\s*{re.escape(skill)}\s*\|([^|]*)\|", template)
             self.assertIsNotNone(match, skill)
             self.assertEqual(match.group(1).strip(), "", skill)
 
@@ -1287,31 +1278,48 @@ class FalsePassRegressionTests(unittest.TestCase):
 
     def test_spec_package_headings_are_recognized_as_file_boundaries(self):
         expected = {
-            "required_package_files": ["00_scope_and_context.md", "07_current_unknowns.md"]
-        }
-        text = self._spec_base() + "\n" + "\n".join(
-            [
-                "### Package file: 00_scope_and_context.md",
-                "payload",
-                "### Package file: 07_current_unknowns.md",
-                "payload",
+            "required_package_files": [
+                "00_scope_and_context.md",
+                "07_current_unknowns.md",
             ]
+        }
+        text = (
+            self._spec_base()
+            + "\n"
+            + "\n".join(
+                [
+                    "### Package file: 00_scope_and_context.md",
+                    "payload",
+                    "### Package file: 07_current_unknowns.md",
+                    "payload",
+                ]
+            )
         )
         result = VALIDATORS["spec-analysis"](text, expected, "SPEC-TEST").to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "pass")
 
         prose_only = self._spec_base() + "\nPackage file: 00_scope_and_context.md"
-        result = VALIDATORS["spec-analysis"](prose_only, expected, "SPEC-TEST").to_dict()
+        result = VALIDATORS["spec-analysis"](
+            prose_only, expected, "SPEC-TEST"
+        ).to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "fail")
 
-        empty_heading = self._spec_base() + "\n### Package file: 00_scope_and_context.md\n\n### Package file: 07_current_unknowns.md\npayload"
-        result = VALIDATORS["spec-analysis"](empty_heading, expected, "SPEC-TEST").to_dict()
+        empty_heading = (
+            self._spec_base()
+            + "\n### Package file: 00_scope_and_context.md\n\n### Package file: 07_current_unknowns.md\npayload"
+        )
+        result = VALIDATORS["spec-analysis"](
+            empty_heading, expected, "SPEC-TEST"
+        ).to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "fail")
 
-        filename_heading = self._spec_base() + "\n## 00_scope_and_context.md\npayload\n## 07_current_unknowns.md\npayload"
+        filename_heading = (
+            self._spec_base()
+            + "\n## 00_scope_and_context.md\npayload\n## 07_current_unknowns.md\npayload"
+        )
         result = VALIDATORS["spec-analysis"](
             filename_heading, expected, "SPEC-TEST"
         ).to_dict()
@@ -1329,15 +1337,19 @@ class FalsePassRegressionTests(unittest.TestCase):
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "pass")
 
-        package_bundle = self._spec_base() + "\n" + "\n".join(
-            [
-                "## File: `00_scope_and_context.md`",
-                "# Scope and Context",
-                "\n## Nested payload heading\ncontent",
-                "## File: `07_current_unknowns.md`",
-                "# Current Unknowns",
-                "\n## Nested payload heading\ncontent",
-            ]
+        package_bundle = (
+            self._spec_base()
+            + "\n"
+            + "\n".join(
+                [
+                    "## File: `00_scope_and_context.md`",
+                    "# Scope and Context",
+                    "\n## Nested payload heading\ncontent",
+                    "## File: `07_current_unknowns.md`",
+                    "# Current Unknowns",
+                    "\n## Nested payload heading\ncontent",
+                ]
+            )
         )
         result = VALIDATORS["spec-analysis"](
             package_bundle, expected, "SPEC-TEST"
@@ -1345,14 +1357,18 @@ class FalsePassRegressionTests(unittest.TestCase):
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "pass")
 
-        plain_package_bundle = self._spec_base() + "\n" + "\n".join(
-            [
-                "## File: 00_scope_and_context.md",
-                "# Scope and Context",
-                "## File: 07_current_unknowns.md",
-                "# Current Unknowns",
-                "payload",
-            ]
+        plain_package_bundle = (
+            self._spec_base()
+            + "\n"
+            + "\n".join(
+                [
+                    "## File: 00_scope_and_context.md",
+                    "# Scope and Context",
+                    "## File: 07_current_unknowns.md",
+                    "# Current Unknowns",
+                    "payload",
+                ]
+            )
         )
         result = VALIDATORS["spec-analysis"](
             plain_package_bundle, expected, "SPEC-TEST"
@@ -1360,13 +1376,17 @@ class FalsePassRegressionTests(unittest.TestCase):
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "pass")
 
-        empty_package_file = self._spec_base() + "\n" + "\n".join(
-            [
-                "## File: `00_scope_and_context.md`",
-                "## File: `07_current_unknowns.md`",
-                "# Current Unknowns",
-                "payload",
-            ]
+        empty_package_file = (
+            self._spec_base()
+            + "\n"
+            + "\n".join(
+                [
+                    "## File: `00_scope_and_context.md`",
+                    "## File: `07_current_unknowns.md`",
+                    "# Current Unknowns",
+                    "payload",
+                ]
+            )
         )
         result = VALIDATORS["spec-analysis"](
             empty_package_file, expected, "SPEC-TEST"
@@ -1374,13 +1394,17 @@ class FalsePassRegressionTests(unittest.TestCase):
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["SPEC-D020"]["status"], "fail")
 
-        empty_plain_package_file = self._spec_base() + "\n" + "\n".join(
-            [
-                "## File: 00_scope_and_context.md",
-                "## File: 07_current_unknowns.md",
-                "# Current Unknowns",
-                "payload",
-            ]
+        empty_plain_package_file = (
+            self._spec_base()
+            + "\n"
+            + "\n".join(
+                [
+                    "## File: 00_scope_and_context.md",
+                    "## File: 07_current_unknowns.md",
+                    "# Current Unknowns",
+                    "payload",
+                ]
+            )
         )
         result = VALIDATORS["spec-analysis"](
             empty_plain_package_file, expected, "SPEC-TEST"
@@ -1405,7 +1429,9 @@ class FalsePassRegressionTests(unittest.TestCase):
         assertion = next(a for a in result["assertions"] if a["id"] == "COV-D013")
         self.assertEqual(assertion["status"], "fail", assertion)
 
-    def test_qa_workflow_requires_canonical_targets_only_for_used_multi_use_skills(self):
+    def test_qa_workflow_requires_canonical_targets_only_for_used_multi_use_skills(
+        self,
+    ):
         text = """- ワークフロー全体状態: 実行中
 - 開始Skill: test-case-design
 - 開始対象 / 実行範囲: checkoutの注文確定
@@ -1478,9 +1504,7 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
                 "Sample Evaluation Results",
             ],
             "forbidden_tokens": ["aggregated score"],
-            "required_tokens": [
-                "Neither conformance nor nonconformance assessed"
-            ],
+            "required_tokens": ["Neither conformance nor nonconformance assessed"],
         }
         result = VALIDATORS["wcag-conformance-evaluation"](
             text, expected, "WCAG-REPORT-TEST"
@@ -1561,7 +1585,10 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
 | Scope ref | Aspect | Decision | Outcome | Reason / applicability | Evidence refs |
 | --- | --- | --- | --- | --- | --- |
 """
-        blocked = prefix + "\nScope initialization stopped before a scope skeleton was created."
+        blocked = (
+            prefix
+            + "\nScope initialization stopped before a scope skeleton was created."
+        )
         result = VALIDATORS["usability-inspection"](
             blocked, {}, "UI-CLOSURE-TEST"
         ).to_dict()
@@ -1578,14 +1605,18 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["UI-D004"]["status"], "pass")
 
-        localized_block = prefix + "\n対象と観点が未確定のため、scope初期化前に停止しました。"
+        localized_block = (
+            prefix + "\n対象と観点が未確定のため、scope初期化前に停止しました。"
+        )
         result = VALIDATORS["usability-inspection"](
             localized_block, {}, "UI-CLOSURE-TEST"
         ).to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["UI-D004"]["status"], "pass")
 
-        japanese_equivalent = prefix + "\nスコープ初期化はscope skeletonを作る前に停止しました。"
+        japanese_equivalent = (
+            prefix + "\nスコープ初期化はscope skeletonを作る前に停止しました。"
+        )
         result = VALIDATORS["usability-inspection"](
             japanese_equivalent, {}, "UI-CLOSURE-TEST"
         ).to_dict()
@@ -1785,7 +1816,9 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
             ("required_routes", None),
             ("required_routes", {"route_type": "manual"}),
         ):
-            with self.subTest(kind="run", field=field, malformed_type=type(malformed).__name__):
+            with self.subTest(
+                kind="run", field=field, malformed_type=type(malformed).__name__
+            ):
                 candidate = dict(run_artifact)
                 candidate[field] = malformed
                 result = VALIDATORS["regression-testing"](
@@ -1810,7 +1843,9 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
 
     def test_regression_out002_blocks_without_inventing_activity_identity(self):
         repo_root = Path(__file__).resolve().parents[4]
-        case_root = repo_root / "skills/regression-testing/evals/output/cases/reg-out-002"
+        case_root = (
+            repo_root / "skills/regression-testing/evals/output/cases/reg-out-002"
+        )
         output = (case_root / "output.md").read_text(encoding="utf-8")
         expected = json.loads((case_root / "expected.json").read_text(encoding="utf-8"))
         result = VALIDATORS["regression-testing"](
@@ -1820,11 +1855,14 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
         self.assertEqual(assertions["REG-D001"]["status"], "pass")
         self.assertEqual(assertions["REG-D019"]["status"], "pass")
 
-        runtime_diagnostic = output + """
+        runtime_diagnostic = (
+            output
+            + """
 ```json
 {"valid": false, "issues": ["missing_source_execution_ref"]}
 ```
 """
+        )
         result = VALIDATORS["regression-testing"](
             runtime_diagnostic, expected, "REG-OUT-002-RUNTIME-DIAGNOSTIC"
         ).to_dict()
@@ -1902,7 +1940,7 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
         self.assertEqual(valid_assertions["REG-D010"]["status"], "pass")
         self.assertEqual(valid_assertions["REG-D011"]["status"], "pass")
 
-        diagnostic = "```json\n{\"valid\": true, \"issues\": []}\n```\n"
+        diagnostic = '```json\n{"valid": true, "issues": []}\n```\n'
         artifact_block = "```json\n" + json.dumps(activity) + "\n```"
         combined = VALIDATORS["regression-testing"](
             diagnostic + artifact_block,
@@ -1913,7 +1951,7 @@ No conformance conclusion is available. Neither conformance nor nonconformance a
         self.assertEqual(combined_assertions["REG-D001"]["status"], "pass")
         self.assertEqual(combined_assertions["REG-D018"]["status"], "pass")
 
-        malformed_diagnostic = "```json\n{\"valid\":}\n```\n" + artifact_block
+        malformed_diagnostic = '```json\n{"valid":}\n```\n' + artifact_block
         malformed_combined = VALIDATORS["regression-testing"](
             malformed_diagnostic,
             {"artifact_type": "activity"},
@@ -1968,14 +2006,22 @@ TCN-001-CI01は本文未提示のため、欠陥の有無と重大度は判定�
 
         extra_finding = "| REV-001 | 致命的 | TCN-001-CI01 | inferred defect | no evidence | unknown | unspecified | test-case-design | ブロック中 | |\n"
         separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n\n## レビュー制約"
-        bad_text = text.replace(separator, separator.replace("\n\n## レビュー制約", "\n" + extra_finding + "\n## レビュー制約"), 1)
+        bad_text = text.replace(
+            separator,
+            separator.replace(
+                "\n\n## レビュー制約", "\n" + extra_finding + "\n## レビュー制約"
+            ),
+            1,
+        )
         result = VALIDATORS["adversarial-review"](
             bad_text, expected, "REV-BLOCK-TEST"
         ).to_dict()
         assertions = {item["id"]: item for item in result["assertions"]}
         self.assertEqual(assertions["REV-D017"]["status"], "fail")
 
-    def test_exploratory_validator_accepts_explicit_block_for_missing_charter_inputs(self):
+    def test_exploratory_validator_accepts_explicit_block_for_missing_charter_inputs(
+        self,
+    ):
         blocked_session = {
             "schema_version": "1",
             "session_ref": "EXP-BLOCK-TEST",

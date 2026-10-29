@@ -81,9 +81,7 @@ def eval_case(
     case = next(row for row in manifest["cases"] if row["id"] == eval_id)
     if skill in {"test-target-inspection", "test-execution"} and validation_sample:
         case_index = (
-            "case-001"
-            if eval_id in {"TTI-OUT-001", "TEX-OUT-001"}
-            else "case-002"
+            "case-001" if eval_id in {"TTI-OUT-001", "TEX-OUT-001"} else "case-002"
         )
         fixture_root = REPO_ROOT / "tests/fixtures/skills" / skill
         output = fixture_root / f"{case_index}-complete-sample.md"
@@ -116,10 +114,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         paths = (
             SKILLS_ROOT / "e2e-test-result-analysis" / "SKILL.md",
             SKILLS_ROOT / "e2e-test-result-analysis" / "references" / "guidance.md",
-            SKILLS_ROOT
-            / "e2e-test-result-analysis"
-            / "assets"
-            / "output-template.md",
+            SKILLS_ROOT / "e2e-test-result-analysis" / "assets" / "output-template.md",
         )
         for path in paths:
             with self.subTest(path=path):
@@ -144,18 +139,14 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         self.assertNotIn("| TC-001", template)
 
     def test_test_analysis_selection_key_uses_domain_identity(self):
-        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("単一Product Riskに属する技法選択", skill)
         self.assertIn("その`risk_id`をkeyに使います", skill)
         self.assertIn("複数Riskをまとめた選択", skill)
         self.assertIn("Eval ID、ファイル名、実行時刻からkeyを作りません", skill)
 
     def test_test_analysis_preserves_explicit_values_when_authority_is_missing(self):
-        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(encoding="utf-8")
         guidance = (
             SKILLS_ROOT / "test-analysis" / "references" / "guidance.md"
         ).read_text(encoding="utf-8")
@@ -179,10 +170,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             / "coverage-techniques.md"
         ).read_text(encoding="utf-8")
         template = (
-            SKILLS_ROOT
-            / "test-condition-design"
-            / "assets"
-            / "output-template.md"
+            SKILLS_ROOT / "test-condition-design" / "assets" / "output-template.md"
         ).read_text(encoding="utf-8")
         self.assertIn("入力由来の条件・Coverage Item候補", skill)
         self.assertIn("current Authority未解決", skill)
@@ -192,10 +180,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
 
     def test_spec_analysis_ui_package_materialize_uses_full_schema_and_draft_refs(self):
         guidance = (
-            SKILLS_ROOT
-            / "spec-analysis"
-            / "references"
-            / "ui-test-target-analysis.md"
+            SKILLS_ROOT / "spec-analysis" / "references" / "ui-test-target-analysis.md"
         ).read_text(encoding="utf-8")
         self.assertIn("完全な固定header配列", guidance)
         self.assertIn("@draft:<draft_key>", guidance)
@@ -203,14 +188,14 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
 
     def test_target_inspection_persistence_enum_keeps_source_separate(self):
         template = (
-            SKILLS_ROOT
-            / "test-target-inspection"
-            / "assets/output-template.md"
+            SKILLS_ROOT / "test-target-inspection" / "assets/output-template.md"
         ).read_text(encoding="utf-8")
         self.assertIn("値欄は`はい`または`いいえ`", template)
         self.assertIn("`確認元`へ分けます", template)
 
-    def test_coverage_traceability_dispatch_distinguishes_input_and_selection_metadata(self):
+    def test_coverage_traceability_dispatch_distinguishes_input_and_selection_metadata(
+        self,
+    ):
         text = (SKILLS_ROOT / "coverage-analysis" / "SKILL.md").read_text(
             encoding="utf-8"
         )
@@ -219,7 +204,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         self.assertIn("selection_key=null", text)
         self.assertIn('runtime_unit_key="artifact:traceability:all"', text)
         self.assertIn('scope_key="all"', text)
-        self.assertIn("`input_mode=\"artifact\"`を使うのは", text)
+        self.assertIn('`input_mode="artifact"`を使うのは', text)
 
     def test_test_target_inspection_fixtures_pass(self):
         validate = load_validator("test-target-inspection")
@@ -271,9 +256,7 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
             if lines[index].startswith("## ")
         )
         table_lines = [
-            line
-            for line in lines[section + 1 : next_section]
-            if line.startswith("|")
+            line for line in lines[section + 1 : next_section] if line.startswith("|")
         ]
         retained = [
             line
@@ -493,7 +476,9 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         self.assertEqual(
             next(
                 item.status
-                for item in validate(text, expected, "TTI-OUT-002-UNVERIFIED-REPORT").assertions
+                for item in validate(
+                    text, expected, "TTI-OUT-002-UNVERIFIED-REPORT"
+                ).assertions
                 if item.id == "TTI-D014"
             ),
             "pass",

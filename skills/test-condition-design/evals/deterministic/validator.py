@@ -427,9 +427,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
         blocked_candidate_combos = []
         blocked_candidate_errors = []
-        blocked_candidate_disposition = pairwise.get(
-            "blocked_candidate_disposition"
-        )
+        blocked_candidate_disposition = pairwise.get("blocked_candidate_disposition")
         if blocked_candidate_disposition:
             if ci:
                 blocked_candidate_errors.append(
@@ -546,7 +544,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                                 "pair": target_pair,
                             }
                         )
-                    if any(combo.get(name) != value for name, value in target_pair.items()):
+                    if any(
+                        combo.get(name) != value for name, value in target_pair.items()
+                    ):
                         blocked_candidate_errors.append(
                             {
                                 "reason": "full assignment does not contain its target pair",
@@ -566,7 +566,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     )
                 if not clean(row.get("理由 / 根拠", "")):
                     blocked_candidate_errors.append(
-                        {"reason": "target disposition reason is missing", "target_key": target_key}
+                        {
+                            "reason": "target disposition reason is missing",
+                            "target_key": target_key,
+                        }
                     )
                 if (
                     target_key
@@ -578,8 +581,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     and not invalid_values
                     and not assignment_forbidden(combo, forbidden)
                     and all(
-                        combo.get(name) == value
-                        for name, value in target_pair.items()
+                        combo.get(name) == value for name, value in target_pair.items()
                     )
                     and clean(row.get("扱い", "")) == blocked_candidate_disposition
                     and clean(row.get("理由 / 根拠", ""))
@@ -590,7 +592,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             )
             if duplicate_keys:
                 blocked_candidate_errors.append(
-                    {"reason": "target keys are duplicated", "target_keys": duplicate_keys}
+                    {
+                        "reason": "target keys are duplicated",
+                        "target_keys": duplicate_keys,
+                    }
                 )
             result.add(
                 "TCN-D030",
@@ -683,13 +688,17 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     row
                     for row in candidate_disposed
                     if any(
-                        candidate_disposition_matches(row, key)
-                        for key in target_keys
+                        candidate_disposition_matches(row, key) for key in target_keys
                     )
                     and clean(row.get("扱い", "")) == "ブロック中"
                     and clean(row.get("理由 / 根拠", ""))
                 ]
-                if matched or len(matches) != 1 or len(target_keys) != 1 or len(disposition_matches) != 1:
+                if (
+                    matched
+                    or len(matches) != 1
+                    or len(target_keys) != 1
+                    or len(disposition_matches) != 1
+                ):
                     missing_trans.append(
                         {
                             **t,
@@ -785,7 +794,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             clean(row.get("Runtime target key", "")) for row in blocked_bva_rows
         ]
         duplicate_bva_target_keys = sorted(
-            key for key in set(bva_target_keys) if key and bva_target_keys.count(key) > 1
+            key
+            for key in set(bva_target_keys)
+            if key and bva_target_keys.count(key) > 1
         )
         if duplicate_bva_target_keys:
             missing_values.append(

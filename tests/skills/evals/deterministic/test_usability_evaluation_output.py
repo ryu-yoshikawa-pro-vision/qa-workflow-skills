@@ -90,7 +90,9 @@ EV-004 is the immutable TC-001 PASS result.
         self.assertEqual(assertions["UE-D003"]["status"], "pass")
         self.assertEqual(assertions["UE-D005"]["status"], "fail")
 
-    def test_blocked_fixture_cannot_rewrite_saved_test_result_or_product_risk(self) -> None:
+    def test_blocked_fixture_cannot_rewrite_saved_test_result_or_product_risk(
+        self,
+    ) -> None:
         text, expected = _case("case-001")
         result = validator.validate(
             text.replace("TC-001 remains PASS", "TC-001 remains FAIL"),

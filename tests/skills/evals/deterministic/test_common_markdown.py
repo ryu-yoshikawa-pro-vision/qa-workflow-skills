@@ -15,7 +15,7 @@ class CommonMarkdownTests(unittest.TestCase):
 
     def test_fenced_code_blocks_accept_tildes_and_longer_closing_fence(self):
         self.assertEqual(
-            fenced_code_blocks("~~~json\n{\"ok\":true}\n~~~~\n"),
+            fenced_code_blocks('~~~json\n{"ok":true}\n~~~~\n'),
             [("json", '{"ok":true}')],
         )
 
@@ -28,17 +28,18 @@ class CommonMarkdownTests(unittest.TestCase):
     def test_json_artifact_validators_parse_tilde_fences(self):
         validators = load_validators()
         knowledge = validators["qa-knowledge"]("~~~json\n{}\n~~~", {}, "KN-TEST")
-        knowledge_assertions = {row["id"]: row for row in knowledge.to_dict()["assertions"]}
+        knowledge_assertions = {
+            row["id"]: row for row in knowledge.to_dict()["assertions"]
+        }
         self.assertEqual(knowledge_assertions["KN-D001"]["status"], "pass")
 
         regression = validators["regression-testing"](
-            "~~~json\n{\"artifact_type\":\"activity\"}\n~~~", {}, "REG-TEST"
+            '~~~json\n{"artifact_type":"activity"}\n~~~', {}, "REG-TEST"
         )
         regression_assertions = {
             row["id"]: row for row in regression.to_dict()["assertions"]
         }
         self.assertEqual(regression_assertions["REG-D001"]["status"], "pass")
-
 
     def test_bva_values_are_recognized_next_to_japanese_text(self):
         text = """## テスト条件へ展開しないテスト要求

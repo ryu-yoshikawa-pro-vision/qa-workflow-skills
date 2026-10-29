@@ -45,7 +45,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     scope_table = find_table(
         parse_tables(text),
         section_contains="Scope and closure",
-        required_headers=("Scope ref", "Aspect", "Decision", "Outcome", "Reason / applicability"),
+        required_headers=(
+            "Scope ref",
+            "Aspect",
+            "Decision",
+            "Outcome",
+            "Reason / applicability",
+        ),
     )
     scope_rows = scope_table.rows if scope_table else []
     preinitialization_block = (

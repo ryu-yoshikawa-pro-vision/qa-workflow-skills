@@ -188,13 +188,9 @@ class RuntimeValidatorTests(unittest.TestCase):
     def test_expected_runtime_status_is_checked(self) -> None:
         expected = {
             "runtime_contract": {
-                "expected_runtime_units": [
-                    "test-condition-design::model:ep-001"
-                ],
+                "expected_runtime_units": ["test-condition-design::model:ep-001"],
                 "expected_status": {
-                    "test-condition-design::model:ep-001": {
-                        "runtime_status": "ready"
-                    }
+                    "test-condition-design::model:ep-001": {"runtime_status": "ready"}
                 },
             }
         }

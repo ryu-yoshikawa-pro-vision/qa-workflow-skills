@@ -124,7 +124,9 @@ def _shape_issues(doc: dict[str, Any], kind: str) -> list[dict[str, str]]:
             for index, route in enumerate(routes):
                 if not isinstance(route, dict):
                     continue
-                check(f"required_routes[{index}].route_type", route.get("route_type"), str)
+                check(
+                    f"required_routes[{index}].route_type", route.get("route_type"), str
+                )
                 if "e2e_testware_ref" in route:
                     check(
                         f"required_routes[{index}].e2e_testware_ref",
@@ -142,7 +144,10 @@ def _shape_issues(doc: dict[str, Any], kind: str) -> list[dict[str, str]]:
         for field in ("activity_state", "cleanup_status"):
             check(field, doc.get(field), str)
         counts = doc.get("counts")
-        if isinstance(counts, dict) and type(counts.get("auxiliary_testware_count")) is not int:
+        if (
+            isinstance(counts, dict)
+            and type(counts.get("auxiliary_testware_count")) is not int
+        ):
             issues.append(
                 {
                     "path": "counts.auxiliary_testware_count",
@@ -186,11 +191,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             if json_fence_count
             else None,
         )
-        block_valid = (
-            json_fence_count == 0
-            and not missing_tokens
-            and explicit_block
-        )
+        block_valid = json_fence_count == 0 and not missing_tokens and explicit_block
         result.add(
             "REG-D019",
             block_valid,
@@ -539,8 +540,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
         result.add(
             "REG-D009",
-            doc.get("auxiliary_testware_count")
-            == auxiliary_ref_count,
+            doc.get("auxiliary_testware_count") == auxiliary_ref_count,
             "TCなし補助testwareをTC countから分離すること",
         )
     elif kind == "activity":
@@ -577,9 +577,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                     {"tc_ref": tc_ref, "route_ref": route.get("route_ref")}
                 )
             source_result = (
-                execution.get("source_result")
-                if isinstance(execution, dict)
-                else None
+                execution.get("source_result") if isinstance(execution, dict) else None
             )
             if route.get("source_result") != source_result:
                 source_mismatches.append(
@@ -671,9 +669,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         aux_issues = [item for item in auxiliary_rows if item.get("tc_ref")]
         counts = doc.get("counts")
         auxiliary_count = (
-            counts.get("auxiliary_testware_count")
-            if isinstance(counts, dict)
-            else None
+            counts.get("auxiliary_testware_count") if isinstance(counts, dict) else None
         )
         if auxiliary_count != len(auxiliary_rows) or not isinstance(auxiliary, list):
             aux_issues.append({"issue": "auxiliary_count_mismatch"})

@@ -114,8 +114,7 @@ def _is_expected_blocked_gate_outcome(
         blocked_units == [analysis_identity]
         and expected_status.get(analysis_identity, {}).get("runtime_status")
         == "invalid_input"
-        and expected_status.get(analysis_identity, {}).get("result_status")
-        == "blocked"
+        and expected_status.get(analysis_identity, {}).get("result_status") == "blocked"
     )
     return bool(
         expected_block_is_materialization_block
@@ -239,8 +238,7 @@ def _add_runtime_evidence_assertion(
             not isinstance(row, dict)
             or not isinstance(row.get("selected_techniques"), list)
             or any(
-                not isinstance(value, str)
-                or value not in TECHNIQUE_LABEL_BY_SLUG
+                not isinstance(value, str) or value not in TECHNIQUE_LABEL_BY_SLUG
                 for value in row["selected_techniques"]
             )
             for row in selections
