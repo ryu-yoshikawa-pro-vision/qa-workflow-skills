@@ -10,11 +10,11 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.skills.evals.deterministic import run
 from scripts.skills.evals.deterministic.markdown_parser import (
     MarkdownTableParseError,
     parse_tables,
 )
-from scripts.skills.evals.deterministic import run
 
 
 class MarkdownParserTests(unittest.TestCase):

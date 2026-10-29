@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from scripts.skills.evals.deterministic.common import fenced_code_blocks
