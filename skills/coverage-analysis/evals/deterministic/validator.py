@@ -7,6 +7,7 @@ from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     clean,
     compute_graph_gaps,
+    has_value,
     ids_in,
     nonempty_rows,
 )
@@ -184,7 +185,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in matrix_rows + item_rows + orphan_rows:
         if (
             "Model Key" in row
-            and clean(row.get("Model Key", ""))
+            and has_value(row.get("Model Key", ""))
             and not re.fullmatch(
                 r"[a-z][a-z0-9-]*-\d{3,}", clean(row.get("Model Key", ""))
             )

@@ -11,6 +11,10 @@ class MarkdownTable:
     rows: list[dict[str, str]]
 
 
+class MarkdownTableParseError(ValueError):
+    """A table has an invalid shape and cannot be interpreted safely."""
+
+
 def _split_row(line: str) -> list[str]:
     line = line.strip()
     if line.startswith("|"):
@@ -44,11 +48,11 @@ def _split_row(line: str) -> list[str]:
     return cells
 
 
-def _is_separator(line: str) -> bool:
+def _separator_cells(line: str) -> list[str] | None:
     cells = _split_row(line)
-    return bool(cells) and all(
-        re.fullmatch(r":?-{3,}:?", c.replace(" ", "")) for c in cells
-    )
+    if cells and all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+        return cells
+    return None
 
 
 def parse_tables(text: str) -> list[MarkdownTable]:
@@ -62,15 +66,30 @@ def parse_tables(text: str) -> list[MarkdownTable]:
             section = stripped.lstrip("#").strip()
             i += 1
             continue
+        if stripped.startswith("|"):
+            separator_index = i + 1
+            while separator_index < len(lines) and not lines[
+                separator_index
+            ].strip():
+                separator_index += 1
+            if (
+                separator_index > i + 1
+                and separator_index < len(lines)
+                and _separator_cells(lines[separator_index]) is not None
+            ):
+                raise MarkdownTableParseError(
+                    f"Markdown table header and separator rows must be adjacent in section '{section}' "
+                    f"at header line {i + 1} and separator line {separator_index + 1}"
+                )
         if (
             stripped.startswith("|")
             and i + 1 < len(lines)
-            and _is_separator(lines[i + 1])
+            and _separator_cells(lines[i + 1]) is not None
         ):
             headers = _split_row(lines[i])
-            separator = _split_row(lines[i + 1])
+            separator = _separator_cells(lines[i + 1]) or []
             if len(separator) != len(headers):
-                raise ValueError(
+                raise MarkdownTableParseError(
                     f"Markdown table separator column count mismatch in section '{section}': "
                     f"headers={len(headers)} separator={len(separator)}"
                 )
@@ -81,7 +100,7 @@ def parse_tables(text: str) -> list[MarkdownTable]:
                 row_number += 1
                 cells = _split_row(lines[i])
                 if len(cells) != len(headers):
-                    raise ValueError(
+                    raise MarkdownTableParseError(
                         f"Markdown table row column count mismatch in section '{section}' row {row_number}: "
                         f"headers={len(headers)} cells={len(cells)}"
                     )

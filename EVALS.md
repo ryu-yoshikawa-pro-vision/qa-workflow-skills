@@ -193,6 +193,7 @@ Pairwiseフィクスチャでは、2-wiseカバレッジ計算の前に生成組
 ## Markdown parser制約
 
 正規形式のMarkdownテーブルのみを対象とします。セル内のescaped pipe `\|`はセル内容として扱います。headerとrowの列数不一致は暗黙に切り捨てず構造エラーにします。
+決定論grader runnerはこの表構造エラーを該当caseの`FAIL`（`OUTPUT-MD-TABLE-001`）として記録し、batch modeでは残りのcase採点を続行します。
 
 ## CLI
 

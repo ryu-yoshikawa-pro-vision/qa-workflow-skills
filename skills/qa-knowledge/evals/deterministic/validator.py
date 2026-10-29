@@ -5,6 +5,7 @@ import json
 import re
 from typing import Any
 
+from scripts.skills.evals.deterministic.common import fenced_code_blocks
 from scripts.skills.evals.deterministic.result import EvalResult
 
 
@@ -15,9 +16,11 @@ def _canonical(value: Any) -> bytes:
 
 
 def _document(text: str) -> tuple[dict[str, Any] | None, list[str]]:
-    matches = re.findall(
-        r"```json\s*\n(.*?)\n```", text, flags=re.DOTALL | re.IGNORECASE
-    )
+    matches = [
+        body
+        for info, body in fenced_code_blocks(text)
+        if info.casefold().split(maxsplit=1)[:1] == ["json"]
+    ]
     if len(matches) != 1:
         return None, ["exactly_one_json_knowledge_record_required"]
     try:

@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any
 
+from scripts.skills.evals.deterministic.common import fenced_code_blocks
 from scripts.skills.evals.deterministic.result import EvalResult
 
 _SECRET = re.compile(
@@ -12,9 +13,11 @@ _SECRET = re.compile(
 
 
 def _document(text: str) -> tuple[dict[str, Any] | None, list[str]]:
-    matches = re.findall(
-        r"```json\s*\n(.*?)\n```", text, flags=re.DOTALL | re.IGNORECASE
-    )
+    matches = [
+        body
+        for info, body in fenced_code_blocks(text)
+        if info.casefold().split(maxsplit=1)[:1] == ["json"]
+    ]
     if len(matches) != 1:
         return None, ["exactly_one_json_session_required"]
     try:
@@ -64,20 +67,39 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         or charter[key] == ""
         or (key != "side_effect_operations" and charter[key] == [])
     )
+    block_conditions = charter.get("block_conditions")
+    unresolved = doc.get("unresolved")
+    explicit_block = (
+        doc.get("state") == "ブロック中"
+        and isinstance(block_conditions, list)
+        and bool(block_conditions)
+        and all(isinstance(value, str) and value.strip() for value in block_conditions)
+        and isinstance(unresolved, list)
+        and bool(unresolved)
+        and all(isinstance(value, str) and value.strip() for value in unresolved)
+    )
     result.add(
         "EXP-D002",
-        doc.get("mode") in {"exploration", "investigation"} and not missing,
-        "modeとCharter必須項目が揃うこと",
+        doc.get("mode") in {"exploration", "investigation"}
+        and (not missing or explicit_block),
+        "modeとCharter必須項目が揃うか、未充足項目を明示してブロックすること",
         evidence={"mode": doc.get("mode"), "missing": missing},
     )
-    inv_ok = doc.get("mode") != "investigation" or bool(
+    has_symptom_or_hypothesis = bool(
         charter.get("symptom_ref")
         or charter.get("hypothesis_ref")
         or charter.get("symptom")
         or charter.get("hypothesis")
     )
+    blocked_for_missing_symptom = explicit_block and any(
+        "symptom" in condition.casefold() or "hypothesis" in condition.casefold()
+        for condition in block_conditions
+    )
+    inv_ok = doc.get("mode") != "investigation" or has_symptom_or_hypothesis or blocked_for_missing_symptom
     result.add(
-        "EXP-D003", inv_ok, "investigationはsymptomまたはhypothesisを起点にすること"
+        "EXP-D003",
+        inv_ok,
+        "investigationはsymptom / hypothesisを起点にし、不足時はその理由で明示的にブロックすること",
     )
     observations, findings = doc.get("observations"), doc.get("findings")
     separated = isinstance(observations, list) and isinstance(findings, list)

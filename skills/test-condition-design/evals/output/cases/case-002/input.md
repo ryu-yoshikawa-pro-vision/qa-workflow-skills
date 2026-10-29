@@ -10,4 +10,5 @@ Risk: RISK-001。
 状態遷移:
 draft --publish--> published
 published --archive--> archived
+このfixtureの各遷移を個別に設計する開始状態は`draft`と`published`です。これはアプリケーション全体の初期状態や到達setupを指定するものではありません。
 全有効遷移をCoverage Itemへ閉じる。

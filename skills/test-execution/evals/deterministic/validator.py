@@ -5,7 +5,11 @@ from typing import Any
 
 import yaml
 
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    MarkdownTableParseError,
+    find_table,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 RESULT_STATES = {"PASS", "FAIL", "未実行", "判定不能"}
@@ -26,6 +30,7 @@ EXECUTION_METHODS = {
 }
 NONE = {"", "なし", "-", "—", "N/A", "n/a", "null"}
 TC_CLEANUP_NONE = NONE | {"対象なし"}
+UNAVAILABLE_REFS = {"未提供", "未確認", "確認不能", "不明"}
 
 
 def _value(row: dict[str, str], field: str) -> str:
@@ -42,6 +47,10 @@ def _rows(table) -> list[dict[str, str]]:
 
 def _nonempty(value: str) -> bool:
     return value.strip() not in NONE
+
+
+def _reference_marker(value: str) -> str:
+    return re.split(r"[\(（:：]", value.strip(), maxsplit=1)[0].strip()
 
 
 def _integer(value: str) -> int | None:
@@ -81,12 +90,16 @@ def _yaml_fences(text: str) -> tuple[list[Any], list[str]]:
 
 def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result = EvalResult("test-execution", eval_id)
-    parse_errors: list[str] = []
     try:
         tables = parse_tables(text)
-    except Exception as exc:
-        tables = []
-        parse_errors.append(str(exc))
+    except MarkdownTableParseError as exc:
+        result.add(
+            "TEX-D001",
+            False,
+            "正規実行報告セクション・表が存在し、Markdown表が整形式であること",
+            evidence={"parse_errors": [str(exc)]},
+        )
+        return result
 
     required = {
         "実行情報": ("項目", "値", "確認元"),
@@ -110,14 +123,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     report_present = "## 実行結果報告" in text
     result.add(
         "TEX-D001",
-        not parse_errors and not missing and report_present,
+        not missing and report_present,
         "正規実行報告セクション・表が存在し、Markdown表が整形式であること",
         evidence={
-            "parse_errors": parse_errors,
             "missing": missing,
             "report": report_present,
         }
-        if parse_errors or missing or not report_present
+        if missing or not report_present
         else None,
     )
 
@@ -160,7 +172,25 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     yaml_docs, yaml_errors = _yaml_fences(text)
     yaml_issues = []
     plans: dict[str, dict[str, Any]] = {}
-    if yaml_errors:
+    blocked_before_snapshot = expected.get("require_preflight_block") is True
+    if blocked_before_snapshot:
+        unexpected_yaml_errors = [
+            error
+            for error in yaml_errors
+            if error != "no fenced YAML execution plans"
+        ]
+        if unexpected_yaml_errors:
+            yaml_issues.extend(unexpected_yaml_errors)
+        if yaml_docs:
+            yaml_issues.append("preflight-blocked case must not contain a TC snapshot")
+        missing_blocker_tokens = [
+            token
+            for token in expected.get("required_preflight_tokens", ["未実行", "未提供"])
+            if token not in text
+        ]
+        if missing_blocker_tokens:
+            yaml_issues.append({"missing_blocker_tokens": missing_blocker_tokens})
+    elif yaml_errors:
         yaml_issues.extend(yaml_errors)
     for index, doc in enumerate(yaml_docs):
         if not isinstance(doc, dict):
@@ -263,7 +293,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             yaml_issues.append(
                 {"ref": ref, "issue": "unresolved and cleanup must be arrays"}
             )
-    if list(plans) != ids:
+    if not blocked_before_snapshot and list(plans) != ids:
         yaml_issues.append(
             {
                 "mapping_refs": ids,
@@ -274,12 +304,23 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result.add(
         "TEX-D003",
         not yaml_issues,
-        "実行前YAMLをyaml.safe_loadでparseし、step_ref / action・多段step参照・TC集合を検証すること",
+        "実行可能TCのYAML構造を検証するか、snapshot必須資料不足時にYAMLを生成しないこと",
         evidence=yaml_issues or None,
     )
 
     source_issues = []
     source_field = "元TC ID (source_test_case_id)"
+    if blocked_before_snapshot:
+        invalid_unavailable_source_ids = [
+            {
+                "ref": _value(row, "TC参照"),
+                "value": _value(row, source_field),
+            }
+            for row in mappings
+            if _value(row, source_field).lower()
+            not in NONE | {"なし", "未提供", "値なし", "null"}
+        ]
+        source_issues.extend(invalid_unavailable_source_ids)
     for row in mappings:
         ref = _value(row, "TC参照")
         raw_id = _value(row, source_field)
@@ -313,18 +354,28 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     if identity_expected is False or (
         identity_expected is None and not _nonempty(input_identity)
     ):
-        if snapshot_method != expected.get(
+        expected_method = expected.get(
             "expected_snapshot_method", "成果物内TC集合・実行前YAML"
-        ):
+        )
+        method_matches = (
+            "未生成" in snapshot_method
+            if isinstance(expected_method, str) and expected_method.startswith("未生成")
+            else snapshot_method == expected_method
+        )
+        if not method_matches:
             snapshot_issues.append(
-                {"expected": "成果物内TC集合・実行前YAML", "actual": snapshot_method}
+                {"expected": expected_method, "actual": snapshot_method}
             )
     elif identity_expected is True or _nonempty(input_identity):
-        if snapshot_method != expected.get(
-            "expected_snapshot_method", "入力元identity"
-        ):
+        expected_method = expected.get("expected_snapshot_method", "入力元identity")
+        method_matches = (
+            "未生成" in snapshot_method
+            if isinstance(expected_method, str) and expected_method.startswith("未生成")
+            else snapshot_method == expected_method
+        )
+        if not method_matches:
             snapshot_issues.append(
-                {"expected": "入力元identity", "actual": snapshot_method}
+                {"expected": expected_method, "actual": snapshot_method}
             )
         if not _nonempty(input_identity):
             snapshot_issues.append({"issue": "input identity expected but absent"})
@@ -337,13 +388,23 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     previous = _value(info, "前回実行成果物参照")
     previous_issues = []
+    previous_marker = _reference_marker(previous)
     prior_map = {_value(row, "TC参照"): _value(row, "前回TC参照") for row in mappings}
     actual_previous_refs = {
         ref: value
         for ref, value in prior_map.items()
-        if _nonempty(value) and value not in {"なし", "初回"}
+        if _nonempty(value)
+        and value not in {"なし", "初回"}
+        and value not in UNAVAILABLE_REFS
     }
-    if not _nonempty(previous) or previous in {"なし", "初回"}:
+    unavailable_previous = previous_marker in UNAVAILABLE_REFS
+    absent_previous = previous_marker in NONE | UNAVAILABLE_REFS | {"初回"}
+    if blocked_before_snapshot and unavailable_previous:
+        if actual_previous_refs:
+            previous_issues.append(
+                {"unexpected_previous_refs": actual_previous_refs}
+            )
+    elif absent_previous or not _nonempty(previous):
         if actual_previous_refs:
             previous_issues.append({"unexpected_previous_refs": actual_previous_refs})
     elif not actual_previous_refs:
@@ -481,38 +542,52 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     visual_rows = _rows(
         _table(tables, "視覚確認", ("TC参照", "手順 / 観測点", "画像で観測した事実"))
     )
-    for row in procedure_rows:
-        ref = _value(row, "TC参照")
-        if ref not in plans:
-            procedure_issues.append({"ref": ref, "issue": "unknown TC"})
-            continue
-        observed_step = _value(row, "手順 / 観測点 (step_ref)")
-        valid_steps = {
-            step.get("step_ref")
-            for step in plans[ref].get("scenario", {}).get("when", [])
-            if isinstance(step, dict)
-        }
-        if observed_step not in valid_steps:
-            procedure_issues.append(
-                {"ref": ref, "step": observed_step, "issue": "step_ref is not in YAML"}
-            )
-    for row in visual_rows:
-        ref = _value(row, "TC参照")
-        if ref not in plans:
-            procedure_issues.append({"visual_ref": ref, "issue": "unknown TC"})
-            continue
-        if _value(row, "手順 / 観測点") not in {
-            _value(item, "手順 / 観測点 (step_ref)")
-            for item in procedure_rows
-            if _value(item, "TC参照") == ref
-        }:
+    if blocked_before_snapshot:
+        if procedure_rows or visual_rows:
             procedure_issues.append(
                 {
-                    "visual_ref": ref,
-                    "step": _value(row, "手順 / 観測点"),
-                    "issue": "visual observation is not traceable",
+                    "issue": "preflight-blocked case must not contain procedure or visual observation rows",
+                    "procedure_rows": len(procedure_rows),
+                    "visual_rows": len(visual_rows),
                 }
             )
+    else:
+        for row in procedure_rows:
+            ref = _value(row, "TC参照")
+            if ref not in plans:
+                procedure_issues.append({"ref": ref, "issue": "unknown TC"})
+                continue
+            observed_step = _value(row, "手順 / 観測点 (step_ref)")
+            valid_steps = {
+                step.get("step_ref")
+                for step in plans[ref].get("scenario", {}).get("when", [])
+                if isinstance(step, dict)
+            }
+            if observed_step not in valid_steps:
+                procedure_issues.append(
+                    {
+                        "ref": ref,
+                        "step": observed_step,
+                        "issue": "step_ref is not in YAML",
+                    }
+                )
+        for row in visual_rows:
+            ref = _value(row, "TC参照")
+            if ref not in plans:
+                procedure_issues.append({"visual_ref": ref, "issue": "unknown TC"})
+                continue
+            if _value(row, "手順 / 観測点") not in {
+                _value(item, "手順 / 観測点 (step_ref)")
+                for item in procedure_rows
+                if _value(item, "TC参照") == ref
+            }:
+                procedure_issues.append(
+                    {
+                        "visual_ref": ref,
+                        "step": _value(row, "手順 / 観測点"),
+                        "issue": "visual observation is not traceable",
+                    }
+                )
     procedure_by_ref: dict[str, list[dict[str, str]]] = {}
     for row in procedure_rows:
         ref = _value(row, "TC参照")
@@ -623,7 +698,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     defined_scopes = {scope for scope in scope_values if _nonempty(scope)}
     for row in preconditions:
         scope = _value(row, "副作用scope")
-        if _nonempty(scope) and scope not in defined_scopes:
+        unavailable_scope = blocked_before_snapshot and scope in {
+            "未提供",
+            "未指定",
+            "未特定",
+            "確認不能",
+        }
+        if _nonempty(scope) and scope not in defined_scopes and not unavailable_scope:
             side_issues.append(
                 {
                     "ref": _value(row, "TC参照"),
@@ -712,5 +793,39 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         "fixtureで固定したsnapshot参照集合を保持すること",
         evidence=expected_issues or None,
     )
+
+    if blocked_before_snapshot:
+        blocked_issues = []
+        expected_unexecuted = expected.get("expected_unexecuted_count")
+        if expected_unexecuted is not None and len(results) != expected_unexecuted:
+            blocked_issues.append(
+                {
+                    "expected_unexecuted_count": expected_unexecuted,
+                    "actual_result_rows": len(results),
+                }
+            )
+        if any(
+            _value(row, "状態") != "未実行"
+            or _value(row, "実行開始") != "未開始"
+            for row in results
+        ):
+            blocked_issues.append("all requested work must remain unstarted")
+        if method != "未実行":
+            blocked_issues.append({"execution_method": method})
+        if plans or procedure_rows or visual_rows or side_rows:
+            blocked_issues.append(
+                {
+                    "plans": len(plans),
+                    "procedure_rows": len(procedure_rows),
+                    "visual_rows": len(visual_rows),
+                    "side_effect_scope_rows": len(side_rows),
+                }
+            )
+        result.add(
+            "TEX-D015",
+            not blocked_issues,
+            "入力TC snapshotの必須資料がない場合はYAML・操作・cleanupを作らず未実行で閉じること",
+            evidence=blocked_issues or None,
+        )
 
     return result

@@ -249,6 +249,44 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=issues or None,
     )
 
+    blocked_upstream_ids = set(expected.get("expected_blocked_upstream_ids", []))
+    if blocked_upstream_ids:
+        blocked_rows = {}
+        for row in disposed:
+            for upstream_id in ids_in(row.get("上流ID", "")):
+                if upstream_id in blocked_upstream_ids:
+                    blocked_rows[upstream_id] = row
+        blocked_issues = []
+        if trs:
+            blocked_issues.append(
+                {
+                    "reason": "test requirements were generated while required source content is blocked",
+                    "requirement_ids": tr_ids,
+                }
+            )
+        for upstream_id in sorted(blocked_upstream_ids):
+            row = blocked_rows.get(upstream_id)
+            if row is None:
+                blocked_issues.append({"id": upstream_id, "reason": "missing block disposition"})
+            elif clean(row.get("扱い", "")) != "ブロック中":
+                blocked_issues.append(
+                    {
+                        "id": upstream_id,
+                        "reason": "upstream item is not marked blocked",
+                        "actual": clean(row.get("扱い", "")),
+                    }
+                )
+            elif not clean(row.get("理由 / 根拠", "")):
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "block disposition has no reason"}
+                )
+        result.add(
+            "TR-D018",
+            not blocked_issues,
+            "上流の内容が不足する場合、要求を生成せず対象を理由付きでブロック中にすること",
+            evidence=blocked_issues or None,
+        )
+
     required_missing = []
     if "required_test_requirements" in expected:
         required_missing = sorted(

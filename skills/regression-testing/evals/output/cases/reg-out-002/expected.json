@@ -1,3 +1,8 @@
 {
-  "artifact_type": "activity"
+  "expect_blocked_output": true,
+  "required_block_tokens": [
+    "Activity identity",
+    "execution ref",
+    "cleanup"
+  ]
 }

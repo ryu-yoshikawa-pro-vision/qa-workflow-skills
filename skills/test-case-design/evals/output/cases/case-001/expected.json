@@ -5,5 +5,5 @@
   "coverage_closure_ids": ["TCN-001-CI01"],
   "known_authorities": ["SPEC-001"],
   "coverage_item_priorities": { "TCN-001-CI01": "高" },
-  "required_test_cases": ["TC-001"]
+  "expected_blocked_upstream_ids": ["TCN-001", "TCN-001-CI01"]
 }

@@ -26,11 +26,23 @@ UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS = (
     "未実施",
 )
 EXECUTION_PATTERNS = (
-    re.compile(r"(?:Playwright|E2E)[^\n]{0,20}(?:実行|再実行|起動)", re.IGNORECASE),
-    re.compile(r"(?:実行|再実行|起動)[^\n]{0,20}(?:Playwright|E2E)", re.IGNORECASE),
+    re.compile(
+        r"(?:Playwright|(?<![A-Za-z0-9_-])E2E(?![A-Za-z0-9_-]))"
+        r"[^\n]{0,20}(?:実行|再実行|起動)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:実行|再実行|起動)[^\n]{0,20}"
+        r"(?:Playwright|(?<![A-Za-z0-9_-])E2E(?![A-Za-z0-9_-]))",
+        re.IGNORECASE,
+    ),
 )
 NEGATED_EXECUTION = re.compile(
-    r"(?:しない|しません|せず|行わない|行いません|ありません|ではない|ではありません|禁止|してはいけ|不可)",
+    r"^\s*(?:(?:は|を|も|が)\s*)?(?:"
+    r"しない|しません|せず|行わない|行いません|行わなかった|"
+    r"していない|していません|してません|してない|してなかった|"
+    r"されていない|されていません|されません|できない|できません|"
+    r"ありません|なかった|ではない|ではありません|禁止|してはいけ|不可|未実施)",
     re.IGNORECASE,
 )
 
@@ -56,6 +68,13 @@ def _is_unconfirmed_expected_behavior(value: str) -> bool:
         or value.startswith(f"{marker}：")
         for marker in UNCONFIRMED_EXPECTED_BEHAVIOR_MARKERS
     )
+
+
+def _is_negated_execution_claim(line: str, match: re.Match[str]) -> bool:
+    if NEGATED_EXECUTION.search(match.group(0)):
+        return True
+    suffix = line[match.end() :]
+    return bool(NEGATED_EXECUTION.search(suffix))
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -428,6 +447,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=block_only_artifact_issues or None,
     )
 
+    if expected.get("require_all_targets_blocked"):
+        unblocked_targets = [
+            clean(row.get("E2E対象 / 識別子", "")) or "<unknown>"
+            for row in targets
+            if clean(row.get("扱い", "")) != "ブロック中"
+        ]
+        result.add(
+            "E2E-IMPL-D023",
+            bool(targets) and not unblocked_targets,
+            "入力に実装対象sourceがないfixtureでは全対象を実装前blockとして扱うこと",
+            evidence={"missing_targets": not targets, "unblocked_targets": unblocked_targets}
+            if not targets or unblocked_targets
+            else None,
+        )
+
     expected_refs = {clean(str(ref)) for ref in expected.get("required_e2e_refs", [])}
     missing_refs = sorted(expected_refs - set(ref_values))
     result.add(
@@ -455,12 +489,18 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if expected.get("require_no_e2e_execution"):
         execution_terms = []
         for line in text.splitlines():
-            if NEGATED_EXECUTION.search(line):
-                continue
+            matches = sorted(
+                (
+                    match
+                    for pattern in EXECUTION_PATTERNS
+                    for match in pattern.finditer(line)
+                ),
+                key=lambda match: (match.start(), match.end()),
+            )
             execution_terms.extend(
                 match.group(0)
-                for pattern in EXECUTION_PATTERNS
-                if (match := pattern.search(line))
+                for match in matches
+                if not _is_negated_execution_claim(line, match)
             )
         execution_terms = sorted(set(execution_terms))
         result.add(

@@ -1,0 +1,7 @@
+{
+  "new_artifact": true,
+  "required_target_keys": ["target-001"],
+  "required_element_keys": ["element-001"],
+  "required_state_keys": ["state-001"],
+  "forbidden_output_values": []
+}

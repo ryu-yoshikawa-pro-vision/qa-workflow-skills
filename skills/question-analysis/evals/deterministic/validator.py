@@ -18,6 +18,7 @@ from scripts.skills.evals.deterministic.result import EvalResult
 CLASSIFICATIONS = {"ブロッカー", "要確認", "仮定可能", "提案・任意"}
 NORMALIZATIONS = {"SPEC", "DECISION", "ASM", "未確定"}
 ASSUMPTION_STATES = {"提案", "承認済み", "撤回", "置換済み"}
+APPROVED_ASSUMPTION_NO_RESTART_RE = re.compile(r"^不要（承認済み(ASM-\d{3})）$")
 RUNTIME_SKILLS = CANONICAL_SKILLS
 RUNTIME_STATUSES = {
     "ok",
@@ -63,6 +64,26 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     questions = nonempty_rows(q_table)
     assumptions = nonempty_rows(a_table)
     blocked = nonempty_rows(b_table)
+
+    approved_assumption_ids = {
+        clean(row.get("正式ASM ID", ""))
+        for row in assumptions
+        if clean(row.get("状態", "")) == "承認済み"
+        and clean(row.get("正式ASM ID", ""))
+    }
+
+    def no_restart_for_approved_assumption(row: dict[str, str]) -> bool:
+        match = APPROVED_ASSUMPTION_NO_RESTART_RE.fullmatch(
+            clean(row.get("再開Skill", ""))
+        )
+        if match is None or clean(row.get("回答後の正規化先", "")) != "ASM":
+            return False
+        assumption_id = match.group(1)
+        row_context = " ".join(
+            clean(row.get(field, ""))
+            for field in ("根拠", "影響範囲 / 成果物", "回答なしの場合の扱い")
+        )
+        return assumption_id in approved_assumption_ids and assumption_id in row_context
 
     add_required_fields_assertion(
         result,
@@ -171,10 +192,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     invalid_skills = sorted(
         {
-            clean(r.get("再開Skill", ""))
-            for r in questions + blocked
-            if clean(r.get("再開Skill", ""))
-            and clean(r.get("再開Skill", "")) not in CANONICAL_SKILLS
+            clean(row.get("再開Skill", ""))
+            for row in questions + blocked
+            if clean(row.get("再開Skill", ""))
+            and clean(row.get("再開Skill", "")) not in CANONICAL_SKILLS
+            and not (row in questions and no_restart_for_approved_assumption(row))
         }
     )
     result.add(
@@ -188,6 +210,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in questions + blocked:
         skill = clean(row.get("再開Skill", ""))
         target = clean(row.get("再開対象 / 実行範囲", ""))
+        if row in questions and no_restart_for_approved_assumption(row):
+            if target:
+                invalid_restart_targets.append(
+                    {"skill": skill, "target": target, "allowed": ["<空欄>"]}
+                )
+            continue
         allowed_targets = MULTI_USE_SKILL_TARGETS.get(skill)
         if allowed_targets is not None and target not in allowed_targets:
             invalid_restart_targets.append(

@@ -164,6 +164,48 @@ class RuntimeValidatorTests(unittest.TestCase):
         validate_runtime_evidence(text, expected, result)
         self.assertEqual(result.status, "fail")
 
+    def test_declared_runtime_unit_rejects_missing_runtime_evidence(self) -> None:
+        expected = {
+            "runtime_contract": {
+                "expected_runtime_units": [
+                    "coverage-analysis::artifact:traceability:all"
+                ],
+                "expected_generators": {
+                    "coverage-analysis::artifact:traceability:all": "traceability"
+                },
+            }
+        }
+        result = EvalResult("coverage-analysis", "COV-OUT-002")
+        validate_runtime_evidence("# output without runtime evidence", expected, result)
+        failures = {
+            assertion.id
+            for assertion in result.assertions
+            if assertion.status == "fail"
+        }
+        self.assertEqual(result.status, "fail")
+        self.assertIn("RUNTIME-UNITS-EXACT", failures)
+
+    def test_expected_runtime_status_is_checked(self) -> None:
+        expected = {
+            "runtime_contract": {
+                "expected_runtime_units": [
+                    "test-condition-design::model:ep-001"
+                ],
+                "expected_status": {
+                    "test-condition-design::model:ep-001": {
+                        "runtime_status": "ready"
+                    }
+                },
+            }
+        }
+        result = EvalResult("test-condition-design", "TCN-OUT-001")
+        validate_runtime_evidence(_artifact(), expected, result)
+        failures = {a.id for a in result.assertions if a.status == "fail"}
+        self.assertEqual(result.status, "fail")
+        self.assertIn(
+            "RUNTIME-PAIR-test-condition-design-model-ep-001-STATUS", failures
+        )
+
     def test_fingerprint_tampering_is_detected_without_expected_hash_fixture(
         self,
     ) -> None:

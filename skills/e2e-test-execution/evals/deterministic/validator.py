@@ -37,7 +37,15 @@ CLEANUP_STATES = {
     "一部失敗",
 }
 STARTED_MARKERS = {"開始", "開始済み", "実行済み", "はい"}
-NOT_STARTED_MARKERS = {"", "未開始", "未実行", "未実施", "いいえ", "対象なし"}
+NOT_STARTED_MARKERS = {
+    "",
+    "未開始",
+    "開始せず",
+    "未実行",
+    "未実施",
+    "いいえ",
+    "対象なし",
+}
 RESOLVED_NOT_STARTED_MARKERS = NOT_STARTED_MARKERS - {""}
 NON_OWNER_MARKERS = {
     "今回runは所有しない",
@@ -613,8 +621,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     )
     artifact_current = artifact_value in {"はい", "生成", "更新"}
     artifact_not_generated = artifact_value in {
+        "なし",
         "いいえ",
         "未生成",
+        "未生成（runner未開始）",
         "未更新",
         "対象なし",
         "未確認",
@@ -625,14 +635,37 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if runner_started
         else preflight_block and artifact_not_generated
     )
+    expected_execution_issues = []
+    if "expected_runner_started" in expected and runner_started != bool(
+        expected["expected_runner_started"]
+    ):
+        expected_execution_issues.append(
+            {
+                "field": "runner_started",
+                "expected": bool(expected["expected_runner_started"]),
+                "actual": runner_started,
+            }
+        )
+    if "expected_execution_state" in expected and execution_state != clean(
+        str(expected["expected_execution_state"])
+    ):
+        expected_execution_issues.append(
+            {
+                "field": "execution_state",
+                "expected": expected["expected_execution_state"],
+                "actual": execution_state,
+            }
+        )
+    artifact_ok = artifact_ok and not expected_execution_issues
     result.add(
         "E2E-EXEC-D005",
         artifact_ok,
-        "runner開始済みなら今回runで生成・更新したartifactを要求し、preflight blockならrunner未開始・artifact未生成を許容すること",
+        "runner状態・今回run artifactがpreflight block契約と一致し、指定時はfixtureの期待状態とも一致すること",
         evidence={
             "runner": runner_value,
             "execution_state": execution_state,
             "artifact": artifact_value,
+            "expected_execution_issues": expected_execution_issues,
         }
         if not artifact_ok
         else None,

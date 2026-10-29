@@ -1,5 +1,7 @@
 {
   "expected_start_skill": "test-case-design",
+  "expected_start_target": "",
   "expected_final_skill": "test-case-design",
+  "expected_final_target": "",
   "expected_skills": ["test-case-design"]
 }

@@ -69,12 +69,29 @@ def load_validator(skill: str):
     return module.validate
 
 
-def eval_case(skill: str, eval_id: str, *, compact_table_spacing: bool = True):
+def eval_case(
+    skill: str,
+    eval_id: str,
+    *,
+    compact_table_spacing: bool = True,
+    validation_sample: bool = True,
+):
     root = SKILLS_ROOT / skill / "evals" / "output"
     manifest = json.loads((root / "evals.json").read_text(encoding="utf-8"))
     case = next(row for row in manifest["cases"] if row["id"] == eval_id)
-    expected = json.loads((root / case["expected"]).read_text(encoding="utf-8"))
-    output = (root / case["input"]).parent / "reference.md"
+    if skill in {"test-target-inspection", "test-execution"} and validation_sample:
+        case_index = (
+            "case-001"
+            if eval_id in {"TTI-OUT-001", "TEX-OUT-001"}
+            else "case-002"
+        )
+        fixture_root = REPO_ROOT / "tests/fixtures/skills" / skill
+        output = fixture_root / f"{case_index}-complete-sample.md"
+        expected_path = fixture_root / f"{case_index}-complete-sample-expected.json"
+    else:
+        output = (root / case["input"]).parent / "reference.md"
+        expected_path = root / case["expected"]
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
     text = output.read_text(encoding="utf-8")
     return (
         _normalize_table_spacing(text) if compact_table_spacing else text,
@@ -83,14 +100,193 @@ def eval_case(skill: str, eval_id: str, *, compact_table_spacing: bool = True):
 
 
 class NewSkillDeterministicContractTests(unittest.TestCase):
+    def test_adversarial_review_template_defines_empty_table_contract(self):
+        skill = (SKILLS_ROOT / "adversarial-review" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        template = (
+            SKILLS_ROOT / "adversarial-review" / "assets/output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("指摘一覧はヘッダーのみ", skill)
+        self.assertIn("指摘がない場合、このヘッダーだけ", template)
+        self.assertIn("指摘IDは`REV-001`から", skill)
+        self.assertNotIn("| REV-001 |", template)
+
+    def test_e2e_analysis_preserves_supplied_cleanup_status(self):
+        paths = (
+            SKILLS_ROOT / "e2e-test-result-analysis" / "SKILL.md",
+            SKILLS_ROOT / "e2e-test-result-analysis" / "references" / "guidance.md",
+            SKILLS_ROOT
+            / "e2e-test-result-analysis"
+            / "assets"
+            / "output-template.md",
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertIn("cleanup状態", path.read_text(encoding="utf-8"))
+        skill = paths[0].read_text(encoding="utf-8")
+        template = paths[2].read_text(encoding="utf-8")
+        self.assertIn("のいずれか一つ", skill)
+        self.assertIn("状態値を連結しません", template)
+        self.assertIn("正規Skill IDだけ", skill)
+        self.assertIn("正規Skill IDだけ", template)
+
+    def test_test_case_design_blocked_output_has_no_sample_case_rows(self):
+        skill = (SKILLS_ROOT / "test-case-design" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        template = (
+            SKILLS_ROOT / "test-case-design" / "assets/output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("placeholder行を作りません", skill)
+        self.assertIn("header-only", skill)
+        self.assertIn("未採番・仮ID", template)
+        self.assertNotIn("| TC-001", template)
+
+    def test_test_analysis_selection_key_uses_domain_identity(self):
+        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("単一Product Riskに属する技法選択", skill)
+        self.assertIn("その`risk_id`をkeyに使います", skill)
+        self.assertIn("複数Riskをまとめた選択", skill)
+        self.assertIn("Eval ID、ファイル名、実行時刻からkeyを作りません", skill)
+
+    def test_test_analysis_preserves_explicit_values_when_authority_is_missing(self):
+        skill = (SKILLS_ROOT / "test-analysis" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        guidance = (
+            SKILLS_ROOT / "test-analysis" / "references" / "guidance.md"
+        ).read_text(encoding="utf-8")
+        template = (
+            SKILLS_ROOT / "test-analysis" / "assets" / "output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("undetermined_signals", skill)
+        self.assertIn("未提供（入力に記載なし）", skill)
+        self.assertIn("入力値を削除したり", guidance)
+        self.assertIn("入力に操作・観測・合否判定の値が明示", template)
+        self.assertIn("表の列見出しは省略・短縮・言い換えず", template)
+
+    def test_test_condition_design_retains_input_derived_structure_when_blocked(self):
+        skill = (SKILLS_ROOT / "test-condition-design" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        guidance = (
+            SKILLS_ROOT
+            / "test-condition-design"
+            / "references"
+            / "coverage-techniques.md"
+        ).read_text(encoding="utf-8")
+        template = (
+            SKILLS_ROOT
+            / "test-condition-design"
+            / "assets"
+            / "output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("入力由来の条件・Coverage Item候補", skill)
+        self.assertIn("current Authority未解決", skill)
+        self.assertIn("構造候補として保持", guidance)
+        self.assertIn("CI IDやactive CI Entityを創作せず", guidance)
+        self.assertIn("この表をactive Coverage Item", template)
+
+    def test_spec_analysis_ui_package_materialize_uses_full_schema_and_draft_refs(self):
+        guidance = (
+            SKILLS_ROOT
+            / "spec-analysis"
+            / "references"
+            / "ui-test-target-analysis.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("完全な固定header配列", guidance)
+        self.assertIn("@draft:<draft_key>", guidance)
+        self.assertIn("helperが割り当てるstable IDを推測・採番", guidance)
+
+    def test_target_inspection_persistence_enum_keeps_source_separate(self):
+        template = (
+            SKILLS_ROOT
+            / "test-target-inspection"
+            / "assets/output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("値欄は`はい`または`いいえ`", template)
+        self.assertIn("`確認元`へ分けます", template)
+
+    def test_coverage_traceability_dispatch_distinguishes_input_and_selection_metadata(self):
+        text = (SKILLS_ROOT / "coverage-analysis" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('input_mode="direct"', text)
+        self.assertIn("selection_source=null", text)
+        self.assertIn("selection_key=null", text)
+        self.assertIn('runtime_unit_key="artifact:traceability:all"', text)
+        self.assertIn('scope_key="all"', text)
+        self.assertIn("`input_mode=\"artifact\"`を使うのは", text)
+
     def test_test_target_inspection_fixtures_pass(self):
         validate = load_validator("test-target-inspection")
         for eval_id in ("TTI-OUT-001", "TTI-OUT-002"):
             with self.subTest(eval_id=eval_id):
                 text, expected = eval_case(
-                    "test-target-inspection", eval_id, compact_table_spacing=False
+                    "test-target-inspection",
+                    eval_id,
+                    compact_table_spacing=False,
+                    validation_sample=False,
                 )
                 self.assertEqual(validate(text, expected, eval_id).status, "pass")
+
+        template = (
+            SKILLS_ROOT / "test-target-inspection/assets/output-template.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("報告値を`取得不能`へ置き換えず", template)
+
+    def test_blocked_target_inspection_rejects_confirmed_observation_claims(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case(
+            "test-target-inspection", "TTI-OUT-001", validation_sample=False
+        )
+        lines = text.splitlines()
+        section = lines.index("## 画面 / 領域")
+        separator = section + 3
+        self.assertTrue(lines[separator].startswith("| ---"))
+        lines.insert(
+            separator + 1,
+            "| target-001 | 未提供画面 | 未提供 | 確認済み | 実対象証拠なし | build-23 | 2026-10-29 |",
+        )
+
+        result = validate("\n".join(lines), expected, "TTI-OUT-001")
+        self.assertEqual(
+            next(item.status for item in result.assertions if item.id == "TTI-D016"),
+            "fail",
+        )
+
+    def test_blocked_target_inspection_requires_reason_and_followup_impact(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case(
+            "test-target-inspection", "TTI-OUT-001", validation_sample=False
+        )
+        lines = text.splitlines()
+        section = lines.index("## 未確認 / 確認不能")
+        next_section = next(
+            index
+            for index in range(section + 1, len(lines))
+            if lines[index].startswith("## ")
+        )
+        table_lines = [
+            line
+            for line in lines[section + 1 : next_section]
+            if line.startswith("|")
+        ]
+        retained = [
+            line
+            for line in table_lines
+            if line.startswith("| 対象 ") or line.startswith("| ---")
+        ]
+        lines[section + 1 : next_section] = ["", *retained, ""]
+
+        result = validate("\n".join(lines), expected, "TTI-OUT-001")
+        self.assertEqual(
+            next(item.status for item in result.assertions if item.id == "TTI-D017"),
+            "fail",
+        )
 
     def test_target_inspection_requires_confirmation_info_table_and_items(self):
         validate = load_validator("test-target-inspection")
@@ -280,6 +476,72 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
                     ),
                     "fail",
                 )
+
+        expected_old_version = expected["expected_old_version"]
+        without_reported_old_version = text.replace(expected_old_version, "", 1)
+        old_version_result = validate(
+            without_reported_old_version, expected, "TTI-OUT-002"
+        )
+        self.assertEqual(
+            next(
+                item.status
+                for item in old_version_result.assertions
+                if item.id == "TTI-D014"
+            ),
+            "fail",
+        )
+        self.assertEqual(
+            next(
+                item.status
+                for item in validate(text, expected, "TTI-OUT-002-UNVERIFIED-REPORT").assertions
+                if item.id == "TTI-D014"
+            ),
+            "pass",
+        )
+        version_build_row = next(
+            line for line in text.splitlines() if "| version / build" in line
+        )
+        reported_value_omitted = text.replace(
+            version_build_row,
+            "| version / build | 取得不能 | 入力 |",
+            1,
+        )
+        self.assertEqual(
+            next(
+                item.status
+                for item in validate(
+                    reported_value_omitted, expected, "TTI-OUT-002-CURRENT-OMITTED"
+                ).assertions
+                if item.id == "TTI-D014"
+            ),
+            "fail",
+        )
+
+    def test_target_inspection_requires_save_abort_when_store_revision_is_missing(self):
+        validate = load_validator("test-target-inspection")
+        text, expected = eval_case("test-target-inspection", "TTI-OUT-002")
+        expected["expected_save_status"] = "保存中止"
+        aborted = text.replace(
+            "| user-specified-store | rev-4 | If-Match | 保存済み | rev-5 | 条件付き更新成功を再読込で確認 | 保存先 |",
+            "| 未提供 | 未提供 | なし | 保存中止 | 未作成 | 保存先と更新tokenが入力にない | 入力 |",
+            1,
+        )
+        self.assertEqual(
+            next(
+                item.status
+                for item in validate(aborted, expected, "TTI-OUT-002").assertions
+                if item.id == "TTI-D011"
+            ),
+            "pass",
+        )
+        self.assertEqual(
+            next(
+                item.status
+                for item in validate(text, expected, "TTI-OUT-002").assertions
+                if item.id == "TTI-D011"
+            ),
+            "fail",
+        )
 
     def test_target_inspection_disallows_save_records_without_persistence_request(self):
         validate = load_validator("test-target-inspection")
@@ -527,6 +789,12 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
     def test_new_target_artifact_rejects_update_records(self):
         validate = load_validator("test-target-inspection")
         text, expected = eval_case("test-target-inspection", "TTI-OUT-001")
+        result = validate(text, expected, "TTI-OUT-001")
+        self.assertEqual(
+            next(item.status for item in result.assertions if item.id == "TTI-D008"),
+            "pass",
+        )
+
         update_record = (
             "\n## 今回の更新\n\n"
             "| 対象種別 | 対象キー | 更新区分 |\n"
@@ -602,7 +870,10 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         for eval_id in ("TEX-OUT-001", "TEX-OUT-002"):
             with self.subTest(eval_id=eval_id):
                 text, expected = eval_case(
-                    "test-execution", eval_id, compact_table_spacing=False
+                    "test-execution",
+                    eval_id,
+                    compact_table_spacing=False,
+                    validation_sample=False,
                 )
                 self.assertEqual(validate(text, expected, eval_id).status, "pass")
 
@@ -690,6 +961,20 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         self.assertEqual(
             next(item.status for item in result.assertions if item.id == "TEX-D006"),
             "fail",
+        )
+
+    def test_test_execution_accepts_explanatory_absent_prior_artifact_marker(self):
+        validate = load_validator("test-execution")
+        text, expected = eval_case("test-execution", "TEX-OUT-001")
+        first_run = text.replace(
+            "| 前回実行成果物参照 | なし | 初回実行 |",
+            "| 前回実行成果物参照 | なし（初回依頼として提供） | 初回実行 |",
+            1,
+        )
+        result = validate(first_run, expected, "TEX-OUT-001")
+        self.assertEqual(
+            next(item.status for item in result.assertions if item.id == "TEX-D006"),
+            "pass",
         )
 
     def test_test_execution_tracks_only_rerun_tcs_when_snapshot_mixes_new_tcs(self):

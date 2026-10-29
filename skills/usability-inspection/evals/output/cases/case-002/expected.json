@@ -13,7 +13,5 @@
     "user success rate",
     "WCAG conformant"
   ],
-  "required_tokens": [
-    "undetermined"
-  ]
+  "required_tokens": []
 }

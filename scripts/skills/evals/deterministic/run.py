@@ -8,11 +8,17 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
     from scripts.skills.evals.deterministic.loader import load_validators
+    from scripts.skills.evals.deterministic.markdown_parser import (
+        MarkdownTableParseError,
+    )
+    from scripts.skills.evals.deterministic.result import EvalResult
     from scripts.skills.evals.deterministic.runtime_validator import (
         validate_runtime_evidence,
     )
 else:
     from .loader import load_validators
+    from .markdown_parser import MarkdownTableParseError
+    from .result import EvalResult
     from .runtime_validator import validate_runtime_evidence
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -38,7 +44,16 @@ def grade(
 ) -> dict:
     _, expected = load_eval_definition(skill, eval_id)
     text = output_path.read_text(encoding="utf-8")
-    result = VALIDATORS[skill](text, expected, eval_id)
+    try:
+        result = VALIDATORS[skill](text, expected, eval_id)
+    except MarkdownTableParseError as exc:
+        result = EvalResult(skill, eval_id)
+        result.add(
+            "OUTPUT-MD-TABLE-001",
+            False,
+            "成果物のMarkdown表を安全に解析できること",
+            evidence={"error": str(exc)},
+        )
     validate_runtime_evidence(text, expected, result, source_root=runtime_source_root)
     return result.to_dict()
 
