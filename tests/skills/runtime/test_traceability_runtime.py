@@ -801,6 +801,97 @@ class TraceabilityRuntimeTests(unittest.TestCase):
             )
         )
 
+    def _aggregate_tcn_request(self, *, scope_b_complete: bool = True) -> dict:
+        request = self._multi_scope_request(scope_b_complete=scope_b_complete)
+        input_value = request["input"]
+        entities = input_value["current_entities"]
+        current_state, structure_row = structure_state(entities)
+        normalized_input = {
+            "test_conditions": [
+                {"tcn_id": "TCN-001"},
+                {"tcn_id": "TCN-002"},
+            ],
+            "models": [
+                {
+                    "model_key": "ep-001",
+                    "model_type": "ep",
+                    "parent_tcn_id": "TCN-001",
+                },
+                {
+                    "model_key": "ep-002",
+                    "model_type": "ep",
+                    "parent_tcn_id": "TCN-002",
+                },
+            ],
+            "ci_ids": ["TCN-001-CI01", "TCN-002-CI01"],
+        }
+        input_value["analysis_scopes"] = [
+            {
+                "skill": "test-condition-design",
+                "target": "checkout-payment-web",
+                "execution_range": "test-design",
+                "input_mode": "artifact",
+                "normalized_input": normalized_input,
+                "current_structure_state": current_state,
+            }
+        ]
+        input_value["runtime_units"][0] = structure_row
+        input_value["current_runtime_units"][0] = structure_row
+        return request
+
+    def test_aggregate_scope_accepts_distinct_materialize_rows_for_each_tcn(self) -> None:
+        result = run(self._aggregate_tcn_request())
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        self.assertTrue(result["payload"]["can_complete"], result)
+
+    def test_aggregate_scope_preserves_incomplete_materialize_model(self) -> None:
+        result = run(self._aggregate_tcn_request(scope_b_complete=False))
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "unresolved", result)
+        self.assertFalse(result["payload"]["can_complete"], result)
+        self.assertTrue(
+            any(
+                issue["issue_type"] == "model_materialize_incomplete"
+                and issue.get("model_key") == "ep-002"
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_aggregate_scope_rejects_completion_owned_by_another_tcn(self) -> None:
+        request = self._aggregate_tcn_request()
+        input_value = request["input"]
+        input_value["current_runtime_units"] = copy.deepcopy(
+            input_value["runtime_units"]
+        )
+        for row_set in ("runtime_units", "current_runtime_units"):
+            rows = input_value[row_set]
+            first = next(
+                row
+                for row in rows
+                if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-001"
+            )
+            second = next(
+                row
+                for row in rows
+                if row["runtime_unit_key"] == "artifact:materialize_coverage:TCN-002"
+            )
+            first["model_completion"], second["model_completion"] = (
+                second["model_completion"],
+                first["model_completion"],
+            )
+            for row in (first, second):
+                row.pop("result_fingerprint")
+                row["result_fingerprint"] = runtime.sha256_digest(row)
+
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+        self.assertIn(
+            "materialize model completionとTCN scopeが一致しません",
+            result["issues"][0]["message"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -228,6 +228,76 @@ class RequirementStructureRuntimeTests(unittest.TestCase):
             "invalid_input",
         )
 
+    def test_artifact_mode_preserves_feature_qualified_acceptance_id(self) -> None:
+        authority = runtime.make_machine_entity(
+            "spec-analysis", "authority", "AUTH-001", {"authority_id": "AUTH-001"}
+        )
+        ac_id = "AC-CHECKOUT-001"
+        ac = runtime.make_machine_entity(
+            "spec-analysis",
+            "acceptance_criterion",
+            ac_id,
+            {
+                "ac_id": ac_id,
+                "authority_refs": ["AUTH-001"],
+                "scope": {"scope_id": "SCOPE-001"},
+            },
+            upstream_entity_dependencies=[
+                {
+                    "skill": "spec-analysis",
+                    "entity_type": "authority",
+                    "entity_ref": "AUTH-001",
+                    "content_fingerprint": authority["content_fingerprint"],
+                }
+            ],
+        )
+        value = {
+            "authorities": [{"authority_id": "AUTH-001"}],
+            "risks": [],
+            "acceptance_criteria": [
+                {"ac_id": ac_id, "authority_refs": ["AUTH-001"]}
+            ],
+            "scope_ids": ["SCOPE-001"],
+            "test_requirements": [
+                draft("checkout-session", "new", None, authority_refs=["AUTH-001"])
+                | {
+                    "acceptance_refs": [ac_id],
+                    "scope_refs": ["SCOPE-001"],
+                }
+            ],
+            "dispositions": [],
+            "previous_tr_ids": [],
+            "update_scope_tr_ids": [],
+            "inactive_tr_ids": [],
+            "inactive_tr_history": [],
+            "zero_scope_terminal": False,
+        }
+        upstream = [authority, ac]
+        rows = [
+            {
+                "skill": entity["skill"],
+                "entity_type": entity["entity_type"],
+                "entity_ref": entity["entity_ref"],
+                "content": entity["content"],
+            }
+            for entity in upstream
+        ]
+
+        result = run(value, input_mode="artifact", upstream_entities=rows)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        tr_entity = next(
+            row for row in result["payload"]["entities"] if row["entity_type"] == "tr"
+        )
+        self.assertEqual(tr_entity["content"]["acceptance_refs"], [ac_id])
+        self.assertIn(
+            ("spec-analysis", "acceptance_criterion", ac_id),
+            {
+                (row["skill"], row["entity_type"], row["entity_ref"])
+                for row in tr_entity["upstream_entity_dependencies"]
+            },
+        )
+
     def test_inactive_history_reuse_and_zero_scope_terminal(self) -> None:
         first_input = {
             "authorities": [],

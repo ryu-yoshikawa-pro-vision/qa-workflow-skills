@@ -29,7 +29,7 @@ from .common_runtime_checks import (
     evaluate_workflow_runtime_capture,
 )
 from .executor import AgentExecutionError, run_command
-from .prompt_builder import build_generation_prompt
+from .prompt_builder import build_qa_training_store_generation_prompt
 from .target_workspace import (
     DEFAULT_TARGET_REVISION,
     SCENARIO_DIR,
@@ -950,8 +950,9 @@ def run(argv: list[str] | None = None) -> int:
                     ),
                     destination=target,
                 )
-                prompt = build_generation_prompt(
-                    skill="qa-workflow", eval_input=scenario["task_text"]
+                prompt = build_qa_training_store_generation_prompt(
+                    eval_input=scenario["task_text"],
+                    required_artifacts=scenario["required_artifacts"],
                 )
                 agent_execution_evidence = None
                 agent_execution_path = attempt_root / "agent-execution.json"

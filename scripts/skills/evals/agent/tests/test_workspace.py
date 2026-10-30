@@ -25,6 +25,7 @@ from scripts.skills.evals.agent.workspace import (
     verify_judge_docker_command,
     verify_profile_evidence,
     verify_repair_docker_command,
+    create_skill_workspace_from_root,
 )
 
 
@@ -131,6 +132,43 @@ class WorkspaceIsolationTests(unittest.TestCase):
             (output / "unexpected").write_text("source content", encoding="utf-8")
             with self.assertRaisesRegex(AgentEvalError, "must be empty"):
                 prepare_agent_output_mountpoint(workspace)
+
+    def test_candidate_skill_workspace_excludes_python_bytecode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            package = root / "source"
+            skill = package / "skills" / "spec-analysis"
+            (skill / "scripts" / "__pycache__").mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
+            (skill / "scripts" / "runtime.py").write_text(
+                "print('runtime')\n", encoding="utf-8"
+            )
+            (skill / "scripts" / "__pycache__" / "runtime.cpython-311.pyc").write_bytes(
+                b"stale bytecode"
+            )
+            (skill / "scripts" / "orphan.pyo").write_bytes(b"orphan bytecode")
+            destination = root / "candidate-package"
+
+            manifest = create_skill_workspace_from_root(
+                package,
+                destination,
+                expected_skills={"spec-analysis"},
+                parent_revision="a" * 40,
+            )
+            copied_paths = {row["path"] for row in manifest["files"]}
+            self.assertEqual(
+                copied_paths,
+                {
+                    "skills/spec-analysis/SKILL.md",
+                    "skills/spec-analysis/scripts/runtime.py",
+                },
+            )
+            self.assertFalse(
+                (destination / "skills/spec-analysis/scripts/__pycache__").exists()
+            )
+            self.assertFalse(
+                (destination / "skills/spec-analysis/scripts/orphan.pyo").exists()
+            )
 
     def test_legacy_docker_evidence_cannot_authorize_new_profile(self) -> None:
         profile = {

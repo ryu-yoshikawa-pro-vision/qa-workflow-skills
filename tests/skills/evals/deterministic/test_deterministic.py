@@ -106,6 +106,28 @@ class DeterministicValidatorTests(unittest.TestCase):
         invalid = valid.replace("SPEC-001", "SPEC-999")
         self.assert_fails("test-requirement-design", invalid, exp, "TR-D003")
 
+    def test_test_requirement_recognizes_feature_qualified_acceptance_ids(self):
+        text = """# TR
+## テスト要求一覧
+| テスト要求ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 | 関連AC ID | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TR-001 | Session継続を保証 | SPEC-001 | RISK-001 | 高 | システム / UI | AC-CHECKOUT-001 | |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
+| --- | --- | --- | --- |
+"""
+        expected = {
+            "known_authorities": ["SPEC-001"],
+            "known_product_risks": ["RISK-001"],
+            "product_risk_levels": {"RISK-001": "高"},
+            "known_acceptance_criteria": ["AC-CHECKOUT-001"],
+        }
+        self.assert_pass("test-requirement-design", text, expected)
+        invalid = text.replace("AC-CHECKOUT-001", "AC-CHECKOUT-999")
+        self.assert_fails(
+            "test-requirement-design", invalid, expected, "TR-D016"
+        )
+
     def test_test_condition_pairwise_valid_and_missing_pair(self):
         base = """# TCN
 ## テスト条件へ展開しないテスト要求

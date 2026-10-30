@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from scripts.skills.evals.agent import qa_training_store
 from scripts.skills.evals.agent.executor import ExecutionResult
+from scripts.skills.evals.agent.prompt_builder import (
+    build_qa_training_store_generation_prompt,
+)
 from scripts.skills.evals.agent.qa_training_store import (
     DEFAULT_TARGET_REVISION,
     load_scenario,
@@ -19,6 +22,36 @@ from scripts.skills.evals.agent.qa_training_store import (
 
 
 class QATrainingStoreTests(unittest.TestCase):
+    def test_qts_generation_prompt_includes_only_canonical_artifact_metadata(self) -> None:
+        scenario = load_scenario()
+        prompt = build_qa_training_store_generation_prompt(
+            eval_input=scenario["task_text"],
+            required_artifacts=scenario["required_artifacts"],
+        )
+        for artifact in scenario["required_artifacts"]:
+            self.assertIn(f"`{artifact['skill']}`", prompt)
+            self.assertIn(f"`{artifact['kind']}`", prompt)
+            self.assertIn(f"`{artifact['scope']}`", prompt)
+        self.assertIn("固定シナリオのartifact-index登録契約", prompt)
+        self.assertIn("下表の各 `skill` と同じ `scope`", prompt)
+        self.assertIn("artifact_ids", prompt)
+        self.assertIn(
+            "| `spec-analysis` | `spec-analysis` | `checkout-payment-web` |",
+            prompt,
+        )
+        self.assertIn("文字列 `\"1\"` ではなくJSON numberの `1`", prompt)
+        self.assertNotIn("QTS-SEM-001", prompt)
+        self.assertNotIn("QTS-SEM-010", prompt)
+
+    def test_qts_generation_prompt_rejects_malformed_artifact_metadata(self) -> None:
+        with self.assertRaises(ValueError):
+            build_qa_training_store_generation_prompt(
+                eval_input="Run the QA workflow.",
+                required_artifacts=[
+                    {"skill": "spec-analysis", "kind": "spec-analysis"}
+                ],
+            )
+
     def _valid_output(self, root: Path, scenario: dict) -> dict:
         artifacts = []
         routing = []

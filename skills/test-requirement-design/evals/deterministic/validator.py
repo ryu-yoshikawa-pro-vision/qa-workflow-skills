@@ -17,7 +17,9 @@ from scripts.skills.evals.deterministic.markdown_parser import find_table, parse
 from scripts.skills.evals.deterministic.result import EvalResult
 
 DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "ブロック中"}
-ACCEPTANCE_ID_RE = re.compile(r"(?<![A-Za-z0-9_-])AC-\d{3,}(?![A-Za-z0-9_-])")
+ACCEPTANCE_ID_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])AC-(?:[A-Z0-9]+-)*\d{3,}(?![A-Za-z0-9_-])"
+)
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:

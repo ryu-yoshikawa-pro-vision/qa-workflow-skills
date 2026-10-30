@@ -16,6 +16,37 @@ def build_generation_prompt(*, skill: str, eval_input: str) -> str:
 """
 
 
+def build_qa_training_store_generation_prompt(
+    *, eval_input: str, required_artifacts: list[dict[str, str]]
+) -> str:
+    if not eval_input.strip() or not required_artifacts:
+        raise ValueError("eval_input and required_artifacts must be non-empty")
+    rows: list[str] = []
+    for index, item in enumerate(required_artifacts):
+        if not isinstance(item, dict) or set(item) != {"skill", "kind", "scope"}:
+            raise ValueError(f"required_artifacts[{index}] has an invalid shape")
+        if any(
+            not isinstance(item[key], str) or not item[key].strip()
+            for key in ("skill", "kind", "scope")
+        ):
+            raise ValueError(f"required_artifacts[{index}] has an invalid field")
+        rows.append(
+            f"| `{item['skill']}` | `{item['kind']}` | `{item['scope']}` |"
+        )
+    contract = "\n".join(rows)
+    enriched_input = f"""{eval_input}
+
+# 固定シナリオのartifact-index登録契約
+
+各必須成果物を `artifact-index.json` に登録するときは、下表の `skill`、`kind`、`scope` を正確に使用してください。`routing[]`にも、下表の各 `skill` と同じ `scope` を持つ行を1つずつ登録し、statusと理由を実際の状態に合わせ、実在する成果物のIDを`artifact_ids`へ結び付けてください。このメタデータは成果物本文やrouting statusを指定しません。`schema_version` は文字列 `"1"` ではなくJSON numberの `1` にしてください。実在する成果物だけを登録し、未完了・blockedの工程は実際の状態で記録してください。
+
+| skill | kind | scope |
+| --- | --- | --- |
+{contract}
+"""
+    return build_generation_prompt(skill="qa-workflow", eval_input=enriched_input)
+
+
 def build_analysis_prompt(*, case_id: str, evidence: str, skill_excerpt: str) -> str:
     return f"""保存済み評価の原因を分類してください。表示された原成果物・公開仕様・実行観測とSkill sourceを照合してください。
 Evaluator-onlyのexpected、rubric、Judge fixture、Reference、正解ラベルは与えられていません。推測・検索しないでください。

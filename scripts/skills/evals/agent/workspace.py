@@ -1130,6 +1130,8 @@ def create_skill_workspace_from_root(
         parts = PurePosixPath(relative).parts
         if len(parts) < 2:
             continue
+        if "__pycache__" in parts or path.suffix in {".pyc", ".pyo"}:
+            continue
         skill = parts[0]
         if skill not in expected_skills:
             raise AgentEvalError("candidate package changes the fixed Skill set")
