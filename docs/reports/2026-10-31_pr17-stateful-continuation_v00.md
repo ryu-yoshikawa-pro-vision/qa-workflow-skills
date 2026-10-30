@@ -96,6 +96,20 @@ production helperの不具合は確認されませんでした。既存baseline 
 | `scripts/format_tracked.py check`                         | PASS（Ruffとdprint、tracked targets） |
 | `git diff --check`                                        | PASS                                  |
 
+## GitHub Actions
+
+報告書を含むcommit `5234e3899d6c4e28bb3f10d0dbbc0c995c56a599`のPR merge refで、既存5 workflowはすべてsuccessでした。
+
+| Workflow                            | Run                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Code Quality                        | [41105828874](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/41105828874) |
+| Validate Agent Skills               | [41105828746](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/41105828746) |
+| Validate Deterministic Output Evals | [41105828900](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/41105828900) |
+| Validate Semantic Output Evals      | [41105829047](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/41105829047) |
+| Codex Harness                       | [41105828898](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/41105828898) |
+
+この記録を加えた後のreport-only commitでも最終PR HEADのCIを再確認します。
+
 ## 未達・正式評価の残条件
 
 - QTS in-progress stateへの安全なCAS更新APIはなく、今回はread-only継続に限定しました。native conditional writeなしでのstate update、QTS downstreamの保存・再開、QTSの完了baseline再利用は未成立です。
