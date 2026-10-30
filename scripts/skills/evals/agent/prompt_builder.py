@@ -30,9 +30,7 @@ def build_qa_training_store_generation_prompt(
             for key in ("skill", "kind", "scope")
         ):
             raise ValueError(f"required_artifacts[{index}] has an invalid field")
-        rows.append(
-            f"| `{item['skill']}` | `{item['kind']}` | `{item['scope']}` |"
-        )
+        rows.append(f"| `{item['skill']}` | `{item['kind']}` | `{item['scope']}` |")
     contract = "\n".join(rows)
     enriched_input = f"""{eval_input}
 

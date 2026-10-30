@@ -124,9 +124,7 @@ class DeterministicValidatorTests(unittest.TestCase):
         }
         self.assert_pass("test-requirement-design", text, expected)
         invalid = text.replace("AC-CHECKOUT-001", "AC-CHECKOUT-999")
-        self.assert_fails(
-            "test-requirement-design", invalid, expected, "TR-D016"
-        )
+        self.assert_fails("test-requirement-design", invalid, expected, "TR-D016")
 
     def test_test_condition_pairwise_valid_and_missing_pair(self):
         base = """# TCN

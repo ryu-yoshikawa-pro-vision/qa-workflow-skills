@@ -22,7 +22,9 @@ from scripts.skills.evals.agent.qa_training_store import (
 
 
 class QATrainingStoreTests(unittest.TestCase):
-    def test_qts_generation_prompt_includes_only_canonical_artifact_metadata(self) -> None:
+    def test_qts_generation_prompt_includes_only_canonical_artifact_metadata(
+        self,
+    ) -> None:
         scenario = load_scenario()
         prompt = build_qa_training_store_generation_prompt(
             eval_input=scenario["task_text"],
@@ -39,7 +41,7 @@ class QATrainingStoreTests(unittest.TestCase):
             "| `spec-analysis` | `spec-analysis` | `checkout-payment-web` |",
             prompt,
         )
-        self.assertIn("文字列 `\"1\"` ではなくJSON numberの `1`", prompt)
+        self.assertIn('文字列 `"1"` ではなくJSON numberの `1`', prompt)
         self.assertNotIn("QTS-SEM-001", prompt)
         self.assertNotIn("QTS-SEM-010", prompt)
 

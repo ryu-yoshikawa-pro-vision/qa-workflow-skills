@@ -2981,8 +2981,7 @@ def evaluate_materialize_completion(
         scoped_tcn_ids.update(
             model["parent_tcn_id"]
             for model in models.values()
-            if isinstance(model.get("parent_tcn_id"), str)
-            and model["parent_tcn_id"]
+            if isinstance(model.get("parent_tcn_id"), str) and model["parent_tcn_id"]
         )
         test_conditions = normalized.get("test_conditions")
         if isinstance(test_conditions, list):

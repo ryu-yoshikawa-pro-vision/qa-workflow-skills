@@ -254,9 +254,7 @@ class RequirementStructureRuntimeTests(unittest.TestCase):
         value = {
             "authorities": [{"authority_id": "AUTH-001"}],
             "risks": [],
-            "acceptance_criteria": [
-                {"ac_id": ac_id, "authority_refs": ["AUTH-001"]}
-            ],
+            "acceptance_criteria": [{"ac_id": ac_id, "authority_refs": ["AUTH-001"]}],
             "scope_ids": ["SCOPE-001"],
             "test_requirements": [
                 draft("checkout-session", "new", None, authority_refs=["AUTH-001"])

@@ -839,7 +839,9 @@ class TraceabilityRuntimeTests(unittest.TestCase):
         input_value["current_runtime_units"][0] = structure_row
         return request
 
-    def test_aggregate_scope_accepts_distinct_materialize_rows_for_each_tcn(self) -> None:
+    def test_aggregate_scope_accepts_distinct_materialize_rows_for_each_tcn(
+        self,
+    ) -> None:
         result = run(self._aggregate_tcn_request())
         self.assertEqual(result["runtime_status"], "ok", result)
         self.assertEqual(result["result_status"], "ready", result)
