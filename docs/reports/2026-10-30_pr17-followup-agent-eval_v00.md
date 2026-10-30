@@ -102,6 +102,7 @@ Agentは9個の成果物（8必須Skill成果物と条件付き`question-analysi
 - 上記runtime contractのbyte-identical複製を持つ残り8 Skillにも同じ実装を同期し、リポジトリの同一性契約を維持。
 - Agent evaluator prompt: qa-training-storeの固定scenarioから許可された`skill/kind/scope`対応を生成Agentへ与え、artifact-index作成に必要な最小metadataを固定する。expected本文やstatusは与えない。
 - Skill package copier: `__pycache__`、`.pyc`、`.pyo`を配布対象から除外。
+- 最初のGitHub Code Quality実行（commit `039d519e`）で新規testのimport順違反（Ruff `I001`）が見つかったため、`test_workspace.py`のimportだけを整列した。ロジック変更ではなく、修正後にAgent focused testsを28件再実行してPASSした。
 - 既存46ケースのexpected、rubric、validatorの合否条件はPASSを増やす目的で変更していない。
 
 ## 7. Judgeと正式受入
@@ -112,23 +113,25 @@ Judge dataset `qts-judge-fixtures-v2`は11件。Human review待ち9件、determi
 
 ## 8. Tests / CI
 
-| 検証                                                           | 結果                                                                                                                                                                              |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent runner tests                                             | 156 PASS / 2 SKIP                                                                                                                                                                 |
-| Focused Agent tests（QTS prompt / workspace copier）           | 28 PASS                                                                                                                                                                           |
-| Agent evaluator repository contracts                           | 4 PASS                                                                                                                                                                            |
-| Deterministic runner tests                                     | 19 PASS                                                                                                                                                                           |
-| Focused deterministic validator tests                          | 10 PASS                                                                                                                                                                           |
-| Semantic runner tests                                          | 27 PASS                                                                                                                                                                           |
-| Semantic repository contracts                                  | 13 PASS                                                                                                                                                                           |
-| Skill runtime suite                                            | 378 PASS                                                                                                                                                                          |
-| Focused Skill runtime tests（test-requirement / traceability） | 25 PASS                                                                                                                                                                           |
-| `dprint check`                                                 | PASS                                                                                                                                                                              |
-| `compileall`（`scripts skills tests`）                         | PASS                                                                                                                                                                              |
-| `git diff --check`                                             | PASS                                                                                                                                                                              |
-| Full deterministic output suite                                | sandbox制約で356件中4 FAIL / 1 ERROR。tempfileが`/tmp/.git`のためGit worktree内と判定されるstate-root testsとlocalhost bind `EPERM`。既存のnormal WSL2 CI経路では再実行していない |
-| Ruff                                                           | ローカルPython環境に`ruff` moduleがなく未実施。インストールしていない                                                                                                             |
-| GitHub Actions                                                 | 最終PR HEADへpush後に結果を記録する                                                                                                                                               |
+| 検証                                                           | 結果                                                                                                                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent runner tests                                             | 156 PASS / 2 SKIP                                                                                                                                                                                   |
+| Focused Agent tests（QTS prompt / workspace copier）           | 28 PASS                                                                                                                                                                                             |
+| Agent evaluator repository contracts                           | 4 PASS                                                                                                                                                                                              |
+| Deterministic runner tests                                     | 19 PASS                                                                                                                                                                                             |
+| Focused deterministic validator tests                          | 10 PASS                                                                                                                                                                                             |
+| Semantic runner tests                                          | 27 PASS                                                                                                                                                                                             |
+| Semantic repository contracts                                  | 13 PASS                                                                                                                                                                                             |
+| Skill runtime suite                                            | 378 PASS                                                                                                                                                                                            |
+| Focused Skill runtime tests（test-requirement / traceability） | 25 PASS                                                                                                                                                                                             |
+| `dprint check`                                                 | PASS                                                                                                                                                                                                |
+| `compileall`（`scripts skills tests`）                         | PASS                                                                                                                                                                                                |
+| `git diff --check`                                             | PASS                                                                                                                                                                                                |
+| Full deterministic output suite                                | sandbox制約で356件中4 FAIL / 1 ERROR。tempfileが`/tmp/.git`のためGit worktree内と判定されるstate-root testsとlocalhost bind `EPERM`。既存のnormal WSL2 CI経路では再実行していない                   |
+| Ruff                                                           | ローカルPython環境に`ruff` moduleがなく未実施。インストールしていない。GitHub Code Qualityは固定Ruff 0.16.8で検査し、commit `039d519e`では新規testの`I001`を検出                                    |
+| GitHub Actions（commit `039d519e`）                            | Agent Skills / Deterministic Output / Semantic Outputはsuccess。Code Qualityは上記import順でfailure。Codex Harnessは今回の観測時点でin progress。follow-up commitでimport順を修正し、再CIを確認する |
+
+commit `039d519e`の[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40998456735)、[Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40998456993)、[Deterministic Output](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40998456737)、[Semantic Output](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40998456818)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/40998456833)。最終follow-up commitのCI状態はPR checksで確認し、PR本文にも記録する。
 
 ## 9. 未達事項と結論
 

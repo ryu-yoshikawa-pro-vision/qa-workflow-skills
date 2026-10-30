@@ -17,6 +17,7 @@ from scripts.skills.evals.agent.isolation_probe import _live_mount_probe
 from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher import PACKAGE_SHA512
 from scripts.skills.evals.agent.workspace import (
     _validate_profile,
+    create_skill_workspace_from_root,
     expected_codex_exec_argv_fingerprints,
     prepare_agent_output_mountpoint,
     profile_fingerprint,
@@ -25,7 +26,6 @@ from scripts.skills.evals.agent.workspace import (
     verify_judge_docker_command,
     verify_profile_evidence,
     verify_repair_docker_command,
-    create_skill_workspace_from_root,
 )
 
 
