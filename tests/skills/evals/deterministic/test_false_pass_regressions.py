@@ -291,8 +291,7 @@ class FalsePassRegressionTests(unittest.TestCase):
         )
         self.assertTrue(
             explicit_state(
-                "- verify_runtime_evidence valid: `true`\n"
-                "- 成果物状態: *完成*",
+                "- verify_runtime_evidence valid: `true`\n- 成果物状態: *完成*",
                 valid=True,
             )
         )
@@ -305,8 +304,7 @@ class FalsePassRegressionTests(unittest.TestCase):
         )
         self.assertFalse(
             explicit_state(
-                "- verify_runtime_evidence valid: **true**\n"
-                "- 成果物状態: **完成**",
+                "- verify_runtime_evidence valid: **true**\n- 成果物状態: **完成**",
                 valid=False,
             )
         )

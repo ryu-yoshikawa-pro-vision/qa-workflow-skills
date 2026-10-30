@@ -14,6 +14,7 @@
 
 | 項目                | 条件                                                                     |
 | ------------------- | ------------------------------------------------------------------------ |
+| 実施期間            | 2026-10-30〜2026-10-31 JST                                               |
 | 評価開始HEAD        | `6ca543ce515a8501ad3d6a6dc542672d4a1bac68`                               |
 | 作業終了HEAD        | この報告とvalidator修正を含むPR最終HEAD                                  |
 | 評価Skill revision  | `6ca543ce515a8501ad3d6a6dc542672d4a1bac68`                               |
@@ -129,26 +130,28 @@ Adversarial Reviewは0件のfindingを報告したが、手動レビューであ
 
 この統合評価ではSkill、QTS product source/spec/test、grader expected、artifact-index validator、runtime helperを変更していない。indexのmetadata修正はGit管理外の生成物に限定した。
 
-| 検証                              | 結果                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------- |
-| false-pass regressions            | 58 tests PASS                                                              |
-| workflow runtime                  | 13 tests PASS                                                              |
-| qa-workflow runtime               | 14 tests PASS                                                              |
-| artifact graph workflow tests     | 7 tests PASS                                                               |
-| qa-training-store evaluator tests | 13 tests PASS                                                              |
-| runtime contract identity         | 56 tests PASS                                                              |
-| semantic repository structure     | 1 test PASS                                                                |
-| semantic runtime portability      | 1 test PASS                                                                |
-| semantic datasets                 | 2 tests PASS                                                               |
-| 46 case current-source regrade    | 46件、missing 0、41 PASS / 5 FAIL / 0 exception                            |
-| Python compileall                 | `python -m compileall -q scripts skills tests` PASS                        |
-| dprint                            | `dprint fmt`後、対象reportの`dprint check` PASS                            |
-| `git diff --check`                | PASS                                                                       |
-| Ruff                              | 実行環境にRuff executableなし。依存導入はしていない                        |
-| Full artifact-graph suite         | 40/43 PASS。3 SQLite path testはmanaged sandboxの`/tmp/.git`検出により失敗 |
-| GitHub Actions                    | 最終push HEADで5 workflowを確認予定                                        |
+| 検証                              | 結果                                                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| false-pass regressions            | 58 tests PASS                                                                                                     |
+| workflow runtime                  | 13 tests PASS                                                                                                     |
+| qa-workflow runtime               | 14 tests PASS                                                                                                     |
+| artifact graph workflow tests     | 7 tests PASS                                                                                                      |
+| qa-training-store evaluator tests | 13 tests PASS                                                                                                     |
+| runtime contract identity         | 56 tests PASS                                                                                                     |
+| semantic repository structure     | 1 test PASS                                                                                                       |
+| semantic runtime portability      | 1 test PASS                                                                                                       |
+| semantic datasets                 | 2 tests PASS                                                                                                      |
+| 46 case current-source regrade    | 46件、missing 0、41 PASS / 5 FAIL / 0 exception                                                                   |
+| Python compileall                 | `python -m compileall -q scripts skills tests` PASS                                                               |
+| dprint                            | `dprint fmt`後、対象reportの`dprint check` PASS                                                                   |
+| `git diff --check`                | PASS                                                                                                              |
+| Ruff                              | 実行環境にRuff executableなし。依存導入はしていない                                                               |
+| Full artifact-graph suite         | 40/43 PASS。3 SQLite path testはmanaged sandboxの`/tmp/.git`検出により失敗                                        |
+| GitHub Actions                    | code commit `2df5553`は4 workflow success。Code QualityのみPython 2ファイルのformat差分で失敗し、後続commitで修正 |
 
 Full artifact-graph suiteの3件はtemporary rootの親にあるmanaged sandboxの`/tmp/.git`をGit worktree境界として検出した環境制約である。今回のQTS評価には不要なSQLite経路を使っていない。これをproduction defectと混同していない。
+
+初回CIログではdprint対象とpatch whitespace checkは成功し、`format_tracked.py check`が`validator.py`と回帰testの2行だけをRuff format差分として報告した。CIが示した改行・折返しを適用し、同じfocused regression 58件と`git diff --check`を再実行してPASSした。後続commitのCI結果はPRの最新checkに記録する。
 
 ## 正式評価の未達
 

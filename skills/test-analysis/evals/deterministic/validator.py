@@ -76,9 +76,7 @@ def _has_explicit_gate_state(text: str, valid: bool) -> bool:
     artifact_state = "完成" if valid else "未完成（ブロック中）"
 
     def has_value(label: str, expected: str) -> bool:
-        label_pattern = re.compile(
-            rf"{label}\s*[:=：]\s*(.*?)\s*$", re.IGNORECASE
-        )
+        label_pattern = re.compile(rf"{label}\s*[:=：]\s*(.*?)\s*$", re.IGNORECASE)
         for line in text.splitlines():
             candidate = line.strip()
             if candidate.startswith(("-", "*")):
