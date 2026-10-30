@@ -74,16 +74,36 @@ def _runtime_contract_module():
 def _has_explicit_gate_state(text: str, valid: bool) -> bool:
     status = "true" if valid else "false"
     artifact_state = "完成" if valid else "未完成（ブロック中）"
-    return bool(
-        re.search(
-            rf"(?im)^\s*[-*]?\s*`?verify_runtime_evidence\s+valid\s*[:=：]\s*{status}`?\s*$",
-            text,
+
+    def has_value(label: str, expected: str) -> bool:
+        label_pattern = re.compile(
+            rf"{label}\s*[:=：]\s*(.*?)\s*$", re.IGNORECASE
         )
-        and re.search(
-            rf"(?m)^\s*[-*]?\s*`?成果物状態\s*[:：]\s*{re.escape(artifact_state)}`?\s*$",
-            text,
-        )
+        for line in text.splitlines():
+            candidate = line.strip()
+            if candidate.startswith(("-", "*")):
+                candidate = candidate[1:].strip()
+            candidate = _strip_markdown_wrapper(candidate)
+            match = label_pattern.fullmatch(candidate)
+            if match and _strip_markdown_wrapper(match.group(1).strip()) == expected:
+                return True
+        return False
+
+    return has_value(r"verify_runtime_evidence\s+valid", status) and has_value(
+        re.escape("成果物状態"), artifact_state
     )
+
+
+def _strip_markdown_wrapper(value: str) -> str:
+    """Remove one balanced Markdown code/emphasis wrapper around an exact value."""
+    for marker in ("**", "__", "`", "*", "_"):
+        if (
+            len(value) > 2 * len(marker)
+            and value.startswith(marker)
+            and value.endswith(marker)
+        ):
+            return value[len(marker) : -len(marker)].strip()
+    return value
 
 
 def _is_expected_blocked_gate_outcome(

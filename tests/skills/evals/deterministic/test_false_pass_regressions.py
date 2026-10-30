@@ -282,11 +282,46 @@ class FalsePassRegressionTests(unittest.TestCase):
                 valid=True,
             )
         )
+        self.assertTrue(
+            explicit_state(
+                "- verify_runtime_evidence valid: **false**\n"
+                "- 成果物状態: **未完成（ブロック中）**",
+                valid=False,
+            )
+        )
+        self.assertTrue(
+            explicit_state(
+                "- verify_runtime_evidence valid: `true`\n"
+                "- 成果物状態: *完成*",
+                valid=True,
+            )
+        )
+        self.assertFalse(
+            explicit_state(
+                "- verify_runtime_evidence valid: **false*\n"
+                "- 成果物状態: **未完成（ブロック中）**",
+                valid=False,
+            )
+        )
+        self.assertFalse(
+            explicit_state(
+                "- verify_runtime_evidence valid: **true**\n"
+                "- 成果物状態: **完成**",
+                valid=False,
+            )
+        )
         gate = {
             "valid": False,
             "issues": [{"issue_type": "missing_entity", "blocking": True}],
         }
         self.assertTrue(helper(gate, [identity], expected_status, entity_blocks, text))
+        bold_text = (
+            "- verify_runtime_evidence valid: **false**\n"
+            "- 成果物状態: **未完成（ブロック中）**"
+        )
+        self.assertTrue(
+            helper(gate, [identity], expected_status, entity_blocks, bold_text)
+        )
         unexpected_issue = {
             "valid": False,
             "issues": [{"issue_type": "duplicate_runtime_unit", "blocking": True}],
