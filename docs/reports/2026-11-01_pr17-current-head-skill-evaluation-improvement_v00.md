@@ -86,7 +86,8 @@
 - `tests.skills.runtime.test_test_analysis_technique_candidates`: 3 passed
 - `tests.skills.evals.deterministic.test_deterministic`: 10 passed
 - 対象agent/runtime/scripts/testsの`compileall`: success
-- 7723 HEADでのGitHub Actions: Code Quality、Validate Deterministic Output Evals、Validate Semantic Output Evals、Validate Agent Skills、Codex Harnessの5 workflowがsuccess（本報告commit後のCIは別途確認する）。
+- 7723 HEADでのGitHub Actions: Code Quality、Validate Deterministic Output Evals、Validate Semantic Output Evals、Validate Agent Skills、Codex Harnessの5 workflowがsuccess。
+- 報告書を含むcommit `8da8f9b5e836f51f96a0c9a552d34b0aa3b997f6`のGitHub Actionsも5 workflowすべてsuccess。
 
 ## 判断と未達
 
