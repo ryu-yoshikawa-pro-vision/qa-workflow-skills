@@ -165,7 +165,9 @@ class MarkdownParserTests(unittest.TestCase):
             )
             self.assertEqual(return_code, 0)
             self.assertEqual(assertion["status"], "pass")
-            self.assertEqual(json.loads(result_path.read_text(encoding="utf-8")), payload)
+            self.assertEqual(
+                json.loads(result_path.read_text(encoding="utf-8")), payload
+            )
 
 
 if __name__ == "__main__":

@@ -94,7 +94,9 @@ def main() -> int:
     expected_override = None
     if args.expected_json:
         try:
-            expected_override = json.loads(args.expected_json.read_text(encoding="utf-8"))
+            expected_override = json.loads(
+                args.expected_json.read_text(encoding="utf-8")
+            )
         except (OSError, json.JSONDecodeError) as exc:
             parser.error(f"--expected-json is unreadable or invalid: {exc}")
         if not isinstance(expected_override, dict):
