@@ -193,6 +193,7 @@ Pairwiseフィクスチャでは、2-wiseカバレッジ計算の前に生成組
 ## Markdown parser制約
 
 正規形式のMarkdownテーブルのみを対象とします。セル内のescaped pipe `\|`はセル内容として扱います。headerとrowの列数不一致は暗黙に切り捨てず構造エラーにします。
+決定論grader runnerはこの表構造エラーを該当caseの`FAIL`（`OUTPUT-MD-TABLE-001`）として記録し、batch modeでは残りのcase採点を続行します。
 
 ## CLI
 
@@ -460,3 +461,9 @@ PR #16では決定論的output evalを44件から46件へ、semantic evalを155�
 追加したrouting caseは`WF-UI-TARGET-001`、`WF-UI-TARGET-002`、`WF-UI-TARGET-003`、`WF-UI-TARGET-004`、`WF-UI-TARGET-005`、`WF-UI-TARGET-006`、`WF-UI-TARGET-007`、`WF-UI-TARGET-008`です。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。
+
+## 実Agent評価ランナー
+
+実Agentが生成した成果物を固定Evaluatorの既存deterministic grader / semantic Judgeで評価する共通CLIを`scripts/skills/evals/agent/`に置きます。Skill source、scenario / dataset、Agent / Judgeの実効条件、隔離検証、各attemptの結果をrunごとに保存し、固定`qa-training-store` revisionでの統合workflow評価、独立Judge検証、根拠が揃ったSkill単独の限定修正・再評価を扱います。詳細な実行条件とCLIは[`scripts/skills/evals/agent/README.md`](scripts/skills/evals/agent/README.md)を参照してください。
+
+外部Agent / Judgeの実行は通常CIに含めません。CIではfake subprocessによる正常・異常系、出力契約、隔離設定、固定target・scenario・証拠境界を検証します。改善候補は評価run内へ保存するだけで、自動採用やGit操作を行いません。

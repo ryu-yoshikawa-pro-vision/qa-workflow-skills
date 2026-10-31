@@ -4,9 +4,11 @@
 
 - ワークフロー全体状態: 未開始 / 実行中 / 部分完了（ブロック中あり） / ブロック中 / 完了
 - 開始Skill:
-- 開始対象 / 実行範囲: 複数用途Skillの場合は正規値
+- 開始対象 / 実行範囲: 複数用途Skillの場合は正規値。単一用途Skillは空欄
 - 最終Skill:
-- 最終対象 / 実行範囲: 複数用途Skillの場合は正規値
+- 最終対象 / 実行範囲: 複数用途Skillの場合は正規値。単一用途Skillは空欄
+
+対象欄は初期状態では空欄です。状態が`未開始`または`省略`以外の複数用途Skillには、その処理用途に対応する正規対象を記入します。`再利用`・`ブロック中`・`要再検証`の行も対象を空欄にしません。対象候補の説明や「いずれか」という一覧を値として転記しません。未開始・省略の行と単一用途Skillの対象欄は空欄にします。既存Coverage Itemを入力にTest Caseだけを作る場合、再利用する`coverage-analysis`の対象は`テスト設計`です。
 
 ## persisted workflow state record
 
@@ -44,30 +46,32 @@
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
-| Skill                       | 対象 / 実行範囲                                                       | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
-| --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
-| spec-analysis               |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| question-analysis           |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-analysis               | テスト分析 / E2E対象選定のいずれか                                    | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-requirement-design     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-condition-design       |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-case-design            |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| coverage-analysis           | テスト設計 / TC → E2E実装 / E2E実装 → 実行結果のいずれか              | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| adversarial-review          | テスト設計成果物 / E2E実装のいずれか                                  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| e2e-test-inspection         |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| e2e-test-implementation     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| e2e-test-execution          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| e2e-test-result-analysis    |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| e2e-test-reporting          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-target-inspection      |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| test-execution              |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| qa-workflow                 |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| regression-testing          | baseline / membership / Run計画 / Run結果更新 / 履歴参照のいずれか    | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| exploratory-testing         | exploration / investigation のいずれか                                | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| qa-knowledge                | triage / create / update / revalidation / lookup / history のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| usability-evaluation        |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| usability-inspection        | general / scoped / formal-handoff のいずれか                          | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
-| wcag-conformance-evaluation |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| Skill                       | 対象 / 実行範囲 | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
+| --------------------------- | --------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
+| spec-analysis               |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| question-analysis           |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-analysis               |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-requirement-design     |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-condition-design       |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-case-design            |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| coverage-analysis           |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| adversarial-review          |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-inspection         |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-implementation     |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-execution          |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-result-analysis    |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-reporting          |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-target-inspection      |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-execution              |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| qa-workflow                 |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| regression-testing          |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| exploratory-testing         |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| qa-knowledge                |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| usability-evaluation        |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| usability-inspection        |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| wcag-conformance-evaluation |                 | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+
+状態表の`対象 / 実行範囲`も、使用中の複数用途Skillでは正規値を使い、未開始・省略の行では空欄にします。単一用途Skillでは状態にかかわらず空欄にし、対象を説明する文章は備考欄へ記載します。表の全行を保持し、未開始・省略・ブロック中のSkillも省略しません。
 
 ## workflow state永続化契約
 

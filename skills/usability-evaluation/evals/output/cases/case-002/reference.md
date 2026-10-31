@@ -23,6 +23,8 @@
 | ------------- | ---------- | ------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------- |
 | modal-pattern | TARGET-001 | Modal dialog | Temporarily present a task while retaining a safe route to complete or leave it. | The settings dialog lets the person save a reversible preference or cancel. | The dialog is used for a focused preference task with explicit Save and Cancel controls. | [{"reference_entry_ref":"REF-0001","source_item_ref":"SRC-012-ITEM-0001"}] | -                     |
 
+`SRC-012-ITEM-0002` is also valid when directly supporting the recorded keyboard-focus and Escape behavior. Keep its use scoped to the interaction result; this fixture does not evaluate accessibility semantics or visual-integrity aspects.
+
 ## Evaluation Scope Closure
 
 | Aspect Key                | Aspect                      | Handling     | Reason                                                   |

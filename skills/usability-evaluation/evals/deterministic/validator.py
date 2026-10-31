@@ -5,7 +5,11 @@ import json
 import re
 from typing import Any
 
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    MarkdownTableParseError,
+    find_table,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 ASPECTS = [
@@ -239,7 +243,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     errors: list[str] = []
     try:
         tables = parse_tables(text)
-    except Exception as exc:
+    except MarkdownTableParseError as exc:
         result.add(
             "UE-D001", False, "machine-owned output tables parse", evidence=str(exc)
         )
@@ -283,6 +287,86 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             tables, section_contains=section, required_headers=headers
         )
     missing = [key for key, table in found.items() if table is None]
+    if expected.get("require_incomplete_missing_finding_block") is True:
+        required_block_tokens = [
+            *expected.get("required_block_tokens", []),
+        ]
+        missing_block_tokens = [
+            token for token in required_block_tokens if token not in text
+        ]
+        missing_finding_reason = any(
+            re.search(r"\bfinding(?:\s+(?:ref(?:erence)?|id))?\b", sentence, re.I)
+            and re.search(
+                r"\b(?:no|not|missing|unavailable|without|cannot|could not)\b"
+                r"|\bnot (?:supplied|provided|available|present)\b",
+                sentence,
+                re.I,
+            )
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", text)
+        )
+        preserved_tc_outcomes = expected.get("preserved_tc_outcomes", {})
+        preservation_terms = re.compile(
+            r"\b(?:immutable|unchanged|preserv\w*|remain\w*|"
+            r"(?:not|never)\s+(?:change|alter|rewrite))\b"
+            r"|(?:維持|変更(?:しない|なし)|不変|そのまま)",
+            re.I,
+        )
+        outcome_statuses_preserved = isinstance(preserved_tc_outcomes, dict) and all(
+            isinstance(tc_ref, str)
+            and isinstance(outcome, str)
+            and any(
+                tc_ref in line
+                and re.search(rf"\b{re.escape(outcome)}\b", line, re.I)
+                and preservation_terms.search(line)
+                for line in text.splitlines()
+            )
+            for tc_ref, outcome in preserved_tc_outcomes.items()
+        )
+        forbidden_values = expected.get("forbidden_output_values", [])
+        forbidden_values_found = [token for token in forbidden_values if token in text]
+        fabricated_refs = sorted(set(re.findall(r"\b(?:FND|EVAL)-\d{3,}\b", text)))
+        no_machine_sections = all(table is None for table in found.values())
+        blocked = (
+            "INCOMPLETE" in text
+            and missing_finding_reason
+            and outcome_statuses_preserved
+            and not missing_block_tokens
+            and not forbidden_values_found
+            and no_machine_sections
+            and not fabricated_refs
+        )
+        result.add(
+            "UE-D001",
+            blocked,
+            "必須Finding参照がない場合、機械所有成果物を作らずblock理由を報告すること",
+            evidence={
+                "missing_block_tokens": missing_block_tokens,
+                "missing_finding_reason": not missing_finding_reason,
+                "preserved_tc_outcomes": (
+                    preserved_tc_outcomes
+                    if outcome_statuses_preserved
+                    else "one_or_more_required_outcomes_not_explicitly_preserved"
+                ),
+                "forbidden_output_values": forbidden_values_found,
+                "machine_sections_present": not no_machine_sections,
+                "fabricated_refs": fabricated_refs,
+            }
+            if not blocked
+            else None,
+        )
+        result.add(
+            "UE-D008",
+            not fabricated_refs and no_machine_sections,
+            "Finding未解決時に評価IDやFinding IDを手作業で作らないこと",
+            evidence={
+                "machine_sections_present": not no_machine_sections,
+                "fabricated_refs": fabricated_refs,
+            }
+            if fabricated_refs or not no_machine_sections
+            else None,
+        )
+        return result
+
     result.add(
         "UE-D001",
         not missing,

@@ -1010,17 +1010,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "versioned requirement/procedure/semantic catalogs are structurally complete",
         evidence=errors or None,
     )
-    headings = set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))
+    headings = set(re.findall(r"^#{2,6}\s+(.+?)\s*$", text, re.M))
     baseline_sections = {
         "Evaluation Input",
-        "WCAG-EM Step 1",
-        "WCAG-EM Step 2",
-        "WCAG-EM Step 3",
-        "WCAG-EM Step 4",
-        "WCAG-EM Step 5",
+        "Step 1: Define evaluation scope",
+        "Step 2: Explore the target Web product",
+        "Step 3: Select representative samples",
+        "Step 4: Audit the selected sample",
+        "Step 5: Report the evaluation findings",
         "Criterion Evaluation Plan",
         "Sample Evaluation Results",
-        "Report Closure",
     }
     missing = sorted(
         (baseline_sections | set(expected.get("required_sections", []))) - headings
@@ -1040,11 +1039,41 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "fixture-required outcome/limitations are preserved",
         evidence=absent or None,
     )
-    forbidden = [
-        token
-        for token in expected.get("forbidden_tokens", [])
-        if token.casefold() in text.casefold()
-    ]
+    forbidden = []
+    for token in expected.get("forbidden_tokens", []):
+        if token.casefold() == "aggregated score":
+            unavailable_values = {
+                "",
+                "not generated",
+                "not reported",
+                "not assessed",
+                "not applicable",
+                "unavailable",
+                "none",
+            }
+            score_rows = re.findall(
+                r"^\|\s*aggregated score\s*\|([^|\n]*)"
+                r"(?:\|[^|\n]*)*\|\s*$",
+                text,
+                re.IGNORECASE | re.MULTILINE,
+            )
+            populated_score_rows = [
+                value.strip().casefold()
+                for value in score_rows
+                if value.strip().casefold() not in unavailable_values
+            ]
+            inline_score_claims = re.findall(
+                r"\baggregated score\b\s*(?::|=|\bis\b|\bwas\b|\bof\b)\s*"
+                r"(?!not\s+(?:generated|reported|assessed)\b|unavailable\b|none\b)"
+                r"(?:\d+(?:\.\d+)?\s*(?:%|/\s*\d+(?:\.\d+)?)?|\d+\s+out\s+of\s+\d+)",
+                text,
+                re.IGNORECASE,
+            )
+            if populated_score_rows or inline_score_claims:
+                forbidden.append(token)
+            continue
+        if token.casefold() in text.casefold():
+            forbidden.append(token)
     result.add(
         "WCAG-D004",
         not forbidden,

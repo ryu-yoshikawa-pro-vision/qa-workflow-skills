@@ -76,6 +76,30 @@ class ClosureExclusivityRegressionTests(unittest.TestCase):
         }
         self.assert_fails("test-case-design", text, expected, "TC-D007")
 
+    def test_test_case_disposition_closure_parses_multiple_upstream_ids(self) -> None:
+        text = """# テストケース
+## テストケース一覧
+| テストケースID | タイトル / 目的 | 関連観点ID | 関連カバレッジ項目ID | 関連テスト要求ID | 優先度 | 前提条件 | テストデータ | 実施手順 | 期待結果 | 期待結果の根拠 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-001 | 入力境界を確認する | — | — | TR-001 | 高 | 有効状態 | 境界値 | 入力する | 結果を確認する | SPEC-001 |
+## テストケースへ展開しないカバレッジ項目 / テスト条件
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
+| --- | --- | --- | --- |
+| TCN-001-CI01 / TCN-001-CI02 | カバレッジ項目 | ブロック中 | 必要な入力情報がない |
+"""
+        expected = {
+            "known_test_conditions": ["TCN-001"],
+            "known_coverage_items": ["TCN-001-CI01", "TCN-001-CI02"],
+            "known_test_requirements": ["TR-001"],
+            "known_authorities": ["SPEC-001"],
+            "coverage_closure_ids": ["TCN-001-CI01", "TCN-001-CI02"],
+        }
+        result = VALIDATORS["test-case-design"](
+            text, expected, "CLOSURE-EXCLUSIVITY"
+        ).to_dict()
+        assertions = {item["id"]: item for item in result["assertions"]}
+        self.assertEqual(assertions["TC-D007"]["status"], "pass", assertions["TC-D007"])
+
 
 if __name__ == "__main__":
     unittest.main()

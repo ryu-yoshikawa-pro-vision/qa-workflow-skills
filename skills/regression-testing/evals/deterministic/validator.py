@@ -1,29 +1,212 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
+from scripts.skills.evals.deterministic.common import fenced_code_blocks
 from scripts.skills.evals.deterministic.result import EvalResult
 
 
+def _json_documents(text: str) -> tuple[list[Any], list[str]]:
+    matches = [
+        body
+        for info, body in fenced_code_blocks(text)
+        if info.casefold().split(maxsplit=1)[:1] == ["json"]
+    ]
+    values: list[Any] = []
+    errors: list[str] = []
+    for index, block in enumerate(matches, start=1):
+        try:
+            values.append(json.loads(block))
+        except json.JSONDecodeError as exc:
+            errors.append(f"invalid_json[{index}]:{exc.msg}")
+    return values, errors
+
+
 def _document(text: str) -> tuple[dict[str, Any] | None, list[str]]:
-    matches = re.findall(
-        r"```json\s*\n(.*?)\n```", text, flags=re.DOTALL | re.IGNORECASE
-    )
-    if len(matches) != 1:
-        return None, ["exactly_one_json_artifact_required"]
-    try:
-        value = json.loads(matches[0])
-    except json.JSONDecodeError as exc:
-        return None, [f"invalid_json:{exc.msg}"]
-    if not isinstance(value, dict):
-        return None, ["artifact_root_must_be_object"]
-    return value, []
+    values, errors = _json_documents(text)
+    if errors:
+        return None, errors
+    artifacts = [
+        value
+        for value in values
+        if isinstance(value, dict) and "artifact_type" in value
+    ]
+    if len(artifacts) != 1:
+        return None, ["exactly_one_json_machine_artifact_required"]
+    return artifacts[0], []
+
+
+def _shape_issues(doc: dict[str, Any], kind: str) -> list[dict[str, str]]:
+    """Report wrong JSON container shapes before semantic validation uses them."""
+    issues: list[dict[str, str]] = []
+    if not isinstance(kind, str):
+        return [
+            {
+                "path": "artifact_type",
+                "expected": "str",
+                "actual": type(kind).__name__,
+            }
+        ]
+
+    def check(path: str, value: Any, expected: type) -> None:
+        if not isinstance(value, expected):
+            issues.append(
+                {
+                    "path": path,
+                    "expected": expected.__name__,
+                    "actual": type(value).__name__,
+                }
+            )
+
+    def check_list(path: str, value: Any, item_type: type | None = None) -> None:
+        check(path, value, list)
+        if isinstance(value, list) and item_type is not None:
+            for index, item in enumerate(value):
+                check(f"{path}[{index}]", item, item_type)
+
+    def check_map(path: str, value: Any, value_type: type | None = None) -> None:
+        check(path, value, dict)
+        if isinstance(value, dict) and value_type is not None:
+            for key, item in value.items():
+                check(f"{path}.{key}", item, value_type)
+
+    if kind == "baseline":
+        check("completeness_evidence", doc.get("completeness_evidence"), dict)
+        check_list("memberships", doc.get("memberships"), dict)
+        check_list("source_revisions", doc.get("source_revisions"), dict)
+        memberships = doc.get("memberships")
+        if isinstance(memberships, list):
+            for index, item in enumerate(memberships):
+                if not isinstance(item, dict):
+                    continue
+                check(f"memberships[{index}].decision", item.get("decision"), str)
+                check(
+                    f"memberships[{index}].lifecycle_status",
+                    item.get("lifecycle_status"),
+                    str,
+                )
+                check_list(
+                    f"memberships[{index}].source_refs", item.get("source_refs"), str
+                )
+                check_list(
+                    f"memberships[{index}].source_revisions",
+                    item.get("source_revisions"),
+                    dict,
+                )
+        for field in (
+            "scope_refs",
+            "member_tc_refs",
+            "one_off_tc_refs",
+            "unresolved_tc_refs",
+            "undecided_tc_refs",
+        ):
+            check_list(field, doc.get(field), str)
+        check_list("coverage_gaps", doc.get("coverage_gaps"))
+    elif kind == "run":
+        check("baseline", doc.get("baseline"), dict)
+        check_list("selected_tc_refs", doc.get("selected_tc_refs"), str)
+        check_list("required_routes", doc.get("required_routes"), dict)
+        check_list("auxiliary_testware_refs", doc.get("auxiliary_testware_refs"), str)
+        if type(doc.get("auxiliary_testware_count")) is not int:
+            issues.append(
+                {
+                    "path": "auxiliary_testware_count",
+                    "expected": "int",
+                    "actual": type(doc.get("auxiliary_testware_count")).__name__,
+                }
+            )
+        baseline = doc.get("baseline")
+        if isinstance(baseline, dict):
+            check_list("baseline.member_tc_refs", baseline.get("member_tc_refs"), str)
+        routes = doc.get("required_routes")
+        if isinstance(routes, list):
+            for index, route in enumerate(routes):
+                if not isinstance(route, dict):
+                    continue
+                check(
+                    f"required_routes[{index}].route_type", route.get("route_type"), str
+                )
+                if "e2e_testware_ref" in route:
+                    check(
+                        f"required_routes[{index}].e2e_testware_ref",
+                        route.get("e2e_testware_ref"),
+                        str,
+                    )
+    elif kind == "activity":
+        check_map("source_executions", doc.get("source_executions"), dict)
+        check_list("route_results", doc.get("route_results"), dict)
+        check_map("tc_execution_state", doc.get("tc_execution_state"), str)
+        check("counts", doc.get("counts"), dict)
+        check_list("auxiliary_route_results", doc.get("auxiliary_route_results"), dict)
+        check_list("auxiliary_testware_refs", doc.get("auxiliary_testware_refs"), str)
+        check_list("unresolved", doc.get("unresolved"), str)
+        for field in ("activity_state", "cleanup_status"):
+            check(field, doc.get(field), str)
+        counts = doc.get("counts")
+        if (
+            isinstance(counts, dict)
+            and type(counts.get("auxiliary_testware_count")) is not int
+        ):
+            issues.append(
+                {
+                    "path": "counts.auxiliary_testware_count",
+                    "expected": "int",
+                    "actual": type(counts.get("auxiliary_testware_count")).__name__,
+                }
+            )
+        routes = doc.get("route_results")
+        if isinstance(routes, list):
+            for index, route in enumerate(routes):
+                if not isinstance(route, dict):
+                    continue
+                for field in ("tc_ref", "route_ref", "execution_ref"):
+                    check(f"route_results[{index}].{field}", route.get(field), str)
+    return issues
 
 
 def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result = EvalResult("regression-testing", eval_id)
+    if expected.get("expect_blocked_output") is True:
+        json_values, json_errors = _json_documents(text)
+        json_fence_count = len(json_values) + len(json_errors)
+        required_tokens = expected.get("required_block_tokens", [])
+        missing_tokens = [
+            token
+            for token in required_tokens
+            if not isinstance(token, str) or token.casefold() not in text.casefold()
+        ]
+        explicit_block = any(
+            marker in text.casefold()
+            for marker in ("block", "blocked", "ブロック", "materializeできない")
+        )
+        result.add(
+            "REG-D001",
+            json_fence_count == 0,
+            "必須identity / provenance不足のblock経路でJSON fenced blockを出力しないこと",
+            evidence={
+                "json_fence_count": json_fence_count,
+                "json_errors": json_errors,
+            }
+            if json_fence_count
+            else None,
+        )
+        block_valid = json_fence_count == 0 and not missing_tokens and explicit_block
+        result.add(
+            "REG-D019",
+            block_valid,
+            "必要なActivity identity / source evidence / cleanup情報がない場合にJSON fenced blockを出さず理由を示してblockすること",
+            evidence={
+                "json_fence_count": json_fence_count,
+                "json_errors": json_errors,
+                "missing_block_tokens": missing_tokens,
+                "explicit_block": explicit_block,
+            }
+            if not block_valid
+            else None,
+        )
+        return result
+
     doc, errors = _document(text)
     result.add(
         "REG-D001",
@@ -37,10 +220,20 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     kind = doc.get("artifact_type")
     result.add(
         "REG-D002",
-        kind in {"baseline", "run", "activity"},
+        isinstance(kind, str) and kind in {"baseline", "run", "activity"},
         "artifact typeがbaseline / run / activityのいずれかであること",
         evidence=kind,
     )
+    shape_issues = _shape_issues(doc, kind)
+    result.add(
+        "REG-D018",
+        not shape_issues,
+        "artifact fieldのJSON container / value shapeがdata contractに適合すること",
+        evidence=shape_issues or None,
+    )
+    # Continue safe semantic checks where possible so existing assertions retain
+    # their diagnostics. Any fallback below is paired with a failing REG-D018;
+    # malformed containers can never be accepted as a valid artifact.
     if kind == "baseline":
         evidence = doc.get("completeness_evidence", {})
         evidence_keys = (
@@ -120,7 +313,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
         valid_decisions = {"member", "one_off", "out_of_scope", "unresolved"}
         decisions_valid = membership_shape_valid and all(
-            item.get("decision") in valid_decisions
+            isinstance(item.get("decision"), str)
+            and item.get("decision") in valid_decisions
             for item in memberships
             if isinstance(item, dict)
         )
@@ -251,6 +445,10 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             doc.get("schema_version") == "1"
             and isinstance(doc.get("baseline_ref"), str)
             and bool(doc.get("baseline_ref", "").strip())
+            and (
+                "expected_baseline_ref" not in expected
+                or doc.get("baseline_ref") == expected["expected_baseline_ref"]
+            )
             and isinstance(doc.get("discovery_snapshot_ref"), str)
             and bool(doc.get("discovery_snapshot_ref", "").strip())
             and isinstance(doc.get("scope_refs"), list)
@@ -268,67 +466,126 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
     elif kind == "run":
         scope = doc.get("run_scope")
-        baseline = doc.get("baseline", {})
+        baseline = doc.get("baseline")
+        baseline_current = (
+            isinstance(baseline, dict)
+            and baseline.get("complete") is True
+            and baseline.get("currentness") == "current"
+        )
         result.add(
             "REG-D006",
-            scope != "full"
-            or (
-                baseline.get("complete") is True
-                and baseline.get("currentness") == "current"
-            ),
+            scope != "full" or baseline_current,
             "full Runはcompleteかつcurrentなbaselineだけから作ること",
         )
-        selected = set(doc.get("selected_tc_refs", []))
-        members = set(baseline.get("member_tc_refs", []))
+        selected_refs = doc.get("selected_tc_refs")
+        selected = (
+            set(selected_refs)
+            if isinstance(selected_refs, list)
+            and all(isinstance(ref, str) for ref in selected_refs)
+            else None
+        )
+        member_refs = (
+            baseline.get("member_tc_refs") if isinstance(baseline, dict) else None
+        )
+        members = (
+            set(member_refs)
+            if isinstance(member_refs, list)
+            and all(isinstance(ref, str) for ref in member_refs)
+            else None
+        )
+        subset_valid = (
+            selected is not None
+            and members is not None
+            and selected <= members
+            and (scope != "selected" or doc.get("suite_complete") is False)
+        )
         result.add(
             "REG-D007",
-            selected <= members
-            and (scope != "selected" or doc.get("suite_complete") is False),
+            subset_valid,
             "selected RunはSuite memberのsubsetとして保持し、Suite完了と扱わないこと",
-            evidence=sorted(selected - members),
+            evidence=(
+                sorted(selected - members)
+                if selected is not None and members is not None
+                else {
+                    "selected_tc_refs_type": type(selected_refs).__name__,
+                    "baseline.member_tc_refs_type": type(member_refs).__name__,
+                }
+            ),
         )
-        routes = doc.get("required_routes", [])
-        invalid = [
-            route
-            for route in routes
-            if route.get("route_type") not in {"manual", "e2e"}
-            or (route.get("route_type") == "e2e" and not route.get("e2e_testware_ref"))
-        ]
+        routes = doc.get("required_routes")
+        invalid = (
+            [
+                route
+                for route in routes
+                if not isinstance(route, dict)
+                or not isinstance(route.get("route_type"), str)
+                or route.get("route_type") not in {"manual", "e2e"}
+                or (
+                    route.get("route_type") == "e2e"
+                    and not route.get("e2e_testware_ref")
+                )
+            ]
+            if isinstance(routes, list)
+            else [{"field": "required_routes", "actual_type": type(routes).__name__}]
+        )
         result.add(
             "REG-D008",
             not invalid,
             "required routeをmanualまたはconcrete E2E testware refで表すこと",
             evidence=invalid or None,
         )
+        auxiliary_refs = doc.get("auxiliary_testware_refs")
+        auxiliary_ref_count = (
+            len(auxiliary_refs) if isinstance(auxiliary_refs, list) else None
+        )
         result.add(
             "REG-D009",
-            doc.get("auxiliary_testware_count")
-            == len(doc.get("auxiliary_testware_refs", [])),
+            doc.get("auxiliary_testware_count") == auxiliary_ref_count,
             "TCなし補助testwareをTC countから分離すること",
         )
     elif kind == "activity":
-        routes = doc.get("route_results", [])
+        route_results = doc.get("route_results")
+        routes = (
+            [route for route in route_results if isinstance(route, dict)]
+            if isinstance(route_results, list)
+            else ()
+        )
         by_tc: dict[str, list[dict[str, Any]]] = {}
         source_mismatches = []
-        source = doc.get("source_executions", {})
+        source = doc.get("source_executions")
+
+        def source_execution(route: dict[str, Any]) -> dict[str, Any] | None:
+            execution_ref = route.get("execution_ref")
+            value = (
+                source.get(execution_ref)
+                if isinstance(source, dict) and isinstance(execution_ref, str)
+                else None
+            )
+            return value if isinstance(value, dict) else None
+
         for route in routes:
             tc_ref = route.get("tc_ref")
             by_tc.setdefault(str(tc_ref), []).append(route)
-            execution = source.get(route.get("execution_ref"), {})
+            execution = source_execution(route)
             actual_started = (
-                execution.get("start_state") == "開始済み"
+                isinstance(execution, dict)
+                and execution.get("start_state") == "開始済み"
                 and execution.get("actual_start_confirmed") is True
             )
             if route.get("executed") is not actual_started:
                 source_mismatches.append(
                     {"tc_ref": tc_ref, "route_ref": route.get("route_ref")}
                 )
-            if route.get("source_result") != execution.get("source_result"):
+            source_result = (
+                execution.get("source_result") if isinstance(execution, dict) else None
+            )
+            if route.get("source_result") != source_result:
                 source_mismatches.append(
                     {"tc_ref": tc_ref, "issue": "source_result_reinterpreted"}
                 )
             if route.get("result_finalized") is not (
-                execution.get("result_finalized") is True
+                isinstance(execution, dict)
+                and execution.get("result_finalized") is True
             ):
                 source_mismatches.append(
                     {
@@ -337,6 +594,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                     }
                 )
         state_errors = []
+        tc_states = doc.get("tc_execution_state")
         for tc_ref, tc_routes in by_tc.items():
             started = all(route.get("executed") is True for route in tc_routes)
             expected_state = (
@@ -348,7 +606,10 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                     else "unexecuted"
                 )
             )
-            if doc.get("tc_execution_state", {}).get(tc_ref) != expected_state:
+            actual_state = (
+                tc_states.get(tc_ref) if isinstance(tc_states, dict) else None
+            )
+            if actual_state != expected_state:
                 state_errors.append({"tc_ref": tc_ref, "expected": expected_state})
         result.add(
             "REG-D010",
@@ -361,7 +622,6 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
         cleanup = doc.get("cleanup_status")
         expected_state = doc.get("activity_state")
-        source = doc.get("source_executions", {})
         completion_valid = expected_state != "完了" or (
             bool(routes)
             and all(
@@ -370,12 +630,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 and route.get("source_result_projectable") is True
                 and isinstance(route.get("source_result"), str)
                 and bool(route.get("source_result", "").strip())
+                and isinstance(source_execution(route), dict)
                 and route.get("source_result")
-                == source.get(route.get("execution_ref"), {}).get("source_result")
-                and source.get(route.get("execution_ref"), {}).get("result_finalized")
-                is True
+                == source_execution(route).get("source_result")
+                and source_execution(route).get("result_finalized") is True
                 for route in routes
             )
+            and isinstance(cleanup, str)
             and cleanup in {"成功", "対象なし", "意図的に残した状態"}
             and not doc.get("unresolved")
         )
@@ -399,9 +660,18 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             and doc.get("scope_identity"),
             "Activityがidentityと固定snapshotを参照すること",
         )
-        auxiliary = doc.get("auxiliary_route_results", [])
-        aux_issues = [item for item in auxiliary if item.get("tc_ref")]
-        if doc.get("counts", {}).get("auxiliary_testware_count") != len(auxiliary):
+        auxiliary = doc.get("auxiliary_route_results")
+        auxiliary_rows = (
+            [item for item in auxiliary if isinstance(item, dict)]
+            if isinstance(auxiliary, list)
+            else ()
+        )
+        aux_issues = [item for item in auxiliary_rows if item.get("tc_ref")]
+        counts = doc.get("counts")
+        auxiliary_count = (
+            counts.get("auxiliary_testware_count") if isinstance(counts, dict) else None
+        )
+        if auxiliary_count != len(auxiliary_rows) or not isinstance(auxiliary, list):
             aux_issues.append({"issue": "auxiliary_count_mismatch"})
         result.add(
             "REG-D015",

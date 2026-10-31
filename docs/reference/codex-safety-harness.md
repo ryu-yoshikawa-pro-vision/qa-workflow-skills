@@ -56,7 +56,7 @@ Windowsでroot移動が失敗した場合は、`-ErrorAction Stop`により後�
 
 protected branch上のstate-changing Gitはdenyします。限定例外として、新しいlocal非protected branchへの`git switch -c <name>`と、既存local非protected branchへの`git switch <name>`だけをHookが通します。追加start-point、force/discard option、protected branch宛、存在しないbranchはdenyします。例外のswitchもexecpolicyの`prompt`を通す必要があります。
 
-作業branchからの通常pushは、設定済みの名前付きremote 1件、1つの明示refspec、現在のbranchまたは`HEAD`をsourceとし、現在のbranchを宛先とする場合だけ候補になります。例は`git push origin feature/existing`、`git push origin HEAD:feature/existing`、`git push -u origin feature/existing`です。`-u` / `--set-upstream`以外のpush option、refspec後のoption、URLやpathの直接指定、remoteまたはrefspecの省略、複数refspec、wildcard/matching refspec、削除・force prefix、別branchやprotected branch宛はHookがdenyします。
+作業branchからの通常pushは、設定済みの名前付きremote 1件と1つの明示refspecに限ります。sourceは現在branchまたは`HEAD`、宛先は現在branchまたは既知の非保護branch（local branch、または指定remoteのremote-tracking branch）である必要があります。現在branchと異なる宛先には`HEAD:feature/target`または`feature/current:feature/target`のようなsource:destination形式を使います。sourceと宛先を兼ねる単一branch名は現在branchに限り、未確認の宛先branchはdenyします。`-u` / `--set-upstream`以外のpush option、refspec後のoption、URLやpathの直接指定、remoteまたはrefspecの省略、複数refspec、wildcard/matching refspec、削除・force prefix、protected branch宛はHookがdenyします。
 
 Hookはremoteに有効なpush URLが1件だけあることを確認します。保護対象は`main` / `master`に加え、push先remoteのローカル`refs/remotes/<remote>/HEAD`が示すデフォルトbranchです。このHEAD情報が未設定、読取失敗、不正、またはpush先remoteと不整合なら通常pushをdenyします。判定はローカル記録に基づき、Hook実行時にネットワークでremoteの最新状態を確認しません。`push.followTags`、`push.recurseSubmodules`、`remote.<name>.mirror`、`remote.<name>.push`が追加更新を起こし得る値の場合や、その設定を解決できない場合もdenyします。非fast-forwardや認証失敗はGit本体またはremoteが拒否します。Hookの通過はpush成功やbranch protectionの解除を意味しません。
 

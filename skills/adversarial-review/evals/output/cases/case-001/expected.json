@@ -1,6 +1,11 @@
 {
   "known_artifact_ids": ["TC-001"],
   "expected_defects": [
-    { "target_id": "TC-001", "contains": "仕様根拠", "severity": "重大", "repair_target": "test-case-design" }
+    {
+      "target_id": "TC-001",
+      "contains": "存在しないAuthority ID",
+      "severity": "重大",
+      "repair_target": "test-case-design"
+    }
   ]
 }

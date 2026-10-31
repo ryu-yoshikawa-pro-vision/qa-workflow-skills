@@ -25,6 +25,52 @@ def _case(case_name: str) -> tuple[str, dict]:
 
 
 class UsabilityEvaluationOutputTests(unittest.TestCase):
+    def test_missing_required_finding_closes_as_incomplete_without_fabricated_ids(
+        self,
+    ) -> None:
+        _, expected = _case("case-001")
+        blocked = """# UI / UX Evaluation
+
+**Status: INCOMPLETE.** The required Finding ref was not supplied; no actual Finding ref was supplied.
+TC-001 remains PASS; this evaluation does not rewrite its result.
+
+"""
+        result = validator.validate(blocked, expected, "UE-OUT-001")
+        assertions = {row["id"]: row for row in result.to_dict()["assertions"]}
+        self.assertEqual(assertions["UE-D001"]["status"], "pass")
+        self.assertEqual(assertions["UE-D008"]["status"], "pass")
+
+        equivalent_block = """# UI / UX Evaluation
+
+**Status: INCOMPLETE.** No actual Finding ref was supplied or available within the permitted read boundary.
+EV-004 is the immutable TC-001 PASS result.
+"""
+        equivalent = validator.validate(equivalent_block, expected, "UE-OUT-001-EQUIV")
+        equivalent_assertions = {
+            row["id"]: row for row in equivalent.to_dict()["assertions"]
+        }
+        self.assertEqual(equivalent_assertions["UE-D001"]["status"], "pass")
+
+        missing_reason = validator.validate(
+            "**Status: INCOMPLETE.**\nTC-001 remains PASS and is immutable.",
+            expected,
+            "UE-OUT-001-NO-REASON",
+        )
+        missing_reason_assertions = {
+            row["id"]: row for row in missing_reason.to_dict()["assertions"]
+        }
+        self.assertEqual(missing_reason_assertions["UE-D001"]["status"], "fail")
+
+        fabricated = validator.validate(
+            blocked + "\nFinding ref: FND-001\n", expected, "UE-OUT-001"
+        )
+        failed = {
+            row["id"]
+            for row in fabricated.to_dict()["assertions"]
+            if row["status"] == "fail"
+        }
+        self.assertEqual(failed, {"UE-D001", "UE-D008"})
+
     def test_saved_dialog_issue_and_no_issue_outputs_close_deterministically(
         self,
     ) -> None:
@@ -37,16 +83,16 @@ class UsabilityEvaluationOutputTests(unittest.TestCase):
     def test_non_aspect_validation_error_does_not_fail_fixed_aspect_assertion(
         self,
     ) -> None:
-        text, expected = _case("case-001")
-        text = text.replace(
-            '["EV-001","EV-002","EV-003","EV-004"]', '["UNKNOWN-EVIDENCE"]', 1
-        )
+        text, expected = _case("case-002")
+        text = text.replace('["EV-101","EV-102","EV-103"]', '["UNKNOWN-EVIDENCE"]', 1)
         result = validator.validate(text, expected, "UE-OUT-NEG-001")
         assertions = {row["id"]: row for row in result.to_dict()["assertions"]}
         self.assertEqual(assertions["UE-D003"]["status"], "pass")
         self.assertEqual(assertions["UE-D005"]["status"], "fail")
 
-    def test_fixture_cannot_rewrite_saved_test_result_or_product_risk(self) -> None:
+    def test_blocked_fixture_cannot_rewrite_saved_test_result_or_product_risk(
+        self,
+    ) -> None:
         text, expected = _case("case-001")
         result = validator.validate(
             text.replace("TC-001 remains PASS", "TC-001 remains FAIL"),
@@ -54,7 +100,7 @@ class UsabilityEvaluationOutputTests(unittest.TestCase):
             "UE-OUT-NEG-002",
         )
         assertions = {row["id"]: row for row in result.to_dict()["assertions"]}
-        self.assertEqual(assertions["UE-D007"]["status"], "fail")
+        self.assertEqual(assertions["UE-D001"]["status"], "fail")
 
     def test_eval_manifest_and_pr12_evidence_fixture_are_present(self) -> None:
         manifest = json.loads(

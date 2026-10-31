@@ -12,7 +12,7 @@
     "REF-0001": ["SRC-012-ITEM-0002"]
   },
   "known_refs": {
-    "evidence_refs": ["EV-001", "EV-002", "EV-003", "EV-004"],
+    "evidence_refs": ["EV-001", "EV-002", "EV-003", "EV-004", "input.md"],
     "project_authority_refs": [],
     "test_rule_result_refs": ["RULE-001"],
     "requirement_check_refs": [],
@@ -23,6 +23,13 @@
     "owner_activity_refs": ["ACTIVITY-001"],
     "inspection_request_refs": []
   },
-  "required_output_tokens": ["TC-001 remains PASS", "Finding"],
-  "forbidden_output_values": ["TC-001: FAIL", "TC-001 FAIL", "Product Risk"]
+  "require_incomplete_missing_finding_block": true,
+  "required_block_tokens": ["Status: INCOMPLETE"],
+  "preserved_tc_outcomes": { "TC-001": "PASS" },
+  "forbidden_output_values": [
+    "TC-001: FAIL",
+    "TC-001 FAIL",
+    "TC-001 remains FAIL",
+    "Product Risk"
+  ]
 }

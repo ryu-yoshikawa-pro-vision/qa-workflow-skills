@@ -72,8 +72,11 @@ ID_PATTERNS = {
 }
 
 ALL_ID_RE = re.compile(
-    r"\b(?:SPEC|DEC|INF|UNK|Q|RISK|TR|TCN|TC|REV|SRC|ASM|CHG|DEP)-\d{3}(?:-CI\d{2,})?\b"
+    r"(?<![A-Za-z0-9_-])(?:SPEC|DEC|INF|UNK|Q|RISK|TR|TCN|TC|REV|SRC|ASM|CHG|DEP)-\d{3}(?:-CI\d{2,})?(?![A-Za-z0-9_-])"
 )
+
+_FENCE_OPEN_RE = re.compile(r"^ {0,3}(?P<delimiter>`{3,}|~{3,})(?P<info>.*)$")
+_FENCE_CLOSE_RE = re.compile(r"^ {0,3}(?P<delimiter>`{3,}|~{3,})[ \t]*$")
 
 
 def clean(value: str) -> str:
@@ -87,6 +90,38 @@ def has_value(value: str) -> bool:
 
 def ids_in(value: str) -> list[str]:
     return ALL_ID_RE.findall(value or "")
+
+
+def fenced_code_blocks(text: str) -> list[tuple[str, str]]:
+    """Return Markdown fenced blocks with their info string and body."""
+    lines = text.splitlines()
+    blocks: list[tuple[str, str]] = []
+    index = 0
+    while index < len(lines):
+        opening = _FENCE_OPEN_RE.fullmatch(lines[index])
+        if opening is None:
+            index += 1
+            continue
+        delimiter = opening.group("delimiter")
+        info = opening.group("info").strip()
+        if delimiter.startswith("`") and "`" in info:
+            index += 1
+            continue
+        close_index = index + 1
+        while close_index < len(lines):
+            closing = _FENCE_CLOSE_RE.fullmatch(lines[close_index])
+            if (
+                closing is not None
+                and closing.group("delimiter")[0] == delimiter[0]
+                and len(closing.group("delimiter")) >= len(delimiter)
+            ):
+                blocks.append((info, "\n".join(lines[index + 1 : close_index])))
+                index = close_index + 1
+                break
+            close_index += 1
+        else:
+            index += 1
+    return blocks
 
 
 def nonempty_rows(

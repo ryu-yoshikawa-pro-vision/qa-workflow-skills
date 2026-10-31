@@ -229,8 +229,11 @@ def _source_constant(path: Path, name: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _source_paths(skill: str, generator: str) -> tuple[Path, Path]:
-    scripts = REPO_ROOT / "skills" / skill / "scripts"
+def _source_paths(
+    skill: str, generator: str, source_root: Path | None = None
+) -> tuple[Path, Path]:
+    root = source_root if source_root is not None else REPO_ROOT
+    scripts = root / "skills" / skill / "scripts"
     return scripts / "runtime_contract.py", scripts / f"{generator}.py"
 
 
@@ -445,6 +448,7 @@ def _assert_runtime_pair(
     input_body: Any,
     result_body: Any,
     expected: dict[str, Any],
+    source_root: Path | None = None,
 ) -> None:
     prefix = "RUNTIME-PAIR-" + re.sub(r"[^A-Za-z0-9]+", "-", identity).strip("-")[:80]
     ok_input = (
@@ -503,7 +507,9 @@ def _assert_runtime_pair(
     )
     try:
         runtime_path, generator_path = _source_paths(
-            str(metadata.get("skill")), str(result_body.get("generator"))
+            str(metadata.get("skill")),
+            str(result_body.get("generator")),
+            source_root,
         )
         expected_runtime_contract = _source_constant(
             runtime_path, "RUNTIME_CONTRACT_VERSION"
@@ -791,7 +797,11 @@ def _assert_targets(
 
 
 def validate_runtime_evidence(
-    text: str, expected: dict[str, Any], result: EvalResult
+    text: str,
+    expected: dict[str, Any],
+    result: EvalResult,
+    *,
+    source_root: Path | None = None,
 ) -> None:
     """Append runtime/Machine Entity assertions when the eval declares them."""
     declared = any(
@@ -837,7 +847,12 @@ def validate_runtime_evidence(
     result_map = {identity: body for identity, body in result_rows}
     for identity in sorted(set(input_map) & set(result_map)):
         _assert_runtime_pair(
-            result, identity, input_map[identity], result_map[identity], expected
+            result,
+            identity,
+            input_map[identity],
+            result_map[identity],
+            expected,
+            source_root,
         )
 
     entity_rows, _ = _blocks(text, "Machine Entities", result, "ENTITY-JSON")

@@ -1,1 +1,1 @@
-指定の2件の詳細TCをsnapshotとして固定し、手順、期待結果、観測方法をYAMLに整理してからPlaywright MCPで実行し報告する。入力元にidentityはない。正規形は assets/output-template.md と assets/execution-plan-template.yaml。入力側では両TCの正式IDが重複するが、今回対象は2件とも明示されている。
+詳細TC 2件の実行依頼です。入力にはTC本文、正式ID値、操作・期待結果・観測条件、テスト対象、許可originが添付されていません。両TCの正式IDが重複するという説明だけがあり、ID値はありません。snapshotを復元できる資料はこの入力に含まれません。必要資料が揃う場合は手順、期待結果、観測方法をYAMLに整理してから利用可能なPlaywright手段で実行し報告してください。入力元identityはありません。正規形は `assets/output-template.md` と `assets/execution-plan-template.yaml` です。

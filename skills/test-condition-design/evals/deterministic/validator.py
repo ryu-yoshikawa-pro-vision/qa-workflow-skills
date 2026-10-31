@@ -93,8 +93,31 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     tcn = nonempty_rows(tcn_table)
     ci = nonempty_rows(ci_table)
-    tr_disposed = nonempty_rows(tr_disp_table)
-    candidate_disposed = nonempty_rows(cand_disp_table)
+    tr_disposed = [
+        row
+        for row in nonempty_rows(tr_disp_table)
+        if not (
+            clean(row.get("テスト要求ID", "")) in {"", "-", "—"}
+            and clean(row.get("扱い", "")) in {"", "-", "—"}
+        )
+    ]
+    candidate_disposed = [
+        row
+        for row in nonempty_rows(cand_disp_table)
+        if not (
+            clean(row.get("候補", "")) in {"", "-", "—"}
+            and clean(row.get("扱い", "")) in {"", "-", "—"}
+        )
+    ]
+
+    def candidate_disposition_matches(row: dict[str, str], target_key: str) -> bool:
+        # The output contract keeps a human-readable candidate in `候補` and its
+        # runtime target key in `カバー先`. Older/simple rows may put the key in
+        # `候補` directly, so accept either canonical location.
+        return target_key in {
+            clean(row.get("候補", "")),
+            clean(row.get("カバー先", "")),
+        }
 
     tcn_ids = [clean(r.get("観点ID", "")) for r in tcn]
     ci_ids = [clean(r.get("カバレッジ項目ID", "")) for r in ci]
@@ -159,7 +182,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "テスト観点 / 条件",
             "テスト技法 / 根拠",
             "カバレッジ基準",
-            "優先度",
         ):
             if not clean(row.get(f, "")):
                 missing.append({"tcn": tid, "field": f})
@@ -292,9 +314,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         combo_rows = nonempty_rows(combo_table)
         actual_factors: dict[str, set[str]] = {}
         for row in factor_rows:
-            actual_factors.setdefault(clean(row.get("因子", "")), set()).add(
-                clean(row.get("値", ""))
-            )
+            factor = clean(row.get("因子", ""))
+            value = clean(row.get("値", ""))
+            # The template permits constraint-only rows. They are not factors.
+            if not factor and not value:
+                continue
+            actual_factors.setdefault(factor, set()).add(value)
         expected_factors = {k: set(v) for k, v in pairwise.get("factors", {}).items()}
         mismatch = {
             k: {
@@ -400,8 +425,187 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             evidence=missing_factor or None,
         )
 
+        blocked_candidate_combos = []
+        blocked_candidate_errors = []
+        blocked_candidate_disposition = pairwise.get("blocked_candidate_disposition")
+        if blocked_candidate_disposition:
+            if ci:
+                blocked_candidate_errors.append(
+                    {
+                        "reason": "fixture expects blocked targets without active CI entities",
+                        "coverage_item_ids": [
+                            clean(row.get("カバレッジ項目ID", "")) for row in ci
+                        ],
+                    }
+                )
+            if combo_rows:
+                blocked_candidate_errors.append(
+                    {
+                        "reason": "fixture expects blocked targets without active generated CI combinations",
+                        "rows": combo_rows,
+                    }
+                )
+            candidate_table = find_table(
+                tables,
+                section_contains="Pairwise runtime target候補",
+                required_headers=(
+                    "候補target key",
+                    "対象2-wise pair",
+                    "生成row（全因子割当）",
+                    "扱い",
+                    "理由 / 根拠",
+                ),
+            )
+            candidate_rows = nonempty_rows(candidate_table)
+            if blocked_candidate_disposition != "ブロック中":
+                blocked_candidate_errors.append(
+                    {
+                        "reason": "unsupported expected blocked disposition",
+                        "value": blocked_candidate_disposition,
+                    }
+                )
+            if not candidate_rows:
+                blocked_candidate_errors.append(
+                    {"reason": "blocked runtime target candidate rows are missing"}
+                )
+
+            candidate_keys = []
+            for row in candidate_rows:
+                target_key = clean(row.get("候補target key", ""))
+                target_pair, pair_errors = _parse_pairwise_combination(
+                    row.get("対象2-wise pair", "")
+                )
+                combo, combo_errors = _parse_pairwise_combination(
+                    row.get("生成row（全因子割当）", "")
+                )
+                if not target_key:
+                    blocked_candidate_errors.append(
+                        {"reason": "target key is missing", "row": row}
+                    )
+                candidate_keys.append(target_key)
+                if pair_errors or len(target_pair) != 2:
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "target pair must contain exactly two valid factor=value tokens",
+                            "target_key": target_key,
+                            "errors": pair_errors,
+                        }
+                    )
+                if combo_errors:
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "full assignment has invalid factor=value tokens",
+                            "target_key": target_key,
+                            "errors": combo_errors,
+                        }
+                    )
+
+                extra = sorted(set(combo) - expected_factor_names)
+                missing_names = sorted(expected_factor_names - set(combo))
+                invalid_values = [
+                    {"factor": factor, "value": value}
+                    for factor, value in combo.items()
+                    if factor in expected_factors
+                    and value not in expected_factors[factor]
+                ]
+                if extra or missing_names or invalid_values:
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "assignment must use every fixture factor and only its allowed values",
+                            "target_key": target_key,
+                            "extra_factors": extra,
+                            "missing_factors": missing_names,
+                            "invalid_values": invalid_values,
+                        }
+                    )
+                if assignment_forbidden(combo, forbidden):
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "assignment violates a forbidden constraint",
+                            "target_key": target_key,
+                            "assignment": combo,
+                        }
+                    )
+                if len(target_pair) == 2:
+                    pair_names = sorted(target_pair)
+                    pair_key = (
+                        pair_names[0],
+                        target_pair[pair_names[0]],
+                        pair_names[1],
+                        target_pair[pair_names[1]],
+                    )
+                    if pair_key not in feasible_pairs(
+                        pairwise.get("factors", {}), forbidden
+                    ):
+                        blocked_candidate_errors.append(
+                            {
+                                "reason": "target pair is not feasible under the fixture constraints",
+                                "target_key": target_key,
+                                "pair": target_pair,
+                            }
+                        )
+                    if any(
+                        combo.get(name) != value for name, value in target_pair.items()
+                    ):
+                        blocked_candidate_errors.append(
+                            {
+                                "reason": "full assignment does not contain its target pair",
+                                "target_key": target_key,
+                                "pair": target_pair,
+                                "assignment": combo,
+                            }
+                        )
+                if clean(row.get("扱い", "")) != blocked_candidate_disposition:
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "target disposition differs from the fixture",
+                            "target_key": target_key,
+                            "actual": clean(row.get("扱い", "")),
+                            "expected": blocked_candidate_disposition,
+                        }
+                    )
+                if not clean(row.get("理由 / 根拠", "")):
+                    blocked_candidate_errors.append(
+                        {
+                            "reason": "target disposition reason is missing",
+                            "target_key": target_key,
+                        }
+                    )
+                if (
+                    target_key
+                    and not pair_errors
+                    and len(target_pair) == 2
+                    and not combo_errors
+                    and not extra
+                    and not missing_names
+                    and not invalid_values
+                    and not assignment_forbidden(combo, forbidden)
+                    and all(
+                        combo.get(name) == value for name, value in target_pair.items()
+                    )
+                    and clean(row.get("扱い", "")) == blocked_candidate_disposition
+                    and clean(row.get("理由 / 根拠", ""))
+                ):
+                    blocked_candidate_combos.append(combo)
+            duplicate_keys = sorted(
+                key for key in set(candidate_keys) if candidate_keys.count(key) > 1
+            )
+            if duplicate_keys:
+                blocked_candidate_errors.append(
+                    {
+                        "reason": "target keys are duplicated",
+                        "target_keys": duplicate_keys,
+                    }
+                )
+            result.add(
+                "TCN-D030",
+                not blocked_candidate_errors,
+                "blocked Pairwise target候補が全因子割当・対象pair・扱い・理由を保持すること",
+                evidence=blocked_candidate_errors or None,
+            )
+
         feasible = feasible_pairs(pairwise.get("factors", {}), forbidden)
-        covered = covered_pairs(valid_combos)
+        covered = covered_pairs(valid_combos + blocked_candidate_combos)
         missing_pairs = sorted(feasible - covered)
         result.add(
             "TCN-D015",
@@ -437,8 +641,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 ),
             )
         )
+        blocked_target_rows = nonempty_rows(
+            find_table(
+                tables,
+                section_contains="状態遷移runtime target候補",
+                required_headers=(
+                    "Runtime target key",
+                    "Coverage transition",
+                    "扱い",
+                    "理由 / 根拠",
+                ),
+            )
+        )
         missing_trans = []
         for t in transitions:
+            transition = f"{t['from']} --{t['event']}--> {t['to']}"
             matched = False
             for row in rows:
                 if not (
@@ -455,8 +672,78 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 if ci_refs and all(ref in ci_set for ref in ci_refs):
                     matched = True
                     break
-            if not matched and not t.get("disposition"):
+            if t.get("disposition") == "ブロック中":
+                matches = [
+                    row
+                    for row in blocked_target_rows
+                    if clean(row.get("Coverage transition", "")) == transition
+                    and clean(row.get("扱い", "")) == "ブロック中"
+                    and clean(row.get("Runtime target key", ""))
+                    and clean(row.get("理由 / 根拠", ""))
+                ]
+                target_keys = {
+                    clean(row.get("Runtime target key", "")) for row in matches
+                }
+                disposition_matches = [
+                    row
+                    for row in candidate_disposed
+                    if any(
+                        candidate_disposition_matches(row, key) for key in target_keys
+                    )
+                    and clean(row.get("扱い", "")) == "ブロック中"
+                    and clean(row.get("理由 / 根拠", ""))
+                ]
+                if (
+                    matched
+                    or len(matches) != 1
+                    or len(target_keys) != 1
+                    or len(disposition_matches) != 1
+                ):
+                    missing_trans.append(
+                        {
+                            **t,
+                            "reason": "blocked transition must be closed by one matching runtime target and candidate disposition",
+                            "target_rows": matches,
+                            "candidate_dispositions": disposition_matches,
+                            "active_coverage_row": matched,
+                        }
+                    )
+            elif not matched:
                 missing_trans.append(t)
+        expected_blocked_transitions = {
+            f"{t['from']} --{t['event']}--> {t['to']}"
+            for t in transitions
+            if t.get("disposition") == "ブロック中"
+        }
+        invalid_blocked_targets = [
+            row
+            for row in blocked_target_rows
+            if clean(row.get("Coverage transition", ""))
+            not in expected_blocked_transitions
+            or clean(row.get("扱い", "")) != "ブロック中"
+            or not clean(row.get("Runtime target key", ""))
+            or not clean(row.get("理由 / 根拠", ""))
+        ]
+        target_keys = [
+            clean(row.get("Runtime target key", "")) for row in blocked_target_rows
+        ]
+        duplicate_target_keys = sorted(
+            key for key in set(target_keys) if key and target_keys.count(key) > 1
+        )
+        if invalid_blocked_targets:
+            missing_trans.append(
+                {
+                    "reason": "blocked target candidate does not match the fixture contract",
+                    "rows": invalid_blocked_targets,
+                }
+            )
+        if duplicate_target_keys:
+            missing_trans.append(
+                {
+                    "reason": "blocked transition target keys must be unique",
+                    "target_keys": duplicate_target_keys,
+                }
+            )
         result.add(
             "TCN-D016",
             not missing_trans,
@@ -469,12 +756,101 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     bva = expected.get("bva", [])
     if bva:
         coverage_text = "\n".join(clean(r.get("カバレッジ項目", "")) for r in ci)
+        blocked_bva_table = find_table(
+            tables,
+            section_contains="境界値runtime target候補",
+            required_headers=(
+                "Runtime target key",
+                "境界 / 位置",
+                "入力値",
+                "扱い",
+                "理由 / 根拠",
+            ),
+        )
+        blocked_bva_rows = nonempty_rows(blocked_bva_table)
         missing_values = []
+        expected_blocked_bva_values = {
+            str(value)
+            for case in bva
+            if case.get("blocked_candidate_disposition")
+            for value in case.get("required_values", [])
+        }
+        invalid_blocked_bva_rows = [
+            row
+            for row in blocked_bva_rows
+            if clean(row.get("入力値", "")) not in expected_blocked_bva_values
+            or not clean(row.get("Runtime target key", ""))
+            or not clean(row.get("理由 / 根拠", ""))
+            or clean(row.get("扱い", "")) != "ブロック中"
+        ]
+        if invalid_blocked_bva_rows:
+            missing_values.append(
+                {
+                    "reason": "blocked BVA target candidate does not match the fixture contract",
+                    "rows": invalid_blocked_bva_rows,
+                }
+            )
+        bva_target_keys = [
+            clean(row.get("Runtime target key", "")) for row in blocked_bva_rows
+        ]
+        duplicate_bva_target_keys = sorted(
+            key
+            for key in set(bva_target_keys)
+            if key and bva_target_keys.count(key) > 1
+        )
+        if duplicate_bva_target_keys:
+            missing_values.append(
+                {
+                    "reason": "blocked BVA target keys must be unique",
+                    "target_keys": duplicate_bva_target_keys,
+                }
+            )
         for case in bva:
             for value in case.get("required_values", []):
-                if not re.search(
-                    rf"(?<![\w.]){re.escape(str(value))}(?![\w.])", coverage_text
-                ):
+                active_value = re.search(
+                    rf"(?<![A-Za-z0-9_.]){re.escape(str(value))}(?![A-Za-z0-9_.])",
+                    coverage_text,
+                )
+                blocked_disposition = case.get("blocked_candidate_disposition")
+                if blocked_disposition:
+                    matching_rows = [
+                        row
+                        for row in blocked_bva_rows
+                        if clean(row.get("入力値", "")) == str(value)
+                        and clean(row.get("扱い", "")) == blocked_disposition
+                        and clean(row.get("Runtime target key", ""))
+                        and clean(row.get("理由 / 根拠", ""))
+                    ]
+                    target_keys = {
+                        clean(row.get("Runtime target key", ""))
+                        for row in matching_rows
+                    }
+                    disposition_matches = [
+                        row
+                        for row in candidate_disposed
+                        if any(
+                            candidate_disposition_matches(row, key)
+                            for key in target_keys
+                        )
+                        and clean(row.get("扱い", "")) == blocked_disposition
+                        and clean(row.get("理由 / 根拠", ""))
+                    ]
+                    if (
+                        active_value
+                        or len(matching_rows) != 1
+                        or len(target_keys) != 1
+                        or len(disposition_matches) != 1
+                    ):
+                        missing_values.append(
+                            {
+                                "value": value,
+                                "reason": "blocked BVA target must have one matching candidate and disposition, with no active CI",
+                                "target_rows": matching_rows,
+                                "candidate_dispositions": disposition_matches,
+                                "active_coverage_item": bool(active_value),
+                            }
+                        )
+                elif not active_value:
                     missing_values.append(value)
         result.add(
             "TCN-D017",
@@ -516,7 +892,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 "カバレッジ項目",
                 "導出元の技法 / 基準",
                 "期待挙動の根拠",
-                "優先度",
             )
             if not clean(row.get(f, ""))
         ]

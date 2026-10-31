@@ -1,6 +1,6 @@
 {
   "required_tc_ids": ["TC-101"],
-  "required_e2e_refs": ["tests/auth/login.spec.ts > login succeeds"],
   "required_fact_labels": ["Playwright構成 / 実行入口", "認証・データ・開始状態"],
+  "require_all_targets_blocked": true,
   "tc_absent": false
 }

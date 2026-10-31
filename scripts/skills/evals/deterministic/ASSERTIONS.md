@@ -316,7 +316,7 @@
 
 ## regression-testing
 
-- `REG-D001` 正規JSON artifactが一つだけ整形式で存在する
+- `REG-D001` artifactが必要な経路では`artifact_type`を持つ正規JSON artifactが一つだけ存在し、fixtureでblockを要求する経路では存在しない。JSON形式のruntime diagnosticはmachine artifactとして数えない
 - `REG-D002` artifact typeがbaseline / run / activityのいずれか
 - `REG-D003` Baseline completeとdiscovery・lifecycle・解決済みmembership根拠および期待current TC populationの整合
 - `REG-D004` membership refの一意性とcurrent logical TCだけのmember化
@@ -333,6 +333,8 @@
 - `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させない
 - `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
+- `REG-D018` artifact fieldのJSON container / value shapeがdata contractに適合する
+- `REG-D019` 必須Activity identity / source evidence / cleanup情報がない場合に理由を示してblockする
 
 ## exploratory-testing
 

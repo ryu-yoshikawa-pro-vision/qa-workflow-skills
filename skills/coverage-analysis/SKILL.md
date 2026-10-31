@@ -18,12 +18,20 @@ description: 現在有効な仕様根拠、プロダクトリスク、テスト�
 9. 既定出力形式が必要な場合は`assets/output-template.md`を使用します。
 10. 他Skillを参照するときは正規Skill名を使用します。
 11. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。自己検証でカバレッジ基準や他層成果物を再設計せず、責務外問題は既存ルーティングへ戻します。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
+12. Runtime Resultに含まれる各blocking issueを人向けの該当欄にも対応付けます。特にorphan nodeはMachine Runtime / Entity表だけに置かず、「陳腐化 / 孤立分析」に成果物ID、分類、根拠、推奨対応、修正Skill / 層を記録します。修正対象が特定できない場合、成果物ID以外の説明をmachine ID欄へ入れず、修正先・根拠欄へ理由を記録します。
+13. 修正対象がない、または特定できない欄は、テンプレートが空欄を定める場合は空欄にします。`—`、`対象なし`等を修正対象ID・参照欄へ入れず、該当する意味は理由欄へ記録します。
 
 ## 決定論的runtime dispatch
 
 `traceability`は、正規化されたcanonical scopeから、期待されるruntime unitと派生対象を決めます。callerがexpected root、stable ID、fingerprintを注入してはいけません。runtime結果、Machine Entity、target mapping、coverage item、test caseの各層を、同じModel Key・generation fingerprint・freshnessで比較します。
 
+分析対象グラフを整理した後、成果物へ転記する前に`skills/coverage-analysis/scripts/traceability.py`を必ず実行し、そのRuntime Input / Resultを保存します。current Runtime / Entity / structure-state evidenceが入力にないscopeは追加せず、提供されたgraphをnodes / edges / dispositionsへ写してdispatchします。scopeが一件もない場合も空配列のまま実行し、返された`unresolved`を保持します。Runtime dispatchを省いて`verify_runtime_evidence`だけを呼んだり、scope / current stateを推測で埋めたりしません。
+
+`traceability.py`のrequest metadataでは、`input_mode`と`selection_source`を混同しません。入力を直接組み立てた場合は`input_mode="direct"`、`selection_source=null`、`selection_key=null`です。`input_mode`の値を`selection_source`へ転記したり、aggregate unitの`all`を`selection_key`へ設定したりしません。aggregate unitは`runtime_unit_key="artifact:traceability:all"`、`model_key=null`、`model_type=null`、`technique_slug=null`、`selection_source=null`、`selection_key=null`、`scope_key="all"`とします。`scope_key`はruntime unitのscopeであり、selection metadataではありません。`input_mode="artifact"`を使うのは、入力が既存artifact由来と確認できる場合だけです。
+
 `current`だけを有効な証拠として扱い、`stale` / `legacy` / `deleted` / `unknown`は未閉鎖または要再検証へ分類します。件数、リンク数、`can_complete`だけで閉鎖済みと判定せず、semantic coverage itemと期待根拠が揃わない場合は完全カバレッジへ昇格しません。
+
+出力中のModel Key等のstable identity欄には、実在し確認できた値だけを記載します。値がない・適用されない場合は空欄にし、`未提示`などの説明は根拠 / 備考へ分けます。
 
 ### 最終runtime evidence gate
 

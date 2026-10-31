@@ -132,17 +132,23 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=missing_auth or None,
     )
 
-    disposed_ids = {clean(r.get("上流ID", "")) for r in disposed}
+    disposed_ids = {ref for row in disposed for ref in ids_in(row.get("上流ID", ""))}
     disposition_known = set()
     if tcn_spec:
         disposition_known |= known_tcn
     if ci_spec:
         disposition_known |= known_ci
+    if tr_spec:
+        disposition_known |= known_tr
+    if auth_spec:
+        disposition_known |= known_auth
     unknown_disposed = sorted(
         {
             upstream
-            for upstream in disposed_ids
-            if upstream and (tcn_spec or ci_spec) and upstream not in disposition_known
+            for row in disposed
+            for upstream in ids_in(row.get("上流ID", ""))
+            if (tcn_spec or ci_spec or tr_spec or auth_spec)
+            and upstream not in disposition_known
         }
     )
     result.add(
@@ -327,4 +333,44 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "フィクスチャで必須のテストケースが存在すること",
         evidence=required_missing or None,
     )
+
+    blocked_upstream_ids = set(expected.get("expected_blocked_upstream_ids", []))
+    if blocked_upstream_ids:
+        blocked_rows = {}
+        for row in disposed:
+            for upstream_id in ids_in(row.get("上流ID", "")):
+                if upstream_id in blocked_upstream_ids:
+                    blocked_rows[upstream_id] = row
+        blocked_issues = []
+        if cases:
+            blocked_issues.append(
+                {
+                    "reason": "test cases were generated while required upstream data is blocked",
+                    "case_ids": ids,
+                }
+            )
+        for upstream_id in sorted(blocked_upstream_ids):
+            row = blocked_rows.get(upstream_id)
+            if row is None:
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "missing block disposition"}
+                )
+            elif clean(row.get("扱い", "")) != "ブロック中":
+                blocked_issues.append(
+                    {
+                        "id": upstream_id,
+                        "reason": "upstream item is not marked blocked",
+                        "actual": clean(row.get("扱い", "")),
+                    }
+                )
+            elif not clean(row.get("理由 / 根拠", "")):
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "block disposition has no reason"}
+                )
+        result.add(
+            "TC-D015",
+            not blocked_issues,
+            "入力に必要な上流内容がない場合、テストケースを作らず対象を理由付きでブロック中にすること",
+            evidence=blocked_issues or None,
+        )
     return result

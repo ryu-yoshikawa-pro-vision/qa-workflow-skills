@@ -19,6 +19,7 @@
 - Codexのdisconnect / reconnect、recovered queue、別session由来と疑われるapprovalやoutputが出た場合は承認せず、新しいfresh sessionで作業状態を再確認します。
 - root AGENTS.mdはCodex標準のcompact復元へ委ねます。独自SessionStart Hookや重複する指示再注入を追加しません。
 - 人間向けのrepository文書は原則日本語で記述します。
+- PR本文はレビューに必要な現在状態の要約として保ち、過去状態を追記して蓄積しません。本文だけにある重要な判断・検証根拠は、置換前に適切な既存Markdown文書へ保存し、本文は最新HEAD・CI・未達条件に置き換えます。
 
 ## 委譲と参照先
 

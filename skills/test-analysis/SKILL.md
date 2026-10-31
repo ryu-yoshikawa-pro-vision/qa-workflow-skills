@@ -32,13 +32,21 @@ description: 新規機能・変更機能・指定対象機能について、変�
 
 `analysis_entities.py`へ渡すtest-analysis contextでは、本文の引用ではなく、判断で実際に参照したEntity identityを`authority_refs[]`（Authorityの`entity_ref`）と`risk_refs[]`（Product Riskの`risk_id`）へ明示します。配列は重複なし・canonical順にし、`residual_risks[]`等の自然言語fieldから参照を推測せず、fingerprintを入力しません。artifact modeではAuthorityをcurrent Machine Entityへ解決します。direct modeでも各Authority refを渡されたcurrent Machine Entityへ解決し、存在しないAuthority Entityを生成・推測しません。Riskは同一invocationで生成されたEntityへ解決されます。unknown refは正常完了にしません。
 
-`selection_key`は正規化済み入力から決まり、callerが期待runtime unit配列やfingerprintを注入してはいけません。`support_status`、`runtime_status`、`result_status`、`freshness_status`、`deterministic_generated`を保持し、partial / unsupported / stale / legacyを完全結果として扱いません。
+`selection_key`は正規化済み入力から決まり、callerが期待runtime unit配列やfingerprintを注入してはいけません。単一Product Riskに属する技法選択はその`risk_id`をkeyに使います。複数Riskをまとめた選択、またはRiskへ限定されない選択は`selection-001`から選択単位ごとに安定して割り当て、既存選択を更新するときは同じ意味のkeyを再利用します。Eval ID、ファイル名、実行時刻からkeyを作りません。`support_status`、`runtime_status`、`result_status`、`freshness_status`、`deterministic_generated`を保持し、partial / unsupported / stale / legacyを完全結果として扱いません。
+
+入力が技法選択を明示していても、複数Riskをまとめた選択、またはRiskへ限定されない選択なら安定keyで`technique_candidates`をdispatchします。明示選択以外のsignalが分からない場合は`null`を渡し、`undetermined_signals`と`complete=false`を保持します。現在有効な仕様根拠がないことだけで入力済みの技法選択やテスト可能性の値を消しません。明示値は入力由来と記録し、未解決の期待挙動・根拠・適用可否は別にブロック中として残します。
+
+選択したunitは、Skill packageの`scripts/<generator>.py`へ正規の`{metadata, input}` JSON requestをstdinで渡して実行し、stdoutのenvelopeをそのまま保存します。`analysis_entities`がcurrent Authority不足で実行できなくても、独立して入力が揃っている`risk_matrix`、技法候補、変更影響、環境要件は個別にdispatchします。あるunitの失敗を別unitの未実行理由にせず、実行できないunitは実際のruntime resultと不足条件を残します。runtimeを一度も実行していない場合や、必要unitを省略した場合は完成した機械証拠として報告しません。
+
+実dispatchしたもののEntityを1件も生成できなかった場合も、`render_machine_entities("test-analysis", [])`の戻り値を保存して空集合を明示します。これは実際の生成結果であり、Entityやfingerprintを補作してはいけません。
 
 ### 最終runtime evidence gate
 
 最終成果物を返す直前に、Skill-local `scripts/runtime_contract.py`へ実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`operation=verify_runtime_evidence`を実行します。runtime-v2では`partial_rerun=false`、test-analysis所有Entityをcarry-forwardしないため`previous_artifact_markdown=null`固定です。partial rerun指定または非null previousは誤用としてrejectされます。返却`valid=true`の場合だけ完成として返し、`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。expected集合や前回Entity配列を手組みしません。
 
 ## インターフェース
+
+既に入力や承認済み評価方式で確定している影響度・発生可能性は1〜4の数字だけを該当セルへ転記し、再採点しません。リスクの失敗内容が入力にない場合、失敗欄を空欄にせず「未提供（入力に記載なし）」と記録し、IDや数値から失敗を創作しません。その値だけで生成できるrisk matrixは実行し、意味内容やcurrent Authorityを必要とする分析Entityは不足を明示してブロックします。enum欄には許可された値だけを記載し、根拠や補足は隣接する説明欄へ分けます。入力に値がない場合は空欄にし、不足の説明は根拠または備考に記載します。
 
 - **入力**: 対象挙動と要求範囲を理解できる現在有効な仕様根拠または同等の仕様情報。変更情報、既存テスト / 不具合、案件コンテキスト等は利用可能な場合に補助入力とします。
 - **処理**: 対象のプロダクトリスクを評価し、何をなぜどの深さでテストするか、テストレベル、観測方法、テスト重点、適用技法を決めます。

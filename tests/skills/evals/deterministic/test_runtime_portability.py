@@ -8,6 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.skills.evals.deterministic.test_cli_integration import (
+    valid_risk_runtime_evidence,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 VALID_RISK_OUTPUT = """# テスト分析
@@ -46,7 +50,9 @@ class RuntimePortabilityTests(unittest.TestCase):
             )
 
             output_path = root / "valid-output.md"
-            output_path.write_text(VALID_RISK_OUTPUT, encoding="utf-8")
+            output_path.write_text(
+                VALID_RISK_OUTPUT + valid_risk_runtime_evidence(), encoding="utf-8"
+            )
             completed = subprocess.run(
                 [
                     sys.executable,

@@ -14,7 +14,8 @@ description: 固定Charterの範囲で未知の問題を探索する。既存own
 3. current UI / known behaviorの収集は`test-target-inspection`、既知TCの忠実実行は`test-execution` / `e2e-test-execution`、E2E原因分析は`e2e-test-result-analysis`へroutingします。「調査」という語だけでInvestigationにしません。
 4. Observationは実測事実、Findingはfollow-upを要する検出事項として分離します。実測を仕様、原因、Defectへ自動昇格しません。
 5. unknown attemptはside effect上限を消費した扱いにし、状態を確認せず盲目的に再試行しません。必要なcleanupが失敗 / 未確認ならSessionを安全完了扱いしません。
-6. Production helperが必須のschema / lifecycle処理に失敗した場合は`incomplete` / `unresolved` / `blocked`に閉じ、LLMで同じ処理を代替しません。
+6. Charterの必須情報不足で開始をblockする場合は、不足した各前提を`charter.block_conditions[]`へ具体的に列挙し、同じ理由を`unresolved[]`にも残します。`investigation`のsymptom / hypothesisが未提供なら、その不足自体をblock conditionに含めます。空配列のまま「ブロック中」としません。
+7. Production helperが必須のschema / lifecycle処理に失敗した場合は`incomplete` / `unresolved` / `blocked`に閉じ、LLMで同じ処理を代替しません。
 
 ## 正規対象
 

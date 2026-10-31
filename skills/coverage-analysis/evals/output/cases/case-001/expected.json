@@ -1,4 +1,17 @@
 {
+  "runtime_contract": {
+    "expected_runtime_units": ["coverage-analysis::artifact:traceability:all"],
+    "expected_generators": { "coverage-analysis::artifact:traceability:all": "traceability" },
+    "expected_status": {
+      "coverage-analysis::artifact:traceability:all": {
+        "runtime_status": "ok",
+        "result_status": "unresolved",
+        "support_status": "supported",
+        "runtime_required": true,
+        "deterministic_generated": true
+      }
+    }
+  },
   "graph": {
     "node_types": { "SPEC-001": "Authority", "TR-001": "TR", "TCN-001": "TCN", "TCN-001-CI01": "CI", "TC-001": "TC" },
     "edges": [["SPEC-001", "TR-001"], ["TR-001", "TCN-001"], ["TCN-001", "TCN-001-CI01"]],
