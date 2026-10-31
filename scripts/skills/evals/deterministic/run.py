@@ -41,8 +41,12 @@ def grade(
     output_path: Path,
     *,
     runtime_source_root: Path | None = None,
+    expected_override: dict | None = None,
 ) -> dict:
-    _, expected = load_eval_definition(skill, eval_id)
+    if expected_override is None:
+        _, expected = load_eval_definition(skill, eval_id)
+    else:
+        expected = expected_override
     text = output_path.read_text(encoding="utf-8")
     try:
         result = VALIDATORS[skill](text, expected, eval_id)
@@ -77,8 +81,24 @@ def main() -> int:
         type=Path,
         help="Trusted source checkout used to verify runtime implementation fingerprints",
     )
+    parser.add_argument(
+        "--expected-json",
+        type=Path,
+        help="Private expected JSON for a held-out single case outside the tracked manifest",
+    )
     parser.add_argument("--result", type=Path, help="Optional JSON result output path")
     args = parser.parse_args()
+
+    if args.expected_json and args.skill == "all":
+        parser.error("--expected-json is supported only for a single-skill case")
+    expected_override = None
+    if args.expected_json:
+        try:
+            expected_override = json.loads(args.expected_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            parser.error(f"--expected-json is unreadable or invalid: {exc}")
+        if not isinstance(expected_override, dict):
+            parser.error("--expected-json must contain a JSON object")
 
     results: list[dict] = []
     missing_outputs: list[str] = []
@@ -92,6 +112,7 @@ def main() -> int:
                 args.eval_id,
                 args.output,
                 runtime_source_root=args.runtime_source_root,
+                expected_override=expected_override,
             )
         )
         payload = results[0]

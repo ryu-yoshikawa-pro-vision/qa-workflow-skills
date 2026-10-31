@@ -930,6 +930,30 @@ class FalsePassRegressionTests(unittest.TestCase):
             "TR-D015",
         )
 
+    def test_fixture_can_require_no_test_requirements(self):
+        text = """# テスト要求
+## テスト要求一覧
+| テスト要求ID | 関連AC ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
+| --- | --- | --- | --- |
+"""
+        expected = {
+            "known_authorities": [],
+            "known_acceptance_criteria": [],
+            "known_product_risks": [],
+            "expected_no_test_requirements": True,
+        }
+        self.assert_passes("test-requirement-design", text, expected)
+
+        invented = text.replace(
+            "## テスト要求を作らない上流項目",
+            "| TR-001 | - | リセット処理を検証 | SPEC-UNKNOWN | | 低 | API / 応答を観測 | |\n"
+            "## テスト要求を作らない上流項目",
+        )
+        self.assert_fails("test-requirement-design", invented, expected, "TR-D019")
+
     def test_missing_source_content_is_blocked_in_test_design_skills(self):
         tc_block = """# TC
 ## テストケース一覧

@@ -108,6 +108,65 @@ class MarkdownParserTests(unittest.TestCase):
             self.assertEqual(malformed["assertions"][0]["id"], "OUTPUT-MD-TABLE-001")
             self.assertIn(("regression-testing", "REG-OUT-002"), results)
 
+    def test_private_expected_json_grades_a_held_out_single_case(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = root / "output.md"
+            output.write_text(
+                """# テスト要求
+## テスト要求一覧
+| テスト要求ID | 関連AC ID | テスト要求 | 現在有効な仕様根拠 | 関連プロダクトリスク | 優先度 | テストレベル / 観測方法 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+## テスト要求を作らない上流項目
+| 上流ID | 種別 | 扱い | 理由 / 根拠 |
+| --- | --- | --- | --- |
+""",
+                encoding="utf-8",
+            )
+            expected = root / "expected.json"
+            expected.write_text(
+                json.dumps(
+                    {
+                        "known_authorities": [],
+                        "known_acceptance_criteria": [],
+                        "known_product_risks": [],
+                        "expected_no_test_requirements": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result_path = root / "result.json"
+            stdout = io.StringIO()
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "run.py",
+                        "--skill",
+                        "test-requirement-design",
+                        "--eval-id",
+                        "TR-HELDOUT-006",
+                        "--output",
+                        str(output),
+                        "--expected-json",
+                        str(expected),
+                        "--result",
+                        str(result_path),
+                    ],
+                ),
+                redirect_stdout(stdout),
+            ):
+                return_code = run.main()
+
+            payload = json.loads(stdout.getvalue())
+            assertion = next(
+                item for item in payload["assertions"] if item["id"] == "TR-D019"
+            )
+            self.assertEqual(return_code, 0)
+            self.assertEqual(assertion["status"], "pass")
+            self.assertEqual(json.loads(result_path.read_text(encoding="utf-8")), payload)
+
 
 if __name__ == "__main__":
     unittest.main()

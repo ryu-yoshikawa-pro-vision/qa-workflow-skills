@@ -302,4 +302,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "フィクスチャで必須のテスト要求が存在すること",
         evidence=required_missing or None,
     )
+    if expected.get("expected_no_test_requirements") is True:
+        result.add(
+            "TR-D019",
+            not trs,
+            "フィクスチャが要求なしを指定した場合、テスト要求を生成しないこと",
+            evidence=tr_ids or None,
+        )
     return result

@@ -59,6 +59,18 @@ python scripts/skills/evals/deterministic/run.py \
   --output path/to/generated-output.md
 ```
 
+追跡manifestへまだ追加しないheld-out単一ケースは、Agent生成後にEvaluator側のprivate `expected.json`を指定できます。
+
+```bash
+python scripts/skills/evals/deterministic/run.py \
+  --skill test-requirement-design \
+  --eval-id TR-HELDOUT-006 \
+  --output path/to/generated-output.md \
+  --expected-json evaluator-private/TR-HELDOUT-006.expected.json
+```
+
+このoptionは既存のSkill validatorと共通runtime validatorへ渡します（runtime validatorの検査範囲はケースのexpected contractに従います）。ファイルアクセスは隔離しないため、expected JSONをAgentから物理的に読めない場所に保管し、Agent実行後にEvaluator側で採点してください。Skill-local runtime契約を使う場合は、同じSkill package revisionの`runtime_contract.py`で別途`verify_runtime_evidence`を実行します。`--skill all`とは併用できません。
+
 全ケース:
 
 ```bash

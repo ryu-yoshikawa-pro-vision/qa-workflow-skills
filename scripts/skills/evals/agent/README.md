@@ -294,6 +294,14 @@ python -m scripts.skills.evals.agent.improve \
 
 `--analyze-only`も分析Agentの実行を伴いますが、Skillファイルは変更しません。修正が許可された通常runでは、各候補を同一target / scenario / profileで2回以上再評価します。外部Judgeの承認、実行環境、比較条件が不足している場合はreview pending / unverifiedとして残し、PASSへ読み替えません。
 
+### 開発用のdeterministic candidate比較
+
+正式な`improve`実行条件が未成立でも、認証・launcherのfail-closedを解除せず、既存CodexセッションのAgent出力を固定Evaluatorで調べる開発用比較はできます。入力とexpectedをAgent実行前に固定し、Agent可視領域には対象Skill package、必要なruntime資材、入力、出力先だけを置きます。baselineと単一Skill candidateを同じAgent設定で反復実行し、candidate package・patch・入力・grader・runtime verifierのrevision/hash、各成果物、失敗assertion、runtime結果をattempt単位で保存します。
+
+tracked manifestに未登録のdeterministicケースは、Agent生成完了後にEvaluator側のprivate expected JSONを`deterministic/run.py --expected-json`へ渡して既存validatorで採点できます。対象Skillの`runtime_contract.py`も同じpackage revisionから`verify_runtime_evidence`を再実行し、実装fingerprintとcurrentnessを別に確認します。expected・graderをAgentへ提供せず、意味評価を未承認Judgeで代用しません。
+
+サブエージェントや共有workspaceを使う比較では、AgentからEvaluator領域への物理的な読取拒否を証明できません。Agent-visible以外を閲覧した可能性があるattemptは除外し、比較結果は実動作検証としてのみ扱います。provider buildやCLI telemetryが得られない場合は未取得と記録します。この手順は正式な`improve`受入、独立評価、候補の自動採用を置き換えません。
+
 ## CI・ローカルテスト
 
 通常CIは外部LLM、Codex、Docker runtimeを起動しません。Fake Agent / Judgeのunit・integration testとrepository contract testを実行します。
