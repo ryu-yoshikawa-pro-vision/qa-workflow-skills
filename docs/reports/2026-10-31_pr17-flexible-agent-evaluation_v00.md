@@ -70,7 +70,7 @@ TEX結果の異同を確認した。保存batch内のartifact SHA-256 `a86ae7cc�
 - 最終比較8成果物は、通常のSkill graderと別に、baseline / candidateそれぞれのsource revisionに固定したSkill-local runtime verifierで再検証し、8/8 valid、issue 0だった。
 - `compileall`、deterministic runner unit 19件、repository deterministic suite 356件、runtime suite 380件はPASS。repository deterministic suiteはsandbox内で一度4 failure / 1 errorとなったが、`/tmp/.git`によるtemp state拒否とlocalhost bindの`EPERM`を確認した後、既存手順どおり通常WSL2・`TMPDIR=/var/tmp`で同じsuiteを実行し356件すべてPASSした。
 - formatter script test 10件、patch-whitespace test 3件、JSON parse、選択した変更fileのtrailing whitespace、`git diff --check`はPASS。
-- 最初のCode Quality CIは、dprint未整形の3ファイルで失敗した。最終3ファイルに対するdprint formatを行った。Ruff対象のPython source変更はない。最終CI実行の結果はpush後に確認する。
+- 最初のCode Quality CIは、dprint未整形の3ファイルで失敗した。最終3ファイルに対するdprint formatを行った。Ruff対象のPython source変更はない。入力契約・整形修正commit `f1b51a25a67a0f4774a2a97cccf40526a2a6679e`でGitHub Actions 5 workflow（Code Quality、Codex Harness、Agent Skills、Deterministic Output Evals、Semantic Output Evals）はすべてSUCCESS。後続の報告書のみのcommitについては別HEADのCIで確認する。
 - 初回比較と修正後比較のraw output、入力・Skill・grader hash、Agent呼び出し条件を別attempt rootへ保存した。初回rootは`.agent-eval-runs/pr17-flexible-agent-eval-20261031-fmojcd39/`、修正後rootは`.agent-eval-runs/pr17-flexible-agent-eval-ci-corrected-20261031-r1/`。秘密・認証file・tokenは保存していない。
 - この方式では候補Skillを同じ実験中にAgentが直接修正せず、既存PR revisionをcandidateとして評価した。自動修正・独立Judgeを使った正式改善判定は未実施。
 
