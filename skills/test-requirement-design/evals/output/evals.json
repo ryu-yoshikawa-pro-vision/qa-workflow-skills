@@ -4,6 +4,8 @@
   "cases": [
     { "id": "TR-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json" },
     { "id": "TR-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" },
-    { "id": "TR-OUT-003", "input": "cases/case-003/input.md", "expected": "cases/case-003/expected.json" }
+    { "id": "TR-OUT-003", "input": "cases/case-003/input.md", "expected": "cases/case-003/expected.json" },
+    { "id": "TR-OUT-004", "input": "cases/case-004/input.md", "expected": "cases/case-004/expected.json" },
+    { "id": "TR-OUT-005", "input": "cases/case-005/input.md", "expected": "cases/case-005/expected.json" }
   ]
 }

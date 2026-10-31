@@ -1,0 +1,19 @@
+{
+  "known_authorities": [
+    "SPEC-901"
+  ],
+  "known_acceptance_criteria": [],
+  "known_product_risks": [
+    "RISK-901"
+  ],
+  "product_risk_levels": {
+    "RISK-901": "高"
+  },
+  "required_linked_upstream_ids": [
+    "SPEC-901",
+    "RISK-901"
+  ],
+  "required_test_requirements": [
+    "TR-001"
+  ]
+}

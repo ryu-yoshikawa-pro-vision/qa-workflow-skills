@@ -8,9 +8,22 @@ Skill本体の実行基盤は変更しません。Codex、Claude Code等のAgent
 
 `feat/agent-eval-runner`
 
+## 2026-10-31 開発用比較と正式実行の区別
+
+このPlanの品質評価・改善目的を、特定のAgent起動方法の完成と混同しない。以下のWSL2二重bubblewrap・固定Codex CLI・認証・専用process境界は**専用runnerで独立した正式評価を行うための設計**であり、開発時の実Agent生成・既存deterministic graderによる比較を始める一律の前提ではない。既存のCodex環境など、別の安全なAgent実行環境を使う場合は次の開発用条件を満たせば、非正式な比較として評価を進めてよい。
+
+- baseline / candidateのSkill package、Eval Input、Evaluator、Agent設定をrevisionまたはhashで固定し、attemptを分けて成果物と結果を保存する。
+- Agentの入力にはSkill packageと対象入力だけを含め、expected、Reference、rubric、grader、他attemptの結果をpromptおよびAgent向けstaging directoryへ含めない。共有workspace等により物理的read-denialを確認できない場合、その限界を保存し、正式な独立評価や自動修正根拠として扱わない。
+- 実効Agent model / reasoning設定は起動呼び出しの設定で記録し、Agent自身の申告だけを根拠にしない。CLI versionやprovider buildが実行方式から取得できない場合は未取得とする。
+- deterministic評価は既存graderを使う。semantic評価は承認・検証済みJudge、または根拠を保存した人間の判断だけを自動修正の根拠にする。未承認fixtureや独立性を確認できないJudge結果は品質の参考として分離する。
+- A/Bの比較は、変更対象Skill以外の比較条件を固定し、原則として各revision 2 attempt以上と修正に使用しない独立入力で行う。結果の揺れ、途中までの改善、回帰をすべて保存し、PASS数だけで改善を認定しない。
+- この開発用経路は既存`run.py`やlauncherの安全停止を解除しない。専用runnerの正式受入条件は引き続き満たす必要があるが、その未達だけで独立に実施可能な開発評価を止めない。
+
+2026-10-31の実証では、既存Codexセッションのサブエージェントを逐次利用し、`test-requirement-design`の2つの固定入力をbaseline / candidate各2回で生成した。修正対象に用いていない入力で`TR-D011`の再現と解消を確認した。共有workspaceの物理的隔離は未検証であり、これは開発用比較に限る。詳細と未達条件は[実Agent評価方式の再検討・Skill比較報告](../reports/2026-10-31_pr17-flexible-agent-evaluation_v00.md)を参照する。
+
 ## 2026-10-24 正式実行方式の更新
 
-この節および[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)を、Agent / Judge / Repairの現行実行方式の正本とする。以下に残るDockerのAgent / Judge起動例、Docker image / containerを隔離境界とする記述は過去実装の説明であり、現在の正式実行手順としては使わない。Codexを起動しない固定verifierのDocker実行だけは従来契約を維持する。
+この節および[WSL2移行Plan](./2026-10-24_135100_pr17-wsl2-bubblewrap-migration.md)は、専用runnerによる正式なAgent / Judge / Repair実行方式の正本とする。開発用比較でこの構成を一律の起動前提とはしない。以下に残るDockerのAgent / Judge起動例、Docker image / containerを隔離境界とする記述は過去実装の説明であり、現在の正式実行手順としては使わない。Codexを起動しない固定verifierのDocker実行だけは従来契約を維持する。
 
 - 正式な実行hostはWSL2 Ubuntu内のLinux clean checkout。Windows Python、Windows開発checkout、`/mnt/c`配下をAgent/Judgeへ公開しない。
 - Agent/Judge/RepairはCodex CLI `0.163.0`とそのpackageに同梱されたbubblewrapを使い、使い捨て外側bubblewrapの内側でCodex Linux sandboxを起動する。CLI package version・配布元・digest・実行binary digest・同梱bwrap digestは実行時に照合する。OS/kernel/Python等は実測して記録し、特定値を固定設定としてハードコードしない。

@@ -1,8 +1,20 @@
 # 実Agent評価ランナー
 
-このランナーは、指定した`qa-workflow-skills` Git revisionのSkill packageを一時領域へ展開し、実Agentで生成した結果を固定Evaluatorの既存grader / Judgeで評価します。評価結果と機械判定をattempt単位で保存します。既存Skillの通常実行経路やSkill packageの配置規則は変更しません。
+この正式runnerは、指定した`qa-workflow-skills` Git revisionのSkill packageを一時領域へ展開し、実Agentで生成した結果を固定Evaluatorの既存grader / Judgeで評価します。評価結果と機械判定をattempt単位で保存します。既存Skillの通常実行経路やSkill packageの配置規則は変更しません。
 
-Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
+正式runnerのCodex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
+
+## 開発用の実Agent比較
+
+Skillの開発・診断では、正式runnerの認証・隔離条件が未達でも、既存CodexセッションからSkillを実行して既存deterministic graderへ接続する比較を行えます。これは正式評価の代替ではなく、launcherのfail-closedを解除しません。PR #17では2026-10-31に、Codexセッションのサブエージェントを1 attemptずつ逐次起動する方法を使用し、`test-requirement-design`でbaseline / candidateを各2回比較しました。手順、評価結果、Agent / workspaceのアクセス制約は[比較報告](../../../../docs/reports/2026-10-31_pr17-flexible-agent-evaluation_v00.md)を参照してください。
+
+再利用時も、次の条件を保ちます。
+
+- baselineとcandidateのSkill revision、同じEval Input、Evaluator、Agentの実効model / reasoning設定を固定し、attemptごとの成果物・grader結果・hashを保存する。
+- Agentへは対象Skill packageと対象入力のみを渡す。expected、Reference、rubric、grader、他attempt結果はpromptやAgent向けstaging directoryへ含めない。
+- 共有workspace等で物理的read-denialを証明できない場合はその制約を記録し、結果を開発用の実動作比較として扱う。独立Judgeによる正式判定や自動修正の根拠にはしない。
+- 既存の`run.py`、launcher、認証停止、Judge承認条件を回避・緩和しない。semantic判定を自動修正の根拠にするのは承認・検証済みJudgeまたは根拠付き人間確認に限る。
+- 新しい実Agent runnerを追加せず、可能な範囲は既存CLIと既存graderを再利用する。
 
 ## 2026-10-31 認証・隔離と異常終了の状態
 
