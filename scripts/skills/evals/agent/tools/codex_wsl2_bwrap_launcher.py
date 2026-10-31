@@ -2404,6 +2404,16 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the fixed Codex CLI ChatGPT device login under the dedicated-store lock",
     )
+    parser.add_argument(
+        "--operator-recover-auth",
+        action="store_true",
+        help="discard an uncertain dedicated auth store without login or model access",
+    )
+    parser.add_argument(
+        "--confirm-discard-uncertain-auth-store",
+        action="store_true",
+        help="confirm permanent deletion of the uncertain dedicated auth file",
+    )
     parser.add_argument("--mode", choices=("agent", "judge", "repair"))
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--observations-path", type=Path)
@@ -2485,6 +2495,17 @@ def _authentication_status_locked(
 
 
 def _operator_login(runtime_root: Path | None) -> tuple[dict[str, Any], int]:
+    if AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED:
+        return (
+            {
+                "status": "login_blocked",
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "authentication_state_uncertain": True,
+                "error": "authentication_process_concurrency_unresolved",
+            },
+            2,
+        )
     try:
         with _authentication_execution_context() as paths:
             try:
@@ -2590,6 +2611,110 @@ def _operator_login(runtime_root: Path | None) -> tuple[dict[str, Any], int]:
         )
 
 
+def _operator_recover_auth(*, confirm_discard: bool) -> tuple[dict[str, Any], int]:
+    """Discard an uncertain dedicated store without reading or restoring it."""
+    if not confirm_discard:
+        return (
+            {
+                "status": "recovery_confirmation_required",
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "authentication_state_uncertain": True,
+                "error": "explicit_store_discard_confirmation_required",
+            },
+            2,
+        )
+    if AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED:
+        return (
+            {
+                "status": "recovery_blocked",
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "authentication_state_uncertain": True,
+                "error": "authentication_process_concurrency_unresolved",
+                "model_api_used": False,
+            },
+            2,
+        )
+    try:
+        with _authentication_execution_context(allow_uncertain_state=True) as paths:
+            if (
+                not paths.uncertain_file.exists()
+                and not paths.uncertain_file.is_symlink()
+            ):
+                return (
+                    {
+                        "status": "recovery_blocked",
+                        "authentication_method": "not_checked",
+                        "authentication_check_status": "blocked",
+                        "authentication_state_uncertain": False,
+                        "error": "authentication_recovery_requires_uncertain_state",
+                    },
+                    2,
+                )
+            if not _owned_private_path(
+                paths.uncertain_file,
+                uid=paths.uid,
+                mode=0o600,
+                directory=False,
+            ):
+                raise AuthExecutionBlocked("authentication_state_marker_invalid")
+
+            store_discarded = False
+            if paths.auth_file.exists() or paths.auth_file.is_symlink():
+                if not _owned_private_path(
+                    paths.auth_file,
+                    uid=paths.uid,
+                    mode=0o600,
+                    directory=False,
+                ):
+                    raise AuthExecutionBlocked(
+                        "authentication_auth_file_permissions_invalid"
+                    )
+                paths.auth_file.unlink()
+                store_discarded = True
+
+            directory_fd = os.open(
+                paths.codex_home,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+            _clear_auth_state_uncertain(paths)
+            return (
+                {
+                    "status": "store_reset_requires_operator_login",
+                    "authentication_method": "not_checked",
+                    "authentication_check_status": "not_checked",
+                    "authentication_store": "empty_dedicated_persistent_file",
+                    "authentication_state_uncertain": False,
+                    "local_auth_store_discarded": store_discarded,
+                    "operator_login_required": True,
+                    "model_api_used": False,
+                },
+                0,
+            )
+    except (AuthExecutionBlocked, OSError) as exc:
+        reason = (
+            exc.reason if isinstance(exc, AuthExecutionBlocked) else type(exc).__name__
+        )
+        return (
+            {
+                "status": "recovery_failed",
+                "authentication_method": "not_checked",
+                "authentication_check_status": "blocked",
+                "authentication_state_uncertain": True,
+                "error": reason,
+                "model_api_used": False,
+            },
+            2,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     if os.name == "posix":
         signal.signal(
@@ -2619,12 +2744,29 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Codex launcher cleanup failed: {cleanup_error}", file=sys.stderr)
             return 2
         return 0
+    operator_modes = (
+        args.auth_status_only,
+        args.operator_login,
+        args.operator_recover_auth,
+    )
+    if sum(operator_modes) > 1:
+        _parser().error("only one operator authentication action may be selected")
+    if args.confirm_discard_uncertain_auth_store and not args.operator_recover_auth:
+        _parser().error(
+            "--confirm-discard-uncertain-auth-store requires --operator-recover-auth"
+        )
     if args.auth_status_only:
         result, exit_code = _authentication_status(args.runtime_root)
         print(json.dumps(result, ensure_ascii=True, sort_keys=True))
         return exit_code
     if args.operator_login:
         result, exit_code = _operator_login(args.runtime_root)
+        print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+        return exit_code
+    if args.operator_recover_auth:
+        result, exit_code = _operator_recover_auth(
+            confirm_discard=args.confirm_discard_uncertain_auth_store
+        )
         print(json.dumps(result, ensure_ascii=True, sort_keys=True))
         return exit_code
     if (

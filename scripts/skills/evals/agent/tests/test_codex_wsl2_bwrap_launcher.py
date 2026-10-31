@@ -743,6 +743,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             with (
                 patch.object(
                     codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
                     "_authentication_execution_context",
                     side_effect=lambda **_kwargs: synthetic_auth_execution_context(
                         paths
@@ -782,6 +787,25 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             self.assertNotIn("CODEX_API_KEY", options["env"])
             self.assertNotIn("SYNTHETIC_AUTH_MARKER", json.dumps(result))
 
+    def test_operator_login_is_blocked_while_process_boundary_is_unresolved(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                codex_wsl2_bwrap_launcher, "_authentication_execution_context"
+            ) as auth_context,
+            patch.object(codex_wsl2_bwrap_launcher.subprocess, "run") as run,
+        ):
+            result, exit_code = codex_wsl2_bwrap_launcher._operator_login(None)
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(result["status"], "login_blocked")
+        self.assertEqual(
+            result["error"], "authentication_process_concurrency_unresolved"
+        )
+        auth_context.assert_not_called()
+        run.assert_not_called()
+
     def test_operator_login_refuses_nonempty_store_without_starting_codex(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -791,6 +815,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             paths.auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="utf-8")
             os.chmod(paths.auth_file, 0o600)
             with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
                 patch.object(
                     codex_wsl2_bwrap_launcher,
                     "_authentication_execution_context",
@@ -831,6 +860,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             with (
                 patch.object(
                     codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
                     "_authentication_execution_context",
                     side_effect=lambda **kwargs: synthetic_auth_execution_context(
                         paths, **kwargs
@@ -859,6 +893,11 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
             codex_home.mkdir(parents=True, mode=0o700)
             paths = synthetic_auth_paths(root, codex_home)
             with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
                 patch.object(
                     codex_wsl2_bwrap_launcher,
                     "_authentication_execution_context",
@@ -1159,6 +1198,274 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     with codex_wsl2_bwrap_launcher._authentication_execution_context():
                         self.fail("timed-out auth attempt must refuse retry")
                 codex_wsl2_bwrap_launcher._clear_auth_state_uncertain(paths)
+            self.assertFalse(paths.uncertain_file.exists())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process termination behavior")
+    def test_killed_process_after_partial_auth_write_keeps_marker_and_blocks_retry(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "service-home" / ".codex"
+            codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_bytes(b'{"synthetic":"complete"}')
+            os.chmod(auth_file, 0o600)
+            paths = synthetic_auth_paths(root, codex_home)
+            child_env = {
+                "PATH": os.environ.get("PATH", os.defpath),
+                "HOME": str(codex_home.parent),
+                "CODEX_HOME": str(codex_home),
+                "TMPDIR": str(root),
+                "PYTHONPATH": str(codex_wsl2_bwrap_launcher.REPO_ROOT),
+            }
+            child_code = "\n".join(
+                (
+                    "import os,sys",
+                    "from pathlib import Path",
+                    "from scripts.skills.evals.agent.tools import "
+                    "codex_wsl2_bwrap_launcher as launcher",
+                    "from scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher "
+                    "import AuthExecutionPaths",
+                    "paths=AuthExecutionPaths(",
+                    "uid=os.geteuid(),",
+                    "home=Path(sys.argv[1]),",
+                    "codex_home=Path(sys.argv[2]),",
+                    "auth_file=Path(sys.argv[3]),",
+                    "state_dir=Path(sys.argv[4]),",
+                    "lock_file=Path(sys.argv[5]),",
+                    "uncertain_file=Path(sys.argv[6]))",
+                    "launcher._evaluation_auth_paths=lambda:paths",
+                    "launcher._assert_no_other_service_processes=lambda _uid:None",
+                    "with launcher._authentication_execution_context():",
+                    " launcher._mark_auth_state_uncertain(paths)",
+                    " fd=os.open(paths.auth_file,os.O_WRONLY|os.O_TRUNC)",
+                    " os.write(fd,b'{\\\"synthetic\\\":')",
+                    " os.fsync(fd)",
+                    " os.close(fd)",
+                    " os.kill(os.getpid(),9)",
+                )
+            )
+            child = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    child_code,
+                    str(codex_home.parent),
+                    str(codex_home),
+                    str(paths.auth_file),
+                    str(paths.state_dir),
+                    str(paths.lock_file),
+                    str(paths.uncertain_file),
+                ],
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+            self.assertEqual(child.wait(timeout=10), -9)
+            self.assertEqual(auth_file.read_bytes(), b'{"synthetic":')
+            self.assertEqual(
+                paths.uncertain_file.read_text(encoding="ascii"),
+                "codex_attempt_incomplete\n",
+            )
+
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher, "_assert_no_other_service_processes"
+                ),
+                self.assertRaisesRegex(
+                    AuthExecutionBlocked, "authentication_state_uncertain"
+                ),
+            ):
+                with codex_wsl2_bwrap_launcher._authentication_execution_context():
+                    self.fail("partial auth store must block a retry")
+
+    def test_operator_recovery_requires_confirmation_and_discards_without_login(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "service-home" / ".codex"
+            codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="ascii")
+            os.chmod(auth_file, 0o600)
+            paths = synthetic_auth_paths(root, codex_home)
+            codex_wsl2_bwrap_launcher._mark_auth_state_uncertain(paths)
+
+            refused, refused_code = codex_wsl2_bwrap_launcher._operator_recover_auth(
+                confirm_discard=False
+            )
+            self.assertEqual(refused_code, 2)
+            self.assertEqual(
+                refused["error"], "explicit_store_discard_confirmation_required"
+            )
+            self.assertTrue(auth_file.exists())
+            self.assertTrue(paths.uncertain_file.exists())
+
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher, "_assert_no_other_service_processes"
+                ),
+                patch.object(codex_wsl2_bwrap_launcher.subprocess, "run") as run,
+            ):
+                recovered, recovered_code = (
+                    codex_wsl2_bwrap_launcher._operator_recover_auth(
+                        confirm_discard=True
+                    )
+                )
+
+            self.assertEqual(recovered_code, 0)
+            self.assertEqual(recovered["status"], "store_reset_requires_operator_login")
+            self.assertTrue(recovered["local_auth_store_discarded"])
+            self.assertTrue(recovered["operator_login_required"])
+            self.assertFalse(recovered["authentication_state_uncertain"])
+            self.assertFalse(auth_file.exists())
+            self.assertFalse(paths.uncertain_file.exists())
+            run.assert_not_called()
+
+    def test_operator_recovery_is_blocked_while_process_boundary_is_unresolved(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                codex_wsl2_bwrap_launcher, "_authentication_execution_context"
+            ) as auth_context,
+        ):
+            result, exit_code = codex_wsl2_bwrap_launcher._operator_recover_auth(
+                confirm_discard=True
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(result["status"], "recovery_blocked")
+        self.assertEqual(
+            result["error"], "authentication_process_concurrency_unresolved"
+        )
+        self.assertTrue(result["authentication_state_uncertain"])
+        auth_context.assert_not_called()
+
+    def test_operator_recovery_fsync_failure_keeps_marker_and_does_not_restore_store(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "service-home" / ".codex"
+            codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="ascii")
+            os.chmod(auth_file, 0o600)
+            paths = synthetic_auth_paths(root, codex_home)
+            codex_wsl2_bwrap_launcher._mark_auth_state_uncertain(paths)
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher, "_assert_no_other_service_processes"
+                ),
+                patch.object(
+                    os, "fsync", side_effect=OSError("synthetic fsync failure")
+                ),
+            ):
+                result, exit_code = codex_wsl2_bwrap_launcher._operator_recover_auth(
+                    confirm_discard=True
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(result["status"], "recovery_failed")
+            self.assertTrue(result["authentication_state_uncertain"])
+            self.assertFalse(auth_file.exists())
+            self.assertTrue(paths.uncertain_file.exists())
+
+    def test_operator_recovery_refuses_when_service_process_remains(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "service-home" / ".codex"
+            codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="ascii")
+            os.chmod(auth_file, 0o600)
+            paths = synthetic_auth_paths(root, codex_home)
+            codex_wsl2_bwrap_launcher._mark_auth_state_uncertain(paths)
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED",
+                    False,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_assert_no_other_service_processes",
+                    side_effect=AuthExecutionBlocked(
+                        "unexpected_service_identity_process"
+                    ),
+                ),
+            ):
+                result, exit_code = codex_wsl2_bwrap_launcher._operator_recover_auth(
+                    confirm_discard=True
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(result["status"], "recovery_failed")
+            self.assertEqual(result["error"], "unexpected_service_identity_process")
+            self.assertTrue(auth_file.exists())
+            self.assertTrue(paths.uncertain_file.exists())
+
+    def test_operator_recovery_requires_existing_uncertain_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codex_home = root / "service-home" / ".codex"
+            codex_home.mkdir(parents=True, mode=0o700)
+            auth_file = codex_home / "auth.json"
+            auth_file.write_text("SYNTHETIC_AUTH_MARKER", encoding="ascii")
+            os.chmod(auth_file, 0o600)
+            paths = synthetic_auth_paths(root, codex_home)
+            with (
+                patch.object(
+                    codex_wsl2_bwrap_launcher,
+                    "_evaluation_auth_paths",
+                    return_value=paths,
+                ),
+                patch.object(
+                    codex_wsl2_bwrap_launcher, "_assert_no_other_service_processes"
+                ),
+            ):
+                result, exit_code = codex_wsl2_bwrap_launcher._operator_recover_auth(
+                    confirm_discard=True
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(result["status"], "recovery_blocked")
+            self.assertTrue(auth_file.exists())
             self.assertFalse(paths.uncertain_file.exists())
 
     def test_service_process_inventory_blocks_unexpected_codex_identity(self) -> None:

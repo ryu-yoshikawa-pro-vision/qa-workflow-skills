@@ -1,5 +1,15 @@
 # PR #17 WSL2二重bubblewrap実行方式移行Plan
 
+## 2026-10-31 認証異常終了・Judge準備の追跡結果
+
+固定Codex CLI 0.163.0 app-serverを使った合成token / loopback mockの通常refresh試験を実施し、2つのprocess間でrefresh結果を保存・再読込できた。記録は`.agent-eval-runs/pr17-auth-refresh-synthetic-20261031-04/`にあり、2 process、2 mock request、model API未使用、実認証store未使用を示す。試験記録にはprocessごとのbinary digestがないため、別の同HEAD isolation probeに記録された固定binary digestとは結合されていない。これはCodex source harnessやfake childではなくCodex CLI app-server経路として記録されたが、実行binaryとのrevision-boundな紐付けは未達である。
+
+固定CLIのfile backend sourceは`auth.json`のtruncate / write / flushを行い、atomic replacementやfile fsyncを行わない。launcherのmarkerは失敗時に残る。途中write後に合成processをSIGKILLするtest、store fsync失敗、明示確認付きの専用store破棄復旧と残存process拒否testを追加した。実CLIへのpartial-write / crash injectionは未実施である。新しい`--operator-recover-auth --confirm-discard-uncertain-auth-store`はprocess-concurrency gateと既存lock・process inventoryを通過したうえでuncertain storeだけを読まずに破棄し、directory fsync後にmarkerを消す。これはloginやmodel APIを実行せず、成功後も本人による明示的な新規loginを要求する。現在はprocess-concurrency gateが未解決のため回復・loginも拒否し、復旧処理は実専用UIDでは未実行。
+
+現WSL2に`qa-agent-eval` user/groupはなく、systemd / sudo policyや専用runtime/source配置も変更していない。nonblocking `flock`は協調者を直列化するが、同UID非協調processやprocess inventory後のroot起動を防がない。root/WSL管理者は信頼境界であり、専用UIDの起動主体をrunnerと信頼済み管理者へ限定する管理設定と運用確認が未達である。このため`AUTHENTICATION_REFRESH_PERSISTENCE_UNRESOLVED`と`AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED`は両方trueのまま維持し、Agent/Judge/Repairのproduction launchをfail-closedにする。
+
+Judge fixture 11件は`pending_deterministic_review` 2件、`pending_human_review` 9件、approved 0件を維持する。001/002の固定validatorはmutation後のrequired routing/artifact違反を検出するが、実baseline artifactがなく、rating 1の期待labelを承認するところまでは成立しない。9件の人間レビュー用criterion別資料は[2026-10-26 PR #17 現在状態報告](../reports/2026-10-26_pr17-current-status_v00.md)にあり、承認bindingやratingは変更しない。最新のテスト・運用依頼・受入残課題は[2026-10-31 正式受入follow-up](../reports/2026-10-31_pr17-formal-acceptance-followup_v00.md)を参照する。
+
 ## Goal
 
 PR #17のAgent、Judge、改善分析・修正実行を、既存Docker内Codexの代わりにWSL2 Ubuntu上の外側bubblewrapとCodex CLI 0.163.0の内側Linux sandboxで起動する。既存のEvaluator分離、品質判定、承認binding、QTS verifier、改善条件を保ち、合成データの実効隔離試験がすべて成立するまではrunを`isolation_unverified`として正式評価を拒否する。

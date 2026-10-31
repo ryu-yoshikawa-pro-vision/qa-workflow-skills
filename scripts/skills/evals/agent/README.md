@@ -4,13 +4,19 @@
 
 Codex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
 
-## 2026-10-27 現在の認証・隔離状態
+## 2026-10-31 認証・隔離と異常終了の状態
 
-commit `079c29ec49c7f074fb16dcbb045f0d89a844226e`に対するfresh schema 2 formal probeで、persistent auth bind後もsynthetic markerのshell読取りが拒否されることを確認しました。16 required checksすべてがtrue、Agent/Judge/Repairが各26/26 subchecksで`verified`、`model_api_used=false`でした。この合成証拠に基づき`authentication_shell_visible_risk=false`とします。証拠は`.agent-eval-runs/pr17-auth-isolation-079c29e-20261026T154336Z/isolation.json`です。これは実認証fileやrefreshを検証した結果ではありません。後続の文書commitではclean HEADに対してfresh probeを再実行します。
+HEAD `8801520f1a7c32979a3a0507fa555fd9f7cea5f8`に対する保存済みsynthetic isolation probeは`verified`で、16 required checksがすべてtrueです。記録された固定CLIは`0.163.0`、binary SHA-256は`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`、`model_api_used=false`です。evidenceは`.agent-eval-runs/pr17-residual-formal-smoke-20261031-01/isolation.json`です。これは実認証や同一UID process起動制御の証明ではありません。
 
-固定CLIのfile backendは選択中の`CODEX_HOME/auth.json`をtruncate/write/flushし、process間lockやatomic replacementを持ちません。runnerは専用store、非blocking `flock`、同じ専用UIDで既に動いているprocessの検査、Codex終了後のfile/directory `fsync`、異常終了時に残す不確定状態markerを実装しました。これはrunner内の協調と既存process検出を行うもので、同UIDを任意に使える管理者やrootを制限するものではありません。
+合成refresh evidence `.agent-eval-runs/pr17-auth-refresh-synthetic-20261031-04/result.json`は、protocolを「Codex CLI 0.163.0 app-server `getAuthStatus(refreshToken=true)`」と記録し、loopback mockと合成tokenで2つのclean process間のrefresh保存・再読込を確認しています。これはsource harnessやfake childの記録ではなくCodex CLI processとして記録された実行ですが、resultにそのprocessのbinary digestは含まれていません。別のisolation probeは固定binary digestを記録しますが、refresh attemptとのdigest bindingはありません。強制終了・truncate後partial writeはこのattemptで未試験です。認証本文・token・そのhash、実認証store、model APIは使用・保存していません。
 
-WSL2環境には専用`qa-agent-eval`ユーザーがなく、管理者操作も実施できていません。専用UIDのhome、固定runtime、clean runner checkoutとPython環境を配置し、同UID processの起動元を信頼済み管理者・runnerのみに限定するOS境界は未構築です。Codex source harnessによるsynthetic OAuth refresh/persist/reloadも未実施です。したがって`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`を維持します。Agent/Judge/Repairはこの2条件でfail-closedです。
+固定Codex sourceのfile backendは`auth.json`をtruncateしてwrite/flushし、atomic replacementやfile `fsync`を行いません。launcherはCodex開始前にuncertain markerとstate directoryをfsyncし、子process正常終了、一時home cleanup、認証file / directory fsync後にだけmarkerを除去します。失敗時はmarkerを残して次attemptを拒否します。今回、合成子processを途中書込み後にSIGKILLする回帰testと、store fsync失敗・marker・retryのtestを追加しました。これらはlauncherの制御を検査する合成testであり、固定Codex binaryの異常終了を実測した結果ではありません。
+
+marker後の復旧には`--operator-recover-auth --confirm-discard-uncertain-auth-store`を追加しました。専用UIDのlockとprocess inventoryを通過し、markerが存在し、storeとmarkerのpath/owner/modeが安全な場合だけ、専用`auth.json`を読まずに破棄し、directoryをfsyncしてmarkerを消します。旧storeのbackup/restore、login/logout、Codex起動、model APIは行いません。成功しても`operator_login_required=true`であり、本人が別途新規loginするまでは認証済みになりません。fsyncやprocess確認に失敗した場合はmarkerを残します。この復旧codeは実専用UID上で未実行です。
+
+現WSL2環境に`qa-agent-eval` user/groupはなく、管理者による作成・runtime/source配置も行っていません。通常利用者を専用UIDから隔離するには、`nologin`・locked password・専用home/store・追加groupなし・sudo権限なしを管理者が設定し、`sudoers`等で専用UIDを起動できる主体を信頼済み管理者とrunnerに制限する必要があります。root/WSL管理者はこれを迂回できる信頼境界です。`flock`は協調processを直列化し、process inventoryは既存processを検出しますが、inventory後にrootが起動するprocessを防ぎません。管理者が同時起動しない運用境界が確認できないため、`authentication_process_concurrency_unresolved=true`を維持します。
+
+`authentication_refresh_persistence_unresolved=true`と`authentication_process_concurrency_unresolved=true`を維持するため、Agent/Judge/Repairは引き続きfail-closedです。今回の検証と管理者待ち事項は[2026-10-31 PR #17 正式受入follow-up](../../../../docs/reports/2026-10-31_pr17-formal-acceptance-followup_v00.md)を参照してください。
 
 過去の`refresh_token_reused`の直接原因は確定していません。`file`を明示するのは永続化方式を固定し、keyring不可時のfallbackを避けるためです。`auto`はkeyring error時にfileへfallbackし、`ephemeral`はprocess終了後に残らず、keyringもprocess横断refresh lockを提供しません。選択理由と環境確認の記録は[PR #17 現在状態報告](../../../../docs/reports/2026-10-26_pr17-current-status_v00.md)を参照してください。
 
@@ -62,6 +68,7 @@ getent group qa-agent-eval
 ```bash
 sudo useradd --system --user-group --create-home \
   --home-dir /var/lib/qa-agent-eval --shell /usr/sbin/nologin qa-agent-eval
+sudo passwd --lock qa-agent-eval
 sudo chmod 0700 /var/lib/qa-agent-eval
 sudo install -d -o qa-agent-eval -g qa-agent-eval -m 0700 \
   /var/lib/qa-agent-eval/.codex \
@@ -72,6 +79,7 @@ sudo -u qa-agent-eval -- env \
   sh -c 'umask 077; printf "%s\n" "cli_auth_credentials_store = \"file\"" > "$CODEX_HOME/config.toml"; chmod 0600 "$CODEX_HOME/config.toml"; : > "$HOME/.local/state/qa-workflow-skills/codex-auth.lock"; chmod 0600 "$HOME/.local/state/qa-workflow-skills/codex-auth.lock"'
 getent passwd qa-agent-eval
 id qa-agent-eval
+passwd -S qa-agent-eval
 sudo -l -U qa-agent-eval
 stat -c '%U:%G %a %n' /var/lib/qa-agent-eval \
   /var/lib/qa-agent-eval/.codex \
@@ -80,6 +88,25 @@ stat -c '%U:%G %a %n' /var/lib/qa-agent-eval \
 ```
 
 このaccountのshellは`nologin`で、専用home/storeを他UIDから読めないmodeにします。通常の`sella`の`.codex`からファイルをコピーしません。固定Codex runtime、clean evaluator checkout、Python 3.11環境は別途`/opt/qa-agent-eval/`のroot所有・service UID読取専用領域へ配置し、digestとsource revisionを照合してから使います。実行outputだけをservice UIDが書けるようにします。root/WSL管理者は認証storeを読め、専用UIDで任意processを開始できます。管理者は信頼境界であり、runnerの`flock`はそれを制限しません。runnerは起動直前に同UID processを検査して既存の非runner processを拒否しますが、管理者が同時に別processを起動することまでは防げません。管理者は専用UIDをrunnerと明示的なlogin recoveryにのみ使い、同時起動を避けます。
+
+`nologin`とpassword lockだけでは、`sudo -u qa-agent-eval`を実行できる管理者からのprocess起動を制限しません。正式なprocess境界には、root所有の固定runner entrypoint / systemd unitと、そのentrypointだけを起動できるsudoersまたはpolkit policyが必要です。一般利用者へ任意の`sudo -u`, `runuser`, shellまたはinterpreter実行権限を付与しません。root/WSL管理者は引き続き信頼境界です。現環境にはこのboundaryがなく、`AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED=true`です。
+
+中断後の`codex-auth-state-uncertain` markerを通常のAgent実行や`--operator-login`で無視・削除してはいけません。固定runtime、clean source、service accountを準備した後、管理者と認証所有者が専用storeを捨てる判断をした場合だけ、launcherのprocess inventoryで既存process不在を確認して専用store recoveryを実行します。これは専用`auth.json`を読まずにunlinkし、directoryをfsyncしてmarkerを消します。古いstoreのbackup / restoreはしません。
+
+ただし、現在はlauncher側もprocess-concurrency gateを確認するため、上記のOS process boundaryを実証して`AUTHENTICATION_PROCESS_CONCURRENCY_UNRESOLVED=false`へ変更するまで、`--operator-login`と`--operator-recover-auth`は認証storeへ触れずに拒否されます。現状態で下のコマンドを実行しても復旧・loginは行われません。gateを緩めるためだけにflagを変更してはいけません。
+
+```bash
+sudo -u qa-agent-eval -- env \
+  HOME=/var/lib/qa-agent-eval \
+  CODEX_HOME=/var/lib/qa-agent-eval/.codex \
+  QAEVAL_CODEX_RUNTIME_ROOT=/opt/qa-agent-eval/runtime-final \
+  PYTHONPATH=/opt/qa-agent-eval/source \
+  /opt/qa-agent-eval/venv/bin/python \
+  -m scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher \
+  --operator-recover-auth --confirm-discard-uncertain-auth-store
+```
+
+この操作はlogin / logout、Codex起動、model APIを呼びません。返却statusが`store_reset_requires_operator_login`でも未認証です。本人が別途公式ChatGPT device loginを明示的に完了してからstatusを確認します。recovery後もrefresh persistenceやprocess-start境界の別条件が未達ならAgent/Judge/Repairはfail-closedのままです。
 
 ### 利用者本人が戻った後のログイン
 
@@ -112,7 +139,7 @@ sudo -u qa-agent-eval -- env \
   -m scripts.skills.evals.agent.tools.codex_wsl2_bwrap_launcher --auth-status-only
 ```
 
-status成功は現在のlogin方式だけを確認します。refresh更新が次attemptで有効なことや、固定CLI本体の異常時保存を証明しません。fresh formal isolation probe、Codex sourceのsynthetic refresh test、OS process-start条件の確認も別々に必要です。どれか一つでも未達なら実Agentを起動しません。
+status成功は現在のlogin方式だけを確認します。保存済みのsynthetic refresh probeは固定CLI 0.163.0 app-server processが2 clean process間で更新状態を再読込したことを記録していますが、attemptごとのbinary digestがなく、truncate後の異常終了・partial writeを検証していません。fresh formal isolation evidenceと専用UIDのprocess-start境界も別に必要です。どれか一つでも未達なら実Agentを起動しません。
 
 account作成を取り消す必要があり、まだ認証していない場合は、管理者が`sudo userdel qa-agent-eval`でaccountを削除できます。このcommandはhomeを残します。認証後は認証状態を無断削除せず、利用者が状態と必要なcredential revokeを確認した後に管理者がsecure dispositionを決めます。既定WSLユーザーや元の開発環境には変更がないため、復元操作はありません。
 
@@ -172,7 +199,7 @@ launcher unit testは、実`HOME`、実`CODEX_HOME`、通常ユーザーの認�
 
 追加したprocess試験では、同じUIDの協調childは`flock`を取得できませんが、lock取得後に起動してlockを無視する同UID childはmode 0600の合成storeを読めました。起動前後のprocess inventoryは検査時点に存在するprocessを拒否しますが、検査後の起動を防ぐOS境界ではありません。timeoutでchildがkillされるとkernelがlockを解放し、不確定markerは残るため、次の実行は`authentication_state_uncertain`で拒否されます。marker削除は一時試験のcleanup内だけで行います。したがって同UID processの起動主体を制限する条件が未検証のまま、`authentication_process_concurrency_unresolved=true`を維持します。
 
-固定Codex CLI `0.163.0`の[auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)では`CODEX_REFRESH_TOKEN_URL_OVERRIDE`がtoken refresh endpointに使われます。[app-serverの`getAuthStatus`](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/account_processor.rs)に`refreshToken=true`を指定すると`AuthManager`のrefreshを実行でき、[protocol](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server-protocol/src/protocol/common.rs)にもそのrequestがあります。合成`CODEX_HOME`とlocalhost mockに限定すれば、モデル要求を送らず固定binaryのrefresh/save/reloadを試す経路はあります。この環境で固定binaryのversionは`codex-cli 0.163.0`と確認しましたが、Codex開発sandboxではlocalhost `socket()`が`EPERM`、isolated network namespaceではloopback設定が`NETLINK_ROUTE EPERM`となり、mock試験は開始できませんでした。Rust toolchain/source checkoutもないためsource harnessも実行していません。endpoint overrideは固定CLI sourceでtest-onlyに制限されていません。専用temporary environmentの試験以外で設定せず、production launcher/profileへ追加しません。refresh/save/reloadは未達のため`authentication_refresh_persistence_unresolved=true`を維持し、launcherはfail-closedです。
+固定Codex CLI `0.163.0`の[auth manager](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/login/src/auth/manager.rs)では`CODEX_REFRESH_TOKEN_URL_OVERRIDE`がtoken refresh endpointに使われます。[app-serverの`getAuthStatus`](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server/src/request_processors/account_processor.rs)に`refreshToken=true`を指定すると`AuthManager`のrefreshを実行でき、[protocol](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server-protocol/src/protocol/common.rs)にもそのrequestがあります。2026-10-31に合成`CODEX_HOME`とlocalhost mockを使い、固定Codex CLI app-serverの通常refresh/save/reloadを2つのprocess間で確認しました。保存記録は`.agent-eval-runs/pr17-auth-refresh-synthetic-20261031-04/`です。source harnessやfake childは使っていませんが、resultに個別binary digestがなく、separate isolation probeとのrevision-bound bindingはありません。固定sourceのfile backendは`auth.json`をtruncate/write/flushし、atomic replacementやfile fsyncを行いません。launcherのfake process crash testは途中書込み後のmarker保持・retry拒否を確認しますが、固定binaryのpartial-write / abnormal terminationは未試験です。endpoint overrideはfixed CLI sourceでtest-onlyに制限されていません。専用temporary environmentの試験以外で設定せず、production launcher/profileへ追加しません。これらの未達が残るため`authentication_refresh_persistence_unresolved=true`を維持し、launcherはfail-closedです。
 
 fresh formal evidenceではsynthetic markerをpersistent pathから`/codex-home/auth.json`へbindし、Agent/Judge/Repair shellのdirect/alias/proc/host/other-attempt/environment/FD read拒否を検査します。commit `079c29ec49c7f074fb16dcbb045f0d89a844226e`のevidenceは16/16 required checksと3 modeすべてverifiedで、`model_api_used=false`でした。文書更新後の新しいclean HEADに対するevidenceは再生成が必要です。runnerの`flock`は協調process間だけを直列化し、process inventoryは起動前に存在する専用UID processを拒否します。同じUIDを任意に使えるtrusted administrator/rootを制限しないため、OS process-start境界の実環境確認なしにrefresh競合を解決済みとは扱いません。専用account未作成、source harness未実施、管理者境界未検証のため、三modeのproduction launchはfail-closedです。
 
