@@ -133,21 +133,23 @@ class WorkspaceIsolationTests(unittest.TestCase):
             with self.assertRaisesRegex(AgentEvalError, "must be empty"):
                 prepare_agent_output_mountpoint(workspace)
 
-    def test_candidate_skill_workspace_excludes_eval_data_and_python_bytecode(self) -> None:
+    def test_candidate_skill_workspace_excludes_eval_data_and_python_bytecode(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             package = root / "source"
             skill = package / "skills" / "spec-analysis"
             (skill / "scripts" / "__pycache__").mkdir(parents=True)
-            (skill / "evals" / "output" / "cases" / "case-001").mkdir(
-                parents=True
-            )
+            (skill / "evals" / "output" / "cases" / "case-001").mkdir(parents=True)
             (skill / "evals" / "deterministic").mkdir(parents=True)
             (skill / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
             (skill / "scripts" / "runtime.py").write_text(
                 "print('runtime')\n", encoding="utf-8"
             )
-            expected = skill / "evals" / "output" / "cases" / "case-001" / "expected.json"
+            expected = (
+                skill / "evals" / "output" / "cases" / "case-001" / "expected.json"
+            )
             expected.write_text('{"fixture":"private"}\n', encoding="utf-8")
             (skill / "evals" / "deterministic" / "validator.py").write_text(
                 "raise RuntimeError('private evaluator')\n", encoding="utf-8"
