@@ -163,7 +163,7 @@ def capture_invocation(
     timed_out = False
     try:
         execution = subprocess.run(
-            [sys.executable, str(script)],
+            [sys.executable, "-B", str(script)],
             input=request_bytes,
             cwd=script.parent.parent,
             stdout=subprocess.PIPE,
@@ -223,7 +223,11 @@ def capture_invocation(
         "result_relative_path": (
             Path(".runtime-evidence") / relative_record / "result.json"
         ).as_posix(),
-        "command": ["python", f".agents/skills/{skill}/scripts/{script.name}"],
+        "command": [
+            "python",
+            "-B",
+            f".agents/skills/{skill}/scripts/{script.name}",
+        ],
         "exit_code": exit_code,
         "timed_out": timed_out,
         "duration_seconds": round(time.monotonic() - started, 3),

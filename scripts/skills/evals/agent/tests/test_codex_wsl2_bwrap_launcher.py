@@ -1958,6 +1958,10 @@ class CodexWsl2LauncherUnitTests(unittest.TestCase):
                     auth_store_path=auth_source,
                 )
             self.assertIn(
+                ["--setenv", "PYTHONDONTWRITEBYTECODE", "1"],
+                [mounts[index : index + 3] for index in range(len(mounts) - 2)],
+            )
+            self.assertIn(
                 ["--bind", str(auth_source), "/codex-home/auth.json"],
                 [mounts[index : index + 3] for index in range(len(mounts) - 2)],
             )

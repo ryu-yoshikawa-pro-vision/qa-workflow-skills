@@ -53,6 +53,10 @@ def build_qa_training_store_generation_prompt(
 
 `artifacts[]`には下表の必須QA成果物と、実際に必要な場合の`question-analysis`だけを登録してください。execution record、runtime request / result、その他の評価記録はQA成果物として作成・登録しないでください。評価者がattempt記録として`.qa-eval-output/`の外に保存します。
 
+# Python helperの実行
+
+target内でPython helperやSkill scriptを実行するときは、必ず`PYTHONDONTWRITEBYTECODE=1 python -B`を使い、`__pycache__`や`.pyc`を生成しないでください。
+
 # 固定シナリオのartifact-index登録契約
 
 各必須成果物を `artifact-index.json` に登録するときは、下表の `skill`、`kind`、`scope` を正確に使用してください。`routing[]`にも、下表の各 `skill` と同じ `scope` を持つ行を1つずつ登録し、statusと理由を実際の状態に合わせ、実在する成果物のIDを`artifact_ids`へ結び付けてください。このメタデータは成果物本文やrouting statusを指定しません。`schema_version` は文字列 `"1"` ではなくJSON numberの `1` にしてください。実在する成果物だけを登録し、未完了・blockedの工程は実際の状態で記録してください。

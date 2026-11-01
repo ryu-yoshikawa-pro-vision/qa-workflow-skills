@@ -243,9 +243,14 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             script = skill_root / "runtime_contract.py"
             script.write_text(
                 "import json, sys\n"
+                "import local_helper\n"
                 "json.loads(sys.stdin.buffer.read())\n"
-                "print(json.dumps({'valid': False, 'current_structure_state': []}))\n",
+                "print(json.dumps({'valid': False, 'current_structure_state': [], "
+                "'helper': local_helper.VALUE}))\n",
                 encoding="utf-8",
+            )
+            (skill_root / "local_helper.py").write_text(
+                "VALUE = 'loaded'\n", encoding="utf-8"
             )
             record = (
                 root
@@ -277,7 +282,17 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             )
         self.assertEqual(result["evidence_status"], "captured")
         self.assertFalse(saved_result["valid"])
+        self.assertEqual(saved_result["helper"], "loaded")
+        self.assertFalse((skill_root / "__pycache__").exists())
         self.assertEqual(saved_request, request_bytes)
+        self.assertEqual(
+            invocation["command"],
+            [
+                "python",
+                "-B",
+                ".agents/skills/qa-workflow/scripts/runtime_contract.py",
+            ],
+        )
         self.assertEqual(
             invocation["request_sha256"],
             "sha256:" + hashlib.sha256(request_bytes).hexdigest(),

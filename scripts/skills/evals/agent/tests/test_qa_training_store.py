@@ -47,6 +47,7 @@ class QATrainingStoreTests(unittest.TestCase):
         self.assertIn("合成1-commit baseline", prompt)
         self.assertIn("execution record", prompt)
         self.assertIn("QA成果物として作成・登録しないでください", prompt)
+        self.assertIn("PYTHONDONTWRITEBYTECODE=1 python -B", prompt)
         self.assertNotIn("QTS-SEM-001", prompt)
         self.assertNotIn("QTS-SEM-010", prompt)
 

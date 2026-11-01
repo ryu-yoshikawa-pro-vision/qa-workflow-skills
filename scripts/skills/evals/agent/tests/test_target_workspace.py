@@ -223,6 +223,7 @@ class TargetWorkspaceTests(unittest.TestCase):
         self.assertNotEqual(prepared["synthetic_baseline_revision"], source_revision)
         self.assertIn(source_revision, instructions)
         self.assertIn("合成1-commit baseline", instructions)
+        self.assertIn("PYTHONDONTWRITEBYTECODE=1 python -B", instructions)
         self.assertTrue(integrity["unchanged"])
         self.assertTrue(integrity["synthetic_baseline_matches"])
 

@@ -399,9 +399,10 @@ def prepare_sanitized_target(
 - 規範仕様の優先順位は `docs/spec/README.md` に従ってください。
 - Product Code、既存Product Test、規範仕様、配置Skill、評価用設定を変更しないでください。
 - 成果物の書込みは `.qa-eval-output/` だけに行ってください。
+- Python helperやSkill scriptを実行する場合は、常に `PYTHONDONTWRITEBYTECODE=1 python -B` を使い、`__pycache__` / `.pyc` を作らないでください。
 - artifact-index.jsonには実ファイルの登録と各工程のrouting判断だけを記録してください。期待成果物本文や正解routingは与えません。
-- runtime verifierを使う場合、対象Skillの`runtime_contract.py`へ渡すrequest bytesを`.qa-eval-output/.runtime-evidence/<skill>/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、`.qa-eval-tools/verifier_capture.py --skill <skill> --operation verify --request <request.json> --record <invocation-dir>`で実行してください。記録対象のSkillは`coverage-analysis`、`qa-workflow`、`spec-analysis`、`test-analysis`、`test-case-design`、`test-condition-design`、`test-requirement-design`、`usability-inspection`、`wcag-conformance-evaluation`です。requestを作っただけの自己申告JSONは実行証拠になりません。
-- qa-workflowの`workflow_runtime.py`を使う場合も、実際の入力bytesを同じattempt内の`.runtime-evidence/qa-workflow/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、同じwrapperを`--skill qa-workflow --operation workflow-runtime`で実行してください。`valid`と`payload.can_complete`は別々に判定されます。
+- runtime verifierを使う場合、対象Skillの`runtime_contract.py`へ渡すrequest bytesを`.qa-eval-output/.runtime-evidence/<skill>/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、`PYTHONDONTWRITEBYTECODE=1 python -B .qa-eval-tools/verifier_capture.py --skill <skill> --operation verify --request <request.json> --record <invocation-dir>`で実行してください。記録対象のSkillは`coverage-analysis`、`qa-workflow`、`spec-analysis`、`test-analysis`、`test-case-design`、`test-condition-design`、`test-requirement-design`、`usability-inspection`、`wcag-conformance-evaluation`です。requestを作っただけの自己申告JSONは実行証拠になりません。
+- qa-workflowの`workflow_runtime.py`を使う場合も、実際の入力bytesを同じattempt内の`.runtime-evidence/qa-workflow/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、同じwrapperを`PYTHONDONTWRITEBYTECODE=1 python -B`で`--skill qa-workflow --operation workflow-runtime`とともに実行してください。`valid`と`payload.can_complete`は別々に判定されます。
 - commit、push、PR作成、評価資料の探索をしないでください。
 """,
         encoding="utf-8",

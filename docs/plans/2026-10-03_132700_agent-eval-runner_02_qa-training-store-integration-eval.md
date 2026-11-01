@@ -147,6 +147,8 @@ sanitized targetには評価前後の変更検出用としてEvaluatorが合成�
 
 target integrity検証では、sanitized target自身の`.git`がsymlinkでないdirectoryであり、Gitが返すrepository rootがtarget rootと一致し、HEADが準備時の合成baseline revisionと一致し、commitが1件・remoteなしであることを確認します。あわせて`.git`と許可された`.qa-eval-output/`を除く全filesystem entryを走査し、tracked / untracked / ignored fileの内容差分、symlink、通常file・directory以外のentryを検出します。`.qa-eval-output/`は対象sourceの不変性manifestから除外しますが、artifact-index、成果物path、runtime evidence、secret scanで別途検証します。
 
+Agentがtarget内でPython helperやSkill scriptを実行するときは`PYTHONDONTWRITEBYTECODE=1 python -B`を指示し、Codex outer environmentにも`PYTHONDONTWRITEBYTECODE=1`を設定します。Evaluatorが起動するruntime capture helperは`python -B`で実行します。bytecode生成を抑止しても、許可外のtarget変更を検査対象から除外しません。`.qa-eval-output/`外に`__pycache__`や`.pyc`があればworkspace integrity failureとして記録します。
+
 評価用copyでは次を記録します。
 
 - source repository

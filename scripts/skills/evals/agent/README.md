@@ -12,6 +12,7 @@ Skillの開発・診断では、正式runnerの認証・隔離条件が未達で
 
 - baselineとcandidateのSkill revision、同じEval Input、Evaluator、Agentの実効model / reasoning設定を固定し、attemptごとの成果物・grader結果・hashを保存する。
 - Agentへは対象Skill packageと対象入力のみを渡す。expected、Reference、rubric、grader、他attempt結果はpromptやAgent向けstaging directoryへ含めない。
+- target内でPython helperやSkill scriptを使う場合は`PYTHONDONTWRITEBYTECODE=1 python -B`を指定します。runtime capture helperも`-B`で起動し、bytecodeを抑止してもtarget integrity検査は省略しません。
 - 共有workspace等で物理的read-denialを証明できない場合はその制約を記録し、結果を開発用の実動作比較として扱う。独立Judgeによる正式判定や自動修正の根拠にはしない。
 - 既存の`run.py`、launcher、認証停止、Judge承認条件を回避・緩和しない。semantic判定を自動修正の根拠にするのは承認・検証済みJudgeまたは根拠付き人間確認に限る。
 - 新しい実Agent runnerを追加せず、可能な範囲は既存CLIと既存graderを再利用する。
