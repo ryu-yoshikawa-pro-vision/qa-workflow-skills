@@ -53,6 +53,7 @@ candidateは`SKILL.md`だけに、上流ID欄には`entity_ref`をそのまま�
 - `compileall`: PASS
 - 変更対象のdprint check: PASS
 - `git diff --check`: PASS
-- `python scripts/format_tracked.py check`: ローカルの`ruff` executableがなく未完了。PRのCode Quality CIで再確認する。
+- `python scripts/format_tracked.py check`: ローカルの`ruff` executableがなく未完了。push後のCode Quality CI（run `41292498067`）はPASS。
+- push後の最終HEAD `7347194d4572e0155e83d889318cfda67e2c0188`では、5つのGitHub Actions（Code Quality `41292498067`、Validate Agent Skills `41292498060`、Validate Semantic Output Evals `41292498075`、Validate Deterministic Output Evals `41292498073`、Codex Harness `41292498080`）がすべてPASS。
 
 合成のimprove処理テストはcandidate保存と再評価失敗時の停止を検証するが、今回の実Agent candidate生成は`improve.py`のライブrunnerを経由していない。実Agentによる原因分析とpatch作成、保存済みの全attempt、現在のdeterministic grader、Skill-local runtime verifierを組み合わせた開発用比較である。再利用工程の完全自動運転が受け入れられたとは主張しない。
