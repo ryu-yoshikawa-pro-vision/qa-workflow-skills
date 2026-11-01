@@ -17,8 +17,8 @@ from scripts.skills.evals.deterministic.result import EvalResult
 from scripts.skills.evals.deterministic.runtime_validator import (
     _canonical_text,
     _digest,
-    validate_skill_local_runtime_evidence,
     validate_runtime_evidence,
+    validate_skill_local_runtime_evidence,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[5]

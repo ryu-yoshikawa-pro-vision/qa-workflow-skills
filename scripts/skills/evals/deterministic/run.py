@@ -13,16 +13,16 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.deterministic.result import EvalResult
     from scripts.skills.evals.deterministic.runtime_validator import (
-        validate_skill_local_runtime_evidence,
         validate_runtime_evidence,
+        validate_skill_local_runtime_evidence,
     )
 else:
     from .loader import load_validators
     from .markdown_parser import MarkdownTableParseError
     from .result import EvalResult
     from .runtime_validator import (
-        validate_skill_local_runtime_evidence,
         validate_runtime_evidence,
+        validate_skill_local_runtime_evidence,
     )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
