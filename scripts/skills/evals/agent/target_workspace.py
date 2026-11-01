@@ -289,11 +289,7 @@ def verify_workspace_unchanged(
         "head": head,
         "expected_synthetic_baseline_revision": expected_synthetic_baseline_revision,
         "synthetic_baseline_matches": synthetic_baseline_matches,
-        "commit_count": (
-            int(git_commits)
-            if git_commits and git_commits.isdecimal()
-            else None
-        ),
+        "commit_count": int(git_commits) if git_commits and git_commits.isdecimal() else None,
         "remotes": remotes,
         "blockers": blockers,
     }
