@@ -1183,8 +1183,7 @@ def validate_skill_local_runtime_evidence(
         or not isinstance(input_body.get("metadata"), dict)
         or not isinstance(input_body.get("input"), dict)
         or input_body["metadata"].get("skill") != skill
-        or input_body["metadata"].get("runtime_unit_key")
-        != policy["runtime_unit_key"]
+        or input_body["metadata"].get("runtime_unit_key") != policy["runtime_unit_key"]
     ):
         result.add(
             "RT-D017",
@@ -1275,12 +1274,14 @@ def validate_skill_local_runtime_evidence(
             "verifier_path": str(verifier_path),
         }
     issues = verification.get("issues") if isinstance(verification, dict) else None
-    if not isinstance(verification, dict) or not isinstance(
-        verification.get("valid"), bool
-    ) or not isinstance(issues, list) or any(
-        not isinstance(issue, dict)
-        or not isinstance(issue.get("issue_type"), str)
-        for issue in issues
+    if (
+        not isinstance(verification, dict)
+        or not isinstance(verification.get("valid"), bool)
+        or not isinstance(issues, list)
+        or any(
+            not isinstance(issue, dict) or not isinstance(issue.get("issue_type"), str)
+            for issue in issues
+        )
     ):
         return {
             "status": "execution error",

@@ -40,9 +40,7 @@ def load_eval_definition(skill: str, eval_id: str) -> tuple[dict, dict]:
 
 
 def load_skill_runtime_policy(skill: str) -> dict | None:
-    eval_file = (
-        REPO_ROOT / "skills" / skill / "evals" / "output" / "evals.json"
-    )
+    eval_file = REPO_ROOT / "skills" / skill / "evals" / "output" / "evals.json"
     data = json.loads(eval_file.read_text(encoding="utf-8"))
     if data.get("skill") != skill:
         raise ValueError(f"output eval manifest skill does not match: {skill}")

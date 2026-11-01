@@ -205,9 +205,7 @@ class RuntimeValidatorTests(unittest.TestCase):
         self.assertEqual(missing_outcome["status"], "missing_evidence")
         self.assertEqual(missing.status, "fail")
 
-        malformed_text = self._skill_runtime_artifact().replace(
-            "```json", "```text", 1
-        )
+        malformed_text = self._skill_runtime_artifact().replace("```json", "```text", 1)
         malformed = EvalResult("example-skill", "EXAMPLE-003")
         malformed_outcome = validate_skill_local_runtime_evidence(
             malformed_text,

@@ -872,9 +872,9 @@ class ImprovementGateTests(unittest.TestCase):
                         output_root
                         / "experiments"
                         / experiment_id
-                        / sha256_bytes(
-                            f"{case['skill']}:{case['id']}".encode("utf-8")
-                        )[7:23]
+                        / sha256_bytes(f"{case['skill']}:{case['id']}".encode("utf-8"))[
+                            7:23
+                        ]
                     )
                     trial_root = case_root / "repair-trials" / "trial-01"
                     patch_path = trial_root / "patch.diff"
@@ -1205,9 +1205,7 @@ class ImprovementGateTests(unittest.TestCase):
         self.assertIn("Synthetic candidate change.", route["saved_candidate_patch"])
         self.assertTrue(route["saved_candidate_archive"])
         self.assertEqual(len(route["candidate_eval_calls"]), 1)
-        self.assertEqual(
-            route["candidate_eval_calls"][0]["skill"], "test-case-design"
-        )
+        self.assertEqual(route["candidate_eval_calls"][0]["skill"], "test-case-design")
         self.assertEqual(trial["status"], "execution_error")
         self.assertEqual(
             trial["stop_reason"], "synthetic candidate re-evaluation unavailable"
