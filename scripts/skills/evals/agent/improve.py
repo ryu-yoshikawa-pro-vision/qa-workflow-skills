@@ -3564,7 +3564,9 @@ def _run_deterministic_improvements(
                     case_record["blocked_reason"] = trial["stop_reason"]
                     break
                 patch_text = "".join(
-                    difflib.unified_diff(
+                    line
+                    for change in changes
+                    for line in difflib.unified_diff(
                         (package_path / "skills" / chosen_skill / change["path"])
                         .read_text(encoding="utf-8")
                         .splitlines(keepends=True),
@@ -3574,7 +3576,6 @@ def _run_deterministic_improvements(
                         fromfile=f"a/skills/{chosen_skill}/{change['path']}",
                         tofile=f"b/skills/{chosen_skill}/{change['path']}",
                     )
-                    for change in changes
                 )
                 (trial_root / "patch.diff").write_text(patch_text, encoding="utf-8")
                 with zipfile.ZipFile(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -10,10 +11,13 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.skills.evals.deterministic.result import EvalResult
 from scripts.skills.evals.deterministic.runtime_validator import (
+    _canonical_text,
     _digest,
+    validate_skill_local_runtime_evidence,
     validate_runtime_evidence,
 )
 
@@ -122,6 +126,204 @@ class RuntimeValidatorTests(unittest.TestCase):
         expected = "sha256:" + hashlib.sha256(b'{"n":1}').hexdigest()
         self.assertEqual(_digest({"n": Decimal("1.0")}), expected)
         self.assertEqual(_digest({"n": Decimal("1.00")}), expected)
+
+    def _skill_runtime_artifact(self) -> str:
+        identity = "example-skill::artifact:example:all"
+        input_body = {
+            "metadata": {
+                "skill": "example-skill",
+                "runtime_unit_key": "artifact:example:all",
+            },
+            "input": {"amount": Decimal("1.25")},
+        }
+        entities_body = {
+            "schema_version": "entity-state-v2",
+            "skill": "example-skill",
+            "entities": [],
+        }
+        return "\n".join(
+            [
+                (
+                    f"### Machine Runtime Input: {identity}\n\n"
+                    f"```json\n{_canonical_text(input_body)}\n```"
+                ),
+                (
+                    f"### Machine Runtime Result: {identity}\n\n"
+                    "```json\n"
+                    f"{_canonical_text({'runtime_status': 'blocked'})}\n```"
+                ),
+                (
+                    "### Machine Entities: example-skill\n\n"
+                    f"```json\n{_canonical_text(entities_body)}\n```"
+                ),
+            ]
+        )
+
+    def _write_fake_runtime_verifier(
+        self, root: Path, *, valid: bool = True, exit_code: int = 0
+    ) -> None:
+        verifier = root / "skills/example-skill/scripts/runtime_contract.py"
+        verifier.parent.mkdir(parents=True)
+        verifier.write_text(
+            "import json, sys\n"
+            "request = json.load(sys.stdin)\n"
+            "assert request['operation'] == 'verify_runtime_evidence'\n"
+            "assert request['normalized_skill_input']['amount'] == 1.25\n"
+            "assert request['partial_rerun'] is False\n"
+            f"issues = [] if {valid!r} else [{{'issue_type': 'synthetic_invalid'}}]\n"
+            f"sys.stdout.write(json.dumps({{'valid': {valid!r}, 'issues': issues}}))\n"
+            f"sys.exit({exit_code})\n",
+            encoding="utf-8",
+        )
+
+    def test_skill_runtime_gate_accepts_valid_blocked_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(root)
+            result = EvalResult("example-skill", "EXAMPLE-001")
+            outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-001",
+                {
+                    "runtime_unit_key": "artifact:example:all",
+                    "partial_rerun": False,
+                },
+                result,
+                source_root=Path(os.path.relpath(root, Path.cwd())),
+            )
+        self.assertEqual(outcome["status"], "verified")
+        self.assertTrue(outcome["valid"])
+        self.assertEqual(result.status, "pass")
+
+    def test_skill_runtime_gate_rejects_missing_and_malformed_evidence(self) -> None:
+        policy = {"runtime_unit_key": "artifact:example:all", "partial_rerun": False}
+        missing = EvalResult("example-skill", "EXAMPLE-002")
+        missing_outcome = validate_skill_local_runtime_evidence(
+            "# no machine evidence", "example-skill", "EXAMPLE-002", policy, missing
+        )
+        self.assertEqual(missing_outcome["status"], "missing_evidence")
+        self.assertEqual(missing.status, "fail")
+
+        malformed_text = self._skill_runtime_artifact().replace(
+            "```json", "```text", 1
+        )
+        malformed = EvalResult("example-skill", "EXAMPLE-003")
+        malformed_outcome = validate_skill_local_runtime_evidence(
+            malformed_text,
+            "example-skill",
+            "EXAMPLE-003",
+            policy,
+            malformed,
+        )
+        self.assertEqual(malformed_outcome["status"], "invalid_evidence")
+        self.assertEqual(malformed.status, "fail")
+
+    def test_skill_runtime_gate_distinguishes_invalid_evidence_from_execution_error(
+        self,
+    ) -> None:
+        policy = {"runtime_unit_key": "artifact:example:all", "partial_rerun": False}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(root, valid=False)
+            invalid_result = EvalResult("example-skill", "EXAMPLE-004")
+            invalid_outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-004",
+                policy,
+                invalid_result,
+                source_root=root,
+            )
+            self.assertEqual(invalid_outcome["status"], "invalid_evidence")
+            self.assertEqual(invalid_result.status, "fail")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(root, exit_code=7)
+            execution_result = EvalResult("example-skill", "EXAMPLE-005")
+            execution_outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-005",
+                policy,
+                execution_result,
+                source_root=root,
+            )
+        self.assertEqual(execution_outcome["status"], "execution error")
+        self.assertIsNone(execution_outcome["valid"])
+        self.assertEqual(execution_result.status, "pass")
+
+    def test_skill_runtime_verifier_source_change_is_execution_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(root)
+            verifier = root / "skills/example-skill/scripts/runtime_contract.py"
+            original_run = subprocess.run
+
+            def run_then_change_source(*args, **kwargs):
+                completed = original_run(*args, **kwargs)
+                verifier.write_text(
+                    verifier.read_text(encoding="utf-8") + "# changed\n",
+                    encoding="utf-8",
+                )
+                return completed
+
+            result = EvalResult("example-skill", "EXAMPLE-006")
+            with patch(
+                "scripts.skills.evals.deterministic.runtime_validator.subprocess.run",
+                side_effect=run_then_change_source,
+            ):
+                outcome = validate_skill_local_runtime_evidence(
+                    self._skill_runtime_artifact(),
+                    "example-skill",
+                    "EXAMPLE-006",
+                    {
+                        "runtime_unit_key": "artifact:example:all",
+                        "partial_rerun": False,
+                    },
+                    result,
+                    source_root=root,
+                )
+
+        self.assertEqual(outcome["status"], "execution error")
+        self.assertIsNone(outcome["valid"])
+        self.assertEqual(
+            outcome["reason"], "skill_local_runtime_verifier_changed_during_execution"
+        )
+
+    def test_skill_runtime_verifier_inconsistent_response_is_execution_error(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(root)
+            verifier = root / "skills/example-skill/scripts/runtime_contract.py"
+            verifier.write_text(
+                "import json, sys\n"
+                "json.load(sys.stdin)\n"
+                "sys.stdout.write(json.dumps({'valid': True, 'issues': "
+                "[{'issue_type': 'impossible'}]}))\n",
+                encoding="utf-8",
+            )
+            result = EvalResult("example-skill", "EXAMPLE-007")
+            outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-007",
+                {
+                    "runtime_unit_key": "artifact:example:all",
+                    "partial_rerun": False,
+                },
+                result,
+                source_root=root,
+            )
+
+        self.assertEqual(outcome["status"], "execution error")
+        self.assertIsNone(outcome["valid"])
+        self.assertEqual(
+            outcome["reason"], "skill_local_runtime_verifier_inconsistent_response"
+        )
 
     def test_declared_runtime_and_entity_contract_passes(self) -> None:
         expected = {

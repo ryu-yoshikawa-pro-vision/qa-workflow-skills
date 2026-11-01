@@ -378,6 +378,9 @@
 - `RT-D013` runtime dependency graphの重複・自己依存・cycle拒否
 - `RT-D014` adapter childのderived input、親generation依存、重複・欠落の検出
 - `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator
+- `RT-D016` Skillがmanifestで必須と宣言したruntime input / result / Entity evidenceの存在・一意性
+- `RT-D017` Skill-local runtime verifierへ渡すfull-build入力のidentity / shape
+- `RT-D018` Skill-local `verify_runtime_evidence`のvalid判定
 
 ## test-target-inspection
 

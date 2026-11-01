@@ -488,6 +488,8 @@ class ImprovementGateTests(unittest.TestCase):
         self,
         *,
         allow_repair: bool,
+        repair_delta: bool = False,
+        candidate_eval_response: dict | None = None,
         trace_redacted: bool | list[bool] = False,
         runner_results: list[SimpleNamespace] | None = None,
         baseline_cleanup_status: str = "succeeded",
@@ -637,6 +639,19 @@ class ImprovementGateTests(unittest.TestCase):
 
             def fake_run_command(*args, **kwargs):
                 run_calls.append((args, kwargs))
+                if repair_delta and len(run_calls) == 2:
+                    skill_file = (
+                        Path(kwargs["cwd"])
+                        / ".agents"
+                        / "skills"
+                        / case["skill"]
+                        / "SKILL.md"
+                    )
+                    skill_file.write_text(
+                        skill_file.read_text(encoding="utf-8")
+                        + "Synthetic candidate change.\n",
+                        encoding="utf-8",
+                    )
                 return available_results.pop(0) if available_results else default_result
 
             mount_calls: list[list[str]] = []
@@ -651,6 +666,12 @@ class ImprovementGateTests(unittest.TestCase):
                 result_path = destination / "result.json"
                 result_path.write_text("{}\n", encoding="utf-8")
                 return {"status": "captured", "result_path": str(result_path)}
+
+            candidate_eval_calls: list[dict] = []
+
+            def candidate_eval(**kwargs):
+                candidate_eval_calls.append(dict(kwargs))
+                return dict(candidate_eval_response or {})
 
             with ExitStack() as stack:
                 stack.enter_context(
@@ -809,6 +830,14 @@ class ImprovementGateTests(unittest.TestCase):
                         else improve_module._run_independent_eval,
                     )
                 )
+                if candidate_eval_response is not None:
+                    stack.enter_context(
+                        patch.object(
+                            improve_module,
+                            "_run_deterministic_candidate_eval",
+                            side_effect=candidate_eval,
+                        )
+                    )
                 stack.enter_context(
                     patch.object(
                         improve_module,
@@ -835,9 +864,33 @@ class ImprovementGateTests(unittest.TestCase):
                     max_seconds=3600 if allow_repair else 600,
                     analyze_only=not allow_repair,
                 )
+                saved_candidate_patch = None
+                saved_candidate_archive = None
+                if result.get("cases") and result["cases"][0].get("repair_trials"):
+                    experiment_id = result["experiment_id"]
+                    case_root = (
+                        output_root
+                        / "experiments"
+                        / experiment_id
+                        / sha256_bytes(
+                            f"{case['skill']}:{case['id']}".encode("utf-8")
+                        )[7:23]
+                    )
+                    trial_root = case_root / "repair-trials" / "trial-01"
+                    patch_path = trial_root / "patch.diff"
+                    archive_path = trial_root / "changed-files.zip"
+                    saved_candidate_patch = (
+                        patch_path.read_text(encoding="utf-8")
+                        if patch_path.is_file()
+                        else None
+                    )
+                    saved_candidate_archive = archive_path.is_file()
             return {
                 "result": result,
                 "run_calls": run_calls,
+                "candidate_eval_calls": candidate_eval_calls,
+                "saved_candidate_patch": saved_candidate_patch,
+                "saved_candidate_archive": saved_candidate_archive,
                 "launcher_calls": launcher_calls,
                 "docker_agent_spy": docker_agent_spy,
                 "docker_repair_spy": docker_repair_spy,
@@ -1125,6 +1178,42 @@ class ImprovementGateTests(unittest.TestCase):
             route["run_calls"][1][1]["timeout_cleanup_argv"],
             improve_module.codex_cleanup_argv(route["run_calls"][1][0][0]),
         )
+
+    def test_improvement_process_saves_candidate_and_stops_on_reevaluation_error(
+        self,
+    ) -> None:
+        normal_completion = SimpleNamespace(
+            stdout="synthetic response",
+            timed_out=False,
+            exit_code=0,
+            cleanup_status="succeeded",
+        )
+        route = self._run_deterministic_wsl2_route(
+            allow_repair=True,
+            repair_delta=True,
+            candidate_eval_response={
+                "status": "review_pending",
+                "reason": "synthetic candidate re-evaluation unavailable",
+            },
+            runner_results=[normal_completion, normal_completion],
+        )
+
+        case = route["result"]["cases"][0]
+        trial = case["repair_trials"][0]
+        self.assertTrue(case["analysis_decision"]["allowed"])
+        self.assertEqual(route["result"]["repair_attempts_started"], 1)
+        self.assertIn("Synthetic candidate change.", route["saved_candidate_patch"])
+        self.assertTrue(route["saved_candidate_archive"])
+        self.assertEqual(len(route["candidate_eval_calls"]), 1)
+        self.assertEqual(
+            route["candidate_eval_calls"][0]["skill"], "test-case-design"
+        )
+        self.assertEqual(trial["status"], "execution_error")
+        self.assertEqual(
+            trial["stop_reason"], "synthetic candidate re-evaluation unavailable"
+        )
+        self.assertEqual(case["status"], "review_pending")
+        self.assertEqual(route["result"]["status"], "review_pending_or_unmet")
 
     def test_schema2_deterministic_normal_cleanup_not_needed_is_accepted(self) -> None:
         normal_completion = SimpleNamespace(

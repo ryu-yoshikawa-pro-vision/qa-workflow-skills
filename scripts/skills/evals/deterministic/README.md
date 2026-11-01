@@ -69,7 +69,9 @@ python scripts/skills/evals/deterministic/run.py \
   --expected-json evaluator-private/TR-HELDOUT-006.expected.json
 ```
 
-このoptionは既存のSkill validatorと共通runtime validatorへ渡します（runtime validatorの検査範囲はケースのexpected contractに従います）。ファイルアクセスは隔離しないため、expected JSONをAgentから物理的に読めない場所に保管し、Agent実行後にEvaluator側で採点してください。Skill-local runtime契約を使う場合は、同じSkill package revisionの`runtime_contract.py`で別途`verify_runtime_evidence`を実行します。`--skill all`とは併用できません。
+このoptionは既存のSkill validatorと共通runtime validatorへ渡します（runtime validatorのケース固有検査範囲はexpected contractに従います）。加えて、Skillのeval manifestに`skill_runtime_verification`がある場合、graderは同じSkill package revisionの`runtime_contract.py`を用いて必須の最終`verify_runtime_evidence` gateを実行します。このSkill単位の契約はケースの`expected.json`とは独立しており、たとえば`test-requirement-design`ではblocked成果物でも必要なInput / Result / Entitiesを含み、Skill-local verifierが`valid=true`を返す必要があります。正しいblocked状態を`runtime_status=ready`へ強制するものではありません。missing / invalid evidenceはFAIL、verifierを起動できない場合や応答を検証できない場合は`execution error`（CLI exit code 2）です。Agent runnerもこの状態を実行エラーとして保持します。
+
+この機能はgrader内でSkill-local verifierを実行するため、graderは信頼できるSkill package revisionから起動してください。通常の決定論的graderはAgentとファイルアクセスを隔離しません。expectedやgraderをAgentに見せない情報分離はAgent実行方式側で別途確保してください。
 
 全ケース:
 

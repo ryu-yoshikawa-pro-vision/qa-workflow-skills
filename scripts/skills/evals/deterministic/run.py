@@ -13,13 +13,17 @@ if __package__ in {None, ""}:
     )
     from scripts.skills.evals.deterministic.result import EvalResult
     from scripts.skills.evals.deterministic.runtime_validator import (
+        validate_skill_local_runtime_evidence,
         validate_runtime_evidence,
     )
 else:
     from .loader import load_validators
     from .markdown_parser import MarkdownTableParseError
     from .result import EvalResult
-    from .runtime_validator import validate_runtime_evidence
+    from .runtime_validator import (
+        validate_skill_local_runtime_evidence,
+        validate_runtime_evidence,
+    )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 VALIDATORS = load_validators()
@@ -33,6 +37,19 @@ def load_eval_definition(skill: str, eval_id: str) -> tuple[dict, dict]:
             expected_path = eval_file.parent / case["expected"]
             return case, json.loads(expected_path.read_text(encoding="utf-8"))
     raise KeyError(f"unknown eval id for {skill}: {eval_id}")
+
+
+def load_skill_runtime_policy(skill: str) -> dict | None:
+    eval_file = (
+        REPO_ROOT / "skills" / skill / "evals" / "output" / "evals.json"
+    )
+    data = json.loads(eval_file.read_text(encoding="utf-8"))
+    if data.get("skill") != skill:
+        raise ValueError(f"output eval manifest skill does not match: {skill}")
+    policy = data.get("skill_runtime_verification")
+    if policy is not None and not isinstance(policy, dict):
+        raise ValueError("skill_runtime_verification must be a JSON object")
+    return policy
 
 
 def grade(
@@ -59,7 +76,36 @@ def grade(
             evidence={"error": str(exc)},
         )
     validate_runtime_evidence(text, expected, result, source_root=runtime_source_root)
-    return result.to_dict()
+    content_status = result.status
+    try:
+        policy = load_skill_runtime_policy(skill)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        policy = None
+        runtime_verification = {
+            "status": "execution error",
+            "valid": None,
+            "reason": f"skill_runtime_policy_unavailable:{type(exc).__name__}",
+        }
+    else:
+        runtime_verification = None
+    if policy is not None:
+        runtime_verification = validate_skill_local_runtime_evidence(
+            text,
+            skill,
+            eval_id,
+            policy,
+            result,
+            source_root=runtime_source_root,
+        )
+    elif runtime_verification is None:
+        runtime_verification = {"status": "not_required", "valid": None}
+    payload = result.to_dict()
+    if policy is not None or runtime_verification["status"] == "execution error":
+        payload["content_status"] = content_status
+        payload["runtime_verification"] = runtime_verification
+    if runtime_verification["status"] == "execution error":
+        payload["status"] = "execution error"
+    return payload
 
 
 def main() -> int:
@@ -138,10 +184,14 @@ def main() -> int:
                     )
                 else:
                     missing_outputs.append(relative)
+        if any(result["status"] == "execution error" for result in results):
+            aggregate_status = "execution error"
+        elif missing_outputs or any(result["status"] == "fail" for result in results):
+            aggregate_status = "fail"
+        else:
+            aggregate_status = "pass"
         payload = {
-            "status": "fail"
-            if missing_outputs or any(r["status"] == "fail" for r in results)
-            else "pass",
+            "status": aggregate_status,
             "missing_outputs": missing_outputs,
             "results": results,
         }
@@ -151,6 +201,8 @@ def main() -> int:
         args.result.parent.mkdir(parents=True, exist_ok=True)
         args.result.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
+    if payload.get("status") == "execution error":
+        return 2
     return 1 if payload.get("status") == "fail" else 0
 
 

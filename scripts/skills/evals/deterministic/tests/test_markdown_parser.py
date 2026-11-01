@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,83 @@ from scripts.skills.evals.deterministic.markdown_parser import (
     MarkdownTableParseError,
     parse_tables,
 )
+
+
+def _valid_requirement_structure_evidence() -> str:
+    skill = "test-requirement-design"
+    runtime_unit_key = "artifact:requirement_structure:all"
+    metadata = {
+        "envelope_version": "1",
+        "skill": skill,
+        "runtime_contract_version": "runtime-v2",
+        "generator_contract_version": "requirement-structure-v2",
+        "runtime_unit_key": runtime_unit_key,
+        "model_key": None,
+        "model_type": None,
+        "technique_slug": None,
+        "selection_source": None,
+        "selection_key": None,
+        "scope_key": "all",
+        "input_mode": "direct",
+        "upstream_entities": [],
+        "upstream_runtime_units": [],
+        "static_data_versions": {},
+        "authority_refs": [],
+        "reference_refs": [],
+    }
+    input_value = {
+        "authorities": [],
+        "risks": [],
+        "acceptance_criteria": [],
+        "scope_ids": [],
+        "test_requirements": [],
+        "dispositions": [],
+        "previous_tr_ids": [],
+        "update_scope_tr_ids": [],
+        "inactive_tr_ids": [],
+        "inactive_tr_history": [],
+        "zero_scope_terminal": False,
+    }
+    repo_root = run.REPO_ROOT
+    script = repo_root / "skills" / skill / "scripts" / "requirement_structure.py"
+    completed = subprocess.run(
+        [sys.executable, str(script)],
+        input=json.dumps({"metadata": metadata, "input": input_value}).encode(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=repo_root,
+        check=False,
+    )
+    if completed.returncode != 0 or completed.stderr:
+        raise AssertionError(completed.stderr.decode("utf-8", errors="replace"))
+    runtime_result = json.loads(completed.stdout)
+
+    def fence(value: object) -> str:
+        rendered = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        return f"```json\n{rendered}\n```"
+
+    identity = f"{skill}::{runtime_unit_key}"
+    entities = {
+        "schema_version": "entity-state-v2",
+        "skill": skill,
+        "entities": runtime_result["payload"]["entities"],
+    }
+    return "\n".join(
+        [
+            f"### Machine Runtime Input: {identity}",
+            "",
+            fence({"metadata": metadata, "input": input_value}),
+            f"### Machine Runtime Result: {identity}",
+            "",
+            fence(runtime_result),
+            f"### Machine Entities: {skill}",
+            "",
+            fence(entities),
+            "",
+        ]
+    )
 
 
 class MarkdownParserTests(unittest.TestCase):
@@ -120,7 +198,8 @@ class MarkdownParserTests(unittest.TestCase):
 ## テスト要求を作らない上流項目
 | 上流ID | 種別 | 扱い | 理由 / 根拠 |
 | --- | --- | --- | --- |
-""",
+"""
+                + _valid_requirement_structure_evidence(),
                 encoding="utf-8",
             )
             expected = root / "expected.json"

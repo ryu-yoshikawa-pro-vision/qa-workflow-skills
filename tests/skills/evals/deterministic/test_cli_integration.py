@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.skills.evals.deterministic import run as deterministic_run
+from scripts.skills.evals.deterministic.result import EvalResult
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUNNER = REPO_ROOT / "scripts" / "skills" / "evals" / "deterministic" / "run.py"
@@ -262,6 +268,95 @@ class CliIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(json.loads(completed.stdout)["status"], "fail")
 
+    def test_skill_runtime_evidence_is_required_even_when_content_passes(self):
+        def content_pass(_text, _expected, eval_id):
+            result = EvalResult("test-requirement-design", eval_id)
+            result.add("CONTENT-FIXTURE", True, "fixed content validator fixture")
+            return result
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output.md"
+            output.write_text("# content-only output\n", encoding="utf-8")
+            with patch.dict(
+                deterministic_run.VALIDATORS,
+                {"test-requirement-design": content_pass},
+            ):
+                result = deterministic_run.grade(
+                    "test-requirement-design", "TR-OUT-003", output
+                )
+
+        self.assertEqual(result["content_status"], "pass")
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["runtime_verification"]["status"], "missing_evidence")
+        assertions = {row["id"]: row for row in result["assertions"]}
+        self.assertEqual(assertions["CONTENT-FIXTURE"]["status"], "pass")
+        self.assertEqual(assertions["RT-D016"]["status"], "fail")
+
+        _, expected = deterministic_run.load_eval_definition(
+            "test-requirement-design", "TR-OUT-003"
+        )
+        self.assertNotIn("runtime_contract", expected)
+
+    def test_held_out_expected_override_still_uses_skill_runtime_policy(self):
+        def content_pass(_text, _expected, eval_id):
+            result = EvalResult("test-requirement-design", eval_id)
+            result.add("CONTENT-FIXTURE", True, "fixed held-out content fixture")
+            return result
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output.md"
+            output.write_text("# content-only held-out output\n", encoding="utf-8")
+            with patch.dict(
+                deterministic_run.VALIDATORS,
+                {"test-requirement-design": content_pass},
+            ):
+                result = deterministic_run.grade(
+                    "test-requirement-design",
+                    "TR-HELDOUT-001",
+                    output,
+                    expected_override={"known_authorities": ["SPEC-901"]},
+                )
+
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(result["runtime_verification"]["status"], "missing_evidence")
+
+    def test_skill_runtime_verifier_execution_error_has_distinct_cli_exit(self):
+        evidence = """### Machine Runtime Input: test-requirement-design::artifact:requirement_structure:all
+
+```json
+{"metadata":{"skill":"test-requirement-design","runtime_unit_key":"artifact:requirement_structure:all"},"input":{}}
+```
+### Machine Runtime Result: test-requirement-design::artifact:requirement_structure:all
+
+```json
+{}
+```
+### Machine Entities: test-requirement-design
+
+```json
+{"schema_version":"entity-state-v2","skill":"test-requirement-design","entities":[]}
+```
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "output.md"
+            output.write_text(evidence, encoding="utf-8")
+            completed = self.run_cli(
+                "--skill",
+                "test-requirement-design",
+                "--eval-id",
+                "TR-OUT-003",
+                "--output",
+                str(output),
+                "--runtime-source-root",
+                str(root / "missing-source"),
+            )
+
+        self.assertEqual(completed.returncode, 2, completed.stdout + completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["status"], "execution error")
+        self.assertEqual(result["runtime_verification"]["status"], "execution error")
+
     def test_all_mode_missing_output_exit_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             completed = self.run_cli("--skill", "all", "--output-root", tmp)
@@ -271,6 +366,45 @@ class CliIntegrationTests(unittest.TestCase):
             payload = json.loads(completed.stdout)
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["missing_outputs"])
+
+    def test_all_mode_preserves_runtime_execution_error_in_aggregate_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "test-requirement-design" / "TR-OUT-001.md"
+            output.parent.mkdir()
+            output.write_text("synthetic saved output\n", encoding="utf-8")
+            result_path = root / "result.json"
+            stdout = io.StringIO()
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "run.py",
+                        "--skill",
+                        "all",
+                        "--output-root",
+                        str(root),
+                        "--result",
+                        str(result_path),
+                    ],
+                ),
+                patch.object(
+                    deterministic_run,
+                    "grade",
+                    return_value={"status": "execution error", "assertions": []},
+                ),
+                redirect_stdout(stdout),
+            ):
+                return_code = deterministic_run.main()
+
+            saved_payload = json.loads(result_path.read_text(encoding="utf-8"))
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(return_code, 2)
+        self.assertEqual(payload["status"], "execution error")
+        self.assertTrue(payload["missing_outputs"])
+        self.assertEqual(saved_payload, payload)
 
 
 if __name__ == "__main__":
