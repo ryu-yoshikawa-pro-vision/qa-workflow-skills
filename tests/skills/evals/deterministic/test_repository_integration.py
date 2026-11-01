@@ -52,7 +52,9 @@ class RepositoryDeterministicIntegrationTests(unittest.TestCase):
         self.assertEqual(sorted(validators), expected)
         self.assertTrue(all(callable(validate) for validate in validators.values()))
 
-    def test_each_skill_final_runtime_gate_has_an_expected_independent_policy(self) -> None:
+    def test_each_skill_final_runtime_gate_has_an_expected_independent_policy(
+        self,
+    ) -> None:
         gated_skills = {
             path.parent.name
             for path in SKILLS_ROOT.glob("*/SKILL.md")
@@ -64,17 +66,13 @@ class RepositoryDeterministicIntegrationTests(unittest.TestCase):
             with self.subTest(skill=skill):
                 skill_root = SKILLS_ROOT / skill
                 manifest = json.loads(
-                    (skill_root / "evals/output/evals.json").read_text(
-                        encoding="utf-8"
-                    )
+                    (skill_root / "evals/output/evals.json").read_text(encoding="utf-8")
                 )
                 self.assertEqual(
                     manifest.get("skill_runtime_verification"),
                     expected_policy,
                 )
-                self.assertTrue(
-                    (skill_root / "scripts/runtime_contract.py").is_file()
-                )
+                self.assertTrue((skill_root / "scripts/runtime_contract.py").is_file())
 
 
 if __name__ == "__main__":

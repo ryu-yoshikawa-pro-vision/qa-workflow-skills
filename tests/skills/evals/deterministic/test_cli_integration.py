@@ -263,9 +263,7 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertEqual(result["content_status"], "pass")
             self.assertEqual(result["runtime_verification"]["status"], "blocked")
             self.assertFalse(result["runtime_verification"]["valid"])
-            self.assertTrue(
-                result["runtime_verification"]["accepted_blocked_outcome"]
-            )
+            self.assertTrue(result["runtime_verification"]["accepted_blocked_outcome"])
             assertions = {row["id"]: row for row in result["assertions"]}
             self.assertEqual(assertions["RISK-D018"]["status"], "pass")
             self.assertEqual(assertions["RT-D018"]["status"], "pass")

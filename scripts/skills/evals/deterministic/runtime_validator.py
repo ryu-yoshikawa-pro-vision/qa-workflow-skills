@@ -1350,7 +1350,11 @@ def validate_skill_local_runtime_evidence(
         else None,
     )
     return {
-        "status": "verified" if valid else "blocked" if accepted_blocked else "invalid_evidence",
+        "status": "verified"
+        if valid
+        else "blocked"
+        if accepted_blocked
+        else "invalid_evidence",
         "valid": valid,
         "accepted_blocked_outcome": accepted_blocked,
         "expected_runtime_unit": expected_identity,
