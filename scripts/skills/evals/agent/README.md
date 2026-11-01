@@ -304,6 +304,33 @@ tracked manifestに未登録のdeterministicケースは、Agent生成完了後�
 
 この制約だけで、検証済みcandidateをPR branchのレビュー対象へ反映することまで禁止するものではありません。反映前に、原因と変更箇所の対応、baseline / candidateの比較条件と全attempt、Skill-local runtime evidence、未使用の別caseによる回帰、関連契約テスト、patchとrevisionのhashを確認し、情報隔離と実効modelの未検証範囲を記録します。失敗または証拠不足のcandidateは別candidateの作業を妨げません。runnerは引き続きGit操作を行わず、PR branch上のcandidateはmerge・正式採用・正式な独立評価とは区別します。
 
+#### 手動Agentと既存Python処理をつなぐ手順
+
+この開発用手順では、Codexセッションのサブエージェント起動は親Agentの操作です。`run.py`や`improve.py`から現在のセッションのサブエージェントを起動できると仮定したり、動かない外部コマンド呼び出し口を追加したりしません。手動でAgentを起動し、成果物の採点・runtime検証には以下の既存Python処理を使います。
+
+1. 新しい`.agent-eval-runs/<run-id>/`を作り、`agent-visible/`と`evaluator-private/`を分けます。run開始前にEvaluator HEAD、Skill名、Eval ID、入力hash、baseline / candidate revisionとSkill package fingerprint、grader / runtime verifier revision、Agent設定、期待値hash（`evaluator-private`だけ）を記録します。全pathはrun rootからの相対pathにし、Agentが起動したらattemptごとの記録を新規作成します。
+2. Agent向けpackageはリポジトリのSkill directoryを丸ごとcopyせず、既存の`workspace.create_skill_workspace()`または`create_skill_workspace_from_root()`で作ります。これらは`SKILL.md`と`references/`、`scripts/`、`assets/`だけをpackage化し、`evals/`のexpected、validator、rubric、Referenceを除外します。Repairは`improve.py`の`_copy_allowed_skill_files()`と同じ許可範囲で対象Skillだけをstagingします。起動前にstaging manifestとdirectory treeを確認し、評価用ファイルが1つでも含まれていれば起動しません。
+3. 各attemptへ渡すのは固定した入力、対象Skill package、必要な出力先、実行に必要な資料だけです。baseline、candidate、repair、independent regressionを別attempt directoryに置きます。修正Agentへexpected、grader、Reference、独立回帰の入力・正解を渡さず、candidateを固定するまで独立回帰を生成Agentへ見せません。
+4. サブエージェントを使う場合は起動ごとに`model="gpt-6-luna"`、`reasoning_effort="max"`、`fork_turns="none"`を明示します。`attempt.json`では要求値を`*_requested`として記録し、実効値を裏付けるtool telemetryがなければ`effective_*="unverified"`とします。生成開始、生成前停止、生成失敗、成果物生成を区別し、品質FAILを理由に再試行・attempt除外しません。
+5. Agent終了後、固定Evaluator側から次を実行します。manifest登録済みケースではexpectedはEvaluator内のmanifestから読み、held-out caseの場合だけEvaluator-privateのexpectedを`--expected-json`で指定します。Agent-visible rootにそのpathを置いてはいけません。
+
+   ```bash
+   python -m scripts.skills.evals.deterministic.run \
+     --skill "$SKILL" \
+     --eval-id "$EVAL_ID" \
+     --output "$ATTEMPT_ROOT/agent-visible/output/agent-output.md" \
+     --runtime-source-root "$ATTEMPT_ROOT/agent-visible/skill-package" \
+     --result "$ATTEMPT_ROOT/evaluator-private/grader-result.json"
+   ```
+
+   `deterministic.run`は固定graderに加え、Skillの`evals/output/evals.json`が宣言するSkill-local runtime policyも実行します。結果の`content_status`、`runtime_verification.status`、`runtime_verification.valid`を別々に保存します。runtime source rootには、そのattemptで使ったbaselineまたはcandidate packageを指定します。必要なruntime evidenceの欠落はFAIL、verifier自体の起動・実装失敗はexecution error、仕様上妥当なblockedはSkill契約に従ったblockedとして区別し、どれもPASSへ読み替えません。
+6. attempt完了後、出力・grader result・入力・Skill manifest・patchのhashを`attempt.json`とrun indexへ結びます。すべての生成attemptを記録し、失敗・停止・不整合も保持します。秘密情報や認証file、raw credentialsは保存しません。
+7. 原因分析では、成果物、入力、Skill契約、validator/expected、runtime結果を照合し、Skill、Agent variation、Eval input/expected、grader/runtime、環境、証拠不足へ分類します。Repair Agentへ渡す失敗説明は対象Skillと問題箇所に絞り、expected本文やgrader実装を含めません。許可path外のpatch、expected/grader/eval変更は候補を無効にします。
+8. target caseのbaselineとcandidateを同じ固定入力・Evaluator・要求Agent設定で対応付け、全attemptのassertionとruntime結果を比較します。candidate revision、patch、契約テストを保存してから、未使用のindependent inputでbaseline / candidateを個別に評価します。独立回帰の入力・expectedは修正Agentから隔離し、修正前からあったFAILと新しい回帰を分けます。比較条件不一致、揺れ、runtime evidence欠落、原因不明はそのcandidateだけをreview-pendingにします。
+9. PR branchへ反映する場合は、candidate patch、許可path、同条件比較、runtime evidence、独立回帰、関連testを人がレビューし、対象Skillだけを通常のGit変更として反映します。runnerや開発用手順はcommit / pushを行いません。
+
+この手動経路は全工程の自動化ではありません。既存Pythonで自動化するのは固定manifest/package作成の該当helper、deterministic採点、runtime verifier、profile付き正式比較・改善、patch制約・契約testです。開発用のAgent起動、原因分類の判断、手動attempt間の比較判断、candidateのPR反映は親Agentが行います。正式runnerはprofile verificationを要求し、`compare.py`と`improve.py`はそのformal result/provenance契約を前提にします。開発用成果物をformal `result.json`に偽装したり、`profile_verification="verified"`を手作業で付けたりしてはいけません。正式条件が不足する開発用比較は、既存の保存済み`evidence-index.json`に記録されたattempt/grader/runtime結果とrevision/hashから再構成し、`compare.py` / `improve.py`のformal受入結果とは別に報告します。
+
 ## CI・ローカルテスト
 
 通常CIは外部LLM、Codex、Docker runtimeを起動しません。Fake Agent / Judgeのunit・integration testとrepository contract testを実行します。

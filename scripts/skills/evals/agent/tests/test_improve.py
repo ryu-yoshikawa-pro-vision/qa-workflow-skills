@@ -19,6 +19,7 @@ from scripts.skills.evals.agent.common import (
     visible_skill_names,
 )
 from scripts.skills.evals.agent.improve import (
+    _copy_allowed_skill_files,
     _analysis_repair_gate,
     _assess_independent_case,
     _freeze_independent_eval_plan,
@@ -3383,6 +3384,46 @@ class ImprovementGateTests(unittest.TestCase):
                     "qa-workflow",
                     {"references/guide.md"},
                 )
+
+    def test_repair_workspace_excludes_evaluator_owned_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            package = root / "package"
+            skill = package / "skills" / "test-analysis"
+            files = {
+                "SKILL.md": "# Skill\n",
+                "references/guidance.md": "guidance\n",
+                "scripts/runtime.py": "print('runtime')\n",
+                "assets/template.md": "template\n",
+                "evals/deterministic/validator.py": "private grader\n",
+                "evals/output/cases/case-001/expected.json": '{"private":true}\n',
+                "evals/semantic/rubric.json": '{"private":true}\n',
+            }
+            for relative, content in files.items():
+                path = skill / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            destination = root / "repair-workspace" / ".agents" / "skills"
+            visible_paths = _copy_allowed_skill_files(
+                package, destination, "test-analysis"
+            )
+
+            self.assertEqual(
+                visible_paths,
+                {
+                    "SKILL.md",
+                    "references/guidance.md",
+                    "scripts/runtime.py",
+                    "assets/template.md",
+                },
+            )
+            copied = {
+                path.relative_to(destination / "test-analysis").as_posix()
+                for path in (destination / "test-analysis").rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(copied, visible_paths)
 
 
 if __name__ == "__main__":
