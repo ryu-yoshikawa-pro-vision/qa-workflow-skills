@@ -156,9 +156,7 @@ class TargetWorkspaceTests(unittest.TestCase):
             root.mkdir()
             outside = Path(temporary) / "outside"
             outside.mkdir()
-            (root / ".qa-eval-output").symlink_to(
-                outside, target_is_directory=True
-            )
+            (root / ".qa-eval-output").symlink_to(outside, target_is_directory=True)
             with self.assertRaisesRegex(AgentEvalError, "Agent output root"):
                 _scan_workspace(root)
 
@@ -222,9 +220,7 @@ class TargetWorkspaceTests(unittest.TestCase):
             instructions = (target / "AGENTS.md").read_text(encoding="utf-8")
 
         self.assertEqual(prepared["source_revision"], source_revision)
-        self.assertNotEqual(
-            prepared["synthetic_baseline_revision"], source_revision
-        )
+        self.assertNotEqual(prepared["synthetic_baseline_revision"], source_revision)
         self.assertIn(source_revision, instructions)
         self.assertIn("合成1-commit baseline", instructions)
         self.assertTrue(integrity["unchanged"])

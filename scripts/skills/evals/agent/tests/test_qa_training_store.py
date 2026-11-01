@@ -758,9 +758,9 @@ class QATrainingStoreTests(unittest.TestCase):
                         self.assertEqual(saved_agent_output["status"], "saved")
                     if extra_output:
                         manifest = json.loads(
-                            (
-                                saved_output_root / "artifact-manifest.json"
-                            ).read_text(encoding="utf-8")
+                            (saved_output_root / "artifact-manifest.json").read_text(
+                                encoding="utf-8"
+                            )
                         )
                         extra = next(
                             row

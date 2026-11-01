@@ -199,9 +199,7 @@ def _scan_workspace(root: Path) -> dict[str, dict[str, Any]]:
     if root.is_symlink() or not root.is_dir():
         raise AgentEvalError("workspace root must be a real directory")
     output_root = root / ".qa-eval-output"
-    if output_root.is_symlink() or (
-        output_root.exists() and not output_root.is_dir()
-    ):
+    if output_root.is_symlink() or (output_root.exists() and not output_root.is_dir()):
         raise AgentEvalError("Agent output root must be a real directory")
     manifest: dict[str, dict[str, Any]] = {}
     for path in sorted(root.rglob("*")):
