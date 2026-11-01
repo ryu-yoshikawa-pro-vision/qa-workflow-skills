@@ -160,7 +160,13 @@ class RuntimeValidatorTests(unittest.TestCase):
         )
 
     def _write_fake_runtime_verifier(
-        self, root: Path, *, valid: bool = True, exit_code: int = 0
+        self,
+        root: Path,
+        *,
+        valid: bool = True,
+        exit_code: int = 0,
+        issue_type: str = "synthetic_invalid",
+        issue_count: int = 1,
     ) -> None:
         verifier = root / "skills/example-skill/scripts/runtime_contract.py"
         verifier.parent.mkdir(parents=True)
@@ -170,7 +176,8 @@ class RuntimeValidatorTests(unittest.TestCase):
             "assert request['operation'] == 'verify_runtime_evidence'\n"
             "assert request['normalized_skill_input']['amount'] == 1.25\n"
             "assert request['partial_rerun'] is False\n"
-            f"issues = [] if {valid!r} else [{{'issue_type': 'synthetic_invalid'}}]\n"
+            f"issues = [] if {valid!r} else "
+            f"[{{'issue_type': {issue_type!r}}} for _ in range({issue_count})]\n"
             f"sys.stdout.write(json.dumps({{'valid': {valid!r}, 'issues': issues}}))\n"
             f"sys.exit({exit_code})\n",
             encoding="utf-8",
@@ -195,6 +202,94 @@ class RuntimeValidatorTests(unittest.TestCase):
         self.assertEqual(outcome["status"], "verified")
         self.assertTrue(outcome["valid"])
         self.assertEqual(result.status, "pass")
+
+    def test_skill_runtime_gate_accepts_only_validator_confirmed_blocked_outcome(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(
+                root, valid=False, issue_type="missing_entity"
+            )
+            result = EvalResult("example-skill", "EXAMPLE-BLOCKED")
+            result.add(
+                "BLOCKED-CONTRACT", True, "fixed validator accepted blocked state"
+            )
+            outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-BLOCKED",
+                {
+                    "runtime_unit_key": "artifact:example:all",
+                    "partial_rerun": False,
+                    "accepted_blocked_assertion_id": "BLOCKED-CONTRACT",
+                },
+                result,
+                source_root=root,
+            )
+
+        self.assertEqual(outcome["status"], "blocked")
+        self.assertFalse(outcome["valid"])
+        self.assertTrue(outcome["accepted_blocked_outcome"])
+        assertions = {row.id: row for row in result.assertions}
+        self.assertEqual(assertions["RT-D018"].status, "pass")
+
+    def test_skill_runtime_gate_does_not_accept_blocked_without_fixed_assertion(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(
+                root, valid=False, issue_type="missing_entity"
+            )
+            result = EvalResult("example-skill", "EXAMPLE-UNCONFIRMED")
+            outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-UNCONFIRMED",
+                {
+                    "runtime_unit_key": "artifact:example:all",
+                    "partial_rerun": False,
+                    "accepted_blocked_assertion_id": "BLOCKED-CONTRACT",
+                },
+                result,
+                source_root=root,
+            )
+
+        self.assertEqual(outcome["status"], "invalid_evidence")
+        self.assertFalse(outcome["accepted_blocked_outcome"])
+        assertions = {row.id: row for row in result.assertions}
+        self.assertEqual(assertions["RT-D018"].status, "fail")
+
+    def test_skill_runtime_gate_rejects_multiple_blocking_issues_as_accepted_blocked(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_fake_runtime_verifier(
+                root, valid=False, issue_type="missing_entity", issue_count=2
+            )
+            result = EvalResult("example-skill", "EXAMPLE-MULTIPLE-BLOCKERS")
+            result.add(
+                "BLOCKED-CONTRACT", True, "fixed validator accepted blocked state"
+            )
+            outcome = validate_skill_local_runtime_evidence(
+                self._skill_runtime_artifact(),
+                "example-skill",
+                "EXAMPLE-MULTIPLE-BLOCKERS",
+                {
+                    "runtime_unit_key": "artifact:example:all",
+                    "partial_rerun": False,
+                    "accepted_blocked_assertion_id": "BLOCKED-CONTRACT",
+                },
+                result,
+                source_root=root,
+            )
+
+        self.assertEqual(outcome["status"], "invalid_evidence")
+        self.assertFalse(outcome["accepted_blocked_outcome"])
+        assertions = {row.id: row for row in result.assertions}
+        self.assertEqual(assertions["RT-D018"].status, "fail")
 
     def test_skill_runtime_gate_rejects_missing_and_malformed_evidence(self) -> None:
         policy = {"runtime_unit_key": "artifact:example:all", "partial_rerun": False}

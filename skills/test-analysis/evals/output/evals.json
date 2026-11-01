@@ -1,6 +1,11 @@
 {
   "skill": "test-analysis",
   "canonical_output": true,
+  "skill_runtime_verification": {
+    "runtime_unit_key": "artifact:analysis_entities:all",
+    "partial_rerun": false,
+    "accepted_blocked_assertion_id": "RISK-D018"
+  },
   "cases": [
     { "id": "RISK-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json" },
     { "id": "RISK-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" }

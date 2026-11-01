@@ -1,6 +1,10 @@
 {
   "skill": "coverage-analysis",
   "canonical_output": true,
+  "skill_runtime_verification": {
+    "runtime_unit_key": "artifact:traceability:all",
+    "partial_rerun": false
+  },
   "cases": [
     { "id": "COV-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json" },
     { "id": "COV-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" }

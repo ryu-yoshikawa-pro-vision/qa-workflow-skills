@@ -1075,11 +1075,19 @@ def validate_skill_local_runtime_evidence(
     the artifact, so a missing evidence block cannot pass merely because that
     fixture has no extra runtime assertions.
     """
+    blocked_assertion_id = policy.get("accepted_blocked_assertion_id")
+    allowed_policy_fields = {"runtime_unit_key", "partial_rerun"}
+    if blocked_assertion_id is not None:
+        allowed_policy_fields.add("accepted_blocked_assertion_id")
     if (
-        set(policy) != {"runtime_unit_key", "partial_rerun"}
+        set(policy) != allowed_policy_fields
         or not isinstance(policy.get("runtime_unit_key"), str)
         or not policy["runtime_unit_key"]
         or policy.get("partial_rerun") is not False
+        or (
+            blocked_assertion_id is not None
+            and (not isinstance(blocked_assertion_id, str) or not blocked_assertion_id)
+        )
     ):
         return {
             "status": "execution error",
@@ -1315,20 +1323,36 @@ def validate_skill_local_runtime_evidence(
 
     valid = verification["valid"]
     issue_types = sorted({issue["issue_type"] for issue in issues})
+    accepted_blocked_assertions = [
+        assertion
+        for assertion in result.assertions
+        if assertion.id == blocked_assertion_id
+    ]
+    accepted_blocked = (
+        not valid
+        and len(issues) == 1
+        and issue_types == ["missing_entity"]
+        and len(accepted_blocked_assertions) == 1
+        and accepted_blocked_assertions[0].status == "pass"
+    )
     result.add(
         "RT-D018",
-        valid,
-        "Skill-local verify_runtime_evidenceが成果物をvalidと判定すること",
+        valid or accepted_blocked,
+        "Skill-local runtime verifierが有効な成果物または契約で許可されたblocked状態を確認すること",
         evidence={
             "expected_runtime_unit": expected_identity,
             "issue_types": issue_types,
+            "accepted_blocked_assertion_id": blocked_assertion_id
+            if accepted_blocked
+            else None,
         }
-        if not valid
+        if not valid or accepted_blocked
         else None,
     )
     return {
-        "status": "verified" if valid else "invalid_evidence",
+        "status": "verified" if valid else "blocked" if accepted_blocked else "invalid_evidence",
         "valid": valid,
+        "accepted_blocked_outcome": accepted_blocked,
         "expected_runtime_unit": expected_identity,
         "issue_types": issue_types,
         "verifier_path": str(verifier_path),

@@ -380,7 +380,7 @@
 - `RT-D015` expected root / Entity集合をactual出力から推測しない独立validator
 - `RT-D016` Skillがmanifestで必須と宣言したruntime input / result / Entity evidenceの存在・一意性
 - `RT-D017` Skill-local runtime verifierへ渡すfull-build入力のidentity / shape
-- `RT-D018` Skill-local `verify_runtime_evidence`のvalid判定
+- `RT-D018` Skill-local `verify_runtime_evidence`のvalid判定、またはmanifestが明示し固定deterministic assertionが確認したblocked状態
 
 ## test-target-inspection
 

@@ -69,7 +69,9 @@ python scripts/skills/evals/deterministic/run.py \
   --expected-json evaluator-private/TR-HELDOUT-006.expected.json
 ```
 
-このoptionは既存のSkill validatorと共通runtime validatorへ渡します（runtime validatorのケース固有検査範囲はexpected contractに従います）。加えて、Skillのeval manifestに`skill_runtime_verification`がある場合、graderは同じSkill package revisionの`runtime_contract.py`を用いて必須の最終`verify_runtime_evidence` gateを実行します。このSkill単位の契約はケースの`expected.json`とは独立しており、たとえば`test-requirement-design`ではblocked成果物でも必要なInput / Result / Entitiesを含み、Skill-local verifierが`valid=true`を返す必要があります。正しいblocked状態を`runtime_status=ready`へ強制するものではありません。missing / invalid evidenceはFAIL、verifierを起動できない場合や応答を検証できない場合は`execution error`（CLI exit code 2）です。Agent runnerもこの状態を実行エラーとして保持します。
+このoptionは既存のSkill validatorと共通runtime validatorへ渡します（runtime validatorのケース固有検査範囲はexpected contractに従います）。`SKILL.md`が必須の最終runtime gateを宣言するSkillは、eval manifestにも`skill_runtime_verification` policyを宣言します。repository integration testが両者の対応を確認します。policyがある場合、graderは同じSkill package revisionの`runtime_contract.py`を用いて必須の最終`verify_runtime_evidence` gateを実行します。このSkill単位の契約はケースの`expected.json`とは独立しており、必須evidence blockの欠落や不正形式はexpectedにassertionがなくてもFAILになります。通常はSkill-local verifierの`valid=true`が必要です。正しいblocked状態を`runtime_status=ready`へ強制しません。
+
+Skill契約上、blocked成果物自体が正しい評価結果となる場合に限り、manifestの`accepted_blocked_assertion_id`で指定した固定deterministic assertionがその状態を確認し、Skill-local verifierのblocking issueが`missing_entity`だけであれば、`runtime_verification.status=blocked`として区別できます。この状態は完了・runtime validを意味しません。test-analysisの`RISK-D018`がこの例外を検証します。他Skillではmanifestに許可を宣言しない限り、`valid=false`はFAILです。verifierを起動できない場合や応答を検証できない場合は`execution error`（CLI exit code 2）で、Agent runnerもこの状態を実行エラーとして保持します。
 
 この機能はgrader内でSkill-local verifierを実行するため、graderは信頼できるSkill package revisionから起動してください。通常の決定論的graderはAgentとファイルアクセスを隔離しません。expectedやgraderをAgentに見せない情報分離はAgent実行方式側で別途確保してください。
 

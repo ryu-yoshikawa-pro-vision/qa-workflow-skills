@@ -84,7 +84,11 @@ def valid_risk_runtime_evidence() -> str:
         if generator == "analysis_entities":
             risk_envelope = result_envelopes["risk_matrix"]
             candidate_envelope = result_envelopes["technique_candidates"]
-            candidate_result = candidate_envelope["payload"]
+            candidate_payload = candidate_envelope["payload"]
+            candidate_result = {
+                key: candidate_payload[key]
+                for key in ("selection_key", "candidates", "undetermined_signals")
+            }
             signals = {
                 "ordered_domain": False,
                 "explicit_boundaries": False,
@@ -210,8 +214,17 @@ def valid_risk_runtime_evidence() -> str:
         "\n"
         + "\n".join(blocks)
         + "\n### Machine Entities: test-analysis\n\n"
-        + '```json\n{"entities":[],"schema_version":"entity-state-v2",'
-        + '"skill":"test-analysis"}\n```\n'
+        + "```json\n"
+        + json.dumps(
+            {
+                "entities": [],
+                "schema_version": "entity-state-v2",
+                "skill": "test-analysis",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n```\n"
         + "\n## 最終runtime evidence gate\n\n"
         + "- verify_runtime_evidence valid: false\n"
         + "- 成果物状態: 未完成（ブロック中）\n"
@@ -245,7 +258,17 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertEqual(
                 completed.returncode, 0, completed.stdout + completed.stderr
             )
-            self.assertEqual(json.loads(completed.stdout)["status"], "pass")
+            result = json.loads(completed.stdout)
+            self.assertEqual(result["status"], "pass")
+            self.assertEqual(result["content_status"], "pass")
+            self.assertEqual(result["runtime_verification"]["status"], "blocked")
+            self.assertFalse(result["runtime_verification"]["valid"])
+            self.assertTrue(
+                result["runtime_verification"]["accepted_blocked_outcome"]
+            )
+            assertions = {row["id"]: row for row in result["assertions"]}
+            self.assertEqual(assertions["RISK-D018"]["status"], "pass")
+            self.assertEqual(assertions["RT-D018"]["status"], "pass")
 
     def test_single_invalid_output_exit_one(self):
         with tempfile.TemporaryDirectory() as tmp:
