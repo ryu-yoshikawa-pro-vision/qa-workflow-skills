@@ -168,6 +168,12 @@
 - 評価基準を変える必要が出た場合は修正候補を自動採用しません。固定Evaluatorを改訂するかはレビュー待ちとし、必要なら両Skill revisionを新Evaluatorで改めて評価します。
 - 候補は再現可能なpatch・候補revision・テスト結果・比較結果とともに保存し、元のbaselineを変更しません。検証済みでもmain / PRへ自動取り込みません。
 
+### PR branchへのcandidate反映と停止範囲
+
+- `improve.py`自体はGit branch / commit / push / PRを操作しません。検証済みcandidateは、ユーザーまたはmaintainerが明示的に反映を指示した場合、根拠・patch・baseline / candidate revision・全attempt・同一Evaluator比較・必須runtime evidence・別case回帰・関連契約テストをレビューした後に、作業中のPR branchへ個別に反映できます。これはmainへの採用、merge、正式な独立評価完了を意味しません。
+- 実効model telemetryや物理的なEvaluator読取拒否が未検証の場合、実行記録を開発用評価として表示します。これだけで独立性を保証したとは扱いませんが、安全な開発用deterministic評価や、信頼性の限界を明記したcandidate reviewを一律停止する条件にはしません。formal runner / Judgeのfail-closedは別の受入境界として維持します。
+- 原因不明、同条件比較不能、必須runtime evidence欠落、契約違反、独立回帰失敗または重要結果の揺れは当該candidateだけをreview-pendingにします。秘密情報の実漏えい、Agentへの正解情報混入が確認された場合、証拠と成果物の対応が壊れた場合、既存作業領域の破壊リスク、または安全に実行できる環境がない場合は、影響する評価作業全体を停止します。無関係なSkill / caseの安全な開発評価は継続できます。
+
 ## レビュー待ちの保存契約
 
 `--output-root`配下の`improvement/`に次を保存します。

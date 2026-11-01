@@ -32,6 +32,8 @@ runtime入力・結果はSkill-local `runtime_contract.py`の共通envelopeで�
 - **処理**: 上流の仕様根拠とプロダクトリスクを、「何を検証・保証すべきか」という検証責務へ変換し、テスト要求または明示した扱いへ閉じます。
 - **出力**: 安定したID、検証責務、現在有効な仕様根拠、関連プロダクトリスク、優先度、テストレベル / 観測方法を持つテスト要求と、テスト要求を作らない上流項目の扱いを作ります。
 
+人間向けの「テスト要求を作らない上流項目」表では、「上流ID」に対象Entityのstableな`entity_ref`をそのまま記載します。revision referenceやversionは識別子へ連結せず、必要なら「理由 / 根拠」欄へ分けて記載します（例: `entity_ref=SPEC-932`、`revision_reference=rev-2`なら上流IDは`SPEC-932`）。Machine EntityのDispositionも同じstableな`entity_ref`を保持します。この表記規則は上流Entityのcurrentnessや扱い状態を変更せず、既存の停止条件・ブロック中の判断とruntime evidence gateに従います。
+
 ## リソース
 
 - 詳細判断基準: `references/guidance.md`

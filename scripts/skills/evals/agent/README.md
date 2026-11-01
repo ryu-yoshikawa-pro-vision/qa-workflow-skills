@@ -302,6 +302,8 @@ tracked manifestに未登録のdeterministicケースは、Agent生成完了後�
 
 サブエージェントや共有workspaceを使う比較では、AgentからEvaluator領域への物理的な読取拒否を証明できません。Agent-visible以外を閲覧した可能性があるattemptは除外し、比較結果は実動作検証としてのみ扱います。provider buildやCLI telemetryが得られない場合は未取得と記録します。この手順は正式な`improve`受入、独立評価、候補の自動採用を置き換えません。
 
+この制約だけで、検証済みcandidateをPR branchのレビュー対象へ反映することまで禁止するものではありません。反映前に、原因と変更箇所の対応、baseline / candidateの比較条件と全attempt、Skill-local runtime evidence、未使用の別caseによる回帰、関連契約テスト、patchとrevisionのhashを確認し、情報隔離と実効modelの未検証範囲を記録します。失敗または証拠不足のcandidateは別candidateの作業を妨げません。runnerは引き続きGit操作を行わず、PR branch上のcandidateはmerge・正式採用・正式な独立評価とは区別します。
+
 ## CI・ローカルテスト
 
 通常CIは外部LLM、Codex、Docker runtimeを起動しません。Fake Agent / Judgeのunit・integration testとrepository contract testを実行します。
