@@ -444,6 +444,16 @@ def build_artifact_manifest(
                     }
                 )
                 continue
+            if not path.is_file() and not path.is_dir():
+                files.append(
+                    {
+                        "path": path.relative_to(output_root).as_posix(),
+                        "classification": "unsafe_filesystem_entry",
+                    }
+                )
+                continue
+            if path.is_dir():
+                continue
             if not path.is_file():
                 continue
             relative = path.relative_to(output_root).as_posix()
@@ -953,6 +963,7 @@ def run(argv: list[str] | None = None) -> int:
                 prompt = build_qa_training_store_generation_prompt(
                     eval_input=scenario["task_text"],
                     required_artifacts=scenario["required_artifacts"],
+                    target_revision=target_sha,
                 )
                 agent_execution_evidence = None
                 agent_execution_path = attempt_root / "agent-execution.json"
@@ -1065,7 +1076,11 @@ def run(argv: list[str] | None = None) -> int:
                         },
                     )
                     workspace_integrity = verify_workspace_unchanged(
-                        target, prepare["baseline_manifest"]
+                        target,
+                        prepare["baseline_manifest"],
+                        expected_synthetic_baseline_revision=prepare[
+                            "synthetic_baseline_revision"
+                        ],
                     )
                     atomic_write_json(
                         attempt_root / "target-integrity.json", workspace_integrity
@@ -1091,6 +1106,19 @@ def run(argv: list[str] | None = None) -> int:
                         "agent_timed_out": agent.timed_out,
                         "required_artifacts_present": validation["status"] == "pass",
                     }
+                    unclassified_output_files = [
+                        item["path"]
+                        for item in manifest["files"]
+                        if item["classification"]
+                        in {
+                            "unsafe_filesystem_entry",
+                            "unsafe_symlink",
+                            "unregistered_or_internal",
+                        }
+                    ]
+                    machine_summary["unclassified_output_files"] = (
+                        unclassified_output_files
+                    )
                     atomic_write_json(
                         attempt_root / "artifact-validation.json", validation
                     )
@@ -1225,6 +1253,8 @@ def run(argv: list[str] | None = None) -> int:
                     ):
                         attempt_status = "execution_error"
                     elif validation["status"] != "pass":
+                        attempt_status = "needs_review"
+                    elif unclassified_output_files and attempt_status == "pass":
                         attempt_status = "needs_review"
                     if (
                         runtime["status"] == "environment_error"

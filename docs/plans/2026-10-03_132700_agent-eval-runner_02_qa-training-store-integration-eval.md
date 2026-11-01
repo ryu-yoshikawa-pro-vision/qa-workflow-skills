@@ -143,6 +143,10 @@ live runの`--target-root`は、少なくとも次を満たすことをpreflight
 
 sanitized targetはworking treeのfilesystem copyではなく、固定source revisionの**tracked contentだけ**から作ります。これにより、target側のuntracked file、local secret、過去の一時成果物を入力へ混ぜません。
 
+sanitized targetには評価前後の変更検出用としてEvaluatorが合成した1 commitのlocal Git baselineを作ります。この`HEAD`は固定targetのsource revisionではなく、元revisionのGit objectも持ち込みません。EvaluatorはAgent-visibleな`AGENTS.md`と生成promptの両方で、固定source revisionからtracked contentを抽出した事実と合成baselineの用途を明示し、Agentにsource revisionの`git cat-file`確認やfetchをさせません。Agentは配置されたsnapshotを入力とし、規範仕様ファイル自体が欠落する場合だけpathを示して停止します。
+
+target integrity検証では、sanitized target自身の`.git`がsymlinkでないdirectoryであり、Gitが返すrepository rootがtarget rootと一致し、HEADが準備時の合成baseline revisionと一致し、commitが1件・remoteなしであることを確認します。あわせて`.git`と許可された`.qa-eval-output/`を除く全filesystem entryを走査し、tracked / untracked / ignored fileの内容差分、symlink、通常file・directory以外のentryを検出します。`.qa-eval-output/`は対象sourceの不変性manifestから除外しますが、artifact-index、成果物path、runtime evidence、secret scanで別途検証します。
+
 評価用copyでは次を記録します。
 
 - source repository
@@ -204,6 +208,7 @@ sanitized targetのrootにはEvaluatorが最小の評価用`AGENTS.md`を生成�
 - Product Code、既存Product Test、規範仕様を変更しない
 - 評価成果物の書込みはEvaluatorが指定した`.qa-eval-output/`だけに限定する（target source / 固定Skill / 評価用設定はouter bubblewrapのread-only mountで書込み禁止）
 - `artifact-index.json`の`artifacts[]`に実ファイルを、`routing[]`にSkill / scopeごとの実行・再利用・省略・blocked・未完了判断と理由を登録する形式のみ指示する。正解となるrouting一覧・期待QA成果物本文は与えない
+- execution recordやruntime request / resultはEvaluatorがattempt evidenceとして保存し、正規QA成果物として作成・登録しない。必須成果物一覧と必要時の`question-analysis`以外をartifact-indexへ追加せず、未分類fileは`needs_review`にする
 - commit / push / PR作成等のGit mutationを行わない
 - Evaluator側のReference / expected / rubric / graderを探索しない
 

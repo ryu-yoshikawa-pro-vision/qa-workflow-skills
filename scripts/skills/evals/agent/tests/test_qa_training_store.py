@@ -29,6 +29,7 @@ class QATrainingStoreTests(unittest.TestCase):
         prompt = build_qa_training_store_generation_prompt(
             eval_input=scenario["task_text"],
             required_artifacts=scenario["required_artifacts"],
+            target_revision=DEFAULT_TARGET_REVISION,
         )
         for artifact in scenario["required_artifacts"]:
             self.assertIn(f"`{artifact['skill']}`", prompt)
@@ -42,6 +43,10 @@ class QATrainingStoreTests(unittest.TestCase):
             prompt,
         )
         self.assertIn('文字列 `"1"` ではなくJSON numberの `1`', prompt)
+        self.assertIn(DEFAULT_TARGET_REVISION, prompt)
+        self.assertIn("合成1-commit baseline", prompt)
+        self.assertIn("execution record", prompt)
+        self.assertIn("QA成果物として作成・登録しないでください", prompt)
         self.assertNotIn("QTS-SEM-001", prompt)
         self.assertNotIn("QTS-SEM-010", prompt)
 
@@ -52,6 +57,13 @@ class QATrainingStoreTests(unittest.TestCase):
                 required_artifacts=[
                     {"skill": "spec-analysis", "kind": "spec-analysis"}
                 ],
+                target_revision=DEFAULT_TARGET_REVISION,
+            )
+        with self.assertRaises(ValueError):
+            build_qa_training_store_generation_prompt(
+                eval_input="Run the QA workflow.",
+                required_artifacts=load_scenario()["required_artifacts"],
+                target_revision="not-a-commit",
             )
 
     def _valid_output(self, root: Path, scenario: dict) -> dict:
@@ -383,6 +395,16 @@ class QATrainingStoreTests(unittest.TestCase):
     def test_fake_agent_and_fake_judge_complete_the_two_attempt_runner(self) -> None:
         self._run_fake_agent()
 
+    def test_unregistered_execution_record_never_produces_a_pass(self) -> None:
+        self._run_fake_agent(extra_output="execution-record.md")
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "requires POSIX named pipes")
+    def test_special_output_entry_never_produces_a_pass(self) -> None:
+        self._run_fake_agent(
+            extra_output="unexpected-pipe",
+            extra_output_kind="fifo",
+        )
+
     @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
     def test_final_message_does_not_follow_agent_symlinks(self) -> None:
         for link in ("relative", "absolute", "dangling", "parent"):
@@ -408,7 +430,14 @@ class QATrainingStoreTests(unittest.TestCase):
                 self._run_fake_agent(link=link, failure="timeout")
 
     def _run_fake_agent(
-        self, *, link=None, failure=None, race_save=False, save_failure=False
+        self,
+        *,
+        link=None,
+        failure=None,
+        race_save=False,
+        save_failure=False,
+        extra_output=None,
+        extra_output_kind="file",
     ) -> None:
         scenario = load_scenario()
         run_parent = qa_training_store.REPO_ROOT / ".agent-eval-runs"
@@ -516,6 +545,14 @@ class QATrainingStoreTests(unittest.TestCase):
                     qa_root = cwd / ".qa-eval-output"
                     qa_root.mkdir(exist_ok=True)
                     self._valid_output(qa_root, scenario)
+                    if extra_output:
+                        extra_path = qa_root / extra_output
+                        if extra_output_kind == "fifo":
+                            os.mkfifo(extra_path)
+                        else:
+                            extra_path.write_text(
+                                "Evaluator execution record.\n", encoding="utf-8"
+                            )
                     if link == "parent":
                         (qa_root / "linked-parent").symlink_to(
                             sentinel.parent, target_is_directory=True
@@ -719,6 +756,24 @@ class QATrainingStoreTests(unittest.TestCase):
                         )
                     else:
                         self.assertEqual(saved_agent_output["status"], "saved")
+                    if extra_output:
+                        manifest = json.loads(
+                            (
+                                saved_output_root / "artifact-manifest.json"
+                            ).read_text(encoding="utf-8")
+                        )
+                        extra = next(
+                            row
+                            for row in manifest["files"]
+                            if row["path"] == extra_output
+                        )
+                        self.assertEqual(
+                            extra["classification"],
+                            "unsafe_filesystem_entry"
+                            if extra_output_kind == "fifo"
+                            else "unregistered_or_internal",
+                        )
+                        self.assertEqual(attempt["status"], "needs_review")
                 self.assertEqual(sentinel.read_text(encoding="utf-8"), "unchanged")
                 self.assertFalse(dangling.exists())
         finally:
@@ -731,14 +786,14 @@ class QATrainingStoreTests(unittest.TestCase):
             "execution_error"
             if save_failure or (failure and not (failure == "timeout" and link))
             else "needs_review"
-            if link
+            if link or extra_output
             else "pass"
         )
         expected_exit = (
             2
             if save_failure or (failure and not (failure == "timeout" and link))
             else 1
-            if link
+            if link or extra_output
             else 0
         )
         self.assertEqual(exit_code, expected_exit, saved)

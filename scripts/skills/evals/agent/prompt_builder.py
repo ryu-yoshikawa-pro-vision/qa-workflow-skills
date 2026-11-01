@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 
 def build_generation_prompt(*, skill: str, eval_input: str) -> str:
     if not skill.strip() or not eval_input.strip():
@@ -17,10 +19,19 @@ def build_generation_prompt(*, skill: str, eval_input: str) -> str:
 
 
 def build_qa_training_store_generation_prompt(
-    *, eval_input: str, required_artifacts: list[dict[str, str]]
+    *,
+    eval_input: str,
+    required_artifacts: list[dict[str, str]],
+    target_revision: str,
 ) -> str:
-    if not eval_input.strip() or not required_artifacts:
-        raise ValueError("eval_input and required_artifacts must be non-empty")
+    if (
+        not eval_input.strip()
+        or not required_artifacts
+        or not re.fullmatch(r"[0-9a-f]{40}", target_revision)
+    ):
+        raise ValueError(
+            "eval_input, required_artifacts, and target_revision are required"
+        )
     rows: list[str] = []
     for index, item in enumerate(required_artifacts):
         if not isinstance(item, dict) or set(item) != {"skill", "kind", "scope"}:
@@ -33,6 +44,14 @@ def build_qa_training_store_generation_prompt(
         rows.append(f"| `{item['skill']}` | `{item['kind']}` | `{item['scope']}` |")
     contract = "\n".join(rows)
     enriched_input = f"""{eval_input}
+
+# 固定revisionのsanitized workspaceについて
+
+評価者は対象repositoryのcommit `{target_revision}` から、評価に必要なtracked filesをsanitized workspaceへ抽出しています。workspace内の`.git`は元repositoryの履歴ではなく、評価前後の変更検出に使う合成1-commit baselineです。そのため、workspaceの`HEAD`や`git cat-file`では元revisionを解決できません。checkout済みのファイルを固定revisionの入力として扱い、別revisionのfetch・checkoutはしないでください。必要な規範仕様ファイル自体が見つからない場合は、そのpathを示して停止してください。
+
+# 成果物と実行記録の区別
+
+`artifacts[]`には下表の必須QA成果物と、実際に必要な場合の`question-analysis`だけを登録してください。execution record、runtime request / result、その他の評価記録はQA成果物として作成・登録しないでください。評価者がattempt記録として`.qa-eval-output/`の外に保存します。
 
 # 固定シナリオのartifact-index登録契約
 

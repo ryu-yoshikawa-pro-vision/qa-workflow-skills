@@ -196,6 +196,13 @@ def _validate_project_context(project_context: str) -> dict[str, Any]:
 
 
 def _scan_workspace(root: Path) -> dict[str, dict[str, Any]]:
+    if root.is_symlink() or not root.is_dir():
+        raise AgentEvalError("workspace root must be a real directory")
+    output_root = root / ".qa-eval-output"
+    if output_root.is_symlink() or (
+        output_root.exists() and not output_root.is_dir()
+    ):
+        raise AgentEvalError("Agent output root must be a real directory")
     manifest: dict[str, dict[str, Any]] = {}
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root).as_posix()
@@ -208,6 +215,10 @@ def _scan_workspace(root: Path) -> dict[str, dict[str, Any]]:
         if path.is_file():
             size = path.stat().st_size
             manifest[relative] = {"size": size, "sha256": _hash_file(path)}
+        elif not path.is_dir():
+            raise AgentEvalError(
+                f"workspace contains a non-regular filesystem entry: {relative}"
+            )
     return manifest
 
 
@@ -222,7 +233,10 @@ def _hash_file(path: Path) -> str:
 
 
 def verify_workspace_unchanged(
-    root: Path, baseline: dict[str, dict[str, Any]]
+    root: Path,
+    baseline: dict[str, dict[str, Any]],
+    *,
+    expected_synthetic_baseline_revision: str,
 ) -> dict[str, Any]:
     current = _scan_workspace(root)
     changed = sorted(
@@ -230,13 +244,60 @@ def verify_workspace_unchanged(
         for key in set(baseline) | set(current)
         if baseline.get(key) != current.get(key)
     )
-    git_commits = _git(root, ["rev-list", "--count", "HEAD"])
-    remotes = _git(root, ["remote"])
+
+    local_git_metadata = root / ".git"
+    local_git_metadata_valid = (
+        local_git_metadata.is_dir() and not local_git_metadata.is_symlink()
+    )
+    repository_root = None
+    head = None
+    git_commits = None
+    remotes: list[str] = []
+    git_error = False
+    try:
+        repository_root = _git(root, ["rev-parse", "--show-toplevel"])
+        head = _git(root, ["rev-parse", "HEAD"])
+        git_commits = _git(root, ["rev-list", "--count", "HEAD"])
+        remote_output = _git(root, ["remote"])
+        remotes = remote_output.splitlines() if remote_output else []
+    except AgentEvalError:
+        git_error = True
+    repository_root_matches_target = (
+        repository_root is not None
+        and Path(repository_root).resolve() == root.resolve()
+    )
+    synthetic_baseline_matches = head == expected_synthetic_baseline_revision
+    blockers: list[str] = []
+    if changed:
+        blockers.append("workspace_files_changed")
+    if not local_git_metadata_valid:
+        blockers.append("target_local_git_metadata_missing_or_unsafe")
+    if git_error:
+        blockers.append("git_metadata_unreadable")
+    if not repository_root_matches_target:
+        blockers.append("git_repository_root_does_not_match_target")
+    if not synthetic_baseline_matches:
+        blockers.append("synthetic_baseline_revision_mismatch")
+    if git_commits != "1":
+        blockers.append("synthetic_baseline_commit_count_not_one")
+    if remotes:
+        blockers.append("target_git_remote_configured")
     return {
-        "unchanged": not changed and git_commits == "1" and not remotes,
+        "unchanged": not blockers,
         "changed_paths": changed,
-        "commit_count": int(git_commits),
-        "remotes": remotes.splitlines() if remotes else [],
+        "repository_root": repository_root,
+        "repository_root_matches_target": repository_root_matches_target,
+        "local_git_metadata_valid": local_git_metadata_valid,
+        "head": head,
+        "expected_synthetic_baseline_revision": expected_synthetic_baseline_revision,
+        "synthetic_baseline_matches": synthetic_baseline_matches,
+        "commit_count": (
+            int(git_commits)
+            if git_commits and git_commits.isdecimal()
+            else None
+        ),
+        "remotes": remotes,
+        "blockers": blockers,
     }
 
 
@@ -248,6 +309,8 @@ def prepare_sanitized_target(
     verifier_capture_source: Path,
     destination: Path,
 ) -> dict[str, Any]:
+    if destination.is_symlink():
+        raise AgentEvalError("sanitized target destination must not be a symlink")
     revision = resolve_commit(source_root, source_revision)
     if destination.exists():
         if not destination.is_dir() or any(destination.iterdir()):
@@ -332,9 +395,10 @@ def prepare_sanitized_target(
     project_context = minimal_project_context()
     context_result = _validate_project_context(project_context)
     (destination / "AGENTS.md").write_text(
-        """# Evaluation Instructions
+        f"""# Evaluation Instructions
 
 - 対象は固定revisionのCheckout / Payment Web分析・設計workflowです。
+- Evaluatorは対象repositoryの`{revision}`から評価用tracked filesを抽出しました。workspace内の`.git`は変更検出用の合成1-commit baselineであり、元repositoryの履歴やsource revisionではありません。元revisionのGit object解決やfetchは行わず、配置されたファイルを入力として扱ってください。
 - Agent-visibleなSkillは `.agents/skills/` にEvaluatorが配置したSkill集合だけです。
 - 規範仕様の優先順位は `docs/spec/README.md` に従ってください。
 - Product Code、既存Product Test、規範仕様、配置Skill、評価用設定を変更しないでください。
