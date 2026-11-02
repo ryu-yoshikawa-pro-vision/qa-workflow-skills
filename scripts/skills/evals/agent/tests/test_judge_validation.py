@@ -508,7 +508,9 @@ class JudgeValidationTests(unittest.TestCase):
         if incomplete_workflow_route:
             index_path = output / "artifact-index.json"
             index = json.loads(index_path.read_text(encoding="utf-8"))
-            route = next(row for row in index["routing"] if row["skill"] == "qa-workflow")
+            route = next(
+                row for row in index["routing"] if row["skill"] == "qa-workflow"
+            )
             route.update(
                 {"status": "incomplete", "reason": "Unresolved scope remains."}
             )
@@ -548,9 +550,7 @@ class JudgeValidationTests(unittest.TestCase):
                     "trace_status": "captured",
                     "trace_redacted": False,
                     "trace_path": trace_path,
-                    "final_message_sha256": sha256_bytes(
-                        final_message.encode("utf-8")
-                    ),
+                    "final_message_sha256": sha256_bytes(final_message.encode("utf-8")),
                 }
             ),
             encoding="utf-8",
@@ -1109,9 +1109,7 @@ class JudgeValidationTests(unittest.TestCase):
             "criteria": ["QTS-SEM-001", "QTS-SEM-002"],
             "fixture_content_integrity_status": "verified",
             "approval": {"binding_status": "matched"},
-            "approval_binding": {
-                "baseline_artifact_fingerprint": "sha256:" + "a" * 64
-            },
+            "approval_binding": {"baseline_artifact_fingerprint": "sha256:" + "a" * 64},
         }
         verified = _baseline_fixture_precondition(
             mutation,
@@ -1308,7 +1306,9 @@ class JudgeValidationTests(unittest.TestCase):
                     scenario=scenario,
                     attempt_id="attempt-01",
                 )
-                manifest_path = root / "attempt-01" / "qa-output" / "artifact-manifest.json"
+                manifest_path = (
+                    root / "attempt-01" / "qa-output" / "artifact-manifest.json"
+                )
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 mutate(manifest)
                 manifest_path.write_text(json.dumps(manifest), encoding="utf-8")

@@ -183,8 +183,10 @@ def _run_relative_path(run_root: Path, value: Any) -> Path | None:
     if not isinstance(value, str) or not value:
         return None
     relative = PurePosixPath(value)
-    if not relative.parts or relative.is_absolute() or any(
-        part in {"", ".", ".."} for part in relative.parts
+    if (
+        not relative.parts
+        or relative.is_absolute()
+        or any(part in {"", ".", ".."} for part in relative.parts)
     ):
         return None
     candidate = run_root
@@ -334,9 +336,7 @@ def _baseline_attempt_eligibility(
     ):
         return False, "saved_output_manifest_not_verified", None
     validation = validate_artifact_index(output, scenario)
-    if canonical_fingerprint(validation) != canonical_fingerprint(
-        persisted_validation
-    ):
+    if canonical_fingerprint(validation) != canonical_fingerprint(persisted_validation):
         return False, "artifact_validation_record_mismatch", None
     artifact_rows = {row["path"]: row for row in validation["artifacts"]}
     manifest_artifact_ids = manifest.get("artifact_ids")
@@ -359,9 +359,7 @@ def _baseline_attempt_eligibility(
         seen_manifest_paths.add(relative)
         path = _run_relative_path(output, relative)
         try:
-            content = (
-                path.read_bytes() if path is not None and path.is_file() else None
-            )
+            content = path.read_bytes() if path is not None and path.is_file() else None
         except OSError:
             content = None
         if (
@@ -413,8 +411,7 @@ def _baseline_attempt_eligibility(
     if status == "pass" and attempt.get("judge_status") not in {"pass", "not_run"}:
         return False, "passing_attempt_has_nonpassing_judge_status", None
     if status == "needs_review" and (
-        validation["status"] != "needs_review"
-        or attempt.get("judge_status") != "pass"
+        validation["status"] != "needs_review" or attempt.get("judge_status") != "pass"
     ):
         return False, "needs_review_reason_not_classified", None
     return (
@@ -447,9 +444,7 @@ def _select_baseline_attempt(
         )
         if eligible and output is not None:
             attempt_id = attempt.get("attempt_id")
-            result_root = _run_relative_path(
-                run_root, attempt.get("saved_result_root")
-            )
+            result_root = _run_relative_path(run_root, attempt.get("saved_result_root"))
             if (
                 not isinstance(attempt_id, str)
                 or not attempt_id
@@ -479,17 +474,18 @@ def _select_baseline_attempt(
                 }
             )
     if not eligible_attempts:
-        summary = ", ".join(
-            f"{row['attempt_id']}:{row['reason']}"
-            for row in selection
-            if not row["eligible"]
-        ) or "no candidate attempts"
+        summary = (
+            ", ".join(
+                f"{row['attempt_id']}:{row['reason']}"
+                for row in selection
+                if not row["eligible"]
+            )
+            or "no candidate attempts"
+        )
         raise AgentEvalError(
             "baseline run has no eligible saved Agent attempt (" + summary + ")"
         )
-    eligible_attempts.sort(
-        key=lambda item: (item[1].get("status") != "pass", item[0])
-    )
+    eligible_attempts.sort(key=lambda item: (item[1].get("status") != "pass", item[0]))
     _index, selected, output, reason = eligible_attempts[0]
     return selected, output, reason, selection
 
@@ -503,7 +499,9 @@ def _baseline_fixture_precondition(
     if definition.get("mutation") == "none":
         return {"status": "not_required", "reason": "normal_fixture"}
     normal_fixture_id = (
-        "normal-workflow" if definition.get("group") == "workflow" else "normal-artifacts"
+        "normal-workflow"
+        if definition.get("group") == "workflow"
+        else "normal-artifacts"
     )
     normal_case = next(
         (row for row in prior_cases if row.get("case_id") == normal_fixture_id), None
@@ -515,9 +513,10 @@ def _baseline_fixture_precondition(
             "normal_fixture_id": normal_fixture_id,
         }
     binding = normal_case.get("approval_binding")
-    if not isinstance(binding, dict) or binding.get(
-        "baseline_artifact_fingerprint"
-    ) != baseline_fingerprint:
+    if (
+        not isinstance(binding, dict)
+        or binding.get("baseline_artifact_fingerprint") != baseline_fingerprint
+    ):
         return {
             "status": "review_pending",
             "reason": "normal_baseline_binding_mismatch",
