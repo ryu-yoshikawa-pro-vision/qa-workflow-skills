@@ -38,6 +38,7 @@ raw attemptと保存済みtargetを変更していない。QTSの製品source、
 - `skills/test-condition-design/SKILL.md`、`references/coverage-techniques.md`: current unresolved resultでもmaterializeを実行し、確定済みtargetとblocked candidateを分離する指示を追加。
 - `docs/plans/2026-10-01_201500_ui-test-target-analysis-mode_09_runtime-entity-and-test-requirement-contracts.md`: v3の契約を追記。
 - runtime tests: v3の未解決model入力、既知targetだけの安定ID割当、blocked targetへのCI不発行、completion未完了を確認。
+- `scripts/skills/evals/agent/judge_validation.py::_prepare_fixture()`: `major-violation-001`生成時に、skipped `test-case-design`が所有する同scope artifactだけを除去するよう修正。cross-reference先の別Skill artifactは保持する。`test_judge_validation.py`に回帰testを追加。
 
 修正後の実Agent出力はまだないため、Skill指示がAgentの再実行を確実に導くかは未検証。旧attempt-02成果物を修正版として扱っていない。
 
@@ -67,6 +68,10 @@ launcherの両安全ゲートは引き続き未解決でfail-closed。2026-10-31
 
 QTS fixtureは11件すべて未承認。human review待ち9件、deterministic review待ち2件の状態を変更していない。既存の人間レビュー資料を再利用可能であり、JudgeやAgentによる自己承認は行っていない。正式Judgeは未実施。
 
+保存済みattempt-01の実成果物をbaselineにし、`major-violation-001/002`の既存mutation builderとartifact-index validatorを決定論実行した。attempt-01 baseline自体がQTSの未完了routingとAuthority projection issueにより`needs_review`で、正常完了のgold baselineではない。修正前の`major-violation-001`では、fixture builderがtest-case-design routingの参照IDを一括削除し、別Skill所有の`a_adversarial_review` artifactまで消してdangling referenceを追加していた。`judge_validation.py::_prepare_fixture()`を修正し、skipしたSkill・scopeが所有するartifactだけ削除する。合成回帰testは別Skill artifactの保存と、意図したtest-case-design skip / required-artifact issueだけを確認する。
+
+修正前確認は`.agent-eval-runs/pr17-qts-judge-deterministic-review-20261102-01/evaluator-private/deterministic-fixture-check.json`、修正後の同じ保存済みbaselineでの再検証は`.agent-eval-runs/pr17-qts-judge-deterministic-review-20261102-02/evaluator-private/deterministic-fixture-check.json`に保存した。修正後fixtureでは、`major-violation-001`に意図したtest-case-design skippedとrequired test-case missingが記録され、Adversarial Review参照のdangling issueは消えた。`major-violation-002`ではincomplete routingが記録された。どちらもbaseline由来の未完了状態を含めvalidatorは`needs_review`を返すため、Judge期待rating `1`のgold label承認やfixture binding成立とは扱わず、両方の`pending_deterministic_review`を維持する。
+
 ### QTS production verifier
 
 この環境にはDocker/Podman/nerdctl/ctr実行経路とDocker socketがなく、固定image digestを指定した既存Docker contract replayは実行していない。保存済みruntime captureのPython replay記録は参照したが、Docker production replayの代替PASSとは扱わない。
@@ -78,6 +83,7 @@ QTS fixtureは11件すべて未承認。human review待ち9件、deterministic r
 - `python -B -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`: **384 passed**
 - focused runtime/integration/cutover/contract tests: **84 passed**
 - deterministic `test_runtime_validator`: **16 passed**
+- Agent evaluator unittest: **175 passed, 2 skipped**; Agent repository contract tests: **4 passed**
 - `compileall` (temporary pycache prefix): passed
 - dprint check (変更対象ファイル): passed
 - `git diff --check`: passed

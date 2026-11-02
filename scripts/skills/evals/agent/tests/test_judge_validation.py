@@ -475,6 +475,65 @@ class JudgeValidationTests(unittest.TestCase):
             "Analysis and design workflow completed.\n", encoding="utf-8"
         )
 
+    def test_skip_test_case_design_preserves_cross_referenced_review_artifact(
+        self,
+    ) -> None:
+        scenario = load_scenario()
+        catalogue = load_fixture_catalogue()
+        definition = next(
+            row for row in catalogue["cases"] if row["id"] == "major-violation-001"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_output = root / "baseline"
+            self._baseline_output(baseline_output, scenario)
+            index_path = baseline_output / "artifact-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            case_row = next(
+                row
+                for row in index["routing"]
+                if row["skill"] == "test-case-design"
+            )
+            review_artifact = next(
+                artifact
+                for artifact in index["artifacts"]
+                if artifact["skill"] == "adversarial-review"
+            )
+            case_row["artifact_ids"].append(review_artifact["artifact_id"])
+            index_path.write_text(
+                json.dumps(index, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+
+            output, validation, _ = _prepare_fixture(
+                definition=definition,
+                baseline_output=baseline_output,
+                fixture_root=root / "fixture",
+                scenario=scenario,
+            )
+
+            mutated = json.loads(
+                (output / "artifact-index.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(validation["status"], "needs_review")
+            self.assertTrue(
+                any(
+                    issue["kind"] == "noncompleted_routing"
+                    and issue["skill"] == "test-case-design"
+                    and issue["status"] == "skipped"
+                    for issue in validation["issues"]
+                )
+            )
+            self.assertFalse(
+                any(
+                    issue["kind"] in {
+                        "routing_references_unknown_artifacts",
+                        "artifact_not_linked_from_routing",
+                    }
+                    for issue in validation["issues"]
+                )
+            )
+            self.assertIn(review_artifact, mutated["artifacts"])
+
     def _run(
         self,
         *,

@@ -219,7 +219,21 @@ def _prepare_fixture(
         )
         if row is None:
             raise AgentEvalError("normal baseline has no test-case-design routing row")
-        skipped_ids = set(row.get("artifact_ids", []))
+        routed_artifact_ids = row.get("artifact_ids")
+        if not isinstance(routed_artifact_ids, list) or any(
+            not isinstance(artifact_id, str) for artifact_id in routed_artifact_ids
+        ):
+            raise AgentEvalError(
+                "test-case-design routing artifact_ids are invalid in the baseline"
+            )
+        skipped_ids = {
+            artifact["artifact_id"]
+            for artifact in index["artifacts"]
+            if isinstance(artifact, dict)
+            and artifact.get("skill") == row.get("skill")
+            and artifact.get("scope") == row.get("scope")
+            and artifact.get("artifact_id") in routed_artifact_ids
+        }
         row.update(
             {
                 "status": "skipped",
@@ -230,7 +244,12 @@ def _prepare_fixture(
         index["artifacts"] = [
             item
             for item in index["artifacts"]
-            if item.get("artifact_id") not in skipped_ids
+            if not (
+                isinstance(item, dict)
+                and item.get("skill") == row.get("skill")
+                and item.get("scope") == row.get("scope")
+                and item.get("artifact_id") in skipped_ids
+            )
         ]
         index_path.write_text(
             json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
