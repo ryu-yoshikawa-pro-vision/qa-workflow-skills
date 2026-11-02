@@ -495,10 +495,7 @@ def _validate_model_results(
             row["support_status"] not in {"supported", "partial", "unsupported"}
             or row["runtime_status"] not in {"ok", "unsupported"}
             or row["result_status"] not in {"ready", "unresolved"}
-            or (
-                row["result_status"] == "unresolved"
-                and row["runtime_status"] != "ok"
-            )
+            or (row["result_status"] == "unresolved" and row["runtime_status"] != "ok")
         ):
             raise InvalidInput("model result statusが不正です")
         if (

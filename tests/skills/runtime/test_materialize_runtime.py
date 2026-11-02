@@ -25,13 +25,7 @@ MATERIALIZE_SCRIPT = (
     / "scripts"
     / "materialize_coverage.py"
 )
-DECISION_SCRIPT = (
-    REPO_ROOT
-    / "skills"
-    / "test-condition-design"
-    / "scripts"
-    / "decision_table.py"
-)
+DECISION_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "decision_table.py"
 TDR_SCRIPT = (
     REPO_ROOT
     / "skills"
@@ -473,7 +467,9 @@ class MaterializeRuntimeTests(unittest.TestCase):
         )
         self.assertIsNotNone(result["payload"]["entities"][0]["content"]["execution"])
 
-    def test_unresolved_model_materializes_known_targets_without_closing_model(self) -> None:
+    def test_unresolved_model_materializes_known_targets_without_closing_model(
+        self,
+    ) -> None:
         model_metadata = {
             "envelope_version": "1",
             "skill": "test-condition-design",
@@ -564,9 +560,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
             "technique_slug": "decision",
         }
         request = materialize_request(ep_result())
-        request["metadata"]["generator_contract_version"] = (
-            "materialize-coverage-v3"
-        )
+        request["metadata"]["generator_contract_version"] = "materialize-coverage-v3"
         request["metadata"]["upstream_entities"][1].update(
             {"entity_ref": "decision-001", "content": model_content}
         )
@@ -593,9 +587,7 @@ class MaterializeRuntimeTests(unittest.TestCase):
         request["input"]["target_annotations"] = [
             {
                 "target_ref": target["target_ref"],
-                "target_content_fingerprint": target[
-                    "target_content_fingerprint"
-                ],
+                "target_content_fingerprint": target["target_content_fingerprint"],
                 "generation_fingerprint": decision["generation_fingerprint"],
                 "priority": "中",
                 "priority_override_reason": None,
@@ -622,7 +614,9 @@ class MaterializeRuntimeTests(unittest.TestCase):
             blocked[0]["target_ref"],
             {row["target_ref"] for row in result["payload"]["target_id_map"]},
         )
-        self.assertFalse(result["payload"]["model_completion"][0]["materialize_complete"])
+        self.assertFalse(
+            result["payload"]["model_completion"][0]["materialize_complete"]
+        )
         self.assertTrue(
             any(
                 issue["issue_type"] == "model_materialize_incomplete"
