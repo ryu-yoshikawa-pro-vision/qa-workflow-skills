@@ -121,7 +121,7 @@ classification等のmaterializerが`required_refs=[]`を返す`materialize_compl
 ### 今回の検証
 
 - Judge validation unit tests: **23 passed**。baseline実行profile照合、別attempt output path拒否、manifestのboolean schema version / 浮動小数size拒否を含む。
-- Agent evaluator unit tests: **182 passed, 2 skipped**。repository contract tests: **4 passed**。
+- Agent evaluator unit tests: **185 passed, 2 skipped**。repository contract tests: **4 passed**。
 - Runtime suite: **388 passed**。
 - Deterministic evaluation contract suite: **362 tests中357 passed、4 failed、1 error**。4件のSQLite state testは`/tmp/.git`が一時test rootの祖先となり、既存の「Git worktree外」guardにより`blocked`となった。localhost static-server testはCodex sandbox内のsocket bindで`EPERM`。これらは今回の変更と独立した実行環境制約として識別し、安全guardは変更していない。
 - `compileall`: 成功。
