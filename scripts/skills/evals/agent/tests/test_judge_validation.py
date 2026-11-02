@@ -490,9 +490,7 @@ class JudgeValidationTests(unittest.TestCase):
             index_path = baseline_output / "artifact-index.json"
             index = json.loads(index_path.read_text(encoding="utf-8"))
             case_row = next(
-                row
-                for row in index["routing"]
-                if row["skill"] == "test-case-design"
+                row for row in index["routing"] if row["skill"] == "test-case-design"
             )
             review_artifact = next(
                 artifact
@@ -525,7 +523,8 @@ class JudgeValidationTests(unittest.TestCase):
             )
             self.assertFalse(
                 any(
-                    issue["kind"] in {
+                    issue["kind"]
+                    in {
                         "routing_references_unknown_artifacts",
                         "artifact_not_linked_from_routing",
                     }
