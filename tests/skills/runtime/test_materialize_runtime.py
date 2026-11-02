@@ -25,7 +25,9 @@ MATERIALIZE_SCRIPT = (
     / "scripts"
     / "materialize_coverage.py"
 )
-DECISION_SCRIPT = REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "decision_table.py"
+DECISION_SCRIPT = (
+    REPO_ROOT / "skills" / "test-condition-design" / "scripts" / "decision_table.py"
+)
 TDR_SCRIPT = (
     REPO_ROOT
     / "skills"
