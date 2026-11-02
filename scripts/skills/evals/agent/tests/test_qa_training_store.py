@@ -13,7 +13,9 @@ from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.prompt_builder import (
     build_qa_training_store_generation_prompt,
 )
-from scripts.skills.evals.agent.public_artifact_index import validate as validate_public_artifact_index
+from scripts.skills.evals.agent.public_artifact_index import (
+    validate as validate_public_artifact_index,
+)
 from scripts.skills.evals.agent.qa_training_store import (
     DEFAULT_TARGET_REVISION,
     load_scenario,
