@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -218,12 +219,32 @@ class TargetWorkspaceTests(unittest.TestCase):
                 ],
             )
             instructions = (target / "AGENTS.md").read_text(encoding="utf-8")
+            validator_exists = (
+                target / ".qa-eval-tools" / "validate_artifact_index.py"
+            ).is_file()
+            public_contract = json.loads(
+                (
+                    target
+                    / ".qa-eval-tools"
+                    / "artifact-index-contract.json"
+                ).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(prepared["source_revision"], source_revision)
         self.assertNotEqual(prepared["synthetic_baseline_revision"], source_revision)
         self.assertIn(source_revision, instructions)
         self.assertIn("合成1-commit baseline", instructions)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1 python -B", instructions)
+        self.assertIn("validate_artifact_index.py", instructions)
+        self.assertIn("artifact-index-contract.json", instructions)
+        self.assertTrue(validator_exists)
+        self.assertEqual(public_contract["schema_version"], 1)
+        self.assertEqual(
+            len(public_contract["required_artifacts"]),
+            8,
+        )
+        self.assertNotIn("rubric", public_contract)
+        self.assertNotIn("expected", public_contract)
         self.assertTrue(integrity["unchanged"])
         self.assertTrue(integrity["synthetic_baseline_matches"])
 

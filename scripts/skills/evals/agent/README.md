@@ -17,6 +17,10 @@ Skillの開発・診断では、正式runnerの認証・隔離条件が未達で
 - 既存の`run.py`、launcher、認証停止、Judge承認条件を回避・緩和しない。semantic判定を自動修正の根拠にするのは承認・検証済みJudgeまたは根拠付き人間確認に限る。
 - 新しい実Agent runnerを追加せず、可能な範囲は既存CLIと既存graderを再利用する。
 
+### QTSのartifact-index自己検査
+
+固定QTSシナリオの開発用評価では、sanitized targetへ公開チェッカー `.qa-eval-tools/validate_artifact_index.py` と、公開済みscenarioから作る構造契約だけを配置します。チェッカーはJSON schema、必須artifactの登録、Markdown path、routing参照、未登録Markdownを検査します。routing statusの意味やQA成果物本文の品質は判定せず、正解routing、expected、rubric、Judge fixtureも渡しません。Evaluator側の `validate_artifact_index()` と内容レビューを置き換えるものではありません。
+
 ## 2026-10-31 認証・隔離と異常終了の状態
 
 HEAD `8801520f1a7c32979a3a0507fa555fd9f7cea5f8`に対する保存済みsynthetic isolation probeは`verified`で、16 required checksがすべてtrueです。記録された固定CLIは`0.163.0`、binary SHA-256は`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`、`model_api_used=false`です。evidenceは`.agent-eval-runs/pr17-residual-formal-smoke-20261031-01/isolation.json`です。これは実認証や同一UID process起動制御の証明ではありません。

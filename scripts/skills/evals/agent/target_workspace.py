@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -387,6 +388,33 @@ def prepare_sanitized_target(
     capture_dir = destination / ".qa-eval-tools"
     capture_dir.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(verifier_capture_source, capture_dir / "verifier_capture.py")
+    public_index_validator = Path(__file__).with_name("public_artifact_index.py")
+    if not public_index_validator.is_file():
+        raise AgentEvalError("public artifact-index validator source is missing")
+    shutil.copyfile(public_index_validator, capture_dir / "validate_artifact_index.py")
+    try:
+        scenario = json.loads(
+            (SCENARIO_DIR / "scenario.json").read_text(encoding="utf-8")
+        )
+        public_index_contract = {
+            "schema_version": 1,
+            "required_artifacts": scenario["required_artifacts"],
+            "optional_artifacts": [
+                {
+                    "skill": "question-analysis",
+                    "kind": "question-analysis",
+                    "scope": "checkout-payment-web",
+                }
+            ],
+            "max_artifact_file_bytes": scenario["max_artifact_file_bytes"],
+            "max_artifact_total_bytes": scenario["max_artifact_total_bytes"],
+        }
+    except (OSError, KeyError, json.JSONDecodeError, TypeError) as exc:
+        raise AgentEvalError("public artifact-index contract is invalid") from exc
+    (capture_dir / "artifact-index-contract.json").write_text(
+        json.dumps(public_index_contract, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     project_context = minimal_project_context()
     context_result = _validate_project_context(project_context)
@@ -400,7 +428,8 @@ def prepare_sanitized_target(
 - Product Code、既存Product Test、規範仕様、配置Skill、評価用設定を変更しないでください。
 - 成果物の書込みは `.qa-eval-output/` だけに行ってください。
 - Python helperやSkill scriptを実行する場合は、常に `PYTHONDONTWRITEBYTECODE=1 python -B` を使い、`__pycache__` / `.pyc` を作らないでください。
-- artifact-index.jsonには実ファイルの登録と各工程のrouting判断だけを記録してください。期待成果物本文や正解routingは与えません。
+- artifact-index.jsonには実ファイルの登録と各工程のrouting判断だけを記録してください。形式とファイル参照は `.qa-eval-tools/validate_artifact_index.py --output-root .qa-eval-output --contract .qa-eval-tools/artifact-index-contract.json` で自己検査できます。この公開チェッカーはschema、必須成果物の登録、path、routing参照だけを確認し、statusの意味的な妥当性や成果物の内容品質は判定しません。未完了の工程を完了扱いにしたり、正解routingを推測したりしないでください。
+- Skill runtime generatorは対象Skillの`SKILL.md`にある入力契約に従い、sanitized targetのroot directoryから正しいPython scriptへJSON bytesをstdinで渡してください。`case_structure.py`は`--help`を実装していません。`runtime_contract.py`による最終成果物の`verify_runtime_evidence`と、generatorによるMachine Runtime Input / Result生成を混同しないでください。
 - runtime verifierを使う場合、対象Skillの`runtime_contract.py`へ渡すrequest bytesを`.qa-eval-output/.runtime-evidence/<skill>/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、`PYTHONDONTWRITEBYTECODE=1 python -B .qa-eval-tools/verifier_capture.py --skill <skill> --operation verify --request <request.json> --record <invocation-dir>`で実行してください。記録対象のSkillは`coverage-analysis`、`qa-workflow`、`spec-analysis`、`test-analysis`、`test-case-design`、`test-condition-design`、`test-requirement-design`、`usability-inspection`、`wcag-conformance-evaluation`です。requestを作っただけの自己申告JSONは実行証拠になりません。
 - qa-workflowの`workflow_runtime.py`を使う場合も、実際の入力bytesを同じattempt内の`.runtime-evidence/qa-workflow/<sha256-of-artifact-relative-path>/<unique-invocation-id>/request.json`へ保存し、同じwrapperを`PYTHONDONTWRITEBYTECODE=1 python -B`で`--skill qa-workflow --operation workflow-runtime`とともに実行してください。`valid`と`payload.can_complete`は別々に判定されます。
 - commit、push、PR作成、評価資料の探索をしないでください。

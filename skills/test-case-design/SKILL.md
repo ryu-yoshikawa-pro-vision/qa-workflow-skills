@@ -24,6 +24,8 @@ description: テスト条件とカバレッジ項目を、第三者が迷わず�
 
 `case_structure`は、currentなTCN / CIと現在有効な仕様根拠から、独立して実施できるテストケース構造を生成します。ケースID、coverage item、test data requirement、前提・手順・観測・期待結果・根拠をstable IDで追跡し、秘密値を出力へ複製しません。semantic itemが不足するケースは実行可能ケースとしてcompleteにせず、未解決・ブロック中・対象外の扱いを保持します。
 
+`case_structure.py`はJSONをstdinから読むgenerator CLIです。実行時はsanitized targetのrootから`PYTHONDONTWRITEBYTECODE=1 python -B .agents/skills/test-case-design/scripts/case_structure.py < path/to/request.json`を使い、`metadata`とcanonical normalized `input`を持つ1つのruntime requestを渡します。このscriptに`--help`引数はありません。`case_structure.py`がMachine Runtime Resultを生成する処理と、最終Markdown全文を検査する`runtime_contract.py`の`verify_runtime_evidence`処理は別の操作です。入力契約が不明な場合は実行せず、入力不足や仕様未確定を推測値で埋めないでください。
+
 Machine Runtime Input / Resultは入力・model・generation・implementation fingerprintとupstream Entity fingerprintを持ち、`runtime_status=ok`かつ`result_status=ready`、`freshness_status=current`、`deterministic_generated=true`の結果だけを通常のケース生成へ使います。実行時のPASS / FAILはケース設計の期待結果を置き換えません。
 
 ### 最終runtime evidence gate

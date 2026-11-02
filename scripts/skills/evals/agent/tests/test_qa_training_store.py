@@ -13,6 +13,7 @@ from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.prompt_builder import (
     build_qa_training_store_generation_prompt,
 )
+from scripts.skills.evals.agent.public_artifact_index import validate as validate_public_artifact_index
 from scripts.skills.evals.agent.qa_training_store import (
     DEFAULT_TARGET_REVISION,
     load_scenario,
@@ -48,6 +49,9 @@ class QATrainingStoreTests(unittest.TestCase):
         self.assertIn("execution record", prompt)
         self.assertIn("QA成果物として作成・登録しないでください", prompt)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1 python -B", prompt)
+        self.assertIn("validate_artifact_index.py", prompt)
+        self.assertIn("実在するMarkdown path", prompt)
+        self.assertIn("routing statusの意味やQA成果物の品質を判定しません", prompt)
         self.assertNotIn("QTS-SEM-001", prompt)
         self.assertNotIn("QTS-SEM-010", prompt)
 
@@ -128,6 +132,52 @@ class QATrainingStoreTests(unittest.TestCase):
         self.assertIn(
             "artifact_missing_or_symlink", {row["kind"] for row in result["issues"]}
         )
+
+    def test_public_artifact_index_check_rejects_shape_errors_but_keeps_routing_semantic(self) -> None:
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / ".qa-eval-output"
+            output.mkdir()
+            self._valid_output(output, scenario)
+            contract = root / "artifact-index-contract.json"
+            contract.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "required_artifacts": scenario["required_artifacts"],
+                        "optional_artifacts": [
+                            {
+                                "skill": "question-analysis",
+                                "kind": "question-analysis",
+                                "scope": "checkout-payment-web",
+                            }
+                        ],
+                        "max_artifact_file_bytes": scenario[
+                            "max_artifact_file_bytes"
+                        ],
+                        "max_artifact_total_bytes": scenario[
+                            "max_artifact_total_bytes"
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            public_pass = validate_public_artifact_index(output, contract)
+            index_path = output / "artifact-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["routing"][0]["status"] = "incomplete"
+            index["routing"][0]["reason"] = "Upstream specification remains unresolved."
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+            incomplete_status = validate_public_artifact_index(output, contract)
+            index["schema_version"] = "1"
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+            malformed_schema = validate_public_artifact_index(output, contract)
+
+        self.assertTrue(public_pass["valid"], public_pass)
+        self.assertTrue(incomplete_status["valid"], incomplete_status)
+        self.assertFalse(malformed_schema["valid"])
+        self.assertEqual(malformed_schema["issues"][0]["kind"], "invalid_index_schema")
 
     def test_two_independent_fake_judges_receive_separate_evidence(self) -> None:
         scenario = load_scenario()

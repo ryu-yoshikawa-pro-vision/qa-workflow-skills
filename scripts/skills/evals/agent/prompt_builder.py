@@ -57,6 +57,10 @@ def build_qa_training_store_generation_prompt(
 
 target内でPython helperやSkill scriptを実行するときは、必ず`PYTHONDONTWRITEBYTECODE=1 python -B`を使い、`__pycache__`や`.pyc`を生成しないでください。
 
+# artifact-indexの形式検査
+
+`artifact-index.json`を書いた後、公開済み登録契約の構造、実在するMarkdown path、artifactとrouting参照の整合を、`PYTHONDONTWRITEBYTECODE=1 python -B .qa-eval-tools/validate_artifact_index.py --output-root .qa-eval-output --contract .qa-eval-tools/artifact-index-contract.json`で検査してください。このチェッカーはrouting statusの意味やQA成果物の品質を判定しません。statusは実際の処理に従い、検査結果を使って実行していない工程を完了扱いしないでください。
+
 # 固定シナリオのartifact-index登録契約
 
 各必須成果物を `artifact-index.json` に登録するときは、下表の `skill`、`kind`、`scope` を正確に使用してください。`routing[]`にも、下表の各 `skill` と同じ `scope` を持つ行を1つずつ登録し、statusと理由を実際の状態に合わせ、実在する成果物のIDを`artifact_ids`へ結び付けてください。このメタデータは成果物本文やrouting statusを指定しません。`schema_version` は文字列 `"1"` ではなくJSON numberの `1` にしてください。実在する成果物だけを登録し、未完了・blockedの工程は実際の状態で記録してください。

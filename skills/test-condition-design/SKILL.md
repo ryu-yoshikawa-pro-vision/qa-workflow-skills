@@ -52,6 +52,8 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 - **処理**: テスト要求を検証条件へ展開し、問題構造に合う技法、カバレッジ基準、カバレッジ項目、採用しない候補の扱いを定義します。
 - **出力**: テスト条件、適用技法、カバレッジ基準、必要なカバレッジ項目、関連テスト要求 / 仕様根拠 / プロダクトリスク、優先度、テスト要求とカバレッジ候補の扱いを作ります。
 
+runtime generatorが条件・Action・ルール・制約値として受け取るtyped valueは、`{"type":"<supported-type>","value":<value>}`のobjectで表します。raw scalarをtyped value欄へ渡してはいけません。値の型や値そのものが仕様から確定できない場合、型変換で補完せず、その対象を未解決・ブロック中として扱うか、入力不足を報告します。
+
 runtime targetが`ブロック中`となりCoverage Itemへmaterializeされない場合は、CI IDやactive CI Entityを創作せず、output templateの技法別runtime target候補表に入力由来の構造、target key、扱い、理由を残します。候補の構造的な網羅確認と、active Coverage Item / 製品挙動の確定を区別します。
 
 優先度のenum欄に記載できる値は`高` / `中` / `低`です。入力に優先度や導出根拠がない場合は欄を空にし、`未提示`などの説明は備考欄へ記載します。
