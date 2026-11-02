@@ -1133,6 +1133,7 @@ class JudgeValidationTests(unittest.TestCase):
             )["reason"],
             "normal_baseline_binding_mismatch",
         )
+
     def test_pixel_parity_fixture_targets_the_unresolved_oracle_without_cart_overlap(
         self,
     ) -> None:
