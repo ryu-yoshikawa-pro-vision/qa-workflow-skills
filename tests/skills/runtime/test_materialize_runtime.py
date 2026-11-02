@@ -18,6 +18,13 @@ EP_SCRIPT = (
     / "scripts"
     / "equivalence_partitions.py"
 )
+CLASSIFICATION_SCRIPT = (
+    REPO_ROOT
+    / "skills"
+    / "test-condition-design"
+    / "scripts"
+    / "classification_tree.py"
+)
 MATERIALIZE_SCRIPT = (
     REPO_ROOT
     / "skills"
@@ -627,6 +634,119 @@ class MaterializeRuntimeTests(unittest.TestCase):
             ),
             result["issues"],
         )
+
+    def test_unresolved_classification_with_no_materializable_targets_has_empty_closure(
+        self,
+    ) -> None:
+        model_metadata = {
+            "envelope_version": "1",
+            "skill": "test-condition-design",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "classification-tree-v1",
+            "runtime_unit_key": "model:classification-001",
+            "model_key": "classification-001",
+            "model_type": "classification",
+            "technique_slug": None,
+            "selection_source": None,
+            "selection_key": None,
+            "scope_key": None,
+            "input_mode": "direct",
+            "upstream_entities": [],
+            "upstream_runtime_units": [],
+            "static_data_versions": {},
+            "authority_refs": [],
+            "reference_refs": [],
+        }
+        classification = run_script(
+            CLASSIFICATION_SCRIPT,
+            {
+                "metadata": model_metadata,
+                "input": {
+                    "classifications": [
+                        {
+                            "classification_key": "role",
+                            "label": "Role",
+                            "classes": [
+                                {
+                                    "class_key": "admin",
+                                    "value": {"type": "enum", "value": "admin"},
+                                    "authority_refs": [],
+                                },
+                                {
+                                    "class_key": "user",
+                                    "value": {"type": "enum", "value": "user"},
+                                    "authority_refs": [],
+                                },
+                            ],
+                            "authority_refs": ["SPEC-001"],
+                        }
+                    ],
+                    "constraints": [],
+                    "child_models": [
+                        {
+                            "child_model_key": "comb-child",
+                            "model_type": "comb",
+                            "derived_from_model_key": "classification-001",
+                            "semantic_parameters": None,
+                        }
+                    ],
+                },
+            },
+        )
+        self.assertEqual(classification["runtime_status"], "ok", classification)
+        self.assertEqual(classification["result_status"], "unresolved", classification)
+
+        model_content = {
+            "derived_from_model_key": None,
+            "model_key": "classification-001",
+            "model_type": "classification",
+            "technique_slug": None,
+            "parent_tcn_id": "TCN-001",
+            "scope_refs": [],
+            "selection_source": "user",
+            "selection_key": None,
+            "status": "active",
+        }
+        request = materialize_request(ep_result())
+        request["metadata"]["upstream_entities"] = [
+            {
+                "skill": "test-condition-design",
+                "entity_type": "tcn",
+                "entity_ref": "TCN-001",
+                "content": {"tcn_id": "TCN-001", "scope_refs": []},
+            },
+            {
+                "skill": "test-condition-design",
+                "entity_type": "model",
+                "entity_ref": "classification-001",
+                "content": model_content,
+            },
+        ]
+        request["input"]["active_model_metadata"] = [
+            {
+                "model_key": "classification-001",
+                "model_type": "classification",
+                "technique_slug": None,
+                "parent_tcn_id": "TCN-001",
+                "content_fingerprint": digest(model_content),
+                "scope_refs": [],
+            }
+        ]
+        request["input"]["models"] = [
+            runtime.current_model_result_row(classification, model_metadata)
+        ]
+        request["input"]["target_annotations"] = []
+        request["input"]["target_dispositions"] = []
+        result = run_script(MATERIALIZE_SCRIPT, request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        completion = result["payload"]["model_completion"]
+        self.assertEqual(len(completion), 1)
+        self.assertEqual(completion[0]["required_target_refs"], [])
+        self.assertTrue(completion[0]["materialize_complete"])
+        self.assertEqual(result["payload"]["target_id_map"], [])
+        self.assertEqual(classification["result_status"], "unresolved")
 
     def test_materialize_rejects_fields_outside_current_model_projection(self) -> None:
         request = materialize_request(ep_result())

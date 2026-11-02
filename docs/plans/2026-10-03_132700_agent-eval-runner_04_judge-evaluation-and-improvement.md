@@ -49,6 +49,8 @@ SkillとJudgeをそれぞれ独立に検証・改善する。**Judge自身の判
 - 人間確認済み正解と重要な食い違いがあれば当該criterionのJudgeはSkill自動修正に利用不可とする。正常例・違反例など必要な正解データ不足、反復時の矛盾、profile未検証、実行エラーでも同様。判断できる別criterionまで一律無効にしない。
 - 判定不能は`judge_unverified`とし、**既存graderの`attempt_status`とは別の改善許可状態**に記録する。評価結果の保存は続行するが、該当criterionを根拠にSkill自動修正しない。
 - 検証時の仕様・入力・正解データの問題とJudge prompt / rubricの問題を区別し、期待判定自体の疑義は[再審査](#確認済み正解データの再審査)へ回す。重要判定が反復で矛盾したときは追加の成功試行や多数決で検証済みに戻さず、全試行・根拠を保存してレビュー待ちとする。追加試行は既存の実行上限内で原因調査に限定する。
+- Baseline選択では全attemptの適格性と理由を保存し、失敗attemptを消さず、実行profile fingerprintとprofile evidence、attemptに結び付く出力path、target integrity・出力安全性・runtime evidence・artifact契約・実行traceを確認できる成果物だけを候補にする。artifact manifestのschema・sizeは整数型まで検証する。`pass`を優先し、`needs_review`は、未完了routingだけが残り、Agent実行・Judge・runtime・証拠検証がpassの場合に限り利用できる。失敗・実行・証拠エラーは選択しない。
+- 重大違反fixtureを検証済みにする前に、同じ固定baseline fingerprintに対する対応する正常fixtureが承認済みかつ反復判定済みであることを確認する。正常baselineに既存の不適合がある状態でmutation効果を検証済みにしない。
 
 ## Judgeの改善
 

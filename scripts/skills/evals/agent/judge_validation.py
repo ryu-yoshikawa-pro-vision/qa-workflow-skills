@@ -7,7 +7,7 @@ import shutil
 import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .common import (
@@ -167,6 +167,386 @@ def _artifact_content_fingerprint(root: Path) -> str:
             "Judge fixture artifacts could not be fingerprinted"
         ) from exc
     return canonical_fingerprint(files)
+
+
+def _read_evidence_object(path: Path) -> dict[str, Any] | None:
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _run_relative_path(run_root: Path, value: Any) -> Path | None:
+    if not isinstance(value, str) or not value:
+        return None
+    relative = PurePosixPath(value)
+    if not relative.parts or relative.is_absolute() or any(
+        part in {"", ".", ".."} for part in relative.parts
+    ):
+        return None
+    candidate = run_root
+    for part in relative.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            return None
+    try:
+        candidate.resolve().relative_to(run_root.resolve())
+    except (OSError, ValueError):
+        return None
+    return candidate
+
+
+def _baseline_attempt_eligibility(
+    attempt: dict[str, Any], *, run_root: Path, scenario: dict[str, Any]
+) -> tuple[bool, str, Path | None]:
+    """Accept intact Agent output and valid needs_review incomplete routing."""
+    status = attempt.get("status")
+    if status not in {"pass", "needs_review"}:
+        return False, "attempt_status_not_eligible", None
+    if (
+        attempt.get("agent_exit_code") != 0
+        or attempt.get("agent_timed_out") is not False
+    ):
+        return False, "agent_execution_not_successful", None
+    isolation = attempt.get("agent_isolation")
+    if not isinstance(isolation, dict) or isolation.get("status") != "verified":
+        return False, "agent_isolation_not_verified", None
+    workspace = attempt.get("workspace_integrity")
+    if not isinstance(workspace, dict) or workspace.get("unchanged") is not True:
+        return False, "target_workspace_integrity_not_verified", None
+    runtime_status = attempt.get("runtime_status")
+    if not isinstance(runtime_status, dict) or any(
+        runtime_status.get(key) != "pass" for key in ("verifier", "workflow_runtime")
+    ):
+        return False, "runtime_evidence_not_verified", None
+
+    output = _run_relative_path(run_root, attempt.get("saved_output_root"))
+    attempt_root = _run_relative_path(run_root, attempt.get("saved_result_root"))
+    attempt_id = attempt.get("attempt_id")
+    if (
+        output is None
+        or attempt_root is None
+        or not output.is_dir()
+        or not attempt_root.is_dir()
+        or output.parent != attempt_root
+        or not isinstance(attempt_id, str)
+        or not attempt_id
+        or attempt_root.name != attempt_id
+    ):
+        return False, "saved_attempt_paths_not_verified", None
+    attempt_record = _read_evidence_object(attempt_root / "attempt.json")
+    agent_execution = _read_evidence_object(attempt_root / "agent-execution.json")
+    persisted_validation = _read_evidence_object(
+        attempt_root / "artifact-validation.json"
+    )
+    target_integrity = _read_evidence_object(attempt_root / "target-integrity.json")
+    safety_scan = _read_evidence_object(attempt_root / "output-safety-scan.json")
+    runtime_checks = _read_evidence_object(attempt_root / "runtime-checks.json")
+    saved_output = _read_evidence_object(attempt_root / "saved-agent-output.json")
+    manifest = _read_evidence_object(output / "artifact-manifest.json")
+    if (
+        attempt_record is None
+        or agent_execution is None
+        or persisted_validation is None
+        or target_integrity is None
+        or safety_scan is None
+        or runtime_checks is None
+        or saved_output is None
+        or manifest is None
+    ):
+        return False, "required_attempt_evidence_missing", None
+    if canonical_fingerprint(attempt_record) != canonical_fingerprint(attempt):
+        return False, "attempt_record_mismatch", None
+    trace_path_value = attempt.get("agent_trace_path")
+    trace_path = _run_relative_path(run_root, trace_path_value)
+    trace_summary = (
+        _read_evidence_object(trace_path) if trace_path is not None else None
+    )
+    final_message_path = output / "final-message.md"
+    try:
+        final_message = (
+            final_message_path.read_bytes()
+            if final_message_path.is_file() and not final_message_path.is_symlink()
+            else None
+        )
+    except OSError:
+        final_message = None
+    if (
+        agent_execution.get("exit_code") != 0
+        or agent_execution.get("timed_out") is not False
+        or agent_execution.get("container_cleanup_status")
+        not in {"succeeded", "not_needed"}
+        or agent_execution.get("trace_status") != "captured"
+        or agent_execution.get("trace_redacted") is not False
+        or final_message is None
+        or agent_execution.get("final_message_sha256") != sha256_bytes(final_message)
+        or attempt.get("agent_trace_status") != "captured"
+        or agent_execution.get("trace_path") != trace_path_value
+        or trace_summary is None
+        or trace_summary.get("status") != "captured"
+        or trace_summary.get("format") != "codex_exec_jsonl"
+        or trace_summary.get("turn_completed") is not True
+        or trace_summary.get("turn_failed") is not False
+        or not isinstance(trace_summary.get("commands"), list)
+    ):
+        return False, "agent_trace_not_verified", None
+    trace_skills = {
+        skill
+        for command in trace_summary["commands"]
+        if isinstance(command, dict) and command.get("successful") is True
+        for skill in command.get("skill_files_read", [])
+        if isinstance(skill, str)
+    }
+    required_skills = {row["skill"] for row in scenario["required_artifacts"]}
+    if not required_skills <= trace_skills:
+        return False, "required_skill_use_not_verified", None
+    if (
+        target_integrity.get("unchanged") is not True
+        or safety_scan.get("status") != "clear"
+        or safety_scan.get("secret_shaped_or_unreadable_paths") != []
+        or saved_output.get("status") != "saved"
+        or not isinstance(saved_output.get("files"), list)
+        or any(
+            not isinstance(row, dict) or row.get("status") != "saved"
+            for row in saved_output["files"]
+        )
+    ):
+        return False, "target_or_output_safety_not_verified", None
+    verifier_check = runtime_checks.get("verifier")
+    workflow_check = runtime_checks.get("workflow_runtime")
+    if (
+        not isinstance(verifier_check, dict)
+        or verifier_check.get("status") != "pass"
+        or not isinstance(workflow_check, dict)
+        or workflow_check.get("status") != "pass"
+    ):
+        return False, "saved_runtime_checks_not_verified", None
+    manifest_files = manifest.get("files")
+    schema_version = manifest.get("schema_version")
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version != 1
+        or not isinstance(manifest_files, list)
+    ):
+        return False, "saved_output_manifest_not_verified", None
+    validation = validate_artifact_index(output, scenario)
+    if canonical_fingerprint(validation) != canonical_fingerprint(
+        persisted_validation
+    ):
+        return False, "artifact_validation_record_mismatch", None
+    artifact_rows = {row["path"]: row for row in validation["artifacts"]}
+    manifest_artifact_ids = manifest.get("artifact_ids")
+    if manifest_artifact_ids != sorted(
+        row["artifact_id"] for row in validation["artifacts"]
+    ):
+        return False, "saved_output_manifest_not_verified", None
+    seen_manifest_paths: set[str] = set()
+    for row in manifest_files:
+        if not isinstance(row, dict):
+            return False, "saved_output_manifest_not_verified", None
+        relative = row.get("path")
+        if (
+            not isinstance(relative, str)
+            or relative in seen_manifest_paths
+            or row.get("classification")
+            not in {"qa_artifact", "runtime_evidence", "runner_internal"}
+        ):
+            return False, "saved_output_manifest_not_verified", None
+        seen_manifest_paths.add(relative)
+        path = _run_relative_path(output, relative)
+        try:
+            content = (
+                path.read_bytes() if path is not None and path.is_file() else None
+            )
+        except OSError:
+            content = None
+        if (
+            path is None
+            or content is None
+            or not isinstance(row.get("size"), int)
+            or isinstance(row.get("size"), bool)
+            or row["size"] != len(content)
+            or not isinstance(row.get("sha256"), str)
+            or row["sha256"] != sha256_bytes(content)
+        ):
+            return False, "saved_output_manifest_not_verified", None
+        if row["classification"] == "qa_artifact":
+            artifact = artifact_rows.get(relative)
+            if (
+                artifact is None
+                or row.get("artifact_id") != artifact["artifact_id"]
+                or row["sha256"] != artifact["sha256"]
+                or row["size"] != artifact["size"]
+            ):
+                return False, "saved_output_manifest_not_verified", None
+        elif row["classification"] == "runtime_evidence":
+            if not relative.startswith(".runtime-evidence/"):
+                return False, "saved_output_manifest_not_verified", None
+        elif relative != "artifact-index.json":
+            return False, "saved_output_manifest_not_verified", None
+    actual_manifest_paths: set[str] = set()
+    try:
+        for path in output.rglob("*"):
+            if path.is_symlink():
+                return False, "saved_output_manifest_not_verified", None
+            if path.is_file():
+                relative = path.relative_to(output).as_posix()
+                if relative not in {"artifact-manifest.json", "final-message.md"}:
+                    actual_manifest_paths.add(relative)
+    except OSError:
+        return False, "saved_output_manifest_not_verified", None
+    if actual_manifest_paths != seen_manifest_paths:
+        return False, "saved_output_manifest_not_verified", None
+    issue_kinds = {
+        item.get("kind") for item in validation["issues"] if isinstance(item, dict)
+    }
+    if issue_kinds - {"noncompleted_routing"}:
+        return False, "baseline_artifact_contract_not_satisfied", None
+    if attempt.get("artifact_index_status") != validation["status"]:
+        return False, "artifact_index_status_mismatch", None
+    if status == "pass" and validation["status"] != "pass":
+        return False, "passing_attempt_has_incomplete_artifact_index", None
+    if status == "pass" and attempt.get("judge_status") not in {"pass", "not_run"}:
+        return False, "passing_attempt_has_nonpassing_judge_status", None
+    if status == "needs_review" and (
+        validation["status"] != "needs_review"
+        or attempt.get("judge_status") != "pass"
+    ):
+        return False, "needs_review_reason_not_classified", None
+    return (
+        True,
+        "passed_machine_checks_with_incomplete_routing"
+        if validation["issues"]
+        else "passed_machine_checks",
+        output,
+    )
+
+
+def _select_baseline_attempt(
+    run: dict[str, Any], *, run_root: Path, scenario: dict[str, Any]
+) -> tuple[dict[str, Any], Path, str, list[dict[str, Any]]]:
+    attempts = run.get("attempts")
+    if not isinstance(attempts, list):
+        raise AgentEvalError("baseline run has no attempt list")
+    candidates = [
+        (index, attempt)
+        for index, attempt in enumerate(attempts)
+        if isinstance(attempt, dict)
+    ]
+    eligible_attempts: list[tuple[int, dict[str, Any], Path, str]] = []
+    selection: list[dict[str, Any]] = []
+    eligible_ids: set[str] = set()
+    eligible_roots: set[Path] = set()
+    for index, attempt in candidates:
+        eligible, reason, output = _baseline_attempt_eligibility(
+            attempt, run_root=run_root, scenario=scenario
+        )
+        if eligible and output is not None:
+            attempt_id = attempt.get("attempt_id")
+            result_root = _run_relative_path(
+                run_root, attempt.get("saved_result_root")
+            )
+            if (
+                not isinstance(attempt_id, str)
+                or not attempt_id
+                or result_root is None
+                or attempt_id in eligible_ids
+                or result_root in eligible_roots
+            ):
+                raise AgentEvalError("baseline attempts are not independent")
+            eligible_ids.add(attempt_id)
+            eligible_roots.add(result_root)
+            eligible_attempts.append((index, attempt, output, reason))
+            selection.append(
+                {
+                    "attempt_id": attempt_id,
+                    "status": attempt.get("status"),
+                    "eligible": True,
+                    "reason": reason,
+                }
+            )
+        else:
+            selection.append(
+                {
+                    "attempt_id": attempt.get("attempt_id", "unknown"),
+                    "status": attempt.get("status"),
+                    "eligible": False,
+                    "reason": reason,
+                }
+            )
+    if not eligible_attempts:
+        summary = ", ".join(
+            f"{row['attempt_id']}:{row['reason']}"
+            for row in selection
+            if not row["eligible"]
+        ) or "no candidate attempts"
+        raise AgentEvalError(
+            "baseline run has no eligible saved Agent attempt (" + summary + ")"
+        )
+    eligible_attempts.sort(
+        key=lambda item: (item[1].get("status") != "pass", item[0])
+    )
+    _index, selected, output, reason = eligible_attempts[0]
+    return selected, output, reason, selection
+
+
+def _baseline_fixture_precondition(
+    definition: dict[str, Any],
+    *,
+    prior_cases: list[dict[str, Any]],
+    baseline_fingerprint: str,
+) -> dict[str, Any]:
+    if definition.get("mutation") == "none":
+        return {"status": "not_required", "reason": "normal_fixture"}
+    normal_fixture_id = (
+        "normal-workflow" if definition.get("group") == "workflow" else "normal-artifacts"
+    )
+    normal_case = next(
+        (row for row in prior_cases if row.get("case_id") == normal_fixture_id), None
+    )
+    if normal_case is None:
+        return {
+            "status": "not_evaluated",
+            "reason": "normal_baseline_fixture_not_evaluated",
+            "normal_fixture_id": normal_fixture_id,
+        }
+    binding = normal_case.get("approval_binding")
+    if not isinstance(binding, dict) or binding.get(
+        "baseline_artifact_fingerprint"
+    ) != baseline_fingerprint:
+        return {
+            "status": "review_pending",
+            "reason": "normal_baseline_binding_mismatch",
+            "normal_fixture_id": normal_fixture_id,
+        }
+    approval = normal_case.get("approval")
+    if (
+        normal_case.get("status") != "verified"
+        or not isinstance(approval, dict)
+        or approval.get("binding_status") != "matched"
+        or normal_case.get("fixture_content_integrity_status") != "verified"
+    ):
+        return {
+            "status": "review_pending",
+            "reason": "normal_baseline_not_verified",
+            "normal_fixture_id": normal_fixture_id,
+            "normal_fixture_status": normal_case.get("status"),
+        }
+    if not set(definition.get("criteria", [])) <= set(normal_case.get("criteria", [])):
+        return {
+            "status": "review_pending",
+            "reason": "normal_baseline_does_not_cover_mutation_criteria",
+            "normal_fixture_id": normal_fixture_id,
+        }
+    return {
+        "status": "verified",
+        "reason": "approved_normal_baseline_passes_mutation_criteria",
+        "normal_fixture_id": normal_fixture_id,
+    }
 
 
 def _approval_binding_status(
@@ -550,24 +930,19 @@ def run_validation(
     run, run_root = _load_result(baseline_result)
     if run.get("profile_verification") != "verified":
         raise AgentEvalError("Judge validation requires a run with verified isolation")
-    baseline_attempt = next(
-        (
-            row
-            for row in run["attempts"]
-            if row.get("status") in {"pass", "fail", "needs_review"}
-        ),
-        None,
-    )
-    if baseline_attempt is None:
-        raise AgentEvalError("baseline run has no saved Agent attempt")
-    baseline_output = (run_root / baseline_attempt["saved_output_root"]).resolve()
-    try:
-        baseline_output.relative_to(run_root.resolve())
-    except ValueError as exc:
-        raise AgentEvalError("baseline output path escapes the run root") from exc
-    if not baseline_output.is_dir():
-        raise AgentEvalError("baseline QA artifacts were not preserved")
     profile = load_execution_profile(profile_path)
+    baseline_agent_command = run.get("agent_command_template")
+    if (
+        run.get("execution_profile_fingerprint") != profile_fingerprint(profile)
+        or not isinstance(baseline_agent_command, list)
+        or any(not isinstance(item, str) for item in baseline_agent_command)
+        or not verify_profile_evidence(
+            profile, run_root, agent_command_argv=baseline_agent_command
+        )
+    ):
+        raise AgentEvalError(
+            "Judge validation requires matching verified baseline profile evidence"
+        )
     if profile.get("schema_version", 1) == 2:
         if candidate_judge_command is not None and candidate_judge_command != ["codex"]:
             raise AgentEvalError(
@@ -600,6 +975,12 @@ def run_validation(
         revision=fixed_target_sha,
         paths=scenario["reference_paths"],
     )
+    (
+        baseline_attempt,
+        baseline_output,
+        baseline_eligibility,
+        baseline_attempt_selection,
+    ) = _select_baseline_attempt(run, run_root=run_root, scenario=scenario)
     baseline_artifact_fingerprint = _artifact_content_fingerprint(baseline_output)
     if run.get("scenario_fingerprint") != scenario["scenario_fingerprint"]:
         raise AgentEvalError("baseline uses a different fixed scenario revision")
@@ -621,6 +1002,16 @@ def run_validation(
         "target_revision": fixed_target_sha,
         "target_source_checkout_revision": target_source_sha,
         "baseline_result": str(baseline_result),
+        "baseline_execution_profile_fingerprint": run.get(
+            "execution_profile_fingerprint"
+        ),
+        "baseline_agent_command_fingerprint": canonical_fingerprint(
+            baseline_agent_command
+        ),
+        "baseline_attempt_id": baseline_attempt.get("attempt_id"),
+        "baseline_attempt_status": baseline_attempt.get("status"),
+        "baseline_attempt_eligibility": baseline_eligibility,
+        "baseline_attempt_selection": baseline_attempt_selection,
         "judge_profile_fingerprint": profile_fingerprint(profile),
         "repeat": repeat,
         "cases": [],
@@ -716,6 +1107,12 @@ def run_validation(
             "fixture_content_integrity_status": "verified",
             "judge_runs": [],
         }
+        baseline_precondition = _baseline_fixture_precondition(
+            definition,
+            prior_cases=result["cases"],
+            baseline_fingerprint=baseline_artifact_fingerprint,
+        )
+        fixture_record["baseline_precondition"] = baseline_precondition
         for repeat_index in range(1, repeat + 1):
             if time.monotonic() - start >= max_seconds:
                 fixture_record["status"] = "review_pending"
@@ -791,6 +1188,7 @@ def run_validation(
         approved = (
             binding_status == "matched"
             and fixture_record["fixture_content_integrity_status"] == "verified"
+            and baseline_precondition["status"] in {"not_required", "verified"}
         )
         if candidate_judge_command is not None:
             candidate_runs = fixture_record.get("candidate_judge_runs", [])

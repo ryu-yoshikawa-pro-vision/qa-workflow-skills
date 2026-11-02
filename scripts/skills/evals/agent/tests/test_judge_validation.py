@@ -7,11 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.skills.evals.agent import compare, judge_validation
-from scripts.skills.evals.agent.common import AgentEvalError
+from scripts.skills.evals.agent.common import AgentEvalError, sha256_bytes
 from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.judge_validation import (
     _approval_binding_status,
     _artifact_content_fingerprint,
+    _baseline_attempt_eligibility,
+    _baseline_fixture_precondition,
     _fixture_approval_binding,
     _fixture_prompt,
     _prepare_fixture,
@@ -92,8 +94,14 @@ class JudgeValidationTests(unittest.TestCase):
             root = Path(temporary)
             run_root = root / "baseline-run"
             (run_root / "attempt-01" / "qa-output").mkdir(parents=True)
+            profile = _profile()
+            profile["schema_version"] = 2
             baseline = {
                 "profile_verification": "verified",
+                "execution_profile_fingerprint": judge_validation.profile_fingerprint(
+                    profile
+                ),
+                "agent_command_template": ["fake-agent"],
                 "attempts": [
                     {
                         "status": "pass",
@@ -121,7 +129,12 @@ class JudgeValidationTests(unittest.TestCase):
                         patch.object(
                             judge_validation,
                             "load_execution_profile",
-                            return_value={"schema_version": 2},
+                            return_value=profile,
+                        ),
+                        patch.object(
+                            judge_validation,
+                            "verify_profile_evidence",
+                            return_value=True,
                         ),
                         self.assertRaisesRegex(AgentEvalError, message),
                     ):
@@ -475,6 +488,119 @@ class JudgeValidationTests(unittest.TestCase):
             "Analysis and design workflow completed.\n", encoding="utf-8"
         )
 
+    def _baseline_attempt(
+        self,
+        root: Path,
+        *,
+        scenario: dict,
+        attempt_id: str,
+        status: str = "pass",
+        incomplete_workflow_route: bool = False,
+        runtime_status: str = "pass",
+        judge_status: str | None = None,
+    ) -> dict:
+        attempt_root = root / attempt_id
+        output = attempt_root / "qa-output"
+        self._baseline_output(output, scenario)
+        final_message_path = output / "final-message.md"
+        final_message = final_message_path.read_text(encoding="utf-8")
+        final_message_path.unlink()
+        if incomplete_workflow_route:
+            index_path = output / "artifact-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            route = next(row for row in index["routing"] if row["skill"] == "qa-workflow")
+            route.update(
+                {"status": "incomplete", "reason": "Unresolved scope remains."}
+            )
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+        validation = judge_validation.validate_artifact_index(output, scenario)
+        (output / "artifact-manifest.json").write_text(
+            json.dumps(build_artifact_manifest(output, validation)), encoding="utf-8"
+        )
+        final_message_path.write_text(final_message, encoding="utf-8")
+        attempt_root.mkdir(parents=True, exist_ok=True)
+        evidence = {
+            "target-integrity.json": {"unchanged": True},
+            "output-safety-scan.json": {
+                "status": "clear",
+                "secret_shaped_or_unreadable_paths": [],
+            },
+            "artifact-validation.json": validation,
+            "runtime-checks.json": {
+                "verifier": {"status": runtime_status},
+                "workflow_runtime": {
+                    "status": runtime_status,
+                    "workflow_runtime_can_complete": not incomplete_workflow_route,
+                    "workflow_runtime_has_unclosed_issues": incomplete_workflow_route,
+                },
+            },
+            "saved-agent-output.json": {"status": "saved", "files": []},
+        }
+        for name, payload in evidence.items():
+            (attempt_root / name).write_text(json.dumps(payload), encoding="utf-8")
+        trace_path = f"{attempt_id}/agent-trace.json"
+        (attempt_root / "agent-execution.json").write_text(
+            json.dumps(
+                {
+                    "exit_code": 0,
+                    "timed_out": False,
+                    "container_cleanup_status": "not_needed",
+                    "trace_status": "captured",
+                    "trace_redacted": False,
+                    "trace_path": trace_path,
+                    "final_message_sha256": sha256_bytes(
+                        final_message.encode("utf-8")
+                    ),
+                }
+            ),
+            encoding="utf-8",
+        )
+        (attempt_root / "agent-trace.json").write_text(
+            json.dumps(
+                {
+                    "format": "codex_exec_jsonl",
+                    "status": "captured",
+                    "turn_completed": True,
+                    "turn_failed": False,
+                    "commands": [
+                        {
+                            "successful": True,
+                            "skill_files_read": sorted(
+                                {row["skill"] for row in scenario["required_artifacts"]}
+                            ),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        attempt = {
+            "attempt_id": attempt_id,
+            "status": status,
+            "agent_exit_code": 0,
+            "agent_timed_out": False,
+            "agent_trace_status": "captured",
+            "agent_trace_path": trace_path,
+            "agent_isolation": {"status": "verified"},
+            "workspace_integrity": {"unchanged": True},
+            "runtime_status": {
+                "verifier": runtime_status,
+                "workflow_runtime": runtime_status,
+            },
+            "judge_status": judge_status
+            if judge_status is not None
+            else "needs_review"
+            if status == "needs_review"
+            else "pass",
+            "artifact_index_status": validation["status"],
+            "saved_result_root": attempt_id,
+            "saved_output_root": f"{attempt_id}/qa-output",
+        }
+        (attempt_root / "attempt.json").write_text(
+            json.dumps(attempt), encoding="utf-8"
+        )
+        return attempt
+
     def test_skip_test_case_design_preserves_cross_referenced_review_artifact(
         self,
     ) -> None:
@@ -543,6 +669,10 @@ class JudgeValidationTests(unittest.TestCase):
         mutate_baseline_after_binding: bool = False,
         stale_binding: bool = False,
         include_gate: bool = False,
+        baseline_statuses: tuple[str, ...] = ("pass", "pass"),
+        incomplete_workflow_route: bool = False,
+        runtime_status: str = "pass",
+        judge_status: str | None = None,
     ) -> dict | tuple[dict, dict, list[dict]]:
         scenario = load_scenario()
         with tempfile.TemporaryDirectory() as repository_temporary:
@@ -552,54 +682,39 @@ class JudgeValidationTests(unittest.TestCase):
             with tempfile.TemporaryDirectory(dir=run_parent) as temporary:
                 root = Path(temporary)
                 baseline_root = root / "baseline"
+                attempts = [
+                    self._baseline_attempt(
+                        baseline_root,
+                        scenario=scenario,
+                        attempt_id=f"attempt-{index:02d}",
+                        status=status,
+                        incomplete_workflow_route=incomplete_workflow_route,
+                        runtime_status=runtime_status,
+                        judge_status=judge_status
+                        or (
+                            "pass"
+                            if incomplete_workflow_route and status == "needs_review"
+                            else None
+                        ),
+                    )
+                    for index, status in enumerate(baseline_statuses, start=1)
+                ]
+                attempt_one, attempt_two = attempts[:2]
                 baseline_output = baseline_root / "attempt-01" / "qa-output"
-                self._baseline_output(baseline_output, scenario)
                 runtime_root = baseline_root / "attempt-01"
-                (runtime_root / "runtime-checks.json").write_text(
-                    json.dumps(
-                        {
-                            "workflow_runtime": {
-                                "workflow_runtime_can_complete": True,
-                                "workflow_runtime_has_unclosed_issues": False,
-                            }
-                        }
-                    ),
-                    encoding="utf-8",
-                )
-                second_output = baseline_root / "attempt-02" / "qa-output"
-                self._baseline_output(second_output, scenario)
-                second_runtime = baseline_root / "attempt-02"
-                (second_runtime / "runtime-checks.json").write_text(
-                    json.dumps(
-                        {
-                            "workflow_runtime": {
-                                "workflow_runtime_can_complete": True,
-                                "workflow_runtime_has_unclosed_issues": False,
-                            }
-                        }
-                    ),
-                    encoding="utf-8",
-                )
                 baseline_result = baseline_root / "result.json"
                 baseline_result.write_text(
                     json.dumps(
                         {
                             "profile_verification": "verified",
+                            "execution_profile_fingerprint": (
+                                judge_validation.profile_fingerprint(_profile())
+                            ),
+                            "agent_command_template": ["fake-agent"],
                             "evaluator_revision": "1" * 40,
                             "target_revision": DEFAULT_TARGET_REVISION,
                             "scenario_fingerprint": scenario["scenario_fingerprint"],
-                            "attempts": [
-                                {
-                                    "status": "pass",
-                                    "saved_result_root": "attempt-01",
-                                    "saved_output_root": "attempt-01/qa-output",
-                                },
-                                {
-                                    "status": "pass",
-                                    "saved_result_root": "attempt-02",
-                                    "saved_output_root": "attempt-02/qa-output",
-                                },
-                            ],
+                            "attempts": attempts,
                         }
                     ),
                     encoding="utf-8",
@@ -899,6 +1014,127 @@ class JudgeValidationTests(unittest.TestCase):
             "mismatch",
         )
 
+    def test_baseline_selection_skips_fail_and_prefers_a_qualified_pass(self) -> None:
+        result = self._run(
+            approved=False,
+            candidate=False,
+            baseline_statuses=("fail", "pass", "pass"),
+        )
+        self.assertEqual(result["baseline_attempt_id"], "attempt-02")
+        self.assertEqual(result["baseline_attempt_status"], "pass")
+        self.assertEqual(
+            result["baseline_attempt_eligibility"], "passed_machine_checks"
+        )
+        self.assertEqual(
+            [row["eligible"] for row in result["baseline_attempt_selection"]],
+            [False, True, True],
+        )
+
+    def test_judge_validation_refuses_run_without_eligible_attempt(self) -> None:
+        with self.assertRaisesRegex(AgentEvalError, "no eligible saved Agent attempt"):
+            self._run(
+                approved=False,
+                candidate=False,
+                baseline_statuses=("fail", "execution_error"),
+            )
+
+    def test_legitimate_incomplete_routing_can_be_a_needs_review_baseline(
+        self,
+    ) -> None:
+        result = self._run(
+            approved=True,
+            candidate=False,
+            baseline_statuses=("needs_review", "needs_review"),
+            incomplete_workflow_route=True,
+        )
+        self.assertEqual(result["baseline_attempt_id"], "attempt-01")
+        self.assertEqual(
+            result["baseline_attempt_eligibility"],
+            "passed_machine_checks_with_incomplete_routing",
+        )
+        self.assertEqual(result["cases"][0]["status"], "verified")
+
+    def test_incomplete_routing_does_not_hide_unresolved_judge_review(self) -> None:
+        with self.assertRaisesRegex(AgentEvalError, "no eligible saved Agent attempt"):
+            self._run(
+                approved=False,
+                candidate=False,
+                baseline_statuses=("needs_review", "needs_review"),
+                incomplete_workflow_route=True,
+                judge_status="needs_review",
+            )
+
+    def test_needs_review_baseline_with_unverified_runtime_is_rejected(self) -> None:
+        with self.assertRaisesRegex(AgentEvalError, "no eligible saved Agent attempt"):
+            self._run(
+                approved=False,
+                candidate=False,
+                baseline_statuses=("needs_review", "needs_review"),
+                runtime_status="evidence_unverified",
+            )
+
+    def test_needs_review_without_incomplete_routing_is_not_a_normal_baseline(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(AgentEvalError, "no eligible saved Agent attempt"):
+            self._run(
+                approved=False,
+                candidate=False,
+                baseline_statuses=("needs_review", "needs_review"),
+            )
+
+    def test_mutation_fixture_requires_approved_normal_baseline(self) -> None:
+        result = self._run(
+            approved=True,
+            candidate=False,
+            case_id="major-violation-001",
+        )
+        case = result["cases"][0]
+        self.assertTrue(case["judge_runs"][0]["expectation_matched"])
+        self.assertEqual(case["approval"]["binding_status"], "matched")
+        self.assertEqual(case["baseline_precondition"]["status"], "not_evaluated")
+        self.assertEqual(case["status"], "review_pending")
+
+    def test_baseline_fixture_precondition_requires_same_approved_baseline_and_criteria(
+        self,
+    ) -> None:
+        mutation = next(
+            row
+            for row in load_fixture_catalogue()["cases"]
+            if row["id"] == "major-violation-001"
+        )
+        baseline = {
+            "case_id": "normal-workflow",
+            "status": "verified",
+            "criteria": ["QTS-SEM-001", "QTS-SEM-002"],
+            "fixture_content_integrity_status": "verified",
+            "approval": {"binding_status": "matched"},
+            "approval_binding": {
+                "baseline_artifact_fingerprint": "sha256:" + "a" * 64
+            },
+        }
+        verified = _baseline_fixture_precondition(
+            mutation,
+            prior_cases=[baseline],
+            baseline_fingerprint="sha256:" + "a" * 64,
+        )
+        self.assertEqual(verified["status"], "verified")
+        self.assertEqual(
+            _baseline_fixture_precondition(
+                mutation,
+                prior_cases=[{**baseline, "status": "review_pending"}],
+                baseline_fingerprint="sha256:" + "a" * 64,
+            )["status"],
+            "review_pending",
+        )
+        self.assertEqual(
+            _baseline_fixture_precondition(
+                mutation,
+                prior_cases=[baseline],
+                baseline_fingerprint="sha256:" + "b" * 64,
+            )["reason"],
+            "normal_baseline_binding_mismatch",
+        )
     def test_pixel_parity_fixture_targets_the_unresolved_oracle_without_cart_overlap(
         self,
     ) -> None:
@@ -1039,7 +1275,9 @@ class JudgeValidationTests(unittest.TestCase):
         self.assertEqual(case["approval"]["status"], "review_pending")
         self.assertEqual(case["status"], "review_pending")
 
-    def test_changed_baseline_artifact_invalidates_existing_approval(self) -> None:
+    def test_tampered_attempt_artifact_is_rejected_in_favor_of_intact_attempt(
+        self,
+    ) -> None:
         result = self._run(
             approved=True,
             candidate=False,
@@ -1047,8 +1285,62 @@ class JudgeValidationTests(unittest.TestCase):
         )
         case = result["cases"][0]
         self.assertTrue(case["judge_runs"][0]["expectation_matched"])
-        self.assertEqual(case["approval"]["binding_status"], "mismatch")
-        self.assertEqual(case["status"], "review_pending")
+        self.assertEqual(result["baseline_attempt_id"], "attempt-02")
+        self.assertEqual(case["approval"]["binding_status"], "matched")
+        self.assertEqual(case["status"], "verified")
+
+    def test_baseline_attempt_rejects_manifest_numeric_type_confusion(self) -> None:
+        scenario = load_scenario()
+        mutations = (
+            ("schema_version", lambda manifest: manifest.update(schema_version=True)),
+            (
+                "file_size",
+                lambda manifest: manifest["files"][0].update(
+                    size=float(manifest["files"][0]["size"])
+                ),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                attempt = self._baseline_attempt(
+                    root,
+                    scenario=scenario,
+                    attempt_id="attempt-01",
+                )
+                manifest_path = root / "attempt-01" / "qa-output" / "artifact-manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                mutate(manifest)
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                eligible, reason, _ = _baseline_attempt_eligibility(
+                    attempt, run_root=root, scenario=scenario
+                )
+
+                self.assertFalse(eligible)
+                self.assertEqual(reason, "saved_output_manifest_not_verified")
+
+    def test_baseline_attempt_rejects_output_from_another_attempt(self) -> None:
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            attempt = self._baseline_attempt(
+                root, scenario=scenario, attempt_id="attempt-01"
+            )
+            other_attempt = self._baseline_attempt(
+                root, scenario=scenario, attempt_id="attempt-02"
+            )
+            attempt["saved_output_root"] = other_attempt["saved_output_root"]
+            (root / "attempt-01" / "attempt.json").write_text(
+                json.dumps(attempt), encoding="utf-8"
+            )
+
+            eligible, reason, _ = _baseline_attempt_eligibility(
+                attempt, run_root=root, scenario=scenario
+            )
+
+            self.assertFalse(eligible)
+            self.assertEqual(reason, "saved_attempt_paths_not_verified")
 
     def test_fixture_manifest_is_rebuilt_after_mutated_artifact_body(self) -> None:
         scenario = load_scenario()

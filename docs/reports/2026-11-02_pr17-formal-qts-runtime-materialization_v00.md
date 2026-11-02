@@ -101,3 +101,31 @@ QTS fixtureは11件すべて未承認。human review待ち9件、deterministic r
 | production verifier replay      | 固定image digestと既存`--network none` Docker実行契約を満たすDocker hostが必要                                                                     |
 | 正式QTS repeat / model条件      | 上記の認証・隔離・fixture承認後、固定scenario・target・profileで独立attemptを実行し、実効model telemetryとprovenanceを保存する必要がある           |
 | Skill自動改善の正式live経路     | 正式baselineと承認済み必要criterionを得てから`improve.py`のRepair・candidate比較・独立回帰を実行する必要がある                                     |
+
+## 2026-11-03 Judge baseline / unresolved runtime follow-up
+
+この追補は、開始HEAD `ef09b1e9028d6396805542139bd8eac5440439dd`に対するコードレビューと回帰確認を記録する。実Agent・Judge・Docker verifierは起動していない。
+
+### Judge baseline選択
+
+`judge_validation.py::run_validation()`は以前、最初に現れた`pass` / `fail` / `needs_review` attemptを、その保存済み実行証拠を検査せずbaselineに選んでいた。これでは、壊れたartifactや実行・runtime未確認の`needs_review`成果物が正常fixtureの基準となり、mutation効果を誤って検証済みにする可能性があった。
+
+baseline候補は、実行profile fingerprintと保存されたprofile evidence（Agent command fingerprintを含む）、attempt要約と保存済み`attempt.json`の一致、attempt IDと出力pathの対応、終了状態、Codex traceとSkill読取記録、隔離・target integrity、秘密情報scan、Skill-local runtime、artifact validation、manifest内全ファイルのhash・分類を照合する。manifest schema versionとsizeがJSON整数であることも確認し、`true == 1`や浮動小数との数値同値で契約を通さない。全attemptの選択可否と理由を結果へ保存し、適格attemptから`pass`を優先する。`needs_review`はrouting未完了だけがdeterministic issueとして残り、Judgeとruntimeがpassで、その他の実行・証拠検査を通過した場合に限って利用する。artifact不整合・semantic Judge未解決・runtime未確認の`needs_review`は拒否する。原データや失敗attemptは変更・削除しない。
+
+`major-violation-*`は、同じbaseline fingerprintに結び付く該当criteriaを覆う正常fixtureが、binding一致・内容整合・Judge反復一致で`verified`になって初めて`verified`候補となる。正常fixture未評価、未承認、baseline違い、criteria不足はreview pendingに留める。決定論的または人間によるfixture承認契約は変更せず、未承認fixtureを承認扱いしない。
+
+### unresolved modelのmaterialization
+
+classification等のmaterializerが`required_refs=[]`を返す`materialize_complete=true`は、そのmaterializerの責務であるknown-target closureが空であることを示す。上流モデルの`result_status=unresolved`を解決した意味ではない。`workflow_runtime`は上流の必須runtime unitが`unresolved`なら`runtime_not_complete`を出し、`can_complete=false`を維持する。誤完了するproduction pathは確認されなかったため、実装変更は行わず、この境界をruntime regression testsで明示した。
+
+### 今回の検証
+
+- Judge validation unit tests: **23 passed**。baseline実行profile照合、別attempt output path拒否、manifestのboolean schema version / 浮動小数size拒否を含む。
+- Agent evaluator unit tests: **182 passed, 2 skipped**。repository contract tests: **4 passed**。
+- Runtime suite: **388 passed**。
+- Deterministic evaluation contract suite: **362 tests中357 passed、4 failed、1 error**。4件のSQLite state testは`/tmp/.git`が一時test rootの祖先となり、既存の「Git worktree外」guardにより`blocked`となった。localhost static-server testはCodex sandbox内のsocket bindで`EPERM`。これらは今回の変更と独立した実行環境制約として識別し、安全guardは変更していない。
+- `compileall`: 成功。
+- dprint: 変更したJudge Planのcheck成功。`git diff --check`: 成功。
+- Ruff: 実行環境にCLIがなく未実施。
+
+この追補とunit/runtime testsはJudge選択ロジックとruntime完了契約の検証であり、Judge fixture承認、独立Judge、正式runner、QTS production Docker replay、`improve.py` live repairの受入ではない。PRに変更を反映できていない間、GitHub Actionsの成功結果は変更前HEADに対するものとして扱う。
