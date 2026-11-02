@@ -102,7 +102,8 @@ attempt-01はQuestion Analysisで24時間境界と在庫不足を分けて質問
 - `compileall`: passed.
 - 対象Python / Markdownのdprint check: passed。
 - `git diff --check`: passed。
-- RuffはローカルPython環境に未導入。GitHub Code Quality CIで確認する。
+- RuffはローカルPython環境に未導入。CIのCode QualityでRuff `0.16.8` / dprint `0.55.2`を実行し、初回に検出されたimport/format差分を修正した後のcommit `733fb3699ee9571fa1d87dfab87b5c9a272b435b`で成功。
+- commit `733fb3699ee9571fa1d87dfab87b5c9a272b435b`のGitHub Actions 5 workflowはすべてsuccess。
 - Docker CLI不在のためproduction verifier replayは未実施。
 
 ## 正式受入の残条件
