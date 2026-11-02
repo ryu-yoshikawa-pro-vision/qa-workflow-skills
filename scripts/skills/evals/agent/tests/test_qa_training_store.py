@@ -135,7 +135,9 @@ class QATrainingStoreTests(unittest.TestCase):
             "artifact_missing_or_symlink", {row["kind"] for row in result["issues"]}
         )
 
-    def test_public_artifact_index_check_rejects_shape_errors_but_keeps_routing_semantic(self) -> None:
+    def test_public_artifact_index_check_rejects_shape_errors_but_keeps_routing_semantic(
+        self,
+    ) -> None:
         scenario = load_scenario()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -155,9 +157,7 @@ class QATrainingStoreTests(unittest.TestCase):
                                 "scope": "checkout-payment-web",
                             }
                         ],
-                        "max_artifact_file_bytes": scenario[
-                            "max_artifact_file_bytes"
-                        ],
+                        "max_artifact_file_bytes": scenario["max_artifact_file_bytes"],
                         "max_artifact_total_bytes": scenario[
                             "max_artifact_total_bytes"
                         ],

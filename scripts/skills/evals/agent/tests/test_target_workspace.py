@@ -223,11 +223,9 @@ class TargetWorkspaceTests(unittest.TestCase):
                 target / ".qa-eval-tools" / "validate_artifact_index.py"
             ).is_file()
             public_contract = json.loads(
-                (
-                    target
-                    / ".qa-eval-tools"
-                    / "artifact-index-contract.json"
-                ).read_text(encoding="utf-8")
+                (target / ".qa-eval-tools" / "artifact-index-contract.json").read_text(
+                    encoding="utf-8"
+                )
             )
 
         self.assertEqual(prepared["source_revision"], source_revision)

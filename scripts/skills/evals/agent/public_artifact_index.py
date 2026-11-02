@@ -20,7 +20,9 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _load(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+    return json.loads(
+        path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object
+    )
 
 
 def _safe_markdown(root: Path, relative: Any) -> Path | None:
@@ -53,13 +55,19 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
         return {"valid": False, "issues": [{"kind": "missing_or_invalid_json"}]}
 
-    if not isinstance(contract, dict) or set(contract) != {
-        "schema_version",
-        "required_artifacts",
-        "optional_artifacts",
-        "max_artifact_file_bytes",
-        "max_artifact_total_bytes",
-    } or type(contract.get("schema_version")) is not int or contract.get("schema_version") != 1:
+    if (
+        not isinstance(contract, dict)
+        or set(contract)
+        != {
+            "schema_version",
+            "required_artifacts",
+            "optional_artifacts",
+            "max_artifact_file_bytes",
+            "max_artifact_total_bytes",
+        }
+        or type(contract.get("schema_version")) is not int
+        or contract.get("schema_version") != 1
+    ):
         return {"valid": False, "issues": [{"kind": "invalid_public_contract"}]}
     if any(
         type(contract.get(field)) is not int or contract[field] <= 0
@@ -89,14 +97,18 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
         for row in required_rows
         if isinstance(row, dict)
         and set(row) == {"skill", "kind", "scope"}
-        and all(isinstance(row[key], str) and row[key] for key in ("skill", "kind", "scope"))
+        and all(
+            isinstance(row[key], str) and row[key] for key in ("skill", "kind", "scope")
+        )
     }
     optional = {
         (row["skill"], row["kind"], row["scope"])
         for row in optional_rows
         if isinstance(row, dict)
         and set(row) == {"skill", "kind", "scope"}
-        and all(isinstance(row[key], str) and row[key] for key in ("skill", "kind", "scope"))
+        and all(
+            isinstance(row[key], str) and row[key] for key in ("skill", "kind", "scope")
+        )
     }
     if len(required) != len(required_rows) or len(optional) != len(optional_rows):
         return {"valid": False, "issues": [{"kind": "invalid_public_contract"}]}
@@ -110,11 +122,17 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
     artifact_total = 0
     for offset, row in enumerate(artifacts):
         if not isinstance(row, dict) or set(row) != {
-            "skill", "kind", "scope", "artifact_id", "path"
+            "skill",
+            "kind",
+            "scope",
+            "artifact_id",
+            "path",
         }:
             issues.append({"kind": "invalid_artifact_row", "index": offset})
             continue
-        if not all(isinstance(row.get(field), str) and row[field].strip() for field in row):
+        if not all(
+            isinstance(row.get(field), str) and row[field].strip() for field in row
+        ):
             issues.append({"kind": "invalid_artifact_field", "index": offset})
             continue
         artifact_id = row["artifact_id"]
@@ -144,12 +162,18 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
     for identity in sorted(required - contracts):
         issues.append({"kind": "required_artifact_missing", "contract": list(identity)})
     for identity in sorted(contracts - required - optional):
-        issues.append({"kind": "artifact_contract_not_published", "contract": list(identity)})
+        issues.append(
+            {"kind": "artifact_contract_not_published", "contract": list(identity)}
+        )
 
     routes: dict[tuple[str, str], dict[str, Any]] = {}
     for offset, row in enumerate(routing):
         if not isinstance(row, dict) or set(row) != {
-            "skill", "scope", "status", "reason", "artifact_ids"
+            "skill",
+            "scope",
+            "status",
+            "reason",
+            "artifact_ids",
         }:
             issues.append({"kind": "invalid_routing_row", "index": offset})
             continue
@@ -179,11 +203,15 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
 
     for skill, _kind, scope in required:
         if (skill, scope) not in routes:
-            issues.append({"kind": "required_routing_missing", "skill": skill, "scope": scope})
+            issues.append(
+                {"kind": "required_routing_missing", "skill": skill, "scope": scope}
+            )
     for identity, artifact_id in artifact_by_contract.items():
         route = routes.get((identity[0], identity[2]))
         if route is None or artifact_id not in route["artifact_ids"]:
-            issues.append({"kind": "artifact_not_linked_from_routing", "artifact_id": artifact_id})
+            issues.append(
+                {"kind": "artifact_not_linked_from_routing", "artifact_id": artifact_id}
+            )
 
     unregistered = []
     for path in output_root.rglob("*.md"):
@@ -204,9 +232,15 @@ def validate(output_root: Path, contract_path: Path) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate the public artifact-index shape and file links.")
+    parser = argparse.ArgumentParser(
+        description="Validate the public artifact-index shape and file links."
+    )
     parser.add_argument("--output-root", type=Path, default=Path(".qa-eval-output"))
-    parser.add_argument("--contract", type=Path, default=Path(".qa-eval-tools/artifact-index-contract.json"))
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        default=Path(".qa-eval-tools/artifact-index-contract.json"),
+    )
     args = parser.parse_args(argv)
     result = validate(args.output_root, args.contract)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))

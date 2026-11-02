@@ -133,7 +133,9 @@ def base_rules() -> dict:
 
 
 class DecisionTableRuntimeTests(unittest.TestCase):
-    def test_runtime_rejects_raw_scalar_instead_of_coercing_to_typed_value(self) -> None:
+    def test_runtime_rejects_raw_scalar_instead_of_coercing_to_typed_value(
+        self,
+    ) -> None:
         value = base_rules()
         value["conditions"][0]["values"][0] = False
 
