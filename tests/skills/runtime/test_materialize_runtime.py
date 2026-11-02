@@ -25,6 +25,13 @@ MATERIALIZE_SCRIPT = (
     / "scripts"
     / "materialize_coverage.py"
 )
+DECISION_SCRIPT = (
+    REPO_ROOT
+    / "skills"
+    / "test-condition-design"
+    / "scripts"
+    / "decision_table.py"
+)
 TDR_SCRIPT = (
     REPO_ROOT
     / "skills"
@@ -90,7 +97,7 @@ def materialize_metadata() -> dict:
         "envelope_version": "1",
         "skill": "test-condition-design",
         "runtime_contract_version": "runtime-v2",
-        "generator_contract_version": "materialize-coverage-v2",
+        "generator_contract_version": "materialize-coverage-v3",
         "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
         "model_key": None,
         "model_type": None,
@@ -465,6 +472,165 @@ class MaterializeRuntimeTests(unittest.TestCase):
             result["payload"]["entities"][0]["content"]["source_kind"], "runtime_target"
         )
         self.assertIsNotNone(result["payload"]["entities"][0]["content"]["execution"])
+
+    def test_unresolved_model_materializes_known_targets_without_closing_model(self) -> None:
+        model_metadata = {
+            "envelope_version": "1",
+            "skill": "test-condition-design",
+            "runtime_contract_version": "runtime-v2",
+            "generator_contract_version": "decision-table-v1",
+            "runtime_unit_key": "model:decision-001",
+            "model_key": "decision-001",
+            "model_type": "decision",
+            "technique_slug": "decision",
+            "selection_source": "analysis",
+            "selection_key": "SEL-001",
+            "scope_key": None,
+            "input_mode": "direct",
+            "upstream_entities": [],
+            "upstream_runtime_units": [],
+            "static_data_versions": {},
+            "authority_refs": [],
+            "reference_refs": [],
+        }
+        decision = run_script(
+            DECISION_SCRIPT,
+            {
+                "metadata": model_metadata,
+                "input": {
+                    "conditions": [
+                        {
+                            "condition_key": "payment_signal",
+                            "label": "Payment signal",
+                            "values": [
+                                {"type": "boolean", "value": False},
+                                {"type": "boolean", "value": True},
+                            ],
+                            "authority_refs": ["SPEC-001"],
+                        }
+                    ],
+                    "actions": [
+                        {
+                            "action_key": "payment_result",
+                            "label": "Payment result",
+                            "values": [
+                                {"type": "boolean", "value": False},
+                                {"type": "boolean", "value": True},
+                            ],
+                            "authority_refs": ["SPEC-001"],
+                        }
+                    ],
+                    "known_rules": [
+                        {
+                            "rule_key": "R-1",
+                            "when": {
+                                "payment_signal": {
+                                    "type": "boolean",
+                                    "value": False,
+                                }
+                            },
+                            "then": {
+                                "payment_result": {
+                                    "type": "boolean",
+                                    "value": False,
+                                }
+                            },
+                            "authority_refs": ["SPEC-001"],
+                        }
+                    ],
+                    "constraints": [],
+                    "accepted_merges": [],
+                },
+            },
+        )
+        self.assertEqual(decision["runtime_status"], "ok", decision)
+        self.assertEqual(decision["result_status"], "unresolved", decision)
+        blocked = [
+            target
+            for target in decision["payload"]["targets"]
+            if not target["materializable"]
+        ]
+        self.assertEqual(len(blocked), 1)
+
+        model_content = {
+            "derived_from_model_key": None,
+            "model_key": "decision-001",
+            "model_type": "decision",
+            "parent_tcn_id": "TCN-001",
+            "scope_refs": [],
+            "selection_key": "SEL-001",
+            "selection_source": "analysis",
+            "status": "active",
+            "technique_slug": "decision",
+        }
+        request = materialize_request(ep_result())
+        request["metadata"]["generator_contract_version"] = (
+            "materialize-coverage-v3"
+        )
+        request["metadata"]["upstream_entities"][1].update(
+            {"entity_ref": "decision-001", "content": model_content}
+        )
+        request["metadata"]["upstream_runtime_units"] = [
+            {
+                "skill": "test-condition-design",
+                "runtime_unit_key": "model:decision-001",
+                "generation_fingerprint": decision["generation_fingerprint"],
+            }
+        ]
+        request["input"]["active_model_metadata"] = [
+            {
+                "model_key": "decision-001",
+                "model_type": "decision",
+                "technique_slug": "decision",
+                "parent_tcn_id": "TCN-001",
+                "content_fingerprint": digest(model_content),
+                "scope_refs": [],
+            }
+        ]
+        request["input"]["models"] = [
+            runtime.current_model_result_row(decision, model_metadata)
+        ]
+        request["input"]["target_annotations"] = [
+            {
+                "target_ref": target["target_ref"],
+                "target_content_fingerprint": target[
+                    "target_content_fingerprint"
+                ],
+                "generation_fingerprint": decision["generation_fingerprint"],
+                "priority": "中",
+                "priority_override_reason": None,
+                "expected_result_root": "root-payment-rule",
+                "test_data_requirement_refs": [],
+            }
+            for target in decision["payload"]["targets"]
+            if target["materializable"]
+        ]
+
+        result = run_script(MATERIALIZE_SCRIPT, request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "unresolved", result)
+        self.assertEqual(
+            {row["target_ref"] for row in result["payload"]["target_id_map"]},
+            {
+                target["target_ref"]
+                for target in decision["payload"]["targets"]
+                if target["materializable"]
+            },
+        )
+        self.assertNotIn(
+            blocked[0]["target_ref"],
+            {row["target_ref"] for row in result["payload"]["target_id_map"]},
+        )
+        self.assertFalse(result["payload"]["model_completion"][0]["materialize_complete"])
+        self.assertTrue(
+            any(
+                issue["issue_type"] == "model_materialize_incomplete"
+                and "decision-001" in issue["model_keys"]
+                for issue in result["issues"]
+            ),
+            result["issues"],
+        )
 
     def test_materialize_rejects_fields_outside_current_model_projection(self) -> None:
         request = materialize_request(ep_result())

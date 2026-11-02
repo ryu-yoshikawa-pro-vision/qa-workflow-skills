@@ -393,7 +393,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             generator_contract_version = {
                 "condition_structure": "condition-structure-v2",
                 "equivalence_partitions": "equivalence-partitions-v1",
-                "materialize_coverage": "materialize-coverage-v2",
+                "materialize_coverage": "materialize-coverage-v3",
             }[generator]
             model_type = "ep" if model_key else None
             metadata = {
@@ -1666,7 +1666,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "envelope_version": "1",
             "skill": "test-condition-design",
             "runtime_contract_version": runtime.RUNTIME_CONTRACT_VERSION,
-            "generator_contract_version": "materialize-coverage-v2",
+            "generator_contract_version": "materialize-coverage-v3",
             "generator": "materialize_coverage",
             "runtime_unit_key": "artifact:materialize_coverage:TCN-001",
             "model_key": None,
@@ -2251,7 +2251,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-001",
-                    "materialize-coverage-v2",
+                    "materialize-coverage-v3",
                     {
                         "ci_id_state": [{"ci_id": "TCN-001-CI01", "status": "active"}],
                         "entities": [ci_one],
@@ -2260,7 +2260,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-002",
-                    "materialize-coverage-v2",
+                    "materialize-coverage-v3",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],
@@ -2499,7 +2499,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-001",
-                    "materialize-coverage-v2",
+                    "materialize-coverage-v3",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],
@@ -2508,7 +2508,7 @@ class EntityAndEvidenceTests(unittest.TestCase):
                 self._artifact_runtime_pair(
                     "materialize_coverage",
                     "artifact:materialize_coverage:TCN-002",
-                    "materialize-coverage-v2",
+                    "materialize-coverage-v3",
                     {
                         "ci_id_state": [{"ci_id": "TCN-002-CI01", "status": "active"}],
                         "entities": [ci_two],

@@ -39,7 +39,7 @@ from runtime_contract import (
 
 SKILL = "test-condition-design"
 GENERATOR = "materialize_coverage"
-GENERATOR_CONTRACT_VERSION = "materialize-coverage-v2"
+GENERATOR_CONTRACT_VERSION = "materialize-coverage-v3"
 SCRIPT_PATH = Path(__file__).resolve()
 TCN_RE = re.compile(r"^TCN-(\d{3})$")
 CI_RE = re.compile(r"^(TCN-\d{3})-CI(\d{2,})$")
@@ -494,7 +494,11 @@ def _validate_model_results(
         if (
             row["support_status"] not in {"supported", "partial", "unsupported"}
             or row["runtime_status"] not in {"ok", "unsupported"}
-            or row["result_status"] != "ready"
+            or row["result_status"] not in {"ready", "unresolved"}
+            or (
+                row["result_status"] == "unresolved"
+                and row["runtime_status"] != "ok"
+            )
         ):
             raise InvalidInput("model result statusが不正です")
         if (
@@ -566,15 +570,27 @@ def _validate_model_results(
                 not isinstance(summary, dict)
                 or not isinstance(summary.get("completeness"), dict)
                 or not isinstance(summary.get("consistency"), dict)
-                or summary.get("complete") is not True
-                or summary["completeness"].get("complete") is not True
-                or summary["consistency"].get("complete") is not True
+                or not isinstance(summary.get("complete"), bool)
+                or not isinstance(summary["completeness"].get("complete"), bool)
+                or not isinstance(summary["consistency"].get("complete"), bool)
+                or (
+                    row["result_status"] == "ready"
+                    and (
+                        summary.get("complete") is not True
+                        or summary["completeness"].get("complete") is not True
+                        or summary["consistency"].get("complete") is not True
+                    )
+                )
             ):
                 raise InvalidInput("CRUD model result coverage_summaryが未完了です")
         elif model_type in {"random", "metamorphic"}:
             if (
                 not isinstance(row.get("completion_summary"), dict)
-                or row["completion_summary"].get("complete") is not True
+                or not isinstance(row["completion_summary"].get("complete"), bool)
+                or (
+                    row["result_status"] == "ready"
+                    and row["completion_summary"].get("complete") is not True
+                )
             ):
                 raise InvalidInput(
                     "Random / Metamorphic model result completion_summaryが未完了です"
@@ -588,7 +604,11 @@ def _validate_model_results(
         }:
             if (
                 not isinstance(row.get("coverage_summary"), dict)
-                or row["coverage_summary"].get("complete") is not True
+                or not isinstance(row["coverage_summary"].get("complete"), bool)
+                or (
+                    row["result_status"] == "ready"
+                    and row["coverage_summary"].get("complete") is not True
+                )
             ):
                 raise InvalidInput("Coverage model result coverage_summaryが未完了です")
         normalized = dict(row)
@@ -1909,6 +1929,10 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 bool(required_refs)
                 and set(required_refs).issubset(set(closed_refs))
                 and summary_complete
+                and not (
+                    model_result is not None
+                    and model_result.get("result_status") == "unresolved"
+                )
             )
         if (
             model_result is not None

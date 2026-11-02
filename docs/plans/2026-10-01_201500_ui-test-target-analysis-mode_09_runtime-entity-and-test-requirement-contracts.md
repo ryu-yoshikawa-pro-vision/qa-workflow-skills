@@ -735,6 +735,10 @@ zero-scope terminalではcurrent target / semantic coverage item / model owner�
 - history entryは同じTCNが再度active→inactiveになった時に最新successful materialize stateで置換する。active中に古いhistoryが残っていてもcurrent materialize resultを常に優先し、terminal deleted TCNではentryを除去する
 - `inactive_ci_ids[]` はactive previous CIだけをactive→inactiveへ遷移させる。既存 `previous_target_id_map[].mapping_status / previous_semantic_ci_map[].mapping_status=active|inactive` は維持し、scope blockをsemantic deletionへ変換しない
 
+### 7.3a materialize-coverage-v3: current unresolved model result
+
+`materialize-coverage-v3`は、`runtime_status=ok`かつ`result_status=unresolved`のcurrent deterministic model resultを受け取れます。入力は引き続き`runtime_contract.py::current_model_result_row()`のprojectionに限定します。runtimeが生成した既知のmaterializable targetはCoverage Itemへ統合し、`materializable=false`の未確定targetにはCIを作りません。model completionを未完了とし、coverage summaryが完了を示す場合もmaterialize resultを`unresolved`に保ちます。こうして、未解決仕様を維持しながら同一TCN内の確定済み経路を追跡でき、必要なTCN-scope materialization evidenceも記録できます。
+
 ### 7.4 case-structure-v2
 
 zero-scope terminalではcurrent `test_conditions / coverage_items / environment_requirements / test_data_requirements / test_cases / dispositions` を空にし、previous active / inactive TC全件をupdate scopeへ入れて`deleted / scope_refs=[]`へ遷移させます。new / reuse TC draftを禁止し、`inactive_tc_history[]`を空へ閉じます。
@@ -1229,7 +1233,7 @@ Product Riskは本PRで `scope_refs / active-inactive-deleted` lifecycleへ拡�
 ## 16. 完了条件
 
 - PR #14後の9 runtime_contract.pyが同一内容でacceptance_criterionを扱える
-- 9コピーがruntime-v2 / entity-state-v2へ同期され、`requirement-structure-v2 / condition-structure-v2 / materialize-coverage-v2 / case-structure-v2` が明示される。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
+- 9コピーがruntime-v2 / entity-state-v2へ同期され、TRD / TCD structure / TCのcontract v2とTCD `materialize-coverage-v2`が明示される。TCD materializeの未解決current model結果対応は§7.3aの`materialize-coverage-v3`として追加する。TRD / TCD / TC固有cutover projectionはshared runtimeではなく各Skill-local helperにある
 - helperからpackage-global spec-analysis evidence + ready / blocked scope ID indexと、current ready scope全件のcanonical batch handoff + compact `scope_index[]` を別responseで決定論生成できる。package-global responseへscope別full payloadを複製しない
 - qa-workflowは `inspect.ready_scope_ids[]` が1件以上の時だけ全件をbatch inputにし、Authority / current AC / Machine Entity / expected identityをhelper側でunion / dedupeする。`current_scope_ids[]` non-empty + `ready_scope_ids=[]` では空batch / downstream runtimeを起動しない。`current_scope_ids=[]` はbatchを作らずzero-scope terminalizationへ進む。blocked scopeをbatchへ含めず、Agentがmerge / filterしない。TR scope_refsはLLMがscope_indexから追加ownershipを明示し、TCN / model / CI / TCはgeneratorが上流参照から決定論伝播する
 - `inspect.current_scope_ids[]` はcurrent SCOPE row全件とexact一致し、ready + blocked unionである。downstream helperはこのcurrent universeを使ってretired SCOPE参照をblocked由来inactiveと区別する
