@@ -1,5 +1,19 @@
 # Judge評価・改善Plan
 
+## 2026-11-03 Judgeの実行方式と独立検証（現行正本）
+
+JudgeおよびJudge改善Agentは既存Codexセッションの**別サブエージェント呼出し**で実行する。固定Codex CLI、専用WSL2 account、認証store、二重bubblewrap、Dockerは利用しない。2026-10-24のWSL2／固定CLIに関する受入ゲートは履歴とし、新方式では参照しない。旧launcherのfail-closedフラグを解除して旧経路を偽装利用しない。
+
+専用隔離環境を整備できないため、**利用者はサブエージェント間の共有権限に由来する残余リスクを受容**してJudgeの評価を進める。別呼出し・別入力・別一時ディレクトリによる運用上の分離は行うが、OS権限の分離や正解データへの物理的アクセス不能までは保証しない。このリスクだけでJudge実行を停止せず、承認済みfixture、期待値の非投入、評価の反復・揺れ・証拠を確認する。実行の独立性と物理的隔離の検証状態は分けて記録し、人間が行う正解データ承認は省略しない。
+
+- Judge promptは対象QA成果物、criterion、判定に必要な固定規範Referenceだけから構成する。期待rating、fixtureの正解・承認情報、分析・修正用の仮説、独立検証用の正解、他Judge結果を渡さない。workflow Judgeと成果物Judgeは別呼出しで実行し、必要な結果と出力形式を既存normalizerで検査する。
+- AgentとJudgeは別attempt・別一時ディレクトリとし、入力内容とhashを記録する。サブエージェントが親セッションの権限を共有する場合、**一時ディレクトリは物理的な読取拒否の根拠にならない**。ツール使用・入力非投入・file manifestを確認できる範囲だけ記録し、アクセス制御や実効model情報を未観測なら`unverified`とする。
+- QTS fixture 11件（2026-11-03時点で承認済み0、人間レビュー待ち9、決定論的レビュー待ち2）は元の規範と固定baselineに基づいて審査する。承認bindingとmanifest、正常fixtureの妥当性、mutationの単独効果を確認する。人間の意味判断をAgentが代行承認しない。2026-11-02追補の`_baseline_attempt_eligibility()`および正常fixture依存条件を維持する。
+- Judge改善では候補作成前にtune／independentのcase集合とfingerprintを固定し、独立検証用の入力・正解・個別結果を改善Agentへ公開しない。期待値やrubricをJudge出力に合わせて変更せず、異なるEvaluator revisionの結果を直接比較しない。
+- `judge_validation.py`の外部CLI process・schema 2 profile必須経路は、サブエージェントの別呼出しで得た回答・利用できる実行証拠を取り込む契約に変更する。根拠のない`verified`の設定や、未承認fixtureの採点結果からの自己承認は禁止する。
+
+Judgeの独立検証で確認すべき意味判定の品質要件は従来どおり維持する。物理的隔離・tool read-denial・実効model/buildを検証できないときは、それぞれ未検証と明記し、満たしていると主張しない。
+
 [親Plan](./2026-10-03_132700_agent-eval-runner.md)のJudge独立評価・改善を定義する。[Skill改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)と[固定対象評価Plan](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md)を補完する。既存の`semantic/prompt_builder.py`、`result.py`、`rubric.json`、`reference.md`とEvaluator-only fixtureを再利用する。新しいJudge採点方式・Agent runtime・DBは作らない。
 
 ## 2026-10-26 fixtureの現在状態
