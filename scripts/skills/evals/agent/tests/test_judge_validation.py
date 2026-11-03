@@ -89,6 +89,50 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_fixture_judge_prompts_do_not_include_gold_fixture_status(self) -> None:
+        scenario = load_scenario()
+        catalogue = load_fixture_catalogue()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_output = root / "baseline"
+            self._baseline_output(baseline_output, scenario)
+            references = {
+                relative: b"Fixed specification reference.\n"
+                for relative in scenario["reference_paths"]
+            }
+            for case_id in ("normal-workflow", "normal-artifacts"):
+                with self.subTest(case_id=case_id):
+                    definition = next(
+                        row for row in catalogue["cases"] if row["id"] == case_id
+                    )
+                    fixture_root = root / case_id
+                    fixture_root.mkdir()
+                    output, validation, final_message = _prepare_fixture(
+                        definition=definition,
+                        baseline_output=baseline_output,
+                        fixture_root=fixture_root,
+                        scenario=scenario,
+                    )
+                    prompt, criteria = _fixture_prompt(
+                        definition=definition,
+                        scenario=scenario,
+                        references=references,
+                        output=output,
+                        validation=validation,
+                        final_message=final_message,
+                        machine_summary={
+                            "required_artifacts_present": validation["status"]
+                            == "pass",
+                            "workflow_runtime_can_complete": False,
+                            "workflow_runtime_has_unclosed_issues": True,
+                        },
+                    )
+                    self.assertEqual(criteria, definition["criteria"])
+                    self.assertNotIn(definition["expected"], prompt)
+                    self.assertNotIn(definition["approval_status"], prompt)
+                    self.assertIn("# Rubric", prompt)
+                    self.assertIn("# Reference", prompt)
+
     def test_schema2_rejects_docker_candidate_judge_and_proposal_commands(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1046,6 +1090,7 @@ class JudgeValidationTests(unittest.TestCase):
             candidate=False,
             baseline_statuses=("needs_review", "needs_review"),
             incomplete_workflow_route=True,
+            judge_status="not_run",
         )
         self.assertEqual(result["baseline_attempt_id"], "attempt-01")
         self.assertEqual(
@@ -1380,6 +1425,208 @@ class JudgeValidationTests(unittest.TestCase):
                 "Inventory is decremented and purchase history is created",
                 (output / test_case["path"]).read_text(encoding="utf-8"),
             )
+
+    def test_subagent_judge_handoff_omits_gold_labels_and_records_unverified_fields(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            runs = repository / ".agent-eval-runs"
+            runs.mkdir()
+            call_root = runs / "stage4" / "calls" / "normal-workflow-01"
+            prompt = "Judge this untrusted QA output against only the provided rubric and reference."
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                handoff = judge_validation.prepare_subagent_judge_call(
+                    call_root=call_root,
+                    call_id="normal-workflow-01",
+                    case_id="normal-workflow",
+                    prompt=prompt,
+                    criteria=["QTS-SEM-001", "QTS-SEM-002"],
+                    baseline_run_id="baseline-run",
+                    baseline_attempt_id="baseline-attempt",
+                    evaluator_revision="1" * 40,
+                    target_revision=DEFAULT_TARGET_REVISION,
+                )
+                request = json.loads((call_root / "request.json").read_text())
+                self.assertEqual(handoff["prompt"], prompt)
+                self.assertEqual(
+                    request["requested_settings"],
+                    {
+                        "model": "gpt-6-luna",
+                        "reasoning_effort": "max",
+                        "fork_turns": "none",
+                    },
+                )
+                self.assertNotIn("expected", request)
+                self.assertNotIn("approval_status", request)
+                self.assertEqual(request["effective_model_status"], "unverified")
+                self.assertEqual(request["tool_trace_status"], "unverified")
+                self.assertEqual(
+                    request["physical_evaluator_read_denial"], "unverified"
+                )
+
+                response = json.dumps(
+                    {
+                        "criteria": [
+                            {
+                                "id": criterion,
+                                "evaluable": True,
+                                "rating": 3,
+                                "reason": "The candidate includes the required evidence.",
+                                "evidence": ["The candidate's relevant section."],
+                            }
+                            for criterion in request["criteria"]
+                        ]
+                    }
+                )
+                recorded = judge_validation.record_subagent_judge_response(
+                    call_root=call_root,
+                    raw_response=response,
+                    host_call_status="response_received",
+                )
+                self.assertEqual(recorded["status"], "diagnostic_response_valid")
+                self.assertEqual(recorded["normalization_status"], "valid")
+                self.assertEqual(recorded["effective_model_status"], "unverified")
+                self.assertEqual(recorded["tool_trace_status"], "unverified")
+                self.assertEqual(
+                    recorded["physical_evaluator_read_denial"], "unverified"
+                )
+                with self.assertRaisesRegex(AgentEvalError, "already exists"):
+                    judge_validation.record_subagent_judge_response(
+                        call_root=call_root,
+                        raw_response=response,
+                        host_call_status="response_received",
+                    )
+
+    def test_subagent_judge_import_rejects_changed_prompt_and_invalid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            runs = repository / ".agent-eval-runs"
+            runs.mkdir()
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                changed_root = runs / "stage4" / "calls" / "normal-workflow-02"
+                judge_validation.prepare_subagent_judge_call(
+                    call_root=changed_root,
+                    call_id="normal-workflow-02",
+                    case_id="normal-workflow",
+                    prompt="Fixed Judge prompt.",
+                    criteria=["QTS-SEM-001", "QTS-SEM-002"],
+                    baseline_run_id="baseline-run",
+                    baseline_attempt_id="baseline-attempt",
+                    evaluator_revision="1" * 40,
+                    target_revision=DEFAULT_TARGET_REVISION,
+                )
+                (changed_root / "judge-prompt.md").write_text(
+                    "Modified prompt.", encoding="utf-8"
+                )
+                with self.assertRaisesRegex(AgentEvalError, "request binding"):
+                    judge_validation.record_subagent_judge_response(
+                        call_root=changed_root,
+                        raw_response="{}",
+                        host_call_status="response_received",
+                    )
+
+                invalid_root = runs / "stage4" / "calls" / "normal-workflow-03"
+                judge_validation.prepare_subagent_judge_call(
+                    call_root=invalid_root,
+                    call_id="normal-workflow-03",
+                    case_id="normal-workflow",
+                    prompt="Fixed Judge prompt.",
+                    criteria=["QTS-SEM-001", "QTS-SEM-002"],
+                    baseline_run_id="baseline-run",
+                    baseline_attempt_id="baseline-attempt",
+                    evaluator_revision="1" * 40,
+                    target_revision=DEFAULT_TARGET_REVISION,
+                )
+                invalid = judge_validation.record_subagent_judge_response(
+                    call_root=invalid_root,
+                    raw_response="not json",
+                    host_call_status="response_received",
+                )
+                self.assertEqual(invalid["status"], "invalid_response")
+                self.assertEqual(invalid["normalization_status"], "invalid")
+
+                missing_status_root = runs / "stage4" / "calls" / "normal-workflow-05"
+                judge_validation.prepare_subagent_judge_call(
+                    call_root=missing_status_root,
+                    call_id="normal-workflow-05",
+                    case_id="normal-workflow",
+                    prompt="Fixed Judge prompt.",
+                    criteria=["QTS-SEM-001", "QTS-SEM-002"],
+                    baseline_run_id="baseline-run",
+                    baseline_attempt_id="baseline-attempt",
+                    evaluator_revision="1" * 40,
+                    target_revision=DEFAULT_TARGET_REVISION,
+                )
+                (missing_status_root / "call-status.json").unlink()
+                with self.assertRaisesRegex(AgentEvalError, "prepared status"):
+                    judge_validation.record_subagent_judge_response(
+                        call_root=missing_status_root,
+                        raw_response='{"criteria":[]}',
+                        host_call_status="response_received",
+                    )
+
+    def test_subagent_judge_redacts_secret_shaped_response_without_hashing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            runs = repository / ".agent-eval-runs"
+            runs.mkdir()
+            call_root = runs / "stage4" / "calls" / "normal-workflow-04"
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                judge_validation.prepare_subagent_judge_call(
+                    call_root=call_root,
+                    call_id="normal-workflow-04",
+                    case_id="normal-workflow",
+                    prompt="Fixed Judge prompt.",
+                    criteria=["QTS-SEM-001", "QTS-SEM-002"],
+                    baseline_run_id="baseline-run",
+                    baseline_attempt_id="baseline-attempt",
+                    evaluator_revision="1" * 40,
+                    target_revision=DEFAULT_TARGET_REVISION,
+                )
+                response = judge_validation.record_subagent_judge_response(
+                    call_root=call_root,
+                    raw_response='{"access_token": "synthetic-secret-value"}',
+                    host_call_status="response_received",
+                )
+                self.assertEqual(response["status"], "evidence_unverified")
+                self.assertTrue(response["response_redacted"])
+                self.assertIsNone(response["response_sha256"])
+                self.assertNotIn("synthetic-secret-value", response["response"])
+
+    def test_major_violation_001_rejects_noop_skip_mutation(self) -> None:
+        scenario = load_scenario()
+        definition = next(
+            row
+            for row in load_fixture_catalogue()["cases"]
+            if row["id"] == "major-violation-001"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline_output = root / "baseline"
+            self._baseline_output(baseline_output, scenario)
+            index_path = baseline_output / "artifact-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            route = next(
+                row
+                for row in index["routing"]
+                if row["skill"] == "test-case-design"
+            )
+            route.update(
+                {
+                    "status": "skipped",
+                    "reason": "No test cases are required.",
+                    "artifact_ids": [],
+                }
+            )
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+            with self.assertRaisesRegex(AgentEvalError, "already skipped route"):
+                _prepare_fixture(
+                    definition=definition,
+                    baseline_output=baseline_output,
+                    fixture_root=root / "fixture",
+                    scenario=scenario,
+                )
 
 
 if __name__ == "__main__":

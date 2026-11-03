@@ -8,7 +8,7 @@ JudgeおよびJudge改善Agentは既存Codexセッションの**別サブエー�
 
 - Judge promptは対象QA成果物、criterion、判定に必要な固定規範Referenceだけから構成する。期待rating、fixtureの正解・承認情報、分析・修正用の仮説、独立検証用の正解、他Judge結果を渡さない。workflow Judgeと成果物Judgeは別呼出しで実行し、必要な結果と出力形式を既存normalizerで検査する。
 - AgentとJudgeは別attempt・別一時ディレクトリとし、入力内容とhashを記録する。サブエージェントが親セッションの権限を共有する場合、**一時ディレクトリは物理的な読取拒否の根拠にならない**。ツール使用・入力非投入・file manifestを確認できる範囲だけ記録し、アクセス制御や実効model情報を未観測なら`unverified`とする。
-- QTS fixture 11件（2026-11-03時点で承認済み0、人間レビュー待ち9、決定論的レビュー待ち2）は元の規範と固定baselineに基づいて審査する。承認bindingとmanifest、正常fixtureの妥当性、mutationの単独効果を確認する。人間の意味判断をAgentが代行承認しない。2026-11-02追補の`_baseline_attempt_eligibility()`および正常fixture依存条件を維持する。
+- QTS fixture 11件（2026-11-03時点で承認済み0、人間レビュー待ち9、決定論的レビュー待ち2）は元の規範と固定baselineに基づいて審査する。承認bindingとmanifest、正常fixtureの妥当性、mutationの単独効果を確認する。人間の意味判断をAgentが代行承認しない。`_baseline_attempt_eligibility()`の出力完全性・target integrity・runtime evidence等の機械条件と、正常fixture依存条件を維持する。初回Judge検証では、他の機械条件を満たす`needs_review` baselineに過去Judgeの`pass`を要求しない。`judge_status=not_run`を許容する一方、過去Judgeの`needs_review`や未確認runtimeを正常fixtureの根拠にしない。
 - Judge改善では候補作成前にtune／independentのcase集合とfingerprintを固定し、独立検証用の入力・正解・個別結果を改善Agentへ公開しない。期待値やrubricをJudge出力に合わせて変更せず、異なるEvaluator revisionの結果を直接比較しない。
 - `judge_validation.py`の外部CLI process・schema 2 profile必須経路は、サブエージェントの別呼出しで得た回答・利用できる実行証拠を取り込む契約に変更する。根拠のない`verified`の設定や、未承認fixtureの採点結果からの自己承認は禁止する。
 

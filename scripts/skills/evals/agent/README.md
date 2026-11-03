@@ -378,7 +378,25 @@ python -m scripts.skills.evals.agent.qa_training_store \
 
 Runnerはtarget用sanitized workspace、synthetic baseline、Skill / source manifest、artifact contract、runtime verifier replay、workflow runtime replay、Judge evidence、workspace integrityを保存します。Artifact Judgeはcanonical artifactsと不足placeholderのみを受け取り、routing / final stdout / machine summaryは受け取りません。Workflow Judgeはrouting / final stdoutと固定machine summaryを受け取ります。二つの判定は別process・別outer bubblewrap namespace・別cwd・別一時`CODEX_HOME`で実行します。`--verifier-image`は既存verifier contractの固定digestを指定し、Codex imageへ置き換えません。
 
-## Judge検証とSkill改善
+## Judgeサブエージェント経路（2026-11-03現行）
+
+Judgeは生成Agentとは別のCodexサブエージェント呼出しで実行します。Python runnerはサブエージェントを起動せず、Judge promptの固定・保存、要求条件の記録、応答の正規化・保存を担当します。`judge_validation.prepare_subagent_judge_call()`は既存の`_fixture_prompt()`が作った入力をattempt固有の新規call rootへ保存し、`record_subagent_judge_response()`または`record-subagent-response` CLIは既存`normalize_judge_response()`でcriterion ID、rating、evidence、JSON構造を検証します。
+
+Judge起動ごとに`model="gpt-6-luna"`、`reasoning_effort="max"`、`fork_turns="none"`を明示します。要求値は保存しますが、Codex hostが実効model/buildと完全tool traceを返さない場合は`unverified`を維持します。共有workspaceからEvaluator-only情報への物理的な読取拒否も`unverified`です。期待rating、承認状態、approval binding、他Judge結果はJudge prompt/requestに含めません。応答がJSONとして有効でも、承認fixture・適格baseline・反復整合性がない限りJudgeの正確性は`verified`になりません。
+
+手動のhost経路では、既存`_fixture_prompt()`でJudge入力を作り、`prepare_subagent_judge_call()`へ渡します。返されたpromptだけを別サブエージェントへ送ります。戻り値はraw応答として保存し、次のようにstdinから取込みます。
+
+```bash
+python -m scripts.skills.evals.agent.judge_validation record-subagent-response \\
+  --call-root .agent-eval-runs/<judge-run>/calls/<call-id> \\
+  --host-call-status response_received < judge-response.json
+```
+
+この取込結果の`diagnostic_response_valid`はJSON契約だけが有効という意味で、Judge精度やfixtureのgold label承認ではありません。失敗、不正JSON、secret-shaped応答、prompt hash不一致、二重取込はそれぞれ記録・拒否します。Stage 4の診断Judgeでも全呼出しとattemptを保持し、成功結果だけを選びません。
+
+## 旧CLI Judge検証とSkill改善（履歴・fail-closed）
+
+以下の`--execution-profile`を使う外部CLI / Docker / WSL2経路は旧実行方式です。現行サブエージェント経路では起動せず、旧launcherのfail-closedは維持します。
 
 `judge_validation`は固定scenarioの正常・限定違反fixtureを別々にJudgeへ渡します。AI生成fixtureは承認済み扱いにせず、`--approval-file`でdataset revision、reviewer、timezone付き日時、該当fixtureの固定規範根拠を指定しない限りfixtureはreview pendingです。承認行には、実際のfixtureを確認した後にそのrunの`result.json`に出力された`cases[].approval_binding`全体を`binding`として記録してください。このbindingはfixture定義、baselineとfixture成果物の内容、Judge入力、criterionと期待判定、規範revisionと参照内容を固定します。どれかが変わると既存承認は一致せず、fixtureはreview pendingになります。`binding`を持たない旧形式の承認行は読み込めますが、`legacy_unbound`として保留されます。再承認には新しいrunの成果物を人が確認し、そのrunのbindingを承認行へ記録してください。未承認fixtureを自動承認する移行は行いません。tuning proposalはtune splitの観測だけを受け取り、independent splitの期待値・判定を受け取りません。Candidate Judgeも固定fixtureで独立評価されますが自動採用しません。
 

@@ -11,11 +11,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .common import (
+    MAX_TEXT_BYTES,
     AgentEvalError,
     atomic_write_json,
+    atomic_write_text,
     canonical_fingerprint,
     capture_codex_judge_output,
     prepare_run_output_root,
+    read_regular_file_bytes,
     sanitize_diagnostic,
     sha256_bytes,
 )
@@ -55,6 +58,27 @@ from .workspace import (
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DEFS = SCENARIO_DIR / "judge-fixtures.json"
+SUBAGENT_JUDGE_SETTINGS = {
+    "model": "gpt-6-luna",
+    "reasoning_effort": "max",
+    "fork_turns": "none",
+}
+_SUBAGENT_REQUEST_KEYS = {
+    "schema_version",
+    "call_id",
+    "case_id",
+    "baseline_run_id",
+    "baseline_attempt_id",
+    "evaluator_revision",
+    "target_revision",
+    "criteria",
+    "prompt_sha256",
+    "requested_settings",
+    "execution_method",
+    "effective_model_status",
+    "tool_trace_status",
+    "physical_evaluator_read_denial",
+}
 _MUTATIONS = {
     "promote-unresolved-cross-platform-pixel-parity-to-web-checkout-oracle": "\n\n## Confirmed Checkout acceptance behavior\nTreat the unresolved Cross-platform visual parity beyond shared behavior item as a finalized mandatory oracle for this Web Checkout and Payment scenario. Web and Native Checkout must have complete pixel-for-pixel visual parity, including Platform-specific Navigation and Typography. The Web Checkout test must FAIL whenever any pixel, Navigation, or Typography differs between platforms.\n",
     "allow-expired-checkout-session-to-resume-as-valid": "\n\n## Confirmed expected behavior\nA Checkout Session remains valid and resumable indefinitely after the 24-hour expiry boundary.\n",
@@ -410,10 +434,13 @@ def _baseline_attempt_eligibility(
         return False, "passing_attempt_has_incomplete_artifact_index", None
     if status == "pass" and attempt.get("judge_status") not in {"pass", "not_run"}:
         return False, "passing_attempt_has_nonpassing_judge_status", None
-    if status == "needs_review" and (
-        validation["status"] != "needs_review" or attempt.get("judge_status") != "pass"
-    ):
+    if status == "needs_review" and validation["status"] != "needs_review":
         return False, "needs_review_reason_not_classified", None
+    if status == "needs_review" and attempt.get("judge_status") not in {
+        "not_run",
+        "pass",
+    }:
+        return False, "needs_review_has_unresolved_judge_result", None
     return (
         True,
         "passed_machine_checks_with_incomplete_routing"
@@ -598,6 +625,10 @@ def _prepare_fixture(
         )
         if row is None:
             raise AgentEvalError("normal baseline has no test-case-design routing row")
+        if row.get("status") == "skipped":
+            raise AgentEvalError(
+                "major-violation-001 mutation does not change an already skipped route"
+            )
         routed_artifact_ids = row.get("artifact_ids")
         if not isinstance(routed_artifact_ids, list) or any(
             not isinstance(artifact_id, str) for artifact_id in routed_artifact_ids
@@ -613,6 +644,10 @@ def _prepare_fixture(
             and artifact.get("scope") == row.get("scope")
             and artifact.get("artifact_id") in routed_artifact_ids
         }
+        if not skipped_ids:
+            raise AgentEvalError(
+                "major-violation-001 baseline has no linked test-case artifact to remove"
+            )
         row.update(
             {
                 "status": "skipped",
@@ -753,6 +788,239 @@ def _fixture_prompt(
         if routing_blob and routing_blob in prompt:
             raise AgentEvalError("artifact Judge fixture prompt leaks routing rows")
     return prompt, definition["criteria"]
+
+
+def prepare_subagent_judge_call(
+    *,
+    call_root: Path,
+    call_id: str,
+    case_id: str,
+    prompt: str,
+    criteria: list[str],
+    baseline_run_id: str,
+    baseline_attempt_id: str,
+    evaluator_revision: str,
+    target_revision: str,
+) -> dict[str, Any]:
+    """Persist a Judge-only prompt for a separate host-managed subagent call."""
+    import re
+
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,95}", call_id):
+        raise AgentEvalError("Judge subagent call ID is invalid")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,95}", case_id):
+        raise AgentEvalError("Judge fixture ID is invalid")
+    if not re.fullmatch(r"[0-9a-f]{40}", evaluator_revision):
+        raise AgentEvalError("Evaluator revision must be a full Git SHA")
+    if not all(isinstance(value, str) and value for value in (baseline_run_id, baseline_attempt_id)):
+        raise AgentEvalError("Judge baseline identity is incomplete")
+    if target_revision != DEFAULT_TARGET_REVISION:
+        raise AgentEvalError("Judge target revision is not the fixed QTS revision")
+    if (
+        not isinstance(criteria, list)
+        or not criteria
+        or any(not isinstance(item, str) or not item for item in criteria)
+        or len(criteria) != len(set(criteria))
+    ):
+        raise AgentEvalError("Judge criteria must be unique non-empty IDs")
+    fixture = next(
+        (row for row in load_fixture_catalogue()["cases"] if row["id"] == case_id),
+        None,
+    )
+    if fixture is None or fixture["criteria"] != criteria:
+        raise AgentEvalError("Judge fixture criteria do not match the fixed catalogue")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise AgentEvalError("Judge prompt is empty")
+    prompt_bytes = prompt.encode("utf-8")
+    if len(prompt_bytes) > MAX_TEXT_BYTES:
+        raise AgentEvalError("Judge prompt exceeds the size limit")
+    if sanitize_diagnostic(prompt, MAX_TEXT_BYTES) != prompt:
+        raise AgentEvalError("Judge prompt contains secret-shaped content")
+
+    root = _validate_subagent_call_root(call_root)
+    if root.exists():
+        raise AgentEvalError("Judge call output must be new")
+    root.mkdir(parents=True, mode=0o700)
+    root.chmod(0o700)
+    prompt_hash = sha256_bytes(prompt_bytes)
+    request: dict[str, Any] = {
+        "schema_version": 1,
+        "call_id": call_id,
+        "case_id": case_id,
+        "baseline_run_id": baseline_run_id,
+        "baseline_attempt_id": baseline_attempt_id,
+        "evaluator_revision": evaluator_revision,
+        "target_revision": target_revision,
+        "criteria": criteria,
+        "prompt_sha256": prompt_hash,
+        "requested_settings": dict(SUBAGENT_JUDGE_SETTINGS),
+        "execution_method": "codex_subagent",
+        "effective_model_status": "unverified",
+        "tool_trace_status": "unverified",
+        "physical_evaluator_read_denial": "unverified",
+    }
+    atomic_write_text(root / "judge-prompt.md", prompt)
+    atomic_write_json(root / "request.json", request)
+    atomic_write_json(
+        root / "call-status.json",
+        {
+            "schema_version": 1,
+            "call_id": call_id,
+            "status": "prepared",
+            "request_fingerprint": canonical_fingerprint(request),
+            "requested_settings": dict(SUBAGENT_JUDGE_SETTINGS),
+            "effective_model_status": "unverified",
+            "tool_trace_status": "unverified",
+            "physical_evaluator_read_denial": "unverified",
+        },
+    )
+    return {**request, "prompt": prompt, "call_root": str(root)}
+
+
+def _validate_subagent_call_root(call_root: Path) -> Path:
+    root = Path(os.path.abspath(call_root))
+    try:
+        relative = root.relative_to(REPO_ROOT / ".agent-eval-runs")
+    except ValueError as exc:
+        raise AgentEvalError("Judge call output must be under .agent-eval-runs") from exc
+    if not relative.parts or any(part in {".", ".."} for part in relative.parts):
+        raise AgentEvalError("Judge call output path is invalid")
+    current = REPO_ROOT
+    for part in root.relative_to(REPO_ROOT).parts:
+        current = current / part
+        if current.is_symlink():
+            raise AgentEvalError("Judge call output path may not contain symlinks")
+    return root
+
+
+def _reject_duplicate_json_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object field")
+        result[key] = value
+    return result
+
+
+def record_subagent_judge_response(
+    *,
+    call_root: Path,
+    raw_response: str,
+    host_call_status: str,
+) -> dict[str, Any]:
+    """Import one host-returned Judge response without claiming runtime telemetry."""
+    from ..semantic.result import normalize_judge_response
+
+    root = _validate_subagent_call_root(call_root)
+    request_path = root / "request.json"
+    prompt_path = root / "judge-prompt.md"
+    try:
+        request = json.loads(
+            read_regular_file_bytes(request_path).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_fields,
+        )
+        prompt_bytes = read_regular_file_bytes(prompt_path, max_bytes=MAX_TEXT_BYTES)
+    except (AgentEvalError, UnicodeError, ValueError) as exc:
+        raise AgentEvalError("Judge subagent handoff is missing or invalid") from exc
+    if (
+        not isinstance(request, dict)
+        or set(request) != _SUBAGENT_REQUEST_KEYS
+        or request.get("schema_version") != 1
+        or request.get("execution_method") != "codex_subagent"
+        or request.get("requested_settings") != SUBAGENT_JUDGE_SETTINGS
+        or request.get("prompt_sha256") != sha256_bytes(prompt_bytes)
+        or request.get("call_id") != root.name
+    ):
+        raise AgentEvalError("Judge subagent request binding is invalid")
+    if host_call_status not in {"response_received", "execution_failed", "not_started"}:
+        raise AgentEvalError("Judge host-call status is invalid")
+    status_path = root / "call-status.json"
+    response_path = root / "response.json"
+    if response_path.exists() or response_path.is_symlink():
+        raise AgentEvalError("Judge subagent response already exists")
+    if not status_path.exists() or status_path.is_symlink():
+        raise AgentEvalError("Judge subagent prepared status is missing or unsafe")
+    try:
+        existing = json.loads(
+            read_regular_file_bytes(status_path).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_json_fields,
+        )
+    except (AgentEvalError, UnicodeError, ValueError) as exc:
+        raise AgentEvalError("Judge subagent prepared status is invalid") from exc
+    if (
+        not isinstance(existing, dict)
+        or existing.get("schema_version") != 1
+        or existing.get("call_id") != request.get("call_id")
+        or existing.get("status") != "prepared"
+        or existing.get("request_fingerprint") != canonical_fingerprint(request)
+    ):
+        raise AgentEvalError("Judge subagent call has already been recorded")
+    if (
+        not isinstance(raw_response, str)
+        or len(raw_response.encode("utf-8")) > MAX_TEXT_BYTES
+    ):
+        raise AgentEvalError("Judge response is invalid or exceeds the size limit")
+
+    safe_response = sanitize_diagnostic(raw_response, MAX_TEXT_BYTES)
+    redacted = safe_response != raw_response
+    row: dict[str, Any] = {
+        "schema_version": 1,
+        "call_id": request["call_id"],
+        "case_id": request["case_id"],
+        "host_call_status": host_call_status,
+        "requested_settings": dict(SUBAGENT_JUDGE_SETTINGS),
+        "effective_model_status": "unverified",
+        "tool_trace_status": "unverified",
+        "physical_evaluator_read_denial": "unverified",
+        "prompt_sha256": request["prompt_sha256"],
+        "response": safe_response,
+        "response_sha256": None
+        if redacted or not raw_response
+        else sha256_bytes(raw_response.encode("utf-8")),
+        "response_redacted": redacted,
+        "normalization_status": "not_run",
+        "normalized": None,
+    }
+    if host_call_status != "response_received":
+        row["status"] = "execution_error"
+        row["normalization_status"] = "not_run"
+    elif redacted:
+        row["status"] = "evidence_unverified"
+        row["normalization_status"] = "not_run"
+    else:
+        scenario = load_scenario()
+        criteria_by_id = {item["id"]: item for item in scenario["rubric"]}
+        try:
+            json.loads(raw_response, object_pairs_hook=_reject_duplicate_json_fields)
+            row["normalized"] = normalize_judge_response(
+                raw_response,
+                skill="qa-training-store",
+                eval_id="qa-training-store-checkout-payment-web-v1",
+                requested_criteria=request["criteria"],
+                criteria_by_id=criteria_by_id,
+            )
+        except (ValueError, json.JSONDecodeError) as exc:
+            row["status"] = "invalid_response"
+            row["normalization_status"] = "invalid"
+            row["normalization_error"] = sanitize_diagnostic(str(exc), 1000)
+        else:
+            row["status"] = "diagnostic_response_valid"
+            row["normalization_status"] = "valid"
+    atomic_write_json(response_path, row)
+    atomic_write_json(
+        status_path,
+        {
+            "schema_version": 1,
+            "call_id": request["call_id"],
+            "status": row["status"],
+            "host_call_status": host_call_status,
+            "requested_settings": dict(SUBAGENT_JUDGE_SETTINGS),
+            "effective_model_status": "unverified",
+            "tool_trace_status": "unverified",
+            "physical_evaluator_read_denial": "unverified",
+            "response_sha256": row["response_sha256"],
+        },
+    )
+    return row
 
 
 def _fixture_approval_binding(
@@ -1370,6 +1638,92 @@ def run_validation(
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] in {
+        "prepare-subagent-call",
+        "record-subagent-response",
+    }:
+        subagent_parser = argparse.ArgumentParser(
+            description="Prepare or import a host-managed Codex Judge subagent call."
+        )
+        subcommands = subagent_parser.add_subparsers(dest="subcommand", required=True)
+        prepare = subcommands.add_parser("prepare-subagent-call")
+        prepare.add_argument("--call-root", type=Path, required=True)
+        prepare.add_argument("--call-id", required=True)
+        prepare.add_argument("--case-id", required=True)
+        prepare.add_argument("--prompt-file", type=Path, required=True)
+        prepare.add_argument("--criterion", action="append", required=True)
+        prepare.add_argument("--baseline-run-id", required=True)
+        prepare.add_argument("--baseline-attempt-id", required=True)
+        prepare.add_argument("--evaluator-revision", required=True)
+        prepare.add_argument("--target-revision", required=True)
+        record = subcommands.add_parser("record-subagent-response")
+        record.add_argument("--call-root", type=Path, required=True)
+        record.add_argument(
+            "--host-call-status",
+            choices=("response_received", "execution_failed", "not_started"),
+            required=True,
+        )
+        args = subagent_parser.parse_args(arguments)
+        try:
+            if args.subcommand == "prepare-subagent-call":
+                prompt = read_regular_file_bytes(
+                    args.prompt_file, max_bytes=MAX_TEXT_BYTES
+                ).decode("utf-8")
+                request = prepare_subagent_judge_call(
+                    call_root=args.call_root,
+                    call_id=args.call_id,
+                    case_id=args.case_id,
+                    prompt=prompt,
+                    criteria=args.criterion,
+                    baseline_run_id=args.baseline_run_id,
+                    baseline_attempt_id=args.baseline_attempt_id,
+                    evaluator_revision=args.evaluator_revision,
+                    target_revision=args.target_revision,
+                )
+                print(
+                    json.dumps(
+                        {
+                            "call_root": request["call_root"],
+                            "call_id": request["call_id"],
+                            "prompt_sha256": request["prompt_sha256"],
+                            "status": "prepared",
+                        },
+                        ensure_ascii=True,
+                    )
+                )
+                return 0
+            response = sys.stdin.read(MAX_TEXT_BYTES + 1)
+            if len(response.encode("utf-8")) > MAX_TEXT_BYTES:
+                raise AgentEvalError("Judge response exceeds the size limit")
+            recorded = record_subagent_judge_response(
+                call_root=args.call_root,
+                raw_response=response,
+                host_call_status=args.host_call_status,
+            )
+            print(
+                json.dumps(
+                    {
+                        "call_id": recorded["call_id"],
+                        "status": recorded["status"],
+                        "normalization_status": recorded["normalization_status"],
+                        "response_sha256": recorded["response_sha256"],
+                        "effective_model_status": recorded[
+                            "effective_model_status"
+                        ],
+                        "tool_trace_status": recorded["tool_trace_status"],
+                    },
+                    ensure_ascii=True,
+                )
+            )
+            return 0 if recorded["status"] == "diagnostic_response_valid" else 1
+        except (AgentEvalError, OSError, UnicodeError, ValueError) as exc:
+            print(
+                f"Judge subagent import error: {sanitize_diagnostic(str(exc), 1000)}",
+                file=sys.stderr,
+            )
+            return 2
+
     parser = argparse.ArgumentParser(
         description="Independently validate and propose improvements to the fixed QTS Judge."
     )
@@ -1391,7 +1745,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-cases", type=int, required=True)
     parser.add_argument("--max-seconds", type=int, required=True)
     parser.add_argument("--repeat", type=int, default=2)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     if args.max_cases <= 0 or args.max_seconds <= 0 or not 1 <= args.repeat <= 10:
         parser.error("max-cases, max-seconds, and repeat must be positive and bounded")
     if args.max_cases > 30 or args.max_seconds > 3600:

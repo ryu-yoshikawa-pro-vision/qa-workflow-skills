@@ -17,7 +17,7 @@ _SECRET_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
     re.compile(
-        r"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+"
+        r"(?i)[\"']?(api[_-]?key|access[_-]?token|refresh[_-]?token|password)[\"']?\s*[:=]\s*[\"']?[^\"'\s,;}{]+[\"']?"
     ),
 )
 _CODEX_JSONL_EVENT_TYPES = {
