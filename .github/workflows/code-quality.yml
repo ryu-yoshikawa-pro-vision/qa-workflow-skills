@@ -176,7 +176,7 @@ jobs:
           require_profile_pattern '^[[:space:]]*profile[[:space:]]+bwrap[[:space:]]+/usr/bin/bwrap([[:space:]]|$)' 'bwrap_attachment'
           require_profile_pattern '^[[:space:]]*profile[[:space:]]+unpriv_bwrap([[:space:]]|$)' 'unprivileged_child_profile'
           require_profile_pattern '^[[:space:]]*allow[[:space:]]+userns,[[:space:]]*(#.*)?$' 'user_namespace_permission'
-          require_profile_pattern '^[[:space:]]*allow[[:space:]]+pix[[:space:]]+/\*\*[[:space:]]+->[[:space:]]+&bwrap//&unpriv_bwrap,' 'capability_stripping_child_transition'
+          require_profile_pattern '^[[:space:]]*allow[[:space:]]+px[[:space:]]+/\*\*[[:space:]]+->[[:space:]]+bwrap//&unpriv_bwrap,' 'capability_stripping_child_transition'
           require_profile_pattern '^[[:space:]]*audit[[:space:]]+deny[[:space:]]+capability,' 'child_capability_denial'
           if grep -Eq '^[[:space:]]*profile[[:space:]].*flags=[^}]*complain' "$profile_source"; then
             echo 'Refusing non-enforcing packaged profile.' >&2
