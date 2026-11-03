@@ -1,67 +1,69 @@
 # PR #17 第3段階：保存成果物完全性・Dockerless verifier
 
-## 対象と結論
+## 結論
 
 - 開始HEAD: `6a1e4e46937d220fece0234fb7eed5c67dc2e0b6`
-- PR: #17、base `main`、開始時OPEN
+- 調査開始時PR HEAD: `9eee33962d8d9a9b7f63ce037b1874c256df0de9`
 - 対象QTS revision: `84ce165493649550832731a60cf436f8ae29c56b`
 - 対象の旧開発run: `.agent-eval-runs/pr17-qts-subagent-stage2-20261103-03/`
 - 今回の読み取り検査記録: `.agent-eval-runs/pr17-qts-verifier-stage3-20261103-01/`
 
-保存済みStage 2のcopyは、今回追加したsource/copy/tree照合で両attemptとも完全性を確認できた。runtime captureとartifact/routingの問題は残っており、attemptの既存`needs_review`判定は維持する。現開発環境に`bwrap`がないため、Dockerless verifier replayは実行せず`evidence_unverified`とした。候補Verifier Pythonは実行していない。元Stage 2証拠は読み取りのみで、変更していない。
+capture後の保存コピー完全性検査を追加し、`captured-output`側だけの変更を検出する回帰を確認した。Dockerless replayはDockerに依存しない既存のsemantic比較経路へ接続済みで、`verify`と`workflow-runtime`を別々に検査する。候補PythonをEvaluator processへimportせず、root所有bubblewrapが作るuser/PID/mount/IPC/UTS namespaceで起動する。
+
+GitHub runnerでは2方式のnetwork namespace作成が権限で失敗したため、現在はsealed cBPF seccompでsocket作成・通信syscall、io_uring、x32 ABIを拒否し、network syscall denialを実測する方式へ切り替えた。**この方式の必須CI probeは次のcommitで再確認する必要がある。** Probe未確認の状態では、候補Verifierを起動しない。保存済みQTS runtime requestのDockerless replayとStage 3の正式受入は未達である。
 
 ## Stage 2証拠との照合
 
-Run ID `d3ab14c200964233b76acbb26ef7a676`は固定target revisionを記録している。run記録のEvaluator revisionは`296e64919a61617243b22f56b3bb3edd16693244`、Skill revisionも同SHAで、現在の開始HEADとは一致しない。従って保存済みruntime requestを現在のEvaluator sourceとの比較へ流用しなかった。期待値と判定基準のrevisionを合わせずに独立replayを行うことは、同条件比較にならないためである。
+Run ID `d3ab14c200964233b76acbb26ef7a676`は固定target revisionを記録している。run記録のEvaluator revisionは`296e64919a61617243b22f56b3bb3edd16693244`、Skill revisionも同SHAで、現在のsourceとは一致しない。revisionの異なるEvaluatorとの比較を同条件と誤認しないため、元runに対するreplayは行っていない。
 
-raw run rootに`evidence-index.md`は存在しなかった。実ファイルの`result.json`、attempt別`capture.json` / `evaluation.json`、runtime invocation、manifestを読み、次を確認した。
+raw run rootに`evidence-index.md`はなかった。保存された`result.json`、attempt別`capture.json` / `evaluation.json`、runtime invocation、manifestを読み、次を確認した。
 
-| Attempt                            | 既存capture / 評価                                   | captured-output完全性                                    | runtime capture                                                                                                                                   |
-| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `d7760de6d12d4c78b45c359017b0eea6` | `captured` / `needs_review`、9 artifact              | 17 files、hash・size・file set一致、symlink/hardlinkなし | `spec-analysis`の`verify` 1件のrequest/result hashとbindingは整合。Question Analysis等の未登録runtime file 4件と他の必須runtime capture不足が残る |
-| `0ddf91f4b33046588a42eee224d40612` | `captured_needs_review` / `needs_review`、8 artifact | 23 files、hash・size・file set一致、symlink/hardlinkなし | `test-analysis`と`test-requirement-design`の`verify-001`が重複し、2 invocationを拒否。必須runtime capture不足も残る                               |
+| Attempt                            | 既存capture / 評価                                   | captured-output完全性                                    | runtime capture                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `d7760de6d12d4c78b45c359017b0eea6` | `captured` / `needs_review`、9 artifact              | 17 files、hash・size・file set一致、symlink/hardlinkなし | `spec-analysis`の`verify` 1件はrequest/result hashとbindingが整合。未登録runtime file 4件と他の必須capture不足が残る |
+| `0ddf91f4b33046588a42eee224d40612` | `captured_needs_review` / `needs_review`、8 artifact | 23 files、hash・size・file set一致、symlink/hardlinkなし | `test-analysis`と`test-requirement-design`の`verify-001`重複を検出し、両invocationを拒否。必須capture不足も残る      |
 
-両attemptのcandidate runtime source manifestは読み取り検査で不整合がなかった。これはSkill使用やAgentのtool traceを証明しない。両方とも実効model/buildと元Agent tool traceは未検証のまま。
+候補runtime source manifestは読み取り検査で不整合なし。これはAgentのSkill使用やtool traceを証明しない。両attemptとも実効model/buildと元Agent tool traceは未検証である。
 
-今回のStage 3 metadataは`.agent-eval-runs/pr17-qts-verifier-stage3-20261103-01/evidence-index.md`と`validation.json`に新規保存した。元runには書き込んでいない。
+今回の読み取り検査metadataは`.agent-eval-runs/pr17-qts-verifier-stage3-20261103-01/evidence-index.md`と`validation.json`に保存した。raw Stage 2 evidenceは変更していない。
 
 ## 実装
 
-- `qts_subagent_eval.py`はgraderより前に、capture attempt ID/fingerprint、元source file list、saved-copy file list、各`saved_sha256`・size、現在のcaptured-output treeを照合する。capture後の追加・削除・変更、symlink/hardlink、redacted file、manifest不一致は`needs_review`とし、artifact validatorとruntime replayを呼ばない。
-- `common_runtime_checks.py`は既存のDocker候補経路を維持し、`verifier_image=None`のDockerless replayを追加した。`verify`と`workflow-runtime`はcandidate、固定source、captured resultを各々比較する。どちらか未実行・不一致・timeout・execution/environment errorなら全体をpassにしない。
-- `isolated_verifier.py`はroot-owned system `unshare`とbubblewrapを使う実行境界をprobeし、成功後だけVerifierを別processで起動する。最初のCode Quality runでは、Ubuntu runnerのbubblewrap 0.9.0がnetwork namespace作成後のloopback設定で`RTM_NEWADDR: Operation not permitted`となった。network namespaceの作成をroot-owned util-linux `unshare`へ分離し、そのnamespace内でbubblewrapを起動するよう修正した。unshareは`--kill-child`で親終了時の子process cleanupも要求する。候補sourceは各fileをhashしたsealed memfd snapshotでread-onlyに渡し、requestはstdinで固定する。sandboxではuser/PID/継承したisolated network/IPC/UTS namespace、read-only root/source、networkなし、bounded tmpfs、CPU/address-space/file/process/open-file/core limits、wall timeoutとtimeout cleanupを要求する。
-- 起動したnamespace launcherとVerifier本体の実行証拠を分けた。bubblewrap/Verifierが非ゼロ終了した場合は、namespace起動失敗とVerifierの非ゼロ終了を区別できないため、namespace launcherの起動だけではVerifier実行済みと断定しない。
-- candidate/fixed executionのsource fingerprint、request/result/stdout/stderr hash、exit code、時間、bounded・secret-sanitized診断、probe結果を保存する。独立replayは元Agentの実行証拠に昇格せず、`payload.can_complete=false`も変えない。
-- `.github/workflows/code-quality.yml`はcheckout credential persistenceを無効化し、bubblewrapを導入して必須boundary testを実行する。`PR17_REQUIRE_VERIFIER_ISOLATION=1`によりprobeが利用できない場合はCIを失敗させ、test skipで合格扱いしない。
-
-Bubblewrapの仕様では、`--disable-userns`はsandbox内のnested user namespace作成を抑止し、`--remount-ro`は指定mount pointに作用する。実装は`--assert-userns-disabled`、mountごとのwrite-denial probeも要求する。[upstream manual](https://github.com/containers/bubblewrap/blob/main/bwrap.xml)
+- `qts_subagent_eval.py`は採点前にcapture attempt ID/fingerprint、元source file list、saved-copy file list、各`saved_sha256`・size、captured-output treeを照合する。capture後の追加・削除・変更、symlink/hardlink、redacted file、manifest不一致は`needs_review`とし、artifact validatorとruntime replayへ進まない。testでは元Agent出力を変えず、保存済み`captured-output`だけを変更して拒否されることを確認した。
+- `common_runtime_checks.py`はDocker候補経路を維持しつつ、`verifier_image=None`でcandidate source、固定Evaluator source、captured resultを意味的に比較するDockerless経路を持つ。`verify`と`workflow-runtime`の両方が個別に一致しない限り全体をpassにしない。未実行・不一致・timeout・execution/environment errorはpassにならない。
+- `isolated_verifier.py`は候補sourceをEvaluator processへimportしない。候補sourceの全fileをhashし、sealed memfdに固定してread-onlyでbubblewrapへ渡す。requestはstdin、環境変数はallowlist、出力は一時fileへ取得する。bubblewrapはroot-owned実行fileを要求し、user/PID/mount/IPC/UTS namespace、read-only root/source、上限付きscratch、resource limit、timeout cleanupを設定する。
+- 最初の方式はbubblewrap自身にnetwork namespaceを作らせたが、CIでloopback初期化が`RTM_NEWADDR: Operation not permitted`となった。util-linux `unshare --user --map-root-user --net`による代替も`/proc/self/uid_map: Operation not permitted`となった。どちらも安全条件を弱めず停止した。
+- 現方式はx86_64向けsealed cBPFをbubblewrap `--seccomp FD`へ渡す。socket/socket data syscall、socketpair、io_uring、x32 syscall ABIをEPERMで拒否し、未知のaudit architectureはkillする。FDは明示したsealed memfdのみを継承し、`close_fds=True`とする。network namespaceを作成したとは記録せず、network syscall denialとして扱う。Bubblewrap manualは`--seccomp FD`をcompiled cBPF programの適用として定義し、`--disable-userns`はsandbox内の新規user namespaceを防ぐ機能と説明する。[bubblewrap upstream manual](https://github.com/containers/bubblewrap/blob/main/bwrap.xml)
+- synthetic probeはseccomp適用、IPv4/IPv6/Unix socket拒否、io_uring拒否、x32拒否、socket FD非継承、namespace分離、credential環境allowlist、Evaluator marker読取拒否、filesystem write拒否、resource limit、timeout後cleanup、source/request固定性を個別に検査する。1つでも未確認・失敗ならcandidate sourceは実行しない。
+- run記録でVerifier実行と元Agent実行を分離する。独立Verifierが結果を再現しても、元Agentがそのコマンドを実行した証拠にはならない。`can_complete=false`は比較値として維持し、replay一致をworkflow完了へ読み替えない。
 
 ## 検証
 
 ### ローカル
 
-- QTS focused tests: 15 PASS
-- runtime trace/replay tests: 18 PASS
-- isolated verifier tests: 15 tests、12 PASS・3 SKIP（bwrapがない環境でcandidateを実行する境界testとtimeout testをskip）
-- Agent evaluation suite: 242 PASS、5 SKIP
-- Agent repository contract tests: 4 PASS
-- runtime suite: 388 PASS
-- `compileall`: PASS
-- `dprint check`: PASS
-- `git diff --check`: PASS
-- Ruff: ローカル未導入のため未実施。Code Quality CIで固定versionを実行する。
-
-この最終回帰では、Verifier候補を実行するnamespace launcherの起動記録とVerifierコード実行の証拠も分離した。非ゼロ終了だけの場合はVerifier実行を`unverified`相当として断定しない。
-
-開発環境ではroot-owned util-linux `unshare --user --map-root-user --net --fork`のsynthetic namespace作成が成功したが、`bwrap`は検出されなかった。追加のnetwork診断では、namespace内の`/proc/net/route`読取が親sandboxからの`EPERM`で止まり、route / interface境界のローカル結果は得られなかった。従って、両launcherを組み合わせたboundary、credentials read-denial、read-only filesystem、network遮断、資源上限、timeout後の子process終了は実測していない。通常Python processへfallbackせず、候補Verifierを起動しなかった。CIの必須probeはhost listener拒否に加えて、non-loopback interfaceとIPv4 / IPv6 routeがないことも確認する。
+- isolated verifier tests: 18件、15 PASS・3 SKIP（環境にbubblewrapがなく、実隔離を要するprobe・候補起動・timeout testをskip）。QTSの候補Verifier Pythonは起動していない。synthetic probe文字列のPython構文は独立に検査した。
+- QTS subagent evaluator tests: 15 PASS。
+- runtime trace/replay tests: 18 PASS。
+- Agent evaluation tests: 245 PASS・5 SKIP。
+- runtime tests: 388 PASS。
+- repository Agent runner contract: 4 PASS。
+- artifact graph deterministic contract: 43 PASS。通常`/tmp`では親sandboxが作成した`/tmp/.git`をSQLite safety checkが検出して3件をblockedにした。`TMPDIR=/dev/shm`へ移して同じsuiteを実行し、全件通過した。
+- `compileall`: PASS。
+- `dprint check`: PASS。
+- `git diff --check`: PASS。
+- `python scripts/format_tracked.py check`: Ruff executableがないため未実施（`could not start ruff: No such file or directory: 'ruff'`）。
+- 既存Agent testsの中に意図的なfake-run出力（execution error / needs_review）があるが、test suite全体はPASSである。
 
 ### GitHub Actions
 
-最初のcommit `6e45bb1`では、Code Qualityの必須probeが`bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`で失敗した。境界を緩和せず、上記の`unshare`経路へ修正している。修正後commitのCIを確認してからこの報告とPR本文を最終化する。開始HEAD `6a1e4e4`の既存5 workflowは開始時すべてSUCCESSだった。
+- `6e45bb1`のCode Quality必須probeは、bubblewrapのnetwork namespace loopback setupが`RTM_NEWADDR: Operation not permitted`となり失敗。
+- `9eee339`のCode Quality必須probeは、util-linux `unshare`が`/proc/self/uid_map: Operation not permitted`となり失敗。candidate verifierは実行していない。他の4 workflowは成功。
+- seccomp方式の次commitで、同じ`PR17_REQUIRE_VERIFIER_ISOLATION=1`の必須probeを再実行する。ここで成功して初めてCI runner上の合成隔離境界を検証済みとする。CI probe成功だけでは、保存済みQTS requestのreplayやAgent tool traceを証明しない。
 
 ## 未達・制約
 
-- Stage 2 QTS raw attemptを現行Verifierで再実行していない。保存runのEvaluator revisionが現在のHEADと異なり、ローカルのboundary probeも未成立である。
-- Dockerless `verify`と`workflow-runtime`の両方を、保存済みQTS requestに対して独立実行する検証は未達（現環境で`bwrap`がなく、両経路とも`evidence_unverified`で候補を起動しない）。今回のunit testは入力検証・fail-closed・semantic比較の処理を確認したが、実OS境界での候補実行を確認していない。
-- 既存のruntime capture不足・重複invocation、Judge未実施、meaningful traceability、`can_complete=false`のQA品質判定は第2段階の未達として維持する。
-- QTS製品コード・仕様・Seed/Reset・既存製品test、元Stage 2 raw evidenceは変更していない。
+- 現開発containerにはbubblewrapがなく、ローカルの実隔離probeは未実施。candidate sourceはfail-closedで起動していない。
+- 次のCIでseccomp方式のprobeが全条件を満たすまで、Dockerless independent verifierの安全な実行境界は`unverified`。CIが失敗した場合も通常Python実行へfallbackしない。
+- 保存済み第2段階runは現行Evaluator revisionと異なり、適切な固定source/requestの対応を再構成できていない。`verify` requestの独立replayは未実施。raw runに`workflow-runtime` invocationはなく、そのreplayも未実施。両経路のsemantic comparisonはunit test済みだが、実隔離下のcandidate/fixed/result比較は未達。
+- QTS capture integrityの結果は両元attemptとも一致し、attemptの`needs_review`を維持した。runtime capture不足・重複invocation、Judge未実施、meaningful traceability、`can_complete=false`のQA品質判定は既存の未達として残る。
+- QTS製品コード・仕様・Seed/Reset・製品test、元Stage 2 raw evidenceは変更していない。

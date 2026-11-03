@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import os
+import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -63,13 +66,49 @@ class IsolatedVerifierTests(unittest.TestCase):
         self.assertEqual(result["status"], "evidence_unverified")
         self.assertFalse(result["candidate_executed"])
 
-    def test_missing_unshare_does_not_provide_host_tools(self) -> None:
+    def test_missing_bubblewrap_does_not_provide_host_tools(self) -> None:
         with patch.object(
             isolated_verifier.shutil,
             "which",
-            side_effect=lambda name: "/usr/bin/bwrap" if name == "bwrap" else None,
+            return_value=None,
         ):
             self.assertIsNone(isolated_verifier._host_tools())
+
+    def test_network_filter_covers_socket_io_uring_and_x32_syscalls(self) -> None:
+        filter_bytes = isolated_verifier._network_seccomp_filter_bytes()
+        self.assertEqual(len(filter_bytes) % 8, 0)
+        self.assertIn(
+            isolated_verifier._X32_SYSCALL_BIT.to_bytes(4, byteorder=sys.byteorder),
+            filter_bytes,
+        )
+        for syscall_number in isolated_verifier._SECCOMP_BLOCKED_X86_64_SYSCALLS:
+            self.assertIn(syscall_number.to_bytes(4, byteorder=sys.byteorder), filter_bytes)
+
+    def test_network_filter_is_unavailable_outside_linux_x86_64(self) -> None:
+        with (
+            patch.object(isolated_verifier.sys, "platform", "darwin"),
+            self.assertRaisesRegex(AgentEvalError, "network seccomp policy is unavailable"),
+        ):
+            isolated_verifier._network_seccomp_filter_bytes()
+
+    def test_synthetic_boundary_probe_script_is_valid_python(self) -> None:
+        module = ast.parse(Path(isolated_verifier.__file__).read_text(encoding="utf-8"))
+        probe_function = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "probe_isolation"
+        )
+        script_assignment = next(
+            node
+            for node in ast.walk(probe_function)
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "script"
+                for target in node.targets
+            )
+        )
+        script = ast.literal_eval(script_assignment.value)
+        compile(script, "<synthetic-boundary-probe>", "exec")
 
     def test_source_fingerprint_mismatch_stops_before_probe_or_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -131,7 +170,6 @@ class IsolatedVerifierTests(unittest.TestCase):
                     return_value=(
                         Path("/usr/bin/bwrap"),
                         Path("/usr/bin/python3"),
-                        Path("/usr/bin/unshare"),
                         {},
                     ),
                 ),
@@ -161,7 +199,10 @@ class IsolatedVerifierTests(unittest.TestCase):
                 )
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["result_sha256"], raw_stdout_sha)
-        self.assertEqual(result["parsed_result_sha256"], "sha256:" + hashlib.sha256(stdout.encode()).hexdigest())
+        self.assertEqual(
+            result["parsed_result_sha256"],
+            "sha256:" + hashlib.sha256(stdout.encode()).hexdigest(),
+        )
 
     def test_duplicate_result_keys_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -183,7 +224,6 @@ class IsolatedVerifierTests(unittest.TestCase):
                     return_value=(
                         Path("/usr/bin/bwrap"),
                         Path("/usr/bin/python3"),
-                        Path("/usr/bin/unshare"),
                         {},
                     ),
                 ),
@@ -194,10 +234,15 @@ class IsolatedVerifierTests(unittest.TestCase):
                         "status": "completed",
                         "stdout": stdout,
                         "stderr": "",
-                        "stdout_sha256": "sha256:" + hashlib.sha256(stdout.encode()).hexdigest(),
+                        "stdout_sha256": "sha256:"
+                        + hashlib.sha256(stdout.encode()).hexdigest(),
                         "stderr_sha256": "sha256:" + "0" * 64,
-                        "source_fingerprint_before": isolated_verifier.source_tree_fingerprint(source),
-                        "source_fingerprint_after": isolated_verifier.source_tree_fingerprint(source),
+                        "source_fingerprint_before": isolated_verifier.source_tree_fingerprint(
+                            source
+                        ),
+                        "source_fingerprint_after": isolated_verifier.source_tree_fingerprint(
+                            source
+                        ),
                         "verifier_executed": True,
                     },
                 ),
@@ -231,7 +276,6 @@ class IsolatedVerifierTests(unittest.TestCase):
                     return_value=(
                         Path("/usr/bin/bwrap"),
                         Path("/usr/bin/python3"),
-                        Path("/usr/bin/unshare"),
                         {},
                     ),
                 ),
@@ -268,15 +312,31 @@ class IsolatedVerifierTests(unittest.TestCase):
                 )
                 process = Mock(returncode=exit_code, pid=12345)
                 process.communicate.return_value = (b"", b"")
+                observed_fds: dict[str, object] = {}
+
+                def capture_spawn(*args: object, **kwargs: object) -> Mock:
+                    self.assertTrue(args)
+                    observed_fds["stdin"] = kwargs["stdin"]
+                    observed_fds["stdout_is_regular"] = stat.S_ISREG(
+                        os.fstat(kwargs["stdout"].fileno()).st_mode
+                    )
+                    observed_fds["stderr_is_regular"] = stat.S_ISREG(
+                        os.fstat(kwargs["stderr"].fileno()).st_mode
+                    )
+                    observed_fds["passed_fds_are_regular"] = all(
+                        stat.S_ISREG(os.fstat(descriptor).st_mode)
+                        for descriptor in kwargs["pass_fds"]
+                    )
+                    return process
+
                 with patch.object(
                     isolated_verifier.subprocess,
                     "Popen",
-                    return_value=process,
+                    side_effect=capture_spawn,
                 ) as popen:
                     result = isolated_verifier._run_bwrap(
                         bwrap=Path("/usr/bin/bwrap"),
                         python=Path("/usr/bin/python3"),
-                        unshare=Path("/usr/bin/unshare"),
                         source_dir=source,
                         in_sandbox_source="/candidate",
                         script_name="runtime_contract.py",
@@ -286,18 +346,19 @@ class IsolatedVerifierTests(unittest.TestCase):
                     )
                     command = popen.call_args.args[0]
                     self.assertEqual(
-                        command[:7],
-                        [
-                            "/usr/bin/unshare",
-                            "--user",
-                            "--map-root-user",
-                            "--net",
-                            "--kill-child",
-                            "--fork",
-                            "--",
-                        ],
+                        command[0], "/usr/bin/bwrap"
                     )
+                    self.assertIn("--seccomp", command)
                     self.assertNotIn("--unshare-net", command)
+                    spawn_kwargs = popen.call_args.kwargs
+                    self.assertTrue(spawn_kwargs["close_fds"])
+                    self.assertEqual(spawn_kwargs["env"], {"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                    self.assertEqual(observed_fds["stdin"], -1)
+                    self.assertTrue(observed_fds["stdout_is_regular"])
+                    self.assertTrue(observed_fds["stderr_is_regular"])
+                    passed_descriptors = spawn_kwargs["pass_fds"]
+                    self.assertEqual(len(passed_descriptors), 2)
+                    self.assertTrue(observed_fds["passed_fds_are_regular"])
 
             self.assertTrue(result["sandbox_process_started"])
             self.assertEqual(result["verifier_executed"], expected_execution)

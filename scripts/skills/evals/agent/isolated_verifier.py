@@ -13,6 +13,7 @@ import shutil
 import signal
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -62,11 +63,67 @@ _REQUIRED_BWRAP_OPTIONS = (
     "--setenv",
     "--chdir",
     "--new-session",
+    "--seccomp",
+)
+_AUDIT_ARCH_X86_64 = 0xC000003E
+_SECCOMP_RET_KILL_PROCESS = 0x80000000
+_SECCOMP_RET_ERRNO = 0x00050000
+_SECCOMP_RET_ALLOW = 0x7FFF0000
+_X32_SYSCALL_BIT = 0x40000000
+_SECCOMP_BLOCKED_X86_64_SYSCALLS = (
+    41,  # socket
+    42,  # connect
+    43,  # accept
+    44,  # sendto
+    45,  # recvfrom
+    46,  # sendmsg
+    47,  # recvmsg
+    48,  # shutdown
+    49,  # bind
+    50,  # listen
+    51,  # getsockname
+    52,  # getpeername
+    53,  # socketpair
+    54,  # setsockopt
+    55,  # getsockopt
+    288,  # accept4
+    299,  # recvmmsg
+    307,  # sendmmsg
+    425,  # io_uring_setup
+    426,  # io_uring_enter
+    427,  # io_uring_register
 )
 
 
 def _sha256(raw: bytes) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _network_seccomp_filter_bytes() -> bytes:
+    """Build an x86_64 seccomp filter that denies socket and io_uring syscalls."""
+    if not sys.platform.startswith("linux") or os.uname().machine not in {
+        "x86_64",
+        "amd64",
+    }:
+        raise AgentEvalError("network seccomp policy is unavailable for this runtime")
+    instructions = [
+        (0x20, 0, 0, 4),  # load seccomp_data.arch
+        (0x15, 1, 0, _AUDIT_ARCH_X86_64),  # continue only on x86_64
+        (0x06, 0, 0, _SECCOMP_RET_KILL_PROCESS),
+        (0x20, 0, 0, 0),  # load seccomp_data.nr
+        # Reject the x32 syscall ABI as well; it shares AUDIT_ARCH_X86_64.
+        (0x45, 0, 1, _X32_SYSCALL_BIT),
+        (0x06, 0, 0, _SECCOMP_RET_ERRNO | 1),
+    ]
+    for syscall_number in _SECCOMP_BLOCKED_X86_64_SYSCALLS:
+        instructions.extend(
+            (
+                (0x15, 0, 1, syscall_number),
+                (0x06, 0, 0, _SECCOMP_RET_ERRNO | 1),  # EPERM
+            )
+        )
+    instructions.append((0x06, 0, 0, _SECCOMP_RET_ALLOW))
+    return b"".join(struct.pack("=HBBI", *instruction) for instruction in instructions)
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -191,14 +248,12 @@ def _sealed_script_fd(script_bytes: bytes) -> int:
         raise
 
 
-def _host_tools() -> tuple[Path, Path, Path, dict[str, Any]] | None:
+def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
     bwrap_name = shutil.which("bwrap")
-    unshare_name = shutil.which("unshare")
-    if not bwrap_name or not unshare_name:
+    if not bwrap_name:
         return None
     bwrap = Path(bwrap_name).resolve(strict=True)
-    unshare = Path(unshare_name).resolve(strict=True)
-    if not _trusted_root_owned_file(bwrap) or not _trusted_root_owned_file(unshare):
+    if not _trusted_root_owned_file(bwrap):
         return None
     try:
         help_result = subprocess.run(
@@ -219,24 +274,6 @@ def _host_tools() -> tuple[Path, Path, Path, dict[str, Any]] | None:
             check=False,
             shell=False,
         )
-        unshare_help_result = subprocess.run(
-            [str(unshare), "--help"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=5,
-            check=False,
-            shell=False,
-        )
-        unshare_version_result = subprocess.run(
-            [str(unshare), "--version"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=5,
-            check=False,
-            shell=False,
-        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     help_text = (help_result.stdout + help_result.stderr).decode(
@@ -245,21 +282,13 @@ def _host_tools() -> tuple[Path, Path, Path, dict[str, Any]] | None:
     if (
         help_result.returncode != 0
         or version_result.returncode != 0
-        or unshare_help_result.returncode != 0
-        or unshare_version_result.returncode != 0
         or any(option not in help_text for option in _REQUIRED_BWRAP_OPTIONS)
-        or any(
-            option not in (unshare_help_result.stdout + unshare_help_result.stderr)
-            .decode("utf-8", errors="replace")
-            for option in (
-                "--user",
-                "--map-root-user",
-                "--net",
-                "--kill-child",
-                "--fork",
-            )
-        )
     ):
+        return None
+
+    try:
+        network_filter = _network_seccomp_filter_bytes()
+    except AgentEvalError:
         return None
 
     usr = Path("/usr").resolve(strict=True)
@@ -275,16 +304,12 @@ def _host_tools() -> tuple[Path, Path, Path, dict[str, Any]] | None:
         return None
     if not _trusted_root_owned_file(python):
         return None
-    return bwrap, python, unshare, {
+    return bwrap, python, {
         "bwrap_version": version_result.stdout.decode("utf-8", errors="replace")
         .strip(),
         "bwrap_sha256": _sha256(read_regular_file_bytes(bwrap, max_bytes=50_000_000)),
-        "unshare_version": unshare_version_result.stdout.decode(
-            "utf-8", errors="replace"
-        ).strip(),
-        "unshare_sha256": _sha256(
-            read_regular_file_bytes(unshare, max_bytes=50_000_000)
-        ),
+        "network_enforcement": "seccomp-deny-socket-and-io-uring",
+        "network_policy_sha256": _sha256(network_filter),
         "python_path": python.as_posix(),
         "python_sha256": _sha256(read_regular_file_bytes(python, max_bytes=50_000_000)),
     }
@@ -294,6 +319,7 @@ def _base_argv(
     *,
     bwrap: Path,
     python: Path,
+    seccomp_fd: int,
     script_fds: list[tuple[int, str]],
     in_sandbox_source: str,
     script_name: str,
@@ -313,6 +339,8 @@ def _base_argv(
         "--assert-userns-disabled",
         "--cap-drop",
         "ALL",
+        "--seccomp",
+        str(seccomp_fd),
         "--ro-bind",
         str(usr),
         "/usr",
@@ -394,7 +422,6 @@ def _run_bwrap(
     *,
     bwrap: Path,
     python: Path,
-    unshare: Path,
     source_dir: Path,
     in_sandbox_source: str,
     script_name: str,
@@ -402,7 +429,6 @@ def _run_bwrap(
     input_bytes: bytes,
     timeout_seconds: float,
     expected_source_fingerprint: str | None = None,
-    synthetic_secret: str | None = None,
     post_exit_wait_seconds: float = 0.0,
 ) -> dict[str, Any]:
     try:
@@ -470,33 +496,33 @@ def _run_bwrap(
             "source_fingerprint_before": source_fingerprint,
         }
     request_digest = _sha256(input_bytes)
+    try:
+        network_filter = _network_seccomp_filter_bytes()
+        network_policy_sha256 = _sha256(network_filter)
+        seccomp_fd = _sealed_script_fd(network_filter)
+    except (AgentEvalError, OSError) as exc:
+        for descriptor, _ in script_fds:
+            os.close(descriptor)
+        return {
+            "status": "evidence_unverified",
+            "reason": "network_seccomp_snapshot_unavailable",
+            "reason_type": type(exc).__name__,
+            "sandbox_process_started": False,
+            "verifier_executed": False,
+            "source_fingerprint_before": source_fingerprint,
+        }
     bwrap_command = _base_argv(
         bwrap=bwrap,
         python=python,
+        seccomp_fd=seccomp_fd,
         script_fds=script_fds,
         in_sandbox_source=in_sandbox_source,
         script_name=script_name,
         inner_argv=inner_argv,
     )
-    # Some hosted kernels allow creating a network namespace but deny the
-    # RTM_NEWADDR operation bubblewrap uses to bring its loopback interface up.
-    # Create the isolated network namespace first with util-linux unshare, then
-    # let bubblewrap inherit it without attempting network setup. It contains no
-    # host interfaces, and the probe must still prove host-listener denial.
-    command = [
-        str(unshare),
-        "--user",
-        "--map-root-user",
-        "--net",
-        "--kill-child",
-        "--fork",
-        "--",
-        *bwrap_command,
-    ]
+    command = bwrap_command
     # The bwrap launcher itself must not inherit CI, user, or auth credentials.
     host_env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C"}
-    if synthetic_secret is not None:
-        host_env["PR17_SYNTHETIC_SECRET"] = synthetic_secret
     stdout_file = tempfile.TemporaryFile(mode="w+b")
     stderr_file = tempfile.TemporaryFile(mode="w+b")
     started = time.monotonic()
@@ -508,11 +534,15 @@ def _run_bwrap(
             stderr=stderr_file,
             env=host_env,
             close_fds=True,
-            pass_fds=tuple(descriptor for descriptor, _ in script_fds),
+            pass_fds=(
+                seccomp_fd,
+                *(descriptor for descriptor, _ in script_fds),
+            ),
             start_new_session=True,
             preexec_fn=_no_new_privs_and_limits,
         )
     except (OSError, subprocess.SubprocessError) as exc:
+        os.close(seccomp_fd)
         for descriptor, _ in script_fds:
             os.close(descriptor)
         stdout_file.close()
@@ -526,6 +556,7 @@ def _run_bwrap(
         }
     for descriptor, _ in script_fds:
         os.close(descriptor)
+    os.close(seccomp_fd)
     timed_out = False
     cleanup_verified = True
     try:
@@ -613,6 +644,8 @@ def _run_bwrap(
         "source_unchanged": source_after_fingerprint == source_fingerprint,
         "request_sha256": request_digest,
         "request_unchanged": _sha256(input_bytes) == request_digest,
+        "network_enforcement": "seccomp-deny-socket-and-io-uring",
+        "network_policy_sha256": network_policy_sha256,
         "script_sha256": entrypoint_sha256,
         "stdout_sha256": None if output_secret_shaped else _sha256(stdout_bytes),
         "stderr_sha256": None if output_secret_shaped else _sha256(stderr_bytes),
@@ -633,7 +666,7 @@ def _run_bwrap(
 
 
 def probe_isolation() -> dict[str, Any]:
-    """Run only a synthetic, harmless boundary probe before any supplied source."""
+    """Probe the OS boundary with harmless synthetic files before supplied code."""
     host_tools = _host_tools()
     if host_tools is None:
         return {
@@ -641,37 +674,96 @@ def probe_isolation() -> dict[str, Any]:
             "reason": "required_bubblewrap_capabilities_unavailable",
             "candidate_executed": False,
         }
-    bwrap, python, unshare, runtime = host_tools
+    bwrap, python, runtime = host_tools
     with tempfile.TemporaryDirectory(prefix="pr17-verifier-probe-") as temporary:
         root = Path(temporary)
         source = root / "probe"
         source.mkdir()
         marker = root / "evaluator-only.txt"
         marker.write_text("synthetic-evaluator-marker", encoding="utf-8")
+        synthetic_credential = root / "synthetic-ci-credential.txt"
+        synthetic_credential.write_text("synthetic-ci-credential", encoding="utf-8")
         probe_path = source / "probe.py"
-        script = r'''import ctypes, errno, json, os, socket, sys
+        script = r'''import ctypes, errno, json, os, socket, stat, sys
 from pathlib import Path
 import resource
+
 status = Path("/proc/self/status").read_text()
-no_new_privs = next((line.split()[1] for line in status.splitlines() if line.startswith("NoNewPrivs:")), "0")
-cap_eff = next((line.split()[1] for line in status.splitlines() if line.startswith("CapEff:")), "-1")
-nspid = next((line.split()[1:] for line in status.splitlines() if line.startswith("NSpid:")), [])
+status_fields = {
+    line.split(":", 1)[0]: line.split(":", 1)[1].strip()
+    for line in status.splitlines()
+    if ":" in line
+}
+no_new_privs = status_fields.get("NoNewPrivs", "0")
+seccomp_mode = status_fields.get("Seccomp", "0")
+cap_eff = status_fields.get("CapEff", "-1")
+nspid = status_fields.get("NSpid", "").split()
+namespace_names = ("user", "pid", "mnt", "ipc", "uts")
+sandbox_namespace_ids = {
+    name: os.stat(f"/proc/self/ns/{name}").st_ino for name in namespace_names
+}
+host_namespace_ids = {
+    name: int(value) for name, value in zip(namespace_names, sys.argv[3:8], strict=True)
+}
+host_pid = int(sys.argv[8])
+host_socket_fd = int(sys.argv[9])
+
+protected_environment_names = (
+    b"GITHUB_TOKEN=",
+    b"ACTIONS_ID_TOKEN_REQUEST_TOKEN=",
+    b"CODEX_HOME=",
+    b"OPENAI_API_KEY=",
+)
 try:
-    parent_environment = Path("/proc/1/environ").read_bytes()
-    parent_environment_secret_unavailable = b"pr17-synthetic-environment-marker" not in parent_environment
+    sandbox_pid1_environment = Path("/proc/1/environ").read_bytes()
+    sandbox_pid1_environment_secret_unavailable = not any(
+        name in sandbox_pid1_environment for name in protected_environment_names
+    )
 except OSError:
-    parent_environment_secret_unavailable = True
+    sandbox_pid1_environment_secret_unavailable = True
+try:
+    Path(f"/proc/{host_pid}/environ").read_bytes()
+    host_process_environment_unreadable = False
+except OSError:
+    host_process_environment_unreadable = True
+allowed_environment_names = {
+    "HOME",
+    "TMPDIR",
+    "PATH",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONNOUSERSITE",
+    "LC_ALL",
+    "LC_CTYPE",
+}
+runtime_environment_sanitized = (
+    {"HOME", "TMPDIR", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "LC_ALL"}
+    .issubset(os.environ)
+    and set(os.environ).issubset(allowed_environment_names)
+)
+
 try:
     Path(sys.argv[1]).read_text()
     marker_read_denied = False
 except OSError:
     marker_read_denied = True
+try:
+    Path(sys.argv[2]).read_text()
+    synthetic_ci_credential_unreadable = False
+except OSError:
+    synthetic_ci_credential_unreadable = True
+try:
+    Path(f"/proc/{host_pid}/fd/{host_socket_fd}").readlink()
+    host_socket_fd_unreadable = False
+except OSError:
+    host_socket_fd_unreadable = True
+
 def write_denied(path):
     try:
         Path(path).write_text("no")
         return False
     except OSError:
         return True
+
 root_write_denied = write_denied("/pr17-outside-write")
 proc_write_denied = write_denied("/proc/self/comm")
 dev_write_denied = write_denied("/dev/pr17-outside-write")
@@ -680,23 +772,52 @@ try:
     source_write_denied = False
 except OSError:
     source_write_denied = True
+
 libc = ctypes.CDLL(None, use_errno=True)
-unshare_result = libc.unshare(0x10000000)
-user_namespace_denied = unshare_result == -1 and ctypes.get_errno() in (errno.EPERM, errno.EACCES)
-port = int(sys.argv[2])
-try:
-    with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-        network_denied = False
-except OSError:
-    network_denied = True
-interfaces = socket.if_nameindex()
-ipv4_routes = [line for line in Path("/proc/net/route").read_text().splitlines()[1:] if line.strip()]
-ipv6_routes = [line for line in Path("/proc/net/ipv6_route").read_text().splitlines() if line.strip()]
+userns_result = libc.unshare(0x10000000)
+user_namespace_denied = userns_result == -1 and ctypes.get_errno() in (
+    errno.EPERM,
+    errno.EACCES,
+)
+
+def socket_creation_denied(family, socktype):
+    try:
+        descriptor = socket.socket(family, socktype)
+    except OSError as exc:
+        return exc.errno == errno.EPERM
+    else:
+        descriptor.close()
+        return False
+
+socket_checks = {
+    "inet": socket_creation_denied(socket.AF_INET, socket.SOCK_STREAM),
+    "inet6": socket_creation_denied(socket.AF_INET6, socket.SOCK_DGRAM),
+    "unix": socket_creation_denied(socket.AF_UNIX, socket.SOCK_STREAM),
+}
+
+def syscall_denied(number, *args):
+    ctypes.set_errno(0)
+    result = libc.syscall(number, *args)
+    return result == -1 and ctypes.get_errno() == errno.EPERM
+
+io_uring_checks = {number: syscall_denied(number, 0, 0, 0) for number in (425, 426, 427)}
+x32_socket_denied = syscall_denied(
+    0x40000000 | 41, socket.AF_INET, socket.SOCK_STREAM, 0
+)
+socket_fds = []
+for entry in Path("/proc/self/fd").iterdir():
+    try:
+        if stat.S_ISSOCK(entry.stat().st_mode):
+            socket_fds.append(entry.name)
+    except FileNotFoundError:
+        continue
+
 try:
     Path("/tmp/probe-scratch").write_text("scratch")
     scratch_write_allowed = True
 except OSError:
     scratch_write_allowed = False
+
 request = sys.stdin.buffer.read()
 limits = {
     name: list(resource.getrlimit(key))
@@ -713,62 +834,112 @@ scratch_limits = {
     path: os.statvfs(path).f_frsize * os.statvfs(path).f_blocks
     for path in ("/tmp", "/workspace")
 }
-pid = os.getpid()
-print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, "nspid": nspid, "parent_environment_secret_unavailable": parent_environment_secret_unavailable, "marker_read_denied": marker_read_denied, "root_write_denied": root_write_denied, "proc_write_denied": proc_write_denied, "dev_write_denied": dev_write_denied, "source_write_denied": source_write_denied, "user_namespace_denied": user_namespace_denied, "network_denied": network_denied, "interfaces": interfaces, "ipv4_routes": ipv4_routes, "ipv6_routes": ipv6_routes, "scratch_write_allowed": scratch_write_allowed, "synthetic_secret_absent": "PR17_SYNTHETIC_SECRET" not in os.environ, "request": request.decode(), "limits": limits, "scratch_limits": scratch_limits}))
+print(json.dumps({
+    "pid": os.getpid(),
+    "no_new_privs": no_new_privs,
+    "seccomp_mode": seccomp_mode,
+    "cap_eff": cap_eff,
+    "nspid": nspid,
+    "sandbox_namespace_ids": sandbox_namespace_ids,
+    "host_namespace_ids": host_namespace_ids,
+    "sandbox_pid1_environment_secret_unavailable": sandbox_pid1_environment_secret_unavailable,
+    "host_process_environment_unreadable": host_process_environment_unreadable,
+    "synthetic_ci_credential_unreadable": synthetic_ci_credential_unreadable,
+    "host_socket_fd_unreadable": host_socket_fd_unreadable,
+    "marker_read_denied": marker_read_denied,
+    "root_write_denied": root_write_denied,
+    "proc_write_denied": proc_write_denied,
+    "dev_write_denied": dev_write_denied,
+    "source_write_denied": source_write_denied,
+    "user_namespace_denied": user_namespace_denied,
+    "socket_checks": socket_checks,
+    "io_uring_checks": io_uring_checks,
+    "x32_socket_denied": x32_socket_denied,
+    "inherited_socket_fds": socket_fds,
+    "scratch_write_allowed": scratch_write_allowed,
+    "runtime_environment_sanitized": runtime_environment_sanitized,
+    "request": request.decode(),
+    "limits": limits,
+    "scratch_limits": scratch_limits,
+}))
 '''
         probe_path.write_text(script, encoding="utf-8")
         source_fingerprint = canonical_fingerprint(_safe_tree(source))
-        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            listener.bind(("127.0.0.1", 0))
-            listener.listen(1)
-            listener.settimeout(0.1)
-            port = listener.getsockname()[1]
-            result = _run_bwrap(
-                bwrap=bwrap,
-                python=python,
-                unshare=unshare,
-                source_dir=source,
-                in_sandbox_source="/probe",
-                script_name="probe.py",
-                inner_argv=[marker.as_posix(), str(port)],
-                input_bytes=b"pr17-synthetic-fixed-request",
-                timeout_seconds=10,
-                expected_source_fingerprint=source_fingerprint,
-                synthetic_secret="pr17-synthetic-environment-marker",
-            )
-        except OSError as exc:
-            listener.close()
-            return {
-                "status": "evidence_unverified",
-                "reason": "host_network_probe_unavailable",
-                "reason_type": type(exc).__name__,
-                "candidate_executed": False,
-                **runtime,
-            }
-        finally:
-            listener.close()
+        namespace_names = ("user", "pid", "mnt", "ipc", "uts")
+        host_namespace_ids = [
+            str(os.stat(f"/proc/self/ns/{name}").st_ino) for name in namespace_names
+        ]
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as parent_socket:
+            try:
+                result = _run_bwrap(
+                    bwrap=bwrap,
+                    python=python,
+                    source_dir=source,
+                    in_sandbox_source="/probe",
+                    script_name="probe.py",
+                    inner_argv=[
+                        marker.as_posix(),
+                        synthetic_credential.as_posix(),
+                        *host_namespace_ids,
+                        str(os.getpid()),
+                        str(parent_socket.fileno()),
+                    ],
+                    input_bytes=b"pr17-synthetic-fixed-request",
+                    timeout_seconds=10,
+                    expected_source_fingerprint=source_fingerprint,
+                )
+            except OSError as exc:
+                return {
+                    "status": "evidence_unverified",
+                    "reason": "boundary_probe_unavailable",
+                    "reason_type": type(exc).__name__,
+                    "candidate_executed": False,
+                    **runtime,
+                }
         try:
             parsed = json.loads(result.pop("stdout", ""))
         except json.JSONDecodeError:
             parsed = None
+
+        socket_checks = parsed.get("socket_checks") if isinstance(parsed, dict) else None
+        io_uring_checks = parsed.get("io_uring_checks") if isinstance(parsed, dict) else None
         checks = {
             "unprivileged_no_new_privs": isinstance(parsed, dict)
             and parsed.get("no_new_privs") == "1",
+            "seccomp_filter_active": isinstance(parsed, dict)
+            and parsed.get("seccomp_mode") == "2",
             "pid_namespace_active": isinstance(parsed, dict)
             and isinstance(parsed.get("pid"), int)
             and 1 < parsed["pid"] < 16
             and parsed.get("nspid") == [str(parsed["pid"])],
+            "user_namespace_isolated": isinstance(parsed, dict)
+            and parsed.get("sandbox_namespace_ids", {}).get("user")
+            != parsed.get("host_namespace_ids", {}).get("user"),
+            "mount_namespace_isolated": isinstance(parsed, dict)
+            and parsed.get("sandbox_namespace_ids", {}).get("mnt")
+            != parsed.get("host_namespace_ids", {}).get("mnt"),
+            "ipc_namespace_isolated": isinstance(parsed, dict)
+            and parsed.get("sandbox_namespace_ids", {}).get("ipc")
+            != parsed.get("host_namespace_ids", {}).get("ipc"),
+            "uts_namespace_isolated": isinstance(parsed, dict)
+            and parsed.get("sandbox_namespace_ids", {}).get("uts")
+            != parsed.get("host_namespace_ids", {}).get("uts"),
             "no_effective_capabilities": isinstance(parsed, dict)
             and parsed.get("cap_eff") == "0000000000000000",
             "nested_user_namespace_denied": isinstance(parsed, dict)
             and parsed.get("user_namespace_denied") is True,
             "evaluator_marker_unreadable": isinstance(parsed, dict)
             and parsed.get("marker_read_denied") is True,
-            "synthetic_environment_secret_unavailable": isinstance(parsed, dict)
-            and parsed.get("synthetic_secret_absent") is True,
-            "parent_process_environment_secret_unavailable": isinstance(parsed, dict)
-            and parsed.get("parent_environment_secret_unavailable") is True,
+            "runtime_environment_is_allowlisted": isinstance(parsed, dict)
+            and parsed.get("runtime_environment_sanitized") is True,
+            "sandbox_pid1_environment_secret_unavailable": isinstance(parsed, dict)
+            and parsed.get("sandbox_pid1_environment_secret_unavailable") is True,
+            "host_process_environment_unreadable": isinstance(parsed, dict)
+            and parsed.get("host_process_environment_unreadable") is True,
+            "synthetic_ci_credential_unreadable": isinstance(parsed, dict)
+            and parsed.get("synthetic_ci_credential_unreadable") is True,
+            "host_socket_fd_unreadable": isinstance(parsed, dict)
+            and parsed.get("host_socket_fd_unreadable") is True,
             "root_filesystem_read_only": isinstance(parsed, dict)
             and parsed.get("root_write_denied") is True,
             "proc_filesystem_read_only": isinstance(parsed, dict)
@@ -777,19 +948,15 @@ print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, 
             and parsed.get("dev_write_denied") is True,
             "source_read_only": isinstance(parsed, dict)
             and parsed.get("source_write_denied") is True,
-            "network_namespace_blocked_host_listener": isinstance(parsed, dict)
-            and parsed.get("network_denied") is True,
-            "network_namespace_has_no_external_interface": isinstance(parsed, dict)
-            and isinstance(parsed.get("interfaces"), list)
-            and all(
-                isinstance(interface, list)
-                and len(interface) == 2
-                and interface[1] == "lo"
-                for interface in parsed["interfaces"]
-            ),
-            "network_namespace_has_no_routes": isinstance(parsed, dict)
-            and parsed.get("ipv4_routes") == []
-            and parsed.get("ipv6_routes") == [],
+            "network_socket_syscalls_denied": isinstance(socket_checks, dict)
+            and {"inet", "inet6", "unix"}.issubset(socket_checks)
+            and all(socket_checks.values()),
+            "io_uring_syscalls_denied": isinstance(io_uring_checks, dict)
+            and io_uring_checks == {"425": True, "426": True, "427": True},
+            "x32_syscall_abi_denied": isinstance(parsed, dict)
+            and parsed.get("x32_socket_denied") is True,
+            "no_inherited_socket_descriptors": isinstance(parsed, dict)
+            and parsed.get("inherited_socket_fds") == [],
             "bounded_scratch_available": isinstance(parsed, dict)
             and parsed.get("scratch_write_allowed") is True,
             "fixed_request_delivered": isinstance(parsed, dict)
@@ -822,12 +989,13 @@ print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, 
             "request_unchanged": result.get("request_unchanged") is True,
             "exit_success": result.get("status") == "completed",
         }
+
         timeout_path = source / "timeout.py"
         timeout_path.write_text(
             '''import subprocess, sys, time
 child = """import os, time
 time.sleep(1.5)
-os.write(1, b'DETACHED_CHILD_SURVIVED\\n')
+os.write(1, b'DETACHED_CHILD_SURVIVED\\\\n')
 """
 subprocess.Popen([sys.executable, '-E', '-s', '-S', '-B', '-c', child], start_new_session=True, close_fds=False)
 time.sleep(30)
@@ -837,7 +1005,6 @@ time.sleep(30)
         timeout_execution = _run_bwrap(
             bwrap=bwrap,
             python=python,
-            unshare=unshare,
             source_dir=source,
             in_sandbox_source="/probe",
             script_name="timeout.py",
@@ -862,8 +1029,6 @@ time.sleep(30)
             "candidate_executed": False,
             **runtime,
         }
-
-
 def run_isolated_python(
     *,
     source_dir: Path,
@@ -938,7 +1103,7 @@ def run_isolated_python(
             "verifier_executed": False,
             "isolation_probe": probe,
         }
-    bwrap, python, unshare, runtime = host_tools
+    bwrap, python, runtime = host_tools
     result = _run_bwrap(
         bwrap=bwrap,
         python=python,
