@@ -60,7 +60,8 @@ raw run rootに`evidence-index.md`はなかった。保存された`result.json`
 - `9eee339`のCode Quality必須probeは、util-linux `unshare`が`/proc/self/uid_map: Operation not permitted`となり失敗。candidate verifierは実行していない。他の4 workflowは成功。
 - `970cf6b`のseccomp方式も、Code Quality runnerがuser namespace UID mapを作れず必須probeに失敗した。`bwrap` stderrは`setting up uid map: Permission denied`、candidate verifierは未実行。他の4 workflowは成功。Static formatting/lint stepsはprobeより後だったため、このrunでは実行されなかった。
 - `0261224`では必須probeをCode Quality jobの最後へ移した。4 workflowは成功したが、Code Qualityは固定Ruff 0.16.8のformat checkで6つのPythonファイルを報告し、probeは未実行となった。指摘された6ファイルだけを同じ固定版Ruffで整形し、全tracked formatter/lint checkをローカルで再実行して成功した。
-- この後のPR commitでCIを再実行する。Code Qualityがprobeまで到達した場合でも、GitHub-hosted runnerのuser namespace権限で失敗すればDockerless verifierは`evidence_unverified`のままとし、候補sourceを実行しない。probe自体はstrictに維持する。
+- `f23dfc4`のCIでは5 workflow中4件（Codex Harness、Agent Skills、Deterministic Output Evals、Semantic Output Evals）が成功した。Code QualityはRuff/dprint/patch whitespaceまで成功した後、必須隔離probeが`bwrap: setting up uid map: Permission denied`で失敗した。probeは`evidence_unverified`、candidateは`candidate_executed: false`であり、隔離依存の3 integration testはrequired-modeで失敗した。これはrunnerのnamespace権限不足であり、候補Verifierの失敗や品質結果ではない。候補sourceは実行されていない。
+- この結果により、通常のGitHub-hosted `ubuntu-latest`では現在必要なnamespace境界を提供しないことが再確認された。Dockerless independent verifier replayは未達のまま維持し、candidate sourceの実行や安全条件の緩和は行わない。
 
 ## 未達・制約
 
