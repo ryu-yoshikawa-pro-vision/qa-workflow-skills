@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   code-quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,11 +39,175 @@ jobs:
           ruff --version
           dprint --version
 
-      - name: Install unprivileged verifier sandbox probe tool
+      - name: Install bubblewrap and AppArmor diagnostic tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends bubblewrap
+          sudo apt-get install --yes --no-install-recommends bubblewrap apparmor apparmor-utils
           bwrap --version
+          mkdir -p "$RUNNER_TEMP/apparmor-profiles-package"
+          (
+            cd "$RUNNER_TEMP"
+            apt-get download "apparmor-profiles=4.0.1really4.0.1-0ubuntu0.24.04.9"
+          )
+          profile_deb="$RUNNER_TEMP/apparmor-profiles_4.0.1really4.0.1-0ubuntu0.24.04.9_all.deb"
+          test "$(dpkg-deb -f "$profile_deb" Package)" = "apparmor-profiles"
+          test "$(dpkg-deb -f "$profile_deb" Version)" = "4.0.1really4.0.1-0ubuntu0.24.04.9"
+          sha256sum "$profile_deb"
+          dpkg-deb -x "$profile_deb" "$RUNNER_TEMP/apparmor-profiles-package"
+
+      - name: Diagnose bubblewrap user namespace denial before profile changes
+        id: bwrap_diagnosis
+        shell: bash
+        run: |
+          set -uo pipefail
+          printf 'runner_os='; . /etc/os-release; printf '%s %s\n' "$ID" "$VERSION_ID"
+          printf 'apparmor_enabled='; cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo unavailable
+          printf 'active_lsm='; cat /sys/kernel/security/lsm 2>/dev/null || echo unavailable
+          for key in kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone user.max_user_namespaces; do
+            if value=$(sysctl -n "$key" 2>/dev/null); then
+              printf '%s=%s\n' "$key" "$value"
+            else
+              printf '%s=absent\n' "$key"
+            fi
+          done
+          printf 'bwrap_path='; readlink -f "$(command -v bwrap)"
+          stat -c 'bwrap_owner=%u:%g bwrap_mode=%a bwrap_type=%F' "$(readlink -f "$(command -v bwrap)")"
+          dpkg-query -S "$(readlink -f "$(command -v bwrap)")" || true
+          printf 'apparmor_parser_path='; command -v apparmor_parser || true
+          printf 'existing_bwrap_profiles=\n'
+          if [ -r /sys/kernel/security/apparmor/profiles ]; then
+            grep -i 'bwrap' /sys/kernel/security/apparmor/profiles || true
+          else
+            echo unavailable
+          fi
+          printf 'existing_bwrap_profile_files=\n'
+          sudo grep -RIlE '^[[:space:]]*(profile[[:space:]]+([^[:space:]]+[[:space:]]+)?/usr/bin/bwrap|/usr/bin/bwrap)([[:space:]]|$)' /etc/apparmor.d 2>/dev/null || true
+
+          set +e
+          timeout 10 bwrap --unshare-user --uid 0 --gid 0 -- /usr/bin/true \
+            >"$RUNNER_TEMP/bwrap-userns-probe.stdout" \
+            2>"$RUNNER_TEMP/bwrap-userns-probe.stderr"
+          probe_exit=$?
+          set -e
+          printf 'initial_bwrap_userns_probe_exit=%s\n' "$probe_exit"
+          cat "$RUNNER_TEMP/bwrap-userns-probe.stderr"
+
+          apparmor_value=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)
+          apparmor_enabled=$(cat /sys/module/apparmor/parameters/enabled 2>/dev/null || true)
+          userns_clone=$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)
+          max_namespaces=$(sysctl -n user.max_user_namespaces 2>/dev/null || true)
+          audit_denials=$(
+            {
+              sudo dmesg --ctime 2>/dev/null || true
+              sudo journalctl -k --since '-5 minutes' --no-pager 2>/dev/null || true
+            } | grep 'apparmor="DENIED"' | grep 'operation="userns_create"' | grep 'comm="bwrap"' | tail -n 5 || true
+          )
+          if [ -n "$audit_denials" ]; then
+            printf 'matching_apparmor_denial=\n%s\n' "$audit_denials"
+          else
+            echo 'matching_apparmor_denial=none_or_kernel_audit_unavailable'
+          fi
+
+          apparmor_blocker=false
+          if [ "$probe_exit" -ne 0 ] \
+            && [ "$apparmor_enabled" = Y ] \
+            && [ "$apparmor_value" = 1 ] \
+            && { [ -z "$userns_clone" ] || [ "$userns_clone" = 1 ]; } \
+            && { [ -n "$max_namespaces" ] && [ "$max_namespaces" -gt 0 ]; } \
+            && [ -n "$audit_denials" ]; then
+            apparmor_blocker=true
+          fi
+          {
+            printf 'initial_bwrap_probe_exit=%s\n' "$probe_exit"
+            printf 'apparmor_userns_blocker=%s\n' "$apparmor_blocker"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply Ubuntu's packaged bubblewrap user namespace profile only on proven AppArmor denial
+        if: steps.bwrap_diagnosis.outputs.apparmor_userns_blocker == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile_source="$RUNNER_TEMP/apparmor-profiles-package/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
+          profile_target=/etc/apparmor.d/bwrap-userns-restrict
+          test "$(readlink -f "$(command -v bwrap)")" = /usr/bin/bwrap
+          test -r "$profile_source"
+          source_owner=$(dpkg-deb -f "$RUNNER_TEMP/apparmor-profiles_4.0.1really4.0.1-0ubuntu0.24.04.9_all.deb" Package)
+          test "$source_owner" = apparmor-profiles
+          grep -Fq 'profile bwrap /usr/bin/bwrap' "$profile_source"
+          grep -Fq 'profile unpriv_bwrap' "$profile_source"
+          grep -Fq 'allow userns,' "$profile_source"
+          grep -Fq 'allow pix /** -> &bwrap//&unpriv_bwrap' "$profile_source"
+          grep -Fq 'audit deny capability,' "$profile_source"
+          if grep -Eq 'flags=[^}]*complain' "$profile_source"; then
+            echo 'Refusing non-enforcing packaged profile.' >&2
+            exit 1
+          fi
+          sha256sum "$profile_source"
+
+          other_profile_files=$(
+            sudo grep -RIlE '^[[:space:]]*(profile[[:space:]]+([^[:space:]]+[[:space:]]+)?/usr/bin/bwrap|/usr/bin/bwrap)([[:space:]]|$)' /etc/apparmor.d 2>/dev/null \
+              | grep -Fvx "$profile_target" || true
+          )
+          if [ -n "$other_profile_files" ]; then
+            printf 'Refusing duplicate bwrap profile attachment:\n%s\n' "$other_profile_files" >&2
+            exit 1
+          fi
+
+          loaded_profiles=$(sudo cat /sys/kernel/security/apparmor/profiles 2>/dev/null | grep -i 'bwrap' || true)
+          if [ -n "$loaded_profiles" ] && { [ ! -f "$profile_target" ] || ! cmp -s "$profile_source" "$profile_target"; }; then
+            echo 'Refusing to replace an unverified loaded bwrap profile.' >&2
+            exit 1
+          fi
+
+          if [ -L "$profile_target" ]; then
+            echo 'Refusing a symlinked existing bwrap profile.' >&2
+            exit 1
+          fi
+          if [ -e "$profile_target" ]; then
+            test -f "$profile_target"
+            test "$(stat -c %u "$profile_target")" = 0
+            existing_mode=$(stat -c %a "$profile_target")
+            if (( (8#$existing_mode & 022) != 0 )); then
+              echo 'Refusing a group- or world-writable existing bwrap profile.' >&2
+              exit 1
+            fi
+            cmp -s "$profile_source" "$profile_target" || {
+              echo 'Refusing to replace a different existing bwrap profile.' >&2
+              exit 1
+            }
+          else
+            sudo install -o root -g root -m 0644 "$profile_source" "$profile_target"
+          fi
+          cmp -s "$profile_source" "$profile_target"
+          if [ ! -r /sys/kernel/security/apparmor/profiles ]; then
+            echo 'AppArmor profile interface is unavailable.' >&2
+            exit 1
+          fi
+
+          sudo apparmor_parser -r "$profile_target"
+          loaded_profiles=$(sudo cat /sys/kernel/security/apparmor/profiles | grep -i 'bwrap' || true)
+          printf 'loaded_bwrap_profiles=\n%s\n' "$loaded_profiles"
+          printf '%s\n' "$loaded_profiles" | grep -q 'bwrap'
+          printf '%s\n' "$loaded_profiles" | grep -q 'unpriv_bwrap'
+          if printf '%s\n' "$loaded_profiles" | grep -v '(enforce)$'; then
+            echo 'A bwrap profile is not in enforce mode.' >&2
+            exit 1
+          fi
+
+          if ! timeout 10 bwrap --unshare-user --uid 0 --gid 0 -- /usr/bin/true; then
+            {
+              sudo dmesg --ctime 2>/dev/null || true
+              sudo journalctl -k --since '-5 minutes' --no-pager 2>/dev/null || true
+            } | grep 'apparmor="DENIED"' | grep -E 'userns_create|comm="bwrap"' | tail -n 10 || true
+            exit 1
+          fi
+          echo 'packaged_profile_activation=verified_for_bwrap_userns_probe'
+
+      - name: Fail closed when the baseline denial is not attributable to AppArmor
+        if: steps.bwrap_diagnosis.outputs.apparmor_userns_blocker != 'true' && steps.bwrap_diagnosis.outputs.initial_bwrap_probe_exit != '0'
+        run: |
+          echo 'The minimal bwrap probe failed without a matching AppArmor userns denial; no profile or sysctl was changed.' >&2
+          exit 1
 
       - name: Test tracked formatter contracts
         run: python -m unittest discover -s tests -p 'test_format_tracked.py' -v

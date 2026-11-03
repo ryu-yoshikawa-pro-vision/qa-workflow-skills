@@ -119,7 +119,9 @@ Dockerless verifier replayは、root所有のOS `bubblewrap`が利用でき、�
 
 `verify`と`workflow-runtime`はそれぞれcandidate source、固定Evaluator source、captured resultのsemantic fieldを比較します。両経路が個別に通らない限り、replay全体をpassにしません。これは実行時の決定論的再現性判定であり、Agentが元runでコマンドを実行した証拠ではありません。元Agentのtool traceがない場合は引き続き`unverified`です。`payload.can_complete=false`は比較対象の値として維持し、replay一致をQA workflow完了へ読み替えません。Dockerを使ったproduction replayとJudge評価も、実施したと記録しません。
 
-CIのCode Quality jobはcheckout credential persistenceを無効にし、Ubuntu runnerへbubblewrapを追加したうえで、`PR17_REQUIRE_VERIFIER_ISOLATION=1`で合成probeと境界テストを実行します。runnerが要求境界を提供しなければjobは失敗します。ローカル環境でbubblewrapや必要namespaceを利用できない場合、通常Python processへfallbackせず、candidate verifierを実行しません。
+CIのCode Quality jobは`ubuntu-24.04`の一時runnerを使い、checkout credential persistenceを無効にしたread-only tokenで実行します。bubblewrapの最小user-namespace probeより前に、AppArmor状態、`kernel.apparmor_restrict_unprivileged_userns`、`kernel.unprivileged_userns_clone`（存在する場合）、namespace上限、既存profile、bwrap binary、kernel denialを機密情報なしで記録します。probe失敗に加えAppArmor有効・当該restrict sysctl有効・user namespace有効・bwrapの`userns_create`拒否記録が一致した場合だけ、Ubuntu 24.04の固定`apparmor-profiles` packageから`bwrap-userns-restrict`を取り出して検査します。既存profile file / loaded profileとの衝突があれば停止し、競合がない場合に限り`/usr/bin/bwrap`用の公式profileをそのjob VMへロードします。system-wide sysctlは変更せず、job終了後にrunner VMは破棄されます。詳細は[UbuntuのAppArmor user namespace制限](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/)と[配布profile一覧](https://packages.ubuntu.com/noble-updates/all/apparmor-profiles/filelist)を参照してください。
+
+profile適用後も、同じ最小probeと`PR17_REQUIRE_VERIFIER_ISOLATION=1`の必須合成probeを全通過した場合にだけ、候補Verifierを実行します。診断がAppArmor原因を確定しない場合、profileが競合する場合、または必須probeが一つでも失敗する場合はjobをfail-closedで停止します。ローカル環境でbubblewrapや必要namespaceを利用できない場合も通常Python processへfallbackせず、candidate verifierを実行しません。
 
 ## 旧CLI runnerの認証・隔離と異常終了の履歴
 
