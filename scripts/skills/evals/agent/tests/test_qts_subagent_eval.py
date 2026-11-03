@@ -177,6 +177,105 @@ class QTSSubagentEvalTests(unittest.TestCase):
                 model="other-model",
             )
 
+    def test_prepared_target_uses_attested_synthetic_head_not_upstream_object_id(
+        self,
+    ) -> None:
+        source = self.repository / "target-source"
+        source.mkdir()
+        (source / "README.md").write_text("fixed sanitized source\n", encoding="utf-8")
+        env = {
+            **os.environ,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_AUTHOR_NAME": "Evaluator",
+            "GIT_AUTHOR_EMAIL": "evaluator@invalid.local",
+            "GIT_COMMITTER_NAME": "Evaluator",
+            "GIT_COMMITTER_EMAIL": "evaluator@invalid.local",
+        }
+        subprocess.run(["git", "init", "--quiet", str(source)], check=True, env=env)
+        subprocess.run(
+            ["git", "-C", str(source), "add", "--all"], check=True, env=env
+        )
+        subprocess.run(
+            ["git", "-C", str(source), "commit", "--quiet", "-m", "snapshot"],
+            check=True,
+            env=env,
+        )
+        target_head = subprocess.run(
+            ["git", "-C", str(source), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        manifest_fingerprint = "sha256:" + "a" * 64
+        provenance = self.repository / ".agent-eval-runs" / "source-provenance.json"
+        provenance.write_text(
+            json.dumps(
+                {
+                    "target_revision": qts.DEFAULT_TARGET_REVISION,
+                    "source_integrity": "verified",
+                    "source_manifest_fingerprint": manifest_fingerprint,
+                    "rebuilt_snapshot_head": target_head,
+                    "source_git_tree_sha": "b" * 40,
+                }
+            ),
+            encoding="utf-8",
+        )
+        prepared_target_arguments: list[dict] = []
+
+        def fake_create_skill_workspace(_repo, revision, destination):
+            skills = set(qts._selected_skills(load_scenario()))
+            files = []
+            for skill in sorted(skills):
+                path = destination / "skills" / skill / "SKILL.md"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"# {skill}\n", encoding="utf-8")
+                files.append(
+                    {
+                        "path": f"skills/{skill}/SKILL.md",
+                        "size": path.stat().st_size,
+                        "sha256": sha256_bytes(path.read_bytes()),
+                    }
+                )
+            return {"revision": revision, "files": files}
+
+        def fake_prepare_target(**kwargs):
+            prepared_target_arguments.append(kwargs)
+            kwargs["destination"].mkdir(parents=True)
+            return {
+                "source_revision": kwargs["source_revision_label"],
+                "source_git_revision": kwargs["source_revision"],
+                "source_manifest_fingerprint": manifest_fingerprint,
+                "baseline_manifest": {},
+                "baseline_manifest_fingerprint": "sha256:" + "c" * 64,
+                "synthetic_baseline_revision": "d" * 40,
+            }
+
+        with patch.object(qts, "REPO_ROOT", self.repository):
+            with (
+                patch.object(qts, "resolve_commit", return_value="e" * 40),
+                patch.object(qts, "_git_head", return_value="f" * 40),
+                patch.object(qts, "_evaluator_source_fingerprints", return_value={}),
+                patch.object(qts, "create_skill_workspace", side_effect=fake_create_skill_workspace),
+                patch.object(qts, "prepare_sanitized_target", side_effect=fake_prepare_target),
+                patch.object(qts, "verify_workspace_unchanged", return_value={"unchanged": True}),
+            ):
+                prepared = qts.prepare_run(
+                    target_source_root=source,
+                    source_provenance_path=provenance,
+                    skill_revision="e" * 40,
+                    output_root=self.repository / ".agent-eval-runs" / "prepared-run",
+                    repeat=2,
+                )
+
+        self.assertEqual(prepared["target_source_checkout_head"], target_head)
+        self.assertEqual(len(prepared_target_arguments), 2)
+        for arguments in prepared_target_arguments:
+            self.assertEqual(arguments["source_revision"], target_head)
+            self.assertEqual(
+                arguments["source_revision_label"], qts.DEFAULT_TARGET_REVISION
+            )
+
     def test_capture_and_evaluate_keep_runtime_and_semantic_unverified(self) -> None:
         run_index_path = self.run_root / "result.json"
         run_index = json.loads(run_index_path.read_text(encoding="utf-8"))

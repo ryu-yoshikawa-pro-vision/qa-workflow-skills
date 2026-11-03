@@ -2353,7 +2353,6 @@ def finalize_formal_subagent_judge_calls(
         review = _read_evidence_object(private_root / "review.json")
         if definition is None or binding is None or review is None:
             raise AgentEvalError("formal Judge fixture binding is missing")
-        binding_sha = canonical_fingerprint(binding)
         approval = approvals.get(case_id)
         approval_status = _approval_binding_status(approval, binding)
         case_record: dict[str, Any] = {

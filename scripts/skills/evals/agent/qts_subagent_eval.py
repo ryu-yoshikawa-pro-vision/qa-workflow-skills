@@ -6,11 +6,11 @@ import io
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
-import shutil
 import tarfile
 import uuid
 from datetime import datetime, timezone
@@ -717,7 +717,9 @@ def prepare_run(
             )
             target_result = prepare_sanitized_target(
                 source_root=target_source_root,
-                source_revision=target_revision,
+                source_revision=target_head
+                if source_provenance is not None
+                else target_revision,
                 source_revision_label=DEFAULT_TARGET_REVISION
                 if source_provenance is not None
                 else None,
