@@ -1386,7 +1386,11 @@ def compare_development_handoff_runs(
         indexed: dict[int, dict[str, Any]] = {}
         for row in rows:
             repeat = row.get("repeat")
-            if not isinstance(repeat, int) or isinstance(repeat, bool) or repeat in indexed:
+            if (
+                not isinstance(repeat, int)
+                or isinstance(repeat, bool)
+                or repeat in indexed
+            ):
                 raise AgentEvalError("run has invalid or duplicate repeat identity")
             indexed[repeat] = row
         return indexed
@@ -1410,9 +1414,15 @@ def compare_development_handoff_runs(
             "candidate": sorted(candidate_by_repeat),
         }
     if any(not row.get("grade_available") for row in baseline_rows + candidate_rows):
-        mismatches["grade_integrity"] = "all attempts must have an integrity-checked grade"
-    if any(row.get("integrity_status") != "valid" for row in baseline_rows + candidate_rows):
-        mismatches["attempt_integrity"] = "one or more attempt records failed validation"
+        mismatches["grade_integrity"] = (
+            "all attempts must have an integrity-checked grade"
+        )
+    if any(
+        row.get("integrity_status") != "valid" for row in baseline_rows + candidate_rows
+    ):
+        mismatches["attempt_integrity"] = (
+            "one or more attempt records failed validation"
+        )
     if set(baseline_by_repeat) == set(candidate_by_repeat):
         changed_inputs = [
             repeat
@@ -1447,7 +1457,9 @@ def compare_development_handoff_runs(
     fixed_common = sorted(
         assertion
         for assertion in common_failures
-        if all(row.get("assertions", {}).get(assertion) == "pass" for row in candidate_rows)
+        if all(
+            row.get("assertions", {}).get(assertion) == "pass" for row in candidate_rows
+        )
     )
     pairs: list[dict[str, Any]] = []
     for repeat in sorted(set(baseline_by_repeat) & set(candidate_by_repeat)):

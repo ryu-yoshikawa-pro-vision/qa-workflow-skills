@@ -240,10 +240,20 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertEqual(record["skill_candidate_revision_status"], "uncommitted_patch")
         self.assertEqual(package["revision"], SKILL_SHA)
         self.assertEqual(package["skills"], [SKILL])
-        self.assertEqual(package["package_fingerprint"], canonical_fingerprint(package["files"]))
+        self.assertEqual(
+            package["package_fingerprint"], canonical_fingerprint(package["files"])
+        )
         self.assertFalse(any("/evals/" in item["path"] for item in package["files"]))
         attempt_id = result["attempts"][0]["attempt_id"]
-        visible_skill = root / "attempts" / attempt_id / "agent-visible" / ".agents" / "skills" / SKILL
+        visible_skill = (
+            root
+            / "attempts"
+            / attempt_id
+            / "agent-visible"
+            / ".agents"
+            / "skills"
+            / SKILL
+        )
         self.assertEqual(
             (visible_skill / "SKILL.md").read_text(encoding="utf-8"),
             "# Candidate Skill\nClarify blocked runtime evidence.\n",
