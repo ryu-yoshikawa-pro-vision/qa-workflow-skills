@@ -154,19 +154,33 @@ jobs:
           profile_source="$RUNNER_TEMP/apparmor-profiles-package/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
           profile_target=/etc/apparmor.d/bwrap-userns-restrict
           test "$(readlink -f "$(command -v bwrap)")" = /usr/bin/bwrap
-          test -r "$profile_source"
+          test -f "$profile_source" && test ! -L "$profile_source" && test -r "$profile_source"
+          echo 'packaged_profile_source=regular_file_readable'
           source_owner=$(dpkg-deb -f "$RUNNER_TEMP/apparmor-profiles_4.0.1really4.0.1-0ubuntu0.24.04.9_all.deb" Package)
           test "$source_owner" = apparmor-profiles
-          grep -Fq 'profile bwrap /usr/bin/bwrap' "$profile_source"
-          grep -Fq 'profile unpriv_bwrap' "$profile_source"
-          grep -Fq 'allow userns,' "$profile_source"
-          grep -Fq 'allow pix /** -> &bwrap//&unpriv_bwrap' "$profile_source"
-          grep -Fq 'audit deny capability,' "$profile_source"
-          if grep -Eq 'flags=[^}]*complain' "$profile_source"; then
+          echo 'packaged_profile_metadata=verified'
+          sha256sum "$profile_source"
+          require_profile_fragment() {
+            local fragment="$1"
+            local description="$2"
+            if grep -Fq "$fragment" "$profile_source"; then
+              printf 'packaged_profile_contract=%s\n' "$description"
+            else
+              printf 'packaged_profile_contract_missing=%s\n' "$description" >&2
+              grep -nE '^[[:space:]]*(abi|profile)|userns|allow pix|audit deny capability|flags=' "$profile_source" >&2 || true
+              exit 1
+            fi
+          }
+          require_profile_fragment 'profile bwrap /usr/bin/bwrap' 'bwrap_attachment'
+          require_profile_fragment 'profile unpriv_bwrap' 'unprivileged_child_profile'
+          require_profile_fragment 'allow userns,' 'user_namespace_permission'
+          require_profile_fragment 'allow pix /** -> &bwrap//&unpriv_bwrap' 'capability_stripping_child_transition'
+          require_profile_fragment 'audit deny capability,' 'child_capability_denial'
+          if grep -Eq '^[[:space:]]*profile[[:space:]].*flags=[^}]*complain' "$profile_source"; then
             echo 'Refusing non-enforcing packaged profile.' >&2
             exit 1
           fi
-          sha256sum "$profile_source"
+          echo 'packaged_profile_mode=not_complain'
 
           other_profile_files=$(
             sudo grep -RIlE '^[[:space:]]*(profile[[:space:]]+([^[:space:]]+[[:space:]]+)?/usr/bin/bwrap|/usr/bin/bwrap)([[:space:]]|$)' /etc/apparmor.d 2>/dev/null \
@@ -176,12 +190,14 @@ jobs:
             printf 'Refusing duplicate bwrap profile attachment:\n%s\n' "$other_profile_files" >&2
             exit 1
           fi
+          echo 'existing_bwrap_profile_files=no_conflict'
 
           loaded_profiles=$(sudo cat /sys/kernel/security/apparmor/profiles 2>/dev/null | grep -i 'bwrap' || true)
           if [ -n "$loaded_profiles" ] && { [ ! -f "$profile_target" ] || ! cmp -s "$profile_source" "$profile_target"; }; then
             echo 'Refusing to replace an unverified loaded bwrap profile.' >&2
             exit 1
           fi
+          echo 'existing_loaded_bwrap_profiles=no_conflict'
 
           if [ -L "$profile_target" ]; then
             echo 'Refusing a symlinked existing bwrap profile.' >&2
@@ -217,6 +233,7 @@ jobs:
             echo 'A bwrap profile is not in enforce mode.' >&2
             exit 1
           fi
+          echo 'loaded_bwrap_profiles=enforce'
 
           if ! timeout 10 bwrap --unshare-user --uid 0 --gid 0 -- /usr/bin/true; then
             {
