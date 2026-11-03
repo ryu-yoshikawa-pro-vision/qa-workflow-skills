@@ -74,8 +74,8 @@ Git管理外の証拠root：
 - `compileall`：成功。
 - dprint check（READMEと変更Pythonファイル）：成功。
 - `git diff --check`：成功。
-- Ruff：ローカルvenvに`ruff` moduleがなく未実施（`No module named ruff`）。commit `4ee7c7814f5acae20ad239bc10ea60f79bb820be`のCode Qualityで`qts_subagent_eval.py`に未使用import 1件が検出されたため削除した。修正後のCode Qualityを含むActionsはfollow-up commit後に確認する。
-- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`のGitHub Actions 5 workflowはすべて成功。commit `4ee7c7814f5acae20ad239bc10ea60f79bb820be`ではSemantic Output EvalsとAgent Skillsが成功、Code Qualityが上記lint違反で失敗し、Deterministic Output EvalsとCodex Harnessは確認時に実行中だった。follow-up後の最終workflow状態はPRで確認する。
+- Ruff：ローカルに未導入（`ruff: command not found`）。commit `4ee7c7814f5acae20ad239bc10ea60f79bb820be`でCode Qualityが未使用importを検出し、`3646f914e7150a8062d0aec821f6c85343e9d54e`で削除した。続くCode QualityではRuff formatが`common.py`、`qts_subagent_eval.py`、そのテストの3ファイルを指摘したため、CIのRuff 0.16.8出力どおり整形した。
+- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`のGitHub Actions 5 workflowはすべて成功。`4ee7c78`のCode Quality失敗は未使用import、`3646f91`のCode Quality失敗はRuff formatだった。follow-up commitの5 workflow結果はPRで確認する。
 
 ## 未検証・次工程
 

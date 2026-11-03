@@ -79,7 +79,9 @@ def read_regular_file_bytes(path: Path, *, max_bytes: int = MAX_TEXT_BYTES) -> b
                 f"evidence must be a singly-linked regular file: {absolute.name}"
             )
         if before.st_size > max_bytes:
-            raise AgentEvalError(f"evidence file exceeds the size limit: {absolute.name}")
+            raise AgentEvalError(
+                f"evidence file exceeds the size limit: {absolute.name}"
+            )
         data = stream.read(max_bytes + 1)
         after = os.fstat(stream.fileno())
     if (

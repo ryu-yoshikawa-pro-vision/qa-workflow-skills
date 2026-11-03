@@ -280,9 +280,7 @@ class QTSSubagentEvalTests(unittest.TestCase):
         output = self.target_root / ".qa-eval-output"
         index = output / "artifact-index.json"
         index.write_text(
-            index.read_text(encoding="utf-8").replace(
-                "{", '{"schema_version":1,', 1
-            ),
+            index.read_text(encoding="utf-8").replace("{", '{"schema_version":1,', 1),
             encoding="utf-8",
         )
         capture = qts.capture_attempt(
@@ -310,12 +308,7 @@ class QTSSubagentEvalTests(unittest.TestCase):
             "sha256:"
         )
         invocation_id = "invocation-1"
-        relative_dir = (
-            Path(".runtime-evidence")
-            / "qa-workflow"
-            / path_digest
-            / invocation_id
-        )
+        relative_dir = Path(".runtime-evidence") / "qa-workflow" / path_digest / invocation_id
         record = output / relative_dir
         record.mkdir(parents=True)
         request_bytes = b'{"operation":"workflow-runtime"}\n'

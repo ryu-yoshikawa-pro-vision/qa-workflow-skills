@@ -754,9 +754,7 @@ def capture_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         "issues": [],
     }
     try:
-        output_scan = _scan_output_tree(
-            output_root, qa_training_store.load_scenario()
-        )
+        output_scan = _scan_output_tree(output_root, qa_training_store.load_scenario())
         capture["output"] = output_scan
         if not output_scan["safe_to_copy"]:
             capture["issues"].append(
@@ -862,7 +860,10 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     if result["execution_status"] != "completed":
         result["issues"].append({"kind": "host_execution_not_completed"})
     execution = record.get("execution")
-    if not isinstance(execution, dict) or execution.get("prompt_matches_prepared") is not True:
+    if (
+        not isinstance(execution, dict)
+        or execution.get("prompt_matches_prepared") is not True
+    ):
         result["issues"].append({"kind": "handoff_prompt_not_verified"})
     if not integrity["unchanged"]:
         result["issues"].append({"kind": "target_integrity_failed_after_capture"})
