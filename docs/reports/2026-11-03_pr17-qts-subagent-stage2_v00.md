@@ -74,8 +74,8 @@ Git管理外の証拠root：
 - `compileall`：成功。
 - dprint check（READMEと変更Pythonファイル）：成功。
 - `git diff --check`：成功。
-- Ruff：ローカルに未導入（`ruff: command not found`）。`4ee7c78`で未使用importを検出し、`3646f91`で削除した。続くCIでは3ファイルのformat、さらに`2b8f485`ではQTS testの1行のformatを指摘したため、各CIのRuff 0.16.8差分を反映した。ローカルpip installはネットワークDNS制約で失敗し、Ruff自体の再実行はCI待ち。
-- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`のGitHub Actions 5 workflowはすべて成功。`4ee7c78`は未使用import、`3646f91`と`2b8f485`はRuff formatでCode Qualityが失敗した。次のfollow-up commit後に5 workflowの最終状態を確認する。
+- Ruff：ローカルに未導入（`ruff: command not found`）。`4ee7c78`で未使用importを検出し、`3646f91`で削除した。続くCIでは3ファイル、さらに`2b8f485`ではQTS test 1行のformatを指摘したためRuff 0.16.8の差分を反映した。ローカルpip installはネットワークDNS制約で失敗したが、commit `945b146b36d2f0c638cf1c513c307ff34ffceb96`のCode Qualityは成功した。
+- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`と、Stage 2最終検証commit `945b146b36d2f0c638cf1c513c307ff34ffceb96`のGitHub Actions 5 workflowはすべて成功。途中のCode Quality失敗は上記import・format修正で解消した。
 
 ## 未検証・次工程
 
