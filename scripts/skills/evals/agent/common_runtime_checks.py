@@ -242,12 +242,9 @@ def run_candidate_verifier_isolated(
         expected_source_fingerprint=expected_source_fingerprint,
     )
     result["candidate_executed"] = result.get("verifier_executed")
-    if (
-        result.get("status") == "verified"
-        and (
-            not isinstance(result.get("result"), dict)
-            or not isinstance(result["result"].get("valid"), bool)
-        )
+    if result.get("status") == "verified" and (
+        not isinstance(result.get("result"), dict)
+        or not isinstance(result["result"].get("valid"), bool)
     ):
         result.update(status="execution_error", reason="invalid_verifier_shape")
     if (
@@ -633,9 +630,7 @@ def evaluate_runtime_captures(
                         "path": invocation_path.parent.relative_to(
                             capture_root
                         ).as_posix(),
-                        "status": fixed_isolated.get(
-                            "status", "evidence_unverified"
-                        ),
+                        "status": fixed_isolated.get("status", "evidence_unverified"),
                         "reason": fixed_isolated.get(
                             "reason", "fixed_runtime_isolation_unverified"
                         ),
@@ -648,9 +643,7 @@ def evaluate_runtime_captures(
                         ),
                         "isolation_probe": fixed_isolated.get("isolation_probe"),
                         "candidate_executed": offline.get("candidate_executed"),
-                        "fixed_execution": _isolated_execution_evidence(
-                            fixed_isolated
-                        ),
+                        "fixed_execution": _isolated_execution_evidence(fixed_isolated),
                     }
                 )
                 continue
@@ -725,16 +718,12 @@ def evaluate_runtime_captures(
                 "original_agent_execution_proven": trace_confirms_capture_invocation(
                     trace_commands or [], invocation
                 ),
-                "candidate_source_fingerprint": offline.get(
-                    "source_fingerprint"
-                ),
+                "candidate_source_fingerprint": offline.get("source_fingerprint"),
                 "fixed_isolation_probe": fixed_isolated.get("isolation_probe")
                 if verifier_image is None
                 else None,
                 "candidate_isolation_probe": offline.get("isolation_probe"),
-                "network": "isolated_namespace"
-                if verifier_image is None
-                else "none",
+                "network": "isolated_namespace" if verifier_image is None else "none",
                 "source_mount": "read_only",
             }
         )
@@ -813,9 +802,7 @@ def _workflow_replay(
                 "status": "evidence_unverified",
                 "reason": "candidate_source_fingerprint_changed_during_replay",
                 "candidate_executed": True,
-                "candidate_source_fingerprint": candidate_run.get(
-                    "source_fingerprint"
-                ),
+                "candidate_source_fingerprint": candidate_run.get("source_fingerprint"),
                 "candidate_isolation_probe": candidate_run.get("isolation_probe"),
             }
         if candidate_run.get("status") != "verified":
@@ -869,8 +856,8 @@ def _workflow_replay(
                 "status": "evidence_unverified",
                 "reason": "workflow_runtime_replay_invalid_json",
                 "candidate_executed": True,
-            "candidate_execution": _isolated_execution_evidence(candidate_run),
-            "fixed_execution": _isolated_execution_evidence(fixed_run),
+                "candidate_execution": _isolated_execution_evidence(candidate_run),
+                "fixed_execution": _isolated_execution_evidence(fixed_run),
             }
         if not isinstance(captured, dict):
             return {
@@ -891,9 +878,7 @@ def _workflow_replay(
                 "candidate_execution": _isolated_execution_evidence(candidate_run),
                 "fixed_execution": _isolated_execution_evidence(fixed_run),
             }
-        mismatched = _semantic_mismatches(
-            fixed, candidate, _WORKFLOW_SEMANTIC_FIELDS
-        )
+        mismatched = _semantic_mismatches(fixed, candidate, _WORKFLOW_SEMANTIC_FIELDS)
         captured_mismatched = _semantic_mismatches(
             captured, candidate, _WORKFLOW_SEMANTIC_FIELDS
         )
@@ -904,9 +889,7 @@ def _workflow_replay(
             "candidate_replay_sha256": candidate_run["result_sha256"],
             "fixed_evaluator_sha256": fixed_run["result_sha256"],
             "candidate_source_fingerprint": candidate_fingerprint,
-            "fixed_source_fingerprint": fixed_run.get(
-                "source_fingerprint_before"
-            ),
+            "fixed_source_fingerprint": fixed_run.get("source_fingerprint_before"),
             "candidate_source_unchanged": candidate_run.get("source_unchanged"),
             "fixed_source_unchanged": fixed_run.get("source_unchanged"),
             "candidate_execution": _isolated_execution_evidence(candidate_run),
@@ -1006,8 +989,7 @@ def _workflow_replay(
             "reason": "workflow_runtime_replay_invalid_shape",
         }
     if not all(
-        _workflow_result_shape_valid(value)
-        for value in (candidate, fixed, captured)
+        _workflow_result_shape_valid(value) for value in (candidate, fixed, captured)
     ):
         return {
             "status": "evidence_unverified",

@@ -41,7 +41,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             len(saved["stdout"]), common_runtime_checks._MAX_REPLAY_DIAGNOSTIC_BYTES
         )
 
-    def test_runtime_replay_aggregation_preserves_execution_failure_classes(self) -> None:
+    def test_runtime_replay_aggregation_preserves_execution_failure_classes(
+        self,
+    ) -> None:
         self.assertEqual(
             common_runtime_checks._aggregate_capture_status(
                 [{"status": "timeout"}, {"status": "pass"}]
@@ -97,13 +99,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            scripts = (
-                root
-                / ".agents"
-                / "skills"
-                / "test-case-design"
-                / "scripts"
-            )
+            scripts = root / ".agents" / "skills" / "test-case-design" / "scripts"
             scripts.mkdir(parents=True)
             (scripts / "runtime_contract.py").write_text(
                 "print('{}')\n", encoding="utf-8"
@@ -148,9 +144,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             root = Path(temporary)
             scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
             scripts.mkdir(parents=True)
-            (scripts / "workflow_runtime.py").write_text(
-                "pass\n", encoding="utf-8"
-            )
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
             results = [
                 {
                     "status": "verified",
@@ -182,7 +176,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
         self.assertEqual(result["status"], "fail")
         self.assertIn("payload.can_complete", result["mismatched_semantic_fields"])
 
-    def test_dockerless_replay_pass_is_parity_only_when_workflow_incomplete(self) -> None:
+    def test_dockerless_replay_pass_is_parity_only_when_workflow_incomplete(
+        self,
+    ) -> None:
         incomplete = {
             "runtime_status": "ok",
             "support_status": "supported",
@@ -194,13 +190,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             root = Path(temporary)
             scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
             scripts.mkdir(parents=True)
-            (scripts / "workflow_runtime.py").write_text(
-                "pass\n", encoding="utf-8"
-            )
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
             candidate_source_fingerprint = (
-                common_runtime_checks.isolated_verifier.source_tree_fingerprint(
-                    scripts
-                )
+                common_runtime_checks.isolated_verifier.source_tree_fingerprint(scripts)
             )
             results = [
                 {
@@ -268,9 +260,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             root = Path(temporary)
             scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
             scripts.mkdir(parents=True)
-            (scripts / "workflow_runtime.py").write_text(
-                "pass\n", encoding="utf-8"
-            )
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
             results = [
                 {
                     "status": "verified",
@@ -300,9 +290,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     fixed_evaluator_root=root,
                 )
         self.assertEqual(result["status"], "evidence_unverified")
-        self.assertEqual(
-            result["reason"], "workflow_runtime_result_contract_invalid"
-        )
+        self.assertEqual(result["reason"], "workflow_runtime_result_contract_invalid")
 
     def test_codex_jsonl_extracts_final_message_and_successful_skill_read(self) -> None:
         events = [

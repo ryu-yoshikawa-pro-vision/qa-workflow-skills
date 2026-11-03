@@ -82,12 +82,16 @@ class IsolatedVerifierTests(unittest.TestCase):
             filter_bytes,
         )
         for syscall_number in isolated_verifier._SECCOMP_BLOCKED_X86_64_SYSCALLS:
-            self.assertIn(syscall_number.to_bytes(4, byteorder=sys.byteorder), filter_bytes)
+            self.assertIn(
+                syscall_number.to_bytes(4, byteorder=sys.byteorder), filter_bytes
+            )
 
     def test_network_filter_is_unavailable_outside_linux_x86_64(self) -> None:
         with (
             patch.object(isolated_verifier.sys, "platform", "darwin"),
-            self.assertRaisesRegex(AgentEvalError, "network seccomp policy is unavailable"),
+            self.assertRaisesRegex(
+                AgentEvalError, "network seccomp policy is unavailable"
+            ),
         ):
             isolated_verifier._network_seccomp_filter_bytes()
 
@@ -155,9 +159,9 @@ class IsolatedVerifierTests(unittest.TestCase):
                 "print('{}')\n", encoding="utf-8"
             )
             stdout = '{"valid":true}\n'
-            raw_stdout_sha = "sha256:" + hashlib.sha256(
-                stdout.encode("utf-8")
-            ).hexdigest()
+            raw_stdout_sha = (
+                "sha256:" + hashlib.sha256(stdout.encode("utf-8")).hexdigest()
+            )
             with (
                 patch.object(
                     isolated_verifier,
@@ -208,9 +212,7 @@ class IsolatedVerifierTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "scripts"
             source.mkdir()
-            (source / "runtime_contract.py").write_text(
-                "pass\n", encoding="utf-8"
-            )
+            (source / "runtime_contract.py").write_text("pass\n", encoding="utf-8")
             stdout = '{"valid":true,"valid":false}\n'
             with (
                 patch.object(
@@ -304,7 +306,10 @@ class IsolatedVerifierTests(unittest.TestCase):
 
     def test_bwrap_exit_code_controls_verifier_execution_evidence(self) -> None:
         for exit_code, expected_execution in ((0, True), (1, None)):
-            with self.subTest(exit_code=exit_code), tempfile.TemporaryDirectory() as tmp:
+            with (
+                self.subTest(exit_code=exit_code),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
                 source = Path(tmp) / "scripts"
                 source.mkdir()
                 (source / "runtime_contract.py").write_text(
@@ -345,14 +350,14 @@ class IsolatedVerifierTests(unittest.TestCase):
                         timeout_seconds=1,
                     )
                     command = popen.call_args.args[0]
-                    self.assertEqual(
-                        command[0], "/usr/bin/bwrap"
-                    )
+                    self.assertEqual(command[0], "/usr/bin/bwrap")
                     self.assertIn("--seccomp", command)
                     self.assertNotIn("--unshare-net", command)
                     spawn_kwargs = popen.call_args.kwargs
                     self.assertTrue(spawn_kwargs["close_fds"])
-                    self.assertEqual(spawn_kwargs["env"], {"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                    self.assertEqual(
+                        spawn_kwargs["env"], {"PATH": "/usr/bin:/bin", "LC_ALL": "C"}
+                    )
                     self.assertEqual(observed_fds["stdin"], -1)
                     self.assertTrue(observed_fds["stdout_is_regular"])
                     self.assertTrue(observed_fds["stderr_is_regular"])

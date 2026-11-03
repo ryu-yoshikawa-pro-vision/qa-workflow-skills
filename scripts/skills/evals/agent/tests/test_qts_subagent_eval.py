@@ -207,9 +207,7 @@ class QTSSubagentEvalTests(unittest.TestCase):
         self.assertTrue(evaluated["public_artifact_index"]["valid"])
         self.assertEqual(evaluated["fixed_artifact_index"]["status"], "pass")
         self.assertEqual(evaluated["judge_status"], "not_run")
-        self.assertEqual(
-            evaluated["docker_production_verifier_replay"], "not_used"
-        )
+        self.assertEqual(evaluated["docker_production_verifier_replay"], "not_used")
         self.assertEqual(
             evaluated["production_verifier_independent_replay"]["overall_status"],
             "evidence_unverified",
@@ -275,9 +273,7 @@ class QTSSubagentEvalTests(unittest.TestCase):
 
     def test_captured_copy_only_change_is_rejected_before_grading(self) -> None:
         qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
-        captured = (
-            self.private_root / "captured-output" / "artifact-00.md"
-        )
+        captured = self.private_root / "captured-output" / "artifact-00.md"
         original = captured.read_bytes()
         changed = original.replace(b"QA artifact", b"QB artifact", 1)
         self.assertEqual(len(changed), len(original))
@@ -320,7 +316,9 @@ class QTSSubagentEvalTests(unittest.TestCase):
             run_root=self.run_root, attempt_id=self.attempt_id
         )
 
-        kinds = {row["kind"] for row in evaluated["captured_output_integrity"]["issues"]}
+        kinds = {
+            row["kind"] for row in evaluated["captured_output_integrity"]["issues"]
+        }
         self.assertIn("captured_output_file_list_mismatch", kinds)
         self.assertIsNone(evaluated["fixed_artifact_index"])
         self.assertEqual(evaluated["overall_status"], "needs_review")
@@ -397,7 +395,9 @@ class QTSSubagentEvalTests(unittest.TestCase):
         self.assertEqual(evaluated["overall_status"], "needs_review")
         fixed_validator.assert_not_called()
 
-    def test_qts_replay_uses_pinned_script_hashes_without_agent_trace_claim(self) -> None:
+    def test_qts_replay_uses_pinned_script_hashes_without_agent_trace_claim(
+        self,
+    ) -> None:
         package_files = [
             {
                 "path": f"skills/{skill}/scripts/runtime_contract.py",

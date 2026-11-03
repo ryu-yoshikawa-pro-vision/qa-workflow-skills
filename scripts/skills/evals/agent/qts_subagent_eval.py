@@ -575,10 +575,9 @@ def _verify_captured_output_integrity(
     if capture.get("schema_version") != 1 or capture.get("attempt_id") != attempt_id:
         issues.append({"kind": "capture_attempt_binding_mismatch"})
     expected_capture_fingerprint = run_row.get("capture_fingerprint")
-    if (
-        not isinstance(expected_capture_fingerprint, str)
-        or expected_capture_fingerprint != canonical_fingerprint(capture)
-    ):
+    if not isinstance(
+        expected_capture_fingerprint, str
+    ) or expected_capture_fingerprint != canonical_fingerprint(capture):
         issues.append({"kind": "capture_manifest_fingerprint_mismatch"})
 
     copy_record = capture.get("copy")
@@ -702,9 +701,7 @@ def _verify_captured_output_integrity(
                 or source.get("sha256") is not None
                 or saved.get("status") != "evidence_unverified"
             ):
-                issues.append(
-                    {"kind": "redaction_manifest_inconsistent", "path": path}
-                )
+                issues.append({"kind": "redaction_manifest_inconsistent", "path": path})
         else:
             if (
                 saved.get("status") != "saved"
@@ -917,10 +914,8 @@ def _runtime_source_fingerprints(
         not isinstance(manifest, dict)
         or not isinstance(manifest.get("files"), list)
         or not isinstance(manifest.get("package_fingerprint"), str)
-        or canonical_fingerprint(manifest["files"])
-        != manifest["package_fingerprint"]
-        or run_row.get("skill_package_fingerprint")
-        != manifest["package_fingerprint"]
+        or canonical_fingerprint(manifest["files"]) != manifest["package_fingerprint"]
+        or run_row.get("skill_package_fingerprint") != manifest["package_fingerprint"]
     ):
         return None, [{"kind": "candidate_skill_package_manifest_unverified"}]
 
@@ -953,9 +948,7 @@ def _runtime_source_fingerprints(
                     }
                 )
                 continue
-            rows.append(
-                {"path": relative_path, "size": size, "sha256": digest}
-            )
+            rows.append({"path": relative_path, "size": size, "sha256": digest})
         if not any(row["path"] == "runtime_contract.py" for row in rows):
             issues.append(
                 {"kind": "candidate_runtime_contract_missing", "skill": skill}
@@ -1181,8 +1174,8 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
             result["runtime_evidence"] = _validate_runtime_bindings(
                 output_root, fixed["artifacts"]
             )
-            source_fingerprints, source_manifest_issues = (
-                _runtime_source_fingerprints(row, record)
+            source_fingerprints, source_manifest_issues = _runtime_source_fingerprints(
+                row, record
             )
             if source_fingerprints is None:
                 verify_replay: dict[str, Any] = {

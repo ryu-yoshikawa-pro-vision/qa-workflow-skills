@@ -59,7 +59,8 @@ raw run rootに`evidence-index.md`はなかった。保存された`result.json`
 - `6e45bb1`のCode Quality必須probeは、bubblewrapのnetwork namespace loopback setupが`RTM_NEWADDR: Operation not permitted`となり失敗。
 - `9eee339`のCode Quality必須probeは、util-linux `unshare`が`/proc/self/uid_map: Operation not permitted`となり失敗。candidate verifierは実行していない。他の4 workflowは成功。
 - `970cf6b`のseccomp方式も、Code Quality runnerがuser namespace UID mapを作れず必須probeに失敗した。`bwrap` stderrは`setting up uid map: Permission denied`、candidate verifierは未実行。他の4 workflowは成功。Static formatting/lint stepsはprobeより後だったため、このrunでは実行されなかった。
-- 次commitでは必須probeをCode Quality jobの最後へ移し、独立したformatter/lint/whitespace検査が境界probe失敗でskipされないようにする。probe自体はstrictのまま保つ。GitHub runnerがuser namespace境界を提供しない限りDockerless verifierは`evidence_unverified`で停止する。
+- `0261224`では必須probeをCode Quality jobの最後へ移した。4 workflowは成功したが、Code Qualityは固定Ruff 0.16.8のformat checkで6つのPythonファイルを報告し、probeは未実行となった。指摘された6ファイルだけを同じ固定版Ruffで整形し、全tracked formatter/lint checkをローカルで再実行して成功した。
+- この後のPR commitでCIを再実行する。Code Qualityがprobeまで到達した場合でも、GitHub-hosted runnerのuser namespace権限で失敗すればDockerless verifierは`evidence_unverified`のままとし、候補sourceを実行しない。probe自体はstrictに維持する。
 
 ## 未達・制約
 

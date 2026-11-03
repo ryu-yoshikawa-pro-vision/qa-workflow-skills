@@ -196,9 +196,7 @@ def _safe_tree(root: Path) -> list[dict[str, Any]]:
             total += len(raw)
             if total > MAX_SOURCE_BYTES:
                 raise AgentEvalError("verifier source exceeds the size limit")
-            rows.append(
-                {"path": relative, "size": len(raw), "sha256": _sha256(raw)}
-            )
+            rows.append({"path": relative, "size": len(raw), "sha256": _sha256(raw)})
         if entry_count > MAX_SOURCE_ENTRIES:
             raise AgentEvalError("verifier source tree exceeds the entry limit")
     return sorted(rows, key=lambda row: row["path"])
@@ -237,9 +235,7 @@ def _sealed_script_fd(script_bytes: bytes) -> int:
         with os.fdopen(os.dup(descriptor), "wb") as stream:
             stream.write(script_bytes)
             stream.flush()
-        seals = (
-            _F_SEAL_SEAL | _F_SEAL_SHRINK | _F_SEAL_GROW | _F_SEAL_WRITE
-        )
+        seals = _F_SEAL_SEAL | _F_SEAL_SHRINK | _F_SEAL_GROW | _F_SEAL_WRITE
         fcntl.fcntl(descriptor, _F_ADD_SEALS, seals)
         os.lseek(descriptor, 0, os.SEEK_SET)
         return descriptor
@@ -304,15 +300,24 @@ def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
         return None
     if not _trusted_root_owned_file(python):
         return None
-    return bwrap, python, {
-        "bwrap_version": version_result.stdout.decode("utf-8", errors="replace")
-        .strip(),
-        "bwrap_sha256": _sha256(read_regular_file_bytes(bwrap, max_bytes=50_000_000)),
-        "network_enforcement": "seccomp-deny-socket-and-io-uring",
-        "network_policy_sha256": _sha256(network_filter),
-        "python_path": python.as_posix(),
-        "python_sha256": _sha256(read_regular_file_bytes(python, max_bytes=50_000_000)),
-    }
+    return (
+        bwrap,
+        python,
+        {
+            "bwrap_version": version_result.stdout.decode(
+                "utf-8", errors="replace"
+            ).strip(),
+            "bwrap_sha256": _sha256(
+                read_regular_file_bytes(bwrap, max_bytes=50_000_000)
+            ),
+            "network_enforcement": "seccomp-deny-socket-and-io-uring",
+            "network_policy_sha256": _sha256(network_filter),
+            "python_path": python.as_posix(),
+            "python_sha256": _sha256(
+                read_regular_file_bytes(python, max_bytes=50_000_000)
+            ),
+        },
+    )
 
 
 def _base_argv(
@@ -684,7 +689,7 @@ def probe_isolation() -> dict[str, Any]:
         synthetic_credential = root / "synthetic-ci-credential.txt"
         synthetic_credential.write_text("synthetic-ci-credential", encoding="utf-8")
         probe_path = source / "probe.py"
-        script = r'''import ctypes, errno, json, os, socket, stat, sys
+        script = r"""import ctypes, errno, json, os, socket, stat, sys
 from pathlib import Path
 import resource
 
@@ -862,7 +867,7 @@ print(json.dumps({
     "limits": limits,
     "scratch_limits": scratch_limits,
 }))
-'''
+"""
         probe_path.write_text(script, encoding="utf-8")
         source_fingerprint = canonical_fingerprint(_safe_tree(source))
         namespace_names = ("user", "pid", "mnt", "ipc", "uts")
@@ -901,8 +906,12 @@ print(json.dumps({
         except json.JSONDecodeError:
             parsed = None
 
-        socket_checks = parsed.get("socket_checks") if isinstance(parsed, dict) else None
-        io_uring_checks = parsed.get("io_uring_checks") if isinstance(parsed, dict) else None
+        socket_checks = (
+            parsed.get("socket_checks") if isinstance(parsed, dict) else None
+        )
+        io_uring_checks = (
+            parsed.get("io_uring_checks") if isinstance(parsed, dict) else None
+        )
         checks = {
             "unprivileged_no_new_privs": isinstance(parsed, dict)
             and parsed.get("no_new_privs") == "1",
@@ -981,9 +990,7 @@ print(json.dumps({
             "tmpfs_limits_applied": isinstance(parsed, dict)
             and isinstance(parsed.get("scratch_limits"), dict)
             and 0 < parsed["scratch_limits"].get("/tmp", 0) <= TMPFS_BYTES
-            and 0
-            < parsed["scratch_limits"].get("/workspace", 0)
-            <= TMPFS_BYTES,
+            and 0 < parsed["scratch_limits"].get("/workspace", 0) <= TMPFS_BYTES,
             "source_unchanged": result.get("source_unchanged") is True
             and result.get("source_fingerprint_before") == source_fingerprint,
             "request_unchanged": result.get("request_unchanged") is True,
@@ -1014,9 +1021,10 @@ time.sleep(30)
             expected_source_fingerprint=canonical_fingerprint(_safe_tree(source)),
             post_exit_wait_seconds=2,
         )
-        checks["detached_child_killed_with_pid_namespace"] = (
-            timeout_execution.get("status") == "timeout"
-            and "DETACHED_CHILD_SURVIVED" not in timeout_execution.get("stdout", "")
+        checks["detached_child_killed_with_pid_namespace"] = timeout_execution.get(
+            "status"
+        ) == "timeout" and "DETACHED_CHILD_SURVIVED" not in timeout_execution.get(
+            "stdout", ""
         )
         checks["timeout_cleanup_verified"] = (
             timeout_execution.get("timeout_cleanup_verified") is True
@@ -1029,6 +1037,8 @@ time.sleep(30)
             "candidate_executed": False,
             **runtime,
         }
+
+
 def run_isolated_python(
     *,
     source_dir: Path,
@@ -1117,7 +1127,10 @@ def run_isolated_python(
     )
     stdout = result.pop("stdout", "")
     stderr = result.pop("stderr", "")
-    if result.get("status") == "completed" and result.get("verifier_executed") is not True:
+    if (
+        result.get("status") == "completed"
+        and result.get("verifier_executed") is not True
+    ):
         result.update(
             status="evidence_unverified",
             reason="verifier_execution_not_proven",
