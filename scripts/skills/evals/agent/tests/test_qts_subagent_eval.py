@@ -193,9 +193,7 @@ class QTSSubagentEvalTests(unittest.TestCase):
             "GIT_COMMITTER_EMAIL": "evaluator@invalid.local",
         }
         subprocess.run(["git", "init", "--quiet", str(source)], check=True, env=env)
-        subprocess.run(
-            ["git", "-C", str(source), "add", "--all"], check=True, env=env
-        )
+        subprocess.run(["git", "-C", str(source), "add", "--all"], check=True, env=env)
         subprocess.run(
             ["git", "-C", str(source), "commit", "--quiet", "-m", "snapshot"],
             check=True,
@@ -256,9 +254,19 @@ class QTSSubagentEvalTests(unittest.TestCase):
                 patch.object(qts, "resolve_commit", return_value="e" * 40),
                 patch.object(qts, "_git_head", return_value="f" * 40),
                 patch.object(qts, "_evaluator_source_fingerprints", return_value={}),
-                patch.object(qts, "create_skill_workspace", side_effect=fake_create_skill_workspace),
-                patch.object(qts, "prepare_sanitized_target", side_effect=fake_prepare_target),
-                patch.object(qts, "verify_workspace_unchanged", return_value={"unchanged": True}),
+                patch.object(
+                    qts,
+                    "create_skill_workspace",
+                    side_effect=fake_create_skill_workspace,
+                ),
+                patch.object(
+                    qts, "prepare_sanitized_target", side_effect=fake_prepare_target
+                ),
+                patch.object(
+                    qts,
+                    "verify_workspace_unchanged",
+                    return_value={"unchanged": True},
+                ),
             ):
                 prepared = qts.prepare_run(
                     target_source_root=source,

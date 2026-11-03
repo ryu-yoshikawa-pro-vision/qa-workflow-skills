@@ -115,7 +115,9 @@ class JudgeValidationTests(unittest.TestCase):
             )
             with (
                 patch.object(judge_validation, "REPO_ROOT", repository),
-                patch("scripts.skills.evals.agent.qts_subagent_eval.REPO_ROOT", repository),
+                patch(
+                    "scripts.skills.evals.agent.qts_subagent_eval.REPO_ROOT", repository
+                ),
             ):
                 result = judge_validation.assess_subagent_baseline(
                     baseline_run_root=run_root,
@@ -128,7 +130,9 @@ class JudgeValidationTests(unittest.TestCase):
                 {"evaluator_revision_mismatch"},
             )
 
-    def test_formal_preparation_is_invalidated_by_revision_or_source_change(self) -> None:
+    def test_formal_preparation_is_invalidated_by_revision_or_source_change(
+        self,
+    ) -> None:
         preparation = {
             "evaluator_revision": "a" * 40,
             "evaluator_source_fingerprints": {"judge_validation.py": "sha256:one"},
@@ -207,7 +211,9 @@ class JudgeValidationTests(unittest.TestCase):
             self.assertIn("unresolved oracle mutation", packet)
             self.assertIn("Baseline machine status: `None`", packet)
 
-    def test_fixture_mutation_diff_tracks_removed_files_and_ignores_manifest(self) -> None:
+    def test_fixture_mutation_diff_tracks_removed_files_and_ignores_manifest(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             baseline = root / "baseline"
@@ -218,7 +224,9 @@ class JudgeValidationTests(unittest.TestCase):
             (fixture / "changed.md").write_text("after\n", encoding="utf-8")
             (baseline / "removed.md").write_text("remove me\n", encoding="utf-8")
             (baseline / "artifact-manifest.json").write_text("{}\n", encoding="utf-8")
-            (fixture / "artifact-manifest.json").write_text("{\"changed\":true}\n", encoding="utf-8")
+            (fixture / "artifact-manifest.json").write_text(
+                '{"changed":true}\n', encoding="utf-8"
+            )
             rows = judge_validation._fixture_mutation_diff(baseline, fixture)
             self.assertEqual(
                 [(row["path"], row["change"]) for row in rows],
@@ -236,7 +244,9 @@ class JudgeValidationTests(unittest.TestCase):
             call_root = case_root / "calls" / call_id
             qa_output = case_root / "qa-output"
             qa_output.mkdir(parents=True)
-            (qa_output / "output.md").write_text("fixed QA artifact\n", encoding="utf-8")
+            (qa_output / "output.md").write_text(
+                "fixed QA artifact\n", encoding="utf-8"
+            )
             call_root.mkdir(parents=True)
             prompt = "Judge the QA artifact against the fixed rubric and reference."
             prompt_bytes = prompt.encode("utf-8")
@@ -283,7 +293,9 @@ class JudgeValidationTests(unittest.TestCase):
                 "target_revision": DEFAULT_TARGET_REVISION,
                 "criteria": ["QTS-SEM-001"],
                 "prompt_sha256": sha256_bytes(prompt_bytes),
-                "requested_settings": dict(judge_validation.SUBAGENT_JUDGE_SETTINGS),
+                "requested_settings": dict(
+                    judge_validation.SUBAGENT_JUDGE_SETTINGS
+                ),
                 "execution_method": "codex_subagent",
                 "effective_model_status": "unverified",
                 "tool_trace_status": "unverified",
@@ -361,7 +373,9 @@ class JudgeValidationTests(unittest.TestCase):
             response["normalized"]["criteria"][0]["rating"] = 1
             response_path.write_text(json.dumps(response), encoding="utf-8")
             with patch.object(judge_validation, "REPO_ROOT", repository):
-                with self.assertRaisesRegex(AgentEvalError, "normalized result was altered"):
+                with self.assertRaisesRegex(
+                    AgentEvalError, "normalized result was altered"
+                ):
                     judge_validation._validate_formal_judge_call_evidence(
                         preparation_root=prep_root,
                         call=call,

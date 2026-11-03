@@ -235,7 +235,9 @@ def _snapshot_source_from_prior_run(
         raise AgentEvalError("prior QTS attempts do not share one source manifest")
 
     snapshot_head = source_record.get("synthetic_baseline_revision")
-    if not isinstance(snapshot_head, str) or not re.fullmatch(r"[0-9a-f]{40}", snapshot_head):
+    if not isinstance(snapshot_head, str) or not re.fullmatch(
+        r"[0-9a-f]{40}", snapshot_head
+    ):
         raise AgentEvalError("prior QTS synthetic baseline identity is invalid")
     archived = subprocess.run(
         [
@@ -331,7 +333,9 @@ def _snapshot_source_from_prior_run(
             b"blob " + str(len(content)).encode("ascii") + b"\0" + content
         ).hexdigest()
         if len(content) != expected["size"] or git_blob != expected["sha"]:
-            raise AgentEvalError("prior QTS file content differs from the fixed Git tree")
+            raise AgentEvalError(
+                "prior QTS file content differs from the fixed Git tree"
+            )
         files.append((path, content, 0o755 if expected["mode"] == "100755" else 0o644))
 
     destination = Path(os.path.abspath(destination))
@@ -339,8 +343,13 @@ def _snapshot_source_from_prior_run(
     try:
         relative_destination = destination.relative_to(REPO_ROOT)
     except ValueError as exc:
-        raise AgentEvalError("QTS source snapshot must be under .agent-eval-runs") from exc
-    if len(relative_destination.parts) < 2 or relative_destination.parts[0] != ".agent-eval-runs":
+        raise AgentEvalError(
+            "QTS source snapshot must be under .agent-eval-runs"
+        ) from exc
+    if (
+        len(relative_destination.parts) < 2
+        or relative_destination.parts[0] != ".agent-eval-runs"
+    ):
         raise AgentEvalError("QTS source snapshot must be under .agent-eval-runs")
     if destination.exists() or destination.is_symlink():
         raise AgentEvalError("QTS source snapshot destination must be new")
@@ -373,7 +382,14 @@ def _snapshot_source_from_prior_run(
             env=env,
         )
         subprocess.run(
-            ["git", "-C", str(destination), "config", "core.hooksPath", str(empty_hooks)],
+            [
+                "git",
+                "-C",
+                str(destination),
+                "config",
+                "core.hooksPath",
+                str(empty_hooks),
+            ],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -393,7 +409,15 @@ def _snapshot_source_from_prior_run(
             env=env,
         )
         subprocess.run(
-            ["git", "-C", str(destination), "commit", "--quiet", "-m", "Verified QTS source snapshot"],
+            [
+                "git",
+                "-C",
+                str(destination),
+                "commit",
+                "--quiet",
+                "-m",
+                "Verified QTS source snapshot",
+            ],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -589,9 +613,7 @@ def prepare_run(
             not isinstance(source_provenance, dict)
             or source_provenance.get("target_revision") != DEFAULT_TARGET_REVISION
             or source_provenance.get("source_integrity") != "verified"
-            or not isinstance(
-                source_provenance.get("source_manifest_fingerprint"), str
-            )
+            or not isinstance(source_provenance.get("source_manifest_fingerprint"), str)
             or not _SHA256_RE.fullmatch(
                 source_provenance["source_manifest_fingerprint"]
             )
@@ -600,13 +622,19 @@ def prepare_run(
                 r"[0-9a-f]{40}", source_provenance["rebuilt_snapshot_head"]
             )
             or not isinstance(source_provenance.get("source_git_tree_sha"), str)
-            or not re.fullmatch(r"[0-9a-f]{40}", source_provenance["source_git_tree_sha"])
+            or not re.fullmatch(
+                r"[0-9a-f]{40}", source_provenance["source_git_tree_sha"]
+            )
         ):
-            raise AgentEvalError("QTS source provenance does not verify the fixed target")
+            raise AgentEvalError(
+                "QTS source provenance does not verify the fixed target"
+            )
         target_revision = DEFAULT_TARGET_REVISION
         target_head = assert_clean_checkout(target_source_root)
         if target_head != source_provenance["rebuilt_snapshot_head"]:
-            raise AgentEvalError("QTS source snapshot HEAD differs from its attestation")
+            raise AgentEvalError(
+                "QTS source snapshot HEAD differs from its attestation"
+            )
         remotes = subprocess.run(
             ["git", "-C", str(target_source_root), "remote"],
             stdin=subprocess.DEVNULL,

@@ -131,13 +131,18 @@ def load_fixture_catalogue(path: Path = FIXTURE_DEFS) -> dict[str, Any]:
 def _formal_evaluator_fingerprints() -> dict[str, str]:
     fingerprints: dict[str, str] = {}
     for relative in _FORMAL_EVALUATOR_PATHS:
-        content = read_regular_file_bytes(REPO_ROOT / relative, max_bytes=MAX_TEXT_BYTES)
+        content = read_regular_file_bytes(
+            REPO_ROOT / relative, max_bytes=MAX_TEXT_BYTES
+        )
         fingerprints[relative] = sha256_bytes(content)
     return fingerprints
 
 
 def _formal_preparation_matches_current(
-    preparation: dict[str, Any], *, current_revision: str, current_fingerprints: dict[str, str]
+    preparation: dict[str, Any],
+    *,
+    current_revision: str,
+    current_fingerprints: dict[str, str],
 ) -> bool:
     return (
         preparation.get("evaluator_revision") == current_revision
@@ -598,10 +603,16 @@ def _subagent_baseline_attempt_eligibility(
         return False, "evaluator_revision_mismatch", None, None
     if run.get("scenario_fingerprint") != scenario.get("scenario_fingerprint"):
         return False, "scenario_fingerprint_mismatch", None, None
-    if run.get("evaluator_source_fingerprints") != qts_subagent_eval._evaluator_source_fingerprints():
+    if (
+        run.get("evaluator_source_fingerprints")
+        != qts_subagent_eval._evaluator_source_fingerprints()
+    ):
         return False, "evaluator_source_fingerprint_mismatch", None, None
     provenance = run.get("target_source_provenance")
-    if not isinstance(provenance, dict) or provenance.get("source_integrity") != "verified":
+    if (
+        not isinstance(provenance, dict)
+        or provenance.get("source_integrity") != "verified"
+    ):
         return False, "target_source_provenance_unverified", None, None
     attempt_id = attempt.get("attempt_id")
     if not isinstance(attempt_id, str) or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
@@ -637,8 +648,7 @@ def _subagent_baseline_attempt_eligibility(
         not isinstance(package, dict)
         or package.get("revision") != run.get("skill_revision")
         or not isinstance(package_files, list)
-        or package.get("package_fingerprint")
-        != canonical_fingerprint(package_files)
+        or package.get("package_fingerprint") != canonical_fingerprint(package_files)
     ):
         return False, "skill_package_manifest_invalid", None, None
     package_root = attempt_root / "evaluator-private" / "skill-packages"
@@ -677,10 +687,9 @@ def _subagent_baseline_attempt_eligibility(
         attempt_root / "evaluator-private" / "generation-prompt.md",
         max_bytes=MAX_TEXT_BYTES,
     )
-    if (
-        sha256_bytes(prompt_bytes) != run.get("prompt_fingerprint")
-        or record.get("prompt_fingerprint") != run.get("prompt_fingerprint")
-    ):
+    if sha256_bytes(prompt_bytes) != run.get("prompt_fingerprint") or record.get(
+        "prompt_fingerprint"
+    ) != run.get("prompt_fingerprint"):
         return False, "generation_prompt_binding_invalid", None, None
     execution = record.get("execution")
     if (
@@ -756,7 +765,9 @@ def _subagent_baseline_attempt_eligibility(
     ):
         return False, "artifact_index_not_eligible", None, None
     issue_kinds = {
-        item.get("kind") for item in fixed_index.get("issues", []) if isinstance(item, dict)
+        item.get("kind")
+        for item in fixed_index.get("issues", [])
+        if isinstance(item, dict)
     }
     if issue_kinds - {"noncompleted_routing"}:
         return False, "artifact_contract_issue_not_eligible", None, None
@@ -787,7 +798,9 @@ def _subagent_baseline_attempt_eligibility(
         for item in index.get("routing", [])
         if isinstance(item, dict)
     }
-    if any(routes.get(key) not in {"executed", "incomplete"} for key in required_route_keys):
+    if any(
+        routes.get(key) not in {"executed", "incomplete"} for key in required_route_keys
+    ):
         return False, "required_routing_missing_or_skipped", None, None
     runtime_evidence = evaluation.get("runtime_evidence")
     if (
@@ -827,7 +840,11 @@ def assess_subagent_baseline(
     for attempt in run["attempts"]:
         if not isinstance(attempt, dict):
             selection.append(
-                {"attempt_id": "invalid", "eligible": False, "reason": "attempt_row_invalid"}
+                {
+                    "attempt_id": "invalid",
+                    "eligible": False,
+                    "reason": "attempt_row_invalid",
+                }
             )
             continue
         if not run_revision_matches:
@@ -867,14 +884,12 @@ def assess_subagent_baseline(
                     "attempt_id": attempt["attempt_id"],
                     "attempt_root": str(root / "attempts" / attempt["attempt_id"]),
                     "output_root": str(output),
-                    "final_message_sha256": sha256_bytes(
-                        final_message.encode("utf-8")
-                    ),
+                    "final_message_sha256": sha256_bytes(final_message.encode("utf-8")),
                 }
             )
-    independent = len({item["attempt_id"] for item in eligible}) == len(eligible) and len(
-        {item["attempt_root"] for item in eligible}
-    ) == len(eligible)
+    independent = len({item["attempt_id"] for item in eligible}) == len(
+        eligible
+    ) and len({item["attempt_root"] for item in eligible}) == len(eligible)
     status = "eligible" if len(eligible) >= 2 and independent else "ineligible"
     return {
         "schema_version": 1,
@@ -898,15 +913,19 @@ def _safe_relative_child(root: Path, relative: str) -> Path:
     if not isinstance(relative, str):
         raise AgentEvalError("formal Judge call path is invalid")
     child = PurePosixPath(relative)
-    if child.is_absolute() or not child.parts or any(
-        part in {"", ".", ".."} for part in child.parts
+    if (
+        child.is_absolute()
+        or not child.parts
+        or any(part in {"", ".", ".."} for part in child.parts)
     ):
         raise AgentEvalError("formal Judge call path is invalid")
     path = root.joinpath(*child.parts)
     try:
         path.relative_to(root)
     except ValueError as exc:
-        raise AgentEvalError("formal Judge call path escapes its preparation root") from exc
+        raise AgentEvalError(
+            "formal Judge call path escapes its preparation root"
+        ) from exc
     current = root
     for part in child.parts:
         current /= part
@@ -979,10 +998,9 @@ def _select_intact_review_attempt(
     """Find captured artifacts suitable for diagnostic fixture review only."""
     from . import qts_subagent_eval
 
-    if (
-        run.get("target_revision") != DEFAULT_TARGET_REVISION
-        or run.get("scenario_fingerprint") != scenario.get("scenario_fingerprint")
-    ):
+    if run.get("target_revision") != DEFAULT_TARGET_REVISION or run.get(
+        "scenario_fingerprint"
+    ) != scenario.get("scenario_fingerprint"):
         return None, [
             {
                 "attempt_id": "run",
@@ -993,7 +1011,9 @@ def _select_intact_review_attempt(
     for row in run.get("attempts", []):
         attempt_id = row.get("attempt_id") if isinstance(row, dict) else None
         if not isinstance(attempt_id, str):
-            rejected.append({"attempt_id": "invalid", "reason": "attempt_identity_invalid"})
+            rejected.append(
+                {"attempt_id": "invalid", "reason": "attempt_identity_invalid"}
+            )
             continue
         try:
             checked_row, attempt_root = qts_subagent_eval._attempt_paths(
@@ -1637,10 +1657,7 @@ def prepare_formal_subagent_judge_calls(
             final_message=fixture_final,
             machine_summary=machine_summary,
         )
-        if (
-            definition["expected"] in prompt
-            or definition["approval_status"] in prompt
-        ):
+        if definition["expected"] in prompt or definition["approval_status"] in prompt:
             raise AgentEvalError("formal Judge prompt contains fixture label metadata")
         artifact_fingerprint = _artifact_content_fingerprint(fixture_output)
         binding = _fixture_approval_binding(
@@ -1727,9 +1744,7 @@ def prepare_formal_subagent_judge_calls(
         if eligible_to_run:
             formal_binding = {
                 "fixture_binding_sha256": canonical_fingerprint(binding),
-                "approval_binding_sha256": canonical_fingerprint(
-                    approval["binding"]
-                ),
+                "approval_binding_sha256": canonical_fingerprint(approval["binding"]),
                 "rubric_sha256": rubric_sha256,
                 "reference_fingerprints": fixture_record["reference_fingerprints"],
                 "artifact_content_fingerprint": artifact_fingerprint,
@@ -1792,7 +1807,9 @@ def prepare_formal_subagent_judge_calls(
     return result
 
 
-def _fixture_mutation_diff(baseline_output: Path, fixture_output: Path) -> list[dict[str, str]]:
+def _fixture_mutation_diff(
+    baseline_output: Path, fixture_output: Path
+) -> list[dict[str, str]]:
     diff_rows: list[dict[str, str]] = []
     baseline_paths = {
         path.relative_to(baseline_output).as_posix()
@@ -1810,8 +1827,14 @@ def _fixture_mutation_diff(baseline_output: Path, fixture_output: Path) -> list[
         after_path = fixture_output / Path(*PurePosixPath(relative).parts)
         before_exists = before_path.is_file() and not before_path.is_symlink()
         after_exists = after_path.is_file() and not after_path.is_symlink()
-        before = before_path.read_text(encoding="utf-8").splitlines() if before_exists else []
-        after = after_path.read_text(encoding="utf-8").splitlines() if after_exists else []
+        before = (
+            before_path.read_text(encoding="utf-8").splitlines()
+            if before_exists
+            else []
+        )
+        after = (
+            after_path.read_text(encoding="utf-8").splitlines() if after_exists else []
+        )
         if before != after:
             rendered = "\n".join(
                 difflib.unified_diff(
@@ -2013,8 +2036,7 @@ def record_subagent_judge_response(
         )
         or (
             request.get("schema_version") == 2
-            and set(request)
-            != _SUBAGENT_REQUEST_KEYS | {"formal_binding"}
+            and set(request) != _SUBAGENT_REQUEST_KEYS | {"formal_binding"}
         )
         or request.get("schema_version") not in {1, 2}
         or request.get("execution_method") != "codex_subagent"
@@ -2194,15 +2216,18 @@ def _validate_formal_judge_call_evidence(
         or response.get("case_id") != prepared_case.get("case_id")
         or request.get("criteria") != prepared_case.get("criteria")
         or request.get("baseline_run_id")
-        != (baseline_assessment.get("baseline_run_id") if isinstance(baseline_assessment, dict) else None)
+        != (
+            baseline_assessment.get("baseline_run_id")
+            if isinstance(baseline_assessment, dict)
+            else None
+        )
         or request.get("baseline_attempt_id")
         not in {
             item.get("attempt_id")
             for item in eligible_attempts
             if isinstance(item, dict)
         }
-        or request.get("evaluator_revision")
-        != preparation.get("evaluator_revision")
+        or request.get("evaluator_revision") != preparation.get("evaluator_revision")
         or request.get("target_revision") != DEFAULT_TARGET_REVISION
         or request.get("requested_settings") != SUBAGENT_JUDGE_SETTINGS
         or request.get("execution_method") != "codex_subagent"
@@ -2242,14 +2267,17 @@ def _validate_formal_judge_call_evidence(
         != fixture_binding.get("judge_input_fingerprint")
         or response.get("formal_binding") != formal
     ):
-        raise AgentEvalError("formal Judge fixture/evaluator binding is stale or altered")
+        raise AgentEvalError(
+            "formal Judge fixture/evaluator binding is stale or altered"
+        )
 
     raw_response = response.get("response")
     host_call_status = response.get("host_call_status")
     if (
         not isinstance(raw_response, str)
         or len(raw_response.encode("utf-8")) > MAX_TEXT_BYTES
-        or host_call_status not in {"response_received", "execution_failed", "not_started"}
+        or host_call_status
+        not in {"response_received", "execution_failed", "not_started"}
         or response.get("requested_settings") != SUBAGENT_JUDGE_SETTINGS
         or response.get("host_execution_evidence_status") != "host_declared_only"
         or response.get("effective_model_status") != "unverified"
@@ -2360,7 +2388,9 @@ def finalize_formal_subagent_judge_calls(
             "split": prepared_case.get("split"),
             "criteria": prepared_case.get("criteria"),
             "approval": {
-                "status": "approved" if approval_status == "matched" else "review_pending",
+                "status": "approved"
+                if approval_status == "matched"
+                else "review_pending",
                 "binding_status": approval_status,
                 "reviewer": approval.get("reviewer") if approval else None,
             },
@@ -2428,9 +2458,7 @@ def finalize_formal_subagent_judge_calls(
                             key: criterion.get(key)
                             for key in ("id", "status", "rating", "evaluable")
                         }
-                        for criterion in item.get("normalized", {}).get(
-                            "criteria", []
-                        )
+                        for criterion in item.get("normalized", {}).get("criteria", [])
                     ]
                 )
                 for item in case_record["judge_runs"]
@@ -3175,16 +3203,23 @@ def main(argv: list[str] | None = None) -> int:
                             "status": recorded["status"],
                             "normalization_status": recorded["normalization_status"],
                             "response_sha256": recorded["response_sha256"],
-                            "effective_model_status": recorded["effective_model_status"],
+                            "effective_model_status": recorded[
+                                "effective_model_status"
+                            ],
                             "tool_trace_status": recorded["tool_trace_status"],
                         },
                         ensure_ascii=True,
                     )
                 )
-                return 0 if recorded["status"] in {
-                    "diagnostic_response_valid",
-                    "formal_response_valid",
-                } else 1
+                return (
+                    0
+                    if recorded["status"]
+                    in {
+                        "diagnostic_response_valid",
+                        "formal_response_valid",
+                    }
+                    else 1
+                )
             if args.subcommand == "prepare-formal-subagent-calls":
                 prepared = prepare_formal_subagent_judge_calls(
                     baseline_run_root=args.baseline_run_root,
@@ -3198,7 +3233,9 @@ def main(argv: list[str] | None = None) -> int:
                     json.dumps(
                         {
                             "preparation": str(args.output_root / "preparation.json"),
-                            "review_packet": str(args.output_root / "human-review-packet.md"),
+                            "review_packet": str(
+                                args.output_root / "human-review-packet.md"
+                            ),
                             "status": prepared["status"],
                             "fixtures": len(prepared.get("fixtures", [])),
                             "formal_calls_prepared": sum(
