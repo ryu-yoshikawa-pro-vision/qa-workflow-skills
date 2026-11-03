@@ -62,7 +62,8 @@ jobs:
           set -uo pipefail
           printf 'runner_os='; . /etc/os-release; printf '%s %s\n' "$ID" "$VERSION_ID"
           printf 'apparmor_enabled='; cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo unavailable
-          printf 'active_lsm='; cat /sys/kernel/security/lsm 2>/dev/null || echo unavailable
+          active_lsm=$(cat /sys/kernel/security/lsm 2>/dev/null || echo unavailable)
+          printf 'active_lsm=%s\n' "$active_lsm"
           for key in kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone user.max_user_namespaces; do
             if value=$(sysctl -n "$key" 2>/dev/null); then
               printf '%s=%s\n' "$key" "$value"
@@ -75,8 +76,8 @@ jobs:
           dpkg-query -S "$(readlink -f "$(command -v bwrap)")" || true
           printf 'apparmor_parser_path='; command -v apparmor_parser || true
           printf 'existing_bwrap_profiles=\n'
-          if [ -r /sys/kernel/security/apparmor/profiles ]; then
-            grep -i 'bwrap' /sys/kernel/security/apparmor/profiles || true
+          if sudo test -r /sys/kernel/security/apparmor/profiles; then
+            sudo grep -i 'bwrap' /sys/kernel/security/apparmor/profiles || true
           else
             echo unavailable
           fi
@@ -96,34 +97,57 @@ jobs:
           apparmor_enabled=$(cat /sys/module/apparmor/parameters/enabled 2>/dev/null || true)
           userns_clone=$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)
           max_namespaces=$(sysctl -n user.max_user_namespaces 2>/dev/null || true)
+          dmesg_readable=false
+          journal_readable=false
+          dmesg_output=
+          journal_output=
+          if sudo dmesg --ctime >/dev/null 2>&1; then
+            dmesg_readable=true
+            dmesg_output=$(sudo dmesg --ctime 2>/dev/null || true)
+          fi
+          if sudo journalctl -k --since '-5 minutes' --no-pager >/dev/null 2>&1; then
+            journal_readable=true
+            journal_output=$(sudo journalctl -k --since '-5 minutes' --no-pager 2>/dev/null || true)
+          fi
+          if [ "$dmesg_readable" = true ] && [ "$journal_readable" = true ]; then
+            echo 'kernel_audit_access=both'
+          elif [ "$dmesg_readable" = true ]; then
+            echo 'kernel_audit_access=dmesg_only'
+          elif [ "$journal_readable" = true ]; then
+            echo 'kernel_audit_access=journal_only'
+          else
+            echo 'kernel_audit_access=unavailable'
+          fi
           audit_denials=$(
-            {
-              sudo dmesg --ctime 2>/dev/null || true
-              sudo journalctl -k --since '-5 minutes' --no-pager 2>/dev/null || true
-            } | grep 'apparmor="DENIED"' | grep 'operation="userns_create"' | grep 'comm="bwrap"' | tail -n 5 || true
+            printf '%s\n%s\n' "$dmesg_output" "$journal_output" \
+              | grep 'apparmor="DENIED"' \
+              | grep 'operation="userns_create"' \
+              | grep 'comm="bwrap"' \
+              | tail -n 5 || true
           )
           if [ -n "$audit_denials" ]; then
             printf 'matching_apparmor_denial=\n%s\n' "$audit_denials"
+          elif [ "$dmesg_readable" = false ] && [ "$journal_readable" = false ]; then
+            echo 'matching_apparmor_denial=unavailable'
           else
-            echo 'matching_apparmor_denial=none_or_kernel_audit_unavailable'
+            echo 'matching_apparmor_denial=none'
           fi
 
-          apparmor_blocker=false
+          apparmor_restriction_matches_probe=false
           if [ "$probe_exit" -ne 0 ] \
             && [ "$apparmor_enabled" = Y ] \
             && [ "$apparmor_value" = 1 ] \
             && { [ -z "$userns_clone" ] || [ "$userns_clone" = 1 ]; } \
-            && { [ -n "$max_namespaces" ] && [ "$max_namespaces" -gt 0 ]; } \
-            && [ -n "$audit_denials" ]; then
-            apparmor_blocker=true
+            && { [ -n "$max_namespaces" ] && [ "$max_namespaces" -gt 0 ]; }; then
+            apparmor_restriction_matches_probe=true
           fi
           {
             printf 'initial_bwrap_probe_exit=%s\n' "$probe_exit"
-            printf 'apparmor_userns_blocker=%s\n' "$apparmor_blocker"
+            printf 'apparmor_restriction_matches_probe=%s\n' "$apparmor_restriction_matches_probe"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Apply Ubuntu's packaged bubblewrap user namespace profile only on proven AppArmor denial
-        if: steps.bwrap_diagnosis.outputs.apparmor_userns_blocker == 'true'
+      - name: Apply Ubuntu's packaged bubblewrap user namespace profile only when AppArmor restriction matches the probe
+        if: steps.bwrap_diagnosis.outputs.apparmor_restriction_matches_probe == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -204,9 +228,9 @@ jobs:
           echo 'packaged_profile_activation=verified_for_bwrap_userns_probe'
 
       - name: Fail closed when the baseline denial is not attributable to AppArmor
-        if: steps.bwrap_diagnosis.outputs.apparmor_userns_blocker != 'true' && steps.bwrap_diagnosis.outputs.initial_bwrap_probe_exit != '0'
+        if: steps.bwrap_diagnosis.outputs.apparmor_restriction_matches_probe != 'true' && steps.bwrap_diagnosis.outputs.initial_bwrap_probe_exit != '0'
         run: |
-          echo 'The minimal bwrap probe failed without a matching AppArmor userns denial; no profile or sysctl was changed.' >&2
+          echo 'The minimal bwrap probe failed without the required AppArmor restriction and available-userns evidence; no profile or sysctl was changed.' >&2
           exit 1
 
       - name: Test tracked formatter contracts
