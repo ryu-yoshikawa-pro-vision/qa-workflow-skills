@@ -85,3 +85,31 @@ F401 importを削除し、synthetic replay testのEvaluator/candidate source tre
 commit `3253eea25a08d9ff0dd62e1b729e2039c5969798`のCode Quality run `41613364162`では、AppArmor診断・profile適用・profile後の最小probeが成功した後、Ruff formatが`test_isolated_verifier.py`と`test_runtime_trace_capture.py`の書式差分を検出した。required isolation probeとsynthetic replayはこのためskipされ、候補Verifierは未実行。固定Ruffが報告した整形差分だけを反映し、後続CIで再確認する。
 
 完全probe・candidate verifier replayは引き続き未達。次のCIがrequired isolation probeを通過した場合に限って、その直後のsynthetic `verify` / `workflow-runtime` replay結果を採用する。Stage 2のQTS runはEvaluator revisionが異なり、raw runに実`workflow-runtime` invocationがないため、今回のsynthetic fixtureが成功してもQTS実captureの独立replayを実施したことにはならない。Stage 3は引き続き未完了であり、第4段階には進まない。
+
+## 2026-11-03 必須probe・合成replayの最終結果
+
+commit `3ee761cf827eb34e8704a0423cc455a62e08bd74`のCode Quality run `41613825703`は成功した。失敗原因はUbuntu 24.04のAppArmor unprivileged-user-namespace制限であることをjob内の実測で確定した。初期bwrap probeはexit 1、stderrは`setting up uid map: Permission denied`。AppArmorは有効、`kernel.apparmor_restrict_unprivileged_userns=1`、`kernel.unprivileged_userns_clone=1`。kernel auditは`profile="unprivileged_userns"`による`setpcap` capability拒否と`/proc/<pid>/uid_map`の書込拒否を記録した。Ubuntu配布`apparmor-profiles` packageの既存`bwrap-userns-restrict`を競合確認後、Enforce modeで当該一時VMだけに適用し、その後の最小bwrap probeと完全な必須隔離probeが成功した。システム全体のsysctl変更は行っていない。Ubuntuの文書は24.04でunprivileged user namespaceをAppArmor profileにより制限する動作と、必要なアプリケーションをprofileで明示許可する設計を説明している。[Ubuntu AppArmor制限](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/)、[配布profile一覧](https://packages.ubuntu.com/noble-updates/all/apparmor-profiles/filelist)。
+
+必須`test_isolated_verifier`は19件すべて成功し、隔離依存テストのskipはなかった。直後の必須synthetic replay testは成功し、ログの機械可読結果は以下のとおり。両方のruntime operationで、固定/candidate/capturedの一致は`pass`、内容改変は`fail`、candidateの非ゼロ終了は`execution_error`になった。synthetic workflow fixtureの`can_complete=true`はfixture値であり、QTSの完了判定ではない。
+
+```json
+{
+  "fixture": "synthetic-runtime-contracts",
+  "qts_agent_capture": false,
+  "verify": {
+    "failure": "execution_error",
+    "mismatch": "fail",
+    "pass": "pass"
+  },
+  "workflow_runtime": {
+    "can_complete": true,
+    "failure": "execution_error",
+    "mismatch": "fail",
+    "pass": "pass"
+  }
+}
+```
+
+同じcommitで5 workflow（Code Quality、Codex Harness、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals）がすべて成功した。これはGitHub-hosted `ubuntu-24.04`でのjob隔離と合成fixtureのDockerless replay受入を確認する。GitHub-hosted runnerは通常、新しいVMとして提供されるため、profileの変更はjob VMの寿命内に限定される。[GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)。
+
+**QTS実captureは独立replayしていない。** Stage 2のrunはEvaluator revisionが現行と異なり、実`workflow-runtime` invocationがなく、現行固定sourceへ安全に対応付けられない。今回の成功はcandidate/fixed verifierの合成request/resultに対する隔離再実行であり、QTS Agentの実行証拠・tool履歴・QA品質や正式Verifier replayの証明ではない。元Stage 2 raw evidenceは変更していない。したがって、Dockerless隔離境界と`verify`/`workflow-runtime` replay契約のStage 3技術検証は成功したが、現行revisionによるQTS captureの実replayは未達として残す。Judge工程には進まない。
