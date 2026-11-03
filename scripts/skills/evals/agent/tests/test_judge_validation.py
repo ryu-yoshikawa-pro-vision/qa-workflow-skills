@@ -115,7 +115,9 @@ class JudgeValidationTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            output = temporary_root / "attempt" / "evaluator-private" / "captured-output"
+            output = (
+                temporary_root / "attempt" / "evaluator-private" / "captured-output"
+            )
             self._baseline_output(output, scenario)
             target = temporary_root / "target"
             for reference in scenario["reference_paths"]:
