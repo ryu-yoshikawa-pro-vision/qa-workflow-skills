@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from . import subagent_eval
 from .common import (
     AgentEvalError,
     atomic_write_bytes,
@@ -1205,6 +1206,291 @@ def _allowed_repair_paths(skill: str, package_root: Path) -> list[str]:
             or path.relative_to(root).parts[0] in {"references", "scripts", "assets"}
         )
     )
+
+
+def _load_development_handoff_run(result_path: Path) -> tuple[dict[str, Any], Path]:
+    path = Path(os.path.abspath(result_path))
+    if path.name != "result.json" or path.is_symlink():
+        raise AgentEvalError("handoff result must be a regular result.json")
+    root = subagent_eval._safe_run_root(path.parent)
+    if path != root / "result.json":
+        raise AgentEvalError("handoff result path is not the run root result")
+    record = subagent_eval._load_run(root)
+    if record.get("evaluation_mode") != "development":
+        raise AgentEvalError("only development handoff runs are accepted")
+    if record.get("suite") != "deterministic":
+        raise AgentEvalError("handoff comparison requires deterministic grading")
+    if any(not isinstance(row, dict) for row in record["attempts"]):
+        raise AgentEvalError("handoff run contains a malformed attempt row")
+    return record, root
+
+
+def _inspect_development_handoff_attempt(
+    record: dict[str, Any], root: Path, row: dict[str, Any]
+) -> dict[str, Any]:
+    attempt_id = row.get("attempt_id")
+    attempt, attempt_root = subagent_eval._attempt(root, record, attempt_id)
+    manifest, output_path = subagent_eval._validate_handoff(
+        root, record, attempt, attempt_root
+    )
+    subagent_eval._validate_prepared_inputs(root, record, attempt, attempt_root)
+    request = subagent_eval._read_json(subagent_eval._request_path(attempt_root))
+    task_path = attempt_root / "agent-visible" / "task.md"
+    task = subagent_eval._regular_file(task_path).decode("utf-8")
+    submission_path = (
+        attempt_root / "agent-visible" / subagent_eval.AGENT_SUBMISSION_NAME
+    ).as_posix()
+    normalized_task = task.replace(submission_path, "<attempt-submission-path>")
+    common = {
+        "attempt_id": attempt_id,
+        "repeat": attempt.get("repeat"),
+        "status": attempt.get("status"),
+        "skill_use_observation": attempt.get("skill_use_observation", "unverified"),
+        "effective_settings_status": attempt.get(
+            "effective_settings_status", "unverified"
+        ),
+        "input_fingerprint": attempt.get("input_fingerprint"),
+        "prompt_sha256": request.get("prompt_sha256"),
+        "prompt_template_sha256": sha256_bytes(normalized_task.encode("utf-8")),
+        "requested_settings": request.get("requested_settings"),
+    }
+    if manifest.get("execution_status") != "completed" or output_path is None:
+        return {
+            **common,
+            "integrity_status": "valid",
+            "grade_available": False,
+            "reason": "attempt_did_not_produce_a_gradeable_output",
+        }
+
+    output_bytes = subagent_eval._regular_file(output_path)
+    output_hash = sha256_bytes(output_bytes)
+    if attempt.get("output", {}).get("sha256") != output_hash:
+        raise AgentEvalError("saved output hash differs from the handoff artifact")
+    grade_ref = attempt.get("grade")
+    if not isinstance(grade_ref, dict) or not isinstance(grade_ref.get("path"), str):
+        raise AgentEvalError("completed deterministic attempt has no saved grade")
+    grade_relative = safe_relative_path(grade_ref["path"])
+    grade_unresolved = root / grade_relative
+    subagent_eval._assert_no_symlink_components(grade_unresolved)
+    grade_path = ensure_within(grade_unresolved, root)
+    if grade_path.is_symlink() or not grade_path.is_file():
+        raise AgentEvalError("saved deterministic grade is missing or unsafe")
+    grade_bytes = subagent_eval._regular_file(grade_path)
+    if sha256_bytes(grade_bytes) != grade_ref.get("sha256"):
+        raise AgentEvalError("saved deterministic grade hash does not match")
+    grade = subagent_eval._read_json(grade_path)
+    replay = subagent_eval.grade_deterministic(
+        attempt["skill"],
+        attempt["eval_id"],
+        output_path,
+        runtime_source_root=root / "evaluator-private" / "skill-source",
+    )
+    if canonical_fingerprint(grade) != canonical_fingerprint(replay):
+        raise AgentEvalError("saved grade differs from fixed Evaluator replay")
+    if attempt.get("grade_status") != grade.get("status"):
+        raise AgentEvalError("attempt grade status differs from its saved grade")
+    assertions = grade.get("assertions")
+    if not isinstance(assertions, list):
+        raise AgentEvalError("deterministic grade has no assertions array")
+    statuses: dict[str, str] = {}
+    for assertion in assertions:
+        if (
+            not isinstance(assertion, dict)
+            or not isinstance(assertion.get("id"), str)
+            or assertion["id"] in statuses
+            or assertion.get("status") not in {"pass", "fail", "skip"}
+        ):
+            raise AgentEvalError("deterministic assertion record is malformed")
+        statuses[assertion["id"]] = assertion["status"]
+    runtime = grade.get("runtime_verification")
+    return {
+        **common,
+        "integrity_status": "valid",
+        "grade_available": True,
+        "grade_status": grade.get("status"),
+        "grade_sha256": grade_ref["sha256"],
+        "output_sha256": output_hash,
+        "assertions": statuses,
+        "runtime_verification": "valid"
+        if isinstance(runtime, dict) and runtime.get("valid") is True
+        else "invalid_or_unverified",
+    }
+
+
+def compare_development_handoff_runs(
+    baseline_result: Path, candidate_result: Path
+) -> dict[str, Any]:
+    """Verify and compare subagent handoff results without formal promotion."""
+    baseline, baseline_root = _load_development_handoff_run(baseline_result)
+    candidate, candidate_root = _load_development_handoff_run(candidate_result)
+    mismatches: dict[str, Any] = {}
+    for field in ("suite", "skill_revision", "dataset_fingerprint", "repeat", "agent"):
+        if baseline.get(field) != candidate.get(field):
+            mismatches[field] = {
+                "baseline": baseline.get(field),
+                "candidate": candidate.get(field),
+            }
+    left_evaluator = baseline.get("evaluator", {}).get("revision")
+    right_evaluator = candidate.get("evaluator", {}).get("revision")
+    if left_evaluator != right_evaluator:
+        mismatches["evaluator_revision"] = {
+            "baseline": left_evaluator,
+            "candidate": right_evaluator,
+        }
+    left_package = baseline.get("skill_package", {}).get("package_fingerprint")
+    right_package = candidate.get("skill_package", {}).get("package_fingerprint")
+    if not left_package or not right_package or left_package == right_package:
+        mismatches["skill_package_fingerprint"] = {
+            "baseline": left_package,
+            "candidate": right_package,
+        }
+    if baseline.get("skill_candidate_revision_status") != "git_commit":
+        mismatches["baseline_revision_status"] = baseline.get(
+            "skill_candidate_revision_status"
+        )
+    if candidate.get("skill_candidate_revision_status") != "uncommitted_patch":
+        mismatches["candidate_revision_status"] = candidate.get(
+            "skill_candidate_revision_status"
+        )
+    for field in ("skill", "eval_id"):
+        left = {row.get(field) for row in baseline.get("attempts", [])}
+        right = {row.get(field) for row in candidate.get("attempts", [])}
+        if len(left) != 1 or left != right:
+            mismatches[field] = {
+                "baseline": sorted(map(str, left)),
+                "candidate": sorted(map(str, right)),
+            }
+
+    def inspect(record: dict[str, Any], root: Path) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for raw in record.get("attempts", []):
+            try:
+                rows.append(_inspect_development_handoff_attempt(record, root, raw))
+            except (AgentEvalError, OSError, ValueError, KeyError, TypeError) as exc:
+                rows.append(
+                    {
+                        "attempt_id": raw.get("attempt_id"),
+                        "repeat": raw.get("repeat"),
+                        "status": raw.get("status"),
+                        "integrity_status": "invalid",
+                        "grade_available": False,
+                        "reason": sanitize_diagnostic(str(exc), 500),
+                    }
+                )
+        return rows
+
+    baseline_rows = inspect(baseline, baseline_root)
+    candidate_rows = inspect(candidate, candidate_root)
+
+    def index_by_repeat(rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+        indexed: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            repeat = row.get("repeat")
+            if not isinstance(repeat, int) or isinstance(repeat, bool) or repeat in indexed:
+                raise AgentEvalError("run has invalid or duplicate repeat identity")
+            indexed[repeat] = row
+        return indexed
+
+    try:
+        baseline_by_repeat = index_by_repeat(baseline_rows)
+        candidate_by_repeat = index_by_repeat(candidate_rows)
+    except AgentEvalError as exc:
+        mismatches["attempt_identity"] = sanitize_diagnostic(str(exc), 300)
+        baseline_by_repeat = {}
+        candidate_by_repeat = {}
+    if len(baseline_rows) < 2 or len(candidate_rows) < 2:
+        mismatches["repeat_count"] = {
+            "baseline": len(baseline_rows),
+            "candidate": len(candidate_rows),
+            "required_per_side": 2,
+        }
+    if set(baseline_by_repeat) != set(candidate_by_repeat):
+        mismatches["repeat_identity"] = {
+            "baseline": sorted(baseline_by_repeat),
+            "candidate": sorted(candidate_by_repeat),
+        }
+    if any(not row.get("grade_available") for row in baseline_rows + candidate_rows):
+        mismatches["grade_integrity"] = "all attempts must have an integrity-checked grade"
+    if any(row.get("integrity_status") != "valid" for row in baseline_rows + candidate_rows):
+        mismatches["attempt_integrity"] = "one or more attempt records failed validation"
+    if set(baseline_by_repeat) == set(candidate_by_repeat):
+        changed_inputs = [
+            repeat
+            for repeat in sorted(baseline_by_repeat)
+            if any(
+                baseline_by_repeat[repeat].get(field)
+                != candidate_by_repeat[repeat].get(field)
+                for field in (
+                    "input_fingerprint",
+                    "prompt_template_sha256",
+                    "requested_settings",
+                )
+            )
+        ]
+        if changed_inputs:
+            mismatches["attempt_conditions"] = {
+                "different_repeats": changed_inputs,
+                "reason": "input, normalized generation prompt, and requested settings must match",
+            }
+
+    common_failures: set[str] = set()
+    if baseline_rows and all(row.get("assertions") for row in baseline_rows):
+        failure_sets = [
+            {
+                assertion
+                for assertion, status in row["assertions"].items()
+                if status == "fail"
+            }
+            for row in baseline_rows
+        ]
+        common_failures = set.intersection(*failure_sets)
+    fixed_common = sorted(
+        assertion
+        for assertion in common_failures
+        if all(row.get("assertions", {}).get(assertion) == "pass" for row in candidate_rows)
+    )
+    pairs: list[dict[str, Any]] = []
+    for repeat in sorted(set(baseline_by_repeat) & set(candidate_by_repeat)):
+        left = baseline_by_repeat[repeat]
+        right = candidate_by_repeat[repeat]
+        old = left.get("assertions", {})
+        new = right.get("assertions", {})
+        new_failures = sorted(
+            assertion
+            for assertion, status in old.items()
+            if status == "pass" and new.get(assertion) == "fail"
+        )
+        pairs.append(
+            {
+                "repeat": repeat,
+                "baseline_grade_status": left.get("grade_status"),
+                "candidate_grade_status": right.get("grade_status"),
+                "baseline_assertions": old,
+                "candidate_assertions": new,
+                "new_failures": new_failures,
+                "candidate_runtime_verification": right.get("runtime_verification"),
+            }
+        )
+    comparable = not mismatches
+    return {
+        "schema_version": 1,
+        "status": "comparable_development_handoff" if comparable else "not_comparable",
+        "comparable": comparable,
+        "formal_acceptance": "unverified",
+        "effective_model_status": "unverified",
+        "physical_read_denial": "unverified",
+        "skill_use_observation": "unverified",
+        "condition_mismatches": mismatches,
+        "baseline_result": str(baseline_result),
+        "candidate_result": str(candidate_result),
+        "baseline_attempts": baseline_rows,
+        "candidate_attempts": candidate_rows,
+        "paired_comparison": pairs,
+        "common_baseline_failures": sorted(common_failures),
+        "fixed_common_failures": fixed_common,
+        "improvement_demonstrated": False,
+        "interpretation": "Development comparison only. Independent regression, causal review, and human review are required before claiming a complete improvement.",
+    }
 
 
 def _safe_child_file(root: Path, relative: str) -> Path:
@@ -4830,6 +5116,37 @@ def run_improvements(
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "compare-handoff":
+        handoff_parser = argparse.ArgumentParser(
+            description="Verify and compare development subagent handoff evaluations."
+        )
+        handoff_parser.add_argument("--baseline-result", type=Path, required=True)
+        handoff_parser.add_argument("--candidate-result", type=Path, required=True)
+        handoff_parser.add_argument("--output", type=Path, required=True)
+        handoff_args = handoff_parser.parse_args(arguments[1:])
+        try:
+            comparison = compare_development_handoff_runs(
+                handoff_args.baseline_result, handoff_args.candidate_result
+            )
+            atomic_write_json(handoff_args.output, comparison)
+        except (AgentEvalError, OSError, ValueError, KeyError, TypeError) as exc:
+            print(
+                f"handoff comparison failed: {sanitize_diagnostic(str(exc), 1000)}",
+                file=sys.stderr,
+            )
+            return 2
+        print(
+            json.dumps(
+                {
+                    "result": str(handoff_args.output),
+                    "status": comparison["status"],
+                },
+                ensure_ascii=True,
+            )
+        )
+        return 0 if comparison["comparable"] else 1
+
     parser = argparse.ArgumentParser(
         description="Analyze saved Agent evaluations and make bounded, isolated Skill repair attempts."
     )
@@ -4843,7 +5160,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-repairs", type=int, required=True)
     parser.add_argument("--max-seconds", type=int, required=True)
     parser.add_argument("--analyze-only", action="store_true")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     if (
         min(args.max_cases, args.max_repairs, args.max_seconds) <= 0
         or args.max_cases > 100

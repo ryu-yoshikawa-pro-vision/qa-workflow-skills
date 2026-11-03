@@ -502,6 +502,19 @@ tracked manifestに未登録のdeterministicケースは、Agent生成完了後�
 8. target caseのbaselineとcandidateを同じ固定入力・Evaluator・要求Agent設定で対応付け、全attemptのassertionとruntime結果を比較します。candidate revision、patch、契約テストを保存してから、未使用のindependent inputでbaseline / candidateを個別に評価します。独立回帰の入力・expectedは修正Agentから隔離し、修正前からあったFAILと新しい回帰を分けます。比較条件不一致、揺れ、runtime evidence欠落、原因不明はそのcandidateだけをreview-pendingにします。
 9. PR branchへ反映する場合は、candidate patch、許可path、同条件比較、runtime evidence、独立回帰、関連testを人がレビューし、対象Skillだけを通常のGit変更として反映します。runnerや開発用手順はcommit / pushを行いません。
 
+baseline以外の候補packageを固定Evaluatorへ渡す場合は、`subagent_eval prepare`へ`--skill-package-root <candidate-root>`を指定します。package rootは`skills/<対象Skill>/`だけを含み、`SKILL.md`と許可された`references/`、`scripts/`、`assets/`のみがattemptへコピーされます。expectedやeval dataはpackageへ入りません。run resultには親Skill revisionと候補package fingerprint、`skill_candidate_revision_status="uncommitted_patch"`を保存します。
+
+開発用handoffのbaseline / candidate比較は、次で保存できます。
+
+```bash
+python -m scripts.skills.evals.agent.improve compare-handoff \
+  --baseline-result "$BASELINE_RUN/result.json" \
+  --candidate-result "$CANDIDATE_RUN/result.json" \
+  --output "$COMPARISON_JSON"
+```
+
+比較処理は各attemptのhandoff、prompt、package、output、grade hashを確認し、同じ固定Evaluatorで保存済みgradeを再計算します。最低2 attemptずつ、固定した入力・生成prompt・要求設定、異なるpackage fingerprintを要求します。実効model、Skill使用、物理read-denialは引き続き`unverified`です。この結果は開発用の対象case比較に限り、独立回帰、人手review、正式評価を代替せず、`improvement_demonstrated`へ自動昇格しません。
+
 この手動経路は全工程の自動化ではありません。既存Pythonで自動化するのは固定manifest/package作成の該当helper、deterministic採点、runtime verifier、profile付き正式比較・改善、patch制約・契約testです。開発用のAgent起動、原因分類の判断、手動attempt間の比較判断、candidateのPR反映は親Agentが行います。正式runnerはprofile verificationを要求し、`compare.py`と`improve.py`はそのformal result/provenance契約を前提にします。開発用成果物をformal `result.json`に偽装したり、`profile_verification="verified"`を手作業で付けたりしてはいけません。正式条件が不足する開発用比較は、既存の保存済み`evidence-index.json`に記録されたattempt/grader/runtime結果とrevision/hashから再構成し、`compare.py` / `improve.py`のformal受入結果とは別に報告します。
 
 ## CI・ローカルテスト

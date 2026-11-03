@@ -28,6 +28,7 @@ from scripts.skills.evals.agent.prompt_builder import build_generation_prompt
 from scripts.skills.evals.agent.workspace import (
     assert_clean_checkout,
     create_skill_workspace,
+    create_skill_workspace_from_root,
     resolve_commit,
 )
 from scripts.skills.evals.deterministic.run import grade as grade_deterministic
@@ -498,6 +499,7 @@ def prepare_run(
     output_root: Path,
     requested_settings: dict[str, str],
     repeat: int = 1,
+    skill_package_root: Path | None = None,
 ) -> dict[str, Any]:
     if suite not in {"deterministic", "semantic"}:
         raise AgentEvalError("suite must be deterministic or semantic")
@@ -518,20 +520,44 @@ def prepare_run(
     case = _case_for(suite, skill, eval_id)
     dataset_fingerprint = _dataset_fingerprint(case)
     root = _fresh_run_root(output_root)
-    extracted = root / ".package-export"
     private_skill_root = root / "evaluator-private" / "skill-source"
+    baseline_export = root / ".baseline-package-export"
     package_manifest_all = create_skill_workspace(
-        REPO_ROOT, resolved_skill_revision, extracted
+        REPO_ROOT, resolved_skill_revision, baseline_export
     )
     if skill not in package_manifest_all["skills"]:
-        shutil.rmtree(extracted, ignore_errors=True)
+        shutil.rmtree(baseline_export, ignore_errors=True)
         raise AgentEvalError("requested Skill is absent from the selected revision")
 
-    files = [
-        row
-        for row in package_manifest_all["files"]
-        if row["path"].startswith(f"skills/{skill}/")
-    ]
+    candidate_status = "git_commit"
+    if skill_package_root is None:
+        package_source = baseline_export
+        files = [
+            row
+            for row in package_manifest_all["files"]
+            if row["path"].startswith(f"skills/{skill}/")
+        ]
+    else:
+        candidate_source = Path(os.path.abspath(skill_package_root))
+        _assert_no_symlink_components(candidate_source)
+        if not candidate_source.is_dir() or candidate_source.is_symlink():
+            raise AgentEvalError("candidate Skill package root must be a directory")
+        try:
+            candidate_source.relative_to(root)
+        except ValueError:
+            pass
+        else:
+            raise AgentEvalError("candidate Skill package must be outside the run root")
+        candidate_export = root / ".candidate-package-export"
+        candidate_manifest = create_skill_workspace_from_root(
+            candidate_source,
+            candidate_export,
+            expected_skills={skill},
+            parent_revision=resolved_skill_revision,
+        )
+        package_source = candidate_export
+        files = candidate_manifest["files"]
+        candidate_status = "uncommitted_patch"
     package_manifest = {
         "revision": resolved_skill_revision,
         "skills": [skill],
@@ -539,7 +565,9 @@ def prepare_run(
         "package_fingerprint": canonical_fingerprint(files),
     }
     if not files:
-        shutil.rmtree(extracted, ignore_errors=True)
+        shutil.rmtree(baseline_export, ignore_errors=True)
+        if package_source != baseline_export:
+            shutil.rmtree(package_source, ignore_errors=True)
         raise AgentEvalError("selected Skill package is empty")
 
     private_skill_dir = private_skill_root / "skills" / skill
@@ -551,8 +579,10 @@ def prepare_run(
     ):
         directory.mkdir(mode=0o700, exist_ok=True)
         directory.chmod(0o700)
-    shutil.copytree(extracted / "skills" / skill, private_skill_dir)
-    shutil.rmtree(extracted)
+    shutil.copytree(package_source / "skills" / skill, private_skill_dir)
+    shutil.rmtree(baseline_export)
+    if package_source != baseline_export:
+        shutil.rmtree(package_source)
 
     run_id = uuid.uuid4().hex
     attempts: list[dict[str, Any]] = []
@@ -634,7 +664,7 @@ def prepare_run(
         "started_at": datetime.now(timezone.utc).isoformat(),
         "evaluator": {"revision": evaluator_revision},
         "skill_revision": resolved_skill_revision,
-        "skill_candidate_revision_status": "git_commit",
+        "skill_candidate_revision_status": candidate_status,
         "skill_package": package_manifest,
         "dataset_fingerprint": dataset_fingerprint,
         "visible_skills": [skill],
@@ -991,6 +1021,11 @@ def _validate_prepared_inputs(
 ) -> dict[str, Any]:
     if assert_clean_checkout(REPO_ROOT) != record.get("evaluator", {}).get("revision"):
         raise AgentEvalError("Evaluator checkout changed after attempt preparation")
+    if record.get("skill_candidate_revision_status") not in {
+        "git_commit",
+        "uncommitted_patch",
+    }:
+        raise AgentEvalError("Skill candidate revision status is invalid")
     request_path = _request_path(attempt_root)
     request = _read_json(request_path)
     if request.get("request_id") != row.get("attempt_id"):
@@ -1167,6 +1202,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--eval-id", required=True)
     prepare.add_argument("--skill-revision", required=True)
     prepare.add_argument("--output-root", type=Path, required=True)
+    prepare.add_argument(
+        "--skill-package-root",
+        type=Path,
+        help="Optional uncommitted single-Skill candidate package for development comparison.",
+    )
     prepare.add_argument("--repeat", type=int, default=1)
     prepare.add_argument("--model", required=True)
     prepare.add_argument("--reasoning-effort", required=True)
@@ -1221,6 +1261,7 @@ def main(argv: list[str] | None = None) -> int:
                     "fork_turns": args.fork_turns,
                 },
                 repeat=args.repeat,
+                skill_package_root=args.skill_package_root,
             )
         elif args.command == "seal":
             result = seal_handoff(

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.skills.evals.agent import subagent_eval
+from scripts.skills.evals.agent import improve, subagent_eval
 from scripts.skills.evals.agent.common import (
     AgentEvalError,
     canonical_fingerprint,
@@ -122,7 +122,11 @@ class SubagentEvalTests(unittest.TestCase):
         }
 
     def _prepare(
-        self, *, suite: str = "deterministic", repeat: int = 1
+        self,
+        *,
+        suite: str = "deterministic",
+        repeat: int = 1,
+        skill_package_root: Path | None = None,
     ) -> tuple[Path, dict]:
         result = subagent_eval.prepare_run(
             suite=suite,
@@ -138,8 +142,26 @@ class SubagentEvalTests(unittest.TestCase):
                 "fork_turns": "none",
             },
             repeat=repeat,
+            skill_package_root=skill_package_root,
         )
         return Path(result["run_root"]), result
+
+    def _candidate_package(self) -> Path:
+        root = self.repository / "candidate-package"
+        skill_root = root / "skills" / SKILL
+        (skill_root / "scripts").mkdir(parents=True)
+        (skill_root / "SKILL.md").write_text(
+            "# Candidate Skill\nClarify blocked runtime evidence.\n",
+            encoding="utf-8",
+        )
+        (skill_root / "scripts" / "runtime_contract.py").write_text(
+            "RUNTIME_IMPLEMENTATION = 'candidate'\n", encoding="utf-8"
+        )
+        (skill_root / "evals" / "output").mkdir(parents=True)
+        (skill_root / "evals" / "output" / "expected.json").write_text(
+            '{"private":"must not enter package"}', encoding="utf-8"
+        )
+        return root
 
     @staticmethod
     def _write_output(
@@ -208,6 +230,80 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertEqual(request["physical_read_denial"], "unverified")
         self.assertEqual(result["attempts"][0]["status"], "awaiting_agent")
         self.assertEqual(result["attempts"][0]["skill_use_observation"], "unverified")
+
+    def test_prepare_records_uncommitted_candidate_package_without_eval_data(self):
+        candidate = self._candidate_package()
+        root, result = self._prepare(skill_package_root=candidate)
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        package = record["skill_package"]
+        self.assertEqual(record["skill_revision"], SKILL_SHA)
+        self.assertEqual(record["skill_candidate_revision_status"], "uncommitted_patch")
+        self.assertEqual(package["revision"], SKILL_SHA)
+        self.assertEqual(package["skills"], [SKILL])
+        self.assertEqual(package["package_fingerprint"], canonical_fingerprint(package["files"]))
+        self.assertFalse(any("/evals/" in item["path"] for item in package["files"]))
+        attempt_id = result["attempts"][0]["attempt_id"]
+        visible_skill = root / "attempts" / attempt_id / "agent-visible" / ".agents" / "skills" / SKILL
+        self.assertEqual(
+            (visible_skill / "SKILL.md").read_text(encoding="utf-8"),
+            "# Candidate Skill\nClarify blocked runtime evidence.\n",
+        )
+        self.assertFalse((visible_skill / "evals").exists())
+
+    def test_prepare_rejects_candidate_package_with_an_extra_skill(self):
+        candidate = self._candidate_package()
+        extra = candidate / "skills" / "other-skill"
+        extra.mkdir(parents=True)
+        (extra / "SKILL.md").write_text("# Extra\n", encoding="utf-8")
+        with self.assertRaisesRegex(AgentEvalError, "fixed Skill set"):
+            self._prepare(skill_package_root=candidate)
+
+    def test_improve_compares_development_handoff_runs_without_formal_promotion(self):
+        baseline_root, baseline = self._prepare(repeat=2)
+        candidate_package = self._candidate_package()
+        candidate_root, candidate = self._prepare(
+            repeat=2, skill_package_root=candidate_package
+        )
+        for run_root, prepared in (
+            (baseline_root, baseline),
+            (candidate_root, candidate),
+        ):
+            for row in prepared["attempts"]:
+                subagent_eval.capture_agent_output(
+                    run_root=run_root,
+                    attempt_id=row["attempt_id"],
+                    content=b"# generated artifact\n",
+                )
+                self._seal(run_root, row["attempt_id"])
+                graded = subagent_eval.grade_attempt(
+                    run_root=run_root, attempt_id=row["attempt_id"]
+                )
+                self.assertEqual(graded["status"], "pass")
+
+        comparison = improve.compare_development_handoff_runs(
+            baseline_root / "result.json", candidate_root / "result.json"
+        )
+        self.assertTrue(comparison["comparable"], comparison["condition_mismatches"])
+        self.assertEqual(comparison["status"], "comparable_development_handoff")
+        self.assertEqual(comparison["formal_acceptance"], "unverified")
+        self.assertEqual(comparison["effective_model_status"], "unverified")
+        self.assertEqual(len(comparison["paired_comparison"]), 2)
+        self.assertFalse(comparison["improvement_demonstrated"])
+        saved_path = self.repository / "handoff-comparison.json"
+        exit_code = improve.main(
+            [
+                "compare-handoff",
+                "--baseline-result",
+                str(baseline_root / "result.json"),
+                "--candidate-result",
+                str(candidate_root / "result.json"),
+                "--output",
+                str(saved_path),
+            ]
+        )
+        self.assertEqual(exit_code, 0)
+        saved = json.loads(saved_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["status"], "comparable_development_handoff")
 
     def test_completed_deterministic_handoff_is_integrity_checked_and_graded(
         self,
