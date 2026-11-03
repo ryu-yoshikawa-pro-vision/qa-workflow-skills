@@ -28,14 +28,15 @@ python -m scripts.skills.evals.agent.subagent_eval prepare \
 
 1. `attempts/<attempt_id>/agent-visible/task.md`と、その同じ`agent-visible/.agents/skills/<skill>/`だけを生成要求に使う。expected、grader、rubric、Reference、別attempt成果物は渡さない。
 2. 要求model・reasoning・`fork_turns`をCodexホストのサブエージェント起動時に指定し、実効設定を確認できなければ未検証のままにする。共有workspaceによる物理的read-denialは保証できず、結果にも`unverified`で残る。
-3. サブエージェントが返したMarkdown bytesを、親ホストから`capture`のstdinへ渡す。secret scan・UTF-8・size検査を通過した場合だけ`handoff/output.md`へ保存する。Agent出力をargvや新しい一時ファイルへ複製しない。実行前に成果物がなければ`seal`を`not_started`または実際の失敗状態で実行する。
+3. サブエージェントは`task.md`に指定された`agent-visible/submission.md`へ最終Markdownを保存する。親ホストは`capture --from-agent-visible`を実行し、固定パスの通常ファイル・単一link・size・UTF-8・secretを検査した後、SHA-256を記録して`handoff/output.md`へ取り込み、元の提出ファイルを削除する。Agentに返却内容を手動転記させない。提出ファイルが不正・欠落ならattemptを`needs_review`にし、`seal`や採点を行わない。
 4. 親ホストが観測した実行状態をsealし、固定graderを実行する。
 
 ```bash
-# ホストが返却文をメモリ上のAGENT_OUTPUTへ渡した後、captureへstdinで接続する。
-printf '%s' "$AGENT_OUTPUT" | python -m scripts.skills.evals.agent.subagent_eval capture \
+# サブエージェントが指定されたagent-visible/submission.mdへ保存した後、原文ファイルを直接取り込む。
+python -m scripts.skills.evals.agent.subagent_eval capture \
   --run-root "$RUN_ROOT" \
-  --attempt-id <attempt-id>
+  --attempt-id <attempt-id> \
+  --from-agent-visible
 
 python -m scripts.skills.evals.agent.subagent_eval seal \
   --run-root "$RUN_ROOT" \
@@ -50,7 +51,7 @@ python -m scripts.skills.evals.agent.subagent_eval grade \
   --attempt-id <attempt-id>
 ```
 
-`capture`は秘密らしい値を含む返却文をディスク保存せず、そのattemptを`needs_review`として記録します。`seal`は親ホストが報告したstatus・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。署名済みhost telemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。
+`capture`は秘密らしい値を含む提出内容を評価保存先へ残さず、そのattemptを`needs_review`として記録します。agent-visible側の固定提出ファイルも取り込み後に削除します。`seal`は親ホストが報告したstatus・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。署名済みhost telemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。stdin captureは互換用に残りますが、長文を親が転記すると内容破損を検出できないため、新しいattemptでは固定提出ファイル経路を使用します。
 
 Deterministic suiteは既存`deterministic.run.grade()`へ渡し、Skill-local runtime evidenceを含む既存検査を維持します。Semantic suiteの生成成果物は保存したうえで、既存`build_judge_prompt()`による別Judge要求を`evaluator-private/`へ作成して`awaiting_judge`にします。Judge応答を取り込んでいない段階ではPASSにしません。Judge結果の取込・承認検証は後続工程です。
 

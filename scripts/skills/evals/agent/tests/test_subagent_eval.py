@@ -95,6 +95,12 @@ class SubagentEvalTests(unittest.TestCase):
         path.write_text(value, encoding="utf-8")
         return path
 
+    @staticmethod
+    def _write_agent_submission(run_root: Path, attempt_id: str, value: str = "# Generated requirements\n") -> Path:
+        path = run_root / "attempts" / attempt_id / "agent-visible" / "submission.md"
+        path.write_text(value, encoding="utf-8")
+        return path
+
     def _seal(self, run_root: Path, attempt_id: str, *, status: str = "completed") -> dict:
         artifact_attempt_id = attempt_id if (run_root / "attempts" / attempt_id / "handoff" / "output.md").exists() else None
         return subagent_eval.seal_handoff(
@@ -120,6 +126,7 @@ class SubagentEvalTests(unittest.TestCase):
         )
         self.assertNotIn("private expected fixture", (visible / "task.md").read_text(encoding="utf-8"))
         self.assertNotIn("Private reference text", (visible / "task.md").read_text(encoding="utf-8"))
+        self.assertIn("/agent-visible/submission.md", (visible / "task.md").read_text(encoding="utf-8"))
         request = json.loads((attempt_root / "evaluator-private" / "request.json").read_text(encoding="utf-8"))
         self.assertEqual(request["effective_settings"], {"status": "unverified"})
         self.assertEqual(request["physical_read_denial"], "unverified")
@@ -150,6 +157,66 @@ class SubagentEvalTests(unittest.TestCase):
         saved_output = root / result["output"]["path"]
         self.assertEqual(saved_output.read_text(encoding="utf-8"), output)
         self.assertTrue(result["grade"]["sha256"].startswith("sha256:"))
+
+    def test_agent_visible_file_is_imported_exactly_then_removed_before_grading(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        output = (
+            "# Test Requirements\n\n"
+            "| TR ID | Source | Requirement |\n"
+            "| --- | --- | --- |\n"
+            "| TR-001 | SPEC-001 | Validate checkout |\n"
+        )
+        source = self._write_agent_submission(root, attempt_id, output)
+
+        captured = subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=attempt_id)
+
+        self.assertEqual(captured["size_bytes"], len(output.encode("utf-8")))
+        self.assertEqual(captured["sha256"], sha256_bytes(output.encode("utf-8")))
+        self.assertFalse(source.exists())
+        visible_files = {
+            path.relative_to(source.parents[1]).as_posix()
+            for path in source.parents[1].rglob("*")
+            if path.is_file()
+        }
+        self.assertNotIn("submission.md", visible_files)
+        self._seal(root, attempt_id)
+        graded = subagent_eval.grade_attempt(run_root=root, attempt_id=attempt_id)
+        saved_output = root / graded["output"]["path"]
+        self.assertEqual(saved_output.read_bytes(), output.encode("utf-8"))
+        self.assertEqual(graded["status"], "pass")
+
+    def test_agent_visible_file_capture_rejects_symlink_and_hardlink(self) -> None:
+        root, prepared = self._prepare(repeat=2)
+        first, second = [row["attempt_id"] for row in prepared["attempts"]]
+        outside = self.repository / "outside.md"
+        outside.write_text("not an artifact", encoding="utf-8")
+        self._write_agent_submission(root, first).unlink()
+        (root / "attempts" / first / "agent-visible" / "submission.md").symlink_to(outside)
+        with self.assertRaisesRegex(AgentEvalError, "submission is unavailable"):
+            subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=first)
+
+        source = self._write_agent_submission(root, second)
+        hardlink = self.repository / "submission-link.md"
+        hardlink.hardlink_to(source)
+        with self.assertRaisesRegex(AgentEvalError, "singly-linked"):
+            subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=second)
+        saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["attempts"][0]["status"], "needs_review")
+        self.assertEqual(saved["attempts"][1]["status"], "needs_review")
+        self.assertFalse((root / "attempts" / second / "handoff" / "output.md").exists())
+
+    def test_agent_visible_secret_is_discarded_and_recorded_as_ungradeable(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        source = self._write_agent_submission(root, attempt_id, "token=not-a-real-but-long-secret-value\n")
+        with self.assertRaisesRegex(AgentEvalError, "may contain a secret"):
+            subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=attempt_id)
+        self.assertFalse(source.exists())
+        self.assertFalse((root / "attempts" / attempt_id / "handoff" / "output.md").exists())
+        saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["attempts"][0]["status"], "needs_review")
+        self.assertNotIn("sha256", saved["attempts"][0])
 
     def test_missing_output_is_saved_as_ungradeable_handoff(self) -> None:
         root, prepared = self._prepare()

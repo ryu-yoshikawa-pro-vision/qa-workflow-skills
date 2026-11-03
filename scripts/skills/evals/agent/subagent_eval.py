@@ -37,6 +37,7 @@ RUN_SCHEMA_VERSION = 1
 HANDOFF_SCHEMA_VERSION = 1
 ATTEMPT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 EXECUTION_STATUSES = {"completed", "failed", "timed_out", "not_started"}
+AGENT_SUBMISSION_NAME = "submission.md"
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -369,6 +370,84 @@ def capture_agent_output(*, run_root: Path, attempt_id: str, content: bytes) -> 
         raise
 
 
+def _read_agent_submission(directory_fd: int) -> tuple[bytes, tuple[int, int]]:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(AGENT_SUBMISSION_NAME, flags, dir_fd=directory_fd)
+    except OSError as exc:
+        raise AgentEvalError("Agent-visible submission is unavailable") from exc
+    with os.fdopen(descriptor, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise AgentEvalError("Agent-visible submission must be a singly-linked regular file")
+        if before.st_size > MAX_TEXT_BYTES:
+            raise AgentEvalError("Agent-visible submission exceeds the size limit")
+        content = stream.read(MAX_TEXT_BYTES + 1)
+        after = os.fstat(stream.fileno())
+    try:
+        current = os.stat(AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise AgentEvalError("Agent-visible submission changed while being read") from exc
+    identity = (before.st_dev, before.st_ino)
+    if (
+        len(content) != before.st_size
+        or len(content) > MAX_TEXT_BYTES
+        or identity != (after.st_dev, after.st_ino)
+        or (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns)
+        or identity != (current.st_dev, current.st_ino)
+        or not stat.S_ISREG(current.st_mode)
+        or current.st_nlink != 1
+    ):
+        raise AgentEvalError("Agent-visible submission changed while being read")
+    return content, identity
+
+
+def _remove_agent_submission(directory_fd: int, identity: tuple[int, int]) -> None:
+    try:
+        current = os.stat(AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise AgentEvalError("Agent-visible submission changed before import completed") from exc
+    if (current.st_dev, current.st_ino) != identity or not stat.S_ISREG(current.st_mode):
+        raise AgentEvalError("Agent-visible submission changed before import completed")
+    os.unlink(AGENT_SUBMISSION_NAME, dir_fd=directory_fd)
+    os.fsync(directory_fd)
+
+
+def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    """Import the fixed Agent-visible file without copying it through a transcript."""
+    root = _safe_run_root(run_root)
+    record = _load_run(root)
+    row, attempt_root = _attempt(root, record, attempt_id)
+    if row.get("status") != "awaiting_agent":
+        raise AgentEvalError("attempt is not waiting for an Agent result")
+    visible = attempt_root / "agent-visible"
+    directory_fd: int | None = None
+    identity: tuple[int, int] | None = None
+    try:
+        _assert_no_symlink_components(visible)
+        directory_fd = os.open(
+            visible,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+        content, identity = _read_agent_submission(directory_fd)
+        try:
+            captured = capture_agent_output(run_root=root, attempt_id=attempt_id, content=content)
+        finally:
+            _remove_agent_submission(directory_fd, identity)
+        return captured
+    except (AgentEvalError, OSError, ValueError) as exc:
+        _mark_handoff_failure(
+            root,
+            attempt_id,
+            f"Agent-visible output import failed: {type(exc).__name__}: {exc}",
+            reported_execution_status="completed",
+        )
+        raise
+    finally:
+        if directory_fd is not None:
+            os.close(directory_fd)
+
+
 def _validate_settings(value: dict[str, Any], name: str) -> None:
     _assert_keys(value, {"model", "reasoning_effort", "fork_turns"}, name)
     if any(not isinstance(value[field], str) or not value[field].strip() for field in value):
@@ -458,7 +537,8 @@ def prepare_run(
         prompt = build_generation_prompt(skill=skill, eval_input=case["input"])
         prompt += (
             "\n\n# Host handoff\n"
-            "Return only the requested final QA artifact. The parent Agent host records the returned artifact. "
+            f"Write the exact requested final QA artifact to `{(visible / AGENT_SUBMISSION_NAME).as_posix()}`. "
+            "Do not return a transcript copy of the artifact to the parent host. "
             "Do not claim an evaluation result, grader status, or execution evidence.\n"
         )
         task_path = visible / "task.md"
@@ -954,9 +1034,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     seal.add_argument("--started-at")
     seal.add_argument("--finished-at")
 
-    capture = subparsers.add_parser("capture", help="Check and save returned Markdown from stdin.")
+    capture = subparsers.add_parser("capture", help="Check and save a subagent Markdown artifact.")
     capture.add_argument("--run-root", type=Path, required=True)
     capture.add_argument("--attempt-id", required=True)
+    capture.add_argument(
+        "--from-agent-visible",
+        action="store_true",
+        help=f"Import the exact {AGENT_SUBMISSION_NAME} file from the prepared workspace.",
+    )
 
     grade = subparsers.add_parser("grade", help="Verify the sealed handoff and run the fixed Evaluator.")
     grade.add_argument("--run-root", type=Path, required=True)
@@ -993,11 +1078,14 @@ def main(argv: list[str] | None = None) -> int:
                 finished_at=args.finished_at,
             )
         elif args.command == "capture":
-            result = capture_agent_output(
-                run_root=args.run_root,
-                attempt_id=args.attempt_id,
-                content=sys.stdin.buffer.read(MAX_TEXT_BYTES + 1),
-            )
+            if args.from_agent_visible:
+                result = capture_agent_visible_output(run_root=args.run_root, attempt_id=args.attempt_id)
+            else:
+                result = capture_agent_output(
+                    run_root=args.run_root,
+                    attempt_id=args.attempt_id,
+                    content=sys.stdin.buffer.read(MAX_TEXT_BYTES + 1),
+                )
         else:
             result = grade_attempt(run_root=args.run_root, attempt_id=args.attempt_id)
         print(json.dumps(result, ensure_ascii=False))
