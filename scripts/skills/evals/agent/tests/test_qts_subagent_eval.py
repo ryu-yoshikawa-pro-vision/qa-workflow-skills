@@ -308,7 +308,9 @@ class QTSSubagentEvalTests(unittest.TestCase):
             "sha256:"
         )
         invocation_id = "invocation-1"
-        relative_dir = Path(".runtime-evidence") / "qa-workflow" / path_digest / invocation_id
+        relative_dir = (
+            Path(".runtime-evidence") / "qa-workflow" / path_digest / invocation_id
+        )
         record = output / relative_dir
         record.mkdir(parents=True)
         request_bytes = b'{"operation":"workflow-runtime"}\n'
