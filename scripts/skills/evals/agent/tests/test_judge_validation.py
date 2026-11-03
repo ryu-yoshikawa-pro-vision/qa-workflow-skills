@@ -1498,7 +1498,9 @@ class JudgeValidationTests(unittest.TestCase):
                         host_call_status="response_received",
                     )
 
-    def test_subagent_judge_import_rejects_changed_prompt_and_invalid_json(self) -> None:
+    def test_subagent_judge_import_rejects_changed_prompt_and_invalid_json(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
             runs = repository / ".agent-eval-runs"
@@ -1566,7 +1568,9 @@ class JudgeValidationTests(unittest.TestCase):
                         host_call_status="response_received",
                     )
 
-    def test_subagent_judge_redacts_secret_shaped_response_without_hashing_it(self) -> None:
+    def test_subagent_judge_redacts_secret_shaped_response_without_hashing_it(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
             runs = repository / ".agent-eval-runs"
@@ -1608,9 +1612,7 @@ class JudgeValidationTests(unittest.TestCase):
             index_path = baseline_output / "artifact-index.json"
             index = json.loads(index_path.read_text(encoding="utf-8"))
             route = next(
-                row
-                for row in index["routing"]
-                if row["skill"] == "test-case-design"
+                row for row in index["routing"] if row["skill"] == "test-case-design"
             )
             route.update(
                 {

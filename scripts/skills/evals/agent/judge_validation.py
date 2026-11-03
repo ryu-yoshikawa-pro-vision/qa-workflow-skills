@@ -811,7 +811,10 @@ def prepare_subagent_judge_call(
         raise AgentEvalError("Judge fixture ID is invalid")
     if not re.fullmatch(r"[0-9a-f]{40}", evaluator_revision):
         raise AgentEvalError("Evaluator revision must be a full Git SHA")
-    if not all(isinstance(value, str) and value for value in (baseline_run_id, baseline_attempt_id)):
+    if not all(
+        isinstance(value, str) and value
+        for value in (baseline_run_id, baseline_attempt_id)
+    ):
         raise AgentEvalError("Judge baseline identity is incomplete")
     if target_revision != DEFAULT_TARGET_REVISION:
         raise AgentEvalError("Judge target revision is not the fixed QTS revision")
@@ -881,7 +884,9 @@ def _validate_subagent_call_root(call_root: Path) -> Path:
     try:
         relative = root.relative_to(REPO_ROOT / ".agent-eval-runs")
     except ValueError as exc:
-        raise AgentEvalError("Judge call output must be under .agent-eval-runs") from exc
+        raise AgentEvalError(
+            "Judge call output must be under .agent-eval-runs"
+        ) from exc
     if not relative.parts or any(part in {".", ".."} for part in relative.parts):
         raise AgentEvalError("Judge call output path is invalid")
     current = REPO_ROOT
@@ -1708,9 +1713,7 @@ def main(argv: list[str] | None = None) -> int:
                         "status": recorded["status"],
                         "normalization_status": recorded["normalization_status"],
                         "response_sha256": recorded["response_sha256"],
-                        "effective_model_status": recorded[
-                            "effective_model_status"
-                        ],
+                        "effective_model_status": recorded["effective_model_status"],
                         "tool_trace_status": recorded["tool_trace_status"],
                     },
                     ensure_ascii=True,
