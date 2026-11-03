@@ -28,8 +28,8 @@ class CodeQualityWorkflowContracts(unittest.TestCase):
 
     def test_profile_application_requires_a_matching_kernel_denial(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("name=\"proc/[0-9]+/uid_map\"", workflow)
-        self.assertIn("capname=\"setpcap\"", workflow)
+        self.assertIn('name="proc/[0-9]+/uid_map"', workflow)
+        self.assertIn('capname="setpcap"', workflow)
         self.assertIn(
             '&& [ "$apparmor_denial_matches_probe" = true ]',
             workflow,
