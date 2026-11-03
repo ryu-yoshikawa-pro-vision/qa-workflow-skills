@@ -20,8 +20,8 @@ from scripts.skills.evals.agent.common import (
     atomic_write_json,
     atomic_write_text,
     canonical_fingerprint,
-    sha256_bytes,
     sanitize_diagnostic,
+    sha256_bytes,
 )
 from scripts.skills.evals.agent.prompt_builder import build_generation_prompt
 from scripts.skills.evals.agent.workspace import (

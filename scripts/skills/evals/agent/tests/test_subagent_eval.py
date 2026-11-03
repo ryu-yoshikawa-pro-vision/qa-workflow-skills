@@ -7,7 +7,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.skills.evals.agent import subagent_eval
-from scripts.skills.evals.agent.common import AgentEvalError, canonical_fingerprint, sha256_bytes
+from scripts.skills.evals.agent.common import (
+    AgentEvalError,
+    canonical_fingerprint,
+    sha256_bytes,
+)
 
 SKILL = "test-requirement-design"
 EVAL_ID = "TR-OUT-001"
@@ -110,6 +114,10 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertTrue((visible / "task.md").is_file())
         self.assertTrue((visible / ".agents" / "skills" / SKILL / "SKILL.md").is_file())
         self.assertFalse((visible / "evaluator-private").exists())
+        self.assertIn(
+            "PYTHONDONTWRITEBYTECODE=1 python -B",
+            (visible / "task.md").read_text(encoding="utf-8"),
+        )
         self.assertNotIn("private expected fixture", (visible / "task.md").read_text(encoding="utf-8"))
         self.assertNotIn("Private reference text", (visible / "task.md").read_text(encoding="utf-8"))
         request = json.loads((attempt_root / "evaluator-private" / "request.json").read_text(encoding="utf-8"))

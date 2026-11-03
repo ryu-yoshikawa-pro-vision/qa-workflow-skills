@@ -11,6 +11,7 @@ def build_generation_prompt(*, skill: str, eval_input: str) -> str:
 対象Skillの手順は `.agents/skills/{skill}/SKILL.md` です。必要な通常Skill packageだけを参照してください。
 評価入力に書かれた仕様・根拠・制約に従い、最終成果物だけを回答してください。
 評価基準、期待出力、Judge、graderについては推測・検索しないでください。
+Skill package内のPython helperやSkill scriptを実行するときは、`PYTHONDONTWRITEBYTECODE=1 python -B`を使い、package内へ`__pycache__`や`.pyc`を生成しないでください。
 
 # Eval Input
 
