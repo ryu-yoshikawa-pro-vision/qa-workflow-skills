@@ -127,6 +127,46 @@ profile適用後も、同じ最小probeと`PR17_REQUIRE_VERIFIER_ISOLATION=1`の
 
 必須probeの後に、CIは合成runtime fixtureで`verify`と`workflow-runtime`のDockerless replay経路を別々に実行します。各経路の一致、不一致、candidate非ゼロ終了を確認し、非一致と実行失敗がpassにならないことを検査します。このfixture結果は隔離・比較経路の検証であり、QTS Agent captureの再生や元Agent実行の証明ではありません。
 
+### QTS Judgeの承認・ホストhandoff（第4段階）
+
+Judge subagentはCodexホストから別呼出しで起動します。PythonはJudgeを起動せず、baseline適格性、fixture生成、approval binding、prompt/request hash、応答取込、既存normalizer、承認済みlabelとの反復比較を担当します。旧CLIのprofile・isolation証拠は新方式へ流用しません。実効model/build、tool履歴、Evaluator-only情報への物理read-denialは別途証拠がない限り`unverified`です。
+
+適格性と人間判断の資料は、固定Evaluator revisionで新しいGit管理外rootへ出力します。
+
+```bash
+BASELINE_RUN=".agent-eval-runs/<qts-baseline-run>"
+PREPARATION=".agent-eval-runs/qts-judge-preparation-$(date -u +%Y%m%dT%H%M%SZ)"
+python -m scripts.skills.evals.agent.judge_validation prepare-formal-subagent-calls \
+  --baseline-run-root "$BASELINE_RUN" \
+  --output-root "$PREPARATION" \
+  --repeat 2
+```
+
+Preparationは全attemptの適格・不適格理由を保存し、`human-review-packet.md`、fixture mutation差分、規範参照のpath・一致行・hash、caseごとのbindingを出力します。不適格baselineでも、完全性を確認できたcaptureから**レビュー専用**資料を作れますが、Judge requestは作らず、そのbindingをgold fixture承認へ使えません。適格baselineには、独立attempt 2件以上、現行Evaluator source fingerprint、改変のないfinal responseとtarget/captured output、必須成果物・routing、必須runtime capture、隔離済み`verify`と`workflow-runtime` replay両方のpassが必要です。正当なincomplete routingは`needs_review`のまま保持し、completeへ変換しません。
+
+人間がfixtureごとの規範根拠と期待判定を確認し、現在のbindingを明示承認した後にだけ正式Judge呼出しを準備できます。承認ファイルはEvaluator-privateに保持し、Judge promptへ期待rating、approval、他Judge結果を含めません。
+
+```bash
+APPROVAL=".agent-eval-runs/evaluator-private/qts-judge-approvals.json"
+python -m scripts.skills.evals.agent.judge_validation prepare-formal-subagent-calls \
+  --baseline-run-root "$BASELINE_RUN" \
+  --approval-file "$APPROVAL" \
+  --output-root "$PREPARATION" \
+  --repeat 2
+```
+
+各`fixtures/<id>/calls/<n>/judge-prompt.md`をCodexホスト上の別Judge subagentへ渡し、要求値`model="gpt-6-luna"`、`reasoning_effort="max"`、`fork_turns="none"`を指定します。応答JSONを別々に保存し、対応するcall rootへstdinで取り込みます。実効model/build、完全なtool trace、物理的read-denialは独立証拠がない限り未検証です。
+
+```bash
+python -m scripts.skills.evals.agent.judge_validation record-subagent-response \
+  --call-root "$PREPARATION/fixtures/<fixture-id>/calls/<call-id>" \
+  --host-call-status response_received < "$JUDGE_RESPONSE_JSON"
+python -m scripts.skills.evals.agent.judge_validation finalize-formal-subagent-calls \
+  --preparation-root "$PREPARATION" --approval-file "$APPROVAL"
+```
+
+Finalization時は保存済みprompt/request/status/response、raw response hash、normalizer出力、fixture・rubric・Reference・approval bindingを再検査します。改変・欠落・不一致は未検証または実行失敗にし、期待ratingへ合わせて修復しません。未承認、適格baseline不足、反復不一致は`review_pending`です。Judge応答とホストが宣言した実行状態は記録しますが、実効model/build、完全なtool trace、物理隔離が未検証ならJudge品質の正式受入にしません。既存fixture 11件は人間承認0件のままです。
+
 ## 旧CLI runnerの認証・隔離と異常終了の履歴
 
 以下は旧専用runner方式の検証記録・運用説明です。2026-11-03の採用方針では、この方式は現行実行経路ではなく、下記のWSL2/認証/Docker前提を満たすまで新方式を停止する条件にもなりません。旧launcherのfail-closed自体は維持します。

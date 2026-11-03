@@ -302,6 +302,7 @@ def prepare_sanitized_target(
     *,
     source_root: Path,
     source_revision: str,
+    source_revision_label: str | None = None,
     candidate_skills_root: Path,
     verifier_capture_source: Path,
     destination: Path,
@@ -309,6 +310,9 @@ def prepare_sanitized_target(
     if destination.is_symlink():
         raise AgentEvalError("sanitized target destination must not be a symlink")
     revision = resolve_commit(source_root, source_revision)
+    revision_label = source_revision_label or revision
+    if not isinstance(revision_label, str) or not revision_label:
+        raise AgentEvalError("target source revision label is invalid")
     if destination.exists():
         if not destination.is_dir() or any(destination.iterdir()):
             raise AgentEvalError(
@@ -362,6 +366,7 @@ def prepare_sanitized_target(
                 raise AgentEvalError("target tracked file could not be read")
             content = stream.read()
             target.write_bytes(content)
+            target.chmod(0o755 if member.mode & 0o111 else 0o644)
             copied_files.append(
                 {
                     "path": normalized,
@@ -422,7 +427,7 @@ def prepare_sanitized_target(
         f"""# Evaluation Instructions
 
 - 対象は固定revisionのCheckout / Payment Web分析・設計workflowです。
-- Evaluatorは対象repositoryの`{revision}`から評価用tracked filesを抽出しました。workspace内の`.git`は変更検出用の合成1-commit baselineであり、元repositoryの履歴やsource revisionではありません。元revisionのGit object解決やfetchは行わず、配置されたファイルを入力として扱ってください。
+- Evaluatorは対象repositoryの`{revision_label}`から評価用tracked filesを抽出しました。workspace内の`.git`は変更検出用の合成1-commit baselineであり、元repositoryの履歴やsource revisionではありません。元revisionのGit object解決やfetchは行わず、配置されたファイルを入力として扱ってください。
 - Agent-visibleなSkillは `.agents/skills/` にEvaluatorが配置したSkill集合だけです。
 - 規範仕様の優先順位は `docs/spec/README.md` に従ってください。
 - Product Code、既存Product Test、規範仕様、配置Skill、評価用設定を変更しないでください。
@@ -476,7 +481,8 @@ def prepare_sanitized_target(
 
     copied_files.sort(key=lambda item: item["path"])
     return {
-        "source_revision": revision,
+        "source_revision": revision_label,
+        "source_git_revision": revision,
         "synthetic_baseline_revision": baseline_sha,
         "source_manifest_fingerprint": canonical_fingerprint(copied_files),
         "baseline_manifest": baseline_manifest,

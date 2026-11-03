@@ -16,7 +16,13 @@ from scripts.skills.evals.agent.target_workspace import (
 
 
 class TargetWorkspaceTests(unittest.TestCase):
-    def _init_repo(self, root: Path, files: dict[str, str]) -> str:
+    def _init_repo(
+        self,
+        root: Path,
+        files: dict[str, str],
+        *,
+        executable_paths: tuple[str, ...] = (),
+    ) -> str:
         root.mkdir(parents=True, exist_ok=True)
         env = {
             **os.environ,
@@ -39,6 +45,8 @@ class TargetWorkspaceTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+            if relative in executable_paths:
+                path.chmod(0o755)
         subprocess.run(
             ["git", "-C", str(root), "add", "--all"],
             check=True,
@@ -193,7 +201,9 @@ class TargetWorkspaceTests(unittest.TestCase):
                     "docs/spec/features/checkout-and-payment.md": (
                         "Checkout specification.\n"
                     ),
+                    "scripts/runtime-check.sh": "#!/bin/sh\nexit 0\n",
                 },
+                executable_paths=("scripts/runtime-check.sh",),
             )
             candidate_skills = root / "candidate-skills"
             (candidate_skills / "qa-workflow").mkdir(parents=True)
@@ -222,11 +232,13 @@ class TargetWorkspaceTests(unittest.TestCase):
             validator_exists = (
                 target / ".qa-eval-tools" / "validate_artifact_index.py"
             ).is_file()
+            executable_target = target / "scripts/runtime-check.sh"
             public_contract = json.loads(
                 (target / ".qa-eval-tools" / "artifact-index-contract.json").read_text(
                     encoding="utf-8"
                 )
             )
+            executable_target_is_executable = os.access(executable_target, os.X_OK)
 
         self.assertEqual(prepared["source_revision"], source_revision)
         self.assertNotEqual(prepared["synthetic_baseline_revision"], source_revision)
@@ -236,6 +248,7 @@ class TargetWorkspaceTests(unittest.TestCase):
         self.assertIn("validate_artifact_index.py", instructions)
         self.assertIn("artifact-index-contract.json", instructions)
         self.assertTrue(validator_exists)
+        self.assertTrue(executable_target_is_executable)
         self.assertEqual(public_contract["schema_version"], 1)
         self.assertEqual(
             len(public_contract["required_artifacts"]),

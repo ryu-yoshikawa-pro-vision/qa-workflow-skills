@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import io
 import json
 import os
 import re
@@ -8,6 +10,8 @@ import stat
 import subprocess
 import sys
 import tempfile
+import shutil
+import tarfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -35,6 +39,7 @@ from .prompt_builder import build_qa_training_store_generation_prompt
 from .public_artifact_index import validate as validate_public_artifact_index
 from .target_workspace import (
     DEFAULT_TARGET_REVISION,
+    _is_excluded,
     prepare_sanitized_target,
     verify_workspace_unchanged,
 )
@@ -165,6 +170,288 @@ def _evaluator_source_fingerprints() -> dict[str, str]:
     return fingerprints
 
 
+def _snapshot_source_from_prior_run(
+    *,
+    source_run_root: Path,
+    source_attempt_id: str,
+    destination: Path,
+    source_tree_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Rebuild a source snapshot after checking it against the fixed Git tree."""
+    source_root = _run_root(source_run_root)
+    source_run = _load_run(source_root)
+    if (
+        source_run.get("target_revision") != DEFAULT_TARGET_REVISION
+        or source_run.get("scenario_fingerprint")
+        != qa_training_store.load_scenario()["scenario_fingerprint"]
+    ):
+        raise AgentEvalError("prior QTS target snapshot does not bind the fixed source")
+    if (
+        not isinstance(source_tree_manifest, dict)
+        or source_tree_manifest.get("schema_version") != 1
+        or source_tree_manifest.get("commit_sha") != DEFAULT_TARGET_REVISION
+        or source_tree_manifest.get("truncated") is not False
+        or not isinstance(source_tree_manifest.get("tree_sha"), str)
+        or not re.fullmatch(r"[0-9a-f]{40}", source_tree_manifest["tree_sha"])
+        or not isinstance(source_tree_manifest.get("files"), list)
+    ):
+        raise AgentEvalError("fixed QTS Git tree attestation is invalid")
+    _source_row, source_attempt_root = _attempt_paths(
+        source_root, source_attempt_id, run=source_run
+    )
+    source_record = _load_attempt_record(source_attempt_root)
+    baseline = _read_json(
+        source_attempt_root / "evaluator-private" / "target-baseline.json"
+    )
+    source_target = source_attempt_root / "target"
+    integrity = verify_workspace_unchanged(
+        source_target,
+        baseline,
+        expected_synthetic_baseline_revision=source_record.get(
+            "synthetic_baseline_revision", ""
+        ),
+    )
+    if not integrity.get("unchanged"):
+        raise AgentEvalError("prior QTS source snapshot was modified")
+    source_manifest_fingerprint = source_record.get("target_manifest_fingerprint")
+    if not isinstance(source_manifest_fingerprint, str) or not _SHA256_RE.fullmatch(
+        source_manifest_fingerprint
+    ):
+        raise AgentEvalError("prior QTS source manifest binding is invalid")
+
+    all_source_fingerprints: set[str] = set()
+    for row in source_run["attempts"]:
+        if not isinstance(row, dict) or not isinstance(row.get("attempt_id"), str):
+            raise AgentEvalError("prior QTS source run has invalid attempt rows")
+        _row, attempt_root = _attempt_paths(
+            source_root, row["attempt_id"], run=source_run
+        )
+        record = _load_attempt_record(attempt_root)
+        fingerprint = record.get("target_manifest_fingerprint")
+        if not isinstance(fingerprint, str) or not _SHA256_RE.fullmatch(fingerprint):
+            raise AgentEvalError("prior QTS source attempt manifest is invalid")
+        all_source_fingerprints.add(fingerprint)
+    if all_source_fingerprints != {source_manifest_fingerprint}:
+        raise AgentEvalError("prior QTS attempts do not share one source manifest")
+
+    snapshot_head = source_record.get("synthetic_baseline_revision")
+    if not isinstance(snapshot_head, str) or not re.fullmatch(r"[0-9a-f]{40}", snapshot_head):
+        raise AgentEvalError("prior QTS synthetic baseline identity is invalid")
+    archived = subprocess.run(
+        [
+            "git",
+            "-c",
+            f"safe.directory={source_target.resolve()}",
+            "-C",
+            str(source_target),
+            "archive",
+            "--format=tar",
+            snapshot_head,
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+        check=False,
+        shell=False,
+    )
+    if archived.returncode != 0 or len(archived.stdout) > 1024 * 1024 * 1024:
+        raise AgentEvalError("prior QTS source archive is unavailable or too large")
+
+    rows: list[dict[str, Any]] = []
+    files: list[tuple[str, bytes, int]] = []
+    archived_files: dict[str, tuple[bytes, int]] = {}
+    evaluator_injected = (
+        "AGENTS.md",
+        "docs/PROJECT_CONTEXT.md",
+    )
+    with tarfile.open(fileobj=io.BytesIO(archived.stdout), mode="r:") as archive:
+        for member in archive.getmembers():
+            relative = PurePosixPath(member.name)
+            if relative.is_absolute() or any(
+                part in {"", ".", ".."} for part in relative.parts
+            ):
+                raise AgentEvalError("prior QTS source archive has an unsafe path")
+            path = relative.as_posix()
+            if member.isdir():
+                continue
+            if not member.isfile():
+                raise AgentEvalError("prior QTS source archive has a non-regular file")
+            if (
+                path in evaluator_injected
+                or path.startswith((".agents/", ".qa-eval-tools/"))
+                or _is_excluded(path)
+            ):
+                continue
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise AgentEvalError("prior QTS source archive file could not be read")
+            content = stream.read()
+            archived_files[path] = (content, member.mode)
+            rows.append(
+                {"path": path, "size": len(content), "sha256": sha256_bytes(content)}
+            )
+    rows.sort(key=lambda item: item["path"])
+    if canonical_fingerprint(rows) != source_manifest_fingerprint:
+        raise AgentEvalError("prior QTS snapshot does not match its source manifest")
+
+    tree_rows: dict[str, dict[str, Any]] = {}
+    for item in source_tree_manifest["files"]:
+        if not isinstance(item, dict):
+            raise AgentEvalError("fixed QTS Git tree entry is invalid")
+        path = item.get("path")
+        if (
+            not isinstance(path, str)
+            or path in tree_rows
+            or not re.fullmatch(r"[0-9a-f]{40}", str(item.get("sha", "")))
+            or item.get("mode") not in {"100644", "100755"}
+            or isinstance(item.get("size"), bool)
+            or not isinstance(item.get("size"), int)
+            or item["size"] < 0
+        ):
+            raise AgentEvalError("fixed QTS Git tree entry is invalid")
+        safe_path = PurePosixPath(path)
+        if (
+            safe_path.is_absolute()
+            or "\\" in path
+            or any(part in {"", ".", ".."} for part in safe_path.parts)
+            or path in evaluator_injected
+            or path.startswith((".agents/", ".qa-eval-tools/"))
+            or _is_excluded(path)
+        ):
+            raise AgentEvalError("fixed QTS Git tree entry is outside the target scope")
+        tree_rows[path] = item
+    if set(tree_rows) != set(archived_files):
+        raise AgentEvalError("prior QTS source paths differ from the fixed Git tree")
+
+    for path in sorted(archived_files):
+        content, _archived_mode = archived_files[path]
+        expected = tree_rows[path]
+        git_blob = hashlib.sha1(
+            b"blob " + str(len(content)).encode("ascii") + b"\0" + content
+        ).hexdigest()
+        if len(content) != expected["size"] or git_blob != expected["sha"]:
+            raise AgentEvalError("prior QTS file content differs from the fixed Git tree")
+        files.append((path, content, 0o755 if expected["mode"] == "100755" else 0o644))
+
+    destination = Path(os.path.abspath(destination))
+    _assert_no_symlink_components(destination)
+    try:
+        relative_destination = destination.relative_to(REPO_ROOT)
+    except ValueError as exc:
+        raise AgentEvalError("QTS source snapshot must be under .agent-eval-runs") from exc
+    if len(relative_destination.parts) < 2 or relative_destination.parts[0] != ".agent-eval-runs":
+        raise AgentEvalError("QTS source snapshot must be under .agent-eval-runs")
+    if destination.exists() or destination.is_symlink():
+        raise AgentEvalError("QTS source snapshot destination must be new")
+    destination.mkdir(parents=True)
+    for relative, content, mode in files:
+        target = destination.joinpath(*PurePosixPath(relative).parts)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        target.chmod(mode)
+    empty_hooks = destination.parent / f".{destination.name}-empty-hooks"
+    empty_hooks.mkdir()
+    env = {
+        **os.environ,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_AUTHOR_NAME": "Evaluator",
+        "GIT_AUTHOR_EMAIL": "evaluator@invalid.local",
+        "GIT_COMMITTER_NAME": "Evaluator",
+        "GIT_COMMITTER_EMAIL": "evaluator@invalid.local",
+    }
+    try:
+        subprocess.run(
+            ["git", "init", "--quiet", str(destination)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            env=env,
+        )
+        subprocess.run(
+            ["git", "-C", str(destination), "config", "core.hooksPath", str(empty_hooks)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            env=env,
+        )
+        subprocess.run(
+            ["git", "-C", str(destination), "add", "--force", "--all"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=60,
+            check=True,
+            shell=False,
+            env=env,
+        )
+        subprocess.run(
+            ["git", "-C", str(destination), "commit", "--quiet", "-m", "Verified QTS source snapshot"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=60,
+            check=True,
+            shell=False,
+            env=env,
+        )
+        snapshot_revision = subprocess.run(
+            ["git", "-C", str(destination), "rev-parse", "HEAD"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            env=env,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+        remotes = subprocess.run(
+            ["git", "-C", str(destination), "remote"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            env=env,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+        if remotes:
+            raise AgentEvalError("verified QTS source snapshot must not have remotes")
+    finally:
+        shutil.rmtree(empty_hooks, ignore_errors=False)
+    return {
+        "method": "verified_prior_sanitized_target_snapshot",
+        "source_run_id": source_run["run_id"],
+        "source_attempt_id": source_attempt_id,
+        "target_revision": DEFAULT_TARGET_REVISION,
+        "source_manifest_fingerprint": source_manifest_fingerprint,
+        "source_synthetic_head": snapshot_head,
+        "rebuilt_snapshot_head": snapshot_revision,
+        "source_file_count": len(rows),
+        "source_git_tree_sha": source_tree_manifest["tree_sha"],
+        "source_git_tree_fingerprint": canonical_fingerprint(
+            sorted(source_tree_manifest["files"], key=lambda item: item["path"])
+        ),
+        "source_integrity": "verified",
+        "host_execution_status": source_record.get("execution", {}).get(
+            "status", "unverified"
+        ),
+        "effective_model_status": "unverified",
+        "tool_trace_status": "unverified",
+    }
+
+
 def _selected_skills(scenario: dict[str, Any]) -> list[str]:
     names = {row["skill"] for row in scenario["required_artifacts"]}
     names.add("question-analysis")
@@ -258,6 +545,7 @@ def prepare_run(
     target_source_root: Path,
     skill_revision: str,
     output_root: Path,
+    source_provenance_path: Path | None = None,
     repeat: int = 2,
     model: str = "gpt-6-luna",
     reasoning_effort: str = "max",
@@ -281,10 +569,68 @@ def prepare_run(
 
     root = _run_root(output_root, create=True)
     scenario = qa_training_store.load_scenario()
-    target_revision = resolve_commit(target_source_root, DEFAULT_TARGET_REVISION)
-    target_head = assert_clean_checkout(
-        target_source_root, expected_revision=DEFAULT_TARGET_REVISION
-    )
+    source_provenance: dict[str, Any] | None = None
+    if source_provenance_path is None:
+        target_revision = resolve_commit(target_source_root, DEFAULT_TARGET_REVISION)
+        target_head = assert_clean_checkout(
+            target_source_root, expected_revision=DEFAULT_TARGET_REVISION
+        )
+    else:
+        provenance_path = Path(os.path.abspath(source_provenance_path))
+        _assert_no_symlink_components(provenance_path)
+        try:
+            provenance_path.relative_to(REPO_ROOT / ".agent-eval-runs")
+        except ValueError as exc:
+            raise AgentEvalError(
+                "QTS source provenance must be under .agent-eval-runs"
+            ) from exc
+        source_provenance = _read_json(provenance_path)
+        if (
+            not isinstance(source_provenance, dict)
+            or source_provenance.get("target_revision") != DEFAULT_TARGET_REVISION
+            or source_provenance.get("source_integrity") != "verified"
+            or not isinstance(
+                source_provenance.get("source_manifest_fingerprint"), str
+            )
+            or not _SHA256_RE.fullmatch(
+                source_provenance["source_manifest_fingerprint"]
+            )
+            or not isinstance(source_provenance.get("rebuilt_snapshot_head"), str)
+            or not re.fullmatch(
+                r"[0-9a-f]{40}", source_provenance["rebuilt_snapshot_head"]
+            )
+            or not isinstance(source_provenance.get("source_git_tree_sha"), str)
+            or not re.fullmatch(r"[0-9a-f]{40}", source_provenance["source_git_tree_sha"])
+        ):
+            raise AgentEvalError("QTS source provenance does not verify the fixed target")
+        target_revision = DEFAULT_TARGET_REVISION
+        target_head = assert_clean_checkout(target_source_root)
+        if target_head != source_provenance["rebuilt_snapshot_head"]:
+            raise AgentEvalError("QTS source snapshot HEAD differs from its attestation")
+        remotes = subprocess.run(
+            ["git", "-C", str(target_source_root), "remote"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+        commit_count = subprocess.run(
+            ["git", "-C", str(target_source_root), "rev-list", "--count", "HEAD"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=True,
+            shell=False,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+        if remotes or commit_count != "1":
+            raise AgentEvalError("QTS source snapshot Git boundary is invalid")
     skill_revision = resolve_commit(REPO_ROOT, skill_revision)
     evaluator_revision = _git_head(REPO_ROOT)
     skills = _selected_skills(scenario)
@@ -309,6 +655,11 @@ def prepare_run(
         "scenario_id": scenario["scenario_id"],
         "target_revision": target_revision,
         "target_source_checkout_head": target_head,
+        "target_source_provenance": source_provenance
+        or {
+            "method": "fixed_git_checkout",
+            "source_integrity": "verified",
+        },
         "skill_revision": skill_revision,
         "evaluator_revision": evaluator_revision,
         "evaluator_source_fingerprints": _evaluator_source_fingerprints(),
@@ -367,11 +718,22 @@ def prepare_run(
             target_result = prepare_sanitized_target(
                 source_root=target_source_root,
                 source_revision=target_revision,
+                source_revision_label=DEFAULT_TARGET_REVISION
+                if source_provenance is not None
+                else None,
                 candidate_skills_root=per_attempt_package / "skills",
                 verifier_capture_source=REPO_ROOT
                 / "scripts/skills/evals/agent/verifier_capture.py",
                 destination=target_root,
             )
+            if (
+                source_provenance is not None
+                and target_result["source_manifest_fingerprint"]
+                != source_provenance["source_manifest_fingerprint"]
+            ):
+                raise AgentEvalError(
+                    "prepared target differs from the verified fixed-source manifest"
+                )
             baseline_path = private_root / "target-baseline.json"
             atomic_write_json(baseline_path, target_result["baseline_manifest"])
             atomic_write_text(private_root / "generation-prompt.md", prompt)
@@ -382,6 +744,10 @@ def prepare_run(
                 "scenario_id": scenario["scenario_id"],
                 "scenario_fingerprint": scenario["scenario_fingerprint"],
                 "target_revision": target_revision,
+                "target_source_checkout_head": target_head,
+                "source_manifest_fingerprint": target_result[
+                    "source_manifest_fingerprint"
+                ],
                 "target_manifest_fingerprint": target_result[
                     "source_manifest_fingerprint"
                 ],
@@ -442,6 +808,7 @@ def record_execution(
     started_at: str,
     finished_at: str,
     submitted_prompt_fingerprint: str | None,
+    final_response: str | None = None,
     host_observation: str = "codex_subagent_tool_returned",
 ) -> dict[str, Any]:
     if execution_status not in {"completed", "failed", "not_started"}:
@@ -475,6 +842,23 @@ def record_execution(
         isinstance(submitted_prompt_fingerprint, str)
         and submitted_prompt_fingerprint == prepared_prompt_fingerprint
     )
+    final_response_status = "not_captured"
+    final_response_sha256 = None
+    if final_response is not None:
+        response_bytes = final_response.encode("utf-8")
+        if len(response_bytes) > MAX_TEXT_BYTES:
+            raise AgentEvalError("host final response exceeds the size limit")
+        if _SECRET_TEXT_RE.search(final_response):
+            final_response_status = "secret_shaped_not_saved"
+        elif final_response:
+            final_path = attempt_root / "evaluator-private" / "final-response.md"
+            if final_path.exists() or final_path.is_symlink():
+                raise AgentEvalError("host final response capture is immutable")
+            atomic_write_text(final_path, final_response)
+            final_response_status = "captured"
+            final_response_sha256 = sha256_bytes(response_bytes)
+        else:
+            final_response_status = "empty"
     execution = {
         "observed_at": _now(),
         "status": execution_status,
@@ -488,6 +872,11 @@ def record_execution(
         "prompt_match_status": "verified_match"
         if prompt_matches_prepared
         else "unverified_or_mismatch",
+        "final_response_status": final_response_status,
+        "final_response_path": "evaluator-private/final-response.md"
+        if final_response_status == "captured"
+        else None,
+        "final_response_sha256": final_response_sha256,
         "effective_model_status": "unverified",
         "tool_trace_status": "unverified",
         "agent_self_report_used_as_execution_proof": False,
@@ -1352,6 +1741,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     prepare = commands.add_parser("prepare")
     prepare.add_argument("--target-source-root", type=Path, required=True)
+    prepare.add_argument("--source-provenance", type=Path)
     prepare.add_argument("--skill-revision", required=True)
     prepare.add_argument("--output-root", type=Path, required=True)
     prepare.add_argument("--repeat", type=int, default=2)
@@ -1369,6 +1759,7 @@ def main(argv: list[str] | None = None) -> int:
     record.add_argument("--started-at", required=True)
     record.add_argument("--finished-at", required=True)
     record.add_argument("--submitted-prompt-fingerprint")
+    record.add_argument("--final-response-file", type=Path)
     record.add_argument("--host-observation", default="codex_subagent_tool_returned")
     capture = commands.add_parser("capture")
     capture.add_argument("--run-root", type=Path, required=True)
@@ -1383,6 +1774,7 @@ def main(argv: list[str] | None = None) -> int:
                 target_source_root=args.target_source_root,
                 skill_revision=args.skill_revision,
                 output_root=args.output_root,
+                source_provenance_path=args.source_provenance,
                 repeat=args.repeat,
                 model=args.model,
                 reasoning_effort=args.reasoning_effort,
@@ -1396,6 +1788,11 @@ def main(argv: list[str] | None = None) -> int:
                 started_at=args.started_at,
                 finished_at=args.finished_at,
                 submitted_prompt_fingerprint=args.submitted_prompt_fingerprint,
+                final_response=(
+                    read_regular_file_bytes(args.final_response_file).decode("utf-8")
+                    if args.final_response_file
+                    else None
+                ),
                 host_observation=args.host_observation,
             )
         elif args.command == "capture":

@@ -12,6 +12,14 @@ JudgeおよびJudge改善Agentは既存Codexセッションの**別サブエー�
 - Judge改善では候補作成前にtune／independentのcase集合とfingerprintを固定し、独立検証用の入力・正解・個別結果を改善Agentへ公開しない。期待値やrubricをJudge出力に合わせて変更せず、異なるEvaluator revisionの結果を直接比較しない。
 - `judge_validation.py`の外部CLI process・schema 2 profile必須経路は、サブエージェントの別呼出しで得た回答・利用できる実行証拠を取り込む契約に変更する。根拠のない`verified`の設定や、未承認fixtureの採点結果からの自己承認は禁止する。
 
+### 現行QTS Judge handoffの運用契約
+
+- QTS Judgeの現在の入口は`prepare-formal-subagent-calls`、`record-subagent-response`、`finalize-formal-subagent-calls`である。Codexホストが指定値`gpt-6-luna` / `max` / `none`で別Judgeを起動し、Pythonは固定prompt・fixture/baseline/Evaluator bindingの作成、応答取込、既存normalizer、承認済みlabelとの比較を行う。旧`run_validation()`のCLI profile / launcher / isolation gateは互換経路として残し、新方式で利用も解除もしない。
+- 正式準備では現Evaluator revisionで適格な独立QTS attemptを2件以上要求する。attemptごとに固定target/scenario/prompt/Skill package、target integrity、captured output integrity、final response、全必須成果物/routing、全必須runtime invocation、`verify`と`workflow-runtime`の独立replay passを照合する。未完了routingは評価結果として保持するが、他の実行・runtime・証拠欠落は正常baselineへ昇格させない。
+- baselineが不適格でも、改変されていないcaptureから人間レビュー用の診断packetを作成できる。その派生mutationとbindingはgold fixtureの承認・Judge実行には使用できない。packetには全fixtureのsplit、未承認label、criterion、mutation差分、固定規範参照の行・fingerprint、機械検査status、baseline出力path、推奨判断と確認理由を含める。
+- Judge準備時にEvaluator revisionとJudge実装・semantic normalizer・scenario・rubric・fixture catalogueのfingerprintを保存し、finalize時に現行revision/fingerprintと一致しないhandoffを拒否する。approval binding・prompt/request・raw response・normalized resultの再照合に失敗したcallは採点しない。Judgeの実効model/build、完全なtool trace、物理的read-denialは未検証のまま保持する。
+- fixture審査結果は人間が`approved`にするまで未承認である。新方式のDiagnostic Judge出力、決定論的artifact/routing検査、AIレビューpacketは人間承認の代わりにならない。正式Judgeの反復・accuracy検証は、適格baselineと一致する人間承認bindingが存在するcriterionだけで行う。
+
 Judgeの独立検証で確認すべき意味判定の品質要件は従来どおり維持する。物理的隔離・tool read-denial・実効model/buildを検証できないときは、それぞれ未検証と明記し、満たしていると主張しない。
 
 [親Plan](./2026-10-03_132700_agent-eval-runner.md)のJudge独立評価・改善を定義する。[Skill改善Plan](./2026-10-03_132700_agent-eval-runner_03_analysis-and-improvement.md)と[固定対象評価Plan](./2026-10-03_132700_agent-eval-runner_02_qa-training-store-integration-eval.md)を補完する。既存の`semantic/prompt_builder.py`、`result.py`、`rubric.json`、`reference.md`とEvaluator-only fixtureを再利用する。新しいJudge採点方式・Agent runtime・DBは作らない。

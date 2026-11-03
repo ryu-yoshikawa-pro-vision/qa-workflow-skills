@@ -17,6 +17,7 @@ from scripts.skills.evals.agent.judge_validation import (
     _fixture_approval_binding,
     _fixture_prompt,
     _prepare_fixture,
+    _safe_relative_child,
     load_fixture_catalogue,
     run_validation,
 )
@@ -89,6 +90,298 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_subagent_baseline_revision_mismatch_is_recorded_per_attempt(self) -> None:
+        scenario = load_scenario()
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            run_root = repository / ".agent-eval-runs" / "stale-run"
+            run_root.mkdir(parents=True)
+            (run_root / "result.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "execution_method": "codex_subagent_handoff",
+                        "run_id": "stale-run",
+                        "target_revision": DEFAULT_TARGET_REVISION,
+                        "evaluator_revision": "1" * 40,
+                        "scenario_fingerprint": scenario["scenario_fingerprint"],
+                        "attempts": [
+                            {"attempt_id": "a" * 32, "status": "needs_review"},
+                            {"attempt_id": "b" * 32, "status": "needs_review"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.object(judge_validation, "REPO_ROOT", repository),
+                patch("scripts.skills.evals.agent.qts_subagent_eval.REPO_ROOT", repository),
+            ):
+                result = judge_validation.assess_subagent_baseline(
+                    baseline_run_root=run_root,
+                    expected_evaluator_revision="2" * 40,
+                )
+            self.assertEqual(result["status"], "ineligible")
+            self.assertEqual(len(result["attempt_selection"]), 2)
+            self.assertEqual(
+                {row["reason"] for row in result["attempt_selection"]},
+                {"evaluator_revision_mismatch"},
+            )
+
+    def test_formal_preparation_is_invalidated_by_revision_or_source_change(self) -> None:
+        preparation = {
+            "evaluator_revision": "a" * 40,
+            "evaluator_source_fingerprints": {"judge_validation.py": "sha256:one"},
+        }
+        self.assertTrue(
+            judge_validation._formal_preparation_matches_current(
+                preparation,
+                current_revision="a" * 40,
+                current_fingerprints={"judge_validation.py": "sha256:one"},
+            )
+        )
+        self.assertFalse(
+            judge_validation._formal_preparation_matches_current(
+                preparation,
+                current_revision="b" * 40,
+                current_fingerprints={"judge_validation.py": "sha256:one"},
+            )
+        )
+        self.assertFalse(
+            judge_validation._formal_preparation_matches_current(
+                preparation,
+                current_revision="a" * 40,
+                current_fingerprints={"judge_validation.py": "sha256:two"},
+            )
+        )
+
+    def test_human_packet_marks_ineligible_baseline_as_hold(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            preparation = {
+                "dataset_revision": "qts-judge-fixtures-v2",
+                "target_revision": DEFAULT_TARGET_REVISION,
+                "evaluator_revision": "a" * 40,
+                "scenario_fingerprint": "sha256:scenario",
+                "rubric_sha256": "sha256:rubric",
+                "evaluator_source_fingerprints": {"judge_validation.py": "sha256:one"},
+                "baseline_assessment": {
+                    "status": "ineligible",
+                    "baseline_run_id": "baseline-run",
+                    "eligible_attempts": [],
+                    "attempts_required": 2,
+                },
+                "review_source_attempt_id": "attempt-1",
+                "fixtures": [
+                    {
+                        "case_id": "major-violation-003",
+                        "criteria": ["QTS-SEM-003"],
+                        "split": "tune",
+                        "expected_label_review_only": "rating_1",
+                        "expected_label_status": "human_review_required",
+                        "baseline_eligibility_status": "ineligible",
+                        "baseline_precondition": {"status": "review_pending"},
+                        "baseline_output_path": ".agent-eval-runs/baseline/captured-output",
+                        "fixture_machine_status": "needs_review",
+                        "fixture_machine_issue_kinds": ["noncompleted_routing"],
+                        "human_review_reason": "unresolved oracle mutation",
+                        "review_recommendation": judge_validation._fixture_review_recommendation(
+                            "major-violation-003", baseline_eligible=False
+                        ),
+                        "mutation_id": "promote-unresolved-oracle",
+                        "mutation_diff": [],
+                        "fixture_binding_sha256": "sha256:binding",
+                        "normative_review_context": [],
+                    }
+                ],
+            }
+
+            judge_validation._write_fixture_review_packet(
+                root=root, preparation=preparation
+            )
+
+            packet = (root / "human-review-packet.md").read_text(encoding="utf-8")
+            self.assertIn("Catalogue expected rating: `rating_1` (unapproved)", packet)
+            self.assertIn("保留。baselineが機械的受入条件を満たさず", packet)
+            self.assertIn("QTS-SEM-003", packet)
+            self.assertIn("unresolved oracle mutation", packet)
+            self.assertIn("Baseline machine status: `None`", packet)
+
+    def test_fixture_mutation_diff_tracks_removed_files_and_ignores_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = root / "baseline"
+            fixture = root / "fixture"
+            baseline.mkdir()
+            fixture.mkdir()
+            (baseline / "changed.md").write_text("before\n", encoding="utf-8")
+            (fixture / "changed.md").write_text("after\n", encoding="utf-8")
+            (baseline / "removed.md").write_text("remove me\n", encoding="utf-8")
+            (baseline / "artifact-manifest.json").write_text("{}\n", encoding="utf-8")
+            (fixture / "artifact-manifest.json").write_text("{\"changed\":true}\n", encoding="utf-8")
+            rows = judge_validation._fixture_mutation_diff(baseline, fixture)
+            self.assertEqual(
+                [(row["path"], row["change"]) for row in rows],
+                [("changed.md", "modified"), ("removed.md", "removed")],
+            )
+
+    def test_formal_judge_finalize_rechecks_raw_response_and_rejects_normalized_tamper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            prep_root = repository / ".agent-eval-runs" / "formal" / "prep"
+            case_root = prep_root / "fixtures" / "normal-workflow"
+            call_id = "normal-workflow-attempt-01"
+            call_root = case_root / "calls" / call_id
+            qa_output = case_root / "qa-output"
+            qa_output.mkdir(parents=True)
+            (qa_output / "output.md").write_text("fixed QA artifact\n", encoding="utf-8")
+            call_root.mkdir(parents=True)
+            prompt = "Judge the QA artifact against the fixed rubric and reference."
+            prompt_bytes = prompt.encode("utf-8")
+            (call_root / "judge-prompt.md").write_bytes(prompt_bytes)
+            fixture_binding = {
+                "fixture_id": "normal-workflow",
+                "dataset_revision": "qts-judge-fixtures-v2",
+                "expected": "rating_at_least_3",
+                "criteria": ["QTS-SEM-001"],
+                "judge_input_fingerprint": sha256_bytes(prompt_bytes),
+                "normative_reference_fingerprints": {
+                    "docs/spec/README.md": "sha256:" + "1" * 64
+                },
+                "artifact_content_fingerprint": judge_validation._artifact_content_fingerprint(
+                    qa_output
+                ),
+            }
+            approval = {"binding": fixture_binding}
+            formal_binding = {
+                "fixture_binding_sha256": judge_validation.canonical_fingerprint(
+                    fixture_binding
+                ),
+                "approval_binding_sha256": judge_validation.canonical_fingerprint(
+                    fixture_binding
+                ),
+                "rubric_sha256": sha256_bytes(
+                    (judge_validation.SCENARIO_DIR / "rubric.json").read_bytes()
+                ),
+                "reference_fingerprints": fixture_binding[
+                    "normative_reference_fingerprints"
+                ],
+                "artifact_content_fingerprint": fixture_binding[
+                    "artifact_content_fingerprint"
+                ],
+                "prompt_sha256": sha256_bytes(prompt_bytes),
+            }
+            request = {
+                "schema_version": 2,
+                "call_id": call_id,
+                "case_id": "normal-workflow",
+                "baseline_run_id": "baseline-run",
+                "baseline_attempt_id": "attempt-1",
+                "evaluator_revision": "2" * 40,
+                "target_revision": DEFAULT_TARGET_REVISION,
+                "criteria": ["QTS-SEM-001"],
+                "prompt_sha256": sha256_bytes(prompt_bytes),
+                "requested_settings": dict(judge_validation.SUBAGENT_JUDGE_SETTINGS),
+                "execution_method": "codex_subagent",
+                "effective_model_status": "unverified",
+                "tool_trace_status": "unverified",
+                "physical_evaluator_read_denial": "unverified",
+                "formal_binding": formal_binding,
+            }
+            (call_root / "request.json").write_text(
+                json.dumps(request), encoding="utf-8"
+            )
+            (call_root / "call-status.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "call_id": call_id,
+                        "status": "prepared",
+                        "request_fingerprint": judge_validation.canonical_fingerprint(
+                            request
+                        ),
+                        "requested_settings": dict(judge_validation.SUBAGENT_JUDGE_SETTINGS),
+                        "effective_model_status": "unverified",
+                        "tool_trace_status": "unverified",
+                        "physical_evaluator_read_denial": "unverified",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            raw = json.dumps(
+                {
+                    "criteria": [
+                        {
+                            "id": "QTS-SEM-001",
+                            "evaluable": True,
+                            "rating": 3,
+                            "reason": "The workflow evidence supports this rating.",
+                            "evidence": ["QA artifact section"],
+                        }
+                    ]
+                }
+            )
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                recorded = judge_validation.record_subagent_judge_response(
+                    call_root=call_root,
+                    raw_response=raw,
+                    host_call_status="response_received",
+                )
+            self.assertEqual(recorded["status"], "formal_response_valid")
+            preparation = {
+                "schema_version": 1,
+                "baseline_assessment": {
+                    "status": "eligible",
+                    "baseline_run_id": "baseline-run",
+                    "eligible_attempts": [{"attempt_id": "attempt-1"}],
+                },
+                "evaluator_revision": "2" * 40,
+            }
+            prepared_case = {
+                "case_id": "normal-workflow",
+                "criteria": ["QTS-SEM-001"],
+            }
+            call = {
+                "call_id": call_id,
+                "call_root": f"fixtures/normal-workflow/calls/{call_id}",
+            }
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                judge_validation._validate_formal_judge_call_evidence(
+                    preparation_root=prep_root,
+                    call=call,
+                    prepared_case=prepared_case,
+                    preparation=preparation,
+                    fixture_binding=fixture_binding,
+                    approval=approval,
+                )
+            response_path = call_root / "response.json"
+            response = json.loads(response_path.read_text(encoding="utf-8"))
+            response["normalized"]["criteria"][0]["rating"] = 1
+            response_path.write_text(json.dumps(response), encoding="utf-8")
+            with patch.object(judge_validation, "REPO_ROOT", repository):
+                with self.assertRaisesRegex(AgentEvalError, "normalized result was altered"):
+                    judge_validation._validate_formal_judge_call_evidence(
+                        preparation_root=prep_root,
+                        call=call,
+                        prepared_case=prepared_case,
+                        preparation=preparation,
+                        fixture_binding=fixture_binding,
+                        approval=approval,
+                    )
+
+    def test_safe_formal_call_path_rejects_traversal_and_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaises(AgentEvalError):
+                _safe_relative_child(root, "../outside")
+            target = root / "target"
+            target.mkdir()
+            (root / "escape").symlink_to(target, target_is_directory=True)
+            with self.assertRaisesRegex(AgentEvalError, "symlink"):
+                _safe_relative_child(root, "escape/child")
+
     def test_fixture_judge_prompts_do_not_include_gold_fixture_status(self) -> None:
         scenario = load_scenario()
         catalogue = load_fixture_catalogue()
