@@ -29,7 +29,10 @@ class SubagentEvalTests(unittest.TestCase):
             "id": EVAL_ID,
             "input": "Create test requirements from the supplied QA specification.",
             "fingerprint_files": [
-                ("input.md", b"Create test requirements from the supplied QA specification."),
+                (
+                    "input.md",
+                    b"Create test requirements from the supplied QA specification.",
+                ),
                 ("expected.json", b'{"private":"expected fixture"}'),
                 ("evals.json", b'{"cases":["TR-OUT-001"]}'),
             ],
@@ -51,25 +54,66 @@ class SubagentEvalTests(unittest.TestCase):
         }
         self.stack = __import__("contextlib").ExitStack()
         self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(subagent_eval, "REPO_ROOT", self.repository))
-        self.stack.enter_context(patch.object(subagent_eval.legacy_run, "REPO_ROOT", self.repository))
-        self.stack.enter_context(patch.object(subagent_eval, "assert_clean_checkout", return_value=EVALUATOR_SHA))
-        self.stack.enter_context(patch.object(subagent_eval, "resolve_commit", return_value=SKILL_SHA))
-        self.stack.enter_context(patch.object(subagent_eval, "_case_for", return_value=self.case))
-        self.stack.enter_context(patch.object(subagent_eval, "create_skill_workspace", side_effect=self._create_package))
-        self.stack.enter_context(patch.object(subagent_eval, "grade_deterministic", return_value={"skill": SKILL, "eval_id": EVAL_ID, "status": "pass", "assertions": []}))
+        self.stack.enter_context(
+            patch.object(subagent_eval, "REPO_ROOT", self.repository)
+        )
+        self.stack.enter_context(
+            patch.object(subagent_eval.legacy_run, "REPO_ROOT", self.repository)
+        )
+        self.stack.enter_context(
+            patch.object(
+                subagent_eval, "assert_clean_checkout", return_value=EVALUATOR_SHA
+            )
+        )
+        self.stack.enter_context(
+            patch.object(subagent_eval, "resolve_commit", return_value=SKILL_SHA)
+        )
+        self.stack.enter_context(
+            patch.object(subagent_eval, "_case_for", return_value=self.case)
+        )
+        self.stack.enter_context(
+            patch.object(
+                subagent_eval,
+                "create_skill_workspace",
+                side_effect=self._create_package,
+            )
+        )
+        self.stack.enter_context(
+            patch.object(
+                subagent_eval,
+                "grade_deterministic",
+                return_value={
+                    "skill": SKILL,
+                    "eval_id": EVAL_ID,
+                    "status": "pass",
+                    "assertions": [],
+                },
+            )
+        )
 
     @staticmethod
     def _create_package(_repo: Path, revision: str, destination: Path) -> dict:
         files = []
         for relative, content in (
-            (f"skills/{SKILL}/SKILL.md", b"# Test Requirement Design\nUse the Skill contract.\n"),
-            (f"skills/{SKILL}/scripts/runtime_contract.py", b"RUNTIME_IMPLEMENTATION = 'test'\n"),
+            (
+                f"skills/{SKILL}/SKILL.md",
+                b"# Test Requirement Design\nUse the Skill contract.\n",
+            ),
+            (
+                f"skills/{SKILL}/scripts/runtime_contract.py",
+                b"RUNTIME_IMPLEMENTATION = 'test'\n",
+            ),
         ):
             path = destination / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
-            files.append({"path": relative, "size": len(content), "sha256": sha256_bytes(content)})
+            files.append(
+                {
+                    "path": relative,
+                    "size": len(content),
+                    "sha256": sha256_bytes(content),
+                }
+            )
         return {
             "revision": revision,
             "skills": [SKILL],
@@ -77,32 +121,50 @@ class SubagentEvalTests(unittest.TestCase):
             "package_fingerprint": canonical_fingerprint(files),
         }
 
-    def _prepare(self, *, suite: str = "deterministic", repeat: int = 1) -> tuple[Path, dict]:
+    def _prepare(
+        self, *, suite: str = "deterministic", repeat: int = 1
+    ) -> tuple[Path, dict]:
         result = subagent_eval.prepare_run(
             suite=suite,
             skill=SKILL,
             eval_id=EVAL_ID,
             skill_revision=SKILL_SHA,
-            output_root=self.repository / ".agent-eval-runs" / f"run-{len(list((self.repository / '.agent-eval-runs').glob('*')))}",
-            requested_settings={"model": "gpt-6-luna", "reasoning_effort": "max", "fork_turns": "none"},
+            output_root=self.repository
+            / ".agent-eval-runs"
+            / f"run-{len(list((self.repository / '.agent-eval-runs').glob('*')))}",
+            requested_settings={
+                "model": "gpt-6-luna",
+                "reasoning_effort": "max",
+                "fork_turns": "none",
+            },
             repeat=repeat,
         )
         return Path(result["run_root"]), result
 
     @staticmethod
-    def _write_output(run_root: Path, attempt_id: str, value: str = "# Generated requirements\n") -> Path:
+    def _write_output(
+        run_root: Path, attempt_id: str, value: str = "# Generated requirements\n"
+    ) -> Path:
         path = run_root / "attempts" / attempt_id / "handoff" / "output.md"
         path.write_text(value, encoding="utf-8")
         return path
 
     @staticmethod
-    def _write_agent_submission(run_root: Path, attempt_id: str, value: str = "# Generated requirements\n") -> Path:
+    def _write_agent_submission(
+        run_root: Path, attempt_id: str, value: str = "# Generated requirements\n"
+    ) -> Path:
         path = run_root / "attempts" / attempt_id / "agent-visible" / "submission.md"
         path.write_text(value, encoding="utf-8")
         return path
 
-    def _seal(self, run_root: Path, attempt_id: str, *, status: str = "completed") -> dict:
-        artifact_attempt_id = attempt_id if (run_root / "attempts" / attempt_id / "handoff" / "output.md").exists() else None
+    def _seal(
+        self, run_root: Path, attempt_id: str, *, status: str = "completed"
+    ) -> dict:
+        artifact_attempt_id = (
+            attempt_id
+            if (run_root / "attempts" / attempt_id / "handoff" / "output.md").exists()
+            else None
+        )
         return subagent_eval.seal_handoff(
             run_root=run_root,
             attempt_id=attempt_id,
@@ -112,7 +174,9 @@ class SubagentEvalTests(unittest.TestCase):
             finished_at="2026-11-03T10:00:01Z",
         )
 
-    def test_prepare_stages_only_input_and_package_and_records_unverified_host_fields(self) -> None:
+    def test_prepare_stages_only_input_and_package_and_records_unverified_host_fields(
+        self,
+    ) -> None:
         root, result = self._prepare()
         attempt = result["attempts"][0]
         attempt_root = root / "attempts" / attempt["attempt_id"]
@@ -124,16 +188,30 @@ class SubagentEvalTests(unittest.TestCase):
             "PYTHONDONTWRITEBYTECODE=1 python -B",
             (visible / "task.md").read_text(encoding="utf-8"),
         )
-        self.assertNotIn("private expected fixture", (visible / "task.md").read_text(encoding="utf-8"))
-        self.assertNotIn("Private reference text", (visible / "task.md").read_text(encoding="utf-8"))
-        self.assertIn("/agent-visible/submission.md", (visible / "task.md").read_text(encoding="utf-8"))
-        request = json.loads((attempt_root / "evaluator-private" / "request.json").read_text(encoding="utf-8"))
+        self.assertNotIn(
+            "private expected fixture",
+            (visible / "task.md").read_text(encoding="utf-8"),
+        )
+        self.assertNotIn(
+            "Private reference text", (visible / "task.md").read_text(encoding="utf-8")
+        )
+        self.assertIn(
+            "/agent-visible/submission.md",
+            (visible / "task.md").read_text(encoding="utf-8"),
+        )
+        request = json.loads(
+            (attempt_root / "evaluator-private" / "request.json").read_text(
+                encoding="utf-8"
+            )
+        )
         self.assertEqual(request["effective_settings"], {"status": "unverified"})
         self.assertEqual(request["physical_read_denial"], "unverified")
         self.assertEqual(result["attempts"][0]["status"], "awaiting_agent")
         self.assertEqual(result["attempts"][0]["skill_use_observation"], "unverified")
 
-    def test_completed_deterministic_handoff_is_integrity_checked_and_graded(self) -> None:
+    def test_completed_deterministic_handoff_is_integrity_checked_and_graded(
+        self,
+    ) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
         output = "# Test Requirements\n\n| TR ID | Source | Requirement |\n| --- | --- | --- |\n| TR-001 | SPEC-001 | Validate checkout |\n"
@@ -158,7 +236,9 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertEqual(saved_output.read_text(encoding="utf-8"), output)
         self.assertTrue(result["grade"]["sha256"].startswith("sha256:"))
 
-    def test_agent_visible_file_is_imported_exactly_then_removed_before_grading(self) -> None:
+    def test_agent_visible_file_is_imported_exactly_then_removed_before_grading(
+        self,
+    ) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
         output = (
@@ -169,7 +249,9 @@ class SubagentEvalTests(unittest.TestCase):
         )
         source = self._write_agent_submission(root, attempt_id, output)
 
-        captured = subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=attempt_id)
+        captured = subagent_eval.capture_agent_visible_output(
+            run_root=root, attempt_id=attempt_id
+        )
 
         self.assertEqual(captured["size_bytes"], len(output.encode("utf-8")))
         self.assertEqual(captured["sha256"], sha256_bytes(output.encode("utf-8")))
@@ -192,7 +274,9 @@ class SubagentEvalTests(unittest.TestCase):
         outside = self.repository / "outside.md"
         outside.write_text("not an artifact", encoding="utf-8")
         self._write_agent_submission(root, first).unlink()
-        (root / "attempts" / first / "agent-visible" / "submission.md").symlink_to(outside)
+        (root / "attempts" / first / "agent-visible" / "submission.md").symlink_to(
+            outside
+        )
         with self.assertRaisesRegex(AgentEvalError, "submission is unavailable"):
             subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=first)
 
@@ -204,16 +288,26 @@ class SubagentEvalTests(unittest.TestCase):
         saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["attempts"][0]["status"], "needs_review")
         self.assertEqual(saved["attempts"][1]["status"], "needs_review")
-        self.assertFalse((root / "attempts" / second / "handoff" / "output.md").exists())
+        self.assertFalse(
+            (root / "attempts" / second / "handoff" / "output.md").exists()
+        )
 
-    def test_agent_visible_secret_is_discarded_and_recorded_as_ungradeable(self) -> None:
+    def test_agent_visible_secret_is_discarded_and_recorded_as_ungradeable(
+        self,
+    ) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
-        source = self._write_agent_submission(root, attempt_id, "token=not-a-real-but-long-secret-value\n")
+        source = self._write_agent_submission(
+            root, attempt_id, "token=not-a-real-but-long-secret-value\n"
+        )
         with self.assertRaisesRegex(AgentEvalError, "may contain a secret"):
-            subagent_eval.capture_agent_visible_output(run_root=root, attempt_id=attempt_id)
+            subagent_eval.capture_agent_visible_output(
+                run_root=root, attempt_id=attempt_id
+            )
         self.assertFalse(source.exists())
-        self.assertFalse((root / "attempts" / attempt_id / "handoff" / "output.md").exists())
+        self.assertFalse(
+            (root / "attempts" / attempt_id / "handoff" / "output.md").exists()
+        )
         saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["attempts"][0]["status"], "needs_review")
         self.assertNotIn("sha256", saved["attempts"][0])
@@ -288,7 +382,9 @@ class SubagentEvalTests(unittest.TestCase):
         root2, prepared2 = self._prepare()
         attempt_id2 = prepared2["attempts"][0]["attempt_id"]
         self._write_output(root2, attempt_id2)
-        (root2 / "attempts" / attempt_id2 / "handoff" / "duplicate.md").write_text("extra", encoding="utf-8")
+        (root2 / "attempts" / attempt_id2 / "handoff" / "duplicate.md").write_text(
+            "extra", encoding="utf-8"
+        )
         with self.assertRaisesRegex(AgentEvalError, "unexpected files"):
             self._seal(root2, attempt_id2)
 
@@ -304,7 +400,9 @@ class SubagentEvalTests(unittest.TestCase):
     def test_request_schema_and_unverified_fields_are_fixed(self) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
-        request_path = root / "attempts" / attempt_id / "evaluator-private" / "request.json"
+        request_path = (
+            root / "attempts" / attempt_id / "evaluator-private" / "request.json"
+        )
         request = json.loads(request_path.read_text(encoding="utf-8"))
         request["schema_version"] = 2
         request_path.write_text(json.dumps(request), encoding="utf-8")
@@ -315,7 +413,9 @@ class SubagentEvalTests(unittest.TestCase):
         saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["attempts"][0]["status"], "needs_review")
 
-    def test_modified_artifact_and_malformed_manifest_do_not_receive_a_grade(self) -> None:
+    def test_modified_artifact_and_malformed_manifest_do_not_receive_a_grade(
+        self,
+    ) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
         output = self._write_output(root, attempt_id)
@@ -332,7 +432,9 @@ class SubagentEvalTests(unittest.TestCase):
         self._write_output(root2, attempt_id2)
         self._seal(root2, attempt_id2)
         manifest_path = root2 / "attempts" / attempt_id2 / "handoff" / "manifest.json"
-        manifest_path.write_text('{"attempt_id":"x","attempt_id":"y"}', encoding="utf-8")
+        manifest_path.write_text(
+            '{"attempt_id":"x","attempt_id":"y"}', encoding="utf-8"
+        )
         with self.assertRaisesRegex(AgentEvalError, "did not pass import validation"):
             subagent_eval.grade_attempt(run_root=root2, attempt_id=attempt_id2)
         record2 = json.loads((root2 / "result.json").read_text(encoding="utf-8"))
@@ -375,13 +477,19 @@ class SubagentEvalTests(unittest.TestCase):
         attempt_id2 = prepared2["attempts"][0]["attempt_id"]
         self._write_output(root2, attempt_id2)
         self._seal(root2, attempt_id2)
-        with patch.object(subagent_eval, "assert_clean_checkout", return_value="c" * 40):
-            with self.assertRaisesRegex(AgentEvalError, "did not pass import validation"):
+        with patch.object(
+            subagent_eval, "assert_clean_checkout", return_value="c" * 40
+        ):
+            with self.assertRaisesRegex(
+                AgentEvalError, "did not pass import validation"
+            ):
                 subagent_eval.grade_attempt(run_root=root2, attempt_id=attempt_id2)
         saved2 = json.loads((root2 / "result.json").read_text(encoding="utf-8"))
         self.assertNotIn("grade", saved2["attempts"][0])
 
-    def test_semantic_output_waits_for_judge_and_uses_existing_judge_prompt(self) -> None:
+    def test_semantic_output_waits_for_judge_and_uses_existing_judge_prompt(
+        self,
+    ) -> None:
         root, prepared = self._prepare(suite="semantic")
         attempt_id = prepared["attempts"][0]["attempt_id"]
         self._write_output(root, attempt_id)
@@ -391,9 +499,13 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertEqual(row["semantic_judge"]["judge_execution"], "unverified")
         judge_prompt = root / row["semantic_judge"]["prompt_path"]
         self.assertTrue(judge_prompt.is_file())
-        self.assertIn("Private reference text", judge_prompt.read_text(encoding="utf-8"))
+        self.assertIn(
+            "Private reference text", judge_prompt.read_text(encoding="utf-8")
+        )
         agent_visible = root / "attempts" / attempt_id / "agent-visible"
-        self.assertFalse(any("judge-request" in path.name for path in agent_visible.rglob("*")))
+        self.assertFalse(
+            any("judge-request" in path.name for path in agent_visible.rglob("*"))
+        )
         self.assertNotIn("grade", row)
 
     def test_capture_rejects_secret_without_persisting_raw_output(self) -> None:
@@ -431,7 +543,11 @@ class SubagentEvalTests(unittest.TestCase):
                 eval_id=EVAL_ID,
                 skill_revision=SKILL_SHA,
                 output_root=self.repository / "not-ignored",
-                requested_settings={"model": "gpt-6-luna", "reasoning_effort": "max", "fork_turns": "none"},
+                requested_settings={
+                    "model": "gpt-6-luna",
+                    "reasoning_effort": "max",
+                    "fork_turns": "none",
+                },
             )
 
 

@@ -109,7 +109,9 @@ def _fresh_run_root(path: Path) -> Path:
     try:
         relative = root.relative_to(repository)
     except ValueError as exc:
-        raise AgentEvalError("subagent run root must be under the Evaluator checkout") from exc
+        raise AgentEvalError(
+            "subagent run root must be under the Evaluator checkout"
+        ) from exc
     if len(relative.parts) < 2 or relative.parts[0] != ".agent-eval-runs":
         raise AgentEvalError("subagent run root must be under .agent-eval-runs/")
     _assert_no_symlink_components(root)
@@ -127,7 +129,9 @@ def _safe_run_root(path: Path) -> Path:
     try:
         relative = root.relative_to(repository)
     except ValueError as exc:
-        raise AgentEvalError("subagent run root is outside the Evaluator checkout") from exc
+        raise AgentEvalError(
+            "subagent run root is outside the Evaluator checkout"
+        ) from exc
     if len(relative.parts) < 2 or relative.parts[0] != ".agent-eval-runs":
         raise AgentEvalError("subagent run root must be under .agent-eval-runs/")
     _assert_no_symlink_components(root)
@@ -145,7 +149,9 @@ def _case_for(suite: str, skill: str, eval_id: str) -> dict[str, Any]:
         cases = legacy_run._load_deterministic_cases(skill, eval_id)
     else:
         cases = legacy_run._load_semantic_cases(skill, eval_id)
-    matching = [case for case in cases if case["skill"] == skill and case["id"] == eval_id]
+    matching = [
+        case for case in cases if case["skill"] == skill and case["id"] == eval_id
+    ]
     if len(matching) != 1:
         raise AgentEvalError("fixed Evaluator must resolve exactly one case")
     case = matching[0]
@@ -171,8 +177,14 @@ def _package_files(root: Path, skill: str) -> list[dict[str, Any]]:
         if not path.is_file():
             raise AgentEvalError("prepared Skill package contains a non-file")
         relative = path.relative_to(root.parent).as_posix()
-        if "/evals/" in f"/{relative}/" or "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
-            raise AgentEvalError("Evaluator data or Python bytecode is in the Skill package")
+        if (
+            "/evals/" in f"/{relative}/"
+            or "__pycache__" in path.parts
+            or path.suffix in {".pyc", ".pyo"}
+        ):
+            raise AgentEvalError(
+                "Evaluator data or Python bytecode is in the Skill package"
+            )
         data = _regular_file(path)
         rows.append({"path": relative, "size": len(data), "sha256": sha256_bytes(data)})
     rows.sort(key=lambda row: row["path"])
@@ -186,7 +198,11 @@ def _validate_package(
 ) -> None:
     skill = attempt["skill"]
     package = record["skill_package"]
-    _assert_keys(package, {"revision", "skills", "files", "package_fingerprint"}, "Skill package manifest")
+    _assert_keys(
+        package,
+        {"revision", "skills", "files", "package_fingerprint"},
+        "Skill package manifest",
+    )
     if package["skills"] != [skill] or package["revision"] != record["skill_revision"]:
         raise AgentEvalError("Skill package manifest does not match the fixed attempt")
     files = package["files"]
@@ -229,17 +245,26 @@ def _request_path(attempt_root: Path) -> Path:
 
 def _load_run(root: Path) -> dict[str, Any]:
     value = _read_json(root / "result.json")
-    if value.get("schema_version") != RUN_SCHEMA_VERSION or value.get("execution_method") != "codex_subagent_handoff":
+    if (
+        value.get("schema_version") != RUN_SCHEMA_VERSION
+        or value.get("execution_method") != "codex_subagent_handoff"
+    ):
         raise AgentEvalError("run result is not a supported subagent handoff run")
     if not isinstance(value.get("attempts"), list):
         raise AgentEvalError("run result has no attempts array")
     return value
 
 
-def _attempt(root: Path, run: dict[str, Any], attempt_id: str) -> tuple[dict[str, Any], Path]:
+def _attempt(
+    root: Path, run: dict[str, Any], attempt_id: str
+) -> tuple[dict[str, Any], Path]:
     if not ATTEMPT_ID_RE.fullmatch(attempt_id):
         raise AgentEvalError("attempt ID is invalid")
-    rows = [row for row in run["attempts"] if isinstance(row, dict) and row.get("attempt_id") == attempt_id]
+    rows = [
+        row
+        for row in run["attempts"]
+        if isinstance(row, dict) and row.get("attempt_id") == attempt_id
+    ]
     if len(rows) != 1:
         raise AgentEvalError("attempt ID is missing or duplicated")
     attempt_root = root / "attempts" / attempt_id
@@ -304,7 +329,9 @@ def _discard_sensitive_unsealed_output(attempt_root: Path) -> None:
         return
     try:
         output.unlink()
-        directory_fd = os.open(output.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        directory_fd = os.open(
+            output.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        )
         try:
             os.fsync(directory_fd)
         finally:
@@ -313,7 +340,9 @@ def _discard_sensitive_unsealed_output(attempt_root: Path) -> None:
         return
 
 
-def capture_agent_output(*, run_root: Path, attempt_id: str, content: bytes) -> dict[str, Any]:
+def capture_agent_output(
+    *, run_root: Path, attempt_id: str, content: bytes
+) -> dict[str, Any]:
     """Persist returned Markdown only after size, encoding, and secret checks."""
     root = _safe_run_root(run_root)
     record = _load_run(root)
@@ -321,7 +350,11 @@ def capture_agent_output(*, run_root: Path, attempt_id: str, content: bytes) -> 
     if row.get("status") != "awaiting_agent":
         raise AgentEvalError("attempt is not waiting for an Agent result")
     try:
-        if not isinstance(content, bytes) or not content or len(content) > MAX_TEXT_BYTES:
+        if (
+            not isinstance(content, bytes)
+            or not content
+            or len(content) > MAX_TEXT_BYTES
+        ):
             raise AgentEvalError("Agent output is empty or exceeds the size limit")
         try:
             output = content.decode("utf-8")
@@ -330,7 +363,9 @@ def capture_agent_output(*, run_root: Path, attempt_id: str, content: bytes) -> 
         if not output.strip():
             raise AgentEvalError("Agent output is empty")
         if legacy_run.SECRET_TEXT_RE.search(output):
-            raise AgentEvalError("Agent output may contain a secret; raw evidence was not imported")
+            raise AgentEvalError(
+                "Agent output may contain a secret; raw evidence was not imported"
+            )
 
         handoff = attempt_root / "handoff"
         _assert_no_symlink_components(handoff)
@@ -339,7 +374,9 @@ def capture_agent_output(*, run_root: Path, attempt_id: str, content: bytes) -> 
         destination = handoff / "output.md"
         if destination.exists() or destination.is_symlink():
             raise AgentEvalError("refusing to overwrite an existing handoff artifact")
-        descriptor, temporary_name = tempfile.mkstemp(prefix=".output.", suffix=".tmp", dir=handoff)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".output.", suffix=".tmp", dir=handoff
+        )
         temporary = Path(temporary_name)
         try:
             with os.fdopen(descriptor, "wb") as stream:
@@ -379,15 +416,21 @@ def _read_agent_submission(directory_fd: int) -> tuple[bytes, tuple[int, int]]:
     with os.fdopen(descriptor, "rb") as stream:
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
-            raise AgentEvalError("Agent-visible submission must be a singly-linked regular file")
+            raise AgentEvalError(
+                "Agent-visible submission must be a singly-linked regular file"
+            )
         if before.st_size > MAX_TEXT_BYTES:
             raise AgentEvalError("Agent-visible submission exceeds the size limit")
         content = stream.read(MAX_TEXT_BYTES + 1)
         after = os.fstat(stream.fileno())
     try:
-        current = os.stat(AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False)
+        current = os.stat(
+            AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False
+        )
     except OSError as exc:
-        raise AgentEvalError("Agent-visible submission changed while being read") from exc
+        raise AgentEvalError(
+            "Agent-visible submission changed while being read"
+        ) from exc
     identity = (before.st_dev, before.st_ino)
     if (
         len(content) != before.st_size
@@ -404,10 +447,16 @@ def _read_agent_submission(directory_fd: int) -> tuple[bytes, tuple[int, int]]:
 
 def _remove_agent_submission(directory_fd: int, identity: tuple[int, int]) -> None:
     try:
-        current = os.stat(AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False)
+        current = os.stat(
+            AGENT_SUBMISSION_NAME, dir_fd=directory_fd, follow_symlinks=False
+        )
     except OSError as exc:
-        raise AgentEvalError("Agent-visible submission changed before import completed") from exc
-    if (current.st_dev, current.st_ino) != identity or not stat.S_ISREG(current.st_mode):
+        raise AgentEvalError(
+            "Agent-visible submission changed before import completed"
+        ) from exc
+    if (current.st_dev, current.st_ino) != identity or not stat.S_ISREG(
+        current.st_mode
+    ):
         raise AgentEvalError("Agent-visible submission changed before import completed")
     os.unlink(AGENT_SUBMISSION_NAME, dir_fd=directory_fd)
     os.fsync(directory_fd)
@@ -431,7 +480,9 @@ def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str
         )
         content, identity = _read_agent_submission(directory_fd)
         try:
-            captured = capture_agent_output(run_root=root, attempt_id=attempt_id, content=content)
+            captured = capture_agent_output(
+                run_root=root, attempt_id=attempt_id, content=content
+            )
         finally:
             _remove_agent_submission(directory_fd, identity)
         return captured
@@ -450,7 +501,9 @@ def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str
 
 def _validate_settings(value: dict[str, Any], name: str) -> None:
     _assert_keys(value, {"model", "reasoning_effort", "fork_turns"}, name)
-    if any(not isinstance(value[field], str) or not value[field].strip() for field in value):
+    if any(
+        not isinstance(value[field], str) or not value[field].strip() for field in value
+    ):
         raise AgentEvalError(f"{name} values must be non-empty strings")
     if value["fork_turns"] not in {"none", "all"}:
         raise AgentEvalError(f"{name}.fork_turns is invalid")
@@ -468,7 +521,11 @@ def prepare_run(
 ) -> dict[str, Any]:
     if suite not in {"deterministic", "semantic"}:
         raise AgentEvalError("suite must be deterministic or semantic")
-    if isinstance(repeat, bool) or not isinstance(repeat, int) or not 1 <= repeat <= 100:
+    if (
+        isinstance(repeat, bool)
+        or not isinstance(repeat, int)
+        or not 1 <= repeat <= 100
+    ):
         raise AgentEvalError("repeat must be an integer between 1 and 100")
     _validate_settings(requested_settings, "requested_settings")
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", skill):
@@ -483,13 +540,16 @@ def prepare_run(
     root = _fresh_run_root(output_root)
     extracted = root / ".package-export"
     private_skill_root = root / "evaluator-private" / "skill-source"
-    package_manifest_all = create_skill_workspace(REPO_ROOT, resolved_skill_revision, extracted)
+    package_manifest_all = create_skill_workspace(
+        REPO_ROOT, resolved_skill_revision, extracted
+    )
     if skill not in package_manifest_all["skills"]:
         shutil.rmtree(extracted, ignore_errors=True)
         raise AgentEvalError("requested Skill is absent from the selected revision")
 
     files = [
-        row for row in package_manifest_all["files"]
+        row
+        for row in package_manifest_all["files"]
         if row["path"].startswith(f"skills/{skill}/")
     ]
     package_manifest = {
@@ -573,7 +633,10 @@ def prepare_run(
                 "repeat": repeat_index,
                 "input_fingerprint": input_fingerprint,
                 "status": "awaiting_agent",
-                "host_execution": {"status": "not_recorded", "verification": "unverified"},
+                "host_execution": {
+                    "status": "not_recorded",
+                    "verification": "unverified",
+                },
                 "effective_settings_status": "unverified",
                 "execution_evidence_status": "unverified",
                 "skill_use_observation": "unverified",
@@ -616,7 +679,12 @@ def prepare_run(
         "excluded": [],
     }
     atomic_write_json(root / "result.json", record)
-    return {"run_root": str(root), "result": str(root / "result.json"), "run_id": run_id, "attempts": attempts}
+    return {
+        "run_root": str(root),
+        "result": str(root / "result.json"),
+        "run_id": run_id,
+        "attempts": attempts,
+    }
 
 
 def _timestamp(value: str | None, field: str) -> str | None:
@@ -666,14 +734,20 @@ def _seal_handoff_impl(
         if not text.strip():
             raise AgentEvalError("Agent output is empty")
         if legacy_run.SECRET_TEXT_RE.search(text):
-            raise AgentEvalError("Agent output may contain a secret; raw evidence was not imported")
-        artifacts.append({"path": "output.md", "size_bytes": len(data), "sha256": sha256_bytes(data)})
+            raise AgentEvalError(
+                "Agent output may contain a secret; raw evidence was not imported"
+            )
+        artifacts.append(
+            {"path": "output.md", "size_bytes": len(data), "sha256": sha256_bytes(data)}
+        )
     if execution_status == "completed" and not artifacts:
         raise AgentEvalError("completed host execution requires output.md")
     if execution_status == "not_started" and artifacts:
         raise AgentEvalError("not_started execution may not contain an Agent output")
     if artifacts and artifact_attempt_id != attempt_id:
-        raise AgentEvalError("artifact origin attempt ID does not match the prepared attempt")
+        raise AgentEvalError(
+            "artifact origin attempt ID does not match the prepared attempt"
+        )
     if not artifacts and artifact_attempt_id is not None:
         raise AgentEvalError("artifact origin ID was supplied without an artifact")
 
@@ -720,9 +794,14 @@ def _seal_handoff_impl(
         "sha256": sha256_bytes(manifest_path.read_bytes()),
     }
     if artifacts:
-        row["ungraded_output"] = {"path": str(output_path.relative_to(root)), "sha256": artifacts[0]["sha256"]}
-    row["status"] = "awaiting_grading" if execution_status == "completed" else (
-        "not_started" if execution_status == "not_started" else "execution error"
+        row["ungraded_output"] = {
+            "path": str(output_path.relative_to(root)),
+            "sha256": artifacts[0]["sha256"],
+        }
+    row["status"] = (
+        "awaiting_grading"
+        if execution_status == "completed"
+        else ("not_started" if execution_status == "not_started" else "execution error")
     )
     _update_run_status(record)
     atomic_write_json(root / "result.json", record)
@@ -764,27 +843,54 @@ def seal_handoff(
         raise
 
 
-def _validate_handoff(root: Path, record: dict[str, Any], row: dict[str, Any], attempt_root: Path) -> tuple[dict[str, Any], Path | None]:
+def _validate_handoff(
+    root: Path, record: dict[str, Any], row: dict[str, Any], attempt_root: Path
+) -> tuple[dict[str, Any], Path | None]:
     handoff = attempt_root / "handoff"
     manifest_path = handoff / "manifest.json"
     manifest = _read_json(manifest_path)
     _assert_keys(
         manifest,
-        {"schema_version", "attempt_id", "request_sha256", "execution_status", "artifact_attempt_id", "observation_source", "observation_verification", "started_at", "finished_at", "requested_settings", "effective_settings", "skill_use_observation", "artifacts"},
+        {
+            "schema_version",
+            "attempt_id",
+            "request_sha256",
+            "execution_status",
+            "artifact_attempt_id",
+            "observation_source",
+            "observation_verification",
+            "started_at",
+            "finished_at",
+            "requested_settings",
+            "effective_settings",
+            "skill_use_observation",
+            "artifacts",
+        },
         "handoff manifest",
     )
-    if manifest["schema_version"] != HANDOFF_SCHEMA_VERSION or manifest["attempt_id"] != row["attempt_id"]:
+    if (
+        manifest["schema_version"] != HANDOFF_SCHEMA_VERSION
+        or manifest["attempt_id"] != row["attempt_id"]
+    ):
         raise AgentEvalError("handoff manifest identity does not match the attempt")
     if manifest["execution_status"] not in EXECUTION_STATUSES:
         raise AgentEvalError("handoff execution status is invalid")
     if manifest["artifacts"]:
         if manifest["artifact_attempt_id"] != row["attempt_id"]:
-            raise AgentEvalError("artifact origin attempt ID differs from the prepared attempt")
+            raise AgentEvalError(
+                "artifact origin attempt ID differs from the prepared attempt"
+            )
     elif manifest["artifact_attempt_id"] is not None:
         raise AgentEvalError("artifact origin was recorded without an artifact")
-    if manifest["observation_source"] != "parent_codex_session_recorded" or manifest["observation_verification"] != "unverified":
+    if (
+        manifest["observation_source"] != "parent_codex_session_recorded"
+        or manifest["observation_verification"] != "unverified"
+    ):
         raise AgentEvalError("host observation must remain explicitly unverified")
-    if manifest["effective_settings"] != {"status": "unverified"} or manifest["skill_use_observation"] != "unverified":
+    if (
+        manifest["effective_settings"] != {"status": "unverified"}
+        or manifest["skill_use_observation"] != "unverified"
+    ):
         raise AgentEvalError("unverified host evidence may not be promoted")
     if row.get("host_execution", {}).get("status") != manifest["execution_status"]:
         raise AgentEvalError("handoff status differs from the recorded host status")
@@ -793,7 +899,24 @@ def _validate_handoff(root: Path, record: dict[str, Any], row: dict[str, Any], a
     request = _read_json(request_path)
     _assert_keys(
         request,
-        {"schema_version", "request_id", "run_id", "suite", "skill", "eval_id", "repeat", "evaluator_revision", "skill_revision", "dataset_fingerprint", "input_fingerprint", "prompt_sha256", "skill_package", "requested_settings", "effective_settings", "physical_read_denial"},
+        {
+            "schema_version",
+            "request_id",
+            "run_id",
+            "suite",
+            "skill",
+            "eval_id",
+            "repeat",
+            "evaluator_revision",
+            "skill_revision",
+            "dataset_fingerprint",
+            "input_fingerprint",
+            "prompt_sha256",
+            "skill_package",
+            "requested_settings",
+            "effective_settings",
+            "physical_read_denial",
+        },
         "prepared request",
     )
     request_bytes = _regular_file(request_path)
@@ -826,7 +949,9 @@ def _validate_handoff(root: Path, record: dict[str, Any], row: dict[str, Any], a
     if not isinstance(artifacts, list) or len(artifacts) > 1:
         raise AgentEvalError("handoff manifest must contain at most one artifact")
     if manifest["execution_status"] == "completed" and len(artifacts) != 1:
-        raise AgentEvalError("completed execution must contain exactly one output artifact")
+        raise AgentEvalError(
+            "completed execution must contain exactly one output artifact"
+        )
     if manifest["execution_status"] == "not_started" and artifacts:
         raise AgentEvalError("not_started handoff may not contain artifacts")
 
@@ -834,17 +959,30 @@ def _validate_handoff(root: Path, record: dict[str, Any], row: dict[str, Any], a
     expected_names: set[str] = {"manifest.json"}
     if artifacts:
         artifact = artifacts[0]
-        if not isinstance(artifact, dict) or set(artifact) != {"path", "size_bytes", "sha256"}:
+        if not isinstance(artifact, dict) or set(artifact) != {
+            "path",
+            "size_bytes",
+            "sha256",
+        }:
             raise AgentEvalError("handoff artifact entry has an invalid shape")
         if artifact["path"] != "output.md":
             raise AgentEvalError("only output.md is accepted in this evaluation stage")
-        if isinstance(artifact["size_bytes"], bool) or not isinstance(artifact["size_bytes"], int) or artifact["size_bytes"] <= 0:
+        if (
+            isinstance(artifact["size_bytes"], bool)
+            or not isinstance(artifact["size_bytes"], int)
+            or artifact["size_bytes"] <= 0
+        ):
             raise AgentEvalError("handoff artifact size is invalid")
-        if not isinstance(artifact["sha256"], str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", artifact["sha256"]):
+        if not isinstance(artifact["sha256"], str) or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", artifact["sha256"]
+        ):
             raise AgentEvalError("handoff artifact hash is invalid")
         output_path = handoff / "output.md"
         data = _regular_file(output_path)
-        if len(data) != artifact["size_bytes"] or sha256_bytes(data) != artifact["sha256"]:
+        if (
+            len(data) != artifact["size_bytes"]
+            or sha256_bytes(data) != artifact["sha256"]
+        ):
             raise AgentEvalError("handoff artifact content does not match its manifest")
         try:
             text = data.decode("utf-8")
@@ -857,14 +995,20 @@ def _validate_handoff(root: Path, record: dict[str, Any], row: dict[str, Any], a
     if actual_names != expected_names:
         raise AgentEvalError("handoff directory has unexpected or duplicate files")
 
-    if row.get("handoff_manifest", {}).get("path") != str(manifest_path.relative_to(root)):
+    if row.get("handoff_manifest", {}).get("path") != str(
+        manifest_path.relative_to(root)
+    ):
         raise AgentEvalError("handoff manifest path does not match the attempt")
-    if row.get("handoff_manifest", {}).get("sha256") != sha256_bytes(_regular_file(manifest_path)):
+    if row.get("handoff_manifest", {}).get("sha256") != sha256_bytes(
+        _regular_file(manifest_path)
+    ):
         raise AgentEvalError("handoff manifest changed after intake")
     return manifest, output_path
 
 
-def _validate_prepared_inputs(root: Path, record: dict[str, Any], row: dict[str, Any], attempt_root: Path) -> dict[str, Any]:
+def _validate_prepared_inputs(
+    root: Path, record: dict[str, Any], row: dict[str, Any], attempt_root: Path
+) -> dict[str, Any]:
     if assert_clean_checkout(REPO_ROOT) != record.get("evaluator", {}).get("revision"):
         raise AgentEvalError("Evaluator checkout changed after attempt preparation")
     request_path = _request_path(attempt_root)
@@ -902,19 +1046,33 @@ def _validate_prepared_inputs(root: Path, record: dict[str, Any], row: dict[str,
 def _update_run_status(record: dict[str, Any]) -> None:
     statuses = [row.get("status") for row in record.get("attempts", [])]
     if any(status in {"awaiting_agent", "awaiting_grading"} for status in statuses):
-        record["status"] = "awaiting_agent" if "awaiting_agent" in statuses else "awaiting_grading"
+        record["status"] = (
+            "awaiting_agent" if "awaiting_agent" in statuses else "awaiting_grading"
+        )
     elif "awaiting_judge" in statuses:
         record["status"] = "needs_review_or_fail"
     elif "execution error" in statuses:
         record["status"] = "execution error"
-    elif any(status in {"fail", "needs_review", "not_started", "not_comparable"} for status in statuses):
+    elif any(
+        status in {"fail", "needs_review", "not_started", "not_comparable"}
+        for status in statuses
+    ):
         record["status"] = "needs_review_or_fail"
     elif statuses and all(status == "pass" for status in statuses):
         record["status"] = "pass"
     else:
         record["status"] = "needs_review_or_fail"
-    record["summary"] = {status: statuses.count(status) for status in sorted({str(item) for item in statuses})}
-    record["finished_at"] = datetime.now(timezone.utc).isoformat() if not any(status in {"awaiting_agent", "awaiting_grading"} for status in statuses) else None
+    record["summary"] = {
+        status: statuses.count(status)
+        for status in sorted({str(item) for item in statuses})
+    }
+    record["finished_at"] = (
+        datetime.now(timezone.utc).isoformat()
+        if not any(
+            status in {"awaiting_agent", "awaiting_grading"} for status in statuses
+        )
+        else None
+    )
 
 
 def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
@@ -947,7 +1105,9 @@ def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         else:
             dataset = case["dataset"]
             eval_case = case["case"]
-            criteria = [dataset["criteria_by_id"][item] for item in eval_case["criteria"]]
+            criteria = [
+                dataset["criteria_by_id"][item] for item in eval_case["criteria"]
+            ]
             judge_prompt = build_judge_prompt(
                 criteria=criteria,
                 eval_input=eval_case["input_text"],
@@ -1012,11 +1172,17 @@ def _record_noncompleted(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Prepare and import Agent-host subagent evaluations.")
+    parser = argparse.ArgumentParser(
+        description="Prepare and import Agent-host subagent evaluations."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    prepare = subparsers.add_parser("prepare", help="Prepare one fixed Eval Input and attempt workspace.")
-    prepare.add_argument("--suite", choices=["deterministic", "semantic"], required=True)
+    prepare = subparsers.add_parser(
+        "prepare", help="Prepare one fixed Eval Input and attempt workspace."
+    )
+    prepare.add_argument(
+        "--suite", choices=["deterministic", "semantic"], required=True
+    )
     prepare.add_argument("--skill", required=True)
     prepare.add_argument("--eval-id", required=True)
     prepare.add_argument("--skill-revision", required=True)
@@ -1026,15 +1192,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--reasoning-effort", required=True)
     prepare.add_argument("--fork-turns", choices=["none", "all"], required=True)
 
-    seal = subparsers.add_parser("seal", help="Record parent-host execution status and seal an attempt handoff.")
+    seal = subparsers.add_parser(
+        "seal", help="Record parent-host execution status and seal an attempt handoff."
+    )
     seal.add_argument("--run-root", type=Path, required=True)
     seal.add_argument("--attempt-id", required=True)
-    seal.add_argument("--execution-status", choices=sorted(EXECUTION_STATUSES), required=True)
+    seal.add_argument(
+        "--execution-status", choices=sorted(EXECUTION_STATUSES), required=True
+    )
     seal.add_argument("--artifact-attempt-id")
     seal.add_argument("--started-at")
     seal.add_argument("--finished-at")
 
-    capture = subparsers.add_parser("capture", help="Check and save a subagent Markdown artifact.")
+    capture = subparsers.add_parser(
+        "capture", help="Check and save a subagent Markdown artifact."
+    )
     capture.add_argument("--run-root", type=Path, required=True)
     capture.add_argument("--attempt-id", required=True)
     capture.add_argument(
@@ -1043,7 +1215,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"Import the exact {AGENT_SUBMISSION_NAME} file from the prepared workspace.",
     )
 
-    grade = subparsers.add_parser("grade", help="Verify the sealed handoff and run the fixed Evaluator.")
+    grade = subparsers.add_parser(
+        "grade", help="Verify the sealed handoff and run the fixed Evaluator."
+    )
     grade.add_argument("--run-root", type=Path, required=True)
     grade.add_argument("--attempt-id", required=True)
 
@@ -1079,7 +1253,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "capture":
             if args.from_agent_visible:
-                result = capture_agent_visible_output(run_root=args.run_root, attempt_id=args.attempt_id)
+                result = capture_agent_visible_output(
+                    run_root=args.run_root, attempt_id=args.attempt_id
+                )
             else:
                 result = capture_agent_output(
                     run_root=args.run_root,
@@ -1091,7 +1267,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except (AgentEvalError, OSError, ValueError, KeyError) as exc:
-        print(f"subagent evaluation failed: {sanitize_diagnostic(str(exc), 1000)}", file=sys.stderr)
+        print(
+            f"subagent evaluation failed: {sanitize_diagnostic(str(exc), 1000)}",
+            file=sys.stderr,
+        )
         return 2
 
 
