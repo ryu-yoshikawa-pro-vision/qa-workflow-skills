@@ -106,9 +106,7 @@ class IsolatedVerifierTests(unittest.TestCase):
         self.assertFalse(
             isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, False)
         )
-        self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(0, 0, True)
-        )
+        self.assertFalse(isolated_verifier._nested_user_namespace_denied(0, 0, True))
         self.assertFalse(
             isolated_verifier._nested_user_namespace_denied(-1, errno.EINVAL, True)
         )
@@ -374,9 +372,7 @@ class IsolatedVerifierTests(unittest.TestCase):
                     self.assertIn("--assert-userns-disabled", command)
                     self.assertNotIn("--unshare-net", command)
                     self.assertEqual(
-                        command[
-                            command.index("PWD") - 1 : command.index("PWD") + 2
-                        ],
+                        command[command.index("PWD") - 1 : command.index("PWD") + 2],
                         ["--setenv", "PWD", "/workspace"],
                     )
                     lib64_link_index = command.index("/lib64")

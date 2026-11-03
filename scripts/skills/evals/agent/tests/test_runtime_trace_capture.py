@@ -32,7 +32,9 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
         source = repo_root / "skills" / skill / "scripts"
         destination = package_root / "skills" / skill / "scripts"
         if any(path.is_symlink() for path in source.rglob("*")):
-            raise AssertionError("runtime fixture source unexpectedly contains a symlink")
+            raise AssertionError(
+                "runtime fixture source unexpectedly contains a symlink"
+            )
         shutil.copytree(
             source,
             destination,
@@ -214,9 +216,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             )
             self.assertEqual(verify_pass["status"], "pass", verify_pass)
             self.assertTrue(
-                verify_pass["captures"][0]["candidate_execution"][
-                    "verifier_executed"
-                ]
+                verify_pass["captures"][0]["candidate_execution"]["verifier_executed"]
             )
             mismatched_verify = dict(fixed_verify["result"], valid=False)
             verify_mismatch = verify_capture(

@@ -80,6 +80,8 @@ PR HEAD `6f76c27b3ff8f0b017f754f572287bf8a23c53ff`をGitHub上で確認した。
 
 profile適用前のprobe、`kernel.apparmor_restrict_unprivileged_userns=1`、有効なAppArmor記録、該当するbwrap userns拒否が整合し、job内の配布済みprofileを競合なし・enforce modeでロードした後に最小probeが成功したため、このrunnerでのUID map拒否原因はAppArmorのunprivileged user namespace制限と確認できた。修正はGitHub-hosted一時runner内の対象jobだけに限定され、system-wide sysctlは変更していない。これは完全な隔離probeの合格を意味しない。
 
-F401 importを削除し、synthetic replay testのEvaluator/candidate source treeを実行前にbytecode除外付きで別々にコピーするよう修正した。固定sourceとcandidateの`verify`、`workflow-runtime`について、隔離下の一致、不一致、candidate非ゼロ終了を必須probeの後に確認するCI stepを維持している。ローカルの関連suiteは38件中34 PASS、4 SKIP。SKIPは実bubblewrap境界がないためで、Verifier候補は実行していない。`compileall`、変更Python/READMEのdprint 0.55.2 check、`git diff --check`は成功。ローカルにRuffはなく、固定Ruff検査は次のGitHub Actionsで再確認する。
+F401 importを削除し、synthetic replay testのEvaluator/candidate source treeを実行前にbytecode除外付きで別々にコピーするよう修正した。固定sourceとcandidateの`verify`、`workflow-runtime`について、隔離下の一致、不一致、candidate非ゼロ終了を必須probeの後に確認するCI stepを維持している。ローカルの関連suiteは38件中34 PASS、4 SKIP。SKIPは実bubblewrap境界がないためで、Verifier候補は実行していない。`compileall`、README/reportのdprint 0.55.2 check、`git diff --check`は成功。ローカルにRuffはなく、Pythonの固定Ruff format検査は次のGitHub Actionsで確認する。
 
-この追記時点で修正後のGitHub Actionsは未実行であり、完全probe・candidate verifier replayは未達。次のCIがrequired isolation probeを通過した場合に限って、その直後のsynthetic `verify` / `workflow-runtime` replay結果を採用する。Stage 2のQTS runはEvaluator revisionが異なり、raw runに実`workflow-runtime` invocationがないため、今回のsynthetic fixtureが成功してもQTS実captureの独立replayを実施したことにはならない。Stage 3は引き続き未完了であり、第4段階には進まない。
+commit `3253eea25a08d9ff0dd62e1b729e2039c5969798`のCode Quality run `41613364162`では、AppArmor診断・profile適用・profile後の最小probeが成功した後、Ruff formatが`test_isolated_verifier.py`と`test_runtime_trace_capture.py`の書式差分を検出した。required isolation probeとsynthetic replayはこのためskipされ、候補Verifierは未実行。固定Ruffが報告した整形差分だけを反映し、後続CIで再確認する。
+
+完全probe・candidate verifier replayは引き続き未達。次のCIがrequired isolation probeを通過した場合に限って、その直後のsynthetic `verify` / `workflow-runtime` replay結果を採用する。Stage 2のQTS runはEvaluator revisionが異なり、raw runに実`workflow-runtime` invocationがないため、今回のsynthetic fixtureが成功してもQTS実captureの独立replayを実施したことにはならない。Stage 3は引き続き未完了であり、第4段階には進まない。
