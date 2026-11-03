@@ -1,5 +1,13 @@
 # PR #17 WSL2二重bubblewrap実行方式移行Plan
 
+## 2026-11-03 現行計画からの除外（履歴保存）
+
+2026-11-03のユーザー指示により、PR #17では**固定Codex CLIでの実モデル起動、専用WSL2 account／認証store／起動権限制御、二重bubblewrap、Docker**を今後の実行方式・受入条件に採用しない。本Planは2026-10-24～10-31に検討・実証した旧方式の**履歴**として残す。下記の実装手順、CLI認証refresh・非協調process競合の安全ゲート、Docker verifierの用意を現行PRの未達条件や次の作業に転記しない。
+
+除外理由は、これらの専用実行環境を現時点で整備できず、評価・改善の作業が停止しているためである。利用者は代替のサブエージェント＋一時ディレクトリ方式に伴う**物理隔離未検証・評価情報の混入可能性を残余リスクとして明示的に受容**している。旧方式と同等の隔離が達成済みとは扱わず、評価結果には当該リスクを記録する。旧方式の環境整備を再度必須と判断して計画を差し戻さない。秘密情報の保護や未承認の正解データを用いた採点は、この判断によって免除されない。
+
+代替方式および現行受入条件は[親Planの2026-11-03節](./2026-10-03_132700_agent-eval-runner.md#2026-11-03-現行実行方式受入方針従来の専用runner方式を置換)を正本とし、QTS・Judge・改善の各子Planの同日更新を参照する。旧launcherのfail-closed状態は解除せず、今後の実行は新方式で明示的に区別する。
+
 ## 2026-10-31 認証異常終了・Judge準備の追跡結果
 
 固定Codex CLI 0.163.0 app-serverを使った合成token / loopback mockの通常refresh試験を実施し、2つのprocess間でrefresh結果を保存・再読込できた。記録は`.agent-eval-runs/pr17-auth-refresh-synthetic-20261031-04/`にあり、2 process、2 mock request、model API未使用、実認証store未使用を示す。試験記録にはprocessごとのbinary digestがないため、別の同HEAD isolation probeに記録された固定binary digestとは結合されていない。これはCodex source harnessやfake childではなくCodex CLI app-server経路として記録されたが、実行binaryとのrevision-boundな紐付けは未達である。

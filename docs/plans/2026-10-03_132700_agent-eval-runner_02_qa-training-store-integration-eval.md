@@ -1,5 +1,20 @@
 # qa-training-store固定対象の実Agent統合評価Plan
 
+## 2026-11-03 固定QTS評価の実行方式変更（現行正本）
+
+本フェーズのAgent、Judge、分析・修正Agentは、親Planの2026-11-03現行方針に従い、既存Codexセッションのサブエージェントをattempt別の一時ディレクトリで実行する。固定Codex CLI、専用WSL2 account、二重bubblewrap、Dockerは使わない。以下の2026-10-24/26の旧環境・認証ゲートの説明は履歴とし、新方式の着手・完了条件にはしない。旧`run.py` / QTS CLIの引数やprofileがDocker/WSL2を必須としている場合、その必須依存を実装で置換するまで既存経路を実行可能とみなさない。
+
+専用の認証・隔離・Docker実行環境を整備できないため、**利用者が共有権限によるEvaluator情報参照可能性と評価独立性の低下を残余リスクとして受容**し、QTS評価を継続する判断をした。これは物理隔離の検証成功を意味しない。固定graderによる品質判定と証拠保存は続け、物理read-denialが未確認であることだけを新方式の実行禁止条件にしない。対象は許可されたテスト入力・Skill・sanitized targetに限り、秘密情報や未検証の任意コード実行まで受容していない。
+
+- 評価対象は従来どおり固定QTS revision `84ce165493649550832731a60cf436f8ae29c56b` のWeb Checkout / Payment。SUTの製品コード・正式仕様・Seed/Reset・既存製品テストは評価のために変更しない。
+- 各attemptではsanitized targetと候補Skill packageを固定し、Agentに必要な情報だけを渡す。Evaluator-onlyのexpected、rubric、grader、Judge fixture・承認情報、他attemptの結果を含めず、prompt・出力・配置manifest・固定revision・hashを保存する。一時ディレクトリだけで物理的read-denialを証明したとは扱わない。
+- `artifact-index.json`、runtime evidence、capture request/result、manifest、最終回答を既存の固定機械判定へ渡す。`can_complete=false`が正当な未確定仕様に由来する場合、仕様やCIを作り足して完了扱いにしない。
+- **production verifier**はDocker固有の起動契約を外し、利用できる隔離実行環境で固定候補sourceとrequestを再実行する方式へ変更する。固定Evaluatorと別実行、read-only入力、必要最小限の書込、network遮断、時間・資源上限、Evaluator-only／秘密情報の非公開、exit code・stdout・stderr・hash照合を検証する。安全な隔離実行手段がない場合は`evidence_unverified`として停止し、非隔離Python replayの一致をproduction受入の証拠へ昇格しない。
+- QTS Judgeは生成Agentとは別呼出しで、workflowとQA成果物の2系統を維持する。承認済みfixture、検証済み正解データ、criterion別の一致・揺れ、関連するbaselineの妥当性を確認する。人間承認が必要なfixtureをAgentに自己承認させない。
+- 正式な結果には、実行方式`subagent`、固定source/Skill/Evaluator、Agentホストから取得できた実効model/profile、attempt別hash、grader、Judge承認・隔離の検証状態を記録する。独立検証できない条件を`verified`に置き換えない。
+
+受入条件は、サブエージェントによる反復QTS生成・保存、固定graderの機械判定、必要criterionの承認済み独立Judge評価、固定Verifierの安全な再実行、同条件比較と独立回帰、および結果・未検証事項の正確な記録とする。元Planの成果物品質・traceability・Skill改善・SUT不変の要求は維持する。
+
 このPlanは、親Plan [`2026-10-03_132700_agent-eval-runner.md`](./2026-10-03_132700_agent-eval-runner.md) のフェーズ2として、実際のテスト対象リポジトリ `qa-training-store` を使って `qa-workflow-skills` を評価する手順と最小実装を定義します。
 
 フェーズ1の共通ランナーが完成し、既存Eval Inputを使った実Agent生成と既存grader接続が成立してから着手します。
