@@ -13,6 +13,12 @@
 - QTS Judgeは生成Agentとは別呼出しで、workflowとQA成果物の2系統を維持する。承認済みfixture、検証済み正解データ、criterion別の一致・揺れ、関連するbaselineの妥当性を確認する。人間承認が必要なfixtureをAgentに自己承認させない。
 - 正式な結果には、実行方式`subagent`、固定source/Skill/Evaluator、Agentホストから取得できた実効model/profile、attempt別hash、grader、Judge承認・隔離の検証状態を記録する。独立検証できない条件を`verified`に置き換えない。
 
+### 2026-11-03 第3段階の実装状態
+
+QTS `capture`後は、採点前にcapture manifest、元出力manifest、saved copy manifest、captured file list、各saved SHA-256 / sizeを照合する。redacted fileやcapture後に追加・削除・変更されたcopyは採点しない。Dockerless verifier replayは、Ubuntu Code Quality runnerに導入したOS bubblewrapの実効合成probeが成功した場合のみ、固定requestとsource snapshotを別process・read-only・network namespace内で実行する。`verify`と`workflow-runtime`を個別に比較し、未実行・不一致・timeout・environment errorを`pass`へ変換しない。これらは第3段階で追加した検査契約であり、保存済み第2段階runの結果を書き換えない。
+
+現在の開発containerではbubblewrapがなく、候補Verifierを実行していない。CIの必須probe結果と保存済みQTS requestでのreplay結果は別に扱う。CI probeの成功だけで、過去QTS requestのreplay、元Agentのtool trace、Docker production replay、Judge、QTS全体の品質・完了を受け入れ済みとはしない。bubblewrapのOS境界が使えない環境は`evidence_unverified`で停止する。
+
 受入条件は、サブエージェントによる反復QTS生成・保存、固定graderの機械判定、必要criterionの承認済み独立Judge評価、固定Verifierの安全な再実行、同条件比較と独立回帰、および結果・未検証事項の正確な記録とする。元Planの成果物品質・traceability・Skill改善・SUT不変の要求は維持する。
 
 このPlanは、親Plan [`2026-10-03_132700_agent-eval-runner.md`](./2026-10-03_132700_agent-eval-runner.md) のフェーズ2として、実際のテスト対象リポジトリ `qa-training-store` を使って `qa-workflow-skills` を評価する手順と最小実装を定義します。

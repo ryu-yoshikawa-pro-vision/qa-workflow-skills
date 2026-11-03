@@ -8,7 +8,13 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .common import AgentEvalError, sha256_bytes, trace_confirms_capture_invocation
+from . import isolated_verifier
+from .common import (
+    AgentEvalError,
+    sanitize_diagnostic,
+    sha256_bytes,
+    trace_confirms_capture_invocation,
+)
 
 _IMAGE_RE = re.compile(r"^(?:[A-Za-z0-9./_-]+@)?sha256:[0-9a-f]{64}$")
 _RUNTIME_SKILLS = frozenset(
@@ -49,10 +55,12 @@ _WORKFLOW_SEMANTIC_FIELDS = (
     "extra_runtime_units",
     "missing_entities",
     "extra_entities",
+    "payload.can_complete",
 )
 _SECRET_RE = re.compile(
     r"(?i)\b(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password)\s*[:=]\s*[^\s,;]+)"
 )
+_MAX_REPLAY_DIAGNOSTIC_BYTES = 16_000
 
 
 def _run(
@@ -99,12 +107,159 @@ def _contains_secret_bytes(raw: bytes) -> bool:
 
 def _load_result(raw: bytes, label: str) -> dict[str, Any]:
     try:
-        value = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_strict_object)
+    except (UnicodeDecodeError, ValueError) as exc:
         raise AgentEvalError(f"{label} returned invalid JSON") from exc
     if not isinstance(value, dict) or not isinstance(value.get("valid"), bool):
         raise AgentEvalError(f"{label} result does not contain a boolean valid field")
     return value
+
+
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
+def _field_value(value: dict[str, Any], path: str) -> tuple[bool, Any]:
+    current: Any = value
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return False, None
+        current = current[part]
+    return True, current
+
+
+def _semantic_mismatches(
+    reference: dict[str, Any], candidate: dict[str, Any], fields: tuple[str, ...]
+) -> list[str]:
+    mismatches: list[str] = []
+    for field in fields:
+        reference_has, reference_value = _field_value(reference, field)
+        candidate_has, candidate_value = _field_value(candidate, field)
+        if reference_has != candidate_has or (
+            reference_has and reference_value != candidate_value
+        ):
+            mismatches.append(field)
+    return mismatches
+
+
+def _workflow_result_shape_valid(value: dict[str, Any]) -> bool:
+    payload = value.get("payload")
+    return (
+        all(
+            isinstance(value.get(field), str)
+            for field in ("runtime_status", "support_status", "result_status")
+        )
+        and isinstance(value.get("issues"), list)
+        and isinstance(payload, dict)
+        and isinstance(payload.get("can_complete"), bool)
+    )
+
+
+def _isolated_execution_evidence(value: dict[str, Any]) -> dict[str, Any]:
+    """Keep bounded diagnostics and identity for one isolated process."""
+    return {
+        key: value.get(key)
+        for key in (
+            "status",
+            "reason",
+            "exit_code",
+            "timed_out",
+            "timeout_cleanup_verified",
+            "elapsed_seconds",
+            "source_fingerprint_before",
+            "source_fingerprint_after",
+            "source_fingerprint",
+            "source_unchanged",
+            "candidate_executed",
+            "verifier_executed",
+            "sandbox_process_started",
+            "request_sha256",
+            "request_unchanged",
+            "script_sha256",
+            "stdout_sha256",
+            "stderr_sha256",
+            "stdout_bytes",
+            "stderr_bytes",
+            "result_sha256",
+            "parsed_result_sha256",
+            "runtime",
+            "isolation_probe",
+        )
+        if key in value
+    } | {
+        key: sanitize_diagnostic(
+            str(value.get(key, "")),
+            _MAX_REPLAY_DIAGNOSTIC_BYTES - len("\n[truncated]"),
+        )
+        for key in ("stdout", "stderr")
+        if key in value
+    }
+
+
+def _skill_script_root(package_root: Path, skill: str) -> Path:
+    if skill not in _RUNTIME_SKILLS:
+        raise AgentEvalError("runtime verifier Skill is not allow-listed")
+    return package_root / "skills" / skill / "scripts"
+
+
+def run_candidate_verifier_isolated(
+    *,
+    candidate_package_root: Path,
+    skill: str,
+    request_bytes: bytes,
+    expected_source_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Replay a candidate verifier only after an OS boundary probe succeeds."""
+    script_root = _skill_script_root(candidate_package_root, skill)
+    try:
+        source_fingerprint = isolated_verifier.source_tree_fingerprint(script_root)
+    except (AgentEvalError, OSError) as exc:
+        return {
+            "status": "evidence_unverified",
+            "reason": "candidate_source_invalid",
+            "reason_type": type(exc).__name__,
+            "candidate_executed": False,
+        }
+    if (
+        expected_source_fingerprint is not None
+        and source_fingerprint != expected_source_fingerprint
+    ):
+        return {
+            "status": "evidence_unverified",
+            "reason": "candidate_source_fingerprint_mismatch",
+            "source_fingerprint": source_fingerprint,
+            "candidate_executed": False,
+        }
+    result = isolated_verifier.run_isolated_python(
+        source_dir=script_root,
+        script_name="runtime_contract.py",
+        request_bytes=request_bytes,
+        expected_source_fingerprint=expected_source_fingerprint,
+    )
+    result["candidate_executed"] = result.get("verifier_executed")
+    if (
+        result.get("status") == "verified"
+        and (
+            not isinstance(result.get("result"), dict)
+            or not isinstance(result["result"].get("valid"), bool)
+        )
+    ):
+        result.update(status="execution_error", reason="invalid_verifier_shape")
+    if (
+        result.get("status") == "verified"
+        and expected_source_fingerprint is not None
+        and result.get("source_fingerprint") != expected_source_fingerprint
+    ):
+        result.update(
+            status="evidence_unverified",
+            reason="candidate_source_fingerprint_changed_during_replay",
+        )
+    return result
 
 
 def run_candidate_verifier_offline(
@@ -293,6 +448,7 @@ def _capture_issue(
     expected: dict[tuple[str, str], str],
     operation: str,
     trace_commands: list[dict[str, Any]] | None,
+    require_tool_trace: bool = True,
 ) -> str | None:
     identity = (invocation.get("skill"), invocation.get("artifact_id"))
     if not all(isinstance(value, str) for value in identity):
@@ -307,7 +463,9 @@ def _capture_issue(
         or invocation.get("timed_out") is not False
     ):
         return "capture_was_unverified_or_failed"
-    if not trace_confirms_capture_invocation(trace_commands or [], invocation):
+    if require_tool_trace and not trace_confirms_capture_invocation(
+        trace_commands or [], invocation
+    ):
         return "tool_trace_does_not_confirm_capture_invocation"
     return None
 
@@ -316,6 +474,10 @@ def _aggregate_capture_status(checks: list[dict[str, Any]]) -> str:
     states = {item["status"] for item in checks}
     if "environment_error" in states:
         return "environment_error"
+    if "timeout" in states:
+        return "timeout"
+    if "execution_error" in states:
+        return "execution_error"
     if "evidence_unverified" in states:
         return "evidence_unverified"
     if "fail" in states:
@@ -327,10 +489,12 @@ def evaluate_runtime_captures(
     *,
     capture_root: Path,
     candidate_package_root: Path,
-    verifier_image: str,
+    verifier_image: str | None,
     fixed_evaluator_root: Path,
     expected_artifacts: list[dict[str, Any]],
     trace_commands: list[dict[str, Any]] | None,
+    require_tool_trace: bool = True,
+    expected_candidate_source_fingerprints: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     expected = _artifact_map(expected_artifacts)
     checks: list[dict[str, Any]] = []
@@ -377,6 +541,7 @@ def evaluate_runtime_captures(
             expected=expected,
             operation="verify",
             trace_commands=trace_commands,
+            require_tool_trace=require_tool_trace,
         )
         if issue:
             checks.append(
@@ -423,51 +588,113 @@ def evaluate_runtime_captures(
             )
             continue
         skill = str(invocation["skill"])
-        offline = run_candidate_verifier_offline(
-            candidate_package_root=candidate_package_root,
-            skill=skill,
-            request_bytes=request_bytes,
-            image=verifier_image,
+        expected_source_fingerprint = (
+            expected_candidate_source_fingerprints.get(skill)
+            if expected_candidate_source_fingerprints is not None
+            else None
+        )
+        offline = (
+            run_candidate_verifier_offline(
+                candidate_package_root=candidate_package_root,
+                skill=skill,
+                request_bytes=request_bytes,
+                image=verifier_image,
+            )
+            if verifier_image is not None
+            else run_candidate_verifier_isolated(
+                candidate_package_root=candidate_package_root,
+                skill=skill,
+                request_bytes=request_bytes,
+                expected_source_fingerprint=expected_source_fingerprint,
+            )
         )
         if offline["status"] != "verified":
             checks.append(
                 {
                     "path": invocation_path.parent.relative_to(capture_root).as_posix(),
                     **offline,
+                    "candidate_execution": _isolated_execution_evidence(offline),
                 }
             )
             continue
         fixed_script = (
             fixed_evaluator_root / "skills" / skill / "scripts" / "runtime_contract.py"
         )
-        fixed_run = _run(
-            [sys.executable, str(fixed_script)], input_bytes=request_bytes, timeout=120
-        )
-        if fixed_run.returncode != 0:
+        if verifier_image is None:
+            fixed_isolated = isolated_verifier.run_isolated_python(
+                source_dir=fixed_script.parent,
+                script_name="runtime_contract.py",
+                request_bytes=request_bytes,
+                timeout_seconds=120,
+            )
+            if fixed_isolated.get("status") != "verified":
+                checks.append(
+                    {
+                        "path": invocation_path.parent.relative_to(
+                            capture_root
+                        ).as_posix(),
+                        "status": fixed_isolated.get(
+                            "status", "evidence_unverified"
+                        ),
+                        "reason": fixed_isolated.get(
+                            "reason", "fixed_runtime_isolation_unverified"
+                        ),
+                        "exit_code": fixed_isolated.get("exit_code"),
+                        "stdout_sha256": fixed_isolated.get("stdout_sha256"),
+                        "stderr_sha256": fixed_isolated.get("stderr_sha256"),
+                        "elapsed_seconds": fixed_isolated.get("elapsed_seconds"),
+                        "timeout_cleanup_verified": fixed_isolated.get(
+                            "timeout_cleanup_verified"
+                        ),
+                        "isolation_probe": fixed_isolated.get("isolation_probe"),
+                        "candidate_executed": offline.get("candidate_executed"),
+                        "fixed_execution": _isolated_execution_evidence(
+                            fixed_isolated
+                        ),
+                    }
+                )
+                continue
+            fixed = fixed_isolated["result"]
+            fixed_result_sha256 = fixed_isolated["result_sha256"]
+            fixed_execution = _isolated_execution_evidence(fixed_isolated)
+        else:
+            fixed_run = _run(
+                [sys.executable, str(fixed_script)],
+                input_bytes=request_bytes,
+                timeout=120,
+            )
+            if fixed_run.returncode != 0:
+                checks.append(
+                    {
+                        "path": invocation_path.parent.relative_to(
+                            capture_root
+                        ).as_posix(),
+                        "status": "environment_error",
+                        "reason": "fixed_runtime_evaluator_failed",
+                    }
+                )
+                continue
+            fixed = _load_result(fixed_run.stdout, "fixed runtime evaluator")
+            fixed_result_sha256 = sha256_bytes(fixed_run.stdout)
+            fixed_execution = {
+                "status": "completed",
+                "exit_code": fixed_run.returncode,
+                "result_sha256": fixed_result_sha256,
+            }
+        if not isinstance(fixed.get("valid"), bool):
             checks.append(
                 {
                     "path": invocation_path.parent.relative_to(capture_root).as_posix(),
-                    "status": "environment_error",
-                    "reason": "fixed_runtime_evaluator_failed",
+                    "status": "evidence_unverified",
+                    "reason": "fixed_runtime_evaluator_result_invalid",
                 }
             )
             continue
-        fixed = _load_result(fixed_run.stdout, "fixed runtime evaluator")
         candidate = offline["result"]
-        mismatched = [
-            field
-            for field in _SEMANTIC_FIELDS
-            if field in fixed
-            and field in candidate
-            and fixed[field] != candidate[field]
-        ]
-        captured_mismatched = [
-            field
-            for field in _SEMANTIC_FIELDS
-            if field in captured
-            and field in candidate
-            and captured[field] != candidate[field]
-        ]
+        mismatched = _semantic_mismatches(fixed, candidate, _SEMANTIC_FIELDS)
+        captured_mismatched = _semantic_mismatches(
+            captured, candidate, _SEMANTIC_FIELDS
+        )
         status = (
             "fail"
             if fixed["valid"] is False
@@ -484,14 +711,30 @@ def evaluate_runtime_captures(
                 "status": status,
                 "captured_result_sha256": sha256_bytes(result_bytes),
                 "candidate_replay_sha256": offline["result_sha256"],
-                "fixed_evaluator_result_sha256": sha256_bytes(fixed_run.stdout),
+                "fixed_evaluator_result_sha256": fixed_result_sha256,
+                "candidate_execution": _isolated_execution_evidence(offline),
+                "fixed_execution": fixed_execution,
                 "fixed_valid": fixed["valid"],
                 "candidate_valid": candidate["valid"],
                 "mismatched_semantic_fields": mismatched,
                 "captured_mismatched_fields": captured_mismatched,
                 "implementation_fingerprint_differences_ignored": True,
-                "tool_trace_confirmed": True,
-                "network": "none",
+                "tool_trace_confirmed": trace_confirms_capture_invocation(
+                    trace_commands or [], invocation
+                ),
+                "original_agent_execution_proven": trace_confirms_capture_invocation(
+                    trace_commands or [], invocation
+                ),
+                "candidate_source_fingerprint": offline.get(
+                    "source_fingerprint"
+                ),
+                "fixed_isolation_probe": fixed_isolated.get("isolation_probe")
+                if verifier_image is None
+                else None,
+                "candidate_isolation_probe": offline.get("isolation_probe"),
+                "network": "isolated_namespace"
+                if verifier_image is None
+                else "none",
                 "source_mount": "read_only",
             }
         )
@@ -519,9 +762,170 @@ def _workflow_replay(
     request_bytes: bytes,
     captured_bytes: bytes,
     candidate_package_root: Path,
-    verifier_image: str,
+    verifier_image: str | None,
     fixed_evaluator_root: Path,
+    expected_candidate_source_fingerprint: str | None = None,
 ) -> dict[str, Any]:
+    if verifier_image is None:
+        if _contains_secret_bytes(request_bytes) or _contains_secret_bytes(
+            captured_bytes
+        ):
+            return {
+                "status": "evidence_unverified",
+                "reason": "secret_shaped_workflow_runtime_evidence_not_replayed",
+                "candidate_executed": False,
+            }
+        candidate_source = _skill_script_root(candidate_package_root, "qa-workflow")
+        try:
+            candidate_fingerprint = isolated_verifier.source_tree_fingerprint(
+                candidate_source
+            )
+        except (AgentEvalError, OSError) as exc:
+            return {
+                "status": "evidence_unverified",
+                "reason": "candidate_workflow_source_invalid",
+                "reason_type": type(exc).__name__,
+                "candidate_executed": False,
+            }
+        if (
+            expected_candidate_source_fingerprint is not None
+            and candidate_fingerprint != expected_candidate_source_fingerprint
+        ):
+            return {
+                "status": "evidence_unverified",
+                "reason": "candidate_source_fingerprint_mismatch",
+                "source_fingerprint": candidate_fingerprint,
+                "candidate_executed": False,
+            }
+        candidate_run = isolated_verifier.run_isolated_python(
+            source_dir=candidate_source,
+            script_name="workflow_runtime.py",
+            request_bytes=request_bytes,
+            expected_source_fingerprint=expected_candidate_source_fingerprint,
+        )
+        if (
+            candidate_run.get("status") == "verified"
+            and expected_candidate_source_fingerprint is not None
+            and candidate_run.get("source_fingerprint")
+            != expected_candidate_source_fingerprint
+        ):
+            return {
+                "status": "evidence_unverified",
+                "reason": "candidate_source_fingerprint_changed_during_replay",
+                "candidate_executed": True,
+                "candidate_source_fingerprint": candidate_run.get(
+                    "source_fingerprint"
+                ),
+                "candidate_isolation_probe": candidate_run.get("isolation_probe"),
+            }
+        if candidate_run.get("status") != "verified":
+            return {
+                **candidate_run,
+                "candidate_source_fingerprint": candidate_fingerprint,
+                "candidate_execution": _isolated_execution_evidence(candidate_run),
+                "candidate_executed": candidate_run.get("verifier_executed"),
+            }
+        fixed_script = (
+            fixed_evaluator_root
+            / "skills"
+            / "qa-workflow"
+            / "scripts"
+            / "workflow_runtime.py"
+        )
+        fixed_run = isolated_verifier.run_isolated_python(
+            source_dir=fixed_script.parent,
+            script_name="workflow_runtime.py",
+            request_bytes=request_bytes,
+            timeout_seconds=120,
+        )
+        if fixed_run.get("status") != "verified":
+            return {
+                "status": fixed_run.get("status", "evidence_unverified"),
+                "reason": fixed_run.get(
+                    "reason", "fixed_workflow_runtime_isolation_unverified"
+                ),
+                "candidate_executed": True,
+                "candidate_source_fingerprint": candidate_fingerprint,
+                "candidate_replay_sha256": candidate_run.get("result_sha256"),
+                "fixed_exit_code": fixed_run.get("exit_code"),
+                "fixed_stdout_sha256": fixed_run.get("stdout_sha256"),
+                "fixed_stderr_sha256": fixed_run.get("stderr_sha256"),
+                "fixed_elapsed_seconds": fixed_run.get("elapsed_seconds"),
+                "fixed_timeout_cleanup_verified": fixed_run.get(
+                    "timeout_cleanup_verified"
+                ),
+                "isolation_probe": fixed_run.get("isolation_probe"),
+                "candidate_execution": _isolated_execution_evidence(candidate_run),
+                "fixed_execution": _isolated_execution_evidence(fixed_run),
+            }
+        candidate = candidate_run["result"]
+        fixed = fixed_run["result"]
+        try:
+            captured = json.loads(
+                captured_bytes.decode("utf-8"), object_pairs_hook=_strict_object
+            )
+        except (UnicodeDecodeError, ValueError):
+            return {
+                "status": "evidence_unverified",
+                "reason": "workflow_runtime_replay_invalid_json",
+                "candidate_executed": True,
+            "candidate_execution": _isolated_execution_evidence(candidate_run),
+            "fixed_execution": _isolated_execution_evidence(fixed_run),
+            }
+        if not isinstance(captured, dict):
+            return {
+                "status": "evidence_unverified",
+                "reason": "workflow_runtime_replay_invalid_shape",
+                "candidate_executed": True,
+                "candidate_execution": _isolated_execution_evidence(candidate_run),
+                "fixed_execution": _isolated_execution_evidence(fixed_run),
+            }
+        if not all(
+            _workflow_result_shape_valid(value)
+            for value in (candidate, fixed, captured)
+        ):
+            return {
+                "status": "evidence_unverified",
+                "reason": "workflow_runtime_result_contract_invalid",
+                "candidate_executed": True,
+                "candidate_execution": _isolated_execution_evidence(candidate_run),
+                "fixed_execution": _isolated_execution_evidence(fixed_run),
+            }
+        mismatched = _semantic_mismatches(
+            fixed, candidate, _WORKFLOW_SEMANTIC_FIELDS
+        )
+        captured_mismatched = _semantic_mismatches(
+            captured, candidate, _WORKFLOW_SEMANTIC_FIELDS
+        )
+        return {
+            "status": "fail" if mismatched or captured_mismatched else "pass",
+            "request_sha256": candidate_run["request_sha256"],
+            "captured_result_sha256": sha256_bytes(captured_bytes),
+            "candidate_replay_sha256": candidate_run["result_sha256"],
+            "fixed_evaluator_sha256": fixed_run["result_sha256"],
+            "candidate_source_fingerprint": candidate_fingerprint,
+            "fixed_source_fingerprint": fixed_run.get(
+                "source_fingerprint_before"
+            ),
+            "candidate_source_unchanged": candidate_run.get("source_unchanged"),
+            "fixed_source_unchanged": fixed_run.get("source_unchanged"),
+            "candidate_execution": _isolated_execution_evidence(candidate_run),
+            "fixed_execution": _isolated_execution_evidence(fixed_run),
+            "mismatched_semantic_fields": mismatched,
+            "captured_mismatched_fields": captured_mismatched,
+            "candidate_isolation_probe": candidate_run.get("isolation_probe"),
+            "fixed_isolation_probe": fixed_run.get("isolation_probe"),
+            "network": "isolated_namespace",
+            "source_mount": "read_only",
+            "root_filesystem": "read_only",
+            "candidate_executed": True,
+            "workflow_runtime_can_complete": fixed.get("payload", {}).get(
+                "can_complete"
+            )
+            if isinstance(fixed.get("payload"), dict)
+            else None,
+            "workflow_runtime_has_unclosed_issues": bool(fixed.get("issues")),
+        }
     if not _IMAGE_RE.fullmatch(verifier_image):
         return {"status": "environment_error", "reason": "verifier_image_not_pinned"}
     if _run(["docker", "image", "inspect", verifier_image], timeout=30).returncode != 0:
@@ -601,18 +1005,18 @@ def _workflow_replay(
             "status": "evidence_unverified",
             "reason": "workflow_runtime_replay_invalid_shape",
         }
-    mismatched = [
-        field
-        for field in _WORKFLOW_SEMANTIC_FIELDS
-        if field in fixed and field in candidate and fixed[field] != candidate[field]
-    ]
-    captured_mismatched = [
-        field
-        for field in _WORKFLOW_SEMANTIC_FIELDS
-        if field in candidate
-        and field in captured
-        and candidate[field] != captured[field]
-    ]
+    if not all(
+        _workflow_result_shape_valid(value)
+        for value in (candidate, fixed, captured)
+    ):
+        return {
+            "status": "evidence_unverified",
+            "reason": "workflow_runtime_result_contract_invalid",
+        }
+    mismatched = _semantic_mismatches(fixed, candidate, _WORKFLOW_SEMANTIC_FIELDS)
+    captured_mismatched = _semantic_mismatches(
+        captured, candidate, _WORKFLOW_SEMANTIC_FIELDS
+    )
     return {
         "status": "fail" if mismatched or captured_mismatched else "pass",
         "request_sha256": sha256_bytes(request_bytes),
@@ -635,10 +1039,12 @@ def evaluate_workflow_runtime_capture(
     *,
     capture_root: Path,
     candidate_package_root: Path,
-    verifier_image: str,
+    verifier_image: str | None,
     fixed_evaluator_root: Path,
     expected_artifacts: list[dict[str, Any]],
     trace_commands: list[dict[str, Any]] | None,
+    require_tool_trace: bool = True,
+    expected_candidate_source_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     expected = {
         identity: path
@@ -689,6 +1095,7 @@ def evaluate_workflow_runtime_capture(
             expected=expected,
             operation="workflow-runtime",
             trace_commands=trace_commands,
+            require_tool_trace=require_tool_trace,
         )
         if issue:
             checks.append(
@@ -705,13 +1112,19 @@ def evaluate_workflow_runtime_capture(
             candidate_package_root=candidate_package_root,
             verifier_image=verifier_image,
             fixed_evaluator_root=fixed_evaluator_root,
+            expected_candidate_source_fingerprint=expected_candidate_source_fingerprint,
         )
         checks.append(
             {
                 "path": invocation_path.parent.relative_to(capture_root).as_posix(),
                 "skill": "qa-workflow",
                 "artifact_path": expected[identity],
-                "tool_trace_confirmed": True,
+                "tool_trace_confirmed": trace_confirms_capture_invocation(
+                    trace_commands or [], invocation
+                ),
+                "original_agent_execution_proven": trace_confirms_capture_invocation(
+                    trace_commands or [], invocation
+                ),
                 **replay,
             }
         )

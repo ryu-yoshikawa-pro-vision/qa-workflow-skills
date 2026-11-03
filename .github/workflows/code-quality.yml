@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,6 +38,17 @@ jobs:
         run: |
           ruff --version
           dprint --version
+
+      - name: Install unprivileged verifier sandbox probe tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap
+          bwrap --version
+
+      - name: Probe Dockerless runtime verifier isolation
+        env:
+          PR17_REQUIRE_VERIFIER_ISOLATION: "1"
+        run: python -m unittest scripts.skills.evals.agent.tests.test_isolated_verifier -v
 
       - name: Test tracked formatter contracts
         run: python -m unittest discover -s tests -p 'test_format_tracked.py' -v

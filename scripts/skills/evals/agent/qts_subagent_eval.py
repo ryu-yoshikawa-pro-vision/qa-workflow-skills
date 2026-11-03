@@ -28,6 +28,8 @@ from .common_runtime_checks import (
     _duplicate_invocation_ids,
     _read_invocation,
     _runtime_invocation_files,
+    evaluate_runtime_captures,
+    evaluate_workflow_runtime_capture,
 )
 from .prompt_builder import build_qa_training_store_generation_prompt
 from .public_artifact_index import validate as validate_public_artifact_index
@@ -47,6 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 RUN_SCHEMA_VERSION = 1
 ATTEMPT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _SECRET_TEXT_RE = qa_training_store._SECRET_TEXT_RE
+_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REQUIRED_RUNTIME_SKILLS = frozenset(
     item["skill"]
     for item in qa_training_store.load_scenario()["required_artifacts"]
@@ -558,6 +561,190 @@ def _scan_output_tree(output_root: Path, scenario: dict[str, Any]) -> dict[str, 
     }
 
 
+def _verify_captured_output_integrity(
+    *,
+    attempt_id: str,
+    run_row: dict[str, Any],
+    capture: dict[str, Any],
+    source_output: dict[str, Any] | None,
+    captured_root: Path,
+    scenario: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the immutable capture record and every byte that will be graded."""
+    issues: list[dict[str, Any]] = []
+    if capture.get("schema_version") != 1 or capture.get("attempt_id") != attempt_id:
+        issues.append({"kind": "capture_attempt_binding_mismatch"})
+    expected_capture_fingerprint = run_row.get("capture_fingerprint")
+    if (
+        not isinstance(expected_capture_fingerprint, str)
+        or expected_capture_fingerprint != canonical_fingerprint(capture)
+    ):
+        issues.append({"kind": "capture_manifest_fingerprint_mismatch"})
+
+    copy_record = capture.get("copy")
+    source_record = capture.get("output")
+    if (
+        not isinstance(copy_record, dict)
+        or not isinstance(copy_record.get("files"), list)
+        or not isinstance(source_record, dict)
+        or not isinstance(source_record.get("files"), list)
+    ):
+        return {
+            "status": "needs_review",
+            "valid": False,
+            "files_checked": 0,
+            "issues": [*issues, {"kind": "capture_file_manifest_missing"}],
+        }
+
+    try:
+        saved_scan = _scan_output_tree(captured_root, scenario)
+    except (AgentEvalError, OSError) as exc:
+        return {
+            "status": "needs_review",
+            "valid": False,
+            "files_checked": 0,
+            "issues": [
+                *issues,
+                {
+                    "kind": "captured_output_filesystem_invalid",
+                    "reason": type(exc).__name__,
+                },
+            ],
+        }
+
+    source_rows: dict[str, dict[str, Any]] = {}
+    for item in source_record["files"]:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            issues.append({"kind": "capture_source_file_manifest_invalid"})
+            continue
+        path = item["path"]
+        if path in source_rows:
+            issues.append({"kind": "capture_source_file_duplicate", "path": path})
+        source_rows[path] = item
+
+    saved_rows: dict[str, dict[str, Any]] = {}
+    for item in copy_record["files"]:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            issues.append({"kind": "capture_saved_file_manifest_invalid"})
+            continue
+        path = item["path"]
+        relative = PurePosixPath(path)
+        if (
+            relative.is_absolute()
+            or "\\" in path
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            issues.append({"kind": "capture_saved_file_path_invalid"})
+            continue
+        if path in saved_rows:
+            issues.append({"kind": "capture_saved_file_duplicate", "path": path})
+        saved_rows[path] = item
+
+    source_paths = set(source_rows)
+    saved_paths = set(saved_rows)
+    actual_rows = {item["path"]: item for item in saved_scan["files"]}
+    actual_paths = set(actual_rows)
+    if source_paths != saved_paths:
+        issues.append(
+            {
+                "kind": "capture_file_list_mismatch",
+                "missing_saved_paths": sorted(source_paths - saved_paths),
+                "extra_saved_paths": sorted(saved_paths - source_paths),
+            }
+        )
+    if saved_paths != actual_paths:
+        issues.append(
+            {
+                "kind": "captured_output_file_list_mismatch",
+                "missing_paths": sorted(saved_paths - actual_paths),
+                "extra_paths": sorted(actual_paths - saved_paths),
+            }
+        )
+
+    for path in sorted(saved_paths & actual_paths & source_paths):
+        saved = saved_rows[path]
+        source = source_rows[path]
+        actual = actual_rows[path]
+        saved_digest = saved.get("saved_sha256")
+        size = saved.get("size")
+        if (
+            not isinstance(saved_digest, str)
+            or not _SHA256_RE.fullmatch(saved_digest)
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size < 0
+        ):
+            issues.append({"kind": "capture_saved_file_identity_invalid", "path": path})
+            continue
+        try:
+            actual_bytes = read_regular_file_bytes(
+                captured_root / Path(*PurePosixPath(path).parts),
+                max_bytes=scenario["max_artifact_total_bytes"],
+            )
+        except AgentEvalError as exc:
+            issues.append(
+                {
+                    "kind": "captured_output_file_unreadable",
+                    "path": path,
+                    "reason": type(exc).__name__,
+                }
+            )
+            continue
+        actual_digest = sha256_bytes(actual_bytes)
+        actual_size = len(actual_bytes)
+        if actual_digest != saved_digest or actual_size != size:
+            issues.append({"kind": "captured_output_saved_hash_mismatch", "path": path})
+        redacted = saved.get("redacted") is True
+        if redacted:
+            issues.append({"kind": "redacted_capture_not_gradeable", "path": path})
+            if (
+                source.get("secret_shaped") is not True
+                or source.get("sha256") is not None
+                or saved.get("status") != "evidence_unverified"
+            ):
+                issues.append(
+                    {"kind": "redaction_manifest_inconsistent", "path": path}
+                )
+        else:
+            if (
+                saved.get("status") != "saved"
+                or source.get("secret_shaped") is True
+                or source.get("sha256") != saved.get("sha256")
+                or saved.get("sha256") != saved_digest
+                or source.get("size") != size
+                or actual.get("sha256") != saved_digest
+                or actual.get("size") != size
+            ):
+                issues.append(
+                    {"kind": "capture_source_saved_identity_mismatch", "path": path}
+                )
+
+    if capture.get("copy", {}).get("status") != "saved":
+        issues.append({"kind": "capture_copy_not_gradeable"})
+    if source_output is None:
+        issues.append({"kind": "source_output_unavailable"})
+    else:
+        source_fingerprint = canonical_fingerprint(
+            [
+                {
+                    "path": item["path"],
+                    "size": item["size"],
+                    "sha256": item["sha256"],
+                }
+                for item in source_output["files"]
+            ]
+        )
+        if source_fingerprint != capture.get("source_output_fingerprint"):
+            issues.append({"kind": "source_output_capture_fingerprint_mismatch"})
+
+    return {
+        "status": "verified" if not issues else "needs_review",
+        "valid": not issues,
+        "files_checked": len(actual_paths),
+        "issues": issues,
+    }
+
+
 def _validate_runtime_bindings(
     output_root: Path, artifacts: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -722,6 +909,64 @@ def _validate_runtime_bindings(
     }
 
 
+def _runtime_source_fingerprints(
+    run_row: dict[str, Any], attempt_record: dict[str, Any]
+) -> tuple[dict[str, str] | None, list[dict[str, str]]]:
+    manifest = attempt_record.get("skill_package")
+    if (
+        not isinstance(manifest, dict)
+        or not isinstance(manifest.get("files"), list)
+        or not isinstance(manifest.get("package_fingerprint"), str)
+        or canonical_fingerprint(manifest["files"])
+        != manifest["package_fingerprint"]
+        or run_row.get("skill_package_fingerprint")
+        != manifest["package_fingerprint"]
+    ):
+        return None, [{"kind": "candidate_skill_package_manifest_unverified"}]
+
+    result: dict[str, str] = {}
+    issues: list[dict[str, str]] = []
+    for skill in sorted(_REQUIRED_RUNTIME_SKILLS):
+        prefix = f"skills/{skill}/scripts/"
+        rows: list[dict[str, Any]] = []
+        for item in manifest["files"]:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                issues.append({"kind": "candidate_skill_package_manifest_invalid"})
+                continue
+            path = item["path"]
+            if not path.startswith(prefix):
+                continue
+            relative_path = path.removeprefix(prefix)
+            size = item.get("size")
+            digest = item.get("sha256")
+            if (
+                isinstance(size, bool)
+                or not isinstance(size, int)
+                or size < 0
+                or not isinstance(digest, str)
+                or not _SHA256_RE.fullmatch(digest)
+            ):
+                issues.append(
+                    {
+                        "kind": "candidate_skill_package_script_identity_invalid",
+                        "skill": skill,
+                    }
+                )
+                continue
+            rows.append(
+                {"path": relative_path, "size": size, "sha256": digest}
+            )
+        if not any(row["path"] == "runtime_contract.py" for row in rows):
+            issues.append(
+                {"kind": "candidate_runtime_contract_missing", "skill": skill}
+            )
+        else:
+            result[skill] = canonical_fingerprint(
+                sorted(rows, key=lambda row: row["path"])
+            )
+    return (result if not issues else None), issues
+
+
 def capture_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     root = _run_root(run_root)
     run = _load_run(root)
@@ -833,11 +1078,18 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         "tool_trace_status": "unverified",
         "target_integrity": integrity,
         "capture_status": capture.get("status"),
+        "captured_output_integrity": None,
         "public_artifact_index": None,
         "fixed_artifact_index": None,
         "artifact_manifest": None,
         "runtime_evidence": None,
-        "docker_production_verifier_replay": "evidence_unverified",
+        "docker_production_verifier_replay": "not_used",
+        "production_verifier_independent_replay": {
+            "overall_status": "evidence_unverified",
+            "verify": {"status": "not_run"},
+            "workflow_runtime": {"status": "not_run"},
+            "original_agent_execution_proof": "unverified",
+        },
         "judge_status": "not_run",
         "semantic_status": "not_evaluated",
         "workflow_completion": {
@@ -848,7 +1100,9 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         "machine_checks": {
             "artifact_index": "not_run",
             "output_content_hashes": "not_run",
+            "captured_output_integrity": "not_run",
             "runtime_record_binding": "not_run",
+            "runtime_independent_replay": "not_run",
             "target_integrity": "pass" if integrity["unchanged"] else "fail",
             "entity_traceability": "evidence_unverified",
         },
@@ -886,9 +1140,34 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
                 "reason": type(exc).__name__,
             }
         )
+    captured_integrity = _verify_captured_output_integrity(
+        attempt_id=attempt_id,
+        run_row=row,
+        capture=capture,
+        source_output=source_output,
+        captured_root=output_root,
+        scenario=scenario,
+    )
+    result["captured_output_integrity"] = captured_integrity
+    result["machine_checks"]["output_content_hashes"] = (
+        "verified" if captured_integrity["valid"] else "needs_review"
+    )
+    result["issues"].extend(
+        {
+            "kind": "captured_output_integrity_issue",
+            "issue_kind": issue["kind"],
+            **{key: value for key, value in issue.items() if key != "kind"},
+        }
+        for issue in captured_integrity["issues"]
+    )
     if capture.get("status") == "capture_failed":
         result["issues"].append({"kind": "capture_not_completed"})
-    elif integrity["unchanged"] and source_output is not None and output_root.is_dir():
+    elif (
+        integrity["unchanged"]
+        and source_output is not None
+        and captured_integrity["valid"]
+        and output_root.is_dir()
+    ):
         public_contract = (
             target_root / ".qa-eval-tools" / "artifact-index-contract.json"
         )
@@ -902,6 +1181,91 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
             result["runtime_evidence"] = _validate_runtime_bindings(
                 output_root, fixed["artifacts"]
             )
+            source_fingerprints, source_manifest_issues = (
+                _runtime_source_fingerprints(row, record)
+            )
+            if source_fingerprints is None:
+                verify_replay: dict[str, Any] = {
+                    "status": "evidence_unverified",
+                    "captures": [],
+                    "issues": source_manifest_issues,
+                }
+                workflow_replay: dict[str, Any] = {
+                    "status": "evidence_unverified",
+                    "captures": [],
+                    "issues": source_manifest_issues,
+                }
+            else:
+                verify_replay = evaluate_runtime_captures(
+                    capture_root=output_root / ".runtime-evidence",
+                    candidate_package_root=target_root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=REPO_ROOT,
+                    expected_artifacts=fixed["artifacts"],
+                    trace_commands=None,
+                    require_tool_trace=False,
+                    expected_candidate_source_fingerprints=source_fingerprints,
+                )
+                workflow_replay = evaluate_workflow_runtime_capture(
+                    capture_root=output_root / ".runtime-evidence",
+                    candidate_package_root=target_root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=REPO_ROOT,
+                    expected_artifacts=fixed["artifacts"],
+                    trace_commands=None,
+                    require_tool_trace=False,
+                    expected_candidate_source_fingerprint=source_fingerprints.get(
+                        "qa-workflow"
+                    ),
+                )
+            replay_statuses = {
+                "verify": verify_replay.get("status", "evidence_unverified"),
+                "workflow_runtime": workflow_replay.get(
+                    "status", "evidence_unverified"
+                ),
+            }
+            if "environment_error" in replay_statuses.values():
+                replay_overall = "environment_error"
+            elif "timeout" in replay_statuses.values():
+                replay_overall = "timeout"
+            elif "execution_error" in replay_statuses.values():
+                replay_overall = "execution_error"
+            elif "evidence_unverified" in replay_statuses.values():
+                replay_overall = "evidence_unverified"
+            elif "fail" in replay_statuses.values():
+                replay_overall = "fail"
+            elif all(status == "pass" for status in replay_statuses.values()):
+                replay_overall = "pass"
+            else:
+                replay_overall = "evidence_unverified"
+            result["production_verifier_independent_replay"] = {
+                "execution_method": "bubblewrap_user_namespace"
+                if source_fingerprints is not None
+                else "not_started",
+                "overall_status": replay_overall,
+                "verify": verify_replay,
+                "workflow_runtime": workflow_replay,
+                "verifier_candidate_executed": any(
+                    capture_result.get("candidate_execution", {}).get(
+                        "candidate_executed"
+                    )
+                    is True
+                    for capture_result in verify_replay.get("captures", [])
+                )
+                or workflow_replay.get("candidate_executed") is True,
+                "replay_actor": "evaluator_subprocess",
+                "original_agent_execution_proof": "unverified",
+            }
+            if replay_overall != "pass":
+                result["issues"].append(
+                    {
+                        "kind": "production_verifier_independent_replay_not_pass",
+                        "status": replay_overall,
+                    }
+                )
+            result["issues"].append(
+                {"kind": "original_agent_runtime_execution_unverified"}
+            )
             result["machine_checks"] = {
                 "artifact_index": "pass"
                 if fixed.get("status") == "pass" and public.get("valid") is True
@@ -913,7 +1277,9 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
                     if item["classification"] == "qa_artifact"
                 )
                 else "evidence_unverified",
+                "captured_output_integrity": "verified",
                 "runtime_record_binding": result["runtime_evidence"]["status"],
+                "runtime_independent_replay": replay_overall,
                 "target_integrity": "pass" if integrity["unchanged"] else "fail",
                 "entity_traceability": "evidence_unverified",
             }
@@ -957,6 +1323,8 @@ def evaluate_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
                 and fixed.get("status") == "pass"
                 and result["runtime_evidence"]["status"]
                 == "capture_integrity_consistent"
+                and replay_overall == "pass"
+                and result["tool_trace_status"] == "verified"
                 and not result["issues"]
                 and capture.get("status") == "captured"
             )

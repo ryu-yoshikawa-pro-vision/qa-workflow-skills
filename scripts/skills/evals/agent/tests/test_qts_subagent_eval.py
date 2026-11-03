@@ -208,7 +208,22 @@ class QTSSubagentEvalTests(unittest.TestCase):
         self.assertEqual(evaluated["fixed_artifact_index"]["status"], "pass")
         self.assertEqual(evaluated["judge_status"], "not_run")
         self.assertEqual(
-            evaluated["docker_production_verifier_replay"], "evidence_unverified"
+            evaluated["docker_production_verifier_replay"], "not_used"
+        )
+        self.assertEqual(
+            evaluated["production_verifier_independent_replay"]["overall_status"],
+            "evidence_unverified",
+        )
+        self.assertEqual(
+            evaluated["production_verifier_independent_replay"][
+                "original_agent_execution_proof"
+            ],
+            "unverified",
+        )
+        self.assertFalse(
+            evaluated["production_verifier_independent_replay"][
+                "verifier_candidate_executed"
+            ]
         )
         self.assertEqual(evaluated["overall_status"], "needs_review")
         self.assertFalse(evaluated["workflow_completion"]["claim"] is True)
@@ -255,6 +270,185 @@ class QTSSubagentEvalTests(unittest.TestCase):
         self.assertIn(
             "output_changed_after_capture",
             {row["kind"] for row in evaluated["issues"]},
+        )
+        self.assertEqual(evaluated["overall_status"], "needs_review")
+
+    def test_captured_copy_only_change_is_rejected_before_grading(self) -> None:
+        qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+        captured = (
+            self.private_root / "captured-output" / "artifact-00.md"
+        )
+        original = captured.read_bytes()
+        changed = original.replace(b"QA artifact", b"QB artifact", 1)
+        self.assertEqual(len(changed), len(original))
+        captured.write_bytes(changed)
+
+        with (
+            patch.object(qts, "validate_public_artifact_index") as public_validator,
+            patch.object(
+                qts.qa_training_store, "validate_artifact_index"
+            ) as fixed_validator,
+        ):
+            evaluated = qts.evaluate_attempt(
+                run_root=self.run_root, attempt_id=self.attempt_id
+            )
+
+        issue_kinds = {row["kind"] for row in evaluated["issues"]}
+        self.assertIn("captured_output_integrity_issue", issue_kinds)
+        self.assertTrue(
+            any(
+                row.get("kind") == "captured_output_saved_hash_mismatch"
+                for row in evaluated["captured_output_integrity"]["issues"]
+            )
+        )
+        self.assertFalse(evaluated["captured_output_integrity"]["valid"])
+        self.assertIsNone(evaluated["public_artifact_index"])
+        self.assertIsNone(evaluated["fixed_artifact_index"])
+        self.assertEqual(evaluated["overall_status"], "needs_review")
+        public_validator.assert_not_called()
+        fixed_validator.assert_not_called()
+
+    def test_captured_copy_addition_and_deletion_are_rejected_before_grading(
+        self,
+    ) -> None:
+        qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+        captured = self.private_root / "captured-output"
+        (captured / "extra.md").write_text("unregistered\n", encoding="utf-8")
+        (captured / "artifact-01.md").unlink()
+
+        evaluated = qts.evaluate_attempt(
+            run_root=self.run_root, attempt_id=self.attempt_id
+        )
+
+        kinds = {row["kind"] for row in evaluated["captured_output_integrity"]["issues"]}
+        self.assertIn("captured_output_file_list_mismatch", kinds)
+        self.assertIsNone(evaluated["fixed_artifact_index"])
+        self.assertEqual(evaluated["overall_status"], "needs_review")
+
+    def test_captured_copy_symlink_is_rejected_before_grading(self) -> None:
+        qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+        captured = self.private_root / "captured-output"
+        artifact = captured / "artifact-00.md"
+        outside = self.repository / "outside.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        artifact.unlink()
+        artifact.symlink_to(outside)
+
+        symlink_result = qts.evaluate_attempt(
+            run_root=self.run_root, attempt_id=self.attempt_id
+        )
+        self.assertFalse(symlink_result["captured_output_integrity"]["valid"])
+        self.assertIsNone(symlink_result["fixed_artifact_index"])
+
+    def test_captured_copy_hardlink_is_rejected_before_grading(self) -> None:
+        qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+        captured = self.private_root / "captured-output"
+        artifact = captured / "artifact-00.md"
+        outside = self.repository / "outside.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        artifact.unlink()
+        artifact.hardlink_to(outside)
+        hardlink_result = qts.evaluate_attempt(
+            run_root=self.run_root, attempt_id=self.attempt_id
+        )
+        self.assertFalse(hardlink_result["captured_output_integrity"]["valid"])
+        self.assertIsNone(hardlink_result["fixed_artifact_index"])
+
+    def test_capture_manifest_change_is_rejected_before_grading(self) -> None:
+        qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+        capture_path = self.private_root / "capture.json"
+        capture = json.loads(capture_path.read_text(encoding="utf-8"))
+        capture["copy"]["total_source_bytes"] += 1
+        capture_path.write_text(json.dumps(capture), encoding="utf-8")
+
+        evaluated = qts.evaluate_attempt(
+            run_root=self.run_root, attempt_id=self.attempt_id
+        )
+
+        self.assertIn(
+            "capture_manifest_fingerprint_mismatch",
+            {row["kind"] for row in evaluated["captured_output_integrity"]["issues"]},
+        )
+        self.assertIsNone(evaluated["public_artifact_index"])
+        self.assertEqual(evaluated["overall_status"], "needs_review")
+
+    def test_redacted_capture_is_never_graded(self) -> None:
+        artifact = self.target_root / ".qa-eval-output" / "artifact-00.md"
+        artifact.write_text("access_token=synthetic-marker\n", encoding="utf-8")
+        capture = qts.capture_attempt(
+            run_root=self.run_root, attempt_id=self.attempt_id
+        )
+        self.assertEqual(capture["status"], "captured_needs_review")
+
+        with patch.object(
+            qts.qa_training_store, "validate_artifact_index"
+        ) as fixed_validator:
+            evaluated = qts.evaluate_attempt(
+                run_root=self.run_root, attempt_id=self.attempt_id
+            )
+
+        kinds = {
+            row.get("issue_kind")
+            for row in evaluated["issues"]
+            if row.get("kind") == "captured_output_integrity_issue"
+        }
+        self.assertIn("redacted_capture_not_gradeable", kinds)
+        self.assertIsNone(evaluated["fixed_artifact_index"])
+        self.assertEqual(evaluated["overall_status"], "needs_review")
+        fixed_validator.assert_not_called()
+
+    def test_qts_replay_uses_pinned_script_hashes_without_agent_trace_claim(self) -> None:
+        package_files = [
+            {
+                "path": f"skills/{skill}/scripts/runtime_contract.py",
+                "size": 1,
+                "sha256": sha256_bytes(b"x"),
+            }
+            for skill in sorted(qts._REQUIRED_RUNTIME_SKILLS)
+        ]
+        package_manifest = {
+            "revision": "a" * 40,
+            "skills": sorted(qts._REQUIRED_RUNTIME_SKILLS),
+            "files": package_files,
+            "package_fingerprint": qts.canonical_fingerprint(package_files),
+        }
+        attempt_record = qts._load_attempt_record(self.attempt_root)
+        attempt_record["skill_package"] = package_manifest
+        (self.private_root / "attempt.json").write_text(
+            json.dumps(attempt_record), encoding="utf-8"
+        )
+        run = qts._load_run(self.run_root)
+        run["attempts"][0]["skill_package_fingerprint"] = package_manifest[
+            "package_fingerprint"
+        ]
+        qts._write_run(self.run_root, run)
+
+        with (
+            patch.object(
+                qts,
+                "evaluate_runtime_captures",
+                return_value={"status": "evidence_unverified", "captures": []},
+            ) as verify_replay,
+            patch.object(
+                qts,
+                "evaluate_workflow_runtime_capture",
+                return_value={"status": "evidence_unverified", "captures": []},
+            ) as workflow_replay,
+        ):
+            qts.capture_attempt(run_root=self.run_root, attempt_id=self.attempt_id)
+            evaluated = qts.evaluate_attempt(
+                run_root=self.run_root, attempt_id=self.attempt_id
+            )
+
+        self.assertIsNone(verify_replay.call_args.kwargs["verifier_image"])
+        self.assertFalse(verify_replay.call_args.kwargs["require_tool_trace"])
+        self.assertIsNone(workflow_replay.call_args.kwargs["verifier_image"])
+        self.assertFalse(workflow_replay.call_args.kwargs["require_tool_trace"])
+        self.assertEqual(
+            evaluated["production_verifier_independent_replay"][
+                "original_agent_execution_proof"
+            ],
+            "unverified",
         )
         self.assertEqual(evaluated["overall_status"], "needs_review")
 

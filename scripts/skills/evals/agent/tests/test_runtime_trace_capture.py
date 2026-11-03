@@ -18,6 +18,292 @@ from scripts.skills.evals.agent.verifier_capture import capture_invocation
 
 
 class RuntimeTraceCaptureTests(unittest.TestCase):
+    def test_isolated_execution_evidence_keeps_hashes_and_bounds_diagnostics(
+        self,
+    ) -> None:
+        raw = {
+            "status": "verified",
+            "exit_code": 0,
+            "source_fingerprint_before": "sha256:" + "a" * 64,
+            "request_sha256": "sha256:" + "b" * 64,
+            "stdout_sha256": "sha256:" + "c" * 64,
+            "stderr_sha256": "sha256:" + "d" * 64,
+            "stdout": "x" * (common_runtime_checks._MAX_REPLAY_DIAGNOSTIC_BYTES + 20),
+            "stderr": "",
+        }
+
+        saved = common_runtime_checks._isolated_execution_evidence(raw)
+
+        self.assertEqual(saved["exit_code"], 0)
+        self.assertEqual(saved["request_sha256"], raw["request_sha256"])
+        self.assertEqual(saved["stdout_sha256"], raw["stdout_sha256"])
+        self.assertLessEqual(
+            len(saved["stdout"]), common_runtime_checks._MAX_REPLAY_DIAGNOSTIC_BYTES
+        )
+
+    def test_runtime_replay_aggregation_preserves_execution_failure_classes(self) -> None:
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "timeout"}, {"status": "pass"}]
+            ),
+            "timeout",
+        )
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "execution_error"}, {"status": "pass"}]
+            ),
+            "execution_error",
+        )
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "environment_error"}, {"status": "pass"}]
+            ),
+            "environment_error",
+        )
+
+    def test_dockerless_workflow_replay_keeps_unavailable_boundary_unverified(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text(
+                "raise RuntimeError('must not execute')\n", encoding="utf-8"
+            )
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                return_value={
+                    "status": "evidence_unverified",
+                    "reason": "required_bubblewrap_capabilities_unavailable",
+                    "verifier_executed": False,
+                    "sandbox_process_started": False,
+                },
+            ) as replay:
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=b"{}\n",
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertFalse(result["candidate_executed"])
+        replay.assert_called_once()
+
+    def test_nonzero_candidate_sandbox_exit_does_not_claim_verifier_execution(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = (
+                root
+                / ".agents"
+                / "skills"
+                / "test-case-design"
+                / "scripts"
+            )
+            scripts.mkdir(parents=True)
+            (scripts / "runtime_contract.py").write_text(
+                "print('{}')\n", encoding="utf-8"
+            )
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                return_value={
+                    "status": "execution_error",
+                    "exit_code": 1,
+                    "sandbox_process_started": True,
+                    "verifier_executed": None,
+                },
+            ):
+                result = common_runtime_checks.run_candidate_verifier_isolated(
+                    candidate_package_root=root / ".agents",
+                    skill="test-case-design",
+                    request_bytes=b"{}\n",
+                )
+
+        self.assertEqual(result["status"], "execution_error")
+        self.assertIsNone(result["candidate_executed"])
+
+    def test_dockerless_workflow_replay_compares_can_complete_and_preserves_false(
+        self,
+    ) -> None:
+        valid_result = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [{"issue_type": "runtime_not_complete"}],
+            "payload": {"can_complete": False},
+        }
+        candidate_result = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "ready",
+            "issues": [],
+            "payload": {"can_complete": True},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text(
+                "pass\n", encoding="utf-8"
+            )
+            results = [
+                {
+                    "status": "verified",
+                    "result": candidate_result,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "verifier_executed": True,
+                },
+                {
+                    "status": "verified",
+                    "result": valid_result,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "verifier_executed": True,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(valid_result).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("payload.can_complete", result["mismatched_semantic_fields"])
+
+    def test_dockerless_replay_pass_is_parity_only_when_workflow_incomplete(self) -> None:
+        incomplete = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [{"issue_type": "runtime_not_complete"}],
+            "payload": {"can_complete": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text(
+                "pass\n", encoding="utf-8"
+            )
+            candidate_source_fingerprint = (
+                common_runtime_checks.isolated_verifier.source_tree_fingerprint(
+                    scripts
+                )
+            )
+            results = [
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "source_fingerprint_before": "sha256:" + "d" * 64,
+                    "source_unchanged": True,
+                    "exit_code": 0,
+                    "stdout_sha256": "sha256:" + "e" * 64,
+                    "stderr_sha256": "sha256:" + "f" * 64,
+                    "stdout": "candidate-output",
+                    "stderr": "",
+                    "verifier_executed": True,
+                },
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "source_fingerprint_before": "sha256:" + "1" * 64,
+                    "source_unchanged": True,
+                    "exit_code": 0,
+                    "stdout_sha256": "sha256:" + "2" * 64,
+                    "stderr_sha256": "sha256:" + "3" * 64,
+                    "stdout": "fixed-output",
+                    "stderr": "",
+                    "verifier_executed": True,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(incomplete).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "pass")
+        self.assertFalse(result["workflow_runtime_can_complete"])
+        self.assertEqual(
+            result["candidate_source_fingerprint"], candidate_source_fingerprint
+        )
+        self.assertEqual(result["fixed_source_fingerprint"], "sha256:" + "1" * 64)
+        self.assertEqual(result["candidate_execution"]["exit_code"], 0)
+        self.assertEqual(
+            result["fixed_execution"]["stdout_sha256"], "sha256:" + "2" * 64
+        )
+        self.assertEqual(result["candidate_execution"]["stdout"], "candidate-output")
+
+    def test_dockerless_workflow_replay_requires_boolean_can_complete(self) -> None:
+        incomplete = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [],
+            "payload": {},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text(
+                "pass\n", encoding="utf-8"
+            )
+            results = [
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "verifier_executed": True,
+                },
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "verifier_executed": True,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(incomplete).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertEqual(
+            result["reason"], "workflow_runtime_result_contract_invalid"
+        )
+
     def test_codex_jsonl_extracts_final_message_and_successful_skill_read(self) -> None:
         events = [
             {"type": "thread.started", "thread_id": "thread-001"},
