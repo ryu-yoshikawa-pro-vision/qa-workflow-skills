@@ -293,9 +293,7 @@ class JudgeValidationTests(unittest.TestCase):
                 "target_revision": DEFAULT_TARGET_REVISION,
                 "criteria": ["QTS-SEM-001"],
                 "prompt_sha256": sha256_bytes(prompt_bytes),
-                "requested_settings": dict(
-                    judge_validation.SUBAGENT_JUDGE_SETTINGS
-                ),
+                "requested_settings": dict(judge_validation.SUBAGENT_JUDGE_SETTINGS),
                 "execution_method": "codex_subagent",
                 "effective_model_status": "unverified",
                 "tool_trace_status": "unverified",
@@ -314,7 +312,9 @@ class JudgeValidationTests(unittest.TestCase):
                         "request_fingerprint": judge_validation.canonical_fingerprint(
                             request
                         ),
-                        "requested_settings": dict(judge_validation.SUBAGENT_JUDGE_SETTINGS),
+                        "requested_settings": dict(
+                            judge_validation.SUBAGENT_JUDGE_SETTINGS
+                        ),
                         "effective_model_status": "unverified",
                         "tool_trace_status": "unverified",
                         "physical_evaluator_read_denial": "unverified",
