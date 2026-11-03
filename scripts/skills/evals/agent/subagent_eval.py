@@ -20,6 +20,7 @@ from scripts.skills.evals.agent.common import (
     atomic_write_json,
     atomic_write_text,
     canonical_fingerprint,
+    read_regular_file_bytes,
     sanitize_diagnostic,
     sha256_bytes,
 )
@@ -50,28 +51,7 @@ def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _read_regular_bytes(path: Path, *, max_bytes: int = MAX_TEXT_BYTES) -> bytes:
-    _assert_no_symlink_components(path)
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        raise AgentEvalError(f"evidence file is unavailable: {path.name}") from exc
-    with os.fdopen(descriptor, "rb") as stream:
-        before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
-            raise AgentEvalError(f"evidence must be a singly-linked file: {path.name}")
-        if before.st_size > max_bytes:
-            raise AgentEvalError(f"evidence file exceeds the size limit: {path.name}")
-        data = stream.read(max_bytes + 1)
-        after = os.fstat(stream.fileno())
-    if (
-        len(data) != before.st_size
-        or len(data) > max_bytes
-        or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-    ):
-        raise AgentEvalError(f"evidence file changed while being read: {path.name}")
-    return data
+    return read_regular_file_bytes(path, max_bytes=max_bytes)
 
 
 def _read_json(path: Path) -> dict[str, Any]:

@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.skills.evals.agent import qa_training_store
+from scripts.skills.evals.agent.common import AgentEvalError
 from scripts.skills.evals.agent.executor import ExecutionResult
 from scripts.skills.evals.agent.prompt_builder import (
     build_qa_training_store_generation_prompt,
@@ -457,6 +458,21 @@ class QATrainingStoreTests(unittest.TestCase):
             extra_output="unexpected-pipe",
             extra_output_kind="fifo",
         )
+
+    @unittest.skipUnless(os.name == "posix", "requires POSIX hardlink semantics")
+    def test_safe_agent_output_copy_rejects_hardlinked_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            original = source / "artifact.md"
+            original.write_text("artifact\n", encoding="utf-8")
+            (root / "outside-link.md").hardlink_to(original)
+
+            with self.assertRaisesRegex(AgentEvalError, "singly-linked"):
+                qa_training_store._copy_safe_agent_output(source, root / "captured")
+
+            self.assertFalse((root / "captured" / "artifact.md").exists())
 
     @unittest.skipUnless(os.name == "posix", "requires Linux symlink semantics")
     def test_final_message_does_not_follow_agent_symlinks(self) -> None:

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shlex
+import stat
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -50,6 +51,45 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return "sha256:" + digest.hexdigest()
+
+
+def read_regular_file_bytes(path: Path, *, max_bytes: int = MAX_TEXT_BYTES) -> bytes:
+    """Read one stable, non-linked regular file without following symlinks."""
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+        raise AgentEvalError("file size limit must be a non-negative integer")
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        try:
+            if stat.S_ISLNK(current.lstat().st_mode):
+                raise AgentEvalError("evidence path may not contain symlinks")
+        except FileNotFoundError:
+            continue
+
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(absolute, flags)
+    except OSError as exc:
+        raise AgentEvalError(f"evidence file is unavailable: {absolute.name}") from exc
+    with os.fdopen(descriptor, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise AgentEvalError(
+                f"evidence must be a singly-linked regular file: {absolute.name}"
+            )
+        if before.st_size > max_bytes:
+            raise AgentEvalError(f"evidence file exceeds the size limit: {absolute.name}")
+        data = stream.read(max_bytes + 1)
+        after = os.fstat(stream.fileno())
+    if (
+        len(data) != before.st_size
+        or len(data) > max_bytes
+        or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+    ):
+        raise AgentEvalError(f"evidence file changed while being read: {absolute.name}")
+    return data
 
 
 def canonical_fingerprint(value: Any) -> str:

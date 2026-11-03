@@ -72,6 +72,45 @@ Skillの開発・診断では、正式runnerの認証・隔離条件が未達で
 
 固定QTSシナリオの開発用評価では、sanitized targetへ公開チェッカー `.qa-eval-tools/validate_artifact_index.py` と、公開済みscenarioから作る構造契約だけを配置します。チェッカーはJSON schema、必須artifactの登録、Markdown path、routing参照、未登録Markdownを検査します。routing statusの意味やQA成果物本文の品質は判定せず、正解routing、expected、rubric、Judge fixtureも渡しません。Evaluator側の `validate_artifact_index()` と内容レビューを置き換えるものではありません。
 
+### QTS複数Skillのサブエージェント取込（第2段階）
+
+固定Checkout / Paymentシナリオの複数artifact経路は `qts_subagent_eval.py` を使います。Pythonはサブエージェントを起動せず、CodexホストがattemptごとにAgentを逐次起動します。`subagent_eval.py`の単一Eval Input経路には変更を加えません。
+
+```bash
+RUN_ROOT=".agent-eval-runs/qts-subagent-$(date -u +%Y%m%dT%H%M%SZ)"
+python -m scripts.skills.evals.agent.qts_subagent_eval prepare \
+  --target-source-root /path/to/clean/qa-training-store-checkout \
+  --skill-revision "$(git rev-parse HEAD)" \
+  --output-root "$RUN_ROOT" \
+  --repeat 2 \
+  --model gpt-6-luna \
+  --reasoning-effort max \
+  --fork-turns none
+```
+
+`prepare`はscenarioで必要な8 Skillと条件付き`question-analysis`だけを固定revisionから展開し、attempt別のsanitized targetを作ります。target sourceはscenarioの固定commitでcleanでなければなりません。生成promptはattemptごとの `evaluator-private/generation-prompt.md` に同一hashで保存されます。親ホストはその内容をサブエージェントのtaskとして渡し、対応する `attempts/<id>/target` だけを作業先に指定します。expected、rubric、grader、Judge fixture、Reference、他attemptの結果をpromptへ含めません。共有workspaceによる物理的な読取拒否、実効model/build、tool traceは未検証です。
+
+1. `result.json`のattempt IDと、各attemptのsanitized target pathを確認する。
+2. サブエージェント起動時に要求値`gpt-6-luna` / `max` / `none`を指定する。Codexホストが返した実行状態を、自己申告と分けて `record-execution` に記録する。
+3. Agentの成果物がattempt固有targetの `.qa-eval-output/` に保存された後、`capture`、続けて`evaluate`を実行する。
+
+```bash
+python -m scripts.skills.evals.agent.qts_subagent_eval record-execution \
+  --run-root "$RUN_ROOT" --attempt-id <attempt-id> \
+  --execution-status completed \
+  --started-at <host-observed-ISO-8601> \
+  --finished-at <host-observed-ISO-8601> \
+  --submitted-prompt-fingerprint <sha256-from-prepared-attempt>
+python -m scripts.skills.evals.agent.qts_subagent_eval capture \
+  --run-root "$RUN_ROOT" --attempt-id <attempt-id>
+python -m scripts.skills.evals.agent.qts_subagent_eval evaluate \
+  --run-root "$RUN_ROOT" --attempt-id <attempt-id>
+```
+
+`capture`はsymlink、hardlink、special file、不正なJSON/UTF-8、secret-shaped output、size超過を検査し、受領copyとpath・size・SHA-256 manifestを保存します。取り込み元はattempt IDから解決するtargetに固定され、任意pathや他attemptを指定できません。`evaluate`は公開artifact-index checkerと既存`qa_training_store.validate_artifact_index()`を使い、artifact/routingの契約、内容hash、target integrity、未登録file、runtime invocationのrequest/result hash・artifact path対応を照合します。capture後に出力が変化した場合も不適合になります。
+
+`runtime_evidence.capture_integrity_consistent`は保存record間の構造・hash整合を示すだけで、実際のtool実行やproduction verifier replayの証明ではありません。この段階ではDocker、独立Judge、semantic判定、独立production verifier replayを実行せず、それぞれ`evidence_unverified` / `not_run` / `not_evaluated`として残します。artifact-indexの機械的妥当性とQA workflowの意味的完了は別判定です。未解決仕様の状態や`can_complete=false`を書き換えません。全attemptは成功・失敗・準備停止を含めて保持し、失敗を除外して成績を調整しません。
+
 ## 旧CLI runnerの認証・隔離と異常終了の履歴
 
 以下は旧専用runner方式の検証記録・運用説明です。2026-11-03の採用方針では、この方式は現行実行経路ではなく、下記のWSL2/認証/Docker前提を満たすまで新方式を停止する条件にもなりません。旧launcherのfail-closed自体は維持します。
@@ -97,6 +136,7 @@ marker後の復旧には`--operator-recover-auth --confirm-discard-uncertain-aut
 | Module                                       | 用途                                                                                  |
 | -------------------------------------------- | ------------------------------------------------------------------------------------- |
 | scripts.skills.evals.agent.subagent_eval     | Codexホストのhandoff準備、成果物取込、integrity確認、既存grader接続                   |
+| scripts.skills.evals.agent.qts_subagent_eval | 固定QTS scenarioの複数Skill・artifact-index取込、既存機械検証、attempt保存            |
 | scripts.skills.evals.agent.run               | 旧CLI経路のdeterministic / semantic case、Skill単位、明示されたall batch              |
 | scripts.skills.evals.agent.isolation_probe   | WSL2、outer/inner bubblewrap、固定binary、mount、namespace、FD、network、evidence検証 |
 | scripts.skills.evals.agent.qa_training_store | 固定qa-training-store revisionのCheckout / Payment workflow評価                       |

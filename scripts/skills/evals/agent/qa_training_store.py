@@ -20,6 +20,7 @@ from .common import (
     capture_codex_judge_output,
     ensure_within,
     prepare_run_output_root,
+    read_regular_file_bytes,
     safe_relative_path,
     sanitize_diagnostic,
     sha256_bytes,
@@ -373,7 +374,7 @@ def _copy_safe_agent_output(
         total += size
         if total > 100_000_000:
             raise AgentEvalError("Agent output exceeds the saved artifact size limit")
-        raw = path.read_bytes()
+        raw = read_regular_file_bytes(path, max_bytes=100_000_000)
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
