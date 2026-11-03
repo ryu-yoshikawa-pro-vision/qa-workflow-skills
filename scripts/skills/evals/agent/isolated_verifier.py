@@ -731,6 +731,14 @@ try:
     host_process_environment_unreadable = False
 except OSError:
     host_process_environment_unreadable = True
+required_environment_names = {
+    "HOME",
+    "TMPDIR",
+    "PATH",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONNOUSERSITE",
+    "LC_ALL",
+}
 allowed_environment_names = {
     "HOME",
     "TMPDIR",
@@ -740,10 +748,15 @@ allowed_environment_names = {
     "LC_ALL",
     "LC_CTYPE",
 }
+runtime_environment_missing_required = sorted(
+    required_environment_names - set(os.environ)
+)
+runtime_environment_unexpected_count = len(
+    set(os.environ) - allowed_environment_names
+)
 runtime_environment_sanitized = (
-    {"HOME", "TMPDIR", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "LC_ALL"}
-    .issubset(os.environ)
-    and set(os.environ).issubset(allowed_environment_names)
+    not runtime_environment_missing_required
+    and runtime_environment_unexpected_count == 0
 )
 
 try:
@@ -779,8 +792,10 @@ except OSError:
     source_write_denied = True
 
 libc = ctypes.CDLL(None, use_errno=True)
+ctypes.set_errno(0)
 userns_result = libc.unshare(0x10000000)
-user_namespace_denied = userns_result == -1 and ctypes.get_errno() in (
+userns_errno = ctypes.get_errno() if userns_result == -1 else 0
+user_namespace_denied = userns_result == -1 and userns_errno in (
     errno.EPERM,
     errno.EACCES,
 )
@@ -857,12 +872,15 @@ print(json.dumps({
     "dev_write_denied": dev_write_denied,
     "source_write_denied": source_write_denied,
     "user_namespace_denied": user_namespace_denied,
+    "user_namespace_errno": userns_errno,
     "socket_checks": socket_checks,
     "io_uring_checks": io_uring_checks,
     "x32_socket_denied": x32_socket_denied,
     "inherited_socket_fds": socket_fds,
     "scratch_write_allowed": scratch_write_allowed,
     "runtime_environment_sanitized": runtime_environment_sanitized,
+    "runtime_environment_missing_required": runtime_environment_missing_required,
+    "runtime_environment_unexpected_count": runtime_environment_unexpected_count,
     "request": request.decode(),
     "limits": limits,
     "scratch_limits": scratch_limits,
@@ -996,6 +1014,21 @@ print(json.dumps({
             "request_unchanged": result.get("request_unchanged") is True,
             "exit_success": result.get("status") == "completed",
         }
+        diagnostics = {
+            "nested_user_namespace_errno": (
+                parsed.get("user_namespace_errno") if isinstance(parsed, dict) else None
+            ),
+            "runtime_environment_missing_required": (
+                parsed.get("runtime_environment_missing_required")
+                if isinstance(parsed, dict)
+                else None
+            ),
+            "runtime_environment_unexpected_count": (
+                parsed.get("runtime_environment_unexpected_count")
+                if isinstance(parsed, dict)
+                else None
+            ),
+        }
 
         timeout_path = source / "timeout.py"
         timeout_path.write_text(
@@ -1033,6 +1066,7 @@ time.sleep(30)
             "status": "verified" if all(checks.values()) else "evidence_unverified",
             "reason": None if all(checks.values()) else "isolation_probe_failed",
             "checks": checks,
+            "diagnostics": diagnostics,
             "probe_execution": result,
             "candidate_executed": False,
             **runtime,
