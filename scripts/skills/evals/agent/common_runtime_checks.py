@@ -187,6 +187,8 @@ def _isolated_execution_evidence(value: dict[str, Any]) -> dict[str, Any]:
             "stderr_bytes",
             "result_sha256",
             "parsed_result_sha256",
+            "network_enforcement",
+            "network_policy_sha256",
             "runtime",
             "isolation_probe",
         )
@@ -723,7 +725,13 @@ def evaluate_runtime_captures(
                 if verifier_image is None
                 else None,
                 "candidate_isolation_probe": offline.get("isolation_probe"),
-                "network": "isolated_namespace" if verifier_image is None else "none",
+                "network": "blocked_by_seccomp" if verifier_image is None else "none",
+                "network_enforcement": offline.get("network_enforcement")
+                if verifier_image is None
+                else None,
+                "network_policy_sha256": offline.get("network_policy_sha256")
+                if verifier_image is None
+                else None,
                 "source_mount": "read_only",
             }
         )
@@ -898,7 +906,10 @@ def _workflow_replay(
             "captured_mismatched_fields": captured_mismatched,
             "candidate_isolation_probe": candidate_run.get("isolation_probe"),
             "fixed_isolation_probe": fixed_run.get("isolation_probe"),
-            "network": "isolated_namespace",
+            "network": "blocked_by_seccomp",
+            "network_enforcement": candidate_run.get("network_enforcement"),
+            "network_policy_sha256": candidate_run.get("network_policy_sha256"),
+            "fixed_network_policy_sha256": fixed_run.get("network_policy_sha256"),
             "source_mount": "read_only",
             "root_filesystem": "read_only",
             "candidate_executed": True,

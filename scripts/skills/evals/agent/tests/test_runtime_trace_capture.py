@@ -208,6 +208,8 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     "stdout": "candidate-output",
                     "stderr": "",
                     "verifier_executed": True,
+                    "network_enforcement": "seccomp-deny-socket-and-io-uring",
+                    "network_policy_sha256": "sha256:" + "9" * 64,
                 },
                 {
                     "status": "verified",
@@ -222,6 +224,8 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     "stdout": "fixed-output",
                     "stderr": "",
                     "verifier_executed": True,
+                    "network_enforcement": "seccomp-deny-socket-and-io-uring",
+                    "network_policy_sha256": "sha256:" + "8" * 64,
                 },
             ]
             with patch.object(
@@ -247,6 +251,16 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             result["fixed_execution"]["stdout_sha256"], "sha256:" + "2" * 64
         )
         self.assertEqual(result["candidate_execution"]["stdout"], "candidate-output")
+        self.assertEqual(result["network"], "blocked_by_seccomp")
+        self.assertEqual(
+            result["network_enforcement"], "seccomp-deny-socket-and-io-uring"
+        )
+        self.assertEqual(result["network_policy_sha256"], "sha256:" + "9" * 64)
+        self.assertEqual(result["fixed_network_policy_sha256"], "sha256:" + "8" * 64)
+        self.assertEqual(
+            result["candidate_execution"]["network_policy_sha256"],
+            result["network_policy_sha256"],
+        )
 
     def test_dockerless_workflow_replay_requires_boolean_can_complete(self) -> None:
         incomplete = {
