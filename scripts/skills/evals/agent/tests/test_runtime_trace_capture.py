@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,15 +27,17 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 self.fail(f"Dockerless verifier isolation is required: {probe}")
             self.skipTest(f"isolation boundary unverified: {probe.get('reason')}")
 
-    def _copy_candidate_runtime(
-        self, package_root: Path, skill: str, filenames: tuple[str, ...]
-    ) -> Path:
+    def _copy_runtime_tree(self, package_root: Path, skill: str) -> Path:
         repo_root = Path(__file__).resolve().parents[5]
         source = repo_root / "skills" / skill / "scripts"
         destination = package_root / "skills" / skill / "scripts"
-        destination.mkdir(parents=True)
-        for filename in filenames:
-            shutil.copyfile(source / filename, destination / filename)
+        if any(path.is_symlink() for path in source.rglob("*")):
+            raise AssertionError("runtime fixture source unexpectedly contains a symlink")
+        shutil.copytree(
+            source,
+            destination,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
         return destination
 
     def _write_synthetic_invocation(
@@ -131,17 +132,16 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
     def test_isolated_verify_and_workflow_runtime_replay_contracts(self) -> None:
         """Exercise both replay paths only after the real boundary probe passes."""
         self._require_isolation_or_skip()
-        repo_root = Path(__file__).resolve().parents[5]
         isolated = common_runtime_checks.isolated_verifier
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             candidate_root = root / ".agents"
-            verify_scripts = self._copy_candidate_runtime(
-                candidate_root,
-                "test-condition-design",
-                ("runtime_contract.py",),
+            fixed_root = root / "fixed-evaluator"
+            verify_scripts = self._copy_runtime_tree(
+                candidate_root, "test-condition-design"
             )
+            self._copy_runtime_tree(fixed_root, "test-condition-design")
             from tests.skills.runtime.test_runtime_contract import (
                 EntityAndEvidenceTests,
             )
@@ -160,7 +160,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 + "\n"
             ).encode("utf-8")
             fixed_verify_script = (
-                repo_root
+                fixed_root
                 / "skills"
                 / "test-condition-design"
                 / "scripts"
@@ -195,7 +195,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                     capture_root=saved_capture_root,
                     candidate_package_root=candidate_root,
                     verifier_image=None,
-                    fixed_evaluator_root=repo_root,
+                    fixed_evaluator_root=fixed_root,
                     expected_artifacts=[
                         {
                             "skill": "test-condition-design",
@@ -241,11 +241,8 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
             self.assertIsNone(failed_verify["captures"][0].get("candidate_executed"))
             self.assertNotEqual(verify_candidate_fingerprint, failed_verify_fingerprint)
 
-            workflow_scripts = self._copy_candidate_runtime(
-                candidate_root,
-                "qa-workflow",
-                ("workflow_runtime.py", "runtime_contract.py", "artifact_graph.py"),
-            )
+            workflow_scripts = self._copy_runtime_tree(candidate_root, "qa-workflow")
+            self._copy_runtime_tree(fixed_root, "qa-workflow")
             from tests.skills.runtime.test_workflow_runtime import WorkflowRuntimeTests
 
             workflow_request = WorkflowRuntimeTests()._request()
@@ -254,7 +251,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 + "\n"
             ).encode("utf-8")
             fixed_workflow_script = (
-                repo_root
+                fixed_root
                 / "skills"
                 / "qa-workflow"
                 / "scripts"
@@ -273,7 +270,7 @@ class RuntimeTraceCaptureTests(unittest.TestCase):
                 "captured_bytes": fixed_workflow["stdout"].encode("utf-8"),
                 "candidate_package_root": candidate_root,
                 "verifier_image": None,
-                "fixed_evaluator_root": repo_root,
+                "fixed_evaluator_root": fixed_root,
                 "expected_candidate_source_fingerprint": workflow_fingerprint,
             }
             workflow_pass = common_runtime_checks._workflow_replay(**replay_args)

@@ -73,3 +73,13 @@ raw run rootに`evidence-index.md`はなかった。保存された`result.json`
 - 保存済み第2段階runは現行Evaluator revisionと異なり、適切な固定source/requestの対応を再構成できていない。`verify` requestの独立replayは未実施。raw runに`workflow-runtime` invocationはなく、そのreplayも未実施。両経路のsemantic comparisonはunit test済みだが、実隔離下のcandidate/fixed/result比較は未達。
 - QTS capture integrityの結果は両元attemptとも一致し、attemptの`needs_review`を維持した。runtime capture不足・重複invocation、Judge未実施、meaningful traceability、`can_complete=false`のQA品質判定は既存の未達として残る。
 - QTS製品コード・仕様・Seed/Reset・製品test、元Stage 2 raw evidenceは変更していない。
+
+## 2026-11-03 CI隔離再検証の追記
+
+PR HEAD `6f76c27b3ff8f0b017f754f572287bf8a23c53ff`をGitHub上で確認した。PRはOPENでbase `main`、branch `feat/agent-eval-runner`。Code Quality run `41612404685`では、AppArmor診断と公式packageの`bwrap-userns-restrict` profile適用が完了し、profile後の最小bwrap user-namespace probeも成功した。その後、固定Ruff 0.16.8が`test_runtime_trace_capture.py`の未使用`sys` import（F401）で失敗したため、必須の完全隔離probeおよびVerifier replay stepはskipされた。これは候補Verifierの実行結果ではない。残る4 workflow（Codex Harness、Agent Skills、Deterministic Output Evals、Semantic Output Evals）は成功した。
+
+profile適用前のprobe、`kernel.apparmor_restrict_unprivileged_userns=1`、有効なAppArmor記録、該当するbwrap userns拒否が整合し、job内の配布済みprofileを競合なし・enforce modeでロードした後に最小probeが成功したため、このrunnerでのUID map拒否原因はAppArmorのunprivileged user namespace制限と確認できた。修正はGitHub-hosted一時runner内の対象jobだけに限定され、system-wide sysctlは変更していない。これは完全な隔離probeの合格を意味しない。
+
+F401 importを削除し、synthetic replay testのEvaluator/candidate source treeを実行前にbytecode除外付きで別々にコピーするよう修正した。固定sourceとcandidateの`verify`、`workflow-runtime`について、隔離下の一致、不一致、candidate非ゼロ終了を必須probeの後に確認するCI stepを維持している。ローカルの関連suiteは38件中34 PASS、4 SKIP。SKIPは実bubblewrap境界がないためで、Verifier候補は実行していない。`compileall`、変更Python/READMEのdprint 0.55.2 check、`git diff --check`は成功。ローカルにRuffはなく、固定Ruff検査は次のGitHub Actionsで再確認する。
+
+この追記時点で修正後のGitHub Actionsは未実行であり、完全probe・candidate verifier replayは未達。次のCIがrequired isolation probeを通過した場合に限って、その直後のsynthetic `verify` / `workflow-runtime` replay結果を採用する。Stage 2のQTS runはEvaluator revisionが異なり、raw runに実`workflow-runtime` invocationがないため、今回のsynthetic fixtureが成功してもQTS実captureの独立replayを実施したことにはならない。Stage 3は引き続き未完了であり、第4段階には進まない。
