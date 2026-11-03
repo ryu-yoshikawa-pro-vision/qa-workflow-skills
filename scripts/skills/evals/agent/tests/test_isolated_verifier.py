@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import errno
 import hashlib
 import os
 import stat
@@ -94,6 +95,31 @@ class IsolatedVerifierTests(unittest.TestCase):
             ),
         ):
             isolated_verifier._network_seccomp_filter_bytes()
+
+    def test_nested_user_namespace_denial_matches_bwrap_limit_contract(self) -> None:
+        self.assertTrue(
+            isolated_verifier._nested_user_namespace_denied(
+                -1, errno.EPERM, 58109
+            )
+        )
+        self.assertTrue(
+            isolated_verifier._nested_user_namespace_denied(
+                -1, errno.ENOSPC, 1
+            )
+        )
+        self.assertFalse(
+            isolated_verifier._nested_user_namespace_denied(
+                -1, errno.ENOSPC, 2
+            )
+        )
+        self.assertFalse(
+            isolated_verifier._nested_user_namespace_denied(0, 0, 1)
+        )
+        self.assertFalse(
+            isolated_verifier._nested_user_namespace_denied(
+                -1, errno.EINVAL, 1
+            )
+        )
 
     def test_synthetic_boundary_probe_script_is_valid_python(self) -> None:
         module = ast.parse(Path(isolated_verifier.__file__).read_text(encoding="utf-8"))

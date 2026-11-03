@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import errno
 import fcntl
 import hashlib
 import json
@@ -133,6 +134,19 @@ def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise ValueError("duplicate verifier JSON key")
         result[key] = value
     return result
+
+
+def _nested_user_namespace_denied(
+    result: int, error_number: int, max_namespaces: int | None
+) -> bool:
+    if result != -1:
+        return False
+    if error_number in (errno.EPERM, errno.EACCES):
+        return True
+    # bubblewrap --disable-userns sets this namespace-local limit to 1 before
+    # entering the sandbox. Linux reports ENOSPC when that namespace limit is
+    # reached; accept it only when the effective limit confirms that mechanism.
+    return error_number == errno.ENOSPC and max_namespaces == 1
 
 
 def _no_new_privs_and_limits() -> None:
@@ -751,9 +765,50 @@ allowed_environment_names = {
 runtime_environment_missing_required = sorted(
     required_environment_names - set(os.environ)
 )
-runtime_environment_unexpected_count = len(
-    set(os.environ) - allowed_environment_names
+runtime_environment_unexpected = set(os.environ) - allowed_environment_names
+credential_name_tokens = ("TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL", "AUTH")
+runtime_environment_unexpected_categories = {
+    "credential_shaped_name": any(
+        any(token in name.upper() for token in credential_name_tokens)
+        for name in runtime_environment_unexpected
+    ),
+    "ci_runtime_name": any(
+        name.startswith(("GITHUB_", "ACTIONS_"))
+        for name in runtime_environment_unexpected
+    ),
+    "python_runtime_name": any(
+        name.startswith("PYTHON") for name in runtime_environment_unexpected
+    ),
+    "locale_name": any(
+        name in {"LANG", "LANGUAGE"} or name.startswith("LC_")
+        for name in runtime_environment_unexpected
+    ),
+    "shell_context_name": any(
+        name in {"PWD", "SHLVL", "SHELL", "USER", "LOGNAME", "_"}
+        for name in runtime_environment_unexpected
+    ),
+}
+classified_environment_names = {
+    name
+    for name in runtime_environment_unexpected
+    if name.startswith(("GITHUB_", "ACTIONS_", "PYTHON", "LC_"))
+    or name
+    in {
+        "LANG",
+        "LANGUAGE",
+        "PWD",
+        "SHLVL",
+        "SHELL",
+        "USER",
+        "LOGNAME",
+        "_",
+    }
+    or any(token in name.upper() for token in credential_name_tokens)
+}
+runtime_environment_unexpected_categories["other_name"] = bool(
+    runtime_environment_unexpected - classified_environment_names
 )
+runtime_environment_unexpected_count = len(runtime_environment_unexpected)
 runtime_environment_sanitized = (
     not runtime_environment_missing_required
     and runtime_environment_unexpected_count == 0
@@ -795,10 +850,10 @@ libc = ctypes.CDLL(None, use_errno=True)
 ctypes.set_errno(0)
 userns_result = libc.unshare(0x10000000)
 userns_errno = ctypes.get_errno() if userns_result == -1 else 0
-user_namespace_denied = userns_result == -1 and userns_errno in (
-    errno.EPERM,
-    errno.EACCES,
-)
+try:
+    max_user_namespaces = int(Path("/proc/sys/user/max_user_namespaces").read_text().strip())
+except (OSError, ValueError):
+    max_user_namespaces = None
 
 def socket_creation_denied(family, socktype):
     try:
@@ -871,8 +926,9 @@ print(json.dumps({
     "proc_write_denied": proc_write_denied,
     "dev_write_denied": dev_write_denied,
     "source_write_denied": source_write_denied,
-    "user_namespace_denied": user_namespace_denied,
     "user_namespace_errno": userns_errno,
+    "user_namespace_result": userns_result,
+    "max_user_namespaces": max_user_namespaces,
     "socket_checks": socket_checks,
     "io_uring_checks": io_uring_checks,
     "x32_socket_denied": x32_socket_denied,
@@ -881,6 +937,7 @@ print(json.dumps({
     "runtime_environment_sanitized": runtime_environment_sanitized,
     "runtime_environment_missing_required": runtime_environment_missing_required,
     "runtime_environment_unexpected_count": runtime_environment_unexpected_count,
+    "runtime_environment_unexpected_categories": runtime_environment_unexpected_categories,
     "request": request.decode(),
     "limits": limits,
     "scratch_limits": scratch_limits,
@@ -954,7 +1011,11 @@ print(json.dumps({
             "no_effective_capabilities": isinstance(parsed, dict)
             and parsed.get("cap_eff") == "0000000000000000",
             "nested_user_namespace_denied": isinstance(parsed, dict)
-            and parsed.get("user_namespace_denied") is True,
+            and _nested_user_namespace_denied(
+                parsed.get("user_namespace_result"),
+                parsed.get("user_namespace_errno"),
+                parsed.get("max_user_namespaces"),
+            ),
             "evaluator_marker_unreadable": isinstance(parsed, dict)
             and parsed.get("marker_read_denied") is True,
             "runtime_environment_is_allowlisted": isinstance(parsed, dict)
@@ -1018,6 +1079,9 @@ print(json.dumps({
             "nested_user_namespace_errno": (
                 parsed.get("user_namespace_errno") if isinstance(parsed, dict) else None
             ),
+            "max_user_namespaces": (
+                parsed.get("max_user_namespaces") if isinstance(parsed, dict) else None
+            ),
             "runtime_environment_missing_required": (
                 parsed.get("runtime_environment_missing_required")
                 if isinstance(parsed, dict)
@@ -1025,6 +1089,11 @@ print(json.dumps({
             ),
             "runtime_environment_unexpected_count": (
                 parsed.get("runtime_environment_unexpected_count")
+                if isinstance(parsed, dict)
+                else None
+            ),
+            "runtime_environment_unexpected_categories": (
+                parsed.get("runtime_environment_unexpected_categories")
                 if isinstance(parsed, dict)
                 else None
             ),
