@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -90,6 +91,106 @@ def _profile() -> dict:
 
 
 class JudgeValidationTests(unittest.TestCase):
+    def test_formal_subagent_preparation_accepts_relative_baseline_root(self) -> None:
+        scenario = load_scenario()
+        eval_runs_root = judge_validation.REPO_ROOT / ".agent-eval-runs"
+        eval_runs_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix="judge-relative-baseline-", dir=eval_runs_root
+        ) as temporary:
+            temporary_root = Path(temporary)
+            baseline_root = temporary_root / "baseline"
+            baseline_root.mkdir()
+            (baseline_root / "result.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "execution_method": "codex_subagent_handoff",
+                        "run_id": "relative-baseline-run",
+                        "target_revision": DEFAULT_TARGET_REVISION,
+                        "evaluator_revision": "1" * 40,
+                        "scenario_fingerprint": scenario["scenario_fingerprint"],
+                        "attempts": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = (
+                temporary_root
+                / "attempt"
+                / "evaluator-private"
+                / "captured-output"
+            )
+            self._baseline_output(output, scenario)
+            target = temporary_root / "target"
+            for reference in scenario["reference_paths"]:
+                path = target / reference
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    f"Reference fixture for {reference}\n", encoding="utf-8"
+                )
+            evaluation = {
+                "fixed_artifact_index": {"status": "needs_review"},
+                "runtime_evidence": {"invocations": []},
+            }
+
+            def select_review_source(*, run_root: Path, **_kwargs: object):
+                self.assertTrue(run_root.is_absolute())
+                return (
+                    {
+                        "attempt_id": "a" * 32,
+                        "attempt_root": temporary_root / "attempt",
+                        "target_root": target,
+                        "output_root": output,
+                        "evaluation": evaluation,
+                        "final_message": "Incomplete baseline for human review only.\n",
+                        "review_only": True,
+                    },
+                    [],
+                )
+
+            relative_baseline = Path(
+                os.path.relpath(baseline_root, judge_validation.REPO_ROOT)
+            )
+            output_root = temporary_root / "judge-review"
+            with (
+                patch.object(
+                    judge_validation,
+                    "assess_subagent_baseline",
+                    return_value={
+                        "status": "ineligible",
+                        "baseline_run_id": "relative-baseline-run",
+                        "eligible_attempts": [],
+                        "attempts_required": 2,
+                        "attempt_selection": [],
+                    },
+                ),
+                patch.object(
+                    judge_validation,
+                    "_select_intact_review_attempt",
+                    side_effect=select_review_source,
+                ),
+            ):
+                result = judge_validation.prepare_formal_subagent_judge_calls(
+                    baseline_run_root=relative_baseline,
+                    approval_path=None,
+                    output_root=output_root,
+                    fixture_ids=["normal-workflow"],
+                    repeat=2,
+                )
+
+            self.assertEqual(result["status"], "baseline_ineligible")
+            self.assertEqual(
+                result["review_source_status"],
+                "intact_artifacts_baseline_ineligible",
+            )
+            self.assertEqual(
+                result["fixtures"][0]["fixture_review_status"],
+                "review_only_unqualified_baseline",
+            )
+            self.assertEqual(result["fixtures"][0]["calls"], [])
+            self.assertTrue((output_root / "human-review-packet.md").is_file())
+
     def test_subagent_baseline_revision_mismatch_is_recorded_per_attempt(self) -> None:
         scenario = load_scenario()
         with tempfile.TemporaryDirectory() as temporary:

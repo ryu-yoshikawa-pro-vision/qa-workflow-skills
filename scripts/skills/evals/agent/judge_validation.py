@@ -1511,10 +1511,11 @@ def prepare_formal_subagent_judge_calls(
 
     if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 2:
         raise AgentEvalError("formal Judge evaluation requires at least two repeats")
+    baseline_root = Path(os.path.abspath(baseline_run_root))
     evaluator_revision = qts_subagent_eval._git_head(REPO_ROOT)
     evaluator_source_fingerprints = _formal_evaluator_fingerprints()
     baseline = assess_subagent_baseline(
-        baseline_run_root=baseline_run_root,
+        baseline_run_root=baseline_root,
         expected_evaluator_revision=evaluator_revision,
     )
     root = _validate_subagent_call_root(output_root)
@@ -1562,14 +1563,14 @@ def prepare_formal_subagent_judge_calls(
         "fixtures": [],
     }
     atomic_write_json(root / "preparation.json", result)
-    run = qts_subagent_eval._load_run(Path(baseline_run_root))
+    run = qts_subagent_eval._load_run(baseline_root)
     review_selection: dict[str, Any] | None
     review_rejections: list[dict[str, str]]
     if baseline["status"] == "eligible":
         selected = baseline["eligible_attempts"][0]
         attempt_id = selected["attempt_id"]
         _row, attempt_root = qts_subagent_eval._attempt_paths(
-            Path(baseline_run_root), attempt_id, run=run
+            baseline_root, attempt_id, run=run
         )
         review_selection = {
             "attempt_id": attempt_id,
@@ -1588,7 +1589,7 @@ def prepare_formal_subagent_judge_calls(
         review_rejections = []
     else:
         review_selection, review_rejections = _select_intact_review_attempt(
-            run_root=Path(baseline_run_root), run=run, scenario=scenario
+            run_root=baseline_root, run=run, scenario=scenario
         )
         if review_selection is None:
             result["review_source_rejections"] = review_rejections
