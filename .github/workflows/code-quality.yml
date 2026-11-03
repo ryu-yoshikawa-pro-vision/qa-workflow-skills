@@ -288,3 +288,11 @@ jobs:
         env:
           PR17_REQUIRE_VERIFIER_ISOLATION: "1"
         run: python -m unittest scripts.skills.evals.agent.tests.test_isolated_verifier -v
+
+      - name: Replay verify and workflow-runtime contracts under required isolation
+        env:
+          PR17_REQUIRE_VERIFIER_ISOLATION: "1"
+        run: >-
+          python -m unittest
+          scripts.skills.evals.agent.tests.test_runtime_trace_capture.RuntimeTraceCaptureTests.test_isolated_verify_and_workflow_runtime_replay_contracts
+          -v

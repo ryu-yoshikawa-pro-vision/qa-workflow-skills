@@ -178,6 +178,7 @@ def _isolated_execution_evidence(value: dict[str, Any]) -> dict[str, Any]:
             "candidate_executed",
             "verifier_executed",
             "sandbox_process_started",
+            "bwrap_user_namespace_disable_assertion_passed",
             "request_sha256",
             "request_unchanged",
             "script_sha256",

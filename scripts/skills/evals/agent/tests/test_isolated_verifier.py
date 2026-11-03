@@ -96,19 +96,21 @@ class IsolatedVerifierTests(unittest.TestCase):
         ):
             isolated_verifier._network_seccomp_filter_bytes()
 
-    def test_nested_user_namespace_denial_matches_bwrap_limit_contract(self) -> None:
+    def test_nested_user_namespace_denial_requires_bwrap_assertion(self) -> None:
         self.assertTrue(
-            isolated_verifier._nested_user_namespace_denied(-1, errno.EPERM, 58109)
+            isolated_verifier._nested_user_namespace_denied(-1, errno.EPERM, True)
         )
         self.assertTrue(
-            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, 1)
+            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, True)
         )
         self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, 2)
+            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, False)
         )
-        self.assertFalse(isolated_verifier._nested_user_namespace_denied(0, 0, 1))
         self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(-1, errno.EINVAL, 1)
+            isolated_verifier._nested_user_namespace_denied(0, 0, True)
+        )
+        self.assertFalse(
+            isolated_verifier._nested_user_namespace_denied(-1, errno.EINVAL, True)
         )
 
     def test_synthetic_boundary_probe_script_is_valid_python(self) -> None:
@@ -368,7 +370,15 @@ class IsolatedVerifierTests(unittest.TestCase):
                     command = popen.call_args.args[0]
                     self.assertEqual(command[0], "/usr/bin/bwrap")
                     self.assertIn("--seccomp", command)
+                    self.assertIn("--disable-userns", command)
+                    self.assertIn("--assert-userns-disabled", command)
                     self.assertNotIn("--unshare-net", command)
+                    self.assertEqual(
+                        command[
+                            command.index("PWD") - 1 : command.index("PWD") + 2
+                        ],
+                        ["--setenv", "PWD", "/workspace"],
+                    )
                     lib64_link_index = command.index("/lib64")
                     self.assertEqual(
                         command[lib64_link_index - 2 : lib64_link_index + 1],
@@ -388,6 +398,10 @@ class IsolatedVerifierTests(unittest.TestCase):
 
             self.assertTrue(result["sandbox_process_started"])
             self.assertEqual(result["verifier_executed"], expected_execution)
+            self.assertEqual(
+                result["bwrap_user_namespace_disable_assertion_passed"],
+                expected_execution is True,
+            )
             self.assertNotIn("candidate_executed", result)
 
     def test_missing_isolation_tool_never_executes_supplied_source(self) -> None:

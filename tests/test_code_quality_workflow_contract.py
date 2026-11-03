@@ -40,6 +40,20 @@ class CodeQualityWorkflowContracts(unittest.TestCase):
         self.assertIn("journalctl -k -n 0 --show-cursor", workflow)
         self.assertIn('journalctl -k --after-cursor "$audit_cursor"', workflow)
 
+    def test_runtime_replay_runs_after_required_isolation_probe(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        probe = workflow.index("- name: Probe Dockerless runtime verifier isolation")
+        replay = workflow.index(
+            "- name: Replay verify and workflow-runtime contracts under required isolation"
+        )
+        self.assertLess(probe, replay)
+        replay_step = workflow[replay:]
+        self.assertIn('PR17_REQUIRE_VERIFIER_ISOLATION: "1"', replay_step)
+        self.assertIn(
+            "test_runtime_trace_capture.RuntimeTraceCaptureTests.test_isolated_verify_and_workflow_runtime_replay_contracts",
+            replay_step,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

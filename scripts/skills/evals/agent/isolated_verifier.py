@@ -137,16 +137,16 @@ def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _nested_user_namespace_denied(
-    result: int, error_number: int, max_namespaces: int | None
+    result: int, error_number: int, bwrap_asserted_disabled: bool
 ) -> bool:
-    if result != -1:
+    if result != -1 or not bwrap_asserted_disabled:
         return False
-    if error_number in (errno.EPERM, errno.EACCES):
-        return True
-    # bubblewrap --disable-userns sets this namespace-local limit to 1 before
-    # entering the sandbox. Linux reports ENOSPC when that namespace limit is
-    # reached; accept it only when the effective limit confirms that mechanism.
-    return error_number == errno.ENOSPC and max_namespaces == 1
+    # bubblewrap --disable-userns first applies its user.max_user_namespaces
+    # restriction, then --assert-userns-disabled independently tries to create
+    # a nested user namespace and exits nonzero if that succeeds. A completed
+    # command with both options therefore supplies the needed setup assertion;
+    # the direct probe may report EPERM, EACCES, or ENOSPC for the denied call.
+    return error_number in (errno.EPERM, errno.EACCES, errno.ENOSPC)
 
 
 def _no_new_privs_and_limits() -> None:
@@ -407,6 +407,9 @@ def _base_argv(
         "--chdir",
         "/workspace",
         "--clearenv",
+        "--setenv",
+        "PWD",
+        "/workspace",
         "--setenv",
         "HOME",
         "/tmp",
@@ -677,6 +680,11 @@ def _run_bwrap(
             stderr_bytes.decode("utf-8", errors="replace"), MAX_OUTPUT_BYTES
         ),
         "sandbox_process_started": True,
+        "bwrap_user_namespace_disable_assertion_passed": (
+            status == "completed"
+            and "--disable-userns" in command
+            and "--assert-userns-disabled" in command
+        ),
         # bubblewrap can exit nonzero before starting Python. A zero exit proves
         # the requested verifier returned; a nonzero exit alone cannot distinguish
         # sandbox setup failure from a verifier failure.
@@ -746,6 +754,7 @@ try:
 except OSError:
     host_process_environment_unreadable = True
 required_environment_names = {
+    "PWD",
     "HOME",
     "TMPDIR",
     "PATH",
@@ -754,6 +763,7 @@ required_environment_names = {
     "LC_ALL",
 }
 allowed_environment_names = {
+    "PWD",
     "HOME",
     "TMPDIR",
     "PATH",
@@ -809,9 +819,11 @@ runtime_environment_unexpected_categories["other_name"] = bool(
     runtime_environment_unexpected - classified_environment_names
 )
 runtime_environment_unexpected_count = len(runtime_environment_unexpected)
+working_directory_environment_sanitized = os.environ.get("PWD") == "/workspace"
 runtime_environment_sanitized = (
     not runtime_environment_missing_required
     and runtime_environment_unexpected_count == 0
+    and working_directory_environment_sanitized
 )
 
 try:
@@ -935,6 +947,7 @@ print(json.dumps({
     "inherited_socket_fds": socket_fds,
     "scratch_write_allowed": scratch_write_allowed,
     "runtime_environment_sanitized": runtime_environment_sanitized,
+    "working_directory_environment_sanitized": working_directory_environment_sanitized,
     "runtime_environment_missing_required": runtime_environment_missing_required,
     "runtime_environment_unexpected_count": runtime_environment_unexpected_count,
     "runtime_environment_unexpected_categories": runtime_environment_unexpected_categories,
@@ -1010,16 +1023,22 @@ print(json.dumps({
             != parsed.get("host_namespace_ids", {}).get("uts"),
             "no_effective_capabilities": isinstance(parsed, dict)
             and parsed.get("cap_eff") == "0000000000000000",
+            "bwrap_user_namespace_disable_assertion_passed": result.get(
+                "bwrap_user_namespace_disable_assertion_passed"
+            )
+            is True,
             "nested_user_namespace_denied": isinstance(parsed, dict)
             and _nested_user_namespace_denied(
                 parsed.get("user_namespace_result"),
                 parsed.get("user_namespace_errno"),
-                parsed.get("max_user_namespaces"),
+                result.get("bwrap_user_namespace_disable_assertion_passed") is True,
             ),
             "evaluator_marker_unreadable": isinstance(parsed, dict)
             and parsed.get("marker_read_denied") is True,
             "runtime_environment_is_allowlisted": isinstance(parsed, dict)
             and parsed.get("runtime_environment_sanitized") is True,
+            "working_directory_environment_is_sandboxed": isinstance(parsed, dict)
+            and parsed.get("working_directory_environment_sanitized") is True,
             "sandbox_pid1_environment_secret_unavailable": isinstance(parsed, dict)
             and parsed.get("sandbox_pid1_environment_secret_unavailable") is True,
             "host_process_environment_unreadable": isinstance(parsed, dict)
@@ -1079,9 +1098,13 @@ print(json.dumps({
             "nested_user_namespace_errno": (
                 parsed.get("user_namespace_errno") if isinstance(parsed, dict) else None
             ),
-            "max_user_namespaces": (
+            "observed_proc_max_user_namespaces": (
                 parsed.get("max_user_namespaces") if isinstance(parsed, dict) else None
             ),
+            "bwrap_user_namespace_disable_assertion_passed": result.get(
+                "bwrap_user_namespace_disable_assertion_passed"
+            )
+            is True,
             "runtime_environment_missing_required": (
                 parsed.get("runtime_environment_missing_required")
                 if isinstance(parsed, dict)
