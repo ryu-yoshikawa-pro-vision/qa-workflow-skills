@@ -10,7 +10,7 @@
 
 capture後の保存コピー完全性検査を追加し、`captured-output`側だけの変更を検出する回帰を確認した。Dockerless replayはDockerに依存しない既存のsemantic比較経路へ接続済みで、`verify`と`workflow-runtime`を別々に検査する。候補PythonをEvaluator processへimportせず、root所有bubblewrapが作るuser/PID/mount/IPC/UTS namespaceで起動する。
 
-GitHub runnerでは2方式のnetwork namespace作成が権限で失敗したため、現在はsealed cBPF seccompでsocket作成・通信syscall、io_uring、x32 ABIを拒否し、network syscall denialを実測する方式へ切り替えた。**この方式の必須CI probeは次のcommitで再確認する必要がある。** Probe未確認の状態では、候補Verifierを起動しない。保存済みQTS runtime requestのDockerless replayとStage 3の正式受入は未達である。
+GitHub runnerではnetwork namespaceの2方式が権限で失敗したため、現在はsealed cBPF seccompでsocket作成・通信syscall、io_uring、x32 ABIを拒否する方式を必須probeで検証する。commit `970cf6b367516a6fdd39a10da231fea934867002`のCIではbubblewrapが`setting up uid map: Permission denied`で止まり、probeは`evidence_unverified`、候補Verifierは未実行だった。Probe未確認の状態では、候補Verifierを起動しない。保存済みQTS runtime requestのDockerless replayとStage 3の正式受入は未達である。
 
 ## Stage 2証拠との照合
 
@@ -58,12 +58,13 @@ raw run rootに`evidence-index.md`はなかった。保存された`result.json`
 
 - `6e45bb1`のCode Quality必須probeは、bubblewrapのnetwork namespace loopback setupが`RTM_NEWADDR: Operation not permitted`となり失敗。
 - `9eee339`のCode Quality必須probeは、util-linux `unshare`が`/proc/self/uid_map: Operation not permitted`となり失敗。candidate verifierは実行していない。他の4 workflowは成功。
-- seccomp方式の次commitで、同じ`PR17_REQUIRE_VERIFIER_ISOLATION=1`の必須probeを再実行する。ここで成功して初めてCI runner上の合成隔離境界を検証済みとする。CI probe成功だけでは、保存済みQTS requestのreplayやAgent tool traceを証明しない。
+- `970cf6b`のseccomp方式も、Code Quality runnerがuser namespace UID mapを作れず必須probeに失敗した。`bwrap` stderrは`setting up uid map: Permission denied`、candidate verifierは未実行。他の4 workflowは成功。Static formatting/lint stepsはprobeより後だったため、このrunでは実行されなかった。
+- 次commitでは必須probeをCode Quality jobの最後へ移し、独立したformatter/lint/whitespace検査が境界probe失敗でskipされないようにする。probe自体はstrictのまま保つ。GitHub runnerがuser namespace境界を提供しない限りDockerless verifierは`evidence_unverified`で停止する。
 
 ## 未達・制約
 
 - 現開発containerにはbubblewrapがなく、ローカルの実隔離probeは未実施。candidate sourceはfail-closedで起動していない。
-- 次のCIでseccomp方式のprobeが全条件を満たすまで、Dockerless independent verifierの安全な実行境界は`unverified`。CIが失敗した場合も通常Python実行へfallbackしない。
+- 現行GitHub-hosted runnerではbubblewrap UID mapがpermission deniedで、user namespace boundaryを利用できない。Dockerless independent verifierの安全な実行境界は`unverified`。別方式の管理者実行や通常Python processへfallbackしない。
 - 保存済み第2段階runは現行Evaluator revisionと異なり、適切な固定source/requestの対応を再構成できていない。`verify` requestの独立replayは未実施。raw runに`workflow-runtime` invocationはなく、そのreplayも未実施。両経路のsemantic comparisonはunit test済みだが、実隔離下のcandidate/fixed/result比較は未達。
 - QTS capture integrityの結果は両元attemptとも一致し、attemptの`needs_review`を維持した。runtime capture不足・重複invocation、Judge未実施、meaningful traceability、`can_complete=false`のQA品質判定は既存の未達として残る。
 - QTS製品コード・仕様・Seed/Reset・製品test、元Stage 2 raw evidenceは変更していない。

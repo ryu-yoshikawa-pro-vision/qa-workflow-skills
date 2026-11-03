@@ -45,11 +45,6 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bubblewrap
           bwrap --version
 
-      - name: Probe Dockerless runtime verifier isolation
-        env:
-          PR17_REQUIRE_VERIFIER_ISOLATION: "1"
-        run: python -m unittest scripts.skills.evals.agent.tests.test_isolated_verifier -v
-
       - name: Test tracked formatter contracts
         run: python -m unittest discover -s tests -p 'test_format_tracked.py' -v
 
@@ -61,3 +56,8 @@ jobs:
 
       - name: Check patch whitespace
         run: python .github/check_patch_whitespace.py
+
+      - name: Probe Dockerless runtime verifier isolation
+        env:
+          PR17_REQUIRE_VERIFIER_ISOLATION: "1"
+        run: python -m unittest scripts.skills.evals.agent.tests.test_isolated_verifier -v
