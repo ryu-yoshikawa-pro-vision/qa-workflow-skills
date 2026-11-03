@@ -160,22 +160,24 @@ jobs:
           test "$source_owner" = apparmor-profiles
           echo 'packaged_profile_metadata=verified'
           sha256sum "$profile_source"
-          require_profile_fragment() {
-            local fragment="$1"
+          require_profile_pattern() {
+            local pattern="$1"
             local description="$2"
-            if grep -Fq "$fragment" "$profile_source"; then
+            if grep -Eq "$pattern" "$profile_source"; then
               printf 'packaged_profile_contract=%s\n' "$description"
             else
               printf 'packaged_profile_contract_missing=%s\n' "$description" >&2
-              grep -nE '^[[:space:]]*(abi|profile)|userns|allow pix|audit deny capability|flags=' "$profile_source" >&2 || true
+              printf 'packaged_profile_source_begin\n' >&2
+              sed -n '1,120p' "$profile_source" >&2
+              printf 'packaged_profile_source_end\n' >&2
               exit 1
             fi
           }
-          require_profile_fragment 'profile bwrap /usr/bin/bwrap' 'bwrap_attachment'
-          require_profile_fragment 'profile unpriv_bwrap' 'unprivileged_child_profile'
-          require_profile_fragment 'allow userns,' 'user_namespace_permission'
-          require_profile_fragment 'allow pix /** -> &bwrap//&unpriv_bwrap' 'capability_stripping_child_transition'
-          require_profile_fragment 'audit deny capability,' 'child_capability_denial'
+          require_profile_pattern '^[[:space:]]*profile[[:space:]]+bwrap[[:space:]]+/usr/bin/bwrap([[:space:]]|$)' 'bwrap_attachment'
+          require_profile_pattern '^[[:space:]]*profile[[:space:]]+unpriv_bwrap([[:space:]]|$)' 'unprivileged_child_profile'
+          require_profile_pattern '^[[:space:]]*allow[[:space:]]+userns,[[:space:]]*(#.*)?$' 'user_namespace_permission'
+          require_profile_pattern '^[[:space:]]*allow[[:space:]]+pix[[:space:]]+/\*\*[[:space:]]+->[[:space:]]+&bwrap//&unpriv_bwrap,' 'capability_stripping_child_transition'
+          require_profile_pattern '^[[:space:]]*audit[[:space:]]+deny[[:space:]]+capability,' 'child_capability_denial'
           if grep -Eq '^[[:space:]]*profile[[:space:]].*flags=[^}]*complain' "$profile_source"; then
             echo 'Refusing non-enforcing packaged profile.' >&2
             exit 1
