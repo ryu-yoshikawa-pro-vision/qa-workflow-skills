@@ -98,27 +98,17 @@ class IsolatedVerifierTests(unittest.TestCase):
 
     def test_nested_user_namespace_denial_matches_bwrap_limit_contract(self) -> None:
         self.assertTrue(
-            isolated_verifier._nested_user_namespace_denied(
-                -1, errno.EPERM, 58109
-            )
+            isolated_verifier._nested_user_namespace_denied(-1, errno.EPERM, 58109)
         )
         self.assertTrue(
-            isolated_verifier._nested_user_namespace_denied(
-                -1, errno.ENOSPC, 1
-            )
+            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, 1)
         )
         self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(
-                -1, errno.ENOSPC, 2
-            )
+            isolated_verifier._nested_user_namespace_denied(-1, errno.ENOSPC, 2)
         )
+        self.assertFalse(isolated_verifier._nested_user_namespace_denied(0, 0, 1))
         self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(0, 0, 1)
-        )
-        self.assertFalse(
-            isolated_verifier._nested_user_namespace_denied(
-                -1, errno.EINVAL, 1
-            )
+            isolated_verifier._nested_user_namespace_denied(-1, errno.EINVAL, 1)
         )
 
     def test_synthetic_boundary_probe_script_is_valid_python(self) -> None:
