@@ -353,7 +353,7 @@ def _base_argv(
         "usr/lib",
         "/lib",
         "--symlink",
-        "usr/lib",
+        "usr/lib64",
         "/lib64",
         "--symlink",
         "usr/bin",

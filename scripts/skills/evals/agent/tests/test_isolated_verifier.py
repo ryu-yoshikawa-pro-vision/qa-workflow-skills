@@ -353,6 +353,11 @@ class IsolatedVerifierTests(unittest.TestCase):
                     self.assertEqual(command[0], "/usr/bin/bwrap")
                     self.assertIn("--seccomp", command)
                     self.assertNotIn("--unshare-net", command)
+                    lib64_link_index = command.index("/lib64")
+                    self.assertEqual(
+                        command[lib64_link_index - 2 : lib64_link_index + 1],
+                        ["--symlink", "usr/lib64", "/lib64"],
+                    )
                     spawn_kwargs = popen.call_args.kwargs
                     self.assertTrue(spawn_kwargs["close_fds"])
                     self.assertEqual(
