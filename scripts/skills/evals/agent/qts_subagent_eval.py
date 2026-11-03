@@ -33,7 +33,6 @@ from .prompt_builder import build_qa_training_store_generation_prompt
 from .public_artifact_index import validate as validate_public_artifact_index
 from .target_workspace import (
     DEFAULT_TARGET_REVISION,
-    _scan_workspace,
     prepare_sanitized_target,
     verify_workspace_unchanged,
 )

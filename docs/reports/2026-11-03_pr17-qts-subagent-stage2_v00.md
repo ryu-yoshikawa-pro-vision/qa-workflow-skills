@@ -74,8 +74,8 @@ Git管理外の証拠root：
 - `compileall`：成功。
 - dprint check（READMEと変更Pythonファイル）：成功。
 - `git diff --check`：成功。
-- Ruff：ローカルvenvに`ruff` moduleがなく未実施（`No module named ruff`）。CI Code Qualityで再確認する。
-- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`のGitHub Actions 5 workflowはすべて成功。今回の変更後CIはpush後に確認する。
+- Ruff：ローカルvenvに`ruff` moduleがなく未実施（`No module named ruff`）。commit `4ee7c7814f5acae20ad239bc10ea60f79bb820be`のCode Qualityで`qts_subagent_eval.py`に未使用import 1件が検出されたため削除した。修正後のCode Qualityを含むActionsはfollow-up commit後に確認する。
+- 作業開始時のPR HEAD `296e64919a61617243b22f56b3bb3edd16693244`のGitHub Actions 5 workflowはすべて成功。commit `4ee7c7814f5acae20ad239bc10ea60f79bb820be`ではSemantic Output EvalsとAgent Skillsが成功、Code Qualityが上記lint違反で失敗し、Deterministic Output EvalsとCodex Harnessは確認時に実行中だった。follow-up後の最終workflow状態はPRで確認する。
 
 ## 未検証・次工程
 
