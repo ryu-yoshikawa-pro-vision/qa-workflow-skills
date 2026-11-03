@@ -1,10 +1,60 @@
 # 実Agent評価ランナー
 
-この正式runnerは、指定した`qa-workflow-skills` Git revisionのSkill packageを一時領域へ展開し、実Agentで生成した結果を固定Evaluatorの既存grader / Judgeで評価します。評価結果と機械判定をattempt単位で保存します。既存Skillの通常実行経路やSkill packageの配置規則は変更しません。
+現行の開発用経路では、Codexホストがサブエージェントを起動し、`subagent_eval.py`が固定Eval Input・Skill packageを準備して、戻り成果物を完全性検証後に既存graderへ渡します。既存の外部CLI runnerは互換用に残していますが、その旧認証・隔離経路はfail-closedを維持し、今回の開発用経路では起動しません。どちらの経路もattempt単位で結果を保存し、Skill本体の実行経路やpackage配置規則は変更しません。
 
-正式runnerのCodex Agent / Judge / RepairはWSL2 Ubuntuの二重bubblewrap方式で起動します。実行profile、実効command、run結果は秘密情報を含めず、run単位の`.agent-eval-runs/`へ置きます。このdirectoryはGit管理対象外です。通常CIは外部LLMを呼ばず、fake Agent / Judgeの契約テストだけを実行します。QTSのCodexを使わないdeterministic verifierは既存の固定Docker image契約を維持します。
+サブエージェント経路は固定Codex CLI、専用WSL2 account、認証store、bubblewrap、Dockerを使いません。親セッションと共有するファイル権限からの物理read-denial、実効model/build、process独立性は検証されず、結果に`unverified`として記録します。通常CIは外部LLMを呼ばず、Agent / Judgeの契約テストだけを実行します。旧runnerや旧QTS verifierの固定環境要件を、この開発用経路の完了条件へ読み替えません。
 
-## 開発用の実Agent比較
+## Codexホストのサブエージェント経路
+
+この経路はPythonからサブエージェントを起動しません。Codexホストが指定model・reasoning・`fork_turns`でAgentを起動し、親セッションが結果を所定のattemptへ保存します。PythonはEval Inputと固定Skill revisionの準備、handoffの検査、既存graderの実行、結果保存を行います。旧`run.py`、認証・隔離launcherのfail-closedは変更せず、この開発用経路へ流用しません。
+
+次の例は既存deterministic Eval Inputを2 attempt分準備します。出力先は新規・空のGit-ignored `.agent-eval-runs/`配下でなければなりません。
+
+```bash
+RUN_ROOT=".agent-eval-runs/subagent-tr-out-013-$(date -u +%Y%m%dT%H%M%SZ)"
+python -m scripts.skills.evals.agent.subagent_eval prepare \
+  --suite deterministic \
+  --skill test-requirement-design \
+  --eval-id TR-OUT-013 \
+  --skill-revision "$(git rev-parse HEAD)" \
+  --output-root "$RUN_ROOT" \
+  --repeat 2 \
+  --model gpt-6-luna \
+  --reasoning-effort max \
+  --fork-turns none
+```
+
+`result.json`の各`attempt_id`に対して、Agentホストで以下を行います。
+
+1. `attempts/<attempt_id>/agent-visible/task.md`と、その同じ`agent-visible/.agents/skills/<skill>/`だけを生成要求に使う。expected、grader、rubric、Reference、別attempt成果物は渡さない。
+2. 要求model・reasoning・`fork_turns`をCodexホストのサブエージェント起動時に指定し、実効設定を確認できなければ未検証のままにする。共有workspaceによる物理的read-denialは保証できず、結果にも`unverified`で残る。
+3. サブエージェントが返したMarkdown bytesを、親ホストから`capture`のstdinへ渡す。secret scan・UTF-8・size検査を通過した場合だけ`handoff/output.md`へ保存する。Agent出力をargvや新しい一時ファイルへ複製しない。実行前に成果物がなければ`seal`を`not_started`または実際の失敗状態で実行する。
+4. 親ホストが観測した実行状態をsealし、固定graderを実行する。
+
+```bash
+# ホストが返却文をメモリ上のAGENT_OUTPUTへ渡した後、captureへstdinで接続する。
+printf '%s' "$AGENT_OUTPUT" | python -m scripts.skills.evals.agent.subagent_eval capture \
+  --run-root "$RUN_ROOT" \
+  --attempt-id <attempt-id>
+
+python -m scripts.skills.evals.agent.subagent_eval seal \
+  --run-root "$RUN_ROOT" \
+  --attempt-id <attempt-id> \
+  --execution-status completed \
+  --artifact-attempt-id <attempt-id> \
+  --started-at <host-observed-ISO-8601> \
+  --finished-at <host-observed-ISO-8601>
+
+python -m scripts.skills.evals.agent.subagent_eval grade \
+  --run-root "$RUN_ROOT" \
+  --attempt-id <attempt-id>
+```
+
+`capture`は秘密らしい値を含む返却文をディスク保存せず、そのattemptを`needs_review`として記録します。`seal`は親ホストが報告したstatus・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。署名済みhost telemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。
+
+Deterministic suiteは既存`deterministic.run.grade()`へ渡し、Skill-local runtime evidenceを含む既存検査を維持します。Semantic suiteの生成成果物は保存したうえで、既存`build_judge_prompt()`による別Judge要求を`evaluator-private/`へ作成して`awaiting_judge`にします。Judge応答を取り込んでいない段階ではPASSにしません。Judge結果の取込・承認検証は後続工程です。
+
+## 開発用実Agent評価の共通注意
 
 Skillの開発・診断では、正式runnerの認証・隔離条件が未達でも、既存CodexセッションからSkillを実行して既存deterministic graderへ接続する比較を行えます。これは正式評価の代替ではなく、launcherのfail-closedを解除しません。PR #17では2026-10-31に、Codexセッションのサブエージェントを1 attemptずつ逐次起動する方法を使用し、`test-requirement-design`でbaseline / candidateを各2回比較しました。手順、評価結果、Agent / workspaceのアクセス制約は[比較報告](../../../../docs/reports/2026-10-31_pr17-flexible-agent-evaluation_v00.md)を参照してください。
 
@@ -13,15 +63,17 @@ Skillの開発・診断では、正式runnerの認証・隔離条件が未達で
 - baselineとcandidateのSkill revision、同じEval Input、Evaluator、Agentの実効model / reasoning設定を固定し、attemptごとの成果物・grader結果・hashを保存する。
 - Agentへは対象Skill packageと対象入力のみを渡す。expected、Reference、rubric、grader、他attempt結果はpromptやAgent向けstaging directoryへ含めない。
 - target内でPython helperやSkill scriptを使う場合は`PYTHONDONTWRITEBYTECODE=1 python -B`を指定します。runtime capture helperも`-B`で起動し、bytecodeを抑止してもtarget integrity検査は省略しません。
-- 共有workspace等で物理的read-denialを証明できない場合はその制約を記録し、結果を開発用の実動作比較として扱う。独立Judgeによる正式判定や自動修正の根拠にはしない。
-- 既存の`run.py`、launcher、認証停止、Judge承認条件を回避・緩和しない。semantic判定を自動修正の根拠にするのは承認・検証済みJudgeまたは根拠付き人間確認に限る。
-- 新しい実Agent runnerを追加せず、可能な範囲は既存CLIと既存graderを再利用する。
+- 共有workspace等で物理的read-denialを証明できない場合はその制約を記録し、結果を開発用の実動作比較として扱う。意味評価は承認・検証済みJudgeまたは根拠付き人間確認がなければ未判定とする。
+- 既存の`run.py`、旧launcherの認証停止、Judge承認条件を回避・緩和しない。deterministic評価は既存graderで独立に判定し、semantic判定をPASSへ読み替えない。
+- サブエージェント起動APIをPython側に仮装しない。ホスト起動は明示的な手順とし、入力準備・成果物取込・完全性確認・固定grader・結果保存は既存package manifestとgraderを再利用する。
 
 ### QTSのartifact-index自己検査
 
 固定QTSシナリオの開発用評価では、sanitized targetへ公開チェッカー `.qa-eval-tools/validate_artifact_index.py` と、公開済みscenarioから作る構造契約だけを配置します。チェッカーはJSON schema、必須artifactの登録、Markdown path、routing参照、未登録Markdownを検査します。routing statusの意味やQA成果物本文の品質は判定せず、正解routing、expected、rubric、Judge fixtureも渡しません。Evaluator側の `validate_artifact_index()` と内容レビューを置き換えるものではありません。
 
-## 2026-10-31 認証・隔離と異常終了の状態
+## 旧CLI runnerの認証・隔離と異常終了の履歴
+
+以下は旧専用runner方式の検証記録・運用説明です。2026-11-03の採用方針では、この方式は現行実行経路ではなく、下記のWSL2/認証/Docker前提を満たすまで新方式を停止する条件にもなりません。旧launcherのfail-closed自体は維持します。
 
 HEAD `8801520f1a7c32979a3a0507fa555fd9f7cea5f8`に対する保存済みsynthetic isolation probeは`verified`で、16 required checksがすべてtrueです。記録された固定CLIは`0.163.0`、binary SHA-256は`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`、`model_api_used=false`です。evidenceは`.agent-eval-runs/pr17-residual-formal-smoke-20261031-01/isolation.json`です。これは実認証や同一UID process起動制御の証明ではありません。
 
@@ -43,14 +95,15 @@ marker後の復旧には`--operator-recover-auth --confirm-discard-uncertain-aut
 
 | Module                                       | 用途                                                                                  |
 | -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| scripts.skills.evals.agent.run               | deterministic / semantic case、Skill単位、明示されたall batch                         |
+| scripts.skills.evals.agent.subagent_eval     | Codexホストのhandoff準備、成果物取込、integrity確認、既存grader接続                   |
+| scripts.skills.evals.agent.run               | 旧CLI経路のdeterministic / semantic case、Skill単位、明示されたall batch              |
 | scripts.skills.evals.agent.isolation_probe   | WSL2、outer/inner bubblewrap、固定binary、mount、namespace、FD、network、evidence検証 |
 | scripts.skills.evals.agent.qa_training_store | 固定qa-training-store revisionのCheckout / Payment workflow評価                       |
 | scripts.skills.evals.agent.judge_validation  | 正常例・固定違反例でのJudge独立検証とレビュー用候補比較                               |
 | scripts.skills.evals.agent.compare           | 条件が一致するrun間のattempt / criterion比較                                          |
 | scripts.skills.evals.agent.improve           | 保存済みrunの分析、許可path限定修正、同条件での再評価                                 |
 
-## 実行前提
+## 旧専用runnerの実行前提（現行開発用経路では使用しない）
 
 - 評価ランナー本体はWSL2 Ubuntu内のclean Linux checkoutから起動します。Windows Python、Windows開発checkout、/mnt/c上のtarget checkoutは正式実行に使用しません。
 - Python 3.11と既存deterministic validator用PyYAML 6.0.3、Codex CLI Linux x64 0.163.0、そのpackageに同梱されたbwrap、最小runtimeとCA bundleを使います。追加system packageや管理者権限は避けます。
@@ -69,7 +122,7 @@ marker後の復旧には`--operator-recover-auth --confirm-discard-uncertain-aut
 - Codex source / 固定targetの既存ファイル・directoryはouter mountで個別にread-only bindします。Codex workspace-writeがsandbox準備で必要とするattempt-local workspace root、`.git`、`.codex`だけは一時領域として分離し、許可outputとRepair対象Skill以外の既存sourceは変更できません。実行前後manifestを比較し、単にworkspace全体をwrite可能にする方式は不適合です。
 - 通常CIは外部LLM、実認証、live Codex execを呼びません。fake Agent/Judge contract testsを実行します。実Codex sandbox smokeはWSL2のformal launcher経由で無認証のsynthetic inputだけに実行します。
 
-## 専用WSL2ユーザーの準備と本人ログイン
+## 旧専用WSL2ユーザーの準備と本人ログイン（現行経路では不要）
 
 専用account名は`qa-agent-eval`、homeの提案pathは`/var/lib/qa-agent-eval`です。これらは実環境に作成済みの値ではありません。2026-10-27のCodex実行環境ではWSL2 Ubuntu 24.04.4、通常ユーザー`sella` (UID/GID 1000)、専用accountなしを確認しました。`/home/sella`は他UIDからtraverseできず、固定runtimeと既存venvもその配下にあるため、service UIDから直接利用できません。`/etc/passwd`、既定WSLユーザー、systemd、通常ユーザーhome、認証storeは変更していません。管理者権限が得られなかったので、account・runtime・clean source checkout・専用Python環境の作成は保留です。
 
