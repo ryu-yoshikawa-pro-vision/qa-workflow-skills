@@ -77,7 +77,7 @@ Current-revisionの5 run groupには合計10 attempt recordがある。8件はAg
 - deterministic evaluation tests: 10 passed。
 - `compileall`: passed。
 - dprint check、`git diff --check`: passed。
-- ローカルRuffは未導入。Code Quality workflowで確認する。
+- ローカルRuffは未導入。初回Code Qualityで検出された2箇所のRuff format違反をcommit `8522c3e`で修正し、同HEADのCode Qualityを含むGitHub Actions 5件がすべてsuccessとなった。
 - Codexホストのsubagent callとrequested settingsを記録したが、実効model/build telemetryは取得していない。
 - expected等をtask/packageから分けたが、共有workspaceの物理的な読取拒否は未検証。これはformal/independent evaluationではない。
 - 独立Judge、formal runner、semantic evaluationは使用していない。固定QTS workflowやその未解決仕様は今回の対象ではない。
