@@ -44,7 +44,6 @@ _SECRET_RE = re.compile(
 _REQUIRED_BWRAP_OPTIONS = (
     "--unshare-user",
     "--unshare-pid",
-    "--unshare-net",
     "--unshare-ipc",
     "--unshare-uts",
     "--disable-userns",
@@ -192,12 +191,14 @@ def _sealed_script_fd(script_bytes: bytes) -> int:
         raise
 
 
-def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
+def _host_tools() -> tuple[Path, Path, Path, dict[str, Any]] | None:
     bwrap_name = shutil.which("bwrap")
-    if not bwrap_name:
+    unshare_name = shutil.which("unshare")
+    if not bwrap_name or not unshare_name:
         return None
     bwrap = Path(bwrap_name).resolve(strict=True)
-    if not _trusted_root_owned_file(bwrap):
+    unshare = Path(unshare_name).resolve(strict=True)
+    if not _trusted_root_owned_file(bwrap) or not _trusted_root_owned_file(unshare):
         return None
     try:
         help_result = subprocess.run(
@@ -218,6 +219,24 @@ def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
             check=False,
             shell=False,
         )
+        unshare_help_result = subprocess.run(
+            [str(unshare), "--help"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5,
+            check=False,
+            shell=False,
+        )
+        unshare_version_result = subprocess.run(
+            [str(unshare), "--version"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5,
+            check=False,
+            shell=False,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     help_text = (help_result.stdout + help_result.stderr).decode(
@@ -226,7 +245,20 @@ def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
     if (
         help_result.returncode != 0
         or version_result.returncode != 0
+        or unshare_help_result.returncode != 0
+        or unshare_version_result.returncode != 0
         or any(option not in help_text for option in _REQUIRED_BWRAP_OPTIONS)
+        or any(
+            option not in (unshare_help_result.stdout + unshare_help_result.stderr)
+            .decode("utf-8", errors="replace")
+            for option in (
+                "--user",
+                "--map-root-user",
+                "--net",
+                "--kill-child",
+                "--fork",
+            )
+        )
     ):
         return None
 
@@ -243,10 +275,16 @@ def _host_tools() -> tuple[Path, Path, dict[str, Any]] | None:
         return None
     if not _trusted_root_owned_file(python):
         return None
-    return bwrap, python, {
+    return bwrap, python, unshare, {
         "bwrap_version": version_result.stdout.decode("utf-8", errors="replace")
         .strip(),
         "bwrap_sha256": _sha256(read_regular_file_bytes(bwrap, max_bytes=50_000_000)),
+        "unshare_version": unshare_version_result.stdout.decode(
+            "utf-8", errors="replace"
+        ).strip(),
+        "unshare_sha256": _sha256(
+            read_regular_file_bytes(unshare, max_bytes=50_000_000)
+        ),
         "python_path": python.as_posix(),
         "python_sha256": _sha256(read_regular_file_bytes(python, max_bytes=50_000_000)),
     }
@@ -269,7 +307,6 @@ def _base_argv(
         "--new-session",
         "--unshare-user",
         "--unshare-pid",
-        "--unshare-net",
         "--unshare-ipc",
         "--unshare-uts",
         "--disable-userns",
@@ -357,6 +394,7 @@ def _run_bwrap(
     *,
     bwrap: Path,
     python: Path,
+    unshare: Path,
     source_dir: Path,
     in_sandbox_source: str,
     script_name: str,
@@ -432,7 +470,7 @@ def _run_bwrap(
             "source_fingerprint_before": source_fingerprint,
         }
     request_digest = _sha256(input_bytes)
-    command = _base_argv(
+    bwrap_command = _base_argv(
         bwrap=bwrap,
         python=python,
         script_fds=script_fds,
@@ -440,6 +478,21 @@ def _run_bwrap(
         script_name=script_name,
         inner_argv=inner_argv,
     )
+    # Some hosted kernels allow creating a network namespace but deny the
+    # RTM_NEWADDR operation bubblewrap uses to bring its loopback interface up.
+    # Create the isolated network namespace first with util-linux unshare, then
+    # let bubblewrap inherit it without attempting network setup. It contains no
+    # host interfaces, and the probe must still prove host-listener denial.
+    command = [
+        str(unshare),
+        "--user",
+        "--map-root-user",
+        "--net",
+        "--kill-child",
+        "--fork",
+        "--",
+        *bwrap_command,
+    ]
     # The bwrap launcher itself must not inherit CI, user, or auth credentials.
     host_env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C"}
     if synthetic_secret is not None:
@@ -588,7 +641,7 @@ def probe_isolation() -> dict[str, Any]:
             "reason": "required_bubblewrap_capabilities_unavailable",
             "candidate_executed": False,
         }
-    bwrap, python, runtime = host_tools
+    bwrap, python, unshare, runtime = host_tools
     with tempfile.TemporaryDirectory(prefix="pr17-verifier-probe-") as temporary:
         root = Path(temporary)
         source = root / "probe"
@@ -636,6 +689,9 @@ try:
         network_denied = False
 except OSError:
     network_denied = True
+interfaces = socket.if_nameindex()
+ipv4_routes = [line for line in Path("/proc/net/route").read_text().splitlines()[1:] if line.strip()]
+ipv6_routes = [line for line in Path("/proc/net/ipv6_route").read_text().splitlines() if line.strip()]
 try:
     Path("/tmp/probe-scratch").write_text("scratch")
     scratch_write_allowed = True
@@ -658,7 +714,7 @@ scratch_limits = {
     for path in ("/tmp", "/workspace")
 }
 pid = os.getpid()
-print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, "nspid": nspid, "parent_environment_secret_unavailable": parent_environment_secret_unavailable, "marker_read_denied": marker_read_denied, "root_write_denied": root_write_denied, "proc_write_denied": proc_write_denied, "dev_write_denied": dev_write_denied, "source_write_denied": source_write_denied, "user_namespace_denied": user_namespace_denied, "network_denied": network_denied, "scratch_write_allowed": scratch_write_allowed, "synthetic_secret_absent": "PR17_SYNTHETIC_SECRET" not in os.environ, "request": request.decode(), "limits": limits, "scratch_limits": scratch_limits}))
+print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, "nspid": nspid, "parent_environment_secret_unavailable": parent_environment_secret_unavailable, "marker_read_denied": marker_read_denied, "root_write_denied": root_write_denied, "proc_write_denied": proc_write_denied, "dev_write_denied": dev_write_denied, "source_write_denied": source_write_denied, "user_namespace_denied": user_namespace_denied, "network_denied": network_denied, "interfaces": interfaces, "ipv4_routes": ipv4_routes, "ipv6_routes": ipv6_routes, "scratch_write_allowed": scratch_write_allowed, "synthetic_secret_absent": "PR17_SYNTHETIC_SECRET" not in os.environ, "request": request.decode(), "limits": limits, "scratch_limits": scratch_limits}))
 '''
         probe_path.write_text(script, encoding="utf-8")
         source_fingerprint = canonical_fingerprint(_safe_tree(source))
@@ -671,6 +727,7 @@ print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, 
             result = _run_bwrap(
                 bwrap=bwrap,
                 python=python,
+                unshare=unshare,
                 source_dir=source,
                 in_sandbox_source="/probe",
                 script_name="probe.py",
@@ -722,6 +779,17 @@ print(json.dumps({"pid": pid, "no_new_privs": no_new_privs, "cap_eff": cap_eff, 
             and parsed.get("source_write_denied") is True,
             "network_namespace_blocked_host_listener": isinstance(parsed, dict)
             and parsed.get("network_denied") is True,
+            "network_namespace_has_no_external_interface": isinstance(parsed, dict)
+            and isinstance(parsed.get("interfaces"), list)
+            and all(
+                isinstance(interface, list)
+                and len(interface) == 2
+                and interface[1] == "lo"
+                for interface in parsed["interfaces"]
+            ),
+            "network_namespace_has_no_routes": isinstance(parsed, dict)
+            and parsed.get("ipv4_routes") == []
+            and parsed.get("ipv6_routes") == [],
             "bounded_scratch_available": isinstance(parsed, dict)
             and parsed.get("scratch_write_allowed") is True,
             "fixed_request_delivered": isinstance(parsed, dict)
@@ -769,6 +837,7 @@ time.sleep(30)
         timeout_execution = _run_bwrap(
             bwrap=bwrap,
             python=python,
+            unshare=unshare,
             source_dir=source,
             in_sandbox_source="/probe",
             script_name="timeout.py",
@@ -869,7 +938,7 @@ def run_isolated_python(
             "verifier_executed": False,
             "isolation_probe": probe,
         }
-    bwrap, python, runtime = host_tools
+    bwrap, python, unshare, runtime = host_tools
     result = _run_bwrap(
         bwrap=bwrap,
         python=python,

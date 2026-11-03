@@ -63,6 +63,14 @@ class IsolatedVerifierTests(unittest.TestCase):
         self.assertEqual(result["status"], "evidence_unverified")
         self.assertFalse(result["candidate_executed"])
 
+    def test_missing_unshare_does_not_provide_host_tools(self) -> None:
+        with patch.object(
+            isolated_verifier.shutil,
+            "which",
+            side_effect=lambda name: "/usr/bin/bwrap" if name == "bwrap" else None,
+        ):
+            self.assertIsNone(isolated_verifier._host_tools())
+
     def test_source_fingerprint_mismatch_stops_before_probe_or_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "scripts"
@@ -120,7 +128,12 @@ class IsolatedVerifierTests(unittest.TestCase):
                 patch.object(
                     isolated_verifier,
                     "_host_tools",
-                    return_value=(Path("/usr/bin/bwrap"), Path("/usr/bin/python3"), {}),
+                    return_value=(
+                        Path("/usr/bin/bwrap"),
+                        Path("/usr/bin/python3"),
+                        Path("/usr/bin/unshare"),
+                        {},
+                    ),
                 ),
                 patch.object(
                     isolated_verifier,
@@ -167,7 +180,12 @@ class IsolatedVerifierTests(unittest.TestCase):
                 patch.object(
                     isolated_verifier,
                     "_host_tools",
-                    return_value=(Path("/usr/bin/bwrap"), Path("/usr/bin/python3"), {}),
+                    return_value=(
+                        Path("/usr/bin/bwrap"),
+                        Path("/usr/bin/python3"),
+                        Path("/usr/bin/unshare"),
+                        {},
+                    ),
                 ),
                 patch.object(
                     isolated_verifier,
@@ -210,7 +228,12 @@ class IsolatedVerifierTests(unittest.TestCase):
                 patch.object(
                     isolated_verifier,
                     "_host_tools",
-                    return_value=(Path("/usr/bin/bwrap"), Path("/usr/bin/python3"), {}),
+                    return_value=(
+                        Path("/usr/bin/bwrap"),
+                        Path("/usr/bin/python3"),
+                        Path("/usr/bin/unshare"),
+                        {},
+                    ),
                 ),
                 patch.object(
                     isolated_verifier,
@@ -249,10 +272,11 @@ class IsolatedVerifierTests(unittest.TestCase):
                     isolated_verifier.subprocess,
                     "Popen",
                     return_value=process,
-                ):
+                ) as popen:
                     result = isolated_verifier._run_bwrap(
                         bwrap=Path("/usr/bin/bwrap"),
                         python=Path("/usr/bin/python3"),
+                        unshare=Path("/usr/bin/unshare"),
                         source_dir=source,
                         in_sandbox_source="/candidate",
                         script_name="runtime_contract.py",
@@ -260,6 +284,20 @@ class IsolatedVerifierTests(unittest.TestCase):
                         input_bytes=b"{}\n",
                         timeout_seconds=1,
                     )
+                    command = popen.call_args.args[0]
+                    self.assertEqual(
+                        command[:7],
+                        [
+                            "/usr/bin/unshare",
+                            "--user",
+                            "--map-root-user",
+                            "--net",
+                            "--kill-child",
+                            "--fork",
+                            "--",
+                        ],
+                    )
+                    self.assertNotIn("--unshare-net", command)
 
             self.assertTrue(result["sandbox_process_started"])
             self.assertEqual(result["verifier_executed"], expected_execution)

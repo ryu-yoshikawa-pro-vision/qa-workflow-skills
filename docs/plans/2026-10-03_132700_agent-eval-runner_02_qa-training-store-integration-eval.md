@@ -15,7 +15,7 @@
 
 ### 2026-11-03 第3段階の実装状態
 
-QTS `capture`後は、採点前にcapture manifest、元出力manifest、saved copy manifest、captured file list、各saved SHA-256 / sizeを照合する。redacted fileやcapture後に追加・削除・変更されたcopyは採点しない。Dockerless verifier replayは、Ubuntu Code Quality runnerに導入したOS bubblewrapの実効合成probeが成功した場合のみ、固定requestとsource snapshotを別process・read-only・network namespace内で実行する。`verify`と`workflow-runtime`を個別に比較し、未実行・不一致・timeout・environment errorを`pass`へ変換しない。これらは第3段階で追加した検査契約であり、保存済み第2段階runの結果を書き換えない。
+QTS `capture`後は、採点前にcapture manifest、元出力manifest、saved copy manifest、captured file list、各saved SHA-256 / sizeを照合する。redacted fileやcapture後に追加・削除・変更されたcopyは採点しない。Dockerless verifier replayは、root所有のOS `unshare`でuser/network namespaceを作ってからOS bubblewrapをそのnetwork namespace内で起動し、実効合成probeが成功した場合のみ固定requestとsource snapshotを別process・read-onlyで実行する。Code Quality runnerではbubblewrap自身によるloopback設定が`RTM_NEWADDR`権限拒否で失敗したため、network namespaceの作成とbubblewrap実行を分けた。境界probeはnetwork namespace内からhost listenerへ接続できないことを実測してから候補sourceを起動する。`verify`と`workflow-runtime`を個別に比較し、未実行・不一致・timeout・environment errorを`pass`へ変換しない。これらは第3段階で追加した検査契約であり、保存済み第2段階runの結果を書き換えない。
 
 現在の開発containerではbubblewrapがなく、候補Verifierを実行していない。CIの必須probe結果と保存済みQTS requestでのreplay結果は別に扱う。CI probeの成功だけで、過去QTS requestのreplay、元Agentのtool trace、Docker production replay、Judge、QTS全体の品質・完了を受け入れ済みとはしない。bubblewrapのOS境界が使えない環境は`evidence_unverified`で停止する。
 
