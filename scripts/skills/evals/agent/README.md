@@ -33,9 +33,9 @@ python -m scripts.skills.evals.agent.subagent_eval host-request \
   --attempt-id "$ATTEMPT_ID"
 ```
 
-`host-request`は現在のrun・attempt・prepared request・prompt・Skill package・空のhandoffを検証し、絶対path、要求設定、`host_launch_message`をJSONで返します。これは起動要求の作成だけを行うread-only preflightであり、サブエージェントを起動せず、実行状態や実効設定も観測しません。親ホストは返された`host_launch_message`を使い、返された`requested_settings`をCodexホストの起動時に指定します。物理的read-denial、実効model/build、process独立性は保証されず、証拠がなければ`unverified`のままです。
+`host-request`は現在のrun・attempt・prepared request・prompt・Skill package・空のhandoffを検証し、絶対`working_directory`、`task_path`、`skill_package_root`、`skill_entrypoint`、`submission_path`、attempt ID、要求設定、`host_launch_message`をJSONで返します。Skill packageは記録済みmanifestと照合された全ファイルを含みます。これは起動要求の作成だけを行うread-only preflightであり、サブエージェントを起動せず、実行状態や実効設定も観測しません。親ホストは返されたpathとattempt IDをそのまま使い、`host_launch_message`に従います。返された`requested_settings`をCodexホストの起動時に指定します。物理的read-denial、実効model/build、process独立性は保証されず、証拠がなければ`unverified`のままです。
 
-1. `host_launch_message`に従い、Codexホストから手動でAgentを起動する。Agentのコマンドは`tools.exec_command()`を使い、`workdir`に返された絶対`working_directory`を指定する。読む対象は返された`task_path`と同じattemptのSkill packageに限り、expected、grader、rubric、Reference、private情報、他attempt成果物を見ない。
+1. `host_launch_message`に従い、Codexホストから手動でAgentを起動する。Agentのコマンドは`tools.exec_command()`を使い、`workdir`に返された絶対`working_directory`をそのまま指定する。読む対象は返された`task_path`と`skill_package_root`以下の完全な同一attempt Skill packageに限る。packageを一部のファイルへ縮小せず、expected、grader、rubric、Reference、private情報、他attempt成果物を見ない。返された`attempt_id`と`artifact_attempt_id`を取り違えない。
 2. 起動直前と完了直後のhost観測時刻をUTCのISO-8601で記録し、hostが観測した実行statusと要求設定を記録する。Agentの自己申告だけで実効model/build、trace、Skill使用、隔離を検証済みにしない。
 3. サブエージェントは返された固定`submission_path`へ最終Markdownを保存する。親ホストは`capture --from-agent-visible`を実行し、固定パスの通常ファイル・単一link・size・UTF-8・secretを検査した後、SHA-256を記録して`handoff/output.md`へ取り込み、元の提出ファイルを削除する。Agentに返却内容を手動転記させない。提出ファイルが不正・欠落ならattemptを`needs_review`にし、`seal`や採点を行わない。
 4. capture成功後、`host-request`が返した`artifact_attempt_id`（=対象`attempt_id`）を`seal --artifact-attempt-id`へ明示してhost観測を記録し、固定graderを実行する。
@@ -60,9 +60,18 @@ python -m scripts.skills.evals.agent.subagent_eval grade \
   --attempt-id "$ATTEMPT_ID"
 ```
 
-`STARTED_AT`と`FINISHED_AT`には親ホストが観測した起動直前・完了直後のUTC時刻を入れます。失敗・timeout・未起動でartifactがない場合、completedやartifact IDを指定せず、観測したstatusを記録します。
+`STARTED_AT`と`FINISHED_AT`には親ホストが観測した起動直前・完了直後のUTC時刻を入れます。失敗・timeout・未起動でartifactがない場合、completedやartifact IDを指定せず、観測したstatusと短い`--execution-reason`を記録します。理由はホストからの申告内容であり、原因の独立検証ではありません。reasonなしの非completed sealは`needs_review`で停止します。
 
-`capture`は秘密らしい値を含む提出内容を評価保存先へ残さず、そのattemptを`needs_review`として記録します。agent-visible側の固定提出ファイルも取り込み後に削除します。`seal`は親ホストが報告したstatus・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。署名済みhost telemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。stdin captureは互換用に残りますが、長文を親が転記すると内容破損を検出できないため、新しいattemptでは固定提出ファイル経路を使用します。
+```bash
+# 例：ホスト側の起動前検査で停止した場合。観測した事実を短く記録する。
+python -m scripts.skills.evals.agent.subagent_eval seal \
+  --run-root "$RUN_ROOT" \
+  --attempt-id "$ATTEMPT_ID" \
+  --execution-status not_started \
+  --execution-reason "host preflight could not resolve the prepared task path"
+```
+
+`capture`は秘密らしい値を含む提出内容を評価保存先へ残さず、そのattemptを`needs_review`として記録します。agent-visible側の固定提出ファイルも取り込み後に削除します。`seal`は親ホストが報告したstatus・非完了時の診断理由・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。診断理由を含むホスト観測は署名済みtelemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。stdin captureは互換用に残りますが、長文を親が転記すると内容破損を検出できないため、新しいattemptでは固定提出ファイル経路を使用します。
 
 Deterministic suiteは既存`deterministic.run.grade()`へ渡し、Skill-local runtime evidenceを含む既存検査を維持します。Semantic suiteの生成成果物は保存したうえで、既存`build_judge_prompt()`による別Judge要求を`evaluator-private/`へ作成して`awaiting_judge`にします。Judge応答を取り込んでいない段階ではPASSにしません。Judge結果の取込・承認検証は後続工程です。
 
@@ -495,7 +504,7 @@ tracked manifestに未登録のdeterministicケースは、Agent生成完了後�
 1. 新しい`.agent-eval-runs/<run-id>/`を作り、`agent-visible/`と`evaluator-private/`を分けます。run開始前にEvaluator HEAD、Skill名、Eval ID、入力hash、baseline / candidate revisionとSkill package fingerprint、grader / runtime verifier revision、Agent設定、期待値hash（`evaluator-private`だけ）を記録します。全pathはrun rootからの相対pathにし、Agentが起動したらattemptごとの記録を新規作成します。
 2. Agent向けpackageはリポジトリのSkill directoryを丸ごとcopyせず、既存の`workspace.create_skill_workspace()`または`create_skill_workspace_from_root()`で作ります。これらは`SKILL.md`と`references/`、`scripts/`、`assets/`だけをpackage化し、`evals/`のexpected、validator、rubric、Referenceを除外します。Repairは`improve.py`の`_copy_allowed_skill_files()`と同じ許可範囲で対象Skillだけをstagingします。起動前にstaging manifestとdirectory treeを確認し、評価用ファイルが1つでも含まれていれば起動しません。
 3. 各attemptへ渡すのは固定した入力、対象Skill package、必要な出力先、実行に必要な資料だけです。baseline、candidate、repair、independent regressionを別attempt directoryに置きます。修正Agentへexpected、grader、Reference、独立回帰の入力・正解を渡さず、candidateを固定するまで独立回帰を生成Agentへ見せません。
-4. サブエージェントを使う場合は起動ごとに`model="gpt-6-luna"`、`reasoning_effort="max"`、`fork_turns="none"`を明示します。`subagent_eval host-request`の`host_launch_message`を変更せずAgentへ渡し、最初のtool操作で指定された絶対`working_directory`、`task_path`、`skill_entrypoint`を検査させます。確認に失敗した場合は相対pathを推測せず、そのattemptを生成前停止として記録します。`attempt.json`では要求値を`*_requested`として記録し、実効値を裏付けるtool telemetryがなければ`effective_*="unverified"`とします。生成開始、生成前停止、生成失敗、成果物生成を区別し、品質FAILを理由に再試行・attempt除外しません。
+4. サブエージェントを使う場合は起動ごとに`model="gpt-6-luna"`、`reasoning_effort="max"`、`fork_turns="none"`を明示します。`subagent_eval host-request`の`host_launch_message`を変更せずAgentへ渡し、最初のtool操作で指定された絶対`working_directory`、`task_path`、完全な`skill_package_root`、`skill_entrypoint`を検査させます。確認に失敗した場合は相対pathを推測せず、そのattemptを生成前停止として記録します。`seal`で非完了状態を記録するときは、実際に観測した起動・実行エラーの短い`--execution-reason`も保存します。これらはホスト申告であり、実行原因の独立検証とは区別します。`attempt.json`では要求値を`*_requested`として記録し、実効値を裏付けるtool telemetryがなければ`effective_*="unverified"`とします。生成開始、生成前停止、生成失敗、成果物生成を区別し、品質FAILを理由に再試行・attempt除外しません。
 5. Agent終了後、固定Evaluator側から次を実行します。manifest登録済みケースではexpectedはEvaluator内のmanifestから読み、held-out caseの場合だけEvaluator-privateのexpectedを`--expected-json`で指定します。Agent-visible rootにそのpathを置いてはいけません。
 
    ```bash

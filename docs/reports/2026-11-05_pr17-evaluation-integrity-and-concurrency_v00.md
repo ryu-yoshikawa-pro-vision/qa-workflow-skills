@@ -92,3 +92,47 @@ TCN-OUT-002の同じ2 raw outputに対する新Evaluatorの再採点は別ファ
 - TR-OUT-003は1件FAIL、1件が手順起因needs_reviewで、Skill起因の再現性は未確認。
 
 PR branchには`173aeddb831aff2b44d98e2f17918edbe4f6c89e`、`645e3a2ae9baef20d8d2f4b788e7b241a9ea44b4`、報告書の`e87716c6d25d13b01be24442773308bf388e292e`、formatter修正の`a64ee084d9fe69e7c031ef3ff21fdd676e492fcd`、CI結果の追記`f60fdbe3e1bf3343f63eb13bfaf3cf7f1ed5d1a7`を通常pushした。a64とf60のGitHub Actionsは各5件すべて成功。正式評価やSkillの改善成立とは扱わない。
+
+## 9. 継続確認（2026-11-05）
+
+この追記は保存済みrunを再分類したもので、新しいAgent attemptやgradeを作っていない。新規attemptは0件、累計inventoryは64件のまま。raw output、grade、request、manifest、candidate patchは変更していない。
+
+### `not_started` 11件の分類
+
+| 件数 | 観測された原因                                                                                                         | 分類                             |
+| ---: | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+|    1 | 親hostの指示がpackage全体ではなく2ファイルだけに制限し、taskを読む前に停止                                             | host起動指示の逸脱               |
+|    3 | prepared absolute working directoryを使わずpreflight                                                                   | host path / 手順誤り             |
+|    4 | handoff側が存在しない`skill_path` / `skill_package` keyを期待し、実際の`skill_entrypoint` / launch message契約と不一致 | host側のrequest consumer契約誤り |
+|    1 | `CreateProcess`に余分な空白を含むcwdを渡した                                                                           | host起動引数誤り                 |
+|    2 | attemptごとの説明記録がなく、原因を特定できない                                                                        | 証拠不足                         |
+
+意図的に実行しなかったattemptや実行環境機能の拒否を示す根拠はない。既知9件はhost起動・preflight手順側で、Skill品質FAILではない。残り2件は未知のまま保持する。過去のschema 1 handoffには理由がないものがあり、raw記録を後から変更しない。
+
+### Skill候補の再確認
+
+- `coverage-analysis / COV-OUT-001`: 修正Evaluator下でbaselineは1/2 PASS・1/2 FAIL、candidateは2/2 PASS。失敗は`RT-D016`の`Machine Entities` block欠落。candidate patchはoutput templateへ、runtime unitごとの3 blockを要求し、entity 0件時は実結果の空配列を表示する指示のみを追加する。独立`COV-OUT-002`はbaseline/candidateとも2/2 PASSで新規失敗なし。patch SHA-256は`7da356f94bbe5a291723176d844069c4e5ee5f2adbb870d720aaee20d4949bab`。一方、baseline欠落は1/2だけであり、baseline自体が不安定。また実Agentのhelper実行tool traceがないため、Skill指示が欠落の原因と完全には立証されていない。候補は採用判断用に保持するが、Skill品質改善成立とはしない。
+- `test-case-design / TC-OUT-001/002`: 保存済み比較では対象入力でcandidate 2/2 PASSだが、独立入力ではcandidate 1/2 PASS・1/2 FAIL。失敗attemptにはruntime Input / Result / Entitiesが一式なく、raw generator resultもhost tool traceもない。成功MarkdownのJSONだけではhelper実行を立証できず、「正しいraw resultの転記漏れ」という仮説も支持されない。原因はAgent omission・実行の揺れ・tool evidence不足から絞れないためcandidate patch SHA-256 `c4f8b560b8dc9b652d0f1c22f4b51ea0c1ca0662dc5ad4cf551d3891a8649243`をレビュー待ちで維持し、再修正しない。
+- `test-condition-design / TCN-OUT-002`: inputはSPEC-001のIDしかなく、本文・revision・currentnessが提供されないことを明示する。現行Skillはcurrent Authorityがない候補をactive CIへ昇格させない。expectedは維持済みで、再採点は32/32 PASS。これは入力・Evaluator整合の解決でありSkill改善ではない。`TCN-D016/D017`はcandidateのblocked dispositionとactive CI欠如を確認する。`TCN-OUT-001`は実際のPairwise組合せ生成を求める別fixtureだが、過去の実Agent gradingにはFAILがあり、正の意味品質が確認済みという扱いにはしない。既存契約に反する新しいSkill欠陥は今回確認できず、新candidateは作らない。
+
+### Eval Inputで確認できる範囲
+
+`test-case-design`の2入力はどちらも上流IDのみで本文・操作・期待条件がなく、仕様を創作せずblockできるかを主に測る。`test-condition-design`にはPairwise組合せを実際に生成する`TCN-OUT-001`と、Authority欠落を扱う`TCN-OUT-002`がある。`coverage-analysis`の2入力は未接続CIと孤立TRというtraceability gapを検出する。`test-requirement-design`にはblocked入力のほか、内容のある直接設計入力`TR-OUT-004/005`がある。よってcase designの正方向生成・Test Dataと期待結果の意味品質は、現在のdeterministic inputだけでは十分に確認されない。COVのgraph診断、TCNのpairwise positive、TRの直接設計も、それぞれの意味品質全体を保証しない。新規caseは仕様・expectedを独立に確定できる根拠がないため今回は追加しない。
+
+### 評価経路の修正
+
+`subagent_eval.py`のhandoff manifestをschema 2へ更新した。`not_started`、`failed`、`timed_out`のsealは短いhost報告理由を必須にし、manifestとrun recordの双方に保存して一致を検証する。理由はhost申告であり、真因の独立証明ではない。理由なしは`needs_review`で停止する。保存済みschema 1 handoffの検証互換を維持し、既存evidenceは書き換えない。
+
+`host-request`はabsolute `skill_package_root`を返し、launch messageはmanifest検証済みpackage全体（`SKILL.md`、references、scripts、assets）を縮小せず使うよう明記する。workdir、task、entrypoint、submission、attempt IDを同じrequestから使う。これはhostへの指示強化であり、親hostが従うことや物理read denialを証明するものではない。
+
+`improve.py`のAgent起動は自動化されていない。Codex hostが手動で起動し、Pythonはprepare / host-request / capture / seal / gradeを実行し、`compare-handoff`はrun間条件とassertionを比較する。原因分析、repairの実行、独立回帰の切替え、採用判断はhost側の明示操作である。存在しないPython agent APIは追加していない。
+
+検証結果：`test_subagent_eval` 39件、agent evaluation suite 280件（6 skip）、deterministic suite 28件、semantic suite 27件、関連runtime tests 40件、compileall、Ruff 0.16.8、dprint、`scripts/format_tracked.py check`（250 files）すべて成功。失敗した最初のformat checkは適用前のRuff整形差分だけで、整形後は成功した。新規実Agent評価は行っていない。
+
+### 現時点の判定
+
+- Skill candidateの正式採用: 0件。
+- Skill全体の改善実証: 0件。
+- 評価基盤で今回修正した問題: 非完了attempt理由の欠落と、host requestにpackage rootが明示されない点。
+- run-root並行更新lock、capture/seal/grade競合対策は前HEADですでに存在し、複数processテストで保持を確認したため再実装していない。
+- 実効model/build、tool trace、Evaluator-only情報の物理read denial、正式runner、Judgeは未検証。

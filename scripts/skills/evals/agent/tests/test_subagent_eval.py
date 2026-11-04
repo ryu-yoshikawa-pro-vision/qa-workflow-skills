@@ -267,6 +267,9 @@ class SubagentEvalTests(unittest.TestCase):
             run_root=run_root,
             attempt_id=attempt_id,
             execution_status=status,
+            execution_reason=(
+                None if status == "completed" else f"host recorded {status}"
+            ),
             artifact_attempt_id=artifact_attempt_id,
             started_at="2026-11-03T10:00:00Z",
             finished_at="2026-11-03T10:00:01Z",
@@ -362,6 +365,7 @@ class SubagentEvalTests(unittest.TestCase):
         for field in (
             "working_directory",
             "task_path",
+            "skill_package_root",
             "skill_entrypoint",
             "submission_path",
         ):
@@ -369,15 +373,26 @@ class SubagentEvalTests(unittest.TestCase):
         visible = root / "attempts" / attempt_id / "agent-visible"
         self.assertEqual(Path(request["working_directory"]), visible)
         self.assertEqual(request["task_path"], str(visible / "task.md"))
-        self.assertEqual(
-            request["skill_entrypoint"],
-            str(visible / ".agents" / "skills" / SKILL / "SKILL.md"),
-        )
+        package_root = visible / ".agents" / "skills" / SKILL
+        self.assertEqual(request["skill_package_root"], str(package_root))
+        self.assertEqual(request["skill_entrypoint"], str(package_root / "SKILL.md"))
         self.assertEqual(request["submission_path"], str(visible / "submission.md"))
         self.assertFalse(Path(request["submission_path"]).exists())
         self.assertTrue(Path(request["submission_path"]).parent.is_dir())
         self.assertEqual(request["attempt_id"], attempt_id)
         self.assertEqual(request["artifact_attempt_id"], attempt_id)
+        package = json.loads((root / "result.json").read_text(encoding="utf-8"))[
+            "skill_package"
+        ]
+        self.assertTrue(package["files"])
+        for item in package["files"]:
+            relative = Path(item["path"]).relative_to(f"skills/{SKILL}")
+            staged = package_root / relative
+            self.assertTrue(staged.is_file(), item["path"])
+        self.assertIn("complete staged Skill package", request["host_launch_message"])
+        self.assertIn("Use the package in full", request["host_launch_message"])
+        self.assertIn(str(package_root), request["host_launch_message"])
+        self.assertIn(attempt_id, request["host_launch_message"])
         self.assertEqual(
             request["requested_settings"],
             {"model": "gpt-6-luna", "reasoning_effort": "max", "fork_turns": "none"},
@@ -693,6 +708,7 @@ class SubagentEvalTests(unittest.TestCase):
                 run_root=root,
                 attempt_id=attempt_id,
                 execution_status="failed",
+                execution_reason="captured handoff output disappeared before sealing",
             )
 
         record = json.loads((root / "result.json").read_text(encoding="utf-8"))
@@ -790,10 +806,102 @@ class SubagentEvalTests(unittest.TestCase):
         attempt_id = prepared["attempts"][0]["attempt_id"]
         manifest = self._seal(root, attempt_id, status="not_started")
         self.assertEqual(manifest["artifacts"], [])
+        self.assertEqual(manifest["execution_reason"], "host recorded not_started")
         saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["attempts"][0]["status"], "not_started")
+        self.assertEqual(
+            saved["attempts"][0]["host_execution"]["execution_reason"],
+            "host recorded not_started",
+        )
+        self.assertEqual(
+            saved["attempts"][0]["host_execution"]["verification"], "unverified"
+        )
         with self.assertRaisesRegex(AgentEvalError, "not ready for grading"):
             subagent_eval.grade_attempt(run_root=root, attempt_id=attempt_id)
+
+    def test_noncompleted_host_execution_requires_a_recorded_reason(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+
+        with self.assertRaisesRegex(AgentEvalError, "requires an execution reason"):
+            subagent_eval.seal_handoff(
+                run_root=root,
+                attempt_id=attempt_id,
+                execution_status="not_started",
+            )
+
+        saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["attempts"][0]["status"], "needs_review")
+        self.assertIn("requires an execution reason", saved["attempts"][0]["reason"])
+        self.assertFalse(
+            (root / "attempts" / attempt_id / "handoff" / "manifest.json").exists()
+        )
+
+    def test_completed_host_execution_rejects_failure_reason(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._write_output(root, attempt_id)
+
+        with self.assertRaisesRegex(AgentEvalError, "may not have a failure reason"):
+            subagent_eval.seal_handoff(
+                run_root=root,
+                attempt_id=attempt_id,
+                execution_status="completed",
+                execution_reason="host observed a launch error",
+                artifact_attempt_id=attempt_id,
+            )
+
+        saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["attempts"][0]["status"], "needs_review")
+
+    def test_noncompleted_manifest_reason_must_match_host_record(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._seal(root, attempt_id, status="not_started")
+        record_path = root / "result.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        row = record["attempts"][0]
+        row["host_execution"]["execution_reason"] = "different parent report"
+        attempt_root = root / "attempts" / attempt_id
+        record_path.write_text(
+            json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(AgentEvalError, "reason differs"):
+            subagent_eval._validate_handoff(root, record, row, attempt_root)
+
+    def test_legacy_v1_handoff_remains_valid_without_execution_reason(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._write_output(root, attempt_id)
+        self._seal(root, attempt_id)
+
+        attempt_root = root / "attempts" / attempt_id
+        manifest_path = attempt_root / "handoff" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["schema_version"] = 1
+        manifest.pop("execution_reason")
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        record_path = root / "result.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        row = record["attempts"][0]
+        row["host_execution"].pop("execution_reason")
+        row["handoff_manifest"]["sha256"] = sha256_bytes(manifest_path.read_bytes())
+        record_path.write_text(
+            json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        validated, output_path = subagent_eval._validate_handoff(
+            root, record, row, attempt_root
+        )
+
+        self.assertEqual(validated["schema_version"], 1)
+        self.assertEqual(output_path, attempt_root / "handoff" / "output.md")
 
     def test_failed_host_execution_is_saved_without_grading(self) -> None:
         root, prepared = self._prepare()
@@ -802,6 +910,7 @@ class SubagentEvalTests(unittest.TestCase):
             run_root=root,
             attempt_id=attempt_id,
             execution_status="timed_out",
+            execution_reason="parent host observed a timeout while awaiting the subagent",
             started_at="2026-11-03T10:00:00Z",
             finished_at="2026-11-03T10:01:00Z",
         )

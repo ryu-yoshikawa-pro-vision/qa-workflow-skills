@@ -37,7 +37,8 @@ from scripts.skills.evals.semantic.prompt_builder import build_judge_prompt
 
 REPO_ROOT = legacy_run.REPO_ROOT
 RUN_SCHEMA_VERSION = 1
-HANDOFF_SCHEMA_VERSION = 1
+HANDOFF_SCHEMA_VERSION = 2
+SUPPORTED_HANDOFF_SCHEMA_VERSIONS = {1, HANDOFF_SCHEMA_VERSION}
 ATTEMPT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 EXECUTION_STATUSES = {"completed", "failed", "timed_out", "not_started"}
 AGENT_SUBMISSION_NAME = "submission.md"
@@ -880,20 +881,23 @@ def _host_launch_request_locked(*, run_root: Path, attempt_id: str) -> dict[str,
 
     visible = visible.resolve(strict=True)
     task_path = (visible / "task.md").resolve(strict=True)
-    skill_entrypoint = (
-        visible / ".agents" / "skills" / row["skill"] / "SKILL.md"
-    ).resolve(strict=True)
+    skill_package_root = (visible / ".agents" / "skills" / row["skill"]).resolve(
+        strict=True
+    )
+    skill_entrypoint = (skill_package_root / "SKILL.md").resolve(strict=True)
     submission_path = visible / AGENT_SUBMISSION_NAME
     host_launch_message = (
         f"Work only on prepared attempt {attempt_id}. Use `tools.exec_command()` "
         f"with `workdir` set to the absolute directory `{visible}`. Read only "
-        f"`{task_path}` and the Skill package under "
-        f"`{visible / '.agents' / 'skills' / row['skill']}`. Follow the task and "
+        f"`{task_path}` and the complete staged Skill package rooted at "
+        f"`{skill_package_root}`. Use the package in full, including its "
+        "references, scripts, and assets; do not narrow it to selected files. "
+        f"Follow the task and "
         f"write the final Markdown only to `{submission_path}`. The submission "
         "file is expected not to exist before launch; check its parent directory "
         "instead of requiring the output file to pre-exist. Your first tool action "
         f"must verify `pwd`, `{task_path}`, and `{skill_entrypoint}` using "
-        "these exact absolute paths; if any check fails, stop and report the "
+        f"the exact absolute paths from attempt `{attempt_id}`; if any check fails, stop and report the "
         "check output without guessing a relative path. Do not inspect "
         "expected data, the grader, evaluator-private files, or any other attempt. "
         "Do not return a transcript copy of the artifact."
@@ -904,6 +908,7 @@ def _host_launch_request_locked(*, run_root: Path, attempt_id: str) -> dict[str,
         "artifact_attempt_id": attempt_id,
         "working_directory": str(visible),
         "task_path": str(task_path),
+        "skill_package_root": str(skill_package_root),
         "skill_entrypoint": str(skill_entrypoint),
         "submission_path": str(submission_path),
         "requested_settings": request["requested_settings"],
@@ -929,6 +934,7 @@ def _seal_handoff_impl(
     run_root: Path,
     attempt_id: str,
     execution_status: str,
+    execution_reason: str | None = None,
     artifact_attempt_id: str | None = None,
     started_at: str | None = None,
     finished_at: str | None = None,
@@ -938,6 +944,18 @@ def _seal_handoff_impl(
     row, attempt_root = _attempt(root, record, attempt_id)
     if execution_status not in EXECUTION_STATUSES:
         raise AgentEvalError("execution status is invalid")
+    if execution_status == "completed":
+        if execution_reason is not None:
+            raise AgentEvalError("completed execution may not have a failure reason")
+        normalized_execution_reason = None
+    else:
+        if not isinstance(execution_reason, str) or not execution_reason.strip():
+            raise AgentEvalError("non-completed execution requires an execution reason")
+        normalized_execution_reason = sanitize_diagnostic(
+            execution_reason.strip(), 1000
+        )
+        if not normalized_execution_reason:
+            raise AgentEvalError("non-completed execution reason is empty")
     if row.get("status") not in {"awaiting_agent", "output_captured"}:
         raise AgentEvalError("attempt is already sealed or was not prepared")
 
@@ -997,6 +1015,7 @@ def _seal_handoff_impl(
         "attempt_id": attempt_id,
         "request_sha256": request_sha,
         "execution_status": execution_status,
+        "execution_reason": normalized_execution_reason,
         "artifact_attempt_id": artifact_attempt_id,
         "observation_source": "parent_codex_session_recorded",
         "observation_verification": "unverified",
@@ -1018,6 +1037,7 @@ def _seal_handoff_impl(
     _write_new_json(manifest_path, manifest)
     row["host_execution"] = {
         "status": execution_status,
+        "execution_reason": normalized_execution_reason,
         "source": manifest["observation_source"],
         "verification": manifest["observation_verification"],
         "started_at": manifest["started_at"],
@@ -1050,6 +1070,7 @@ def seal_handoff(
     run_root: Path,
     attempt_id: str,
     execution_status: str,
+    execution_reason: str | None = None,
     artifact_attempt_id: str | None = None,
     started_at: str | None = None,
     finished_at: str | None = None,
@@ -1060,6 +1081,7 @@ def seal_handoff(
             run_root=root,
             attempt_id=attempt_id,
             execution_status=execution_status,
+            execution_reason=execution_reason,
             artifact_attempt_id=artifact_attempt_id,
             started_at=started_at,
             finished_at=finished_at,
@@ -1071,6 +1093,7 @@ def _seal_handoff_locked(
     run_root: Path,
     attempt_id: str,
     execution_status: str,
+    execution_reason: str | None = None,
     artifact_attempt_id: str | None = None,
     started_at: str | None = None,
     finished_at: str | None = None,
@@ -1080,6 +1103,7 @@ def _seal_handoff_locked(
             run_root=run_root,
             attempt_id=attempt_id,
             execution_status=execution_status,
+            execution_reason=execution_reason,
             artifact_attempt_id=artifact_attempt_id,
             started_at=started_at,
             finished_at=finished_at,
@@ -1107,32 +1131,50 @@ def _validate_handoff(
     handoff = attempt_root / "handoff"
     manifest_path = handoff / "manifest.json"
     manifest = _read_json(manifest_path)
-    _assert_keys(
-        manifest,
-        {
-            "schema_version",
-            "attempt_id",
-            "request_sha256",
-            "execution_status",
-            "artifact_attempt_id",
-            "observation_source",
-            "observation_verification",
-            "started_at",
-            "finished_at",
-            "requested_settings",
-            "effective_settings",
-            "skill_use_observation",
-            "artifacts",
-        },
-        "handoff manifest",
-    )
+    schema_version = manifest.get("schema_version")
+    base_manifest_keys = {
+        "schema_version",
+        "attempt_id",
+        "request_sha256",
+        "execution_status",
+        "artifact_attempt_id",
+        "observation_source",
+        "observation_verification",
+        "started_at",
+        "finished_at",
+        "requested_settings",
+        "effective_settings",
+        "skill_use_observation",
+        "artifacts",
+    }
     if (
-        manifest["schema_version"] != HANDOFF_SCHEMA_VERSION
-        or manifest["attempt_id"] != row["attempt_id"]
+        type(schema_version) is not int
+        or schema_version not in SUPPORTED_HANDOFF_SCHEMA_VERSIONS
     ):
+        raise AgentEvalError("handoff manifest schema version is unsupported")
+    manifest_keys = (
+        base_manifest_keys | {"execution_reason"}
+        if schema_version >= HANDOFF_SCHEMA_VERSION
+        else base_manifest_keys
+    )
+    _assert_keys(manifest, manifest_keys, "handoff manifest")
+    if manifest["attempt_id"] != row["attempt_id"]:
         raise AgentEvalError("handoff manifest identity does not match the attempt")
     if manifest["execution_status"] not in EXECUTION_STATUSES:
         raise AgentEvalError("handoff execution status is invalid")
+    if schema_version == 1:
+        execution_reason = None
+    else:
+        execution_reason = manifest["execution_reason"]
+        if manifest["execution_status"] == "completed":
+            if execution_reason is not None:
+                raise AgentEvalError("completed handoff may not have a failure reason")
+        elif (
+            not isinstance(execution_reason, str)
+            or not execution_reason.strip()
+            or sanitize_diagnostic(execution_reason.strip(), 1000) != execution_reason
+        ):
+            raise AgentEvalError("handoff execution reason is invalid")
     if manifest["artifacts"]:
         if manifest["artifact_attempt_id"] != row["attempt_id"]:
             raise AgentEvalError(
@@ -1155,6 +1197,11 @@ def _validate_handoff(
         raise AgentEvalError("recorded host execution evidence is malformed")
     if host_execution.get("status") != manifest["execution_status"]:
         raise AgentEvalError("handoff status differs from the recorded host status")
+    if (
+        schema_version >= HANDOFF_SCHEMA_VERSION
+        and host_execution.get("execution_reason") != execution_reason
+    ):
+        raise AgentEvalError("handoff execution reason differs from the host record")
 
     request_path = _request_path(attempt_root)
     request = _read_json(request_path)
@@ -1501,6 +1548,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     seal.add_argument(
         "--execution-status", choices=sorted(EXECUTION_STATUSES), required=True
     )
+    seal.add_argument(
+        "--execution-reason",
+        help="Required host-observed reason when execution did not complete.",
+    )
     seal.add_argument("--artifact-attempt-id")
     seal.add_argument("--started-at")
     seal.add_argument("--finished-at")
@@ -1554,6 +1605,7 @@ def main(argv: list[str] | None = None) -> int:
                 run_root=args.run_root,
                 attempt_id=args.attempt_id,
                 execution_status=args.execution_status,
+                execution_reason=args.execution_reason,
                 artifact_attempt_id=args.artifact_attempt_id,
                 started_at=args.started_at,
                 finished_at=args.finished_at,
