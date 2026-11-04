@@ -56,7 +56,7 @@
 - Runtime tests: 388 passed。
 - Deterministic evaluation tests: 28 passed。
 - 対象vertical integration tests: 4 passed。
-- 最初のpushでGitHub Code QualityはRuff format checkに失敗し、変更済みの2 Python fileでformatter差分を報告した。CIの差分どおり整形し、handoff tests 25件、runtime-validator tests 16件、compileall、dprint check、`git diff --check`を再実行して成功。Ruffはローカル未導入のため、修正後のCI rerunで確認する。
+- 最初のpushでGitHub Code QualityはRuff format checkに失敗し、変更済みの2 Python fileでformatter差分を報告した。CIの差分どおり整形し、handoff tests 25件、runtime-validator tests 16件、compileall、dprint check、`git diff --check`を再実行して成功。修正後のcommit `9b540df6d18cddaa9d7187b47d35cb577581e7e5`ではGitHub Actions 5 workflowがすべて成功し、CI環境のRuff format checkも成功した。Ruffはローカル未導入。
 
 ## 最終結論
 
