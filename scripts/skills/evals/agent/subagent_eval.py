@@ -697,6 +697,101 @@ def prepare_run(
     }
 
 
+def host_launch_request(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    """Validate one prepared attempt and return its host-side launch handoff."""
+    root = _safe_run_root(run_root)
+    record = _load_run(root)
+    row, attempt_root = _attempt(root, record, attempt_id)
+    if row.get("status") != "awaiting_agent":
+        raise AgentEvalError("attempt is not waiting for an Agent launch")
+
+    visible = attempt_root / "agent-visible"
+    _assert_no_symlink_components(visible)
+    if not visible.is_dir():
+        raise AgentEvalError("Agent-visible workspace is missing")
+    submission = visible / AGENT_SUBMISSION_NAME
+    if submission.exists() or submission.is_symlink():
+        raise AgentEvalError("stale Agent-visible submission already exists")
+    handoff = attempt_root / "handoff"
+    _assert_no_symlink_components(handoff)
+    if not handoff.is_dir():
+        raise AgentEvalError("handoff directory is missing")
+    if any(handoff.iterdir()):
+        raise AgentEvalError("handoff directory is not empty before Agent launch")
+
+    _validate_prepared_inputs(root, record, row, attempt_root)
+    request_path = _request_path(attempt_root)
+    request_bytes = _regular_file(request_path)
+    request_sha = sha256_bytes(request_bytes)
+    if row.get("request_sha256") != request_sha:
+        raise AgentEvalError("prepared request changed after attempt creation")
+    request = _read_json(request_path)
+    _assert_keys(
+        request,
+        {
+            "schema_version",
+            "request_id",
+            "run_id",
+            "suite",
+            "skill",
+            "eval_id",
+            "repeat",
+            "evaluator_revision",
+            "skill_revision",
+            "dataset_fingerprint",
+            "input_fingerprint",
+            "prompt_sha256",
+            "skill_package",
+            "requested_settings",
+            "effective_settings",
+            "physical_read_denial",
+        },
+        "prepared request",
+    )
+    if (
+        request["schema_version"] != 1
+        or request["request_id"] != attempt_id
+        or request["run_id"] != record.get("run_id")
+        or request["suite"] != record.get("suite")
+        or request["suite"] != row.get("suite")
+        or request["skill"] != row.get("skill")
+        or request["eval_id"] != row.get("eval_id")
+        or request["repeat"] != row.get("repeat")
+        or request["effective_settings"] != {"status": "unverified"}
+        or request["physical_read_denial"] != "unverified"
+    ):
+        raise AgentEvalError("prepared request identity differs from the run")
+    _validate_settings(request["requested_settings"], "prepared request settings")
+
+    visible = visible.resolve(strict=True)
+    task_path = (visible / "task.md").resolve(strict=True)
+    skill_entrypoint = (
+        visible / ".agents" / "skills" / row["skill"] / "SKILL.md"
+    ).resolve(strict=True)
+    submission_path = visible / AGENT_SUBMISSION_NAME
+    host_launch_message = (
+        f"Work only on prepared attempt {attempt_id}. Use `tools.exec_command()` "
+        f"with `workdir` set to the absolute directory `{visible}`. Read only "
+        f"`{task_path}` and the Skill package under "
+        f"`{visible / '.agents' / 'skills' / row['skill']}`. Follow the task and "
+        f"write the final Markdown only to `{submission_path}`. Do not inspect "
+        "expected data, the grader, evaluator-private files, or any other attempt. "
+        "Do not return a transcript copy of the artifact."
+    )
+    return {
+        "run_id": record["run_id"],
+        "attempt_id": attempt_id,
+        "artifact_attempt_id": attempt_id,
+        "working_directory": str(visible),
+        "task_path": str(task_path),
+        "skill_entrypoint": str(skill_entrypoint),
+        "submission_path": str(submission_path),
+        "requested_settings": request["requested_settings"],
+        "host_launch_message": host_launch_message,
+        "request_sha256": request_sha,
+    }
+
+
 def _timestamp(value: str | None, field: str) -> str | None:
     if value is None:
         return None
@@ -1215,6 +1310,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--reasoning-effort", required=True)
     prepare.add_argument("--fork-turns", choices=["none", "all"], required=True)
 
+    host_request = subparsers.add_parser(
+        "host-request",
+        help="Validate one prepared attempt before manual Codex host launch.",
+    )
+    host_request.add_argument("--run-root", type=Path, required=True)
+    host_request.add_argument("--attempt-id", required=True)
+
     seal = subparsers.add_parser(
         "seal", help="Record parent-host execution status and seal an attempt handoff."
     )
@@ -1265,6 +1367,11 @@ def main(argv: list[str] | None = None) -> int:
                 },
                 repeat=args.repeat,
                 skill_package_root=args.skill_package_root,
+            )
+        elif args.command == "host-request":
+            result = host_launch_request(
+                run_root=args.run_root,
+                attempt_id=args.attempt_id,
             )
         elif args.command == "seal":
             result = seal_handoff(

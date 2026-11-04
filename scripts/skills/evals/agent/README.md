@@ -24,32 +24,43 @@ python -m scripts.skills.evals.agent.subagent_eval prepare \
   --fork-turns none
 ```
 
-`result.json`の各`attempt_id`に対して、Agentホストで以下を行います。
+`result.json`の各`attempt_id`について、サブエージェントを起動する前に親ホストで次のread-only preflightを実行します。
 
-1. `attempts/<attempt_id>/agent-visible/task.md`と、その同じ`agent-visible/.agents/skills/<skill>/`だけを生成要求に使う。expected、grader、rubric、Reference、別attempt成果物は渡さない。
-2. 要求model・reasoning・`fork_turns`をCodexホストのサブエージェント起動時に指定し、実効設定を確認できなければ未検証のままにする。共有workspaceによる物理的read-denialは保証できず、結果にも`unverified`で残る。
-3. サブエージェントは`task.md`に指定された`agent-visible/submission.md`へ最終Markdownを保存する。親ホストは`capture --from-agent-visible`を実行し、固定パスの通常ファイル・単一link・size・UTF-8・secretを検査した後、SHA-256を記録して`handoff/output.md`へ取り込み、元の提出ファイルを削除する。Agentに返却内容を手動転記させない。提出ファイルが不正・欠落ならattemptを`needs_review`にし、`seal`や採点を行わない。
-4. 親ホストが観測した実行状態をsealし、固定graderを実行する。
+```bash
+ATTEMPT_ID="<attempt-id from result.json>"
+python -m scripts.skills.evals.agent.subagent_eval host-request \
+  --run-root "$RUN_ROOT" \
+  --attempt-id "$ATTEMPT_ID"
+```
+
+`host-request`は現在のrun・attempt・prepared request・prompt・Skill package・空のhandoffを検証し、絶対path、要求設定、`host_launch_message`をJSONで返します。これは起動要求の作成だけを行うread-only preflightであり、サブエージェントを起動せず、実行状態や実効設定も観測しません。親ホストは返された`host_launch_message`を使い、返された`requested_settings`をCodexホストの起動時に指定します。物理的read-denial、実効model/build、process独立性は保証されず、証拠がなければ`unverified`のままです。
+
+1. `host_launch_message`に従い、Codexホストから手動でAgentを起動する。Agentのコマンドは`tools.exec_command()`を使い、`workdir`に返された絶対`working_directory`を指定する。読む対象は返された`task_path`と同じattemptのSkill packageに限り、expected、grader、rubric、Reference、private情報、他attempt成果物を見ない。
+2. 起動直前と完了直後のhost観測時刻をUTCのISO-8601で記録し、hostが観測した実行statusと要求設定を記録する。Agentの自己申告だけで実効model/build、trace、Skill使用、隔離を検証済みにしない。
+3. サブエージェントは返された固定`submission_path`へ最終Markdownを保存する。親ホストは`capture --from-agent-visible`を実行し、固定パスの通常ファイル・単一link・size・UTF-8・secretを検査した後、SHA-256を記録して`handoff/output.md`へ取り込み、元の提出ファイルを削除する。Agentに返却内容を手動転記させない。提出ファイルが不正・欠落ならattemptを`needs_review`にし、`seal`や採点を行わない。
+4. capture成功後、`host-request`が返した`artifact_attempt_id`（=対象`attempt_id`）を`seal --artifact-attempt-id`へ明示してhost観測を記録し、固定graderを実行する。
 
 ```bash
 # サブエージェントが指定されたagent-visible/submission.mdへ保存した後、原文ファイルを直接取り込む。
 python -m scripts.skills.evals.agent.subagent_eval capture \
   --run-root "$RUN_ROOT" \
-  --attempt-id <attempt-id> \
+  --attempt-id "$ATTEMPT_ID" \
   --from-agent-visible
 
 python -m scripts.skills.evals.agent.subagent_eval seal \
   --run-root "$RUN_ROOT" \
-  --attempt-id <attempt-id> \
+  --attempt-id "$ATTEMPT_ID" \
   --execution-status completed \
-  --artifact-attempt-id <attempt-id> \
-  --started-at <host-observed-ISO-8601> \
-  --finished-at <host-observed-ISO-8601>
+  --artifact-attempt-id "$ATTEMPT_ID" \
+  --started-at "$STARTED_AT" \
+  --finished-at "$FINISHED_AT"
 
 python -m scripts.skills.evals.agent.subagent_eval grade \
   --run-root "$RUN_ROOT" \
-  --attempt-id <attempt-id>
+  --attempt-id "$ATTEMPT_ID"
 ```
+
+`STARTED_AT`と`FINISHED_AT`には親ホストが観測した起動直前・完了直後のUTC時刻を入れます。失敗・timeout・未起動でartifactがない場合、completedやartifact IDを指定せず、観測したstatusを記録します。
 
 `capture`は秘密らしい値を含む提出内容を評価保存先へ残さず、そのattemptを`needs_review`として記録します。agent-visible側の固定提出ファイルも取り込み後に削除します。`seal`は親ホストが報告したstatus・要求設定・attempt ID・成果物path・byte size・SHA-256を記録します。署名済みhost telemetryではないため、実効model/build、tool trace、Skill使用観測、プロセス独立性、物理read-denialは未検証です。成功したhandoff manifestの後書換え、重複・追加ファイル、symlink/hardlink、path traversal、不正JSON、要求revision/hash不一致は拒否し、gradingできない試行も`needs_review`または実行失敗として保存します。completedでもartifactがなければ採点しません。stdin captureは互換用に残りますが、長文を親が転記すると内容破損を検出できないため、新しいattemptでは固定提出ファイル経路を使用します。
 

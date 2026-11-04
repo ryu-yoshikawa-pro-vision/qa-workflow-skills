@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -259,6 +260,117 @@ class SubagentEvalTests(unittest.TestCase):
             "# Candidate Skill\nClarify blocked runtime evidence.\n",
         )
         self.assertFalse((visible_skill / "evals").exists())
+
+    def test_host_launch_request_uses_absolute_paths_and_excludes_private_content(self):
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as unrelated_cwd:
+            try:
+                os.chdir(unrelated_cwd)
+                request = subagent_eval.host_launch_request(
+                    run_root=root, attempt_id=attempt_id
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        for field in (
+            "working_directory",
+            "task_path",
+            "skill_entrypoint",
+            "submission_path",
+        ):
+            self.assertTrue(Path(request[field]).is_absolute(), field)
+        visible = root / "attempts" / attempt_id / "agent-visible"
+        self.assertEqual(Path(request["working_directory"]), visible)
+        self.assertEqual(request["task_path"], str(visible / "task.md"))
+        self.assertEqual(
+            request["skill_entrypoint"],
+            str(visible / ".agents" / "skills" / SKILL / "SKILL.md"),
+        )
+        self.assertEqual(request["submission_path"], str(visible / "submission.md"))
+        self.assertEqual(request["attempt_id"], attempt_id)
+        self.assertEqual(request["artifact_attempt_id"], attempt_id)
+        self.assertEqual(
+            request["requested_settings"],
+            {"model": "gpt-6-luna", "reasoning_effort": "max", "fork_turns": "none"},
+        )
+        launch_message = request["host_launch_message"]
+        self.assertIn("tools.exec_command()", launch_message)
+        self.assertIn(
+            f"workdir` set to the absolute directory `{visible}`", launch_message
+        )
+        self.assertIn(str(visible / "task.md"), launch_message)
+        self.assertIn(str(visible / ".agents" / "skills" / SKILL), launch_message)
+        self.assertIn(str(visible / "submission.md"), launch_message)
+        self.assertIn("Do not inspect expected data", launch_message)
+        self.assertIn("the grader", launch_message)
+        self.assertIn("evaluator-private files", launch_message)
+        self.assertIn("any other attempt", launch_message)
+        serialized = json.dumps(request)
+        self.assertNotIn("private expected fixture", serialized)
+        self.assertNotIn("Private reference text.", serialized)
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["attempts"][0]["status"], "awaiting_agent")
+
+    def test_host_launch_request_rejects_unknown_attempt(self):
+        root, _prepared = self._prepare()
+        with self.assertRaisesRegex(AgentEvalError, "missing or duplicated"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id="f" * 32)
+
+    def test_host_launch_request_rejects_tampered_prepared_request_prompt_and_package(
+        self,
+    ):
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        request_path = (
+            root / "attempts" / attempt_id / "evaluator-private" / "request.json"
+        )
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request["run_id"] = "changed-run-id"
+        request_path.write_text(json.dumps(request), encoding="utf-8")
+        with self.assertRaisesRegex(AgentEvalError, "request changed"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        task = root / "attempts" / attempt_id / "agent-visible" / "task.md"
+        task.write_text("changed prepared prompt", encoding="utf-8")
+        with self.assertRaisesRegex(AgentEvalError, "prompt changed"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        skill_file = (
+            root
+            / "attempts"
+            / attempt_id
+            / "agent-visible"
+            / ".agents"
+            / "skills"
+            / SKILL
+            / "SKILL.md"
+        )
+        skill_file.write_text("changed prepared package", encoding="utf-8")
+        with self.assertRaisesRegex(AgentEvalError, "package files differ"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+
+    def test_host_launch_request_rejects_stale_submission_and_nonempty_handoff(self):
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        stale_submission = self._write_agent_submission(root, attempt_id)
+        with self.assertRaisesRegex(AgentEvalError, "stale Agent-visible submission"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+        self.assertTrue(stale_submission.is_file())
+
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        stale_handoff = self._write_output(root, attempt_id)
+        with self.assertRaisesRegex(AgentEvalError, "handoff directory is not empty"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+        self.assertTrue(stale_handoff.is_file())
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["attempts"][0]["status"], "awaiting_agent")
 
     def test_prepare_rejects_candidate_package_with_an_extra_skill(self):
         candidate = self._candidate_package()
