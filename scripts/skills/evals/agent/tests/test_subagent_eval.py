@@ -315,6 +315,140 @@ class SubagentEvalTests(unittest.TestCase):
         saved = json.loads(saved_path.read_text(encoding="utf-8"))
         self.assertEqual(saved["status"], "comparable_development_handoff")
 
+    def test_handoff_comparison_rejects_missing_recorded_repeat(self):
+        baseline_root, baseline = self._prepare(repeat=2)
+        candidate_package = self._candidate_package()
+        candidate_root, candidate = self._prepare(
+            repeat=2, skill_package_root=candidate_package
+        )
+        for run_root, prepared in (
+            (baseline_root, baseline),
+            (candidate_root, candidate),
+        ):
+            for row in prepared["attempts"]:
+                subagent_eval.capture_agent_output(
+                    run_root=run_root,
+                    attempt_id=row["attempt_id"],
+                    content=b"# generated artifact\n",
+                )
+                self._seal(run_root, row["attempt_id"])
+                subagent_eval.grade_attempt(
+                    run_root=run_root, attempt_id=row["attempt_id"]
+                )
+
+        candidate_result_path = candidate_root / "result.json"
+        candidate_record = json.loads(candidate_result_path.read_text(encoding="utf-8"))
+        candidate_record["attempts"].pop()
+        candidate_result_path.write_text(
+            json.dumps(candidate_record), encoding="utf-8"
+        )
+
+        comparison = improve.compare_development_handoff_runs(
+            baseline_root / "result.json", candidate_result_path
+        )
+        self.assertFalse(comparison["comparable"])
+        self.assertIn(
+            "attempt_record_count_does_not_match_declared_repeat",
+            comparison["condition_mismatches"]["candidate_attempt_inventory"],
+        )
+        self.assertIn(
+            "attempt_directories_do_not_match_recorded_attempts",
+            comparison["condition_mismatches"]["candidate_attempt_inventory"],
+        )
+        self.assertEqual(comparison["fixed_common_failures"], [])
+
+    def test_handoff_comparison_reports_candidate_only_assertion_failure(self):
+        baseline_root, baseline = self._prepare(repeat=2)
+        candidate_package = self._candidate_package()
+        candidate_root, candidate = self._prepare(
+            repeat=2, skill_package_root=candidate_package
+        )
+
+        def grade_by_output(_skill, _eval_id, output_path, **_kwargs):
+            is_candidate = output_path.read_text(encoding="utf-8").startswith(
+                "candidate"
+            )
+            assertions = [
+                {"id": "ASSERT-SHARED", "status": "pass"},
+                {
+                    "id": "ASSERT-CANDIDATE-ONLY",
+                    "status": "fail" if is_candidate else "skip",
+                },
+            ]
+            return {
+                "skill": SKILL,
+                "eval_id": EVAL_ID,
+                "status": "fail" if is_candidate else "pass",
+                "assertions": assertions,
+            }
+
+        with patch.object(
+            subagent_eval, "grade_deterministic", side_effect=grade_by_output
+        ):
+            for run_root, prepared, prefix in (
+                (baseline_root, baseline, b"baseline output\n"),
+                (candidate_root, candidate, b"candidate output\n"),
+            ):
+                for row in prepared["attempts"]:
+                    subagent_eval.capture_agent_output(
+                        run_root=run_root,
+                        attempt_id=row["attempt_id"],
+                        content=prefix,
+                    )
+                    self._seal(run_root, row["attempt_id"])
+                    subagent_eval.grade_attempt(
+                        run_root=run_root, attempt_id=row["attempt_id"]
+                    )
+
+            comparison = improve.compare_development_handoff_runs(
+                baseline_root / "result.json", candidate_root / "result.json"
+            )
+
+        self.assertTrue(comparison["comparable"], comparison["condition_mismatches"])
+        self.assertEqual(
+            comparison["paired_comparison"][0]["new_failures"],
+            ["ASSERT-CANDIDATE-ONLY"],
+        )
+
+    def test_handoff_comparison_handles_null_host_execution_as_unverified_input(self):
+        baseline_root, baseline = self._prepare(repeat=2)
+        candidate_package = self._candidate_package()
+        candidate_root, candidate = self._prepare(
+            repeat=2, skill_package_root=candidate_package
+        )
+        for run_root, prepared in (
+            (baseline_root, baseline),
+            (candidate_root, candidate),
+        ):
+            for row in prepared["attempts"]:
+                subagent_eval.capture_agent_output(
+                    run_root=run_root,
+                    attempt_id=row["attempt_id"],
+                    content=b"# generated artifact\n",
+                )
+                self._seal(run_root, row["attempt_id"])
+                subagent_eval.grade_attempt(
+                    run_root=run_root, attempt_id=row["attempt_id"]
+                )
+        candidate_result_path = candidate_root / "result.json"
+        candidate_record = json.loads(candidate_result_path.read_text(encoding="utf-8"))
+        candidate_record["attempts"][0]["host_execution"] = None
+        candidate_result_path.write_text(
+            json.dumps(candidate_record), encoding="utf-8"
+        )
+
+        comparison = improve.compare_development_handoff_runs(
+            baseline_root / "result.json", candidate_result_path
+        )
+        self.assertFalse(comparison["comparable"])
+        self.assertEqual(
+            comparison["candidate_attempts"][0]["integrity_status"], "invalid"
+        )
+        self.assertIn(
+            "recorded host execution evidence is malformed",
+            comparison["candidate_attempts"][0]["reason"],
+        )
+
     def test_completed_deterministic_handoff_is_integrity_checked_and_graded(
         self,
     ) -> None:

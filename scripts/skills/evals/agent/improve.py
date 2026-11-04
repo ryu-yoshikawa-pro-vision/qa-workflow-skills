@@ -1225,6 +1225,72 @@ def _load_development_handoff_run(result_path: Path) -> tuple[dict[str, Any], Pa
     return record, root
 
 
+def _development_handoff_inventory_issues(
+    record: dict[str, Any], root: Path
+) -> list[str]:
+    """Check that the declared repeat set matches both records and attempt dirs."""
+    issues: list[str] = []
+    declared_repeat = record.get("repeat")
+    if (
+        isinstance(declared_repeat, bool)
+        or not isinstance(declared_repeat, int)
+        or declared_repeat < 1
+    ):
+        issues.append("declared_repeat_is_invalid")
+        expected_repeats: set[int] = set()
+    else:
+        expected_repeats = set(range(1, declared_repeat + 1))
+
+    rows = record.get("attempts")
+    if not isinstance(rows, list):
+        issues.append("attempts_is_not_an_array")
+        rows = []
+    if declared_repeat != len(rows):
+        issues.append("attempt_record_count_does_not_match_declared_repeat")
+
+    attempt_ids: list[str] = []
+    repeats: list[int] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            issues.append("attempt_row_is_not_an_object")
+            continue
+        attempt_id = row.get("attempt_id")
+        if not isinstance(attempt_id, str):
+            issues.append("attempt_id_is_invalid")
+        else:
+            attempt_ids.append(attempt_id)
+        repeat = row.get("repeat")
+        if isinstance(repeat, bool) or not isinstance(repeat, int):
+            issues.append("attempt_repeat_is_invalid")
+        else:
+            repeats.append(repeat)
+    if len(attempt_ids) != len(set(attempt_ids)):
+        issues.append("attempt_ids_are_duplicated")
+    if len(repeats) != len(set(repeats)):
+        issues.append("attempt_repeat_ids_are_duplicated")
+    if set(repeats) != expected_repeats:
+        issues.append("attempt_repeat_ids_do_not_match_declared_repeat")
+
+    attempts_root = root / "attempts"
+    if attempts_root.is_symlink() or not attempts_root.is_dir():
+        issues.append("attempt_directory_root_is_missing_or_unsafe")
+        return sorted(set(issues))
+    try:
+        actual_entries = list(attempts_root.iterdir())
+    except OSError:
+        issues.append("attempt_directory_inventory_is_unavailable")
+        actual_entries = []
+    actual_ids: set[str] = set()
+    for entry in actual_entries:
+        if entry.is_symlink() or not entry.is_dir():
+            issues.append("attempt_directory_inventory_has_unsafe_entry")
+            continue
+        actual_ids.add(entry.name)
+    if actual_ids != set(attempt_ids):
+        issues.append("attempt_directories_do_not_match_recorded_attempts")
+    return sorted(set(issues))
+
+
 def _inspect_development_handoff_attempt(
     record: dict[str, Any], root: Path, row: dict[str, Any]
 ) -> dict[str, Any]:
@@ -1361,6 +1427,15 @@ def compare_development_handoff_runs(
                 "candidate": sorted(map(str, right)),
             }
 
+    baseline_inventory = _development_handoff_inventory_issues(baseline, baseline_root)
+    candidate_inventory = _development_handoff_inventory_issues(
+        candidate, candidate_root
+    )
+    if baseline_inventory:
+        mismatches["baseline_attempt_inventory"] = baseline_inventory
+    if candidate_inventory:
+        mismatches["candidate_attempt_inventory"] = candidate_inventory
+
     def inspect(record: dict[str, Any], root: Path) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for raw in record.get("attempts", []):
@@ -1444,7 +1519,17 @@ def compare_development_handoff_runs(
             }
 
     common_failures: set[str] = set()
-    if baseline_rows and all(row.get("assertions") for row in baseline_rows):
+    inventories_complete = not baseline_inventory and not candidate_inventory
+    all_grades_available = all(
+        row.get("grade_available") and row.get("integrity_status") == "valid"
+        for row in baseline_rows + candidate_rows
+    )
+    if (
+        inventories_complete
+        and all_grades_available
+        and len(baseline_rows) >= 2
+        and all(row.get("assertions") for row in baseline_rows)
+    ):
         failure_sets = [
             {
                 assertion
@@ -1454,12 +1539,17 @@ def compare_development_handoff_runs(
             for row in baseline_rows
         ]
         common_failures = set.intersection(*failure_sets)
-    fixed_common = sorted(
-        assertion
-        for assertion in common_failures
-        if all(
-            row.get("assertions", {}).get(assertion) == "pass" for row in candidate_rows
+    fixed_common = (
+        sorted(
+            assertion
+            for assertion in common_failures
+            if all(
+                row.get("assertions", {}).get(assertion) == "pass"
+                for row in candidate_rows
+            )
         )
+        if not mismatches and all_grades_available
+        else []
     )
     pairs: list[dict[str, Any]] = []
     for repeat in sorted(set(baseline_by_repeat) & set(candidate_by_repeat)):
@@ -1469,8 +1559,13 @@ def compare_development_handoff_runs(
         new = right.get("assertions", {})
         new_failures = sorted(
             assertion
+            for assertion, status in new.items()
+            if status == "fail" and old.get(assertion) != "fail"
+        )
+        regression_assertions = sorted(
+            assertion
             for assertion, status in old.items()
-            if status == "pass" and new.get(assertion) == "fail"
+            if status == "pass" and new.get(assertion) != "pass"
         )
         pairs.append(
             {
@@ -1480,6 +1575,7 @@ def compare_development_handoff_runs(
                 "baseline_assertions": old,
                 "candidate_assertions": new,
                 "new_failures": new_failures,
+                "regression_assertions": regression_assertions,
                 "candidate_runtime_verification": right.get("runtime_verification"),
             }
         )

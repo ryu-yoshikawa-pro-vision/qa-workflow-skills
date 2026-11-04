@@ -902,7 +902,10 @@ def _validate_handoff(
         or manifest["skill_use_observation"] != "unverified"
     ):
         raise AgentEvalError("unverified host evidence may not be promoted")
-    if row.get("host_execution", {}).get("status") != manifest["execution_status"]:
+    host_execution = row.get("host_execution")
+    if not isinstance(host_execution, dict):
+        raise AgentEvalError("recorded host execution evidence is malformed")
+    if host_execution.get("status") != manifest["execution_status"]:
         raise AgentEvalError("handoff status differs from the recorded host status")
 
     request_path = _request_path(attempt_root)
