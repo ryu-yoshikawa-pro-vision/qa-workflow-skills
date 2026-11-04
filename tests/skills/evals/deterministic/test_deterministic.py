@@ -244,6 +244,73 @@ class DeterministicValidatorTests(unittest.TestCase):
         )
         self.assert_fails("coverage-analysis", invalid, {"graph": graph}, "COV-D002")
 
+    def test_coverage_d003_uses_structured_dispositions_not_prose(self):
+        graph = {
+            "node_types": {
+                "SPEC-001": "Authority",
+                "TR-001": "TR",
+                "TCN-001": "TCN",
+                "TCN-001-CI01": "CI",
+            },
+            "edges": [
+                ["SPEC-001", "TR-001"],
+                ["TR-001", "TCN-001"],
+                ["TCN-001", "TCN-001-CI01"],
+            ],
+            "dispositions": {},
+        }
+        template = """## カバレッジマトリクス
+| 上流層 | 上流ID / 挙動 | 下流層 | 下流ID / 扱い | カバレッジ | プロダクトリスク / 優先度 | 根拠 / ギャップ | 推奨対応 | 修正Skill / 層 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CI | TCN-001-CI01 | TC | — | {coverage} | — | {reason} | {recommendation} | test-case-design |
+"""
+
+        def assertion(text):
+            result = VALIDATORS["coverage-analysis"](
+                text, {"graph": graph}, "COV-TEST"
+            ).to_dict()
+            return next(a for a in result["assertions"] if a["id"] == "COV-D003")
+
+        negated_rationale = assertion(
+            template.format(
+                coverage="未網羅",
+                reason="未カバーであり、ブロック中ではない。",
+                recommendation="TCを確認する",
+            )
+        )
+        self.assertEqual(negated_rationale["status"], "pass", negated_rationale)
+
+        prose_only = assertion(
+            template.format(
+                coverage="未網羅",
+                reason="入力不足のためブロック中と説明されている資料もある。",
+                recommendation="ブロック中という分類は採用しない",
+            )
+        )
+        self.assertEqual(prose_only["status"], "pass", prose_only)
+
+        explicit_coverage = assertion(
+            template.format(
+                coverage="ブロック中",
+                reason="仕様判断待ち",
+                recommendation="仕様確認",
+            )
+        )
+        self.assertEqual(explicit_coverage["status"], "fail", explicit_coverage)
+
+        explicit_combined_disposition = assertion(
+            template.format(
+                coverage="未網羅",
+                reason="ブロック中ではない",
+                recommendation="確認",
+            ).replace("| TC | — |", "| TC | TC-001 / ブロック中 |")
+        )
+        self.assertEqual(
+            explicit_combined_disposition["status"],
+            "fail",
+            explicit_combined_disposition,
+        )
+
     def test_adversarial_review_valid_and_fatal_residual(self):
         valid = """# Review
 ## 指摘概要

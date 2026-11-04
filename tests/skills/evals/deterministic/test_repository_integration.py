@@ -41,6 +41,28 @@ FINAL_RUNTIME_EVIDENCE_POLICIES = {
 
 
 class RepositoryDeterministicIntegrationTests(unittest.TestCase):
+    def test_tcn002_blocked_expectations_match_missing_authority_content(self) -> None:
+        case_root = (
+            SKILLS_ROOT
+            / "test-condition-design/evals/output/cases/case-002"
+        )
+        input_text = (case_root / "input.md").read_text(encoding="utf-8")
+        expected = json.loads(
+            (case_root / "expected.json").read_text(encoding="utf-8")
+        )
+
+        self.assertIn("規範仕様本文・revision・currentness", input_text)
+        self.assertIn("候補表に未解決として保持", input_text)
+        self.assertIn("active Coverage Item・CI", input_text)
+        self.assertEqual(expected["bva"][0]["blocked_candidate_disposition"], "ブロック中")
+        self.assertTrue(expected["required_transitions"])
+        self.assertTrue(
+            all(
+                row["disposition"] == "ブロック中"
+                for row in expected["required_transitions"]
+            )
+        )
+
     def test_output_eval_manifests_have_loadable_validators(self) -> None:
         expected = sorted(
             manifest.parents[2].name

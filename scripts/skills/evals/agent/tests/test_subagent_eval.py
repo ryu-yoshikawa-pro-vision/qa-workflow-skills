@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import tempfile
 import unittest
@@ -18,6 +19,76 @@ SKILL = "test-requirement-design"
 EVAL_ID = "TR-OUT-001"
 SKILL_SHA = "a" * 40
 EVALUATOR_SHA = "b" * 40
+
+
+def _seal_attempt_process(repository: str, run_root: str, attempt_id: str, start, results):
+    from scripts.skills.evals.agent import subagent_eval
+
+    subagent_eval.REPO_ROOT = Path(repository)
+    start.wait(10)
+    try:
+        subagent_eval.seal_handoff(
+            run_root=Path(run_root),
+            attempt_id=attempt_id,
+            execution_status="completed",
+            artifact_attempt_id=attempt_id,
+            started_at="2026-11-05T10:00:00Z",
+            finished_at="2026-11-05T10:00:01Z",
+        )
+        results.put((attempt_id, "sealed"))
+    except Exception as exc:  # Test transport: retain only the error class/message.
+        results.put((attempt_id, f"error:{type(exc).__name__}:{exc}"))
+
+
+def _capture_or_seal_process(
+    repository: str, run_root: str, attempt_id: str, operation: str, start, results
+):
+    from scripts.skills.evals.agent import subagent_eval
+
+    subagent_eval.REPO_ROOT = Path(repository)
+    start.wait(10)
+    try:
+        if operation == "capture":
+            subagent_eval.capture_agent_visible_output(
+                run_root=Path(run_root), attempt_id=attempt_id
+            )
+        else:
+            subagent_eval.seal_handoff(
+                run_root=Path(run_root),
+                attempt_id=attempt_id,
+                execution_status="completed",
+                artifact_attempt_id=attempt_id,
+                started_at="2026-11-05T10:00:00Z",
+                finished_at="2026-11-05T10:00:01Z",
+            )
+        results.put((operation, "ok"))
+    except Exception as exc:
+        results.put((operation, f"error:{type(exc).__name__}:{exc}"))
+
+
+def _grade_attempt_process(repository: str, run_root: str, attempt_id: str, start, results):
+    from scripts.skills.evals.agent import subagent_eval
+
+    root = Path(run_root)
+    subagent_eval.REPO_ROOT = Path(repository)
+    record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+    evaluator_revision = record["evaluator"]["revision"]
+    input_text = "Create test requirements from the supplied QA specification."
+    subagent_eval.assert_clean_checkout = lambda _root: evaluator_revision
+    subagent_eval._case_for = lambda *_args: {"input": input_text}
+    subagent_eval._dataset_fingerprint = lambda _case: record["dataset_fingerprint"]
+    subagent_eval.grade_deterministic = lambda *_args, **_kwargs: {
+        "skill": SKILL,
+        "eval_id": EVAL_ID,
+        "status": "pass",
+        "assertions": [],
+    }
+    start.wait(10)
+    try:
+        subagent_eval.grade_attempt(run_root=root, attempt_id=attempt_id)
+        results.put((attempt_id, "graded"))
+    except Exception as exc:
+        results.put((attempt_id, f"error:{type(exc).__name__}:{exc}"))
 
 
 class SubagentEvalTests(unittest.TestCase):
@@ -197,6 +268,16 @@ class SubagentEvalTests(unittest.TestCase):
             finished_at="2026-11-03T10:00:01Z",
         )
 
+    def _join_processes(self, processes, start, results):
+        for process in processes:
+            process.start()
+        start.set()
+        for process in processes:
+            process.join(20)
+            self.assertFalse(process.is_alive(), "worker did not release the run lock")
+            self.assertEqual(process.exitcode, 0)
+        return [results.get(timeout=2) for _ in processes]
+
     def test_prepare_stages_only_input_and_package_and_records_unverified_host_fields(
         self,
     ) -> None:
@@ -303,6 +384,8 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertIn(str(visible / "task.md"), launch_message)
         self.assertIn(str(visible / ".agents" / "skills" / SKILL), launch_message)
         self.assertIn(str(visible / "submission.md"), launch_message)
+        self.assertIn("Your first tool action must verify `pwd`", launch_message)
+        self.assertIn("without guessing a relative path", launch_message)
         self.assertIn("Do not inspect expected data", launch_message)
         self.assertIn("the grader", launch_message)
         self.assertIn("evaluator-private files", launch_message)
@@ -584,6 +667,31 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertEqual(saved_output.read_text(encoding="utf-8"), output)
         self.assertTrue(result["grade"]["sha256"].startswith("sha256:"))
 
+    def test_captured_output_removed_before_seal_is_not_recorded_as_execution_error(
+        self,
+    ) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        captured = subagent_eval.capture_agent_output(
+            run_root=root,
+            attempt_id=attempt_id,
+            content=b"# Captured artifact\n",
+        )
+        output = root / captured["path"]
+        output.unlink()
+
+        with self.assertRaisesRegex(AgentEvalError, "captured output is missing"):
+            subagent_eval.seal_handoff(
+                run_root=root,
+                attempt_id=attempt_id,
+                execution_status="failed",
+            )
+
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["attempts"][0]["status"], "needs_review")
+        self.assertEqual(record["summary"], {"needs_review": 1})
+        self.assertFalse((output.parent / "manifest.json").exists())
+
     def test_agent_visible_file_is_imported_exactly_then_removed_before_grading(
         self,
     ) -> None:
@@ -717,6 +825,132 @@ class SubagentEvalTests(unittest.TestCase):
         with self.assertRaisesRegex(AgentEvalError, "already sealed"):
             self._seal(root2, duplicate_attempt)
 
+    def test_concurrent_seals_preserve_both_attempts_and_run_summary(self) -> None:
+        root, prepared = self._prepare(repeat=2)
+        attempts = prepared["attempts"]
+        for attempt in attempts:
+            self._write_output(root, attempt["attempt_id"])
+
+        context = multiprocessing.get_context("spawn")
+        start = context.Event()
+        results = context.Queue()
+        processes = [
+            context.Process(
+                target=_seal_attempt_process,
+                args=(
+                    str(self.repository),
+                    str(root),
+                    attempt["attempt_id"],
+                    start,
+                    results,
+                ),
+            )
+            for attempt in attempts
+        ]
+        outcomes = self._join_processes(processes, start, results)
+
+        self.assertCountEqual(outcomes, [(item["attempt_id"], "sealed") for item in attempts])
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            {row["attempt_id"]: row["status"] for row in record["attempts"]},
+            {item["attempt_id"]: "awaiting_grading" for item in attempts},
+        )
+        self.assertEqual(record["summary"], {"awaiting_grading": 2})
+        for row in record["attempts"]:
+            self.assertTrue((root / row["handoff_manifest"]["path"]).is_file())
+
+    def test_concurrent_duplicate_seals_do_not_replace_the_winner(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._write_output(root, attempt_id)
+
+        context = multiprocessing.get_context("spawn")
+        start = context.Event()
+        results = context.Queue()
+        processes = [
+            context.Process(
+                target=_seal_attempt_process,
+                args=(str(self.repository), str(root), attempt_id, start, results),
+            )
+            for _ in range(2)
+        ]
+        outcomes = self._join_processes(processes, start, results)
+
+        self.assertEqual(sum(value == "sealed" for _attempt, value in outcomes), 1)
+        self.assertEqual(sum(value.startswith("error:") for _attempt, value in outcomes), 1)
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["attempts"][0]["status"], "awaiting_grading")
+        self.assertEqual(record["summary"], {"awaiting_grading": 1})
+        self.assertTrue(
+            (root / "attempts" / attempt_id / "handoff" / "manifest.json").is_file()
+        )
+
+    def test_capture_and_seal_race_is_atomic_and_keeps_a_coherent_attempt(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._write_agent_submission(root, attempt_id)
+
+        context = multiprocessing.get_context("spawn")
+        start = context.Event()
+        results = context.Queue()
+        processes = [
+            context.Process(
+                target=_capture_or_seal_process,
+                args=(str(self.repository), str(root), attempt_id, operation, start, results),
+            )
+            for operation in ("capture", "seal")
+        ]
+        self._join_processes(processes, start, results)
+
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        row = record["attempts"][0]
+        handoff = root / "attempts" / attempt_id / "handoff"
+        if row["status"] == "awaiting_grading":
+            self.assertTrue((handoff / "manifest.json").is_file())
+            self.assertEqual(record["summary"], {"awaiting_grading": 1})
+            self.assertEqual(
+                row["captured_output"]["sha256"], row["ungraded_output"]["sha256"]
+            )
+        else:
+            self.assertEqual(row["status"], "needs_review")
+            self.assertEqual(record["summary"], {"needs_review": 1})
+            self.assertFalse((handoff / "manifest.json").exists())
+            self.assertNotIn("grade", row)
+
+    def test_concurrent_duplicate_grades_preserve_the_first_grade(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        self._write_output(root, attempt_id)
+        self._seal(root, attempt_id)
+
+        context = multiprocessing.get_context("spawn")
+        start = context.Event()
+        results = context.Queue()
+        processes = [
+            context.Process(
+                target=_grade_attempt_process,
+                args=(str(self.repository), str(root), attempt_id, start, results),
+            )
+            for _ in range(2)
+        ]
+        outcomes = self._join_processes(processes, start, results)
+
+        self.assertEqual(sum(value == "graded" for _attempt, value in outcomes), 1)
+        self.assertEqual(sum(value.startswith("error:") for _attempt, value in outcomes), 1)
+        record = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["attempts"][0]["status"], "pass")
+        self.assertEqual(record["summary"], {"pass": 1})
+
+    def test_run_state_lock_rejects_symlink(self) -> None:
+        root, prepared = self._prepare()
+        attempt_id = prepared["attempts"][0]["attempt_id"]
+        outside = self.repository / "outside-lock"
+        outside.write_text("", encoding="utf-8")
+        (root / ".result.lock").symlink_to(outside)
+        with self.assertRaisesRegex(AgentEvalError, "may not contain symlinks"):
+            subagent_eval.host_launch_request(run_root=root, attempt_id=attempt_id)
+        self.assertEqual(outside.read_text(encoding="utf-8"), "")
+
     def test_symlink_and_extra_handoff_files_are_rejected(self) -> None:
         root, prepared = self._prepare()
         attempt_id = prepared["attempts"][0]["attempt_id"]
@@ -760,6 +994,8 @@ class SubagentEvalTests(unittest.TestCase):
             subagent_eval.grade_attempt(run_root=root, attempt_id=attempt_id)
         saved = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["attempts"][0]["status"], "needs_review")
+        self.assertEqual(saved["summary"], {"needs_review": 1})
+        self.assertEqual(saved["status"], "needs_review_or_fail")
 
     def test_modified_artifact_and_malformed_manifest_do_not_receive_a_grade(
         self,

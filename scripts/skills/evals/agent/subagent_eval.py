@@ -9,9 +9,10 @@ import stat
 import sys
 import tempfile
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from scripts.skills.evals.agent import run as legacy_run
 from scripts.skills.evals.agent.common import (
@@ -119,6 +120,78 @@ def _safe_run_root(path: Path) -> Path:
     if not root.is_dir():
         raise AgentEvalError("subagent run root does not exist")
     return root
+
+
+@contextmanager
+def _run_record_lock(path: Path) -> Iterator[Path]:
+    """Serialize a run's full result.json read/validate/update/write transaction."""
+    root = _safe_run_root(path)
+    lock_path = root / ".result.lock"
+    _assert_no_symlink_components(lock_path)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise AgentEvalError("could not open the run-state lock") from exc
+
+    acquired = False
+    try:
+        info = os.fstat(descriptor)
+        current = lock_path.lstat()
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino)
+        ):
+            raise AgentEvalError("run-state lock is not a private regular file")
+        if os.name != "nt" and stat.S_IMODE(info.st_mode) & 0o077:
+            raise AgentEvalError("run-state lock permissions are too broad")
+
+        if os.name == "nt":
+            import msvcrt
+
+            if info.st_size == 0:
+                os.write(descriptor, b"\0")
+                os.fsync(descriptor)
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            except OSError as exc:
+                raise AgentEvalError("could not acquire the run-state lock") from exc
+
+            acquired = True
+            try:
+                yield root
+            finally:
+                try:
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                except OSError as exc:
+                    raise AgentEvalError("could not release the run-state lock") from exc
+                acquired = False
+        else:
+            try:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            except (ImportError, OSError) as exc:
+                raise AgentEvalError("could not acquire the run-state lock") from exc
+
+            acquired = True
+            try:
+                yield root
+            finally:
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+                except OSError as exc:
+                    raise AgentEvalError("could not release the run-state lock") from exc
+                acquired = False
+    finally:
+        if acquired:
+            # A failed unlock is surfaced above; closing still releases OS locks.
+            os.close(descriptor)
+        else:
+            os.close(descriptor)
 
 
 def _regular_file(path: Path, *, max_bytes: int = MAX_TEXT_BYTES) -> bytes:
@@ -276,7 +349,7 @@ def _write_new_json(path: Path, value: dict[str, Any]) -> None:
         raise
 
 
-def _mark_handoff_failure(
+def _mark_handoff_failure_locked(
     root: Path,
     attempt_id: str,
     reason: str,
@@ -285,7 +358,7 @@ def _mark_handoff_failure(
 ) -> None:
     record = _load_run(root)
     row, _ = _attempt(root, record, attempt_id)
-    if row.get("status") != "awaiting_agent":
+    if row.get("status") not in {"awaiting_agent", "output_captured"}:
         return
     row["status"] = "needs_review"
     row["handoff_validation"] = "failed"
@@ -321,7 +394,7 @@ def _discard_sensitive_unsealed_output(attempt_root: Path) -> None:
         return
 
 
-def capture_agent_output(
+def _capture_agent_output_locked(
     *, run_root: Path, attempt_id: str, content: bytes
 ) -> dict[str, Any]:
     """Persist returned Markdown only after size, encoding, and secret checks."""
@@ -374,18 +447,40 @@ def capture_agent_output(
         except Exception:
             temporary.unlink(missing_ok=True)
             raise
+        record = _load_run(root)
+        row, _ = _attempt(root, record, attempt_id)
+        if row.get("status") != "awaiting_agent":
+            raise AgentEvalError("attempt changed while Agent output was captured")
+        row["captured_output"] = {
+            "path": str(destination.relative_to(root)),
+            "size_bytes": len(content),
+            "sha256": sha256_bytes(content),
+        }
+        row["status"] = "output_captured"
+        _update_run_status(record)
+        atomic_write_json(root / "result.json", record)
         return {
             "path": str(destination.relative_to(root)),
             "size_bytes": len(content),
             "sha256": sha256_bytes(content),
         }
     except (AgentEvalError, OSError, ValueError) as exc:
-        _mark_handoff_failure(
+        _mark_handoff_failure_locked(
             root,
             attempt_id,
             f"handoff capture failed: {type(exc).__name__}: {exc}",
         )
         raise
+
+
+def capture_agent_output(
+    *, run_root: Path, attempt_id: str, content: bytes
+) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _capture_agent_output_locked(
+            run_root=root, attempt_id=attempt_id, content=content
+        )
 
 
 def _read_agent_submission(directory_fd: int) -> tuple[bytes, tuple[int, int]]:
@@ -443,7 +538,9 @@ def _remove_agent_submission(directory_fd: int, identity: tuple[int, int]) -> No
     os.fsync(directory_fd)
 
 
-def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+def _capture_agent_visible_output_locked(
+    *, run_root: Path, attempt_id: str
+) -> dict[str, Any]:
     """Import the fixed Agent-visible file without copying it through a transcript."""
     root = _safe_run_root(run_root)
     record = _load_run(root)
@@ -461,14 +558,14 @@ def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str
         )
         content, identity = _read_agent_submission(directory_fd)
         try:
-            captured = capture_agent_output(
+            captured = _capture_agent_output_locked(
                 run_root=root, attempt_id=attempt_id, content=content
             )
         finally:
             _remove_agent_submission(directory_fd, identity)
         return captured
     except (AgentEvalError, OSError, ValueError) as exc:
-        _mark_handoff_failure(
+        _mark_handoff_failure_locked(
             root,
             attempt_id,
             f"Agent-visible output import failed: {type(exc).__name__}: {exc}",
@@ -478,6 +575,14 @@ def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str
     finally:
         if directory_fd is not None:
             os.close(directory_fd)
+
+
+def capture_agent_visible_output(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _capture_agent_visible_output_locked(
+            run_root=root, attempt_id=attempt_id
+        )
 
 
 def _validate_settings(value: dict[str, Any], name: str) -> None:
@@ -700,6 +805,12 @@ def prepare_run(
 def host_launch_request(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     """Validate one prepared attempt and return its host-side launch handoff."""
     root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _host_launch_request_locked(run_root=root, attempt_id=attempt_id)
+
+
+def _host_launch_request_locked(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
     record = _load_run(root)
     row, attempt_root = _attempt(root, record, attempt_id)
     if row.get("status") != "awaiting_agent":
@@ -774,7 +885,10 @@ def host_launch_request(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         f"with `workdir` set to the absolute directory `{visible}`. Read only "
         f"`{task_path}` and the Skill package under "
         f"`{visible / '.agents' / 'skills' / row['skill']}`. Follow the task and "
-        f"write the final Markdown only to `{submission_path}`. Do not inspect "
+        f"write the final Markdown only to `{submission_path}`. Your first tool "
+        f"action must verify `pwd`, `{task_path}`, and `{skill_entrypoint}` using "
+        "these exact absolute paths; if any check fails, stop and report the "
+        "check output without guessing a relative path. Do not inspect "
         "expected data, the grader, evaluator-private files, or any other attempt. "
         "Do not return a transcript copy of the artifact."
     )
@@ -818,7 +932,7 @@ def _seal_handoff_impl(
     row, attempt_root = _attempt(root, record, attempt_id)
     if execution_status not in EXECUTION_STATUSES:
         raise AgentEvalError("execution status is invalid")
-    if row.get("status") != "awaiting_agent":
+    if row.get("status") not in {"awaiting_agent", "output_captured"}:
         raise AgentEvalError("attempt is already sealed or was not prepared")
 
     handoff = attempt_root / "handoff"
@@ -855,6 +969,20 @@ def _seal_handoff_impl(
         )
     if not artifacts and artifact_attempt_id is not None:
         raise AgentEvalError("artifact origin ID was supplied without an artifact")
+    captured_output = row.get("captured_output")
+    if row.get("status") == "output_captured" and not isinstance(
+        captured_output, dict
+    ):
+        raise AgentEvalError("captured output state has no integrity record")
+    if captured_output is not None and not artifacts:
+        raise AgentEvalError("captured output is missing from the handoff")
+    if captured_output is not None and artifacts:
+        if captured_output != {
+            "path": str(output_path.relative_to(root)),
+            "size_bytes": artifacts[0]["size_bytes"],
+            "sha256": artifacts[0]["sha256"],
+        }:
+            raise AgentEvalError("captured output differs from the sealed artifact")
 
     request_path = _request_path(attempt_root)
     request = _read_json(request_path)
@@ -922,6 +1050,27 @@ def seal_handoff(
     started_at: str | None = None,
     finished_at: str | None = None,
 ) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _seal_handoff_locked(
+            run_root=root,
+            attempt_id=attempt_id,
+            execution_status=execution_status,
+            artifact_attempt_id=artifact_attempt_id,
+            started_at=started_at,
+            finished_at=finished_at,
+        )
+
+
+def _seal_handoff_locked(
+    *,
+    run_root: Path,
+    attempt_id: str,
+    execution_status: str,
+    artifact_attempt_id: str | None = None,
+    started_at: str | None = None,
+    finished_at: str | None = None,
+) -> dict[str, Any]:
     try:
         return _seal_handoff_impl(
             run_root=run_root,
@@ -937,7 +1086,7 @@ def seal_handoff(
             _, attempt_root = _attempt(root, _load_run(root), attempt_id)
             if "may contain a secret" in str(exc):
                 _discard_sensitive_unsealed_output(attempt_root)
-            _mark_handoff_failure(
+            _mark_handoff_failure_locked(
                 root,
                 attempt_id,
                 f"handoff intake failed: {type(exc).__name__}: {exc}",
@@ -1111,6 +1260,14 @@ def _validate_handoff(
         _regular_file(manifest_path)
     ):
         raise AgentEvalError("handoff manifest changed after intake")
+    captured_output = row.get("captured_output")
+    if captured_output is not None:
+        if output_path is None or captured_output != {
+            "path": str(output_path.relative_to(root)),
+            "size_bytes": manifest["artifacts"][0]["size_bytes"],
+            "sha256": manifest["artifacts"][0]["sha256"],
+        }:
+            raise AgentEvalError("captured output record differs from sealed evidence")
     return manifest, output_path
 
 
@@ -1158,10 +1315,14 @@ def _validate_prepared_inputs(
 
 def _update_run_status(record: dict[str, Any]) -> None:
     statuses = [row.get("status") for row in record.get("attempts", [])]
-    if any(status in {"awaiting_agent", "awaiting_grading"} for status in statuses):
-        record["status"] = (
-            "awaiting_agent" if "awaiting_agent" in statuses else "awaiting_grading"
-        )
+    pending_statuses = {"awaiting_agent", "output_captured", "awaiting_grading"}
+    if any(status in pending_statuses for status in statuses):
+        if "awaiting_agent" in statuses:
+            record["status"] = "awaiting_agent"
+        elif "awaiting_grading" in statuses:
+            record["status"] = "awaiting_grading"
+        else:
+            record["status"] = "output_captured"
     elif "awaiting_judge" in statuses:
         record["status"] = "needs_review_or_fail"
     elif "execution error" in statuses:
@@ -1182,13 +1343,13 @@ def _update_run_status(record: dict[str, Any]) -> None:
     record["finished_at"] = (
         datetime.now(timezone.utc).isoformat()
         if not any(
-            status in {"awaiting_agent", "awaiting_grading"} for status in statuses
+            status in pending_statuses for status in statuses
         )
         else None
     )
 
 
-def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+def _grade_attempt_locked(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     root = _safe_run_root(run_root)
     record = _load_run(root)
     row, attempt_root = _attempt(root, record, attempt_id)
@@ -1253,6 +1414,7 @@ def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
         row["evidence_status"] = "evidence_unverified"
         row["reason"] = sanitize_diagnostic(f"{type(exc).__name__}: {exc}", 1000)
         record["intake_validation"] = "failed"
+        _update_run_status(record)
         atomic_write_json(root / "result.json", record)
         raise AgentEvalError("attempt evidence did not pass import validation") from exc
     record["intake_validation"] = "passed"
@@ -1261,7 +1423,13 @@ def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     return row
 
 
-def _record_noncompleted(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+def grade_attempt(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _grade_attempt_locked(run_root=root, attempt_id=attempt_id)
+
+
+def _record_noncompleted_locked(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     root = _safe_run_root(run_root)
     record = _load_run(root)
     row, attempt_root = _attempt(root, record, attempt_id)
@@ -1282,6 +1450,12 @@ def _record_noncompleted(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
     _update_run_status(record)
     atomic_write_json(root / "result.json", record)
     return row
+
+
+def _record_noncompleted(*, run_root: Path, attempt_id: str) -> dict[str, Any]:
+    root = _safe_run_root(run_root)
+    with _run_record_lock(root):
+        return _record_noncompleted_locked(run_root=root, attempt_id=attempt_id)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

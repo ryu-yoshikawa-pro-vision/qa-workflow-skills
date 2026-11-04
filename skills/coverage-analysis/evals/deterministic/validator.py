@@ -23,6 +23,16 @@ E2E_HANDLING = {
 }
 
 
+def _has_explicit_blocked_status(row: dict[str, str]) -> bool:
+    if any(
+        clean(row.get(field, "")) == "ブロック中"
+        for field in ("状態", "カバレッジ", "扱い")
+    ):
+        return True
+    downstream_disposition = clean(row.get("下流ID / 扱い", ""))
+    return downstream_disposition.rsplit("/", 1)[-1].strip() == "ブロック中"
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("coverage-analysis", eval_id)
     tables = parse_tables(text)
@@ -97,7 +107,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 for t in ("未閉鎖", "未網羅", "未充足", "部分", "ギャップ", "Gap")
             ):
                 recognized.add(gap)
-            if "ブロック中" in status:
+            if _has_explicit_blocked_status(row):
                 blocked.append(gap)
     result.add(
         "COV-D002",
