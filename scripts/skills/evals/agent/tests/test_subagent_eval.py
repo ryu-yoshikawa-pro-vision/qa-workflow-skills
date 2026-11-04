@@ -370,6 +370,8 @@ class SubagentEvalTests(unittest.TestCase):
             str(visible / ".agents" / "skills" / SKILL / "SKILL.md"),
         )
         self.assertEqual(request["submission_path"], str(visible / "submission.md"))
+        self.assertFalse(Path(request["submission_path"]).exists())
+        self.assertTrue(Path(request["submission_path"]).parent.is_dir())
         self.assertEqual(request["attempt_id"], attempt_id)
         self.assertEqual(request["artifact_attempt_id"], attempt_id)
         self.assertEqual(
@@ -384,6 +386,8 @@ class SubagentEvalTests(unittest.TestCase):
         self.assertIn(str(visible / "task.md"), launch_message)
         self.assertIn(str(visible / ".agents" / "skills" / SKILL), launch_message)
         self.assertIn(str(visible / "submission.md"), launch_message)
+        self.assertIn("expected not to exist before launch", launch_message)
+        self.assertIn("check its parent directory", launch_message)
         self.assertIn("Your first tool action must verify `pwd`", launch_message)
         self.assertIn("without guessing a relative path", launch_message)
         self.assertIn("Do not inspect expected data", launch_message)

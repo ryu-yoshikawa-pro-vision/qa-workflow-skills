@@ -51,6 +51,65 @@ def _parse_pairwise_combination(value: str) -> tuple[dict[str, str], list[str]]:
     return combo, errors
 
 
+def _matches_expected_value(actual: str, expected: object) -> bool:
+    """Match an exact fixture value, including the contract's typed rendering."""
+    value = clean(actual)
+    if value == str(expected):
+        return True
+    if isinstance(expected, int) and not isinstance(expected, bool):
+        number = re.escape(str(expected))
+        return any(
+            re.fullmatch(pattern, value, flags=re.IGNORECASE)
+            is not None
+            for pattern in (
+                rf"integer\s+{number}",
+                rf"{number}\s+\(integer\)",
+                rf"整数値\s+{number}",
+            )
+        )
+    return False
+
+
+def _matches_expected_transition(actual: str, transition: str) -> bool:
+    """Allow only the documented input-candidate annotations after a transition."""
+    return clean(actual) in {
+        transition,
+        f"{transition}（入力候補）",
+        f"{transition}（入力遷移候補）",
+        f"{transition}（入力候補。validity未確認）",
+    }
+
+
+def _matches_input_candidate_transition(
+    actual: str, transition: str, transition_key: str | None
+) -> bool:
+    """Match an input-derived transition candidate without substring matches."""
+    value = clean(actual)
+    if _matches_expected_transition(value, transition):
+        return True
+    if transition_key:
+        prefix = f"{transition_key}: "
+        return value.startswith(prefix) and _matches_expected_transition(
+            value[len(prefix) :], transition
+        )
+    return False
+
+
+def _unmaterialized_transition_key(value: str) -> str | None:
+    match = re.fullmatch(
+        r"未生成（transition_key=([A-Za-z0-9_-]+)）", clean(value)
+    )
+    return match.group(1) if match else None
+
+
+def _is_explicit_unmaterialized_target(row: dict[str, str]) -> bool:
+    value = clean(row.get("Runtime target key", ""))
+    if value:
+        return _unmaterialized_transition_key(value) is not None
+    reason = clean(row.get("理由 / 根拠", ""))
+    return "runtime target key" in reason and "生成されていない" in reason
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-condition-design", eval_id)
     tables = parse_tables(text)
@@ -110,14 +169,27 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         )
     ]
 
-    def candidate_disposition_matches(row: dict[str, str], target_key: str) -> bool:
+    def candidate_disposition_matches(
+        row: dict[str, str], target_key: str, expected_value: object | None = None
+    ) -> bool:
         # The output contract keeps a human-readable candidate in `候補` and its
         # runtime target key in `カバー先`. Older/simple rows may put the key in
-        # `候補` directly, so accept either canonical location.
-        return target_key in {
-            clean(row.get("候補", "")),
-            clean(row.get("カバー先", "")),
-        }
+        # `候補` directly. BVA candidate labels may append the exact typed value.
+        candidate = clean(row.get("候補", ""))
+        if target_key in {candidate, clean(row.get("カバー先", ""))}:
+            return True
+        if expected_value is not None:
+            typed_value = None
+            equals_prefix = f"{target_key} = "
+            if candidate.startswith(equals_prefix):
+                typed_value = candidate[len(equals_prefix) :]
+            else:
+                wrapped_prefix = f"{target_key}（"
+                if candidate.startswith(wrapped_prefix) and candidate.endswith("）"):
+                    typed_value = candidate[len(wrapped_prefix) : -1]
+            if typed_value is not None:
+                return _matches_expected_value(typed_value, expected_value)
+        return False
 
     tcn_ids = [clean(r.get("観点ID", "")) for r in tcn]
     ci_ids = [clean(r.get("カバレッジ項目ID", "")) for r in ci]
@@ -673,18 +745,24 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     matched = True
                     break
             if t.get("disposition") == "ブロック中":
-                matches = [
+                transition_rows = [
                     row
                     for row in blocked_target_rows
-                    if clean(row.get("Coverage transition", "")) == transition
+                    if _matches_expected_transition(
+                        row.get("Coverage transition", ""), transition
+                    )
                     and clean(row.get("扱い", "")) == "ブロック中"
-                    and clean(row.get("Runtime target key", ""))
                     and clean(row.get("理由 / 根拠", ""))
                 ]
                 target_keys = {
-                    clean(row.get("Runtime target key", "")) for row in matches
+                    clean(row.get("Runtime target key", ""))
+                    for row in transition_rows
+                    if clean(row.get("Runtime target key", ""))
+                    and not clean(row.get("Runtime target key", "")).startswith(
+                        "未生成（transition_key="
+                    )
                 }
-                disposition_matches = [
+                key_disposition_matches = [
                     row
                     for row in candidate_disposed
                     if any(
@@ -693,18 +771,47 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     and clean(row.get("扱い", "")) == "ブロック中"
                     and clean(row.get("理由 / 根拠", ""))
                 ]
+                input_candidate_disposition_matches = [
+                    row
+                    for row in candidate_disposed
+                    if any(
+                        _matches_input_candidate_transition(
+                            row.get("候補", ""),
+                            transition,
+                            _unmaterialized_transition_key(
+                                target_row.get("Runtime target key", "")
+                            ),
+                        )
+                        for target_row in transition_rows
+                    )
+                    and clean(row.get("扱い", "")) == "ブロック中"
+                    and clean(row.get("理由 / 根拠", ""))
+                ]
+                has_runtime_target = bool(target_keys)
+                unmaterialized_target_rows = all(
+                    _is_explicit_unmaterialized_target(row)
+                    for row in transition_rows
+                )
+                target_closed = (
+                    len(transition_rows) == 1
+                    and len(target_keys) == 1
+                    and len(key_disposition_matches) == 1
+                    if has_runtime_target
+                    else len(transition_rows) == 1
+                    and unmaterialized_target_rows
+                        and len(input_candidate_disposition_matches) == 1
+                )
                 if (
                     matched
-                    or len(matches) != 1
-                    or len(target_keys) != 1
-                    or len(disposition_matches) != 1
+                    or not target_closed
                 ):
                     missing_trans.append(
                         {
                             **t,
-                            "reason": "blocked transition must be closed by one matching runtime target and candidate disposition",
-                            "target_rows": matches,
-                            "candidate_dispositions": disposition_matches,
+                            "reason": "blocked transition must be closed by one runtime target and keyed disposition, or by one input-derived unresolved candidate disposition when runtime emitted no target",
+                            "target_rows": transition_rows,
+                            "candidate_dispositions": key_disposition_matches
+                            or input_candidate_disposition_matches,
                             "active_coverage_row": matched,
                         }
                     )
@@ -718,10 +825,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         invalid_blocked_targets = [
             row
             for row in blocked_target_rows
-            if clean(row.get("Coverage transition", ""))
-            not in expected_blocked_transitions
+            if not any(
+                _matches_expected_transition(
+                    row.get("Coverage transition", ""), transition
+                )
+                for transition in expected_blocked_transitions
+            )
             or clean(row.get("扱い", "")) != "ブロック中"
-            or not clean(row.get("Runtime target key", ""))
             or not clean(row.get("理由 / 根拠", ""))
         ]
         target_keys = [
@@ -770,7 +880,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         blocked_bva_rows = nonempty_rows(blocked_bva_table)
         missing_values = []
         expected_blocked_bva_values = {
-            str(value)
+            value
             for case in bva
             if case.get("blocked_candidate_disposition")
             for value in case.get("required_values", [])
@@ -778,7 +888,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         invalid_blocked_bva_rows = [
             row
             for row in blocked_bva_rows
-            if clean(row.get("入力値", "")) not in expected_blocked_bva_values
+            if not any(
+                _matches_expected_value(row.get("入力値", ""), value)
+                for value in expected_blocked_bva_values
+            )
             or not clean(row.get("Runtime target key", ""))
             or not clean(row.get("理由 / 根拠", ""))
             or clean(row.get("扱い", "")) != "ブロック中"
@@ -816,7 +929,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     matching_rows = [
                         row
                         for row in blocked_bva_rows
-                        if clean(row.get("入力値", "")) == str(value)
+                        if _matches_expected_value(row.get("入力値", ""), value)
                         and clean(row.get("扱い", "")) == blocked_disposition
                         and clean(row.get("Runtime target key", ""))
                         and clean(row.get("理由 / 根拠", ""))
@@ -829,7 +942,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                         row
                         for row in candidate_disposed
                         if any(
-                            candidate_disposition_matches(row, key)
+                            candidate_disposition_matches(
+                                row, key, expected_value=value
+                            )
                             for key in target_keys
                         )
                         and clean(row.get("扱い", "")) == blocked_disposition

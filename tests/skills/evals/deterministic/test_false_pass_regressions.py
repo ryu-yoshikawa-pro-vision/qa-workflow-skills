@@ -642,6 +642,101 @@ class FalsePassRegressionTests(unittest.TestCase):
         text, expected = self._blocked_bva_transition_base()
         self.assert_passes("test-condition-design", text, expected)
 
+    def test_blocked_unmaterialized_transition_closes_as_input_candidate(self):
+        text, expected = self._blocked_bva_transition_base()
+        text = text.replace(
+            "| state:draft-publish | 入力遷移 | ブロック中 | current Authority未解決 | |",
+            "| draft_publish: draft --publish--> published | state runtime / draft_publish | ブロック中 | current Authority未解決 | |",
+        )
+        text = text.replace(
+            "| state:published-archive | 入力遷移 | ブロック中 | current Authority未解決 | |",
+            "| published_archive: published --archive--> archived | state runtime / published_archive | ブロック中 | current Authority未解決 | |",
+        )
+        text = text.replace(
+            "| state:draft-publish | draft --publish--> published | ブロック中 | current Authority未解決 |",
+            "| 未生成（transition_key=draft_publish） | draft --publish--> published | ブロック中 | runtime guardが未解決のためtarget未生成 |",
+        )
+        text = text.replace(
+            "| state:published-archive | published --archive--> archived | ブロック中 | current Authority未解決 |",
+            "| 未生成（transition_key=published_archive） | published --archive--> archived | ブロック中 | runtime guardが未解決のためtarget未生成 |",
+        )
+        text = text.replace(
+            "|  | draft --publish--> published |",
+            "|  | draft --publish--> published（入力候補） |",
+        )
+        text = text.replace(
+            "|  | published --archive--> archived |",
+            "|  | published --archive--> archived（入力候補） |",
+        )
+
+        self.assert_passes("test-condition-design", text, expected)
+
+        unlinked_candidate = text.replace(
+            "draft_publish: draft --publish--> published",
+            "draft_publish: 別の候補",
+        )
+        self.assert_fails(
+            "test-condition-design", unlinked_candidate, expected, "TCN-D016"
+        )
+
+        substring_only = text.replace(
+            "draft_publish: draft --publish--> published",
+            "draft_publish: 無関係な説明にdraft --publish--> publishedを含む",
+        )
+        self.assert_fails(
+            "test-condition-design", substring_only, expected, "TCN-D016"
+        )
+
+        blank_target_with_explicit_reason = text.replace(
+            "未生成（transition_key=draft_publish） | draft --publish--> published | ブロック中 | runtime guardが未解決のためtarget未生成",
+            " | draft --publish--> published（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
+        ).replace(
+            "未生成（transition_key=published_archive） | published --archive--> archived | ブロック中 | runtime guardが未解決のためtarget未生成",
+            " | published --archive--> archived（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
+        ).replace(
+            "draft_publish: draft --publish--> published | state runtime / draft_publish",
+            "draft --publish--> published（入力候補） | state runtime",
+        ).replace(
+            "published_archive: published --archive--> archived | state runtime / published_archive",
+            "published --archive--> archived（入力候補） | state runtime",
+        )
+        self.assert_passes(
+            "test-condition-design", blank_target_with_explicit_reason, expected
+        )
+
+        blank_target_without_explicit_reason = blank_target_with_explicit_reason.replace(
+            "runtime target keyは生成されていない。", "guard未確定。"
+        )
+        self.assert_fails(
+            "test-condition-design",
+            blank_target_without_explicit_reason,
+            expected,
+            "TCN-D016",
+        )
+
+    def test_blocked_bva_accepts_exact_typed_integer_renderings(self):
+        text, expected = self._blocked_bva_transition_base()
+        text = text.replace(
+            "| bva:upper:100 | integer upper | 100 |",
+            "| bva:upper:100 | integer upper | integer 100 |",
+        )
+        text = text.replace(
+            "| bva:upper:101 | integer adjacent | 101 |",
+            "| bva:upper:101 | integer adjacent | 101 (integer) |",
+        )
+        text = text.replace(
+            "| bva:upper:100 | 入力値100 | ブロック中 | current Authority未解決 | |",
+            "| bva:upper:100 = integer 100 | BVA runtime | ブロック中 | current Authority未解決 | |",
+        )
+        text = text.replace(
+            "| bva:upper:101 | 入力値101 | ブロック中 | current Authority未解決 | |",
+            "| bva:upper:101 = 101 (integer) | BVA runtime | ブロック中 | current Authority未解決 | |",
+        )
+        self.assert_passes("test-condition-design", text, expected)
+
+        wrong_type = text.replace("integer 100 | ブロック中", "100.0 (decimal) | ブロック中")
+        self.assert_fails("test-condition-design", wrong_type, expected, "TCN-D017")
+
     def test_blocked_candidate_disposition_accepts_runtime_key_in_cover_target(self):
         text, expected = self._blocked_bva_transition_base()
         text = text.replace(
