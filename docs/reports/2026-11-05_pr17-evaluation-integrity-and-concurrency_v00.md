@@ -80,7 +80,7 @@ TCN-OUT-002の同じ2 raw outputに対する新Evaluatorの再採点は別ファ
 - Ruff 0.16.8: CI initially found formatter differences in five changed Python files. Applied the CI-indicated formatting with the existing cached Ruff binary; `ruff format --check` and `ruff check` then passed.
 - `dprint check`: passed after the report was formatted.
 - `git diff --check` / commit checks: passed.
-- Latest focused rerun after formatting: 49 passed; full Agent evaluation suite: 276 passed, 6 skipped. The first Code Quality run failed only at Ruff format check; a new commit below will trigger the corrected CI run.
+- Latest focused rerun after formatting: 49 passed; full Agent evaluation suite: 276 passed, 6 skipped. The first Code Quality run failed only at Ruff format check. Commit `a64ee084d9fe69e7c031ef3ff21fdd676e492fcd` corrected the format, and all five GitHub Actions workflows succeeded for that commit.
 
 ## 8. 未達と次の判断
 
@@ -91,4 +91,4 @@ TCN-OUT-002の同じ2 raw outputに対する新Evaluatorの再採点は別ファ
 - TCN-OUT-002はbaselineのみを入力整合修正後に再採点し、Skill candidate比較は実施していない。
 - TR-OUT-003は1件FAIL、1件が手順起因needs_reviewで、Skill起因の再現性は未確認。
 
-PR branchの実装変更は`173aeddb831aff2b44d98e2f17918edbe4f6c89e`および`645e3a2ae9baef20d8d2f4b788e7b241a9ea44b4`に記録した。報告書は`e87716c6d25d13b01be24442773308bf388e292e`でpush済み。formatter修正を追加commit・pushし、CI結果をPR本文へ反映する。正式評価やSkillの改善成立とは扱わない。
+PR branchには`173aeddb831aff2b44d98e2f17918edbe4f6c89e`、`645e3a2ae9baef20d8d2f4b788e7b241a9ea44b4`、報告書の`e87716c6d25d13b01be24442773308bf388e292e`、formatter修正の`a64ee084d9fe69e7c031ef3ff21fdd676e492fcd`を通常pushした。a64のGitHub Actions 5件はすべて成功。後続のこの報告書更新は文書のみのcommitであり、そのHEADでもCIを確認する。正式評価やSkillの改善成立とは扱わない。
