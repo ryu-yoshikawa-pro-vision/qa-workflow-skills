@@ -8,6 +8,11 @@ import sys
 import unittest
 from pathlib import Path
 
+from scripts.skills.evals.deterministic.result import EvalResult
+from scripts.skills.evals.deterministic.runtime_validator import (
+    validate_skill_local_runtime_evidence,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONDITION_SCRIPT = (
     REPO_ROOT
@@ -1593,6 +1598,19 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         }
         full_checked = runtime.verify_runtime_evidence(full_request)
         self.assertTrue(full_checked["valid"], full_checked)
+        replay_result = EvalResult("test-condition-design", "synthetic-runtime-gate")
+        replay = validate_skill_local_runtime_evidence(
+            full_artifact,
+            "test-condition-design",
+            "synthetic-runtime-gate",
+            {
+                "runtime_unit_key": "artifact:condition_structure:all",
+                "partial_rerun": False,
+            },
+            replay_result,
+            source_root=REPO_ROOT,
+        )
+        self.assertEqual(replay["status"], "verified", replay)
         self.assertFalse(
             any(
                 identity.startswith("test-requirement-design::")

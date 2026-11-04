@@ -452,6 +452,79 @@ def _expected_entities(expected: dict[str, Any]) -> list[tuple[str, str, str]]:
     return sorted(result)
 
 
+def _normalized_input_for_skill_runtime_replay(
+    skill: str,
+    normalized: dict[str, Any],
+    runtime_unit_key: str,
+    result_rows: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    """Project stable model identities exposed by test-condition-design's root.
+
+    The root request uses draft keys, while its verified condition_structure
+    result assigns stable model keys consumed by the dispatched model units.
+    The final Skill-local verifier expects that post-root normalized view. Keep
+    the evidence request itself unchanged and derive only from its captured
+    root result.
+    """
+    if skill != "test-condition-design":
+        return normalized
+    identity = f"{skill}::{runtime_unit_key}"
+    root_results = [
+        body
+        for row_identity, body in result_rows
+        if row_identity == identity and isinstance(body, dict)
+    ]
+    if len(root_results) != 1:
+        return normalized
+    payload = root_results[0].get("payload")
+    active_models = payload.get("active_model_metadata") if isinstance(payload, dict) else None
+    if not isinstance(active_models, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("model_key"), str)
+        for row in active_models
+    ):
+        return normalized
+
+    projected = dict(normalized)
+    projected["models"] = active_models
+    tcn_state = payload.get("tcn_id_state")
+    if isinstance(tcn_state, list) and all(isinstance(row, dict) for row in tcn_state):
+        projected["test_conditions"] = [
+            {"tcn_id": row["tcn_id"]}
+            for row in tcn_state
+            if row.get("status") == "active" and isinstance(row.get("tcn_id"), str)
+        ]
+    current_ci_ids: set[str] = set()
+    for row_identity, body in result_rows:
+        if not row_identity.startswith(
+            f"{skill}::artifact:materialize_coverage:"
+        ) or not isinstance(body, dict):
+            continue
+        result_payload = body.get("payload")
+        states = result_payload.get("ci_id_state") if isinstance(result_payload, dict) else None
+        if isinstance(states, list):
+            current_ci_ids.update(
+                state["ci_id"]
+                for state in states
+                if isinstance(state, dict)
+                and state.get("status") == "active"
+                and isinstance(state.get("ci_id"), str)
+            )
+    projected["ci_ids"] = sorted(current_ci_ids)
+    for row_identity, body in result_rows:
+        if row_identity != f"{skill}::artifact:test_data_requirements:all":
+            continue
+        result_payload = body.get("payload") if isinstance(body, dict) else None
+        requirements = (
+            result_payload.get("normalized_requirements")
+            if isinstance(result_payload, dict)
+            else None
+        )
+        if isinstance(requirements, list):
+            projected["test_data_requirements"] = requirements
+        break
+    return projected
+
+
 def _assert_runtime_pair(
     result: EvalResult,
     identity: str,
@@ -1233,10 +1306,16 @@ def validate_skill_local_runtime_evidence(
             "verifier_path": str(verifier_path),
         }
 
+    normalized_skill_input = _normalized_input_for_skill_runtime_replay(
+        skill,
+        input_body["input"],
+        policy["runtime_unit_key"],
+        parsed["Machine Runtime Result"],
+    )
     request = {
         "operation": "verify_runtime_evidence",
         "skill": skill,
-        "normalized_skill_input": input_body["input"],
+        "normalized_skill_input": normalized_skill_input,
         "artifact_markdown": text,
         "previous_artifact_markdown": None,
         "partial_rerun": False,
