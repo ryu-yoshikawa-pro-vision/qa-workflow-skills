@@ -683,29 +683,34 @@ class FalsePassRegressionTests(unittest.TestCase):
             "draft_publish: draft --publish--> published",
             "draft_publish: 無関係な説明にdraft --publish--> publishedを含む",
         )
-        self.assert_fails(
-            "test-condition-design", substring_only, expected, "TCN-D016"
-        )
+        self.assert_fails("test-condition-design", substring_only, expected, "TCN-D016")
 
-        blank_target_with_explicit_reason = text.replace(
-            "未生成（transition_key=draft_publish） | draft --publish--> published | ブロック中 | runtime guardが未解決のためtarget未生成",
-            " | draft --publish--> published（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
-        ).replace(
-            "未生成（transition_key=published_archive） | published --archive--> archived | ブロック中 | runtime guardが未解決のためtarget未生成",
-            " | published --archive--> archived（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
-        ).replace(
-            "draft_publish: draft --publish--> published | state runtime / draft_publish",
-            "draft --publish--> published（入力候補） | state runtime",
-        ).replace(
-            "published_archive: published --archive--> archived | state runtime / published_archive",
-            "published --archive--> archived（入力候補） | state runtime",
+        blank_target_with_explicit_reason = (
+            text.replace(
+                "未生成（transition_key=draft_publish） | draft --publish--> published | ブロック中 | runtime guardが未解決のためtarget未生成",
+                " | draft --publish--> published（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
+            )
+            .replace(
+                "未生成（transition_key=published_archive） | published --archive--> archived | ブロック中 | runtime guardが未解決のためtarget未生成",
+                " | published --archive--> archived（入力候補） | ブロック中 | runtime target keyは生成されていない。guard未確定",
+            )
+            .replace(
+                "draft_publish: draft --publish--> published | state runtime / draft_publish",
+                "draft --publish--> published（入力候補） | state runtime",
+            )
+            .replace(
+                "published_archive: published --archive--> archived | state runtime / published_archive",
+                "published --archive--> archived（入力候補） | state runtime",
+            )
         )
         self.assert_passes(
             "test-condition-design", blank_target_with_explicit_reason, expected
         )
 
-        blank_target_without_explicit_reason = blank_target_with_explicit_reason.replace(
-            "runtime target keyは生成されていない。", "guard未確定。"
+        blank_target_without_explicit_reason = (
+            blank_target_with_explicit_reason.replace(
+                "runtime target keyは生成されていない。", "guard未確定。"
+            )
         )
         self.assert_fails(
             "test-condition-design",
@@ -734,7 +739,9 @@ class FalsePassRegressionTests(unittest.TestCase):
         )
         self.assert_passes("test-condition-design", text, expected)
 
-        wrong_type = text.replace("integer 100 | ブロック中", "100.0 (decimal) | ブロック中")
+        wrong_type = text.replace(
+            "integer 100 | ブロック中", "100.0 (decimal) | ブロック中"
+        )
         self.assert_fails("test-condition-design", wrong_type, expected, "TCN-D017")
 
     def test_blocked_candidate_disposition_accepts_runtime_key_in_cover_target(self):

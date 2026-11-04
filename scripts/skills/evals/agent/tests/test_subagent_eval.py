@@ -21,7 +21,9 @@ SKILL_SHA = "a" * 40
 EVALUATOR_SHA = "b" * 40
 
 
-def _seal_attempt_process(repository: str, run_root: str, attempt_id: str, start, results):
+def _seal_attempt_process(
+    repository: str, run_root: str, attempt_id: str, start, results
+):
     from scripts.skills.evals.agent import subagent_eval
 
     subagent_eval.REPO_ROOT = Path(repository)
@@ -66,7 +68,9 @@ def _capture_or_seal_process(
         results.put((operation, f"error:{type(exc).__name__}:{exc}"))
 
 
-def _grade_attempt_process(repository: str, run_root: str, attempt_id: str, start, results):
+def _grade_attempt_process(
+    repository: str, run_root: str, attempt_id: str, start, results
+):
     from scripts.skills.evals.agent import subagent_eval
 
     root = Path(run_root)
@@ -853,7 +857,9 @@ class SubagentEvalTests(unittest.TestCase):
         ]
         outcomes = self._join_processes(processes, start, results)
 
-        self.assertCountEqual(outcomes, [(item["attempt_id"], "sealed") for item in attempts])
+        self.assertCountEqual(
+            outcomes, [(item["attempt_id"], "sealed") for item in attempts]
+        )
         record = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(
             {row["attempt_id"]: row["status"] for row in record["attempts"]},
@@ -881,7 +887,9 @@ class SubagentEvalTests(unittest.TestCase):
         outcomes = self._join_processes(processes, start, results)
 
         self.assertEqual(sum(value == "sealed" for _attempt, value in outcomes), 1)
-        self.assertEqual(sum(value.startswith("error:") for _attempt, value in outcomes), 1)
+        self.assertEqual(
+            sum(value.startswith("error:") for _attempt, value in outcomes), 1
+        )
         record = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(record["attempts"][0]["status"], "awaiting_grading")
         self.assertEqual(record["summary"], {"awaiting_grading": 1})
@@ -900,7 +908,14 @@ class SubagentEvalTests(unittest.TestCase):
         processes = [
             context.Process(
                 target=_capture_or_seal_process,
-                args=(str(self.repository), str(root), attempt_id, operation, start, results),
+                args=(
+                    str(self.repository),
+                    str(root),
+                    attempt_id,
+                    operation,
+                    start,
+                    results,
+                ),
             )
             for operation in ("capture", "seal")
         ]
@@ -940,7 +955,9 @@ class SubagentEvalTests(unittest.TestCase):
         outcomes = self._join_processes(processes, start, results)
 
         self.assertEqual(sum(value == "graded" for _attempt, value in outcomes), 1)
-        self.assertEqual(sum(value.startswith("error:") for _attempt, value in outcomes), 1)
+        self.assertEqual(
+            sum(value.startswith("error:") for _attempt, value in outcomes), 1
+        )
         record = json.loads((root / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(record["attempts"][0]["status"], "pass")
         self.assertEqual(record["summary"], {"pass": 1})

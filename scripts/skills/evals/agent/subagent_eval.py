@@ -167,7 +167,9 @@ def _run_record_lock(path: Path) -> Iterator[Path]:
                     os.lseek(descriptor, 0, os.SEEK_SET)
                     msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
                 except OSError as exc:
-                    raise AgentEvalError("could not release the run-state lock") from exc
+                    raise AgentEvalError(
+                        "could not release the run-state lock"
+                    ) from exc
                 acquired = False
         else:
             try:
@@ -184,7 +186,9 @@ def _run_record_lock(path: Path) -> Iterator[Path]:
                 try:
                     fcntl.flock(descriptor, fcntl.LOCK_UN)
                 except OSError as exc:
-                    raise AgentEvalError("could not release the run-state lock") from exc
+                    raise AgentEvalError(
+                        "could not release the run-state lock"
+                    ) from exc
                 acquired = False
     finally:
         if acquired:
@@ -972,9 +976,7 @@ def _seal_handoff_impl(
     if not artifacts and artifact_attempt_id is not None:
         raise AgentEvalError("artifact origin ID was supplied without an artifact")
     captured_output = row.get("captured_output")
-    if row.get("status") == "output_captured" and not isinstance(
-        captured_output, dict
-    ):
+    if row.get("status") == "output_captured" and not isinstance(captured_output, dict):
         raise AgentEvalError("captured output state has no integrity record")
     if captured_output is not None and not artifacts:
         raise AgentEvalError("captured output is missing from the handoff")
@@ -1344,9 +1346,7 @@ def _update_run_status(record: dict[str, Any]) -> None:
     }
     record["finished_at"] = (
         datetime.now(timezone.utc).isoformat()
-        if not any(
-            status in pending_statuses for status in statuses
-        )
+        if not any(status in pending_statuses for status in statuses)
         else None
     )
 

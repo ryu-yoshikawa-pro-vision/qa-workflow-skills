@@ -59,8 +59,7 @@ def _matches_expected_value(actual: str, expected: object) -> bool:
     if isinstance(expected, int) and not isinstance(expected, bool):
         number = re.escape(str(expected))
         return any(
-            re.fullmatch(pattern, value, flags=re.IGNORECASE)
-            is not None
+            re.fullmatch(pattern, value, flags=re.IGNORECASE) is not None
             for pattern in (
                 rf"integer\s+{number}",
                 rf"{number}\s+\(integer\)",
@@ -96,9 +95,7 @@ def _matches_input_candidate_transition(
 
 
 def _unmaterialized_transition_key(value: str) -> str | None:
-    match = re.fullmatch(
-        r"未生成（transition_key=([A-Za-z0-9_-]+)）", clean(value)
-    )
+    match = re.fullmatch(r"未生成（transition_key=([A-Za-z0-9_-]+)）", clean(value))
     return match.group(1) if match else None
 
 
@@ -789,8 +786,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 ]
                 has_runtime_target = bool(target_keys)
                 unmaterialized_target_rows = all(
-                    _is_explicit_unmaterialized_target(row)
-                    for row in transition_rows
+                    _is_explicit_unmaterialized_target(row) for row in transition_rows
                 )
                 target_closed = (
                     len(transition_rows) == 1
@@ -799,12 +795,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     if has_runtime_target
                     else len(transition_rows) == 1
                     and unmaterialized_target_rows
-                        and len(input_candidate_disposition_matches) == 1
+                    and len(input_candidate_disposition_matches) == 1
                 )
-                if (
-                    matched
-                    or not target_closed
-                ):
+                if matched or not target_closed:
                     missing_trans.append(
                         {
                             **t,
