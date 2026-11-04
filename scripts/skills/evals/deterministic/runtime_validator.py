@@ -477,7 +477,9 @@ def _normalized_input_for_skill_runtime_replay(
     if len(root_results) != 1:
         return normalized
     payload = root_results[0].get("payload")
-    active_models = payload.get("active_model_metadata") if isinstance(payload, dict) else None
+    active_models = (
+        payload.get("active_model_metadata") if isinstance(payload, dict) else None
+    )
     if not isinstance(active_models, list) or any(
         not isinstance(row, dict) or not isinstance(row.get("model_key"), str)
         for row in active_models
@@ -500,7 +502,11 @@ def _normalized_input_for_skill_runtime_replay(
         ) or not isinstance(body, dict):
             continue
         result_payload = body.get("payload")
-        states = result_payload.get("ci_id_state") if isinstance(result_payload, dict) else None
+        states = (
+            result_payload.get("ci_id_state")
+            if isinstance(result_payload, dict)
+            else None
+        )
         if isinstance(states, list):
             current_ci_ids.update(
                 state["ci_id"]

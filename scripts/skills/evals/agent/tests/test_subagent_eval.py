@@ -339,9 +339,7 @@ class SubagentEvalTests(unittest.TestCase):
         candidate_result_path = candidate_root / "result.json"
         candidate_record = json.loads(candidate_result_path.read_text(encoding="utf-8"))
         candidate_record["attempts"].pop()
-        candidate_result_path.write_text(
-            json.dumps(candidate_record), encoding="utf-8"
-        )
+        candidate_result_path.write_text(json.dumps(candidate_record), encoding="utf-8")
 
         comparison = improve.compare_development_handoff_runs(
             baseline_root / "result.json", candidate_result_path
@@ -433,9 +431,7 @@ class SubagentEvalTests(unittest.TestCase):
         candidate_result_path = candidate_root / "result.json"
         candidate_record = json.loads(candidate_result_path.read_text(encoding="utf-8"))
         candidate_record["attempts"][0]["host_execution"] = None
-        candidate_result_path.write_text(
-            json.dumps(candidate_record), encoding="utf-8"
-        )
+        candidate_result_path.write_text(json.dumps(candidate_record), encoding="utf-8")
 
         comparison = improve.compare_development_handoff_runs(
             baseline_root / "result.json", candidate_result_path
