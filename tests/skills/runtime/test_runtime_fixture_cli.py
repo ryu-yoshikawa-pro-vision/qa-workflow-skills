@@ -251,7 +251,7 @@ CONFIG = {
         None,
         "TCN-001",
         "artifact",
-        "materialize-coverage-v2",
+        "materialize-coverage-v3",
         "skills/test-condition-design/scripts/materialize_coverage.py",
     ),
     "case_structure": (

@@ -27,6 +27,8 @@
 | runner開始                         |    | execution                   | raw fact            |
 | result artifactの今回run生成・更新 |    | filesystem / reporter       | raw fact            |
 
+run全体status、runner開始、artifact生成の値欄は、許可されたstatus値だけを記載し、理由を括弧書きなどで付け加えません。run全体statusは`passed` / `failed` / `timedout` / `interrupted`または`未確認` / `確認不能` / `構造化結果不完全`、runner開始は`開始` / `開始済み` / `実行済み` / `はい`または`未開始` / `未実行` / `未実施` / `いいえ` / `対象なし`、artifact生成は`はい` / `生成` / `更新`または`なし` / `いいえ` / `未生成` / `未更新` / `対象なし`等を使います。preflight blockでは`確認不能`、`未開始`、`なし`のように記録し、停止理由は`実行成果物状態`のblock理由へ記載します。
+
 ## webServer process ownership（webServerがある場合）
 
 実行条件の`run外準備`行は、準備の有無を問わず必ず記録します。`setup / dependency / webServer / teardown`欄は実効設定のraw factを記録し、serverごとの所有・再利用・cleanupの導出結果はこの表を正本にします。`reuseExistingServer=true`だけからactual reuseを導出せず、実行前から存在して再利用したprocessと今回runが新規起動したprocessを実測事実として区別します。`起動状態`は`実行前から存在`または`今回runが起動`、`既存 / 再利用か`は`既存process再利用`または`新規起動`として記録します。`根拠`は実行前のURL / port疎通確認、実行前process確認、今回runでの起動確認などactual観測を記録し、`reuseExistingServer=true`やconfig上の`reuseExistingServer`だけを単独で記録しません。setup欄へownershipの結論を重複記載させません。webServerなしならownership行は不要です。webServerが未確認 / 確認不能ならrunnerを開始せず、架空のserver識別子を作らずownership行を0件にできます。確認済みのwebServerが複数ある場合も1 process 1行とし、自由記述1セルへまとめません。実効設定で期待される全serverを記録し、既存 / 再利用processは今回run非所有・cleanup対象外、今回runが起動したprocessは所有とcleanup対象の扱いを明示します。
@@ -47,6 +49,8 @@
 | ----------------------------- | ------------------- | ----------------------------- | -------- | --------------- | -------- | ----------------- | -------------- | -------- |
 | session-test-1                | login-flow          | tests/example.spec.ts > login | chromium | 0               | 開始     | passed            | passed         | expected |
 
+resolved primaryが0件の場合は表のヘッダーだけを残し、「該当なし」等のplaceholder行を作成しません。
+
 開始済みresolved primaryでは、`結果 / 未実行理由`にPlaywright `TestResult.status`、`expectedStatus`と`outcome`にPlaywrightから取得したresolved `TestCase`単位のraw値を記録します。未開始resolved primaryでも、`実行開始`は空欄にせず、resolvedできたTestCaseの参照・論理対象・test file / title path・project・repeatEachIndexは空欄にしません。結果・expectedStatus・outcomeを空欄にし、workflow側の未実行理由だけを記録し、attempt行は作成しません。要求primaryのattempt行は、参照先resolved primaryのfile / title / project / repeatEachIndexと完全一致させます。validatorはPlaywright公式の`computeTestCaseOutcome()`とattempt statusの整合だけを確認し、outcomeを生成して成果物へ書き込みません。
 
 ## attempt結果（retryをresolved件数へ加算しない）
@@ -54,6 +58,8 @@
 | resolved primary TestCase参照 | attempt番号 | 実行区分         | test file / title path        | project  | repeatEachIndex | status                                             | retry番号 | duration | error / errors |
 | ----------------------------- | ----------: | ---------------- | ----------------------------- | -------- | --------------: | -------------------------------------------------- | --------: | -------- | -------------- |
 | session-test-1                |           1 | 要求primary test | tests/example.spec.ts > login | chromium |               0 | passed / failed / timedOut / skipped / interrupted |         0 | 10ms     |                |
+
+attemptが0件の場合は表のヘッダーだけを残し、placeholder行を作成しません。
 
 attempt行はPlaywright `TestResult`単位の事実（status、retry、duration、error / errors）だけを保持します。dependency / teardown行はresolved primary参照を持たず、`実行区分`、test file / title path、project、repeatEachIndexで識別し、そのTestCase単位でattempt番号`1..N`・retry番号`0..N-1`を重複なく記録します。primary attemptだけは`resolved primary TestCase参照`を使ってresolved行のidentityと照合します。
 
@@ -72,6 +78,10 @@ attempt行はPlaywright `TestResult`単位の事実（status、retry、duration�
 | ---------------------- | --------------------------------------------------------------- | ----------------- | ------ |
 | runner管理             | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗 |                   |        |
 | run外処理              | 成功 / 失敗 / 未確認 / 対象なし / 意図的に残した状態 / 一部失敗 |                   |        |
+
+cleanupの`状態`と`実行成果物状態`は正規値を説明句やMarkdown強調なしで記載します。理由や根拠は別列またはブロック欄に記録します。
+
+preflightでrunner未開始かつ今回run外の準備・cleanupを行っていない場合、cleanup表に`run外処理`行を作りません。事前のrun外cleanup義務が不明なら、実行条件とブロック理由へ未確認として記録します。今回行っていないcleanupを`未確認`の実績行として追加せず、義務そのものを未確認のまま`対象なし`とも断定しません。
 
 `setup / dependency / webServer / teardown`の4番目が`none` / `なし` / `対象なし` / `未使用`等でなければ、明示的なrunner管理cleanup対象として扱います。`cleanup不要`、`対象なし`、`不要`は、既知のcleanup対象が存在しない場合にrunner管理またはrun外の契約へ記録できます。今回run所有かつcleanup対象のwebServer、または明示teardownがある場合は、runner管理cleanup対象 / 方法とcleanup表のrunner管理行を対応付けます。run外cleanupの実績は、run外準備の有無ではなく、事前に確認したrun外cleanup対象 / 方法と対応付けます。各cleanup契約は`確認済み`等の確認状態だけでは足りず、特定語のallow-listに依存しない通常の具体的な説明を記録します。
 

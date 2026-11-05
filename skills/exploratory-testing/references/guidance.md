@@ -11,6 +11,8 @@ current UI / accessible name / 既知範囲の事実収集は`test-target-inspec
 
 実対象へ操作する前に、mode、目的、対象と非対象、source refs、重点Risk / Questionまたはsymptom / hypothesis、timebox / 終了条件、許可origin、許可操作範囲とside effectとなる操作、side-effect scope / 一回の定義 / 最大回数、cleanup方法、evidence保管方法、block条件を確定します。詳細TCは事前必須にしません。
 
+必須前提が不足して安全に開始できない場合は、その不足を`charter.block_conditions[]`に列挙し、`unresolved[]`にも再開に必要な情報として記録します。Investigationでsymptom / hypothesisが不足している場合は、その不足を個別のblock conditionに含めます。
+
 実対象へ接続できない、必須権限 / dataがない、許可操作で仮説を検証できない、side-effect / safety条件を満たせない、必須evidenceを得られない場合は影響scopeをblockします。独立した安全なscopeは継続できます。
 
 ## Session lifecycle

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -142,6 +145,37 @@ def valid_input() -> dict:
 
 
 class CaseStructureRuntimeTests(unittest.TestCase):
+    def test_documented_generator_invocation_from_sanitized_target_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            scripts = target / ".agents/skills/test-case-design/scripts"
+            scripts.mkdir(parents=True)
+            shutil.copyfile(SCRIPT, scripts / "case_structure.py")
+            shutil.copyfile(RUNTIME_PATH, scripts / "runtime_contract.py")
+            request = json.dumps(
+                {"metadata": metadata(), "input": valid_input()},
+                ensure_ascii=False,
+            ).encode("utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    ".agents/skills/test-case-design/scripts/case_structure.py",
+                ],
+                cwd=target,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                input=request,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            response = json.loads(result.stdout)
+            self.assertEqual(response["runtime_status"], "ok", response)
+            self.assertEqual(response["result_status"], "ready", response)
+            self.assertEqual(response["payload"]["tc_id_map"][0]["tc_id"], "TC-001")
+            self.assertFalse(any(target.rglob("__pycache__")))
+
     def test_case_scope_is_derived_from_tcn_and_ci_and_inactive_id_reactivates(
         self,
     ) -> None:

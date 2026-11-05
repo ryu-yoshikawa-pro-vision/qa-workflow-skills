@@ -3,7 +3,10 @@
   "known_product_risks": ["RISK-001"],
   "product_risk_levels": { "RISK-001": "中" },
   "known_acceptance_criteria": ["AC-001", "AC-002"],
-  "required_linked_acceptance_ids": ["AC-001"],
-  "required_linked_upstream_ids": ["SPEC-001", "RISK-001"],
-  "expected_dispositions": { "AC-002": "ブロック中" }
+  "expected_dispositions": {
+    "AC-001": "ブロック中",
+    "AC-002": "ブロック中",
+    "SPEC-001": "ブロック中",
+    "RISK-001": "ブロック中"
+  }
 }

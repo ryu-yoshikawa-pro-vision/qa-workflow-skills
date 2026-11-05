@@ -9,10 +9,10 @@
     "cross-pattern-flow": "対象外"
   },
   "reference_catalog": {
-    "REF-0001": ["SRC-012-ITEM-0001"]
+    "REF-0001": ["SRC-012-ITEM-0001", "SRC-012-ITEM-0002"]
   },
   "known_refs": {
-    "evidence_refs": ["EV-101", "EV-102", "EV-103"],
+    "evidence_refs": ["EV-101", "EV-102", "EV-103", "AUTH-101", "input.md"],
     "project_authority_refs": ["AUTH-101"],
     "test_rule_result_refs": [],
     "requirement_check_refs": [],

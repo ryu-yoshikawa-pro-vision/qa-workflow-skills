@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import subprocess
+import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -20,6 +23,13 @@ from .result import EvalResult
 BLOCK_RE = re.compile(
     r"^### (?P<kind>Machine Runtime Input|Machine Runtime Result|Machine Entities): (?P<identity>[^\r\n]+)\r?\n\r?\n```json\r?\n(?P<body>.*?)\r?\n```",
     re.MULTILINE | re.DOTALL,
+)
+BLOCK_HEADING_RE = re.compile(
+    (
+        r"^### (?P<kind>Machine Runtime Input|Machine Runtime Result|Machine Entities): "
+        r"(?P<identity>[^\r\n]+)\r?$"
+    ),
+    re.MULTILINE,
 )
 RUNTIME_FIELDS = {
     "envelope_version",
@@ -229,8 +239,11 @@ def _source_constant(path: Path, name: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _source_paths(skill: str, generator: str) -> tuple[Path, Path]:
-    scripts = REPO_ROOT / "skills" / skill / "scripts"
+def _source_paths(
+    skill: str, generator: str, source_root: Path | None = None
+) -> tuple[Path, Path]:
+    root = (source_root if source_root is not None else REPO_ROOT).resolve()
+    scripts = root / "skills" / skill / "scripts"
     return scripts / "runtime_contract.py", scripts / f"{generator}.py"
 
 
@@ -439,12 +452,92 @@ def _expected_entities(expected: dict[str, Any]) -> list[tuple[str, str, str]]:
     return sorted(result)
 
 
+def _normalized_input_for_skill_runtime_replay(
+    skill: str,
+    normalized: dict[str, Any],
+    runtime_unit_key: str,
+    result_rows: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    """Project stable model identities exposed by test-condition-design's root.
+
+    The root request uses draft keys, while its verified condition_structure
+    result assigns stable model keys consumed by the dispatched model units.
+    The final Skill-local verifier expects that post-root normalized view. Keep
+    the evidence request itself unchanged and derive only from its captured
+    root result.
+    """
+    if skill != "test-condition-design":
+        return normalized
+    identity = f"{skill}::{runtime_unit_key}"
+    root_results = [
+        body
+        for row_identity, body in result_rows
+        if row_identity == identity and isinstance(body, dict)
+    ]
+    if len(root_results) != 1:
+        return normalized
+    payload = root_results[0].get("payload")
+    active_models = (
+        payload.get("active_model_metadata") if isinstance(payload, dict) else None
+    )
+    if not isinstance(active_models, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("model_key"), str)
+        for row in active_models
+    ):
+        return normalized
+
+    projected = dict(normalized)
+    projected["models"] = active_models
+    tcn_state = payload.get("tcn_id_state")
+    if isinstance(tcn_state, list) and all(isinstance(row, dict) for row in tcn_state):
+        projected["test_conditions"] = [
+            {"tcn_id": row["tcn_id"]}
+            for row in tcn_state
+            if row.get("status") == "active" and isinstance(row.get("tcn_id"), str)
+        ]
+    current_ci_ids: set[str] = set()
+    for row_identity, body in result_rows:
+        if not row_identity.startswith(
+            f"{skill}::artifact:materialize_coverage:"
+        ) or not isinstance(body, dict):
+            continue
+        result_payload = body.get("payload")
+        states = (
+            result_payload.get("ci_id_state")
+            if isinstance(result_payload, dict)
+            else None
+        )
+        if isinstance(states, list):
+            current_ci_ids.update(
+                state["ci_id"]
+                for state in states
+                if isinstance(state, dict)
+                and state.get("status") == "active"
+                and isinstance(state.get("ci_id"), str)
+            )
+    projected["ci_ids"] = sorted(current_ci_ids)
+    for row_identity, body in result_rows:
+        if row_identity != f"{skill}::artifact:test_data_requirements:all":
+            continue
+        result_payload = body.get("payload") if isinstance(body, dict) else None
+        requirements = (
+            result_payload.get("normalized_requirements")
+            if isinstance(result_payload, dict)
+            else None
+        )
+        if isinstance(requirements, list):
+            projected["test_data_requirements"] = requirements
+        break
+    return projected
+
+
 def _assert_runtime_pair(
     result: EvalResult,
     identity: str,
     input_body: Any,
     result_body: Any,
     expected: dict[str, Any],
+    source_root: Path | None = None,
 ) -> None:
     prefix = "RUNTIME-PAIR-" + re.sub(r"[^A-Za-z0-9]+", "-", identity).strip("-")[:80]
     ok_input = (
@@ -503,7 +596,9 @@ def _assert_runtime_pair(
     )
     try:
         runtime_path, generator_path = _source_paths(
-            str(metadata.get("skill")), str(result_body.get("generator"))
+            str(metadata.get("skill")),
+            str(result_body.get("generator")),
+            source_root,
         )
         expected_runtime_contract = _source_constant(
             runtime_path, "RUNTIME_CONTRACT_VERSION"
@@ -791,7 +886,11 @@ def _assert_targets(
 
 
 def validate_runtime_evidence(
-    text: str, expected: dict[str, Any], result: EvalResult
+    text: str,
+    expected: dict[str, Any],
+    result: EvalResult,
+    *,
+    source_root: Path | None = None,
 ) -> None:
     """Append runtime/Machine Entity assertions when the eval declares them."""
     declared = any(
@@ -837,7 +936,12 @@ def validate_runtime_evidence(
     result_map = {identity: body for identity, body in result_rows}
     for identity in sorted(set(input_map) & set(result_map)):
         _assert_runtime_pair(
-            result, identity, input_map[identity], result_map[identity], expected
+            result,
+            identity,
+            input_map[identity],
+            result_map[identity],
+            expected,
+            source_root,
         )
 
     entity_rows, _ = _blocks(text, "Machine Entities", result, "ENTITY-JSON")
@@ -1032,3 +1136,314 @@ def validate_runtime_evidence(
         if dependency_mismatches
         else None,
     )
+
+
+def validate_skill_local_runtime_evidence(
+    text: str,
+    skill: str,
+    eval_id: str,
+    policy: dict[str, Any],
+    result: EvalResult,
+    *,
+    source_root: Path | None = None,
+) -> dict[str, Any]:
+    """Require the Skill-declared final runtime gate independently of expected.
+
+    ``expected.json`` may add fixture-specific runtime assertions.  This gate
+    instead replays the Skill-local verifier from the runtime input embedded in
+    the artifact, so a missing evidence block cannot pass merely because that
+    fixture has no extra runtime assertions.
+    """
+    blocked_assertion_id = policy.get("accepted_blocked_assertion_id")
+    allowed_policy_fields = {"runtime_unit_key", "partial_rerun"}
+    if blocked_assertion_id is not None:
+        allowed_policy_fields.add("accepted_blocked_assertion_id")
+    if (
+        set(policy) != allowed_policy_fields
+        or not isinstance(policy.get("runtime_unit_key"), str)
+        or not policy["runtime_unit_key"]
+        or policy.get("partial_rerun") is not False
+        or (
+            blocked_assertion_id is not None
+            and (not isinstance(blocked_assertion_id, str) or not blocked_assertion_id)
+        )
+    ):
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "unsupported_skill_runtime_verification_policy",
+        }
+
+    expected_identity = f"{skill}::{policy['runtime_unit_key']}"
+    parsed: dict[str, list[tuple[str, Any]]] = {
+        "Machine Runtime Input": [],
+        "Machine Runtime Result": [],
+        "Machine Entities": [],
+    }
+    malformed: dict[str, list[str]] = {kind: [] for kind in parsed}
+    heading_counts: dict[str, dict[str, int]] = {kind: {} for kind in parsed}
+    for match in BLOCK_HEADING_RE.finditer(text):
+        kind = match.group("kind")
+        identity = match.group("identity")
+        heading_counts[kind][identity] = heading_counts[kind].get(identity, 0) + 1
+    counts: dict[str, dict[str, int]] = {kind: {} for kind in parsed}
+    for match in BLOCK_RE.finditer(text):
+        kind = match.group("kind")
+        identity = match.group("identity")
+        if kind not in parsed:
+            continue
+        counts[kind][identity] = counts[kind].get(identity, 0) + 1
+        try:
+            body = _parse_json(match.group("body"))
+        except (TypeError, ValueError) as exc:
+            malformed[kind].append(f"{identity}:{type(exc).__name__}")
+            continue
+        parsed[kind].append((identity, body))
+
+    expected_entities_identity = skill
+    expected_block_count = {
+        "Machine Runtime Input": expected_identity,
+        "Machine Runtime Result": expected_identity,
+        "Machine Entities": expected_entities_identity,
+    }
+    missing_blocks = [
+        kind
+        for kind, identity in expected_block_count.items()
+        if heading_counts[kind].get(identity, 0) == 0
+    ]
+    duplicate_blocks = [
+        f"{kind}:{identity}"
+        for kind, identities in heading_counts.items()
+        for identity, count in identities.items()
+        if count > 1 and identity in {expected_block_count[kind], skill}
+    ]
+    unparsed_blocks = [
+        f"{kind}:{identity}"
+        for kind, identity in expected_block_count.items()
+        if heading_counts[kind].get(identity, 0) > 0
+        and counts[kind].get(identity, 0) == 0
+    ]
+    if missing_blocks or duplicate_blocks or unparsed_blocks:
+        result.add(
+            "RT-D016",
+            not missing_blocks and not unparsed_blocks and not duplicate_blocks,
+            "Skillが要求するruntime input/result/entity evidenceが一意に存在すること",
+            evidence={
+                "expected_runtime_unit": expected_identity,
+                "missing_blocks": missing_blocks,
+                "duplicate_blocks": duplicate_blocks,
+                "unparsed_blocks": unparsed_blocks,
+            },
+        )
+        return {
+            "status": "missing_evidence"
+            if missing_blocks and not duplicate_blocks and not unparsed_blocks
+            else "invalid_evidence",
+            "valid": False,
+            "expected_runtime_unit": expected_identity,
+            "missing_blocks": missing_blocks,
+            "duplicate_blocks": duplicate_blocks,
+            "unparsed_blocks": unparsed_blocks,
+        }
+    result.add(
+        "RT-D016",
+        True,
+        "Skillが要求するruntime input/result/entity evidenceが一意に存在すること",
+    )
+
+    required_malformed = [
+        f"{kind}:{identity}"
+        for kind, identity in expected_block_count.items()
+        for invalid in malformed[kind]
+        if invalid.startswith(f"{identity}:")
+    ]
+    input_rows = [
+        body
+        for identity, body in parsed["Machine Runtime Input"]
+        if identity == expected_identity
+    ]
+    input_body = input_rows[0] if len(input_rows) == 1 else None
+    if (
+        required_malformed
+        or not isinstance(input_body, dict)
+        or set(input_body) != {"metadata", "input"}
+        or not isinstance(input_body.get("metadata"), dict)
+        or not isinstance(input_body.get("input"), dict)
+        or input_body["metadata"].get("skill") != skill
+        or input_body["metadata"].get("runtime_unit_key") != policy["runtime_unit_key"]
+    ):
+        result.add(
+            "RT-D017",
+            False,
+            "Skill-local runtime verifierへ渡せるruntime input/evidence構造であること",
+            evidence={
+                "expected_runtime_unit": expected_identity,
+                "malformed_blocks": required_malformed,
+            },
+        )
+        return {
+            "status": "invalid_evidence",
+            "valid": False,
+            "expected_runtime_unit": expected_identity,
+            "malformed_blocks": required_malformed,
+        }
+    result.add(
+        "RT-D017",
+        True,
+        "runtime inputがSkill-local verifierのfull-build入力契約に適合すること",
+    )
+
+    root = (source_root if source_root is not None else REPO_ROOT).resolve()
+    verifier_path = root / "skills" / skill / "scripts" / "runtime_contract.py"
+    if not verifier_path.is_file():
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_missing",
+            "verifier_path": str(verifier_path),
+        }
+    try:
+        verifier_sha256_before = _implementation_fingerprint(verifier_path)
+    except OSError:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_fingerprint_unavailable",
+            "verifier_path": str(verifier_path),
+        }
+
+    normalized_skill_input = _normalized_input_for_skill_runtime_replay(
+        skill,
+        input_body["input"],
+        policy["runtime_unit_key"],
+        parsed["Machine Runtime Result"],
+    )
+    request = {
+        "operation": "verify_runtime_evidence",
+        "skill": skill,
+        "normalized_skill_input": normalized_skill_input,
+        "artifact_markdown": text,
+        "previous_artifact_markdown": None,
+        "partial_rerun": False,
+    }
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(verifier_path)],
+            input=_canonical_text(request),
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=verifier_path.parent,
+            env={
+                "PATH": os.defpath,
+                "PYTHONNOUSERSITE": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONUTF8": "1",
+            },
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": type(exc).__name__,
+            "verifier_path": str(verifier_path),
+        }
+    if completed.returncode != 0:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_nonzero_exit",
+            "returncode": completed.returncode,
+            "verifier_path": str(verifier_path),
+        }
+    try:
+        verification = _parse_json(completed.stdout)
+    except ValueError as exc:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": f"skill_local_runtime_verifier_invalid_json:{type(exc).__name__}",
+            "verifier_path": str(verifier_path),
+        }
+    issues = verification.get("issues") if isinstance(verification, dict) else None
+    if (
+        not isinstance(verification, dict)
+        or not isinstance(verification.get("valid"), bool)
+        or not isinstance(issues, list)
+        or any(
+            not isinstance(issue, dict) or not isinstance(issue.get("issue_type"), str)
+            for issue in issues
+        )
+    ):
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_invalid_response",
+            "verifier_path": str(verifier_path),
+        }
+    if verification["valid"] != (not issues):
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_inconsistent_response",
+            "verifier_path": str(verifier_path),
+        }
+    try:
+        verifier_sha256_after = _implementation_fingerprint(verifier_path)
+    except OSError:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_fingerprint_unavailable",
+            "verifier_path": str(verifier_path),
+        }
+    if verifier_sha256_before != verifier_sha256_after:
+        return {
+            "status": "execution error",
+            "valid": None,
+            "reason": "skill_local_runtime_verifier_changed_during_execution",
+            "verifier_path": str(verifier_path),
+        }
+
+    valid = verification["valid"]
+    issue_types = sorted({issue["issue_type"] for issue in issues})
+    accepted_blocked_assertions = [
+        assertion
+        for assertion in result.assertions
+        if assertion.id == blocked_assertion_id
+    ]
+    accepted_blocked = (
+        not valid
+        and len(issues) == 1
+        and issue_types == ["missing_entity"]
+        and len(accepted_blocked_assertions) == 1
+        and accepted_blocked_assertions[0].status == "pass"
+    )
+    result.add(
+        "RT-D018",
+        valid or accepted_blocked,
+        "Skill-local runtime verifierが有効な成果物または契約で許可されたblocked状態を確認すること",
+        evidence={
+            "expected_runtime_unit": expected_identity,
+            "issue_types": issue_types,
+            "accepted_blocked_assertion_id": blocked_assertion_id
+            if accepted_blocked
+            else None,
+        }
+        if not valid or accepted_blocked
+        else None,
+    )
+    return {
+        "status": "verified"
+        if valid
+        else "blocked"
+        if accepted_blocked
+        else "invalid_evidence",
+        "valid": valid,
+        "accepted_blocked_outcome": accepted_blocked,
+        "expected_runtime_unit": expected_identity,
+        "issue_types": issue_types,
+        "verifier_path": str(verifier_path),
+        "verifier_sha256": verifier_sha256_after,
+    }

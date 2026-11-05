@@ -1,6 +1,7 @@
 {
   "expected_logical_primary_count": 1,
-  "expected_resolved_primary_count": 1,
-  "expected_webserver_ids": ["app"],
+  "expected_resolved_primary_count": 0,
+  "expected_runner_started": false,
+  "expected_execution_state": "ブロック中",
   "tc_absent": false
 }

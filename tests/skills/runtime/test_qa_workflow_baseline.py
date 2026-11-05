@@ -191,6 +191,36 @@ class QaWorkflowBaselineTests(unittest.TestCase):
         )
         self.assertEqual(mismatch["status"], "blocked")
 
+    def test_historical_read_rejects_wrong_workflow_binding(self) -> None:
+        result = self.commit()
+        mismatch = artifact_graph.read_qa_workflow_artifact_revision_local(
+            self.root,
+            WORKFLOW_REF,
+            "qa-workflow-local:00000000-0000-4000-8000-000000000017",
+            result["artifact_revision"],
+        )
+        self.assertEqual(mismatch["status"], "blocked")
+        self.assertEqual(mismatch["reason"], "historical_artifact_binding_invalid")
+
+    def test_historical_read_rejects_tampered_artifact_bytes(self) -> None:
+        result = self.commit()
+        artifact_path = (
+            self.root
+            / "artifacts"
+            / WORKFLOW_REF
+            / "qa-workflow"
+            / f"{result['artifact_sha256']}.md"
+        )
+        artifact_path.write_text("# Tampered QA workflow\n", encoding="utf-8")
+        mismatch = artifact_graph.read_qa_workflow_artifact_revision_local(
+            self.root,
+            WORKFLOW_REF,
+            result["artifact_ref"],
+            result["artifact_revision"],
+        )
+        self.assertEqual(mismatch["status"], "blocked")
+        self.assertEqual(mismatch["reason"], "historical_artifact_revision_mismatch")
+
     def test_snapshot_publish_then_state_replace_failure_keeps_old_binding(
         self,
     ) -> None:

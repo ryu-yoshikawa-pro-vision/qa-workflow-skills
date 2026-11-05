@@ -14,9 +14,10 @@ description: Playwright E2Eの実装前に対象repo・workspace・既存E2E・�
 5. 実対象URLやbrowser操作能力がない場合でも、可能なrepo / workspace確認は継続し、実対象に依存する範囲だけを`未確認`または`ブロック中`にします。
 6. 指定URLは主たる対象originの識別であり、別origin、削除、メール、決済、権限変更等の包括許可ではありません。必要な副作用は許可根拠と範囲を確認します。
 7. Playwright設定は新規設計せず、対象testへ効くconfig / project / file / fixture / hook / setup / teardown / reporter / artifact / cleanupの実効事実を確認します。
-8. branch / commit / working tree、対象URL / origin、実対象確認日時、取得できるversion / build ID、主要事実の確認元と鮮度を成果物へ残します。secret、cookie、token、storageStateの値は記録しません。
-9. 最終出力前に、対象決定を最低1行、各行の識別子・決定根拠・扱いを確認します。既存E2Eとの関係を出力する場合は対象ごとに正規の`扱い`を記録します。実装・実行に影響する事実も最低1行以上で、内容・確認元・影響を空欄にしません。存在を確認できないlocator、fixture、helper、URL、API、データ準備方法を推測しません。
+8. branch / commit / working tree、対象URL / origin、実対象確認日時、取得できるversion / build ID、主要事実の確認元と鮮度を成果物へ残します。repoや実対象を確認できず日時・commitを得られない場合も鮮度表のセルを空欄にせず、`未確認（理由）`または`未実施（理由）`を記録します。secret、cookie、token、storageStateの値は記録しません。
+9. 最終出力前に、対象決定を最低1行、各行の識別子・決定根拠・扱いを確認します。既存E2Eとの関係表には対象ごとに最低1行を記録します。関係を確認できない場合は、確認できない対象を識別し、`ブロック中`と理由を記録します。未確認を「既存E2Eなし」や「既存E2Eで十分にカバー済み」と推測しません。実装・実行に影響する事実も最低1行以上で、内容・確認元・影響を空欄にしません。存在を確認できないlocator、fixture、helper、URL、API、データ準備方法を推測しません。
 10. currentな`test-target-inspection`成果物があれば実対象情報の一部を任意に再利用できますが、repo構造・Playwright設定・実効runner契約のinspectionを省略しません。古い範囲だけを`test-target-inspection`で再確認し、E2E全体を不要に再実行しません。
+11. `TC ID（存在時のみ）`、E2E実装参照、証跡参照などの機械参照欄には、入力で確認できた参照だけを記録します。TC IDがない場合は空欄にし、参照元自体がない場合は参照欄を空欄にして未提供の理由を別欄へ記載します。
 
 ## 調査範囲
 

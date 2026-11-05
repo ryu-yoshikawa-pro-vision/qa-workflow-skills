@@ -17,10 +17,14 @@ description: テスト条件とカバレッジ項目を、第三者が迷わず�
 8. 他Skillを参照するときは正規Skill名を使用します。
 9. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成した成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい領域固有の判断を必要としない契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。不足仕様や不明な期待結果の根拠、未解決の仕様根拠を自己検証の名目で創作・補完せず、詳細テストケース完了基準を含む既存契約を正本として扱います。仕様根拠不足、上流判断不足、他Skillの領域固有ロジックが必要な問題は既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身の契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証の経緯や修正回数は出力しません。
 10. currentなテスト対象資料があれば、UI名称・到達方法・具体手順・観測可能性の補助情報として任意に使えます。currentnessは`test-target-inspection`が生きた実対象で確認し、資料上の観測挙動を期待結果の仕様根拠にしません。
+11. 入力で指定された各上流TCN / CIを、テストケースの参照または「展開しない上流項目」の個別Dispositionへ閉じます。CIだけをblockする場合も、その親TCNを暗黙にDisposition済みとして扱いません。
+12. 入力にTC本文・実行条件・期待結果の根拠がなく、上流TCN / CIの意味を実行可能ケースへ展開できない場合は、テストケース一覧と完了確認表にplaceholder行を作りません。各上流IDをDisposition表へ理由付きで記録し、該当するケース表はheader-onlyで残します。`未採番`、仮TC ID、推測した手順・期待結果をケースとして出力しません。
 
 ## 決定論的runtime dispatch
 
 `case_structure`は、currentなTCN / CIと現在有効な仕様根拠から、独立して実施できるテストケース構造を生成します。ケースID、coverage item、test data requirement、前提・手順・観測・期待結果・根拠をstable IDで追跡し、秘密値を出力へ複製しません。semantic itemが不足するケースは実行可能ケースとしてcompleteにせず、未解決・ブロック中・対象外の扱いを保持します。
+
+`case_structure.py`はJSONをstdinから読むgenerator CLIです。実行時はsanitized targetのrootから`PYTHONDONTWRITEBYTECODE=1 python -B .agents/skills/test-case-design/scripts/case_structure.py < path/to/request.json`を使い、`metadata`とcanonical normalized `input`を持つ1つのruntime requestを渡します。このscriptに`--help`引数はありません。`case_structure.py`がMachine Runtime Resultを生成する処理と、最終Markdown全文を検査する`runtime_contract.py`の`verify_runtime_evidence`処理は別の操作です。入力契約が不明な場合は実行せず、入力不足や仕様未確定を推測値で埋めないでください。
 
 Machine Runtime Input / Resultは入力・model・generation・implementation fingerprintとupstream Entity fingerprintを持ち、`runtime_status=ok`かつ`result_status=ready`、`freshness_status=current`、`deterministic_generated=true`の結果だけを通常のケース生成へ使います。実行時のPASS / FAILはケース設計の期待結果を置き換えません。
 

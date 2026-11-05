@@ -12,7 +12,7 @@ from scripts.skills.evals.deterministic.markdown_parser import find_table, parse
 from scripts.skills.evals.deterministic.result import EvalResult
 
 FULL_RESULT_STATUSES = {"passed", "failed", "timedout", "interrupted"}
-RUN_UNAVAILABLE_STATES = {"未確認", "確認不能", "構造化結果不完全"}
+RUN_UNAVAILABLE_STATES = {"未確認", "未提供", "確認不能", "構造化結果不完全"}
 TEST_STATUSES = {"passed", "failed", "timedOut", "skipped", "interrupted"}
 EXPECTED_STATUSES = {"passed", "failed", "timedOut", "skipped", "interrupted"}
 OUTCOMES = {"skipped", "expected", "unexpected", "flaky"}

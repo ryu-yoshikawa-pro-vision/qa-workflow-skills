@@ -17,7 +17,9 @@ from scripts.skills.evals.deterministic.markdown_parser import find_table, parse
 from scripts.skills.evals.deterministic.result import EvalResult
 
 DISPOSITIONS = {"別テストレベル", "残存リスク", "対象外", "ブロック中"}
-ACCEPTANCE_ID_RE = re.compile(r"(?<![A-Za-z0-9_-])AC-\d{3,}(?![A-Za-z0-9_-])")
+ACCEPTANCE_ID_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])AC-(?:[A-Z0-9]+-)*\d{3,}(?![A-Za-z0-9_-])"
+)
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -249,6 +251,46 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=issues or None,
     )
 
+    blocked_upstream_ids = set(expected.get("expected_blocked_upstream_ids", []))
+    if blocked_upstream_ids:
+        blocked_rows = {}
+        for row in disposed:
+            for upstream_id in ids_in(row.get("上流ID", "")):
+                if upstream_id in blocked_upstream_ids:
+                    blocked_rows[upstream_id] = row
+        blocked_issues = []
+        if trs:
+            blocked_issues.append(
+                {
+                    "reason": "test requirements were generated while required source content is blocked",
+                    "requirement_ids": tr_ids,
+                }
+            )
+        for upstream_id in sorted(blocked_upstream_ids):
+            row = blocked_rows.get(upstream_id)
+            if row is None:
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "missing block disposition"}
+                )
+            elif clean(row.get("扱い", "")) != "ブロック中":
+                blocked_issues.append(
+                    {
+                        "id": upstream_id,
+                        "reason": "upstream item is not marked blocked",
+                        "actual": clean(row.get("扱い", "")),
+                    }
+                )
+            elif not clean(row.get("理由 / 根拠", "")):
+                blocked_issues.append(
+                    {"id": upstream_id, "reason": "block disposition has no reason"}
+                )
+        result.add(
+            "TR-D018",
+            not blocked_issues,
+            "上流の内容が不足する場合、要求を生成せず対象を理由付きでブロック中にすること",
+            evidence=blocked_issues or None,
+        )
+
     required_missing = []
     if "required_test_requirements" in expected:
         required_missing = sorted(
@@ -260,4 +302,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "フィクスチャで必須のテスト要求が存在すること",
         evidence=required_missing or None,
     )
+    if expected.get("expected_no_test_requirements") is True:
+        result.add(
+            "TR-D019",
+            not trs,
+            "フィクスチャが要求なしを指定した場合、テスト要求を生成しないこと",
+            evidence=tr_ids or None,
+        )
     return result

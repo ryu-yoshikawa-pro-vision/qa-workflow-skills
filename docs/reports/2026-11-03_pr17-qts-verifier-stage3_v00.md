@@ -1,0 +1,115 @@
+# PR #17 第3段階：保存成果物完全性・Dockerless verifier
+
+## 結論
+
+- 開始HEAD: `6a1e4e46937d220fece0234fb7eed5c67dc2e0b6`
+- 調査開始時PR HEAD: `9eee33962d8d9a9b7f63ce037b1874c256df0de9`
+- 対象QTS revision: `84ce165493649550832731a60cf436f8ae29c56b`
+- 対象の旧開発run: `.agent-eval-runs/pr17-qts-subagent-stage2-20261103-03/`
+- 今回の読み取り検査記録: `.agent-eval-runs/pr17-qts-verifier-stage3-20261103-01/`
+
+capture後の保存コピー完全性検査を追加し、`captured-output`側だけの変更を検出する回帰を確認した。Dockerless replayはDockerに依存しない既存のsemantic比較経路へ接続済みで、`verify`と`workflow-runtime`を別々に検査する。候補PythonをEvaluator processへimportせず、root所有bubblewrapが作るuser/PID/mount/IPC/UTS namespaceで起動する。
+
+GitHub runnerではnetwork namespaceの2方式が権限で失敗したため、現在はsealed cBPF seccompでsocket作成・通信syscall、io_uring、x32 ABIを拒否する方式を必須probeで検証する。commit `970cf6b367516a6fdd39a10da231fea934867002`のCIではbubblewrapが`setting up uid map: Permission denied`で止まり、probeは`evidence_unverified`、候補Verifierは未実行だった。Probe未確認の状態では、候補Verifierを起動しない。保存済みQTS runtime requestのDockerless replayとStage 3の正式受入は未達である。
+
+## Stage 2証拠との照合
+
+Run ID `d3ab14c200964233b76acbb26ef7a676`は固定target revisionを記録している。run記録のEvaluator revisionは`296e64919a61617243b22f56b3bb3edd16693244`、Skill revisionも同SHAで、現在のsourceとは一致しない。revisionの異なるEvaluatorとの比較を同条件と誤認しないため、元runに対するreplayは行っていない。
+
+raw run rootに`evidence-index.md`はなかった。保存された`result.json`、attempt別`capture.json` / `evaluation.json`、runtime invocation、manifestを読み、次を確認した。
+
+| Attempt                            | 既存capture / 評価                                   | captured-output完全性                                    | runtime capture                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `d7760de6d12d4c78b45c359017b0eea6` | `captured` / `needs_review`、9 artifact              | 17 files、hash・size・file set一致、symlink/hardlinkなし | `spec-analysis`の`verify` 1件はrequest/result hashとbindingが整合。未登録runtime file 4件と他の必須capture不足が残る |
+| `0ddf91f4b33046588a42eee224d40612` | `captured_needs_review` / `needs_review`、8 artifact | 23 files、hash・size・file set一致、symlink/hardlinkなし | `test-analysis`と`test-requirement-design`の`verify-001`重複を検出し、両invocationを拒否。必須capture不足も残る      |
+
+候補runtime source manifestは読み取り検査で不整合なし。これはAgentのSkill使用やtool traceを証明しない。両attemptとも実効model/buildと元Agent tool traceは未検証である。
+
+今回の読み取り検査metadataは`.agent-eval-runs/pr17-qts-verifier-stage3-20261103-01/evidence-index.md`と`validation.json`に保存した。raw Stage 2 evidenceは変更していない。
+
+## 実装
+
+- `qts_subagent_eval.py`は採点前にcapture attempt ID/fingerprint、元source file list、saved-copy file list、各`saved_sha256`・size、captured-output treeを照合する。capture後の追加・削除・変更、symlink/hardlink、redacted file、manifest不一致は`needs_review`とし、artifact validatorとruntime replayへ進まない。testでは元Agent出力を変えず、保存済み`captured-output`だけを変更して拒否されることを確認した。
+- `common_runtime_checks.py`はDocker候補経路を維持しつつ、`verifier_image=None`でcandidate source、固定Evaluator source、captured resultを意味的に比較するDockerless経路を持つ。`verify`と`workflow-runtime`の両方が個別に一致しない限り全体をpassにしない。未実行・不一致・timeout・execution/environment errorはpassにならない。
+- CIログの再確認で、Dockerless replayの上位結果がseccomp方式を`network: isolated_namespace`と誤記していたことを発見した。`verify`と`workflow-runtime`の記録を`blocked_by_seccomp`へ直し、実際の`network_enforcement`とpolicy SHA-256をcandidate・fixed別に保存する。これは証拠ラベルの修正で、隔離方式やPASS条件は変えていない。
+- `isolated_verifier.py`は候補sourceをEvaluator processへimportしない。候補sourceの全fileをhashし、sealed memfdに固定してread-onlyでbubblewrapへ渡す。requestはstdin、環境変数はallowlist、出力は一時fileへ取得する。bubblewrapはroot-owned実行fileを要求し、user/PID/mount/IPC/UTS namespace、read-only root/source、上限付きscratch、resource limit、timeout cleanupを設定する。
+- 最初の方式はbubblewrap自身にnetwork namespaceを作らせたが、CIでloopback初期化が`RTM_NEWADDR: Operation not permitted`となった。util-linux `unshare --user --map-root-user --net`による代替も`/proc/self/uid_map: Operation not permitted`となった。どちらも安全条件を弱めず停止した。
+- 現方式はx86_64向けsealed cBPFをbubblewrap `--seccomp FD`へ渡す。socket/socket data syscall、socketpair、io_uring、x32 syscall ABIをEPERMで拒否し、未知のaudit architectureはkillする。FDは明示したsealed memfdのみを継承し、`close_fds=True`とする。network namespaceを作成したとは記録せず、network syscall denialとして扱う。Bubblewrap manualは`--seccomp FD`をcompiled cBPF programの適用として定義し、`--disable-userns`はsandbox内の新規user namespaceを防ぐ機能と説明する。[bubblewrap upstream manual](https://github.com/containers/bubblewrap/blob/main/bwrap.xml)
+- synthetic probeはseccomp適用、IPv4/IPv6/Unix socket拒否、io_uring拒否、x32拒否、socket FD非継承、namespace分離、credential環境allowlist、Evaluator marker読取拒否、filesystem write拒否、resource limit、timeout後cleanup、source/request固定性を個別に検査する。1つでも未確認・失敗ならcandidate sourceは実行しない。
+- run記録でVerifier実行と元Agent実行を分離する。独立Verifierが結果を再現しても、元Agentがそのコマンドを実行した証拠にはならない。`can_complete=false`は比較値として維持し、replay一致をworkflow完了へ読み替えない。
+
+## 検証
+
+### ローカル
+
+- isolated verifier tests: 18件、15 PASS・3 SKIP（環境にbubblewrapがなく、実隔離を要するprobe・候補起動・timeout testをskip）。QTSの候補Verifier Pythonは起動していない。synthetic probe文字列のPython構文は独立に検査した。
+- QTS subagent evaluator tests: 15 PASS。
+- runtime trace/replay tests: 18 PASS。
+- Agent evaluation tests: 245 PASS・5 SKIP。
+- runtime tests: 388 PASS。
+- repository Agent runner contract: 4 PASS。
+- artifact graph deterministic contract: 43 PASS。通常`/tmp`では親sandboxが作成した`/tmp/.git`をSQLite safety checkが検出して3件をblockedにした。`TMPDIR=/dev/shm`へ移して同じsuiteを実行し、全件通過した。
+- `compileall`: PASS。
+- `dprint check`: PASS。
+- `git diff --check`: PASS。
+- `python scripts/format_tracked.py check`: Ruff executableがないため未実施（`could not start ruff: No such file or directory: 'ruff'`）。
+- 既存Agent testsの中に意図的なfake-run出力（execution error / needs_review）があるが、test suite全体はPASSである。
+
+### GitHub Actions
+
+- `6e45bb1`のCode Quality必須probeは、bubblewrapのnetwork namespace loopback setupが`RTM_NEWADDR: Operation not permitted`となり失敗。
+- `9eee339`のCode Quality必須probeは、util-linux `unshare`が`/proc/self/uid_map: Operation not permitted`となり失敗。candidate verifierは実行していない。他の4 workflowは成功。
+- `970cf6b`のseccomp方式も、Code Quality runnerがuser namespace UID mapを作れず必須probeに失敗した。`bwrap` stderrは`setting up uid map: Permission denied`、candidate verifierは未実行。他の4 workflowは成功。Static formatting/lint stepsはprobeより後だったため、このrunでは実行されなかった。
+- `0261224`では必須probeをCode Quality jobの最後へ移した。4 workflowは成功したが、Code Qualityは固定Ruff 0.16.8のformat checkで6つのPythonファイルを報告し、probeは未実行となった。指摘された6ファイルだけを同じ固定版Ruffで整形し、全tracked formatter/lint checkをローカルで再実行して成功した。
+- 最終HEAD `4df7e41`のCIは5 workflow中4件（Codex Harness、Agent Skills、Deterministic Output Evals、Semantic Output Evals）が成功した。Code QualityはRuff/dprint/patch whitespaceまで成功した後、必須隔離probeが`bwrap: setting up uid map: Permission denied`で失敗した。probeは`evidence_unverified`、candidateは`candidate_executed: false`であり、隔離依存の3 integration testはrequired-modeで失敗した。これはrunnerのnamespace権限不足であり、候補Verifierの失敗や品質結果ではない。候補sourceは実行されていない。
+- この結果により、通常のGitHub-hosted `ubuntu-latest`では現在必要なnamespace境界を提供しないことが再確認された。Dockerless independent verifier replayは未達のまま維持し、candidate sourceの実行や安全条件の緩和は行わない。
+
+ネットワーク方式の証拠ラベル修正後、ローカルではruntime trace/replay 18件、QTS subagent evaluator 15件を通過した。isolated verifier suiteは18件中15件通過し、実隔離を必要とする3件はbwrapがないため未実行skip。tracked全体の固定Ruff 0.16.8・dprint 0.55.2検査は成功し、249ファイルが整形済みと確認した。
+
+## 未達・制約
+
+- 現開発containerにはbubblewrapがなく、ローカルの実隔離probeは未実施。candidate sourceはfail-closedで起動していない。
+- 現行GitHub-hosted runnerではbubblewrap UID mapがpermission deniedで、user namespace boundaryを利用できない。Dockerless independent verifierの安全な実行境界は`unverified`。別方式の管理者実行や通常Python processへfallbackしない。
+- 保存済み第2段階runは現行Evaluator revisionと異なり、適切な固定source/requestの対応を再構成できていない。`verify` requestの独立replayは未実施。raw runに`workflow-runtime` invocationはなく、そのreplayも未実施。両経路のsemantic comparisonはunit test済みだが、実隔離下のcandidate/fixed/result比較は未達。
+- QTS capture integrityの結果は両元attemptとも一致し、attemptの`needs_review`を維持した。runtime capture不足・重複invocation、Judge未実施、meaningful traceability、`can_complete=false`のQA品質判定は既存の未達として残る。
+- QTS製品コード・仕様・Seed/Reset・製品test、元Stage 2 raw evidenceは変更していない。
+
+## 2026-11-03 CI隔離再検証の追記
+
+PR HEAD `6f76c27b3ff8f0b017f754f572287bf8a23c53ff`をGitHub上で確認した。PRはOPENでbase `main`、branch `feat/agent-eval-runner`。Code Quality run `41612404685`では、AppArmor診断と公式packageの`bwrap-userns-restrict` profile適用が完了し、profile後の最小bwrap user-namespace probeも成功した。その後、固定Ruff 0.16.8が`test_runtime_trace_capture.py`の未使用`sys` import（F401）で失敗したため、必須の完全隔離probeおよびVerifier replay stepはskipされた。これは候補Verifierの実行結果ではない。残る4 workflow（Codex Harness、Agent Skills、Deterministic Output Evals、Semantic Output Evals）は成功した。
+
+profile適用前のprobe、`kernel.apparmor_restrict_unprivileged_userns=1`、有効なAppArmor記録、該当するbwrap userns拒否が整合し、job内の配布済みprofileを競合なし・enforce modeでロードした後に最小probeが成功したため、このrunnerでのUID map拒否原因はAppArmorのunprivileged user namespace制限と確認できた。修正はGitHub-hosted一時runner内の対象jobだけに限定され、system-wide sysctlは変更していない。これは完全な隔離probeの合格を意味しない。
+
+F401 importを削除し、synthetic replay testのEvaluator/candidate source treeを実行前にbytecode除外付きで別々にコピーするよう修正した。固定sourceとcandidateの`verify`、`workflow-runtime`について、隔離下の一致、不一致、candidate非ゼロ終了を必須probeの後に確認するCI stepを維持している。ローカルの関連suiteは38件中34 PASS、4 SKIP。SKIPは実bubblewrap境界がないためで、Verifier候補は実行していない。`compileall`、README/reportのdprint 0.55.2 check、`git diff --check`は成功。ローカルにRuffはなく、Pythonの固定Ruff format検査は次のGitHub Actionsで確認する。
+
+commit `3253eea25a08d9ff0dd62e1b729e2039c5969798`のCode Quality run `41613364162`では、AppArmor診断・profile適用・profile後の最小probeが成功した後、Ruff formatが`test_isolated_verifier.py`と`test_runtime_trace_capture.py`の書式差分を検出した。required isolation probeとsynthetic replayはこのためskipされ、候補Verifierは未実行。固定Ruffが報告した整形差分だけを反映し、後続CIで再確認する。
+
+完全probe・candidate verifier replayは引き続き未達。次のCIがrequired isolation probeを通過した場合に限って、その直後のsynthetic `verify` / `workflow-runtime` replay結果を採用する。Stage 2のQTS runはEvaluator revisionが異なり、raw runに実`workflow-runtime` invocationがないため、今回のsynthetic fixtureが成功してもQTS実captureの独立replayを実施したことにはならない。Stage 3は引き続き未完了であり、第4段階には進まない。
+
+## 2026-11-03 必須probe・合成replayの最終結果
+
+commit `3ee761cf827eb34e8704a0423cc455a62e08bd74`のCode Quality run `41613825703`は成功した。失敗原因はUbuntu 24.04のAppArmor unprivileged-user-namespace制限であることをjob内の実測で確定した。初期bwrap probeはexit 1、stderrは`setting up uid map: Permission denied`。AppArmorは有効、`kernel.apparmor_restrict_unprivileged_userns=1`、`kernel.unprivileged_userns_clone=1`。kernel auditは`profile="unprivileged_userns"`による`setpcap` capability拒否と`/proc/<pid>/uid_map`の書込拒否を記録した。Ubuntu配布`apparmor-profiles` packageの既存`bwrap-userns-restrict`を競合確認後、Enforce modeで当該一時VMだけに適用し、その後の最小bwrap probeと完全な必須隔離probeが成功した。システム全体のsysctl変更は行っていない。Ubuntuの文書は24.04でunprivileged user namespaceをAppArmor profileにより制限する動作と、必要なアプリケーションをprofileで明示許可する設計を説明している。[Ubuntu AppArmor制限](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/)、[配布profile一覧](https://packages.ubuntu.com/noble-updates/all/apparmor-profiles/filelist)。
+
+必須`test_isolated_verifier`は19件すべて成功し、隔離依存テストのskipはなかった。直後の必須synthetic replay testは成功し、ログの機械可読結果は以下のとおり。両方のruntime operationで、固定/candidate/capturedの一致は`pass`、内容改変は`fail`、candidateの非ゼロ終了は`execution_error`になった。synthetic workflow fixtureの`can_complete=true`はfixture値であり、QTSの完了判定ではない。
+
+```json
+{
+  "fixture": "synthetic-runtime-contracts",
+  "qts_agent_capture": false,
+  "verify": {
+    "failure": "execution_error",
+    "mismatch": "fail",
+    "pass": "pass"
+  },
+  "workflow_runtime": {
+    "can_complete": true,
+    "failure": "execution_error",
+    "mismatch": "fail",
+    "pass": "pass"
+  }
+}
+```
+
+同じcommitで5 workflow（Code Quality、Codex Harness、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals）がすべて成功した。これはGitHub-hosted `ubuntu-24.04`でのjob隔離と合成fixtureのDockerless replay受入を確認する。GitHub-hosted runnerは通常、新しいVMとして提供されるため、profileの変更はjob VMの寿命内に限定される。[GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)。
+
+**QTS実captureは独立replayしていない。** Stage 2のrunはEvaluator revisionが現行と異なり、実`workflow-runtime` invocationがなく、現行固定sourceへ安全に対応付けられない。今回の成功はcandidate/fixed verifierの合成request/resultに対する隔離再実行であり、QTS Agentの実行証拠・tool履歴・QA品質や正式Verifier replayの証明ではない。元Stage 2 raw evidenceは変更していない。したがって、Dockerless隔離境界と`verify`/`workflow-runtime` replay契約のStage 3技術検証は成功したが、現行revisionによるQTS captureの実replayは未達として残す。Judge工程には進まない。

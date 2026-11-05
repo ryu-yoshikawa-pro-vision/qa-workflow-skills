@@ -4,7 +4,11 @@ import json
 import re
 from typing import Any
 
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    MarkdownTableParseError,
+    find_table,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 CONFIRM_STATES = {"確認済み", "未確認", "確認不能"}
@@ -58,13 +62,14 @@ def _freshness_key(section: str, row: dict[str, str]) -> str:
 
 def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     result = EvalResult("test-target-inspection", eval_id)
+    existing_artifact = expected.get("new_artifact") is False
     try:
         tables = parse_tables(text)
-    except Exception as exc:
+    except MarkdownTableParseError as exc:
         result.add(
             "TTI-D001", False, "出力Markdownの表構造が正しいこと", evidence=str(exc)
         )
-        tables = []
+        return result
 
     required = {
         "確認情報": ("項目", "値", "確認元"),
@@ -404,11 +409,14 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
 
     update_table = _table(tables, "今回の更新", ("対象種別", "対象キー", "更新区分"))
     update_rows = _rows(update_table)
-    existing_artifact = _nonempty(confirm.get("既存成果物参照", ""))
-    update_missing = existing_artifact and update_table is None
+    update_missing = (
+        expected.get("require_update_table") is True and update_table is None
+    )
     update_values = [_value(row, "更新区分") for row in update_rows]
     invalid_updates = [value for value in update_values if value not in UPDATE_STATES]
-    unexpected_new_artifact_updates = not existing_artifact and bool(update_rows)
+    unexpected_new_artifact_updates = expected.get("new_artifact") is True and bool(
+        update_rows
+    )
     update_issues = {
         "missing_table": update_missing,
         "invalid": invalid_updates,
@@ -525,6 +533,18 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     elif save_requirement == "いいえ" and save_rows:
         save_issues.append({"issue": "保存要求なしに保存結果recordがある"})
     conditional_update_required = expected.get("conditional_update_required", False)
+    expected_save_status = expected.get("expected_save_status")
+    actual_save_statuses = [_value(row, "保存状態") for row in save_rows]
+    if expected_save_status is not None and actual_save_statuses != [
+        expected_save_status
+    ]:
+        save_issues.append(
+            {
+                "expected_statuses": [expected_save_status],
+                "actual_statuses": actual_save_statuses,
+                "issue": "保存状態が入力に基づく期待状態と一致しない",
+            }
+        )
     for row in save_rows:
         status = _value(row, "保存状態")
         if status not in SAVE_STATES:
@@ -674,5 +694,64 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         "fixtureで必須の対象・要素・状態キーが成果物に存在すること",
         evidence=required_key_issues or None,
     )
+
+    if expected.get("forbid_confirmed_observations"):
+        observation_rows = [
+            (section, row)
+            for section, rows in (
+                ("画面 / 領域", screen),
+                ("UI要素", elements),
+                ("状態", states),
+                ("操作・ふるまい", behaviors),
+                ("構造証跡", _rows(evidence_table)),
+                ("視覚情報", visual),
+                ("データ・権限依存", deps),
+            )
+            for row in rows
+        ]
+        confirmed = [
+            {
+                "section": section,
+                "key": _value(row, "対象キー")
+                or _value(row, "要素キー")
+                or _value(row, "状態キー")
+                or _value(row, "要素キー / 状態キー"),
+            }
+            for section, row in observation_rows
+            if section == "構造証跡" or _value(row, "確認状態") == "確認済み"
+        ]
+        result.add(
+            "TTI-D016",
+            not confirmed,
+            "実対象証跡のないblocked caseで確認済みの観測を主張していないこと",
+            evidence=confirmed or None,
+        )
+
+    if expected.get("require_unconfirmed_explanation"):
+        explanation_rows = _rows(required_tables["未確認 / 確認不能"])
+        explanation_issues = [
+            {
+                "row": index,
+                "missing": [
+                    field
+                    for field in ("対象", "状態", "理由", "後続への影響")
+                    if not _nonempty(_value(row, field))
+                ],
+            }
+            for index, row in enumerate(explanation_rows)
+            if any(
+                not _nonempty(_value(row, field))
+                for field in ("対象", "状態", "理由", "後続への影響")
+            )
+            or _value(row, "状態") not in CONFIRM_STATES
+        ]
+        if not explanation_rows:
+            explanation_issues.append({"issue": "未確認理由の行がない"})
+        result.add(
+            "TTI-D017",
+            not explanation_issues,
+            "blocked caseで未確認の対象・理由・後続影響を明記していること",
+            evidence=explanation_issues or None,
+        )
 
     return result

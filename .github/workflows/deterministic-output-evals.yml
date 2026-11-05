@@ -63,6 +63,15 @@ jobs:
           python -m compileall -q skills/*/evals/deterministic
           python -m compileall -q tests/skills/evals/deterministic
 
+      - name: Compile Agent evaluation runner and tests
+        run: python -m compileall -q scripts/skills/evals/agent tests/skills/evals/agent
+
+      - name: Run fake Agent and Judge evaluation tests
+        run: python -m unittest discover -s scripts/skills/evals/agent/tests -p 'test_*.py' -v
+
+      - name: Run Agent evaluation repository contract tests
+        run: python -m unittest discover -s tests/skills/evals/agent -p 'test_*.py' -v
+
       - name: Compile runtime scripts
         run: |
           python - <<'PY'

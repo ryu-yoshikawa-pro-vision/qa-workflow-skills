@@ -1,5 +1,6 @@
 {
   "artifact_type": "baseline",
+  "expected_baseline_ref": "fixture:qa/regression/baseline/settings-auth-v1",
   "expected_current_tc_refs": [
     "TC-001",
     "TC-002",

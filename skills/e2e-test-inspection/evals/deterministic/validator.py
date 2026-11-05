@@ -122,6 +122,30 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "E2E対象の扱いが許可値であること",
         evidence=invalid_handling or None,
     )
+    if expected.get("require_all_targets_blocked"):
+        unblocked_targets = [
+            clean(row.get("E2E対象 / 識別子", "")) or "<unknown>"
+            for row in targets
+            if clean(row.get("扱い", "")) != "ブロック中"
+        ]
+        unsupported_refs = [
+            clean(row.get("E2E実装参照", ""))
+            for row in targets
+            if clean(row.get("E2E実装参照", ""))
+        ]
+        block_issues = {
+            "missing_targets": not targets,
+            "unblocked_targets": unblocked_targets,
+            "unsupported_refs": unsupported_refs,
+        }
+        result.add(
+            "E2E-INSP-D016",
+            bool(targets) and not unblocked_targets and not unsupported_refs,
+            "入力に対象repo sourceがないfixtureでは対象をblockし、未提示参照を創作しないこと",
+            evidence=block_issues
+            if not targets or unblocked_targets or unsupported_refs
+            else None,
+        )
     tc_ids = [
         clean(row.get("TC ID（存在時のみ）", ""))
         for row in targets

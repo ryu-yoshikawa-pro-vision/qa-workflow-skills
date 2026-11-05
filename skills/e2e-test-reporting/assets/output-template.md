@@ -18,6 +18,8 @@
 | process exit code        |    | process / 未実施            | raw fact / 確認不能 |
 | run-level / global error |    | reporter / process / 未実施 | raw fact / 確認不能 |
 
+必須値を確認できないときは、契約上空欄が指定された欄を除いて値欄に`未提供` / `確認不能` / `未実施`、確認元欄に確認した入力・成果物または「許可された入力内に記録なし」を記載します。表の見出しや確認元を空欄にしたまま未解決情報を隠しません。
+
 ## primary対象集計（単位を混同しない）
 
 | 論理的な要求primary対象 | E2E実装参照                   | TC ID（存在時のみ） | resolved primary TestCase数 | 実際に開始したresolved primary TestCase数 | 未実行logical理由 | 未実行resolved理由 |
@@ -39,6 +41,10 @@
 |                     | tests/example.spec.ts > login | result-1                                 |              |              |
 
 `e2e-test-result-analysis`を実施したreportでは、対応する分析成果物の安定参照を空欄にせず、fixtureまたは入力で指定された参照と完全一致させます。分析未実施が明示された正常runでは`分析結果参照`を必ず空欄にします。分析実施状態が未指定の既存経路では一律に空欄を強制しません。resolvedごとに分析成果物が異なる場合はtrace行ごとに対応付け、同じ参照を推測で使い回しません。
+
+primary集計と追跡表のlogical primary識別子、E2E実装参照は同じ値を保持します。resolved primaryがある場合は入力で確認したresolved参照・実行結果参照へ対応付けます。resolved primaryが0件の場合は、追跡表のresolved / execution参照欄に対応するlogical primary識別子をそのまま記録し、説明文で別の参照を作りません。入力に安定参照がない欄は未提供状態を明示し、架空の参照を割り当てません。
+
+追跡表の`resolved primary TestCase / 実行結果参照`欄は、行ごとに参照を1つだけ記録します。開始済みなら`実行結果参照`のみ、未開始なら`resolved primary TestCase参照`のみ、resolved primaryが0件ならlogical primary識別子のみを記録します。複数参照を`/`等で連結しません。
 
 ## cleanup・証跡・残存リスク
 

@@ -2976,32 +2976,48 @@ def evaluate_materialize_completion(
     if not models:
         return []
     tcn_id = normalized.get("tcn_id")
-    materialize_unit = (
-        f"artifact:materialize_coverage:{tcn_id}"
-        if isinstance(tcn_id, str) and tcn_id
-        else None
-    )
+    scoped_tcn_ids = {tcn_id} if isinstance(tcn_id, str) and tcn_id else set()
+    if not scoped_tcn_ids:
+        scoped_tcn_ids.update(
+            model["parent_tcn_id"]
+            for model in models.values()
+            if isinstance(model.get("parent_tcn_id"), str) and model["parent_tcn_id"]
+        )
+        test_conditions = normalized.get("test_conditions")
+        if isinstance(test_conditions, list):
+            scoped_tcn_ids.update(
+                row["tcn_id"]
+                for row in test_conditions
+                if isinstance(row, dict)
+                and isinstance(row.get("tcn_id"), str)
+                and row["tcn_id"]
+            )
+    materialize_units = {
+        f"artifact:materialize_coverage:{scope_tcn_id}"
+        for scope_tcn_id in scoped_tcn_ids
+    }
     materialize_rows = [
         row
         for row in runtime_rows
-        if str(row.get("runtime_unit_key", "")).startswith(
-            "artifact:materialize_coverage:"
-        )
-        and (
-            materialize_unit is None or row.get("runtime_unit_key") == materialize_unit
-        )
+        if row.get("skill") == "test-condition-design"
+        and row.get("runtime_unit_key") in materialize_units
     ]
-    if len(materialize_rows) > 1:
+    materialize_row_units = [row.get("runtime_unit_key") for row in materialize_rows]
+    if len(materialize_row_units) != len(set(materialize_row_units)):
         raise InvalidInput("materialize runtime unitが重複しています")
-    materialize = materialize_rows[0] if materialize_rows else None
     issues: list[dict[str, Any]] = []
-    completion_rows = (
-        materialize.get("model_completion", []) if materialize is not None else []
-    )
-    if not isinstance(completion_rows, list):
-        raise InvalidInput("model_completionはarrayである必要があります")
+    completion_rows: list[tuple[str, Any]] = []
+    for materialize in materialize_rows:
+        rows = materialize.get("model_completion", [])
+        if not isinstance(rows, list):
+            raise InvalidInput("model_completionはarrayである必要があります")
+        unit = materialize["runtime_unit_key"]
+        materialize_tcn_id = unit.removeprefix("artifact:materialize_coverage:")
+        if not materialize_tcn_id:
+            raise InvalidInput("materialize runtime unitのTCN IDが不正です")
+        completion_rows.extend((materialize_tcn_id, row) for row in rows)
     completion_by_model: dict[str, dict[str, Any]] = {}
-    for row in completion_rows:
+    for materialize_tcn_id, row in completion_rows:
         required = {
             "model_key",
             "required_target_refs",
@@ -3028,6 +3044,19 @@ def evaluate_materialize_completion(
             )
         ):
             raise InvalidInput("model_completion schemaが不正です")
+        model = models.get(row["model_key"])
+        if model is None:
+            raise InvalidInput("model_completion model_keyがcurrent scopeにありません")
+        model_tcn_id = model.get("parent_tcn_id")
+        if not isinstance(model_tcn_id, str) or not model_tcn_id:
+            if isinstance(tcn_id, str) and tcn_id:
+                model_tcn_id = tcn_id
+            elif len(scoped_tcn_ids) == 1:
+                model_tcn_id = next(iter(scoped_tcn_ids))
+            else:
+                model_tcn_id = None
+        if model_tcn_id != materialize_tcn_id:
+            raise InvalidInput("materialize model completionとTCN scopeが一致しません")
         if row["model_key"] in completion_by_model:
             raise InvalidInput("model_completion model_keyが重複しています")
         completion_by_model[row["model_key"]] = row

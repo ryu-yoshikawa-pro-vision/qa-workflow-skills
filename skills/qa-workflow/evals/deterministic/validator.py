@@ -82,20 +82,30 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in rows:
         skill = clean(row.get("Skill", ""))
         target = clean(row.get("対象 / 実行範囲", ""))
+        state = clean(row.get("状態", ""))
         scoped_keys.append(f"{skill} | {target}")
         allowed_targets = MULTI_USE_SKILL_TARGETS.get(skill)
         if allowed_targets is not None:
-            if target not in allowed_targets:
+            target_required = state not in {"未開始", "省略"}
+            if (target_required and target not in allowed_targets) or (
+                not target_required and target not in {"", "-", "—", "N/A", "n/a"}
+            ):
                 invalid_targets.append(
                     {
                         "skill": skill,
                         "target": target,
                         "allowed": sorted(allowed_targets),
+                        "state": state,
                     }
                 )
-        elif target:
+        elif target not in {"", "-", "—", "N/A", "n/a"}:
             invalid_targets.append(
-                {"skill": skill, "target": target, "allowed": ["<空欄>"]}
+                {
+                    "skill": skill,
+                    "target": target,
+                    "allowed": ["<空欄>"],
+                    "state": state,
+                }
             )
     add_duplicate_assertion(
         result, "WF-D012", scoped_keys, "ワークフローのSkill + 対象 / 実行範囲"
@@ -209,7 +219,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     "allowed": sorted(allowed_targets),
                 }
             )
-        elif allowed_targets is None and target:
+        elif allowed_targets is None and target not in {"", "-", "—", "N/A", "n/a"}:
             restart_target_errors.append(
                 {
                     "label": label,

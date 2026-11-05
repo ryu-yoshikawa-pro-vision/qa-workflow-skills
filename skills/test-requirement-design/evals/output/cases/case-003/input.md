@@ -1,6 +1,6 @@
 # Eval Input
 
-今後のテスト設計のためにUI仕様理解packageからartifact modeで要求を作成する。current Machine Entityには`AC-001`、`AC-002`、`SPEC-001`が含まれる。
+今後のテスト設計のためにUI仕様理解packageからartifact modeで要求を作成する。文中に`AC-001`、`AC-002`、`SPEC-001`のIDと要約は示されますが、current Machine Entityのpayload、content fingerprint、Authority / Scope dependencyは入力されていません。これらの要約をcurrent entityとして扱わず、artifact modeの参照条件を満たすと確認できるまで要求生成をblockしてください。
 
 ## Current Acceptance Criteria
 

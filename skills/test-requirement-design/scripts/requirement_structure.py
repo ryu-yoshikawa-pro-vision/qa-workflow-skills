@@ -28,7 +28,7 @@ GENERATOR = "requirement_structure"
 GENERATOR_CONTRACT_VERSION = "requirement-structure-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 TR_RE = re.compile(r"^TR-(\d{3})$")
-AC_RE = re.compile(r"^AC-\d{3,}$")
+AC_RE = re.compile(r"^AC-(?:[A-Z0-9]+-)*\d{3,}$")
 SCOPE_RE = re.compile(r"^SCOPE-\d{3,}$")
 PRIORITY_ORDER = {"低": 1, "中": 2, "高": 3}
 
