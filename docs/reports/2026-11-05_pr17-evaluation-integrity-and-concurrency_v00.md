@@ -136,3 +136,19 @@ PR branchには`173aeddb831aff2b44d98e2f17918edbe4f6c89e`、`645e3a2ae9baef20d8d
 - 評価基盤で今回修正した問題: 非完了attempt理由の欠落と、host requestにpackage rootが明示されない点。
 - run-root並行更新lock、capture/seal/grade競合対策は前HEADですでに存在し、複数processテストで保持を確認したため再実装していない。
 - 実効model/build、tool trace、Evaluator-only情報の物理read denial、正式runner、Judgeは未検証。
+
+## 10. Positive TCN評価の継続（2026-11-05）
+
+固定条件はEvaluator / baseline Skill revision `22299fa635c168d37bb4a801d941891edb386cdb`、`deterministic / TCN-OUT-001`、input fingerprint `sha256:3ad18513c94852b40198c38399e05b244fdb5a223e37b1dc59ce5f8e6a4c93f5`、要求Agent設定 `gpt-6-luna / max / fork_turns=none`。実効model/build、実tool trace、Evaluator-only情報へのread denialは未検証で、開発用handoff評価である。
+
+新規attemptは12件（過去64件と別集計、inventory累計76件）。baselineは10件中8件が`execution error`、2件が`not_started`で、採点可能な成果物は0件。candidate v1は2件中1件をcapture・採点し、1件は成果物pathの誤用による`execution error`。candidate v1のgradeは31 assertion中30 PASS、1 FAILで、`RT-D016`が`Machine Runtime Input`、`Machine Runtime Result`、`Machine Entities`の3 block欠落を検出した。pairwiseの構造・制約・網羅性assertionは通過したが、runtime evidence不足を含む成果物全体はFAILである。
+
+baselineの実行エラー8件は、host launch pathの重複2件、`CreateProcess ENOENT` / 誤ったcwd 3件、pairwise slugの誤指定1件、親runtime inputのpriority欠落とdownstream `upstream_entities` schema不一致1件、起動後にruntime invocationも成果物も報告されなかった1件。候補attempt 2では`host-request.json`が絶対`submission_path`を返していたが、Agentが作業cwd内でrepository相対pathを再構成し`FileNotFoundError`となった。pathを返すhelperの不具合は確認されていない。全失敗理由は各attemptの`host_execution.execution_reason`に記録し、attemptを削除・置換していない。
+
+隔離candidate patch `tcn-runtime-input-clarification.patch`（SHA-256 `dd26a17cf873bd7cb213189ad810312551d6fa5d84ed5b728f65c6ce2ca197fd`）は、runtimeのpriority field、Pairwise slugとgenerator名、上流Machine Entityのmetadata projectionを明確化した。candidate Agentからはruntime call成功の申告があったが、request / result raw dataとtool traceは保存されていないため実行証拠としては未検証。candidateの最終Markdownが既存のSkill-local output/evidence gateに従わなかったため、Skillに原因を帰属できる追加修正候補は作成していない。
+
+`improve.py compare-handoff`はbaseline全attemptにintegrity-checked gradeがないため`not_comparable`を返し、`improvement_demonstrated=false`を維持した。対象比較も成立せず独立回帰は実施していない。COV-OUT-001の保存済みcandidate（baseline 1/2、candidate 2/2。COV-OUT-002回帰は双方2/2）は引き続き候補資料だが、baseline不安定とtool trace不足によりSkill改善実証・採用には数えない。
+
+評価範囲の確認では、現在の`test-requirement-design`出力case-001〜003は上流本文/current Entity不足による停止を主に評価し、004/005はheld-outのまま開示していない。`test-case-design` case-001/002も上流成果物不足によるblock用で、内容のあるケース生成を評価しない。今回のTCN-OUT-001は有限因子と禁止pairからpairwise構造を生成する正方向ケースとして機械採点できたが、`SPEC-001`本文がないため、現行Authorityと製品behaviorの意味評価までは確認できない。新しいTR/TC positive fixtureは独立した仕様根拠・期待値を確定していないため作成せず、意味評価を推測で補っていない。
+
+全12 attempt、manifest、grade、比較、隔離patchとhashはGit管理外の[証拠索引](../../.agent-eval-runs/pr17-positive-skill-eval-20261105-01/evidence-index.md)（SHA-256 `e48c3b5e7ba370cdc4595ae117482624ea313b9bd7e3cc92adbf93f65045e619`）に保存した。これらの成果からSkill全体の改善実証は0件で、candidateは隔離・未採用のままである。
