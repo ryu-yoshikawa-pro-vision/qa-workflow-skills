@@ -118,15 +118,18 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `project-context`（新設）       | Project Contextの検索・不存在確認・新規作成・検証・更新・履歴・安全な保存・必要な設定の提供                                                                                        | QA工程のrouting、仕様・Risk・テスト成果物、workflow stateの管理                              |
 | `feature-analysis`（新設）      | 正規化された情報源・変更証拠を受け、確認済み情報源の範囲、予定/実装済みを区別した機能候補、安定した機能IDと階層、実装要素、機能影響の分類、抽出網羅率、未確認候補を管理            | 外部サービスの認証・直接取得、仕様Authority、QA影響とRisk、テスト設計・実行                  |
-| `spec-analysis`                 | 機能IDを参照し、現在有効な仕様根拠とUNKNOWN、正常・代替・例外・権限・状態・制約（非UIを含む）、機能→Authority / SCOPE / ACの対応を管理                                             | 開発機能の母集団や機能IDの採番、Risk・テスト設計、実装・観測を仕様へ無断昇格                 |
+| `ui-target-analysis`（新設） | UI構造・操作・表示状態・画面遷移、仕様IDへの参照、旧packageの互換投影 | Authority / ACの意味確定、観測を仕様として昇格 |
+| `test-item-analysis`（新設） | テストアイテムの安定ID、階層、機能ID対応、計画/実装/廃止、revision・履歴 | 製品機能・UI構造・Risk・TR・TCNの第二の正本 |
+| `spec-analysis` | 現在有効なAuthority / AC・UNKNOWN、業務状態遷移、認証/認可・権限、データ制約・外部連携の期待仕様を管理 | UI構造・操作の第二の正本、Risk・テスト設計、実装・観測を仕様へ無断昇格 |
 | `question-analysis`             | 不明点・矛盾の分類、回答と元ownerへの差戻し                                                                                                                                        | 機能・仕様・テストの第二の正本                                                               |
 | `test-target-inspection`        | 許可された生きたUIの観測事実、確認条件、鮮度、安全・cleanup                                                                                                                        | 仕様上の期待結果の確定、機能IDの採番                                                         |
-| `test-analysis`                 | 開発変更と機能影響を入力に、**QA影響を別に判定**し、Product Risk・重点・テストレベル・変更影響を扱う                                                                               | 開発差分の機能分類、仕様の決定、Regression Runの最終選定                                     |
-| `test-requirement-design`       | 有効なAuthority / ACとRiskからTRまたは正当なDispositionを定める                                                                                                                    | 機能候補の抽出、仕様根拠の決定                                                               |
-| `test-condition-design`         | TRからTCN、技法、coverage基準とCI（coverage item）を管理                                                                                                                           | Risk再採点、テスト実行                                                                       |
-| `test-case-design`              | TCN / CIから具体的TCと根拠ある期待結果を設計                                                                                                                                       | 仕様の創作、テスト実測結果の判定                                                             |
-| `coverage-analysis`             | 機能母集団・仕様対応・TR / TCN / CI / TCの証拠を読み、仕様対応率、テスト設計の閉鎖性、実設計済みとDispositionの内訳、横断的非機能要件の対応を評価                                  | 情報源の再列挙、抽出網羅率の再計算、仕様やRiskの再判断                                       |
-| `qa-workflow`                   | Project Contextの存在・必須設定を最初に確認し、`project-context`へ作成・更新をroutingする。初回・PR更新・マージ後・リリース前のrouting、再利用、局所停止、要再検証、再開と全体完了 | Project Context文書の独自作成・更新、各Skill固有の意味判断、母集団・カバレッジの再計算、承認 |
+| `test-analysis` | 仕様・アイテム・変更証拠に基づきQA影響、Product Risk、テスト重点・深度・レベル・技法候補、局所再評価を担当 | 開発機能分類、E2E選定正本、正式TCN / CI、Regression Runの最終選定 |
+| `test-requirement-design` | Authority / ACとRiskからTR・Disposition、アイテムとの多対多対応、テストレベルを管理 | 機能・仕様・Riskの第二の正本、TCN / CI |
+| `test-condition-design` | 共通条件、アイテム別TCN、適用判断とDisposition、技法採否・CI・期待結果候補を管理 | Risk再採点、正式な仕様決定、具体的TC・テスト実行 |
+| `test-case-design` | TCN / CIと期待結果候補からTCの前提・データ・手順・観測可能な具体的期待結果を設計 | 仕様Authorityの創作、期待結果の未承認確定、実測結果の判定 |
+| `coverage-analysis` | 機能・アイテム・仕様・Risk・TR / TCN / CI / TC、適用関係と期待結果根拠の閉鎖性・不足を評価 | 機能・アイテムの再発見、Risk採点、仕様・TCの再設計 |
+| `qa-workflow` | Project Context確認、初回・PR更新・マージ後・リリース前のrouting、並行処理、局所停止・再評価、再開・完了判定 | 各Skill正本の独自作成・更新、意味判断、承認 |
+| `e2e-test-selection`（新設） | 技術非依存のE2E候補・採否と理由、選定履歴 | Playwright実装可否・locator・実行・Risk採点 |
 | `regression-testing`            | 変更影響・Risk・既存TC baselineからRun対象と必要実行経路を決める                                                                                                                   | Product Risk再採点、テストの実行と合否判定                                                   |
 | `test-execution` / `e2e-test-*` | 担当するTC / E2Eのinspection・実装・実行・結果・分析・報告とbuild / 環境条件の記録                                                                                                 | 機能・仕様・Risk・既存TCの第二の正本化                                                       |
 | `qa-knowledge`                  | 未整理の知見を正本ownerへroutingし、他に正本がない継続QA知識だけを管理                                                                                                             | 機能一覧、Authority、Risk、TR / TCN / CI / TCの複製管理                                      |
@@ -146,8 +149,8 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 0. 案件のProject Context文書の作成・更新・履歴管理の正本ownerは`project-context`。従来の`qa-workflow`のテンプレート・parser・DEC / ASM ID helperを唯一の既存実装として再利用し、Project Contextの作成処理を`qa-workflow`と二重実装しない。Project Contextが管理するのは案件設定と他の正本への参照であり、機能一覧・仕様・テスト成果物・workflow stateは保持しない。
 1. 製品機能ID・機能階層・実装要素・抽出母集団の正本は`feature-analysis`。Git管理の製品では`main`に対応した確定済み一覧を基準とし、PRごとは派生snapshotにする。複数PRの結果を無条件mergeせず、実際のmerge後に最新`main`へ再照合する。
-2. 機能IDとAuthority / UNKNOWN / SCOPE / AC等の**意味上の対応表の正本は`spec-analysis`**。既存`ui-target-v1`のSCOPEは仕様分析の作業範囲であり、機能IDと同一視しない。複数機能と複数SCOPEの参照を許す。非UIの仕様分解も`spec-analysis`が担当し、既存UI package契約を壊さず必要な出力を追加する。
-3. 抽出網羅率の計算は`feature-analysis`、仕様とテスト設計の網羅性の評価は`coverage-analysis`。正当なDispositionをテスト実設計済み件数に含めない。テスト実行状況はexecution ownerのsource resultを参照し、実行とPASSを区別する。
+2. 機能IDとAuthority / UNKNOWN / ACの意味対応は`spec-analysis`、UI固有のSCOPE / UI構造・操作・画面状態は`ui-target-analysis`が所有する。SCOPEは分析作業範囲であり、機能ID・アイテムIDとは異なる。旧`ui-target-v1`のAuthority / AC / UNKNOWNを二重書込みせず、ownerごとの論理的正本と互換投影を定義したうえで段階を問わず全既存用途の移行を検証する。
+3. 機能抽出網羅率は`feature-analysis`、アイテム一覧と履歴は`test-item-analysis`、共通条件・item×condition採否・期待結果候補は`test-condition-design`、横断的な仕様・テスト設計の閉鎖性評価は`coverage-analysis`。正当なDispositionをテスト実設計済み件数に含めない。テスト実行状況はexecution ownerのsource resultを参照し、実行とPASSを区別する。
 4. workflow stateは既存`qa-workflow`。一方、`artifact_graph.py`のworkflow baseline保存は、案件共通の機能一覧の保存・同時更新を保証するとは扱わない。新しい機能一覧の保存先には、原子的条件付き更新・履歴参照・競合検出を独立に検証し、既存のhelperを使える範囲だけ再利用する。
 5. 新SkillのMachine Entity、`runtime-v2`、`entity-state-v2`、既存`change_impact.py`の型は実際の入出力契約に応じて変更する。新たな型を暗黙受理せず、shared runtimeの既存契約・migration・回帰テストを確認する。
 
@@ -166,6 +169,25 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 必要項目は操作ごとに判定する。例えば新規候補のローカル分析は許可された情報源参照を要求するが、既存内容の読取だけに機能一覧保存rootや承認者を必須としない。Project Contextを作成できても、機能一覧rootへの書込み権限やCI公開設定がなければ、それに依存する工程だけblockedとする。全項目の空欄を理由にProject Contextの新規作成そのものを禁止しない。
 
 情報源・権限・承認・リリースの正本が別資料にある場合は、その参照とrevisionを記録する。Project Context自体を秘密情報、外部資料全文、機能一覧・テスト成果物の第二の保管庫、汎用artifact registryとして使わない。既存`docs/PROJECT_CONTEXT.md`など同名の案件文書があっても、対象案件の正本であると識別できなければ自動採用しない。
+
+### 仕様・UI・状態・権限の正本
+
+- **仕様の期待挙動**：業務オブジェクトの状態・遷移・イベント・ガード、セッション・認証/認可、ロール・所有者・テナント、リソース状態ごとの許可、データ整合・副作用・外部連携、拒否時応答・監査記録は`spec-analysis`の有効なAuthorityへ結び付ける。資料にない規則を実装から推測して正本化しない。
+- **UIの構造と状態**：PAGE / VIEW / STATE / STEP / MODAL等、UI要素・操作・画面状態・フォーカス・操作可能性・画面遷移は`ui-target-analysis`に保持する。これらの「期待される」挙動の根拠は`spec-analysis`へ参照する。実画面で今回観測した結果は従来どおり`test-target-inspection`の事実とし、仕様へ自動昇格しない。
+- **実行時の状態**：テスト環境・fixture・実行前後データ・cleanupと実測状態は実行ownerの管理対象。仕様上の状態モデルと分離する。UI / APIの認可と観測経路を別々に記録し、UIの非表示だけでサーバー側認可を検証済みとしない。
+- **非UI・非機能**：API、バッチ、DB、イベント、外部連携は`feature-analysis`の実装要素を介して`spec-analysis`の期待仕様へ接続する。セキュリティ・性能・信頼性等の横断的要件をUIだけに閉じ込めない。対象外/未確認には根拠と再確認条件を記録する。
+
+### テストアイテムと条件・期待結果の機械契約
+
+1. **テストアイテム**：案件内で安定した独立ID（例：`TI-001`）、種別、名称、親ID、対応製品機能ID（多対多）、関連UI/実装/Authority参照、source revision、予定・未実装・実装済み・廃止・不明、変更履歴を持つ。親子循環、同一性の誤統合、孤立、未確認母集団を検出する。複数レベルで同じIDを使える。
+2. **RiskとTR**：Riskは製品機能・アイテム・横断要件に任意の多対多参照を持ち、根拠とリスクマトリクスの評価結果を保存する。TRはAuthority / ACとRiskから導出し、複数アイテム・テストレベルへ明示的に対応させる。既存IDとDispositionを維持する。
+3. **共通条件の参照元**：`test-condition-design`が再利用する条件（例：`COND-001`）の意図、前提、適用可能な対象種別、根拠、revisionを管理する。共通条件は仕様Authorityでも正式TCNでもない。TRより先に列挙した条件は候補のまま保持し、正式TCNに数えない。
+4. **アイテム×条件**：対象アイテム候補と共通条件候補を独立列挙して適用可否を判定し、アイテムID、共通条件ID、必要TR、テストレベル、根拠、採否、再確認条件を保持する。採用時は**アイテムごとに異なる正式TCN ID**を付け、TRを必須参照する。別レベルでの検証責務も区別し、未確認/blockedを分母から黙って消さない。
+5. **不採用**：対象外・適用不能・別テストレベル・重複・未確認・ブロック中を既存のDisposition語彙に可能な限り合わせて区別する。採用しない理由、仕様・Risk根拠、カバー先、承認が必要な判断、再確認条件を保持する。全直積を正式TCN/TCとして採用しない。
+6. **期待結果候補**：採用したアイテム×条件に複数の結果候補を許し、各結果へ現在有効なAuthority / AC、期待内容、観測経路、状態変化・副作用、期待が一意に決まるための前提、source revision、未確定理由を記録する。根拠が欠ければ未確定とし、候補をそのまま合格条件としない。状態・具体値・権限・外部依存は一意性に影響するときだけ必須。
+7. **CI/TC**：既存CIは境界・同値・状態遷移・組合せ等の具体的なカバレッジ要素であり、アイテム×条件の適用表とは別。`test-case-design`は従来のTCN/CI/TR/expected_results[].authority_refsと新しいitem・条件・期待結果候補の参照を照合し、具体的な操作・データ・個別期待結果へ展開する。新候補はAuthorityの第二の正本にしない。
+8. **現在性・保存**：各層の安定ID、source ref/revision、依存fingerprint、変更・廃止履歴を保存し、影響する下流だけstaleにする。新成果物の保存は既存workflow baselineのCASを自動的に代用せず、実際のproviderのnative conditional write/再読込/競合防止を検証する。
+9. **指標**：機能抽出・アイテム発見・適用候補の判定・正式TCN・CI・TC・実行済みを別の分母/分子で示す。正当なDisposition、未確認、blocked、0件やpartial discoveryを100%達成と混同しない。
 
 ### 1. 開発情報源の棚卸しと取得範囲
 
@@ -217,6 +239,28 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 - 保存先は対象プロジェクトが管理するartifact root。製品固有の仕様・証跡を`qa-workflow-skills` repositoryに保存しない。既存`qa-workflow`のworkflow状態とは別に、機能一覧の原子的条件付き更新・履歴・競合検出を検証する。read→比較→無条件writeをCASと呼ばない。
 - 履歴・currentnessは「いつ分析したか」だけでなく「どの開発revisionと情報源で分析したか」で判断する。過去の結果と最新結果は書き換えずに比較可能にする。
 - 既存`ui-target-v1` packageや下流成果物との連携では、新機能IDとのcrosswalkを明示して移行。対応が一意でない旧成果物を推測移行せずblocked。移行検証前の旧成果物を削除しない。
+
+## 再設計するQAワークフローと戻り先
+
+| 工程 | 担当 | 正本・依存条件 |
+| --- | --- | --- |
+| 0 | `project-context`（`qa-workflow`からrouting） | 案件設定の確認・不足時作成。使用fieldの現在性 |
+| 1 | `feature-analysis` | 開発情報源、機能一覧と実装要素、未確認範囲 |
+| 2a | `spec-analysis` | Authority / AC、業務状態・権限・データ/外部連携の期待仕様とUNKNOWN |
+| 2b | `ui-target-analysis` | UI構造・操作・画面状態。2aのAuthorityを参照し、独立できる範囲は並行実行可 |
+| 3 | `test-item-analysis` | UI/非UIの対象ID・階層・機能参照。2a/2bと独立できる範囲は並行可 |
+| 4 | `test-analysis` | 仕様とアイテムを入力にProduct Risk一次評価、QA影響、重点・レベル・技法候補 |
+| 5 | `test-requirement-design` | Authority / ACとRiskからTR/Dispositionを確定し、アイテムとレベルに対応付け |
+| 6 | `test-condition-design` | 共通条件の候補は先行可。正式TCNはTRとアイテム別に確定し、適用判断と期待結果候補を保存 |
+| 7 | `test-condition-design` | 技法採否とカバレッジ基準、具体的CI・テストデータ要件。多次元組合せ/遷移もここで扱う |
+| 8 | `test-case-design` | current TCN / CI、期待結果候補、Authorityから前提・手順・データ・具体期待結果を設計 |
+| 9 | `coverage-analysis`と必要時の`adversarial-review` | 候補母集団・Dispositionと仕様/リスク/テスト成果物の閉鎖性、誤った期待結果を検査 |
+| 10 | 必要時の`e2e-test-selection`、`regression-testing`、実行Skill | 選定・実装・実行・結果・cleanup。既存current TC/E2Eから直接開始可 |
+
+- **順序は成果物の依存条件**。全工程の強制実行ではない。既存current成果物を再利用し、独立した仕様/UI/アイテム範囲は並行できる。TRより前の共通条件候補は正式TCNとは別状態で保持する。
+- **Risk再評価の循環**：条件候補・認可・状態・開発差分が新しい失敗機構を示したら`test-analysis`へ影響範囲だけ戻す。そのRiskに依存するTR/TCN/CI/TCを`要再検証`とし、無関係なcurrent成果物を維持する。
+- **期待結果の不明点**：有効仕様がない場合は`spec-analysis`/`question-analysis`、対象・適用関係が不正なら`test-item-analysis`/`test-condition-design`、具体的ケースの不整合は`test-case-design`へ戻す。観測事実と仕様Authorityを混同しない。
+- **継続確認**：Draft PRを含むPR/merge/releaseで開発差分→機能→アイテム→仕様→Risk→TR→条件/期待結果候補→CI/TCの鮮度を確認する。製品CIでは保存済みの分類・参照・現在性を決定論的に検証し、AIによる新しい意味判断をしない。
 
 ## 開発イベントとCIの契約
 
