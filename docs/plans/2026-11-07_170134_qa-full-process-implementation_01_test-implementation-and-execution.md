@@ -16,6 +16,17 @@
 - `test-analysis`はProduct Riskとテスト重点、`test-architecture-design`（[親Plan](./2026-11-07_170134_qa-full-process-implementation.md)）はテストレベル／タイプ／方式の全体割当を所有する。
 - PR #22の`feature-analysis`、`test-item-analysis`、`test-condition-analysis`等は計画段階。これらがない現在でも、既存TCと明示的な対象scopeから実行できる経路を維持する。
 
+## 担当Skillと既存Skillへの接続
+
+新設する担当Skillは次の2つとする。対象技術ごとにSkillを複製せず、実際のrunner固有処理は必要な接続・設定・安全確認に限定する。
+
+- **`skills/testware-implementation/`（新設）**：既存TC・仕様Authority・有効なテストアーキテクチャの方針を受け、Playwright E2E以外の自動実行可能なテストコード／fixture／設定を作成・更新・検証し、対象repo／testware ref・実装版・参照TCとの対応を所有する。既存`test-case-design`のTCを再採番・再設計せず、製品業務コードを変更しない。Playwright E2Eの実装依頼は既存`e2e-test-implementation`へ送る。
+- **`skills/testware-execution/`（新設）**：実在する非Playwright runnerの事前確認、対象build／認証／副作用・data／cleanup、実行開始・retry・runner raw結果・実行証拠と後処理を所有する。既存`test-execution`のブラウザ操作、`e2e-test-execution`のPlaywright E2E、`regression-testing`のRun選定を肩代わりしない。原因が不明な実行FAILは元runnerの診断情報を残し、必要な分析ownerへ戻す。
+
+両Skillは別々に直接開始できる。既存testwareの実行だけなら`testware-execution`へ入り、実装・更新が必要な場合だけ`testware-implementation`へ進む。実行結果の正本は`testware-execution`が参照する元runnerの結果と検証済み実行成果物であり、集計・欠陥追跡へ別のraw結果を作り直さない。
+
+新Skillには既存リポジトリの`SKILL.md`、`references/`、`assets/`、必要な`scripts/`と`evals/`を用意する。既存Playwright系との正例・負例trigger、実runner／testwareに合わせた実装・結果契約、portable packaging／既存CIの検証を必須にする。
+
 ## 責務を分ける実装経路
 
 ### 1. 実装対象の特定
@@ -65,7 +76,7 @@ runner固有のraw結果、テスト実行単位と試行、対象TC/testware/it
 
 1. 既存Playwright、`test-execution`、`test-case-design`、`regression-testing`、テスト対象repo／CI／runnerの実契約と呼び出し元・結果ownerを確認する。
 2. 対象scopeとtestwareの権限、技術別の検証・実行方式、非機能の有効な閾値、静的テスト方式を確定し、実行できない対象を判別する。
-3. 新規・既存テストの識別／実装／更新／検証、runnerへの起動と実行前安全確認、raw結果・cleanupの証拠収集と解析への引継ぎを、技術別の担当Skillまたは必要な既存Skillの拡張へ組み込む。
+3. 新規・既存テストの識別／実装／更新／検証を`testware-implementation`、runner起動・実行前安全確認・raw結果・cleanupと解析への引継ぎを`testware-execution`へ実装する。既存Playwright経路へのroutingと、使用する技術別runnerへの接続を検証する。
 4. 既存TC・E2E・RegressionとのID／revision／履歴整合と、`qa-workflow`の直接開始・部分再開・局所blockを検証する。
 5. `test-reporting`への読み取り専用投影、責務別のtrigger／決定論的評価／意味評価／実runner受入を実施する。未検証の実案件をfixture成功で代替しない。
 
@@ -77,12 +88,12 @@ runner固有のraw結果、テスト実行単位と試行、対象TC/testware/it
 - 非同期／外部連携：イベント遅延・重複・順序入替、接続切断、再試行、重複副作用、監査と後処理。
 - 非機能：性能の測定条件と閾値、セキュリティの許可範囲、信頼性の障害注入と後処理、互換性の対象環境別判定。測定不能・基準不明なら結果を未検証にする。
 - 静的テスト：対象revision、要求からの指摘・根拠、誤検出、既存`adversarial-review`との責務重複、レビュー完了の条件。
-- 共通：テストコードが生成できても未実行なら未実行のまま。build不一致、旧run、retry、runner失敗、権限不足、secret/PII、異常終了後cleanup、再開と再実行。
+- 共通：`testware-implementation`と`testware-execution`の単独起動・連携、既存Playwrightとの誤発火防止、テストコード生成だけでは未実行のまま。build不一致、旧run、retry、runner失敗、権限不足、secret/PII、異常終了後cleanup、再開と再実行。
 - 独立fixtureに加え、各対応技術について実在するrunner・起動・テストコード／設定・raw result・CIまたは同等の受入を示す。実機能を使用できない場合は未検証とし、全完了を宣言しない。
 
 ## 完了条件
 
-1. 対象技術のテストを、既存TCから実装／更新／静的・軽量検証し、適切なrunnerで安全に起動・結果／cleanupを取得できる。Playwright既存経路も壊さない。
+1. `testware-implementation`が既存TCに対応する非Playwrightテストコードの実装／更新／静的・軽量検証を、`testware-execution`が実runnerの安全な実行・結果／cleanupを担当し、両方が単独要求・組合せ要求で機能する。Playwright既存経路も壊さない。
 2. API・バッチ・コンポーネント・非同期連携・非機能／静的テストの要求された範囲を全て取り扱い、実行可能な対象で実runnerの受入証拠がある。欠落方式は未対応／blockedとして明示し、完了と誤認しない。
 3. 実行ownerごとにraw結果、対象build／TC／testwareの参照、実開始・retry・判定不能・cleanupと証跡を保持し、統合報告は読み取り専用で投影できる。
 4. 既存正本、技術別の権限・副作用、セキュリティ・秘密情報・履歴・再開、異常時のfail-closedと必要な全回帰テストを満たす。
