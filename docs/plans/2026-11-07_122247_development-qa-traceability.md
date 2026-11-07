@@ -323,22 +323,27 @@ CI判定方針：
 - deterministic helperでschema、参照、循環、重複、revision、候補と機能の閉鎖、分母・分子を検証。意味上の分解粒度や対象外の正当性はsemantic品質確認へ渡す。
 - 情報源未確認・分母0・unknown・対象外・重複・機能なしの差分・partial discoveryの表示と完了判定を個別に検証する。
 
-### 5. 既存仕様・設計成果物への接続と移行
+### 5. UI・テストアイテム・テスト設計の接続と互換移行
 
-- `feature-analysis`が機能一覧、`spec-analysis`が機能ID→Authority / UNKNOWN / SCOPE / AC対応表と非UIの仕様分解を所有し、`test-analysis`のQA影響判定と`coverage-analysis`の追跡性に接続する。
+- `feature-analysis`が機能一覧、`spec-analysis`がAuthority / AC・業務状態/権限、`ui-target-analysis`がUI構造/操作/画面状態、`test-item-analysis`がテスト対象を所有する。各成果物を参照で接続し、別の正本を複製しない。
+- 既存UI modeの`ui-target-v1`全fileと`ui_target_package.py`、Materialize / Inspect / Validate / Manifest、scope readiness、Authority / AC / UNKNOWNのMachine Entity、migration preflight、直下のTRD / TCD / TCの入力を列挙してowner移管表を作る。再設計Q06で未決定の物理分割は先行しない。read-only projectionとwriter境界を設計し、既存ID・revision・履歴を保つ。
+- `test-analysis`内のE2E対象選定成果物を`e2e-test-selection`へ移す。`qa-workflow`の旧routingと既存のTCなし/TCあり/実行だけのE2E経路を検証し、既存選定結果を無断廃棄しない。
+- `test-item-analysis`でテストアイテムの安定ID・階層・計画/実装/廃止・多対多feature参照を実装。`test-requirement-design`でTR⇄itemの明示参照とレベル、`test-condition-design`で共通条件候補・アイテム別TCN・適用/Disposition・期待結果候補を実装する。
+- `test-condition-design/scripts/condition_structure.py`、`materialize_coverage.py`、`test-case-design/scripts/case_structure.py`、`coverage-analysis/scripts/traceability.py`を契約別に変更。現在のcoverage graphの`Authority / Risk / TR / TCN / CI / TC`へアイテム・適用関係を無条件に詰め込まず、参照の型・方向・欠損時の扱いを明示する。`scope_refs`をテストアイテムIDとして流用しない。
+- 新しい厳密schemaを導入する際は既存direct / artifact入力、`entity-state-v2`、`runtime-v2`、`verify_runtime_evidence`、旧TCN/CI/TCと正規化入力のバージョンを確認する。旧成果物は根拠がある関係だけ移行し、根拠が不足する範囲をblockedとして以前のcurrent baselineを保持する。
 - 既存`entity-state-v2` / Runtime evidence / scope ownership / currentnessを尊重し、必要な型・参照を既存ownerのcontractに沿って追加。未知ノードを既存runtimeが無条件受け入れる実装にしない。
 - 既存UI target package、通常spec-analysis、legacy成果物、既存TR/TCN/CI/TC、partial rerunの互換性を保ち、migration前後のID・依存・履歴・再開位置を検証する。関連が不明な旧artifactはblockedにする。
 
 ### 6. 継続workflow・CI接続
 
-- `qa-workflow`で初回 / PR更新 / マージ後 / リリース前の開始・再利用・再開を実装。旧revisionと最新revisionの区別、局所stale、影響なしの証拠、未分類時のfailを確認。
+- `qa-workflow`でProject Context→feature / spec / UI / item→Risk→TR→TCN / CI→TC→coverageと、必要時のE2E / Regressionをroutingする。初回 / PR更新 / マージ後 / リリース前の開始・再利用・再開を実装。旧revisionと最新revisionの区別、局所stale、影響なしの証拠、未分類時のfailを確認。
 - 製品repository向けの呼び出し方法、GitHub Actions連携、必要なsource input / artifact root / permissionを明示し、GitHub eventの重複・競合・fork・secretへの安全対策を実装。
-- reportには開発差分全件、機能抽出、仕様対応、テスト設計、実行状況、未確認source、Riskと判定根拠を別々に表示する。
+- reportには開発差分全件、機能抽出、テストアイテム、item×condition候補と採否、期待結果候補のAuthority、仕様対応、TR / TCN / CI / TC、実行状況、未確認source、Riskと判断根拠を別々に表示する。
 
 ### 7. 評価・文書・検証
 
-- `project-context`と`feature-analysis`のそれぞれにtrigger / deterministic / semantic caseを追加し、既存Skill側のroutingと回帰caseも更新する。
-- README、EVALS、Project Context関連の導入説明・テンプレート・追加stable key・初期化手順、既存workflow、CI利用手順、migration / recovery手順を更新する。
+- `project-context`、`feature-analysis`、`ui-target-analysis`、`test-item-analysis`、`e2e-test-selection`にtrigger / deterministic / semantic caseを追加し、既存Skill側のroutingと回帰caseも更新する。
+- README、EVALS、Project Context関連の導入説明・テンプレート・追加stable key・初期化手順、UI/状態/権限の正本、テストアイテム・共通条件・適用判断・期待結果候補の契約、Skill routing、IVEC / ISTQBとの対応表、CI利用手順、migration / recovery手順を更新する。
 - 以下の独立検証を実施して結果を記録する。成功した一部テストで他の失敗・未実行を代替しない。
 
 ## 検証
@@ -361,11 +366,23 @@ CI判定方針：
 5. 鮮度・保存：無関係な変更の再利用、影響するAuthority / AC / TR以下のstale、旧revisionの拒否、並行更新・CAS conflict、部分再開、前回revision不在、原子的保存とfailure recovery。
 6. セキュリティ：パストラバーサル、symlink、巨大入力、secret/PIIの出力防止、信用できないPR本文内の命令、fork権限、外部取得不能時のfail-closed。
 
+### QAワークフロー再設計の決定論的・意味品質テスト
+
+- **UI仕様と権限**：同一画面に表示状態・業務状態・セッション/認証状態が併存する例、UIで非表示でもAPIの認可が必要な例、所有者・テナント、データ状態によるガード、拒否後データ不変更と監査記録、バッチ/外部連携をそれぞれ独立根拠で追う。
+- **テストアイテム**：UI/API/バッチ/コンポーネントの親子とfeature多対多、計画→実装→廃止、複数テストレベルのID共有、追加/削除/変更、重複・循環・孤立・未知参照、source revision、並行更新/CASを検証する。
+- **条件候補と適用**：共通条件を複数アイテムで使っても個別TCNが別ID、同じアイテムでテストレベル別の検証責務を保持、TR未確定の条件候補は正式TCNへ昇格しない。未適用の対象外/適用不能/別レベル/重複/未確認/blockedと根拠・再確認条件を照合する。
+- **期待結果**：同じ組に「アクセス拒否」「データ不変更」「監査記録」の3候補を別々のAuthority/観測方法/状態へ対応させる。状態・権限・データが不足して結果が一意でなくなる場合のみblocked。Authorityなし/競合/未承認推論/観測事実だけで期待結果を確定しない。TC具体化後も期待結果ごとの仕様参照を維持する。
+- **技法・coverage**：item×conditionの適用判断を、BVA・EP・Decision Table・State Transition・Pairwise等のCI分母と混同しない。組み合わせ全件採用、未検討の隠蔽、正当なDispositionのテスト済み扱い、0件とpartial discoveryのfalse passを検出する。
+- **Risk循環**：TR前の一次Riskが権限/条件/実装変更の新証拠で一部更新され、依存するTR/TCN/CI/TCのみstaleへ戻る。無関係なcurrent成果物と直前完了baselineは保持する。
+- **UI mode・E2E選定の移行**：`ui-target-v1`の00〜09、SPEC/DEC/UNKNOWN、AC/UIOP/SCOPE、Manifestとstable ID、scope readiness、旧callerとlegacy/retired/blockedを検証する。E2E対象選定を新Skillへ移した後も既存TCを使う直接E2E実装/実行を妨げない。
+- **統合受入**：独立fixtureで、確定済み注文の変更禁止・管理者権限・監査要件をUI/APIで確認する例を用い、機能→Authority/UI→アイテム→Risk→TR→共通条件・個別TCN→期待結果候補→CI→TC→実行まで検証する。バッチ/非UIのみ、横断非機能要件、変更後の再評価も検証する。fixtureは未決定の受入製品そのものではない。
+- **CIと実Agent**：Draft PR、merge、release、並行PR、旧baselineからのmigration、保存先への権限不足、改変された証拠の拒否、欠損・未知refとsafe blockについて、決定論的validatorと実Agentの意味品質を別々に検証する。未実行はPASS扱いしない。
+
 ### 意味品質・統合テスト
 
 - 初回全体分析で機能階層と実装要素の分離が適切か、機能の過分割・過統合・未抽出・重複、根拠不足を独立に評価する。
 - 実装で観測した挙動を正式仕様に昇格させないこと、UIなし機能が消えないこと、権限・例外・非同期・外部連携が対応する仕様とテストに接続すること。
-- PR差分→機能→Authority / AC→TR→TCN→CI→TC→関連実行結果の代表ケースと、関連情報が足りずblockedになるケース。
+- PR差分→機能→Authority / UI構造 / AC→アイテム→Risk→TR→共通条件・個別TCN→期待結果候補→CI→TC→関連実行結果の代表ケースと、関連情報が足りずblockedになるケース。
 - 初回、PR更新、マージ後、リリース前、並行PR、旧baselineからの移行を含むAgent workflow E2E評価。構造テストだけでsemantic品質をPASSとしない。
 - CI integrationは実際のテスト用製品repository / fixtureでPRイベント・merge・release対象を検証し、GitHub Actions上の安全性と失敗・警告判定を確認する。外部環境にアクセス不能な試験は未検証として区別する。
 
@@ -395,16 +412,22 @@ CI判定方針：
 5. 既存Authority / UNKNOWN / SCOPE / AC、TR / TCN / CI / TC、Regression・E2E実行結果を参照でき、仕様の二重正本・機能の重複正本・不要なGraphを作らない。
 6. 新規・変更・削除・分割・統合の機能IDと履歴を維持し、影響するQA成果物だけを再検証対象とする。影響不明を「影響なし」にしない。
 7. 同じ製品の並行PR・失敗再試行・rebase・merge・releaseに対して、currentness、CAS、過去結果保護、秘密情報保護、実対象操作の安全契約が満たされる。
-8. 既存UI target package、通常spec-analysis、legacy、現行QA workflowsの互換性 / migration / rollback判定と回帰テストが成立する。
+8. 既存UI target package、通常spec-analysis、legacy、現行QA workflowsの互換性 / migration / rollback判定と回帰テストが成立する。UI mode移行後の00〜09とscope readiness、旧Authority / AC / UNKNOWNとstable ID、E2E対象選定経路を保つ。
 9. `project-context`が案件文書の存在確認、欠損時の新規作成、既存文書の差分更新・履歴・競合防止・承認された保存先への永続化を正本として担当し、`qa-workflow`はroutingと使用設定の変更影響判定だけを行う。必要な案件設定が未確定でも独立した読取工程を継続できる。
 10. 既存のProject Context16節、既存stable key、DEC / ASM ID、`artifact_graph.py`のparser / currentness、`project_context_ids.py`と過去の文書・呼び出し元の互換性を検証する。新Skillの作成・更新・権限不足・並行更新について実Agent受入と独立テストがPASSする。
 11. Skill / runtime / CI / 評価データ / README・利用手順・運用文書を更新し、記載した独立検証および実製品相当の統合受入がPASSする。未検証・SKIP・失敗は成功扱いしない。
-12. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
+12. 独立Skill`ui-target-analysis`、`test-item-analysis`、`e2e-test-selection`が成立し、旧modeの正本・利用者・runtime・ID・履歴・migrationの互換性を検証する。
+13. テストアイテムを製品機能とは別IDで階層・多対多・状態・履歴として管理し、仕様+Risk→TR→共通条件とアイテム別TCN→期待結果候補→CI→TCを追跡できる。未検討の対象と未適用の条件を別指標で報告する。
+14. 業務状態・UI状態・認可・セッション・データ/外部連携の正本が混線せず、一次Riskと条件発見後の局所再評価、TCN候補の先行抽出、複数期待結果とAuthorityの対応が成立する。規格の工程名とSkill名の差を検証し、根拠のない期待結果を完成扱いしない。
+15. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
 
 ## リスク・実装時の確認事項
 
 - **完全性の限界**：コード・資料から発見できない機能の存在は機械的に証明できない。確認した情報源と分析対象境界、未知領域を表示し、誤った完全性主張を防ぐ。
 - **候補の粒度**：ファイル、コード関数、画面、業務機能は一対一ではない。機能同定・重複解消・分割・統合は意味判断を要する。数だけ合わせる処理は禁止。
+- **未確定の回答境界**：再設計Q06（UI package内の具体的な物理分割）とQ20（入力選択肢の個別確定）は未回答。合意済みの正本境界・条件付き必須ルールは守り、無根拠な物理移管や一律必須化をしない。該当部分だけblockedにして他の分析は進める。
+- **標準との相違**：IVEC V3.2のPDF詳細本文は未確認。ISTQB CTFLのtest analysisと本`test-analysis`、ISO/IEC/IEEE 29119-1:2022のtest modelとTCNをそのまま同一視しない。
+- **条件の直積膨張**：アイテム×共通条件を全採用してTCN/TC数を増やさない。未検討と正当な不採用、個別TCNと技法CIの分母を混同しない。
 - **既存schemaとの整合**：`ui-target-v1`はUI分析に特化している。機能階層をSCOPEやUI構造に直接流し込むと既存の振る舞い・readiness・migrationが壊れる可能性がある。明示参照と互換性を先に確認する。
 - **外部連携と権限**：接続先のIssue / 設計資料の種類やAPI契約は案件ごとに異なる。情報源の列挙・取得不能を明示する共通入力を必須にし、資格情報を必要とする個別providerを無断追加しない。
 - **Project Contextの初期化**：既存文書のないことの証明は許可された探索範囲に限る。候補が複数、保存root未指定、原子的な書込み能力不足なら推測せず作成・更新をblockedにする。既存DEC / ASM履歴・stable key・未使用設定のcurrentnessを破壊しない。
