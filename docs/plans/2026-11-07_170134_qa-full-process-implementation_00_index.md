@@ -30,6 +30,7 @@ flowchart TD
     route["既存 qa-workflow：Skill選択・局所停止・再開"]
     caller --> route
 
+    context["予定：project-context（案件設定・初回配置合意）"]
     manage["予定：QA要求・テストアーキテクチャ・テスト管理"]
     develop["予定：機能・UI・item／条件候補の分析"]
     design["既存：仕様Authority・Product Risk・TR／TCN／CI／TC"]
@@ -45,6 +46,9 @@ flowchart TD
     report["予定：統合報告"]
     evaluate["予定：QA活動評価・改善"]
 
+    route -.->|新規案件・配置変更時| context
+    context -.->|合意済みの正本・編集方針| manage
+    context -.->|合意済みの正本・編集方針| develop
     route -->|QAの目的・計画| manage
     route -->|開発差分・外部資料改版| develop
     route -->|有効な既存TCから直接開始| design
