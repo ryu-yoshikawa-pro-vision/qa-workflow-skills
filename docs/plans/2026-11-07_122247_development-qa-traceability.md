@@ -259,6 +259,47 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 ## 再設計するQAワークフローと戻り先
 
+### 開発差分から正式テスト設計への成果物フロー
+
+```mermaid
+flowchart TD
+    source["依頼された入力：初回／PR／merge／release／外部資料改版"]
+    context["project-context：案件設定とsource参照（予定）"]
+    feature["feature-analysis：機能候補・差分（予定）"]
+    spec["spec-analysis：期待仕様Authority（既存）"]
+    ui["ui-target-analysis：UI構造・操作（予定）"]
+    item["test-item-analysis：アイテム候補（予定）"]
+    condition["test-condition-analysis：共通条件候補（予定）"]
+    cross["候補相互照合：不足・重複・未確認"]
+    risk["test-analysis：Product Risk・QA影響（既存）"]
+    tr["test-requirement-design：正式TR（既存）"]
+    formal["test-condition-design：正式TCN／CI（既存）"]
+    tc["test-case-design：具体的TC（既存）"]
+    coverage["coverage-analysis：閉鎖性・不足（既存）"]
+    handoff["必要な実行ownerへ引継ぎ：既存E2E／Regression／非Web"]
+
+    source --> context
+    context --> feature
+    feature --> spec
+    feature --> ui
+    spec --> item
+    spec --> condition
+    ui -.->|UIの事実| item
+    ui -.->|UIの事実| condition
+    item --> cross
+    condition --> cross
+    cross --> risk
+    risk --> tr
+    tr --> formal
+    formal --> tc
+    tc --> coverage
+    coverage --> handoff
+```
+
+この図は**成果物の依存関係**であり、全工程を必ず順番に起動する指定ではない。既存currentなAuthority／TR／TC／E2Eがある場合は必要な入口から開始でき、itemとconditionの候補識別は並行できる。候補相互照合は正式TCNの採用判断ではない。
+
+仕様不明は`spec-analysis`／`question-analysis`、候補不足は対応する分析Skill、Product Riskの新証拠は`test-analysis`、TC／CIの問題は正式設計ownerへ戻す。変更時には依存する成果物だけ`要再検証`として、無関係なcurrent結果を維持する。外側のAgent起動・通知・定期監視は本図に含まない。E2Eの選定／実装／実行・非Web実行の詳細は[継続workflow・受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を参照する。
+
 | 工程 | 担当                                                          | 正本・依存条件                                                                                   |
 | ---- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | 0    | `project-context`（`qa-workflow`からrouting）                 | 案件設定の確認・不足時作成。使用fieldの現在性                                                    |
