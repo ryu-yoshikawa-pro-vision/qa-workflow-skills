@@ -368,32 +368,31 @@ flowchart TD
 
 E2Eの技術非依存な選定は`e2e-test-selection`、対象repo・Playwright実装可否の確認は`e2e-test-inspection`が担当する。選定済みTC・明示E2E対象・既存E2E実行の依頼では、選定Skillや上流の正式テスト設計を強制的にやり直さない。非E2Eの実装・実行とブラウザTCの直接実行は、それぞれの担当Skillの契約に従う。Regressionは選定・Activityを管理し、実際のrun・診断・cleanupは実行ownerの成果物を参照する。ここで描いた選択や矢印は、自動起動や特定モデル・CLIの指定を意味しない。
 
-| 工程 | 担当 | 正本・開始条件 |
-| --- | --- | --- |
-| 0 | `qa-workflow`／必要時の`project-context` | 依頼成果物・sourceと既存current成果物から開始点を決める。案件設定が必要なら参照・作成 |
-| 1 | `feature-analysis` | 機能・開発差分が必要なscopeだけ分析。既存機能の有効な正本があれば再利用 |
-| 2a | `spec-analysis`／必要時の`question-analysis` | 仕様Authority／AC／UNKNOWN。機能分析なしの独立開始と不明点回答後の再開を許可 |
-| 2b | `ui-target-analysis` | UI構造・操作・画面状態。取得可能な事実は2aと並行し、期待挙動は有効Authorityを参照 |
-| 3a | `test-item-analysis` | 機能・仕様・UIの利用可能な根拠からアイテム候補を識別。3bの完了を要求しない |
-| 3b | `test-condition-analysis` | 仕様・機能・UI・権限・状態から共通条件候補を独立識別。3aの完了を要求しない |
-| 3c | `test-item-analysis`と`test-condition-analysis` | 両候補を相互照合し不足・重複・未確認を各ownerへ戻す。正式適用判断はしない |
-| 4 | `test-analysis` | Authority・変更影響・利用可能な候補からProduct Risk・テスト重点を評価。3cを必須の開始条件にしない |
-| 5 | `test-requirement-design` | AuthorityとRiskを根拠に正式TR／Dispositionを確定。既存有効TRは再利用 |
-| 6 | `test-condition-design` | TRとアイテム／条件候補を照合し、正式TCN・適用／Disposition・期待結果候補を管理 |
-| 7 | `test-condition-design` | 技法・カバレッジ基準・正式CI・テストデータ要件を管理 |
-| 8 | `test-case-design` | current TCN／CIとAuthorityから具体的なTC・期待結果を設計 |
-| 9 | `coverage-analysis`／必要時の`adversarial-review` | 依頼範囲の追跡性・閉鎖性とテスト成果物の品質確認。検証済みcurrent結果を再利用 |
-| 10 | `qa-workflow`／必要時の`e2e-test-selection` | 要求された次の活動を選択。E2E価値判断が必要なときだけ新Skillへ委譲 |
-| 11a | 既存E2E Skill群 | TCあり／TCなし／実行のみを区別し、inspection・実装・review・実行・原因分析・報告を必要な範囲で接続 |
-| 11b | `regression-testing`と各実行owner | Regressionの選定・Activityと元run結果を分離。選定された実行だけを委譲 |
-| 11c | `test-execution`／`testware-implementation`／`testware-execution` | ブラウザ直接TCと非E2Eの実装・実行を区別。既存testwareの実行に新規実装を強制しない |
+| 工程 | 担当                                                              | 正本・開始条件                                                                                     |
+| ---- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 0    | `qa-workflow`／必要時の`project-context`                          | 依頼成果物・sourceと既存current成果物から開始点を決める。案件設定が必要なら参照・作成              |
+| 1    | `feature-analysis`                                                | 機能・開発差分が必要なscopeだけ分析。既存機能の有効な正本があれば再利用                            |
+| 2a   | `spec-analysis`／必要時の`question-analysis`                      | 仕様Authority／AC／UNKNOWN。機能分析なしの独立開始と不明点回答後の再開を許可                       |
+| 2b   | `ui-target-analysis`                                              | UI構造・操作・画面状態。取得可能な事実は2aと並行し、期待挙動は有効Authorityを参照                  |
+| 3a   | `test-item-analysis`                                              | 機能・仕様・UIの利用可能な根拠からアイテム候補を識別。3bの完了を要求しない                         |
+| 3b   | `test-condition-analysis`                                         | 仕様・機能・UI・権限・状態から共通条件候補を独立識別。3aの完了を要求しない                         |
+| 3c   | `test-item-analysis`と`test-condition-analysis`                   | 両候補を相互照合し不足・重複・未確認を各ownerへ戻す。正式適用判断はしない                          |
+| 4    | `test-analysis`                                                   | Authority・変更影響・利用可能な候補からProduct Risk・テスト重点を評価。3cを必須の開始条件にしない  |
+| 5    | `test-requirement-design`                                         | AuthorityとRiskを根拠に正式TR／Dispositionを確定。既存有効TRは再利用                               |
+| 6    | `test-condition-design`                                           | TRとアイテム／条件候補を照合し、正式TCN・適用／Disposition・期待結果候補を管理                     |
+| 7    | `test-condition-design`                                           | 技法・カバレッジ基準・正式CI・テストデータ要件を管理                                               |
+| 8    | `test-case-design`                                                | current TCN／CIとAuthorityから具体的なTC・期待結果を設計                                           |
+| 9    | `coverage-analysis`／必要時の`adversarial-review`                 | 依頼範囲の追跡性・閉鎖性とテスト成果物の品質確認。検証済みcurrent結果を再利用                      |
+| 10   | `qa-workflow`／必要時の`e2e-test-selection`                       | 要求された次の活動を選択。E2E価値判断が必要なときだけ新Skillへ委譲                                 |
+| 11a  | 既存E2E Skill群                                                   | TCあり／TCなし／実行のみを区別し、inspection・実装・review・実行・原因分析・報告を必要な範囲で接続 |
+| 11b  | `regression-testing`と各実行owner                                 | Regressionの選定・Activityと元run結果を分離。選定された実行だけを委譲                              |
+| 11c  | `test-execution`／`testware-implementation`／`testware-execution` | ブラウザ直接TCと非E2Eの実装・実行を区別。既存testwareの実行に新規実装を強制しない                  |
 
 - **開始点と並行性**：工程番号は説明用であり、全工程の強制実行順序ではない。`qa-workflow`は依頼範囲とcurrentな正本から必要なSkillだけ選択する。UI・候補識別・Riskは入力が揃った対象範囲から並行・先行できる。依存するAuthority・承認・保存revisionを確認できない範囲だけblockedにする。
 - **変更時の局所再評価**：情報源・仕様・候補・Risk・TC／CI・実装・実行結果のrevisionが変わったとき、影響する成果物だけ`要再検証`とする。仕様の期待挙動は`spec-analysis`、Product Riskは`test-analysis`、正式TCN／CIは`test-condition-design`へ戻す。無関係なcurrent成果物を再生成しない。
 - **レビューからの差戻し**：`coverage-analysis`や`adversarial-review`は他ownerの正本を上書きしない。不明点は`question-analysis`、アイテム・条件候補の不足はそれぞれの候補owner、設計の不整合は正式設計ownerへ戻す。正式適用判断やRisk採点を候補相互照合へ移さない。
 - **E2E・Regression・非E2Eの境界**：E2E選定は価値判断、inspectionは技術的実装可否、RegressionはRun選定・Activity、各実行Skillは実run・結果・cleanupの正本を担当する。TCなしE2Eや既存E2Eのみの依頼に架空のTCを作らない。
 - **継続確認**：Draftを含むPR・merge後・release前、コードPRのない外部資料変更では、source revisionと依存関係から必要scopeを特定する。製品CIは保存済みの分類・参照・現在性を決定論的に検証し、AIの意味判断を再実行しない。
-
 
 **workflow完了検証の接続**：`qa-workflow`の`_default_expected_runtime_units()`は現行6 Skillに対応する。未登録の新設Skillや成果物検証結果を持たないscopeを、期待unitが空という理由で完了にしない。新設各Skillの検証正本を用い、必要な成果物ref・revision・検証結果の受渡しを[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)で実装する。設計runtimeを持たない管理・報告のみの開始でも、各ownerの有効な結果で完了可能とする。
 
