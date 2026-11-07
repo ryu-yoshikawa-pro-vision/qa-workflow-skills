@@ -42,7 +42,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 - 6つの独立責務とそれぞれの成果物、検証・review・currentness・履歴・案件による承認条件。命名と実装入口を`skills/test-requirements-analysis/`、`skills/test-architecture-design/`、`skills/test-management/`、`skills/defect-management/`、`skills/test-reporting/`、`skills/test-evaluation/`とする。各名称は既存の`test-requirement-design`等と誤発火しないよう実装・評価する。
 - `qa-workflow`の必要時routing、Project Context・PR #22の成果物・既存TR/TCN/CI/TC・実行結果との参照連携。適切な成果物がない経路も、可能な範囲だけ局所的にblockedにする。
-- UI以外の実装・実行、性能・セキュリティ・信頼性等の非機能検証、静的テストの既存専門tool/runnerへの安全な接続と、統合結果・未対応能力の管理。利用不能なrunnerや未測定の品質特性をPASSとしない。
+- UI以外のテストコード実装・更新を新規`testware-implementation`、技術別runnerの実行・raw結果・cleanupを新規`testware-execution`が担当する。性能・セキュリティ・信頼性等の非機能検証、静的テストの既存専門tool/runnerへの安全な接続と未対応能力の管理も対象とする。既存Playwright系の正本は維持し、利用不能なrunnerや未測定の品質特性をPASSとしない。
 - 変更時の影響再評価、承認失効、並行処理・部分再実行・履歴、最終報告・活動評価への追跡性。
 - Skill仕様、正規出力、決定論的runtime／validator、trigger・deterministic・semanticの評価データ、workflow integration test、README・EVALS・導入資料・CIの変更。
 
