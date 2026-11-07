@@ -61,7 +61,7 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 
 `test-management`が所有する承認済み計画版、対象scope・期間、test level/type、対象build・環境、要求run／TC／testware、開始／終了基準、および想定source ownerの一覧を、集計の**計画上の母集団**とする。
 
-- 対象の一覧には、一般TC、Playwright E2E、Regression、Exploration、API／バッチ／コンポーネント、非機能測定、UI/UX・WCAG、正式Issue情報のうち対象となるものを含める。用途により件数単位（TC、logical primary、resolved TestCase、attempt、session、test item、欠陥候補等）を分ける。
+- 対象の一覧には、一般TC、Playwright E2E、Regression、Exploration、API／バッチ／コンポーネント、非機能測定、**製品要求・設計・コードの静的レビュー／静的解析**、UI/UX・WCAG、正式Issue情報のうち対象となるものを含める。用途により件数単位（TC、logical primary、resolved TestCase、attempt、session、test item、欠陥候補等）を分ける。
 - 各source ownerから実際に取得した範囲、snapshot／source revision、pagination／query filter／取得可否、実行状態、取得時点と出力したresult refsを記録する。予定にあるownerが欠落した場合は0件とみなさず、取得不完全にする。
 - Reportのみを直接要求され、計画がない場合は明示された対象scopeと許可されたdiscovery rootsから母集団を作る。不明な母集団を自動的に「すべて発見済み」とせず、全体率と終了判定は`未確定`にする。
 - 別build・別環境・別期間のrunは対象条件に適合するものだけ集計する。異なる試行・retry・選択Run・同一testwareを重複加算しない。
@@ -75,8 +75,8 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 
 **受入シナリオ**：
 
-- 計画にAPI実行が1件あるが、Playwrightだけ取得できた場合はAPI実行を未取得とし、全体PASS率・完了判定を確定しない。
-- 同じTCの複数retryや同じE2E runの`logical primary`と`attempt`を1つの分母へ二重加算しない。
+- 計画にAPI実行が1件あるが、Playwright E2Eだけ取得できた場合はAPI実行を未取得とし、全体PASS率・完了判定を確定しない。計画された静的レビューの対象が5件で取得したFindingが0件でも、5件すべてのレビュー完了と取得完全性がない限り「指摘0件・完了」としない。
+- 同じTCの複数retryや同じE2E runの`logical primary`と`attempt`を1つの分母へ二重加算しない。非E2Eではテストファイル・suite・個別テスト・TC・testware refを別単位とし、ファイルの成功から個別テストの実行を推定しない。
 - 一部pagination失敗、read権限不足、外部Issueのstale read、終了条件の欠落、対象外build、過去revision、計画変更後の旧reportで、`complete`と終了判定を正しく分離する。
 - sourceが0件で計画上も対象なしという正当な空集合と、sourceが取得できないため0件に見える状態を区別する。
 
@@ -89,6 +89,27 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 3. 通信切断・crash後の再開で、status不明の副作用（Issue書込み、testware編集、実runnerの試行やcleanup）を無条件に再実行しない。ownerの元証跡・同一操作ID・現在状態を照合し、安全に再開可能な操作だけ進める。
 4. 同一revisionの並行更新、PRのrebase、マージ後の基準変更、外部文書のみの改版、計画承認の失効、保存後の読戻し不一致、旧commit結果の遅延到着を独立fixtureと実保存先で検証する。旧currentを上書きせず、必要な範囲に`要再検証`／`blocked`と担当・再開条件を記録する。
 5. 新しい中央mutable manifestや汎用storage frameworkを作ることを前提としない。既存`qa-workflow`のsource currentness／state／resume、各Skillの履歴契約と実保存先の原子操作を組み合わせて検証する。
+
+### 操作開始前の永続的な記録と再開判定
+
+成果物保存、外部Issue更新、testwareの書込み、実runnerの副作用を伴う操作は、**実操作の前に**既存workflow stateまたは当該ownerの永続化先へ、同じ処理を特定できる操作記録を確定する。新しい横断台帳や第二のartifact graphは作らない。
+
+1. 記録には、workflow／owner／scope、操作の種類、対象ref／保存先、入力source・成果物revision、期待する更新前revision、必要な承認・許可範囲、安定したoperation identity、開始・実行／保存確認・再開条件を含める。秘密情報の実値は記録しない。
+2. 作成前に`artifact_graph.py::claim_mutable_operation()`等の既存claim規則と保存先の原子的create-if-absent／CASを利用する。**同一operation identityを再受付した場合、前回の実保存状態を照合せず同じ副作用を再実行しない**。
+3. 保存処理が成功して応答が消えた場合も、再起動後に対象ref／revision／内容hash・source依存を実保存先から照合して「保存確定」「競合」「状態不明」を判定する。保存先の照会権限不足を「未保存」と推測しない。
+4. 実runner／外部API等で開始済み操作の結果が不明な場合、元のoperation identity、実開始・副作用・cleanupの証拠を持つownerへ戻し、**新しいattemptによる再実行が許可されるまでblocked**にする。
+5. 複数owner更新は、各個別成果物の確認・依存revision照合が完了して初めて横断結果をcurrentとする。部分保存後に中断した場合は保存済み結果を再利用し、未保存または古い部分だけ再処理する。
+
+### 実行後の記録を確定してから引き継ぐ
+
+実行ownerはpreflight・実開始・各attemptの元結果・終了状態・診断・cleanupを**別々の事実**として記録する。実runnerが終了しただけで、結果の参照とcleanup状態が永続化されたとみなさない。
+
+- runner実行後、元結果と結果保存先のref／revision・readbackを確認し、欠落や不一致を保存未完了として引き継ぐ。
+- cleanupの実操作が完了していてもcleanup結果の保存が未確認なら、**実際にcleanupが済んだという証拠は残し**、workflowの引継ぎ・完了のみ未確定とする。
+- 結果保存中・cleanup記録中・元runner終了直後の中断は、元のrun／attempt identityを再照会して復旧する。実行済みのテストを回復のために無条件に再実行しない。
+- `test-reporting`／`regression-testing`／下流Skillは、実測値だけでなく元runの確認済み保存revision・結果最終確定・必要cleanupを照合する。
+
+この契約を[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)の別セッション再開と、[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)の実行ownerに適用する。
 
 ## 製品CIとの成果物受渡し
 
@@ -125,5 +146,5 @@ Skillが提供するのはsource snapshot、成果物refs・content hash、承�
 - 対象として宣言した各保存先について、native create-if-absent、同時更新CAS、履歴再取得、独立再読込、権限拒否、失敗後の復旧を検証する。providerが未確定なら永続更新機能は未完成であり、全体の実装完了にしない。
 - 承認対象のscope／revision／権限主体と失効を検証し、外部Issueへ無許可書込み・二重登録・改ざんされた承認の使用が発生しない。
 - 計画上の母集団とsource inventoryの取得完全性、raw単位、retry、0件とunknown、別build、source遅延／欠落を検証する。
-- 独立した期待結果を用いた実Agent経路、実runner／保存先／外部Issue接続、関連既存runtime・CI・移行・部分再実行を検証する。
+- 独立した期待結果を用いた実Agent経路、実runner／保存先／外部Issue接続、関連既存runtime・CI・移行・部分再実行を検証する。実行完了後・結果保存中・cleanup保存後の中断と再開、異なるセッションでのreadbackを必須ケースとする。
 - 親Planと非Web実装・実行Planの全完了条件を満たした場合だけ、QA全工程の追加責務を完了と判定する。
