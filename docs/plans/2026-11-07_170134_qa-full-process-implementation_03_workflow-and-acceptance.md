@@ -78,6 +78,12 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 
 非E2Eの実行異常は`testware-execution`が**第一分析owner**となり、観測された失敗と次の追加証拠、原因仮説、原因分類（SUT／テストデータ／testware／環境／runner／仕様不明／判定不能）、確度、次の再実行・修正の担当先を診断成果物に保持する。ブラウザ直接TC実行の異常は`test-execution`、PlaywrightブラウザE2Eの異常は既存`e2e-test-result-analysis`が第一分析ownerであり、`defect-management`は欠陥候補の追跡に限定する。証拠不足を製品欠陥に自動昇格しない。
 
+### 人間編集を含む成果物配置の引継ぎ
+
+新規案件や成果物配置の変更時は、`qa-workflow`が既存成果物とProject Contextの配置方針を確認し、必要な場合だけ`project-context`に**ファイル構成・編集可能な正本・機能別の参照・レビュー手順の提案と利用者合意**を依頼する。採用した方針と承認根拠はProject Contextの既存Section 12／14または明示された外部正本のrefへ保存する。合意済みの案件では通常のQA実行時に再確認を強制しない。
+
+各ownerは人間が編集した正本の変更を履歴・ID・source revision・競合とともに取り込み、validatorと必要な条件付き保存・readbackを通す。生成された一覧や`MANIFEST.md`を編集用の第二の正本として扱わない。`ui-target-v1`の標準ファイル配置・既存writerを維持し、機能別参照は導出情報として用意する。新規配置・ファイル移動が未合意でも既存の読取専用分析は続行し、未合意の書込み・移管だけ`blocked`とする。詳細は[開発連動QA PlanのQ06](./2026-11-07_122247_development-qa-traceability.md#成果物の配置人間編集方針の初期合意q06)に従う。
+
 ## 変更・並行処理・途中失敗の再開
 
 ### 依頼受付から局所再評価・保存・実行・CI検証まで
@@ -86,6 +92,8 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 flowchart TD
     external["利用者・外側の仕組み：依頼・source変更を渡す"]
     routing["qa-workflow：必要Skill・対象scope・再開先を決定"]
+    layout["project-context：初回・変更時の配置と人間編集方針を確認"]
+    layoutReady{"正本保存・配置変更に必要な合意は有効か"}
     owner["担当Skill：必要な正本とsource revisionを照合"]
     current{"入力・成果物はcurrentか"}
     reuse["有効な成果物を再利用"]
@@ -110,7 +118,10 @@ flowchart TD
     finish["今回の依頼範囲の結果を返す"]
 
     external --> routing
-    routing --> owner
+    routing --> layout
+    layout --> layoutReady
+    layoutReady -->|有効な合意・読取のみ| owner
+    layoutReady -->|新規保存・配置変更が未合意| blocked
     owner --> current
     current -->|有効| reuse
     current -->|変更あり| update
@@ -157,7 +168,7 @@ flowchart TD
 
 | 受入ケース          | 入口・入力                                     | 必須観測・拒否する誤り                                                                                                                           |
 | ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| S1 初回案件         | 固定製品source＋QA目的／仕様                   | QA要求→アーキテクチャ→計画とfeature／spec／Risk／詳細設計。担当・正本・未確定・承認を追跡できる                                                  |
+| S1 初回案件         | 固定製品source＋QA目的／仕様                   | Project Contextで既存配置・正本・人間編集手順を調べ、初回に必要な配置合意を保存。機能別参照から正本へ到達し、QA要求→アーキテクチャ→計画とfeature／spec／Risk／詳細設計の担当・未確定・承認を追跡できる                                                  |
 | S2 開発変更         | 固定base/headのPR／rebase                      | 差分網羅・feature／item／condition候補→Risk→正式設計、局所stale、旧HEAD結果の誤受容なし                                                          |
 | S3 E2E接続          | current TR/TCN/CI/TCとE2E選定                  | **既存**Playwright inspection→implementation→review／coverage→execution→結果分析／報告。TCあり・TCなし明示対象・既存E2E実行のみの3経路を独立検証 |
 | S4 非Web            | Vitest component／contracts・必要な独立fixture | TC/testware→runner準備→actual start→raw結果・cleanup→異常診断→統合報告。元runからPASS/FAILを再採点しない                                         |
@@ -198,7 +209,7 @@ flowchart TD
 
 ### 完了条件
 
-1. S1〜S17を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。全工程の固定順実行を強制しない。
+1. S1〜S17を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。新規案件の配置合意・既存合意の再利用、人間の直接編集に対する正本の検証・変更影響の追跡、無承認の再配置と生成一覧の編集拒否を確認する。全工程の固定順実行を強制しない。
 2. S3ではPR #22新Skillの計画成果物から既存Playwright E2Eの**実**inspection・implementation・execution・source結果／cleanup・reportingへ接続できる。E2E本体は再実装せず、既存E2E単独／TCなし経路に回帰がない。
 3. 実行準備は全ownerのrefsとrun preflightのready／blockedを示す。非Web異常には明示した分析owner・根拠・仮説・担当先を持ち、欠陥候補とは分離する。
 4. 外部資料変更をコードPRなしでも入力として受け付け、必要範囲だけ再評価できる。通知・定期照合やAgentの実起動をSkill内部の完了条件にしない。
