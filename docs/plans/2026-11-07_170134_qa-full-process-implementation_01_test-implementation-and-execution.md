@@ -61,9 +61,9 @@ IVEC Designerのテスト実装、およびISTQB CTFLの実装活動に含まれ
 | 非Regressionの実行対象・順序・依存関係                         | `test-management`が計画版・必要なTC/testware/run・スイート構成・順序の選定理由、担当・時点・開始／終了基準を保持。特定テスト基盤のsuiteファイルやコマンドは実装ownerが保持                                                        |
 | TCごとの前提・データ・期待結果                                 | 既存`test-case-design`のcurrent TCとsource Authorityを使用。TCなしの明示テストなら、正規の既存testware refと有効な仕様根拠を用い、架空のTCを作らない                                                                              |
 | データ、テストユーザー、fixture、環境設定、reset/cleanupの実装 | `testware-implementation`（Playwrightの場合は既存`e2e-test-implementation`）が、既存repoのsetup／teardown／fixtureを確認して追加・更新・再利用する。資格情報や個人データ実値を成果物に保存しない                                  |
-| 今回runの実行前readyと結果                                     | `testware-execution`（Playwrightの場合は既存実行Skill）が対象build、testware revision、準備データ、権限、環境の実状態、必要な副作用・後処理をpreflightで確認し、準備成功・未確認・blockedを記録。実開始前の停止を実行済みにしない |
+| 今回runの準備・実行結果                                         | `testware-execution`（Playwrightの場合は既存実行Skill）がbuild・testware revision・権限・準備方法・必要な副作用・後処理をpreflightで確認。runner管理のsetup／fixtureが生成する実データは生成後に状態を確認し、準備成功・未確認・blockedを記録。実開始前の停止を実行済みにしない |
 
-**実行準備の受渡し成果物**には`計画scope／対象run・TC／testware refs・revisions／実行順序と依存／環境・build／データとfixture参照／許可された副作用／preflight結果・証拠／未準備項目・担当・再開条件`を残す。データの機密値は格納しない。準備できない項目がある場合、独立対象の実行は続けられても該当runは開始不可とする。今回runのpreflightはplanやテストコードが存在するだけでは完了にしない。
+**実行準備の受渡し成果物**には`計画scope／対象run・TC／testware refs・revisions／実行順序と依存／環境・build／データとfixture参照／許可された副作用／preflight結果・証拠／未準備項目・担当・再開条件`を残す。データの機密値は格納しない。準備できない項目がある場合、独立対象の実行は続けられても該当runは開始不可とする。今回runのpreflightはplanやテストコードが存在するだけでは完了にしない。実データの生成時点・隔離・再利用・cleanupの詳細は[継続workflowの実行時引継ぎ契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md#テストデータの実行時引継ぎ再利用)に従い、runnerが所有するreset／setupをrun外で繰り返さない。
 
 ### 3. 実行前の安全確認と実行
 
