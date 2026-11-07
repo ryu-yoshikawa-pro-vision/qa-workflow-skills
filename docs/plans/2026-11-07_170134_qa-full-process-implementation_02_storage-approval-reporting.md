@@ -2,7 +2,7 @@
 
 ## 目的と適用範囲
 
-この文書は[QA全工程の実装Plan](./2026-11-07_170134_qa-full-process-implementation.md)を補足する、保存先、権限、集計完全性、実Agent受入の詳細契約である。[Planインデックス](./INDEX.md)で担当を確認してから利用する。
+この文書は[QA全工程の実装Plan](./2026-11-07_170134_qa-full-process-implementation.md)を補足する、保存先、権限、集計完全性、実Agent受入の詳細契約である。[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)で担当を確認してから利用する。
 
 対象はQA要求分析、アーキテクチャ、テスト管理、欠陥管理、統合報告、評価、および[非Web実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)からの引継ぎ。製品機能一覧・item・共通条件候補の更新と製品CI接続は[開発連動QAのPlan](./2026-11-07_122247_development-qa-traceability.md)を正本とする。
 
