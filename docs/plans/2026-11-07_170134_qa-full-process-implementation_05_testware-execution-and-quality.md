@@ -53,6 +53,28 @@
 3. 安全が確認できた静的・軽量検証で実装の構文／起動可能性を確認し、**実runner未開始なら「実行済み」にしない**。
 4. 検証失敗や中断では、対象diffと元の状態を照合し、ユーザーの編集を破棄せず、未確定の変更・復旧先を記録する。強制reset、無断上書き、破壊的cleanを禁止する。
 
+### 同時編集と変更確定時の競合防止
+
+書込み前のHEAD・working tree確認、operation単位のclaim、成果物保存のCASは、**testwareファイルへの変更確定時の競合検出を代替しない**。共有ファイルの変更は、事前検査から実際の反映まで整合性を保証する。
+
+**変更対象**：`skills/testware-implementation/`（新設予定）、既存`e2e-test-implementation/references/guidance.md`の共通安全条件、`skills/qa-workflow/scripts/artifact_graph.py::reserve_shared_resource()`を使う呼出し元、変更記録と回帰fixture。既存の排他手段を再利用し、新しい汎用lock managerは作らない。
+
+1. **変更単位の固定**：作業開始時に対象repo・branch／HEAD、対象path、変更前ファイル内容hash、既存dirty状態、許可された差分・operation refを記録する。作業中に追加された依存ファイル・設定も変更対象として再確定する。ユーザー／他Agentの変更を今回の差分と混同しない。
+2. **隔離workspaceでの編集**：各Agentは独立worktreeまたは隔離作業コピーで生成・検証する。共有branchへの反映直前に対象branchのHEADと対象ファイルの最新内容を再取得し、記録した前提との一致を確認する。競合時は反映せず、先行変更を取り込むか再計画して再検証する。非fast-forward更新、force push、強制resetによる上書きは行わない。
+3. **共有workspaceの直接編集**：隔離できず同一repo／pathを共有する場合は、**関係する書込主体が同じ予約機構を守ること**を確認したうえで、対象資源に対する排他予約を編集前に取得し、編集完了／中断まで維持する。`reserve_shared_resource()`等で予約を取得できない場合は対象scopeをblockedとする。予約は変更前内容の照合を省略する理由にならない。予約の安全な解放は既存native conditional releaseに従う。
+4. **第三者更新の検出**：予約を使わない外部書込主体が存在する場合、予約だけで完全な競合防止を保証しない。保存・commit時の期待HEAD／期待内容に基づく条件付き確定を必須とし、条件を満たせない共有更新経路は使用しない。ローカルファイルのwriteとGitのcommit／pushで保証される原子性を混同しない。
+5. **操作の重複と復旧**：`claim_mutable_operation()`の`workflow_ref`・`operation_ref`は同一操作の重複防止に使用する。**別operation IDの同一path編集は競合し得る**ため、資源予約または反映時の競合検出を別途行う。中断後はclaim・予約・作業差分・変更先HEAD・ファイル内容を再読込し、内容不明のまま再編集・再反映しない。
+6. **確定後の検証**：実際の反映先からHEAD・対象ファイル・変更差分を再読込し、意図したassertion／fixture／設定と他者変更の保持を確認する。保存されたtestware ref・source revision・変更証拠を下流へ渡す。反映は成功してもreadbackできない場合、確定済みと推測せず、元のoperation refから調査する。
+7. **権限境界**：作業用copy／branchの使用許可と共有branchへの変更反映許可を区別する。製品本体・正式仕様の変更権限はこのSkillに含めない。
+
+**必須受入**：
+
+- 同一ファイルに対する2セッションが同じpreflightを通過した後、交互に編集・反映する。先に確定した差分を保持し、後続の古い前提による確定は競合として拒否する。
+- 異なるファイルへの独立変更は不要にブロックしない。ただし共通設定・lockfileへ双方が触れた場合は競合とする。
+- shared workspaceで予約の競合・取得失敗・異常終了・別operationによる更新を検証する。隔離worktreeでは並行commit・branch更新・共有先反映直前のHEAD変化を検証する。
+- dirty working tree、既存の未commit変更、検証中断、確定応答消失、対象外pathを組み合わせ、ユーザー変更の欠落・二重編集・無断上書きがないことを確認する。
+- 既存E2E testware実装の安全条件にも同じ競合保証が適用され、新設非E2E側だけ安全になって既存経路が未保護のまま残らないことを確認する。
+
 ## 3. 非E2E testwareの独立品質確認
 
 runnerのPASSとテスト目的の検証成立を分ける。生成・更新したtestwareをテスト完了の根拠とする前に、**実装ownerとは独立した反証レビュー**を行う。
@@ -96,7 +118,7 @@ runnerのPASSとテスト目的の検証成立を分ける。生成・更新し�
 1. Playwright TestのAPI専用テスト、既存ブラウザE2E、Vitest component／integrationが別の実行ownerへ一意にroutingされる。
 2. 永続testwareなしでHTTP 200＋本文不一致、バッチ終了コード0＋出力不一致、観測不能の副作用を判定し、PASS・FAIL・判定不能を区別する。
 3. 非E2E testwareにassertion欠落・常に真となるassertion・誤期待値・必要分岐の欠落を混入し、実行raw PASSとは独立して品質不適合を検出する。
-4. dirty working tree・同一ファイルの並行変更・対象外パス・危険なpackage script・編集途中中断で、上書きや不要な実行を拒否する。
+4. dirty working tree・同一ファイルの並行変更・対象外パス・危険なpackage script・編集途中中断で、上書きや不要な実行を拒否する。隔離worktree／共有workspaceの各反映経路で、preflight直後に他セッションが変更したファイルの更新競合を拒否できる。
 5. Vitestの部分実行、skip／todo、同名・移動・改名、結果欠落・重複attemptの下で計画上の母集団と実績を正しく照合する。
 6. 一般TC・非E2E・E2Eの失敗について、元runを変更せず、担当ownerが原因仮説・追加証拠・次の修正先を残す。
 7. 新実装側の直接開始と既存E2EのTCあり／なし／実行のみの経路が互いに誤発火・回帰しない。
