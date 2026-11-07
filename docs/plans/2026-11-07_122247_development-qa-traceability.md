@@ -19,6 +19,31 @@
 4. 未分類の開発差分はCI失敗。分類済みの仕様・テスト不足は根拠とプロダクトリスクに応じて判定する。失敗・警告・ブロック中を混同しない。
 5. Skillの肥大化を避け、独立した責務は分割する。ただし機能構造、仕様、テスト設計、workflow状態に重複する正本を作らない。
 
+## QAワークフロー再設計の追加合意（2026-11-07）
+
+本節のQ01〜Q25は今回の再設計質問であり、既存Planで引用するQ01（受入製品）、Q04（機能母集団）、Q20（共通時間・費用上限）とは別の質問番号とする。従来の合意は維持する。
+
+1. **テストアイテム（Q01〜Q04）**：機能・画面・API・バッチ・コンポーネント等のテスト対象。複数粒度の親子関係を持ち、製品機能IDとは別の安定IDで多対多に対応する。計画・未実装・実装済み・廃止を区別する。
+2. **仕様とUI（Q05・Q07〜Q09）**：有効な仕様根拠・期待挙動・業務状態・イベント・認証/認可・データ整合・外部連携の期待仕様は`spec-analysis`を正本とする。UI構造・操作・表示状態・画面遷移は独立UI Skillが管理する。UIとAPIの認可を分け、ロール、所有者・テナント、データ状態、拒否時応答・副作用・監査記録を根拠付きで追う。製品機能一覧の正本は`feature-analysis`。
+3. **Product Risk（Q10〜Q11）**：仕様とテストアイテムの整理後、TRより前に一次評価する。機能・アイテム・横断要件を参照でき、条件・変更の新証拠が出れば影響するRiskだけ再評価する。
+4. **TRと技法（Q12〜Q15）**：有効な仕様根拠とRiskからTRを作り、アイテムとテストレベルを明示する。共通条件候補の先行・並行抽出は許可するが、正式TCNはTRへ結び付ける。同一アイテムIDを複数テストレベルで共有する。`test-analysis`が技法候補と目的を示し、`test-condition-design`が採否とcoverage基準・CIを確定する。
+5. **条件の再利用（Q16〜Q18・Q22）**：共通条件を独立参照元として管理し、各アイテムへ適用した正式TCNには別IDを付ける。候補母集団と適用可否を確認し、採用しない場合は対象外・適用不能・別レベル・重複・未確認・ブロック中と根拠・再確認条件を記録する。全直積を機械的に採用しない。具体値・状態遷移・多次元組み合わせは既存CIと技法で扱う。
+6. **期待結果（Q19〜Q21）**：アイテム×条件の対応付け時に期待結果候補を作り、個々の候補の有効な仕様根拠・観測方法・状態変化を記録する。1組に複数候補を許す。具体的な実行可能期待結果は`test-case-design`で確定する。
+7. **mode分割（Q23）**：独立した成果物・判断責務を持つmodeは独立Skillへ分離する。`continuous / gated`や`input_mode=direct / artifact`などの実行・入出力設定は分割しない。
+8. **規範（Q25）**：IVECとISTQBを規範的参考とし、記述が異なる場合は差を明示して実務上の統合設計を行う。認定制度の工程名をSkill名と一対一に対応させない。
+
+**回答を補完せずに残す事項**：
+
+- Q06：UI packageの各file/fieldを物理的にどう分けるかは未回答。既存stable ID・履歴・参照の互換性と正本の単一化は合意済み。既存契約を調査して意味上のownerを定め、根拠のない物理移動は行わず、移管先を確定できない書込みだけblockedとする。
+- Q20：具体的な選択肢は未回答。ただし「有効な仕様根拠は必須。状態・データ・具体値等は結果の一意性に影響するときだけ必須」との補足は適用する。個別候補の根拠・必要条件が欠ける場合だけ未確定/blockedとし、一律の入力要件を推測しない。
+- Q24：代表シナリオは任意・未回答。独立fixtureで権限×状態・API・バッチの受入を検証するが、案件の正式仕様や受入製品の決定とはしない。
+
+### 参照規範の確認範囲
+
+- [IVEC公式シラバス配布ページ](https://www.ivia.or.jp/item43/item38)：デザイナー/アーキテクトV3.2（2025-09-01更新）の公開を確認。今回はPDF本文全章を検証できていないため、特定の詳細作業をIVECが必須化しているとは断定しない。実装前に原本との節単位の照合を実施する。
+- [ISTQB CTFL v4.0.1 1.4.1](https://www.istqb.org/wp-content/uploads/2024/11/ISTQB_CTFL_Syllabus_v4.0.1.pdf)：テスト分析でテスト対象・test basisからテスト条件を識別し、テスト設計でcoverage itemとケースを具体化する。本repositoryの`test-analysis`はProduct Risk中心であり、ISTQBの活動名と完全一致しない。
+- [ISO/IEC/IEEE 29119-1:2022](https://www.iso.org/obp/ui/)：test itemはテスト対象となる作業成果物。test coverage itemは測定対象の属性。同版はテスト条件の定義を持つが、テスト設計にはtest modelを使うと明記している。TCNとtest modelを無条件に同一視しない。
+
 ## 現状と既存契約
 
 ### 確認した実装
@@ -76,6 +101,14 @@ CIの正本：`.github/workflows/validate-skills.yml`、`deterministic-output-ev
 - `evals/`：trigger、deterministic、semanticの正本データとvalidator。共通評価runtimeを再実装しない。
 
 Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠とは異なる正本だからである。情報源ごと、画面/APIごと、指標ごとのSkillを増やさない。内部Pythonモジュールは入力正規化、候補照合、階層・参照検証、網羅率、履歴・永続化の責務で分割し、巨大な単一スクリプトを作らない。
+
+### UIテスト対象分析・テストアイテム・E2E対象選定の独立Skill
+
+- **`ui-target-analysis`（新設）**：UI構造・操作・画面表示状態・ナビゲーションと変更履歴を所有する。従来の`spec-analysis` UIテスト対象分析modeから分離する。仕様上の期待挙動、Authority / AC、UNKNOWNの解決は`spec-analysis`が所有し、UI Skillはcurrentな参照を保持する。現行`ui-target-v1`の00〜09、`ui_target_package.py`、scope readiness、Machine Entity、Manifestを調べ、互換読み出しと単一writerを守る。
+- **`test-item-analysis`（新設）**：対象アイテムの安定ID、階層、機能IDへの多対多参照、予定・実装・廃止の状態、履歴と変更影響の正本。UI/非UIの現物・仕様参照を取り込み、機能・Authority・Risk・TCNの第二の正本を作らない。テストレベルごとに同一アイテムIDを別採番しない。
+- **`e2e-test-selection`（新設）**：技術非依存のE2E候補・自動化目的・価値判断・採否と履歴を正本とする。旧`test-analysis`の`対象 / 実行範囲 = E2E対象選定`から移す。Playwright実装可否・locator・実行は`e2e-test-inspection`以降に残し、既存の直接開始経路を壊さない。
+- **既存Skillに残す責務**：`spec-analysis`は期待仕様・業務状態・権限、`test-analysis`はQA影響とProduct Risk・深度・レベル・技法候補、`test-requirement-design`はTR、`test-condition-design`は共通条件・アイテム別TCN・適用/Disposition・CI・期待結果候補、`test-case-design`はTCの具体化、`coverage-analysis`は横断追跡性。
+- 各新Skillに`SKILL.md`、必要なreference・出力契約/テンプレート・Skill-local決定論的helper・trigger/deterministic/semantic評価を用意する。既存Authority resolver、UI package helper、runtimeを単純複製しない。全current Skillのうち独立成果物を持つ他のmodeも調べ、必要な分離と移行を対象に含める。進行方法だけの設定値はSkill化しない。
 
 ### Skillごとに固定する責務
 
