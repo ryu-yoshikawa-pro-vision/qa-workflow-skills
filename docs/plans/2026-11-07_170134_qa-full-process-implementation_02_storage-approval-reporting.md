@@ -80,6 +80,24 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 - 一部pagination失敗、read権限不足、外部Issueのstale read、終了条件の欠落、対象外build、過去revision、計画変更後の旧reportで、`complete`と終了判定を正しく分離する。
 - sourceが0件で計画上も対象なしという正当な空集合と、sourceが取得できないため0件に見える状態を区別する。
 
+## 複数成果物の途中停止・再開
+
+[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)の入口・source snapshotと一致する場合にだけ、関連する複数のowner成果物を組み合わせてcurrentと判定する。
+
+1. `feature-analysis`→仕様／Risk→TR/TCN/CI/TC→実行→`test-reporting`の各書込みはowner別のnative CASで確定する。**単体のCASだけで全成果物の一括commitが成立したと扱わない**。
+2. 中断直前の記録、全ownerの実保存ref・revision・content hash・入力source revision・依存関係を読戻し、**保存確定／保存状態不明／未開始**を分ける。保存済みでも依存する上流が旧版なら新しい横断報告をcurrentにしない。
+3. 通信切断・crash後の再開で、status不明の副作用（Issue書込み、testware編集、実runnerの試行やcleanup）を無条件に再実行しない。ownerの元証跡・同一操作ID・現在状態を照合し、安全に再開可能な操作だけ進める。
+4. 同一revisionの並行更新、PRのrebase、マージ後の基準変更、外部文書のみの改版、計画承認の失効、保存後の読戻し不一致、旧commit結果の遅延到着を独立fixtureと実保存先で検証する。旧currentを上書きせず、必要な範囲に`要再検証`／`blocked`と担当・再開条件を記録する。
+5. 新しい中央mutable manifestや汎用storage frameworkを作ることを前提としない。既存`qa-workflow`のsource currentness／state／resume、各Skillの履歴契約と実保存先の原子操作を組み合わせて検証する。
+
+## 製品CIとの成果物受渡し
+
+ローカルAgentが生成した解析成果物を製品CIが取得する**方式は未決定**。案件ごとの実装時選定であり、Git commit・CI artifact・Drive等をこの共通契約の標準経路として固定しない。
+
+Skillが提供するのはsource snapshot、成果物refs・content hash、承認revision、依存・欠落・currentness、決定論的に検証できる入力／出力まで。Agentを起動する指示・監視・通知・定期照合はSkill外。製品CIへ実接続する段階では、選択された受渡し経路の認証／権限・保存後readback・source／artifact／build一致・改ざん拒否・欠落時のfailを実証する。
+
+未選定状態では実製品CIの受入を`blocked`とし、既に受渡し経路が設定されたCIで必須成果物が欠落／旧版の場合はfailする。未接続の状態を単にテスト対象外へ移して全体完了を宣言しない。
+
 ## 4. 実Agent受入・独立基準データ
 
 工程ごとに入力fixture、独立した期待成果物、禁止される誤判定、評価方法、source revision、必要な実行環境を定義する。候補Agentの出力から正解や分母を作らない。
@@ -100,7 +118,7 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 - **実Agent実行**：現行Skillと新Skillを実クライアントから起動し、正しいrouting・tool呼出し・保存・block・resume、意図しない外部操作の不在を証拠付きで確認。
 - **実接続**：対象製品・保存先・外部Issue・非Web runner／計測ツールについて、宣言した環境での入出力・失敗・回復・権限を確認。利用不能な環境をfixture成功で代替しない。
 
-受入には成功数の固定目標を先に置かず、各責務の重要な異常系・誤判定を含む独立caseを必要な範囲で追加する。実施済み／未実施／SKIP／失敗を個別に示し、未実施項目を完了へ合算しない。
+受入には成功数の固定目標を先に置かず、[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)のS1〜S10と各責務の重要な異常系・誤判定を含む独立caseを必要な範囲で追加する。**全current Skillを同じAgent上で利用可能として発火・競合を試験し、特定モデル／CLI／評価ハーネスを固定しない**。実施済み／未実施／SKIP／失敗を個別に示し、未実施項目を完了へ合算しない。
 
 ## 5. 検証と完了条件
 
