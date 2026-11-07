@@ -25,7 +25,7 @@
 | 現行成果物       | feature/item/condition候補、Authority、Product Risk、TR/TCN/CI/TC、E2E/testware、Regression、run、defect、報告のref/revisionと取得範囲。未実装の新Skill成果物を必須にせず、存在する正本は再利用 |
 | 実行・保存能力   | 実runner／認証・副作用・cleanup／保存先のatomic条件付き更新／履歴、利用可能なCI受渡し方式。利用不能な操作だけblocked                                                                            |
 
-各成果物handoffは`担当Skill・対象scope・input refs/revisions・output ref/revision・status・未解決事項と担当・再開条件`を示す。正本側の既存形式を維持し、同じ値を全成果物に複製する新しい共通manifestを作らない。sourceの内容が変わった場合は依存する下流だけ`要再検証`にする。
+各成果物handoffは`担当Skill・対象scope・input refs/revisions・output ref/revision・検証済み結果の参照・status・未解決事項と担当・再開条件`を示す。**未登録Skillや検証結果のないscopeを完了扱いせず**、[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)で扱う。正本側の既存形式を維持し、同じ値を全成果物に複製する新しい共通manifestを作らない。sourceの内容が変わった場合は依存する下流だけ`要再検証`にする。
 
 ## 起点別のSkill責務・成果物・停止・再開
 
@@ -65,7 +65,7 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 - `e2e-test-execution`／`test-execution`／`testware-execution`：**今回run**の必要条件、実環境・認証・データ／外部依存のreadyをpreflightで確認。source revision、実準備の証拠と失敗理由を記録し、準備不能なら実操作を開始しない。
 - `regression-testing`：Regressionの場合だけSuite membership・選定・required route・Activityを所有。非RegressionのスイートをこのSkillへ押し込まない。
 
-非Playwrightの異常は`testware-execution`が**第一分析owner**となり、観測された失敗と次の追加証拠、原因仮説、原因分類（SUT／テストデータ／testware／環境／runner／仕様不明／判定不能）、確度、次の再実行・修正の担当先を診断成果物に保持する。専用分析Skillに分離するかは実装時に、既存`e2e-test-result-analysis`の分離基準と実runnerの結果契約・評価を照合して判断する。分離する場合も分析ownerと成果物を必ず明示し、`defect-management`は欠陥候補の追跡に限定する。証拠不足を製品欠陥に自動昇格しない。
+非E2Eの実行異常は`testware-execution`が**第一分析owner**となり、観測された失敗と次の追加証拠、原因仮説、原因分類（SUT／テストデータ／testware／環境／runner／仕様不明／判定不能）、確度、次の再実行・修正の担当先を診断成果物に保持する。ブラウザ直接TC実行の異常は`test-execution`、PlaywrightブラウザE2Eの異常は既存`e2e-test-result-analysis`が第一分析ownerであり、`defect-management`は欠陥候補の追跡に限定する。証拠不足を製品欠陥に自動昇格しない。
 
 ## 変更・並行処理・途中失敗の再開
 
@@ -87,7 +87,10 @@ flowchart TD
     next{"依頼された次の工程"}
     preflight["実行owner：build・環境・データ・権限を確認"]
     ready{"実行とcleanupを安全に実施できるか"}
-    execute["既存E2E／非Web実行owner：実測・診断・cleanup"]
+    execute["担当実行owner：実測・診断・cleanup"]
+    persist["元run結果・診断・cleanupをowner正本へ保存"]
+    persisted{"独立readbackで結果と状態を確認できたか"}
+    uncertain["結果保存状態不明：元run／operation refで照合"]
     handoff["担当成果物・run／報告参照を返す"]
     ciRequired{"外側で製品CI検証が必要か"}
     ciReady{"成果物のCI受渡し方式は設定済みか"}
@@ -115,7 +118,11 @@ flowchart TD
     preflight --> ready
     ready -->|不足・不明| blocked
     ready -->|ready| execute
-    execute --> handoff
+    execute --> persist
+    persist --> persisted
+    persisted -->|保存とcleanupが確認済み| handoff
+    persisted -->|取得不可・不一致| uncertain
+    uncertain --> blocked
     handoff --> ciRequired
     ciRequired -->|不要| finish
     ciRequired -->|必要| ciReady
@@ -126,7 +133,7 @@ flowchart TD
     blocked -.->|条件解消後に外側から再依頼| external
 ```
 
-図中の各判定は**担当Skillや既存実行ownerが返す結果に基づく論理的な引継ぎ**を示す。`qa-workflow`自身が仕様・Risk・欠陥・合否を再判定するわけではない。また、Skillが自動でAgentや製品CIを起動する意味でもない。外側から再依頼がなければblockedのまま保持する。保存先・CI受渡し方式が未選定なら、必要な実接続の受入はblockedであり、設定済みCIにおける必須成果物の不整合はfailとする。
+図中の各判定は**担当Skillや既存実行ownerが返す結果に基づく論理的な引継ぎ**を示す。実runner終了後は元結果・診断・cleanupの保存と独立readbackを確認してから下流へ渡し、状態不明の副作用を再実行しない。`qa-workflow`自身が仕様・Risk・欠陥・合否を再判定するわけではない。また、Skillが自動でAgentや製品CIを起動する意味でもない。外側から再依頼がなければblockedのまま保持する。保存先・CI受渡し方式が未選定なら、必要な実接続の受入はblockedであり、設定済みCIにおける必須成果物の不整合はfailとする。
 
 - source／計画／承認／runのrevisionごとに、どのownerがcurrentな成果物を持つかを固定する。上流変更は該当依存にだけ`要再検証`を付ける。
 - 個々のmutable書込みは実保存先のnative CAS／履歴で競合を検出する。**複数ファイル・複数ownerの更新は原子的とはみなさない**。途中で止まった場合は保存済み成果物と未保存成果物を別々に再読込し、必要な全参照・source revisionsが揃うまで新しい横断結果をcurrentとしない。
@@ -135,7 +142,7 @@ flowchart TD
 
 ## 固定受入と全Skill評価
 
-**受入環境**：`ryu-yoshikawa-pro-vision/qa-training-store`の**開始時に記録した固定commit SHA**を中心に、そこに実在するPlaywright E2EとVitestのcomponent／integration／contracts／API関連テストを確認して使う。対象repoの製品実装・正式仕様・既存テストへ無断変更を加えない。実装を伴うテストは許可済みの作業用copy／branchで検証し、基準commitを不変にする。バッチ・非同期・非機能等の不足技術は独立fixtureで補い、fixture PASSを実製品受入済みとは報告しない。
+**受入環境**：`ryu-yoshikawa-pro-vision/qa-training-store`の**開始時に記録した固定commit SHA**を中心に、そこに実在するPlaywright E2EとVitestのcomponent／integration／contractsテストを確認して使う。`tests/contracts/test-api.test.ts`はテスト制御APIの公開境界を検証するため、HTTP APIの要求・応答・副作用の受入には使わない。実HTTPは独立fixtureで別受入にする。対象repoの製品実装・正式仕様・既存テストへ無断変更を加えない。実装を伴うテストは許可済みの作業用copy／branchで検証し、基準commitを不変にする。バッチ・非同期・非機能等の不足技術は独立fixtureで補い、fixture PASSを実製品受入済みとは報告しない。
 
 | 受入ケース          | 入口・入力                                     | 必須観測・拒否する誤り                                                                                                                           |
 | ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -150,11 +157,35 @@ flowchart TD
 | S9 リリース前       | merge commit／実buildと現行計画・各実行結果    | source inventoryと終了基準を照合、残存Risk・未実行・必要承認を示し、自動releaseしない                                                            |
 | S10 評価・継続改善  | 計画・進捗・実績・過去改善・引継ぎ             | 5軸の根拠と分母、未測定・比較不能・改善未完を可視化し、`qa-knowledge`へ必要な候補だけ引渡す                                                      |
 
-**全Skill発火評価**：実行時のリポジトリに存在する`skills/*/SKILL.md`を検出して**全current Skillを同じAgent上で利用可能にする**。23件／予定追加14件の固定数や特定CLI・モデルに発火実装を結びつけない。近接するSkill（QA要求と個別TR、構成とProduct Risk、E2E選定とinspection、testwareと既存Playwright、テスト報告とE2E個別報告、workflowと計画管理）の正例・負例、途中開始・変更・停止・再開・複合workflowを評価。対象Skill使用の観測できる証拠を必要とし、自己申告だけで発火成功にしない。PR #17の開発用Agent評価ランナーは本番QAの起動／監視機構ではない。
+### 独立開始と追加受入
+
+次の入口は既存Skillの単独開始を維持し、正式TR／TCを作ることを開始条件にしない。
+
+- 探索はCharterから`exploratory-testing`の`exploration`、元ownerが対応できない症状のみ`investigation`。
+- 知識は`qa-knowledge`の`lookup／history／revalidation`から直接開始。参照時にはsource currentnessを照合する。
+- 製品要求・設計・コードの意味的レビューは`adversarial-review`、採用済み静的解析ツールの実行は`testware-execution`。結果をFinding／報告へ引き継ぐ。
+- Playwright製API専用テスト・Vitest・非ブラウザTC直接操作は`testware-execution`。ブラウザ直接TCと既存PlaywrightブラウザE2Eはそれぞれ別の既存owner。
+- 改善は`test-evaluation`の根拠から採用・承認された計画／アーキテクチャ／設計の改版へ進み、次回の実績で効果を再評価する。
+
+責務と完了条件は[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)と[静的テスト・改善契約](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)を正本とする。
+
+**S11：workflow完了検証**。新設Skill・未登録Skill・空のruntime evidence・既存6 Skillとの混在を入力し、検証なしのscopeが完了しないことを確認する。管理のみ・報告のみ・欠陥のみの単独開始も検証する。
+
+**S12：Regression非E2E route**。Vitest個別テストとTCの対応→required route→実runner→元結果→Activityを検証し、manual／E2E／補助testware・部分Run・retry・cleanupとの混在を確認する。
+
+**S13：実行方式と品質ゲート**。Playwright API専用・ブラウザE2E・非ブラウザ直接TCを一意のownerへroutingし、false assertion・欠落assertion・誤期待値、Vitest個別結果の未取得を検出する。
+
+**S14：変更安全性と静的テスト**。dirty working tree・競合・危険なscriptを拒否し、製品要求／設計／コードの単独レビューと静的解析を実施し、Finding・誤検出・修正後の再確認・統合報告へつなぐ。
+
+**S15：探索・Knowledge・改善の循環**。TCなしCharter探索、owner不明調査、Knowledge直接lookupと部分revalidation、改善採用後の計画改版・実施・次回効果測定を検証する。
+
+**S16：永続化とセッション間復旧**。operation記録前後、実run終了直後・結果保存後の応答喪失・cleanup保存中に中断し、別セッションでreadbackして二重実行・二重Issue更新・旧成果物の採用なしに局所再開する。
+
+**全Skill発火評価**：実行時のリポジトリに存在する`skills/*/SKILL.md`を検出して**全current Skillを同じAgent上で利用可能にする**。さらに別セッションからowner成果物・revision・未完了範囲を再読込して、会話履歴なしに再開できることを検証する。23件／予定追加14件の固定数や特定CLI・モデルに発火実装を結びつけない。近接するSkill（QA要求と個別TR、構成とProduct Risk、E2E選定とinspection、testwareと既存Playwright、テスト報告とE2E個別報告、workflowと計画管理）の正例・負例、途中開始・変更・停止・再開・複合workflowを評価。対象Skill使用の観測できる証拠を必要とし、自己申告だけで発火成功にしない。PR #17の開発用Agent評価ランナーは本番QAの起動／監視機構ではない。
 
 ### 完了条件
 
-1. S1〜S10を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。全工程の固定順実行を強制しない。
+1. S1〜S16を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。全工程の固定順実行を強制しない。
 2. S3ではPR #22新Skillの計画成果物から既存Playwright E2Eの**実**inspection・implementation・execution・source結果／cleanup・reportingへ接続できる。E2E本体は再実装せず、既存E2E単独／TCなし経路に回帰がない。
 3. 実行準備は全ownerのrefsとrun preflightのready／blockedを示す。非Web異常には明示した分析owner・根拠・仮説・担当先を持ち、欠陥候補とは分離する。
 4. 外部資料変更をコードPRなしでも入力として受け付け、必要範囲だけ再評価できる。通知・定期照合やAgentの実起動をSkill内部の完了条件にしない。
