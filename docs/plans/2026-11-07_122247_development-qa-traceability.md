@@ -35,10 +35,10 @@
 6. **期待結果（Q19〜Q21）**：アイテム×条件の対応付け時に期待結果候補を作り、個々の候補の有効な仕様根拠・観測方法・状態変化を記録する。1組に複数候補を許す。具体的な実行可能期待結果は`test-case-design`で確定する。
 7. **mode分割（Q23）**：独立した成果物・判断責務を持つmodeは独立Skillへ分離する。`continuous / gated`や`input_mode=direct / artifact`などの実行・入出力設定は分割しない。
 8. **規範（Q25）**：IVECとISTQBを規範的参考とし、記述が異なる場合は差を明示して実務上の統合設計を行う。認定制度の工程名をSkill名と一対一に対応させない。
+9. **成果物の構成（Q06）**：AIに加え人間もQA成果物を直接編集・レビューする。初回の成果物書込み前に、既存配置・各成果物の正本・ファイル単位の編集可能範囲・機能別の参照方法を調査し、利用者と配置・編集方針を合意する。機能ID／アイテムID／条件ID／TC IDと依存revisionを変更影響の正本とし、ファイルパスをIDにしない。物理分割は人間の編集・レビューの負担、変更の独立性、既存schema・writerの制約で決め、機能別ファイルへの一律移動や第二の正本を作らない。
 
 **回答を補完せずに残す事項**：
 
-- Q06：UI packageの各file/fieldを物理的にどう分けるかは未回答。既存stable ID・履歴・参照の互換性と正本の単一化は合意済み。既存契約を調査して意味上のownerを定め、根拠のない物理移動は行わず、移管先を確定できない書込みだけblockedとする。
 - Q20：具体的な選択肢は未回答。ただし「有効な仕様根拠は必須。状態・データ・具体値等は結果の一意性に影響するときだけ必須」との補足は適用する。個別候補の根拠・必要条件が欠ける場合だけ未確定/blockedとし、一律の入力要件を推測しない。
 - Q24：代表シナリオは任意・未回答。独立fixtureで権限×状態・API・バッチの受入を検証するが、案件の正式仕様や受入製品の決定とはしない。
 
@@ -91,7 +91,22 @@ CIの正本：`.github/workflows/validate-skills.yml`、`deterministic-output-ev
 
 既存`qa-workflow`に残すものは、**workflow開始時のProject Context確認と`project-context`へのrouting、使用済み設定項目の`compare_used_context`による鮮度比較、設定変更の下流影響と再開先の決定**である。`qa-workflow`が文書の新規作成・更新を独自実装しない。既存parser / DEC・ASM helperとテンプレートは、現行の呼び出し元と外部参照を壊さないため既存pathの正本として再利用する。新Skillへのコード移動を目的にしたコピーや重複実装は行わない。
 
-**初期化手順**：`qa-workflow`が新しい案件で初回分析を開始する際、Project Contextの既存確認を`project-context`へ依頼する。存在すれば必要なfieldだけ検証して利用する。不存在なら、利用可能な証拠で作成候補を組み立て、保存先・権限・欠落した必須項目を確認して安全に作成する。Project Contextが未保存でも独立して実行できる読取専用の分析は続行してよい。ただしProject Contextに依存する継続保存、承認、CIの合否、再開に必要な設定が不足する範囲はblockedとする。すでに有効な文書がある案件では不要な再作成を行わない。
+**初期化手順**：`qa-workflow`が新しい案件で初回分析を開始する際、Project Contextの既存確認と成果物の配置・編集方針の合意確認を`project-context`へ依頼する。存在すれば必要なfieldだけ検証して利用する。不存在なら、利用可能な証拠で作成候補を組み立て、保存先・権限・欠落した必須項目を確認して安全に作成する。Project Contextが未保存でも独立して実行できる読取専用の分析は続行してよい。ただしProject Contextに依存する継続保存、承認、CIの合否、再開に必要な設定が不足する範囲はblockedとする。すでに有効な文書がある案件では不要な再作成を行わない。
+
+### 成果物の配置・人間編集方針の初期合意（Q06）
+
+**担当**：新設予定の`project-context`が、初回案件設定の一部として成果物の保存先・配置・人間編集の方針を提案し、利用者の合意を確認して記録する。`qa-workflow`は初回／配置変更時にだけ`project-context`へ振り分ける。各ファイルのschema・構造検証・書込み・履歴の正本は引き続き担当Skillが所有する。**配置合意のための新Skillは追加しない**。
+
+1. **既存構成の確認**：許可された案件rootと関連repo、正本の所在、既存のファイル命名・フォルダ、機能別の参照、手動編集の入口、generated／control file、既存writer・validator、ID・相互参照・revision・履歴を取得する。確認していない構成を新規案件の既定と推測しない。
+2. **提案の対象**：成果物の正本owner、機能別に編集・レビューできる単位、横断条件・共通成果物の配置、元ファイルと生成一覧の区別、ファイル移動・改名時の参照維持、人間の編集後に必要な検証・保存手順を提示する。機能横断の条件や仕様根拠を機能別フォルダへ重複保存しない。
+3. **初回合意**：新規案件または有効な配置方針のない案件では、既存構成の維持案と変更が必要な箇所を利用者へ提示し、**実成果物の新規保存・構成変更の前に**採用方針・保存先・編集権限を確認する。明示承認のないファイル移動、再配置、新しい保存形式への変換は行わない。読取専用の分析や、既に許可された既存操作は配置方針の未確定だけで止めない。
+4. **合意の記録**：承認済み配置方針の説明・対象scope・承認根拠・変更条件をProject ContextのSection 12（DECの正本がここにある案件）へ、正本成果物・場所・revisionと機能別参照の入口をSection 14へ記録する。別の承認済み設定文書が正本なら、そのref／revisionを保持する。新しい`qa-context-field`、重複manifest、成果物の第二の正本を無条件に追加しない。
+5. **人間による直接編集**：各担当Skillは、編集可能な**正本**と再生成される読取専用の一覧・control fileを区別する。人間が正本を直接編集した変更は、元のID・source revision・差分・権限を確認し、担当ownerのvalidator・条件付き保存・再読込を通して採用する。生成一覧やMANIFESTを直接編集して正本化しない。競合・不正参照・古いversionは既存の有効な成果物を維持して対象変更をblockedにする。
+6. **機能別の確認**：機能IDから関連する仕様・UI・テストアイテム・条件・TR／TCN／CI／TC・実行結果・変更影響へ辿れる一覧または参照を用意する。この一覧は正本のIDとrevisionから導出し、別途更新すべき機能別の複製を作らない。人間が目的の正本ファイルと変更範囲を確認できることを受入とする。
+7. **既存`ui-target-v1`の扱い**：現行の`00〜09`標準ファイル、`README.md`、`CHANGELOG.md`、`MANIFEST.md`、条件付きfileと`ui_target_package.py`のwriter・schema・ID・版・履歴・scope readinessを維持する。既存形式は原則として現行のまま利用し、機能別の確認はID参照・読取専用の導出一覧で補う。人間の編集・並行変更・PR差分の管理に実害があり、物理的な分割が必要と確認された場合に限り、各ownerの移行形式、互換読取、原子的切替、rollbackと回帰検証を用意してから変更する。
+8. **繰返し確認の抑制**：有効な合意があり保存先・編集方法・owner境界が変わらない場合は再承認しない。配置変更の依頼、正本ownerの移管、既存path廃止、既存編集方式では安全に扱えない範囲が出たときのみ合意・必要な移行を更新する。
+
+**受入**：新規案件の初回合意、既存案件の方針再利用、未承認の配置変更拒否、機能別参照から正本編集対象への到達、人間の直接編集を次回のAgent処理が正しく検出・検証、生成一覧の編集拒否、共通条件の正本重複防止、ファイル改名／移動によるID・履歴・下流参照・rollbackの維持を確認する。
 
 ### 新規の機能分析Skill
 
@@ -265,7 +280,7 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 flowchart TD
     request["依頼・変更入力：初回／PR／外部資料改版"]
     route["qa-workflow：必要なSkillとscopeを選択"]
-    context["project-context：案件設定（新設予定・必要時）"]
+    context["project-context：案件設定・配置方針（新設予定・必要時）"]
     feature["feature-analysis：機能・差分（新設予定）"]
     spec["spec-analysis：仕様Authority（既存）"]
     ui["ui-target-analysis：UI構造（新設予定）"]
@@ -474,7 +489,7 @@ CI判定方針：
 ### 5. UI・テストアイテム・テスト設計の接続と互換移行
 
 - `feature-analysis`が機能一覧、`spec-analysis`がAuthority / AC・業務状態/権限、`ui-target-analysis`がUI構造/操作/画面状態、`test-item-analysis`がテスト対象を所有する。各成果物を参照で接続し、別の正本を複製しない。
-- 既存UI modeの`ui-target-v1`全fileと`ui_target_package.py`、Materialize / Inspect / Validate / Manifest、scope readiness、Authority / AC / UNKNOWNのMachine Entity、migration preflight、直下のTRD / TCD / TCの入力を列挙してowner移管表を作る。再設計Q06で未決定の物理分割は先行しない。read-only projectionとwriter境界を設計し、既存ID・revision・履歴を保つ。
+- 既存UI modeの`ui-target-v1`全fileと`ui_target_package.py`、Materialize / Inspect / Validate / Manifest、scope readiness、Authority / AC / UNKNOWNのMachine Entity、migration preflight、直下のTRD / TCD / TCの入力を列挙してowner移管表を作る。**Q06の初期合意**に従い、現在の00〜09形式を維持しながら人間向けの機能別参照と正本編集の入口を整える。物理分割が合意された場合だけ、writer・reader・ID・version・参照・rollbackを伴う正式な移行として実装する。read-only projectionと単一writerの境界を維持する。
 - `test-analysis`内のE2E対象選定成果物を`e2e-test-selection`へ移す。`qa-workflow`の旧routingと既存のTCなし/TCあり/実行だけのE2E経路を検証し、既存選定結果を無断廃棄しない。
 - `test-item-analysis`でテストアイテムの安定ID・階層・計画/実装/廃止・多対多feature参照を実装。`test-condition-analysis`で共通条件候補の独立識別・ID・根拠・lifecycle・部分更新・条件一覧を実装し、両Skillの並行入力と相互不足照合を定義する。`test-requirement-design`でTR⇄itemの明示参照とレベル、`test-condition-design`で候補IDへの参照、アイテム別TCN・適用/Disposition・期待結果候補を実装する。
 - `test-condition-analysis`の出力検証と`test-condition-design`への正規化handoffを追加する。既存`test-condition-design/scripts/condition_structure.py`、`materialize_coverage.py`、`test-case-design/scripts/case_structure.py`、`coverage-analysis/scripts/traceability.py`を契約別に変更。現在のcoverage graphの`Authority / Risk / TR / TCN / CI / TC`へアイテム・適用関係を無条件に詰め込まず、参照の型・方向・欠損時の扱いを明示する。`scope_refs`をテストアイテムIDとして流用しない。
@@ -506,6 +521,7 @@ CI判定方針：
 - 従来の`artifact_graph.py`の`parse_project_context`、`validate_required_context_fields`、`compare_used_context`と同じ結果を出し、追加stable key、旧形式の未設定・重複・不正type・欠損marker・順序保持を回帰検証する。
 - 同時新規作成、更新のCAS競合、保存直後の読戻し不一致、保存先未指定／書込拒否／symlink／path脱出／失敗後再開／履歴欠落を検証する。失敗時に旧文書・直前のworkflow baselineを保持する。
 - Project Contextのみ新規作成した案件から機能分析へ進む例、未設定の機能一覧rootで保存だけblockedになる例、変更した使用fieldのみ下流をstaleにする例、無関係なfield更新で下流がcurrentのままの例をAgent routingと統合テストで確認する。
+- 新規案件の配置提案・合意記録、既存案件の合意再利用、構成変更時だけの再合意、未承認の物理移動拒否、人間の正本直接編集と検証、機能別参照の更新、共通条件の重複保存拒否、MANIFEST／生成一覧の編集不採用を検証する。
 
 1. 初回全体source列挙：複数repo、複数形式、API / バッチ / UI / 権限 / データ処理、文書のみ、コードのみ、既存テストのみの候補。
 2. PR差分：追加・変更・削除・rename、同一機能の複数ファイル、共通処理、重複候補、formatのみ、外部Issue・文書変更、途中pagination失敗、未知形式。
@@ -563,10 +579,10 @@ CI判定方針：
 6. 新規・変更・削除・分割・統合の機能IDと履歴を維持し、影響するQA成果物だけを再検証対象とする。影響不明を「影響なし」にしない。
 7. 同じ製品の並行PR・失敗再試行・rebase・merge・releaseに対して、currentness、CAS、過去結果保護、秘密情報保護、実対象操作の安全契約が満たされる。
 8. 既存UI target package、通常spec-analysis、legacy、現行QA workflowsの互換性 / migration / rollback判定と回帰テストが成立する。UI mode移行後の00〜09とscope readiness、旧Authority / AC / UNKNOWNとstable ID、E2E対象選定経路を保つ。
-9. `project-context`が案件文書の存在確認、欠損時の新規作成、既存文書の差分更新・履歴・競合防止・承認された保存先への永続化を正本として担当し、`qa-workflow`はroutingと使用設定の変更影響判定だけを行う。必要な案件設定が未確定でも独立した読取工程を継続できる。
+9. `project-context`が案件文書の存在確認、欠損時の新規作成、既存文書の差分更新・履歴・競合防止・承認された保存先への永続化、成果物配置・人間編集方針の初回合意と再利用を担当し、`qa-workflow`はroutingと使用設定の変更影響判定だけを行う。必要な案件設定が未確定でも独立した読取工程を継続できる。
 10. 既存のProject Context16節、既存stable key、DEC / ASM ID、`artifact_graph.py`のparser / currentness、`project_context_ids.py`と過去の文書・呼び出し元の互換性を検証する。新Skillの作成・更新・権限不足・並行更新について実Agent受入と独立テストがPASSする。
 11. Skill / runtime / CI / 評価データ / README・利用手順・運用文書を更新し、記載した独立検証および実製品相当の統合受入がPASSする。未検証・SKIP・失敗は成功扱いしない。
-12. 独立Skill`ui-target-analysis`、`test-item-analysis`、`test-condition-analysis`、`e2e-test-selection`が成立し、旧modeの正本・利用者・runtime・ID・履歴・migrationの互換性を検証する。
+12. 独立Skill`ui-target-analysis`、`test-item-analysis`、`test-condition-analysis`、`e2e-test-selection`が成立し、旧modeの正本・利用者・runtime・ID・履歴・migrationの互換性を検証する。機能別参照から人間が編集する正本の場所へ辿れ、変更後にowner検証を行い、別正本や未承認の再配置を発生させない。
 13. テストアイテムを製品機能とは別IDで階層・多対多・状態・履歴として管理し、共通条件候補を別Skillで安定ID/根拠/履歴付きで並行識別できる。双方の候補から不足を相互検出し、仕様+Risk→TR→共通条件参照とアイテム別TCN→期待結果候補→CI→TCを追跡できる。未発見の対象・未識別の条件・未判定の適用関係を別指標で報告する。
 14. 業務状態・UI状態・認可・セッション・データ/外部連携の正本が混線せず、一次Riskと条件発見後の局所再評価、共通条件候補の先行・並行抽出と正式TCNへの根拠付き採用、複数期待結果とAuthorityの対応が成立する。規格の工程名とSkill名の差を検証し、根拠のない期待結果を完成扱いしない。
 15. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
@@ -575,7 +591,7 @@ CI判定方針：
 
 - **完全性の限界**：コード・資料から発見できない機能の存在は機械的に証明できない。確認した情報源と分析対象境界、未知領域を表示し、誤った完全性主張を防ぐ。
 - **候補の粒度**：ファイル、コード関数、画面、業務機能は一対一ではない。機能同定・重複解消・分割・統合は意味判断を要する。数だけ合わせる処理は禁止。
-- **未確定の回答境界**：再設計Q06（UI package内の具体的な物理分割）とQ20（入力選択肢の個別確定）は未回答。合意済みの正本境界・条件付き必須ルールは守り、無根拠な物理移管や一律必須化をしない。該当部分だけblockedにして他の分析は進める。
+- **合意済みQ06と残る未確定事項**：人間の直接編集・レビューに対応し、初回の成果物配置方針は`project-context`で合意する。既存UI packageの00〜09を無条件に物理分割せず、機能別参照・安定ID・単一writerを維持する。再設計Q20（入力選択肢の個別確定）は未回答であり、既存の条件付き必須ルールを適用して根拠のない一律必須化をしない。影響する範囲だけblockedとする。
 - **標準との相違**：IVEC V3.2のPDF詳細本文は未確認。ISTQB CTFLのtest analysisと本`test-analysis`、ISO/IEC/IEEE 29119-1:2022のtest modelとTCNをそのまま同一視しない。
 - **二重正本の防止**：共通条件候補とそのID/履歴を`test-condition-analysis`、正式なitem×condition採否・TCN/CI・期待結果候補を`test-condition-design`に固定する。既存TCDの技法別候補母集団（partition / boundary / rule等）は正式カバレッジのための局所成果物として残し、新Skillの共通条件一覧と混同・重複保存しない。
 
