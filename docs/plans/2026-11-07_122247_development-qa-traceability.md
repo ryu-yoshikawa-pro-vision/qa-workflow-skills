@@ -46,6 +46,24 @@ CIの正本：`.github/workflows/validate-skills.yml`、`deterministic-output-ev
 
 ## 責務分担と変更範囲
 
+### 新規のProject Context作成・管理Skill
+
+`skills/project-context/`を追加し、案件設定文書の**既存確認・新規作成・検証・差分更新・履歴管理・参照提供**を一貫して担当する。これは案件情報の正本を管理するSkillであり、`qa-workflow`のroutingとは別責務とする。案件により情報源や保存先が変わっても、Skillの責任範囲を変えない。
+
+- **入力**：対象案件を識別できる情報、ユーザーが明示した既存Project Context参照または許可済みの探索範囲、取得可能な案件資料・既存QA成果物の根拠、今回実行するSkillが必要とする設定項目。案件固有の場所を推測して全ファイルシステムや無関係なRepositoryを探索しない。
+- **既存確認**：明示された文書や、案件の許可済みroot内で宣言された候補pathを調べ、`存在` / `不存在を確認` / `参照未指定` / `アクセス不能` / `重複・曖昧`を区別する。見つからないこととアクセスできないことを混同しない。複数の正本候補を自動統合しない。
+- **新規作成**：既存文書がないと確定した場合に限り、`skills/qa-workflow/assets/project-context-template.md`を既定形として候補を組み立てる。確認できた案件情報のみ記入し、未確認値は空欄・`UNKNOWN` / `N/A`・`（未設定）`で明示する。文書の保存場所・対象案件・書込み権限を確定する前に保存しない。
+- **更新**：既存の情報源優先順位、正式用語、決定事項・仮定、成果物参照、環境条件、識別子と履歴を保持する。変更対象項目、変更理由、根拠sourceとrevision、元文書revision、変更後revisionを記録し、無関係な欄を再生成・初期化しない。
+- **検証と提供**：案件設定の構造検証・必要項目検証を既存の`qa-workflow/scripts/artifact_graph.py`にある`parse_project_context` / `validate_required_context_fields`で行う。必要なfieldの値・content identity・文書ref / revisionと未解決項目を返し、担当Skillへ渡す。文書全体を確認済みとしただけで、必要な外部sourceの到達や権限を保証したことにはしない。
+- **DEC / ASM**：Project ContextのSection 12 / 13がその案件の正本ownerである場合だけ、既存`qa-workflow/scripts/project_context_ids.py`の`materialize` / `validate-history`を使用する。他に正本ownerがあるDEC / ASMは参照のみとし、再採番・複製しない。
+- **安全な保存**：案件の承認済み保存先に対し、新規はatomic create-if-absent、更新は保存先が提供するnative atomic conditional writeとexpected revisionを必須にする。保存後は独立再読込で文書内容・revision・参照を確認する。衝突、保存先未指定、条件付き更新非対応、履歴読込不能の場合は候補を返して保存をblockedとし、上書き・別pathへの自動退避・LLMによる成功推測をしない。
+- **成果物**：現在のProject Contextへの一意の参照、revision、必要な項目と未設定一覧、検証結果、作成・更新履歴、競合時の再開先。文書自体の保存とworkflow実行状態の保存を混同しない。
+- **Skill資源**：`SKILL.md`、`references/guidance.md`（発見・作成・更新・owner境界）、`references/data-contract.md`（入出力、保存・revision、エラー）、`assets/output-template.md`（確認結果）、`scripts/`（必要な保存・検証の決定論的helper）、`evals/`（trigger / deterministic / semantic）。既存parser・ID helperを複製せず、実際に使う入口と契約を維持する。
+
+既存`qa-workflow`に残すものは、**workflow開始時のProject Context確認と`project-context`へのrouting、使用済み設定項目の`compare_used_context`による鮮度比較、設定変更の下流影響と再開先の決定**である。`qa-workflow`が文書の新規作成・更新を独自実装しない。既存parser / DEC・ASM helperとテンプレートは、現行の呼び出し元と外部参照を壊さないため既存pathの正本として再利用する。新Skillへのコード移動を目的にしたコピーや重複実装は行わない。
+
+**初期化手順**：`qa-workflow`が新しい案件で初回分析を開始する際、Project Contextの既存確認を`project-context`へ依頼する。存在すれば必要なfieldだけ検証して利用する。不存在なら、利用可能な証拠で作成候補を組み立て、保存先・権限・欠落した必須項目を確認して安全に作成する。Project Contextが未保存でも独立して実行できる読取専用の分析は続行してよい。ただしProject Contextに依存する継続保存、承認、CIの合否、再開に必要な設定が不足する範囲はblockedとする。すでに有効な文書がある案件では不要な再作成を行わない。
+
 ### 新規の機能分析Skill
 
 `skills/feature-analysis/`を追加し、製品機能の発見、機能階層、開発情報源との対応、候補の分類、抽出網羅率、機能単位の変更判定を担当する。これは仕様Authorityの判断やTC生成を担当しない。
@@ -63,21 +81,22 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 情報源・AI実行環境・保存先・承認者・リリース方式は案件ごとに変わる。ただし**Skillの責務と正本ownerは案件ごとに変えない**。入力不足を理由に別Skillが責務を肩代わりせず、該当する範囲を未確認またはブロック中として残す。
 
-| 担当                            | 固定する入力・責務・正本                                                                                                                                                | 担当しないこと                                                               |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `feature-analysis`（新設）      | 正規化された情報源・変更証拠を受け、確認済み情報源の範囲、予定/実装済みを区別した機能候補、安定した機能IDと階層、実装要素、機能影響の分類、抽出網羅率、未確認候補を管理 | 外部サービスの認証・直接取得、仕様Authority、QA影響とRisk、テスト設計・実行  |
-| `spec-analysis`                 | 機能IDを参照し、現在有効な仕様根拠とUNKNOWN、正常・代替・例外・権限・状態・制約（非UIを含む）、機能→Authority / SCOPE / ACの対応を管理                                  | 開発機能の母集団や機能IDの採番、Risk・テスト設計、実装・観測を仕様へ無断昇格 |
-| `question-analysis`             | 不明点・矛盾の分類、回答と元ownerへの差戻し                                                                                                                             | 機能・仕様・テストの第二の正本                                               |
-| `test-target-inspection`        | 許可された生きたUIの観測事実、確認条件、鮮度、安全・cleanup                                                                                                             | 仕様上の期待結果の確定、機能IDの採番                                         |
-| `test-analysis`                 | 開発変更と機能影響を入力に、**QA影響を別に判定**し、Product Risk・重点・テストレベル・変更影響を扱う                                                                    | 開発差分の機能分類、仕様の決定、Regression Runの最終選定                     |
-| `test-requirement-design`       | 有効なAuthority / ACとRiskからTRまたは正当なDispositionを定める                                                                                                         | 機能候補の抽出、仕様根拠の決定                                               |
-| `test-condition-design`         | TRからTCN、技法、coverage基準とCI（coverage item）を管理                                                                                                                | Risk再採点、テスト実行                                                       |
-| `test-case-design`              | TCN / CIから具体的TCと根拠ある期待結果を設計                                                                                                                            | 仕様の創作、テスト実測結果の判定                                             |
-| `coverage-analysis`             | 機能母集団・仕様対応・TR / TCN / CI / TCの証拠を読み、仕様対応率、テスト設計の閉鎖性、実設計済みとDispositionの内訳、横断的非機能要件の対応を評価                       | 情報源の再列挙、抽出網羅率の再計算、仕様やRiskの再判断                       |
-| `qa-workflow`                   | 初回・PR更新・マージ後・リリース前のrouting、再利用、局所停止、要再検証、再開と全体完了                                                                                 | 各Skill固有の意味判断、母集団・カバレッジの再計算、承認                      |
-| `regression-testing`            | 変更影響・Risk・既存TC baselineからRun対象と必要実行経路を決める                                                                                                        | Product Risk再採点、テストの実行と合否判定                                   |
-| `test-execution` / `e2e-test-*` | 担当するTC / E2Eのinspection・実装・実行・結果・分析・報告とbuild / 環境条件の記録                                                                                      | 機能・仕様・Risk・既存TCの第二の正本化                                       |
-| `qa-knowledge`                  | 未整理の知見を正本ownerへroutingし、他に正本がない継続QA知識だけを管理                                                                                                  | 機能一覧、Authority、Risk、TR / TCN / CI / TCの複製管理                      |
+| 担当                            | 固定する入力・責務・正本                                                                                                                                                           | 担当しないこと                                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `project-context`（新設）       | Project Contextの検索・不存在確認・新規作成・検証・更新・履歴・安全な保存・必要な設定の提供                                                                                        | QA工程のrouting、仕様・Risk・テスト成果物、workflow stateの管理                              |
+| `feature-analysis`（新設）      | 正規化された情報源・変更証拠を受け、確認済み情報源の範囲、予定/実装済みを区別した機能候補、安定した機能IDと階層、実装要素、機能影響の分類、抽出網羅率、未確認候補を管理            | 外部サービスの認証・直接取得、仕様Authority、QA影響とRisk、テスト設計・実行                  |
+| `spec-analysis`                 | 機能IDを参照し、現在有効な仕様根拠とUNKNOWN、正常・代替・例外・権限・状態・制約（非UIを含む）、機能→Authority / SCOPE / ACの対応を管理                                             | 開発機能の母集団や機能IDの採番、Risk・テスト設計、実装・観測を仕様へ無断昇格                 |
+| `question-analysis`             | 不明点・矛盾の分類、回答と元ownerへの差戻し                                                                                                                                        | 機能・仕様・テストの第二の正本                                                               |
+| `test-target-inspection`        | 許可された生きたUIの観測事実、確認条件、鮮度、安全・cleanup                                                                                                                        | 仕様上の期待結果の確定、機能IDの採番                                                         |
+| `test-analysis`                 | 開発変更と機能影響を入力に、**QA影響を別に判定**し、Product Risk・重点・テストレベル・変更影響を扱う                                                                               | 開発差分の機能分類、仕様の決定、Regression Runの最終選定                                     |
+| `test-requirement-design`       | 有効なAuthority / ACとRiskからTRまたは正当なDispositionを定める                                                                                                                    | 機能候補の抽出、仕様根拠の決定                                                               |
+| `test-condition-design`         | TRからTCN、技法、coverage基準とCI（coverage item）を管理                                                                                                                           | Risk再採点、テスト実行                                                                       |
+| `test-case-design`              | TCN / CIから具体的TCと根拠ある期待結果を設計                                                                                                                                       | 仕様の創作、テスト実測結果の判定                                                             |
+| `coverage-analysis`             | 機能母集団・仕様対応・TR / TCN / CI / TCの証拠を読み、仕様対応率、テスト設計の閉鎖性、実設計済みとDispositionの内訳、横断的非機能要件の対応を評価                                  | 情報源の再列挙、抽出網羅率の再計算、仕様やRiskの再判断                                       |
+| `qa-workflow`                   | Project Contextの存在・必須設定を最初に確認し、`project-context`へ作成・更新をroutingする。初回・PR更新・マージ後・リリース前のrouting、再利用、局所停止、要再検証、再開と全体完了 | Project Context文書の独自作成・更新、各Skill固有の意味判断、母集団・カバレッジの再計算、承認 |
+| `regression-testing`            | 変更影響・Risk・既存TC baselineからRun対象と必要実行経路を決める                                                                                                                   | Product Risk再採点、テストの実行と合否判定                                                   |
+| `test-execution` / `e2e-test-*` | 担当するTC / E2Eのinspection・実装・実行・結果・分析・報告とbuild / 環境条件の記録                                                                                                 | 機能・仕様・Risk・既存TCの第二の正本化                                                       |
+| `qa-knowledge`                  | 未整理の知見を正本ownerへroutingし、他に正本がない継続QA知識だけを管理                                                                                                             | 機能一覧、Authority、Risk、TR / TCN / CI / TCの複製管理                                      |
 
 **機能影響とQA影響は別判断**とする。例えば依存更新や設定変更を`feature-analysis`が「機能影響なし」と判断しても、`test-analysis`はQA影響とRiskを独立評価する。「機能影響なし」を「QA不要」へ自動変換しない。
 
@@ -88,10 +107,11 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 - **製品repositoryのCI**：保存済みのローカル解析成果物と今回のPR / source revisionを、**決定論的に検証するだけ**とする。Draftを含む全PRに適用し、未分類差分、必須証拠不足、古いsnapshotを失敗させる。CI自身が候補や承認を生成しない。
 - **案件の承認者**：初回範囲、機能抽出結果、「影響なし」「対象外」、仕様未確定の進行可否、例外・残存リスク・リリースの承認を案件ポリシーに基づき行う。Skillは承認者を推測せず、必要な承認がない範囲はblockedにする。
 
-Project Contextまたは指定された正本から、情報源とアクセス方法・権限、対象repository / base branch、保存先、条件付き更新能力、許可されたAgent環境、承認者・例外ルール、通知・是正先、リリース台帳とbuild / deployment参照を受け取る。**未設定事項のサービスや承認者を固定値で補わない**。保存先が不明なら永続保存を実行せず、該当部分をblockedとする。取得可能な独立範囲の分析は続行できる。
+`project-context`がProject Contextの有効な参照とrevisionを確定し、各Skillはそこから情報源とアクセス方法・権限、対象repository / base branch、保存先、条件付き更新能力、許可されたAgent環境、承認者・例外ルール、通知・是正先、リリース台帳とbuild / deployment参照を受け取る。**未設定事項のサービスや承認者を固定値で補わない**。保存先が不明なら永続保存を実行せず、該当部分をblockedとする。取得可能な独立範囲の分析は続行できる。
 
 ### 成果物の正本と既存契約
 
+0. 案件のProject Context文書の作成・更新・履歴管理の正本ownerは`project-context`。従来の`qa-workflow`のテンプレート・parser・DEC / ASM ID helperを唯一の既存実装として再利用し、Project Contextの作成処理を`qa-workflow`と二重実装しない。Project Contextが管理するのは案件設定と他の正本への参照であり、機能一覧・仕様・テスト成果物・workflow stateは保持しない。
 1. 製品機能ID・機能階層・実装要素・抽出母集団の正本は`feature-analysis`。Git管理の製品では`main`に対応した確定済み一覧を基準とし、PRごとは派生snapshotにする。複数PRの結果を無条件mergeせず、実際のmerge後に最新`main`へ再照合する。
 2. 機能IDとAuthority / UNKNOWN / SCOPE / AC等の**意味上の対応表の正本は`spec-analysis`**。既存`ui-target-v1`のSCOPEは仕様分析の作業範囲であり、機能IDと同一視しない。複数機能と複数SCOPEの参照を許す。非UIの仕様分解も`spec-analysis`が担当し、既存UI package契約を壊さず必要な出力を追加する。
 3. 抽出網羅率の計算は`feature-analysis`、仕様とテスト設計の網羅性の評価は`coverage-analysis`。正当なDispositionをテスト実設計済み件数に含めない。テスト実行状況はexecution ownerのsource resultを参照し、実行とPASSを区別する。
@@ -103,6 +123,16 @@ Project Contextまたは指定された正本から、情報源とアクセス�
 `Q01`の受入製品は未確定。アクセスできる`ryu-yoshikawa-pro-vision/qa-training-store`を候補とし、UI以外の機能種別を十分に検証できるか調査する。製品にない種類は独立fixtureでも検証し、対象製品で未確認のものを「実製品受入済み」と報告しない。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
 
 ## データ・計算契約
+
+### Project Contextの追加設定契約
+
+現行`skills/qa-workflow/assets/project-context-template.md`はMarkdownの16節で構成され、Section 16の`qa.regression_scope`、`qa.regression_policy`、`qa.knowledge_root`、`qa.workflow_state_root`、`qa.reservation_root`、`qa.auxiliary_testware_refs`をstable keyとして扱う。Section 12 / 13のDEC / ASMには別のID履歴検証がある。既存の6 key、field type、空値、DEC / ASM ID、既存文書の自由記述・表を維持する。
+
+開発連動QAが実際に参照する追加fieldを既存の`qa-context-field`形式で導入する。まず`qa.feature_source_refs`（`ordered_lines`：根拠のある開発情報源への参照）、`qa.feature_artifact_root`（`path`：製品機能一覧の保存先）、`qa.feature_base_ref`（`scalar`：確定済み機能一覧の基準branch / revision参照）、`qa.feature_approval_policy_ref`（`scalar`：承認・例外判定規則の参照）を定義する。承認者の実名・認証情報・外部サービスtokenをstable keyの値として格納しない。AI利用許可、通知、リリース台帳等は案件の既存Sectionsに根拠と参照を記録し、決定論的consumerに必要なfieldだけ段階的ではなく実装対象の契約として識別・型定義する。既存parserが扱う`scalar`、`path`、`ordered_text`、`ordered_lines`を優先し、汎用schema frameworkを新設しない。
+
+必要項目は操作ごとに判定する。例えば新規候補のローカル分析は許可された情報源参照を要求するが、既存内容の読取だけに機能一覧保存rootや承認者を必須としない。Project Contextを作成できても、機能一覧rootへの書込み権限やCI公開設定がなければ、それに依存する工程だけblockedとする。全項目の空欄を理由にProject Contextの新規作成そのものを禁止しない。
+
+情報源・権限・承認・リリースの正本が別資料にある場合は、その参照とrevisionを記録する。Project Context自体を秘密情報、外部資料全文、機能一覧・テスト成果物の第二の保管庫、汎用artifact registryとして使わない。既存`docs/PROJECT_CONTEXT.md`など同名の案件文書があっても、対象案件の正本であると識別できなければ自動採用しない。
 
 ### 1. 開発情報源の棚卸しと取得範囲
 
@@ -195,41 +225,57 @@ CI判定方針：
 
 - `main`と当branchの最新差分、関連PR、既存UI target / Machine Entity / migration / QA workflow contract、既存tests / CIを再読込する。
 - 情報源発見・機能母集団・機能IDの唯一のownerを確定し、`SCOPE`との意味差・reference形式・schemaの互換性を明文化する。
-- 対象製品repositoryへ導入する際のartifact rootとGitHub event / source access条件をProject Contextから解決する。未設定値を暗黙既定にしない。
+- 対象製品repositoryへの導入時には、Project Contextの参照先・revisionと必要な案件設定を`project-context`に確認させる。存在しない場合の新規作成、曖昧な文書候補の停止、安全な保存契約を先に確認する。artifact rootとGitHub event / source access条件を未設定のまま補わない。
 
-### 2. 情報源・開発差分の入力契約
+### 2. Project Contextの作成・管理Skillと初期化
+
+- `skills/project-context/`を作り、既存文書の発見・不存在確認、新規作成・更新、構造・required field検証、差分と根拠、原子的保存、履歴参照、blocked / 再開先を定義する。既存`qa-workflow/assets/project-context-template.md`、`artifact_graph.py`、`project_context_ids.py`を正式な既存処理として再利用し、汎用parserや新しいDEC / ASM採番器を重複実装しない。
+- 新規の設定用stable keyと値の型、追加時のSection 16の互換性、旧文書の必要項目不足の扱い、複数文書の検出時の停止条件、ローカルAgentでの不足項目の質問経路を定義・実装する。既存文書を無断で上書き・別形式へ移行しない。
+- 新規create-if-absent、更新CAS、保存後再読込、履歴revision、並行作成・更新・競合・旧revisionの拒否を実装する。providerが条件付き更新できなければ保存のみblockedにする。
+- `qa-workflow`を初回開始時に`project-context`へrouteし、保存済み文書への参照、使用fieldとcontent identityだけを受け取るようにする。既存`compare_used_context`とworkflow stateのfreshnessを維持する。
+
+### 3. 情報源・開発差分の入力契約
 
 - `feature-analysis`のsource snapshot、discovery completeness、開発差分、機能候補、証拠refを定義。
 - 初回のGit tree / repoファイル列挙とbase/head差分取得、Issue・仕様・設計・テスト・観測の入力正規化、重複判定、取得失敗の表現を実装。
 - 手動提供とCI入力の両方で同じ契約を検証。対象製品の全体source discovery不足をfail-closedにする。
 
-### 3. 機能構造・網羅率
+### 4. 機能構造・網羅率
 
 - 新Skillと人間可読artifactを作成。安定ID、parent、cross-reference、分割・統合・廃止、情報源との対応を実装。
 - deterministic helperでschema、参照、循環、重複、revision、候補と機能の閉鎖、分母・分子を検証。意味上の分解粒度や対象外の正当性はsemantic品質確認へ渡す。
 - 情報源未確認・分母0・unknown・対象外・重複・機能なしの差分・partial discoveryの表示と完了判定を個別に検証する。
 
-### 4. 既存仕様・設計成果物への接続と移行
+### 5. 既存仕様・設計成果物への接続と移行
 
 - `feature-analysis`が機能一覧、`spec-analysis`が機能ID→Authority / UNKNOWN / SCOPE / AC対応表と非UIの仕様分解を所有し、`test-analysis`のQA影響判定と`coverage-analysis`の追跡性に接続する。
 - 既存`entity-state-v2` / Runtime evidence / scope ownership / currentnessを尊重し、必要な型・参照を既存ownerのcontractに沿って追加。未知ノードを既存runtimeが無条件受け入れる実装にしない。
 - 既存UI target package、通常spec-analysis、legacy成果物、既存TR/TCN/CI/TC、partial rerunの互換性を保ち、migration前後のID・依存・履歴・再開位置を検証する。関連が不明な旧artifactはblockedにする。
 
-### 5. 継続workflow・CI接続
+### 6. 継続workflow・CI接続
 
 - `qa-workflow`で初回 / PR更新 / マージ後 / リリース前の開始・再利用・再開を実装。旧revisionと最新revisionの区別、局所stale、影響なしの証拠、未分類時のfailを確認。
 - 製品repository向けの呼び出し方法、GitHub Actions連携、必要なsource input / artifact root / permissionを明示し、GitHub eventの重複・競合・fork・secretへの安全対策を実装。
 - reportには開発差分全件、機能抽出、仕様対応、テスト設計、実行状況、未確認source、Riskと判定根拠を別々に表示する。
 
-### 6. 評価・文書・検証
+### 7. 評価・文書・検証
 
-- 新Skillのtrigger / deterministic / semantic caseを追加し、既存Skill側のroutingと回帰caseも更新する。
-- README、EVALS、Project Context関連の導入説明、既存workflow、CI利用手順、migration / recovery手順を更新する。
+- `project-context`と`feature-analysis`のそれぞれにtrigger / deterministic / semantic caseを追加し、既存Skill側のroutingと回帰caseも更新する。
+- README、EVALS、Project Context関連の導入説明・テンプレート・追加stable key・初期化手順、既存workflow、CI利用手順、migration / recovery手順を更新する。
 - 以下の独立検証を実施して結果を記録する。成功した一部テストで他の失敗・未実行を代替しない。
 
 ## 検証
 
 ### 決定論的テスト
+
+### Project Context管理の追加テスト
+
+- 既存文書あり／不存在／参照がない／アクセス拒否／同一案件の候補が複数／異なる案件の文書が混在する場合を区別し、無関係な`docs/PROJECT_CONTEXT.md`を正本にしない。
+- 新規作成で既定16節と6つの既存stable keyが保持され、既知の根拠だけを反映し、未確認値を推測補完しない。未設定が残る状態でも文書作成と局所分析は可能とする。
+- DEC / ASMのSection 12 / 13がProject Contextの正本ownerの場合だけ既存`project_context_ids.py`へ委譲し、ID履歴・再利用・置換・削除禁止を守る。外部ownerがある場合はコピー・再採番しない。
+- 従来の`artifact_graph.py`の`parse_project_context`、`validate_required_context_fields`、`compare_used_context`と同じ結果を出し、追加stable key、旧形式の未設定・重複・不正type・欠損marker・順序保持を回帰検証する。
+- 同時新規作成、更新のCAS競合、保存直後の読戻し不一致、保存先未指定／書込拒否／symlink／path脱出／失敗後再開／履歴欠落を検証する。失敗時に旧文書・直前のworkflow baselineを保持する。
+- Project Contextのみ新規作成した案件から機能分析へ進む例、未設定の機能一覧rootで保存だけblockedになる例、変更した使用fieldのみ下流をstaleにする例、無関係なfield更新で下流がcurrentのままの例をAgent routingと統合テストで確認する。
 
 1. 初回全体source列挙：複数repo、複数形式、API / バッチ / UI / 権限 / データ処理、文書のみ、コードのみ、既存テストのみの候補。
 2. PR差分：追加・変更・削除・rename、同一機能の複数ファイル、共通処理、重複候補、formatのみ、外部Issue・文書変更、途中pagination失敗、未知形式。
@@ -248,6 +294,8 @@ CI判定方針：
 
 ### 既存コマンド・CI
 
+- `python -m unittest tests/skills/runtime/test_project_context_ids.py -v`（新Skill連携後の互換性）
+- `python -m unittest tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py -v`（既存Project Context処理・workflow currentness）
 - `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`
 - `python -m unittest discover -s tests/skills/evals/deterministic -v`
 - `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`
@@ -271,8 +319,10 @@ CI判定方針：
 6. 新規・変更・削除・分割・統合の機能IDと履歴を維持し、影響するQA成果物だけを再検証対象とする。影響不明を「影響なし」にしない。
 7. 同じ製品の並行PR・失敗再試行・rebase・merge・releaseに対して、currentness、CAS、過去結果保護、秘密情報保護、実対象操作の安全契約が満たされる。
 8. 既存UI target package、通常spec-analysis、legacy、現行QA workflowsの互換性 / migration / rollback判定と回帰テストが成立する。
-9. Skill / runtime / CI / 評価データ / README・利用手順・運用文書を更新し、記載した独立検証および実製品相当の統合受入がPASSする。未検証・SKIP・失敗は成功扱いしない。
-10. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
+9. `project-context`が案件文書の存在確認、欠損時の新規作成、既存文書の差分更新・履歴・競合防止・承認された保存先への永続化を正本として担当し、`qa-workflow`はroutingと使用設定の変更影響判定だけを行う。必要な案件設定が未確定でも独立した読取工程を継続できる。
+10. 既存のProject Context16節、既存stable key、DEC / ASM ID、`artifact_graph.py`のparser / currentness、`project_context_ids.py`と過去の文書・呼び出し元の互換性を検証する。新Skillの作成・更新・権限不足・並行更新について実Agent受入と独立テストがPASSする。
+11. Skill / runtime / CI / 評価データ / README・利用手順・運用文書を更新し、記載した独立検証および実製品相当の統合受入がPASSする。未検証・SKIP・失敗は成功扱いしない。
+12. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
 
 ## リスク・実装時の確認事項
 
@@ -280,5 +330,6 @@ CI判定方針：
 - **候補の粒度**：ファイル、コード関数、画面、業務機能は一対一ではない。機能同定・重複解消・分割・統合は意味判断を要する。数だけ合わせる処理は禁止。
 - **既存schemaとの整合**：`ui-target-v1`はUI分析に特化している。機能階層をSCOPEやUI構造に直接流し込むと既存の振る舞い・readiness・migrationが壊れる可能性がある。明示参照と互換性を先に確認する。
 - **外部連携と権限**：接続先のIssue / 設計資料の種類やAPI契約は案件ごとに異なる。情報源の列挙・取得不能を明示する共通入力を必須にし、資格情報を必要とする個別providerを無断追加しない。
+- **Project Contextの初期化**：既存文書のないことの証明は許可された探索範囲に限る。候補が複数、保存root未指定、原子的な書込み能力不足なら推測せず作成・更新をblockedにする。既存DEC / ASM履歴・stable key・未使用設定のcurrentnessを破壊しない。
 - **CI導入先**：このrepositoryのCIは製品repoのCIとは別。製品repositoryへの導入・権限・artifact保存・イベントの検証が完了しない限り、開発連動完了と報告しない。
 - **実装の肥大化**：新Skillには機能抽出・機能構造・母集団管理を持たせ、仕様根拠、リスク採点、test coverage、execution、workflow orchestrationを移植しない。既存の大きな`ui_target_package.py`を今回のために全体書換えしないが、新たな接続に必要な局所変更・モジュール分離と回帰テストは省略しない。
