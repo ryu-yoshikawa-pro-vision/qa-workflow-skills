@@ -171,23 +171,25 @@ flowchart TD
 
 **S11：workflow完了検証**。新設Skill・未登録Skill・空のruntime evidence・既存6 Skillとの混在を入力し、検証なしのscopeが完了しないことを確認する。管理のみ・報告のみ・欠陥のみの単独開始も検証する。
 
-**S12：Regression非E2E route**。Vitest個別テストとTCの対応→required route→実runner→元結果→Activityを検証し、manual／E2E／補助testware・部分Run・retry・cleanupとの混在を確認する。
+**S12：Regression非E2E routeと補助実施義務**。Vitest個別テストとTCの対応→required route→実runner→元結果→Activityを検証する。必須補助routeが未開始ならTC側完了だけでActivityを完了にせず、補助のみの実行も正しく状態を表す。補助件数をTCに加算しない。manual／E2E／部分Run／retry／cleanup／旧履歴を回帰する。
 
 **S13：実行方式と品質ゲート**。Playwright API専用・ブラウザE2E・非ブラウザ直接TCを一意のownerへroutingし、false assertion・欠落assertion・誤期待値、Vitest個別結果の未取得を検出する。
 
-**S14：変更安全性と静的テスト**。dirty working tree・競合・危険なscriptを拒否し、製品要求／設計／コードの単独レビューと静的解析を実施し、Finding・誤検出・修正後の再確認・統合報告へつなぐ。
+**S14：変更安全性と静的テスト**。dirty working tree・危険なscriptを拒否する。2セッションが同じpreflightを通過してから同一testwareファイルを書き換える競合を、隔離worktreeの反映時検証または共有workspaceの排他予約と条件付き確定で拒否する。製品要求／設計／コードの静的レビュー・解析を単独実施し、Finding・誤検出・修正確認・報告へつなぐ。
 
-**S15：探索・Knowledge・改善の循環**。TCなしCharter探索、owner不明調査、Knowledge直接lookupと部分revalidation、改善採用後の計画改版・実施・次回効果測定を検証する。
+**S15：探索・Knowledge・改善の循環**。TCなしCharter探索、owner不明調査、Knowledge直接lookupと部分revalidation、改善採用後の計画改版・実施・次回効果測定を検証する。Knowledgeはidentityと直下scope／kindの不一致を拒否し、無関係なentryの依存未取得で対象scopeの有効entryを停止しない。read時の保存revisionを別セッションのlookupへ引き継ぐ。
 
 **S16：永続化とセッション間復旧**。operation記録前後、実run終了直後・結果保存後の応答喪失・cleanup保存中に中断し、別セッションでreadbackして二重実行・二重Issue更新・旧成果物の採用なしに局所再開する。
+
+**S17：Skill構成のQA遂行効率比較**。[QA遂行効率の比較受入契約](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)に従い、初回・変更なし・局所コード変更・外部仕様改版・中断後再開を同一QA目的と独立品質基準で比較する。処理時間、Skill起動、人間の確認・修正、再利用・再分析、利用量／費用、誤PASS・追跡性・安全性を実測し、機能受入と効率化実証を分離する。取得不能な指標や比較不能を改善達成にしない。これは開発時評価であり、通常QAのたびに評価Skillを起動しない。
 
 **全Skill発火評価**：実行時のリポジトリに存在する`skills/*/SKILL.md`を検出して**全current Skillを同じAgent上で利用可能にする**。さらに別セッションからowner成果物・revision・未完了範囲を再読込して、会話履歴なしに再開できることを検証する。23件／予定追加14件の固定数や特定CLI・モデルに発火実装を結びつけない。近接するSkill（QA要求と個別TR、構成とProduct Risk、E2E選定とinspection、testwareと既存Playwright、テスト報告とE2E個別報告、workflowと計画管理）の正例・負例、途中開始・変更・停止・再開・複合workflowを評価。対象Skill使用の観測できる証拠を必要とし、自己申告だけで発火成功にしない。PR #17の開発用Agent評価ランナーは本番QAの起動／監視機構ではない。
 
 ### 完了条件
 
-1. S1〜S16を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。全工程の固定順実行を強制しない。
+1. S1〜S17を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。全工程の固定順実行を強制しない。
 2. S3ではPR #22新Skillの計画成果物から既存Playwright E2Eの**実**inspection・implementation・execution・source結果／cleanup・reportingへ接続できる。E2E本体は再実装せず、既存E2E単独／TCなし経路に回帰がない。
 3. 実行準備は全ownerのrefsとrun preflightのready／blockedを示す。非Web異常には明示した分析owner・根拠・仮説・担当先を持ち、欠陥候補とは分離する。
 4. 外部資料変更をコードPRなしでも入力として受け付け、必要範囲だけ再評価できる。通知・定期照合やAgentの実起動をSkill内部の完了条件にしない。
 5. CI受渡し方式が未選定なら該当実接続の受入はblockedとし、選定後は必要artifactが欠落・古いとCIがfailすること、source SHA・artifact hash・承認revisionを照合できることを実証する。
-6. 全current Skillでの発火、source/currentness、複数成果物の途中失敗・再開、秘密情報・権限・副作用と独立基準データでの検証を完了する。モデルやCLIの名前を固定しない。
+6. 全current Skillでの発火、source/currentness、複数成果物の途中失敗・再開、秘密情報・権限・副作用と独立基準データでの検証を完了する。S17で品質・安全を守った効率化の実測比較を独立に記録し、比較不能や未測定を効率化成功にしない。モデルやCLIの名前を固定しない。
