@@ -139,7 +139,7 @@ Skillが提供するのはsource snapshot、成果物refs・content hash、承�
 - **実Agent実行**：現行Skillと新Skillを実クライアントから起動し、正しいrouting・tool呼出し・保存・block・resume、意図しない外部操作の不在を証拠付きで確認。
 - **実接続**：対象製品・保存先・外部Issue・非Web runner／計測ツールについて、宣言した環境での入出力・失敗・回復・権限を確認。利用不能な環境をfixture成功で代替しない。
 
-受入には成功数の固定目標を先に置かず、[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)のS1〜S10と各責務の重要な異常系・誤判定を含む独立caseを必要な範囲で追加する。**全current Skillを同じAgent上で利用可能として発火・競合を試験し、特定モデル／CLI／評価ハーネスを固定しない**。実施済み／未実施／SKIP／失敗を個別に示し、未実施項目を完了へ合算しない。
+受入には成功数の固定目標を先に置かず、[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)のS1〜S16と各責務の重要な異常系・誤判定を含む独立caseを必要な範囲で追加する。**全current Skillを同じAgent上で利用可能として発火・競合を試験し、特定モデル／CLI／評価ハーネスを固定しない**。実施済み／未実施／SKIP／失敗を個別に示し、未実施項目を完了へ合算しない。
 
 ## 5. 検証と完了条件
 
