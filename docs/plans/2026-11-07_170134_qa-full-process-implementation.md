@@ -8,7 +8,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 全工程支援は、全工程の強制実行、あらゆるrunnerの自前実装、AIによる仕様確定／リスク受容／リリース承認を意味しない。依頼された成果物からの直接開始、既存current成果物の再利用、部分再実行、blockedと再開を維持する。
 
-**Planの位置付け**：この文書はQA要求・テストアーキテクチャ・管理・欠陥追跡・統合報告・活動評価という6つの追加責務を担当し、PR #22の機能抽出／設計Planを変更・置換しない。[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を入口とし、[非Webテスト実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)、[保存・承認・集計の共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)、[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)、[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)、[静的テスト・改善契約](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)を詳細文書とする。PR #22の未確定Q06・Q20・Q24を推測で確定しない。今回の文書修正ではSkill・runtime・CIや製品コードの実装は行わない。
+**Planの位置付け**：この文書はQA要求・テストアーキテクチャ・管理・欠陥追跡・統合報告・活動評価という6つの追加責務を担当し、PR #22の機能抽出／設計Planを変更・置換しない。[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を入口とし、[非Webテスト実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)、[保存・承認・集計の共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)、[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)、[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)、[静的テスト・改善契約](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)、[QA遂行効率の比較受入契約](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)を詳細文書とする。PR #22の未確定Q06・Q20・Q24を推測で確定しない。今回の文書修正ではSkill・runtime・CIや製品コードの実装は行わない。
 
 **Skillの実行境界**：Agent起動の指示・常時監視・通知・定期実行、使用モデル・CLI・ハーネスの選定はSkill外。Skillは渡された依頼とsource revisionに対する分析・成果物・handoff・局所停止・再開を担当する。工程間の契約は[継続workflow・受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を正本とする。
 
@@ -109,7 +109,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 - **正本**：案件のQA活動の有効性・効率・再現性・改善効果の評価、完了／保管／引継ぎの確認と改善項目。`EVALS.md`はSkill品質評価、`qa-knowledge`は継続QA知識の正本のまま。
 - **成果物**：評価scope・時点・入力revision、評価対象目標・指標／計算条件、計画／実績、達成／未達／未測定と根拠、原因候補と判定不能範囲、改善項目・対象の正式owner・採用に必要な承認・計画／設計変更依頼ref・担当・期限・実施状態・確認方法、前回改善の効果測定、保管・引継ぎの状況・承認記録。
 - **動作**：Q08の5評価軸（追跡性、品質、効率、プロセス、再利用性）を測定可能な情報に基づいて扱う。複数指標を独自の根拠なき総合点にしない。比較条件が違えば注記する。リリース承認・プロジェクト終了決定を代行しない。採用された改善は`test-management`・`test-architecture-design`または元設計ownerへ正式な改版依頼として引き継ぎ、実施後の効果を再測定する。再利用知識の候補だけを`qa-knowledge`へルーティングし、Knowledge登録を計画変更・実施とみなさない。
-- **完了条件**：すべての指標に測定元、対象・分母、結果または未測定理由がある。改善と未完了事項は責任・期限・検証方法または未確定状態を持ち、引継ぎ・保管・権限者の確認が追跡できる。
+- **完了条件**：すべての指標に測定元、対象・分母、結果または未測定理由がある。改善と未完了事項は責任・期限・検証方法または未確定状態を持ち、引継ぎ・保管・権限者の確認が追跡できる。**Skill構成の効率比較は本Skillの責務に含めず**、[QA遂行効率の比較受入契約](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)に従う。
 - **変更・検証**：新Skill一式、`test-reporting`／`test-management`からの参照、`qa-knowledge`への候補連携。時間短縮だけで品質改善を主張する例、未測定・非比較条件・改善未実施・複数案件再利用を評価。
 
 ## 共通データ・保存・承認契約
@@ -257,11 +257,13 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 3. テスト計画・監視・是正・プロジェクトリスク・終了基準を管理でき、`qa-workflow`のrouting／Regression Runの第二の正本を作らない。
 4. FAIL／Finding／Observationから欠陥候補・外部Issue参照・修正確認へ接続できる。正式欠陥状態は外部正本を保持し、製品コード修正を行わない。
 5. 一般TC、E2E、Regression、Exploration、非Web／非機能の結果を技術別単位・対象versionのまま集約し、**計画のsource inventoryと取得完全性**を確認する。未実行・部分取得・retry・旧revisionにより偽の100%やPASSが発生しない。
-6. QA活動を5軸で評価し、計画比較・根拠・未測定・改善と引継ぎを追跡できる。採用・承認された改善が適切な計画／設計正本の改版と実施・次回測定へつながる。`EVALS.md`のSkill評価とは分離する。
+6. QA活動を5軸で評価し、計画比較・根拠・未測定・改善と引継ぎを追跡できる。採用・承認された改善が適切な計画／設計正本の改版と実施・次回測定へつながる。`EVALS.md`のSkill評価とは分離する。Skill構成自体の効率化は[比較受入契約](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)の同条件実測で独立判定する。
 7. [非Webの実装・実行Plan](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)、[テスト実行と品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)、[静的テスト・改善契約](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)の全完了条件を満たす。API／バッチ／コンポーネント等でテスト実装・更新からrunner実行・結果まで接続し、非機能品質特性と静的テストの対応・未対応範囲を証拠付きで示す。
 8. [共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)、[継続workflow・受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)、[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)の全完了条件を満たす。対象保存先のnative CAS・履歴、承認主体の認証と対象scope／revision、変更影響、セキュリティ・cleanup、並行更新・再開を実証する。
 9. 現行23 SkillとPR #22の計画中6 Skillの責務・正本・既存ID・直接開始・履歴との整合を保つ。**PR #22実装前は単独受入と参照仕様の照合、実装後は実成果物との統合・ID・migration・回帰受入**を別々に実施する。後者が未検証ならQA全工程の最終実装完了を宣言しない。PR #22の15完了条件と未確定Q06／Q20／Q24を変更しない。
-10. 新Skillの仕様適合・発火・決定論的出力・意味評価・workflow統合・実Agent受入について、**Agentの候補から独立した期待成果物・誤判定拒否例**で検証する。関連回帰テスト・CI・README・EVALS・導入文書を更新し、未実施・SKIP・実案件未接続をPASS扱いしない。 特定のモデル・CLI・ハーネスを固定せず、全current Skillの同時利用と実Agentでの発火・成果物検証、別セッションの成果物readback・停止／再開を必須にする。
+10. 新Skillの仕様適合・発火・決定論的出力・意味評価・workflow統合・実Agent受入・[QA遂行効率の比較受入](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)について、**Agentの候補から独立した期待成果物・誤判定拒否例**で検証する。関連回帰テスト・CI・README・EVALS・導入文書を更新し、未実施・SKIP・実案件未接続をPASS扱いしない。 特定のモデル・CLI・ハーネスを固定せず、全current Skillの同時利用と実Agentでの発火・成果物検証、別セッションの成果物readback・停止／再開を必須にする。
+
+**Skill構成の効率化ゲート**：既存構成または実際の人手手順と同じQA目的・品質条件で、初回、変更なし、局所コード変更、外部仕様改版、中断・再開の実測を比較する。品質劣化・誤PASS・欠落した証拠を短時間化の成果に含めない。比較元がない範囲や費用などの未測定項目は独立して明示し、機能の受入成功を効率化実証へ転用しない。
 
 ## 次の作業で確認する事項
 
