@@ -12,6 +12,7 @@
 
 - 現行の`test-case-design`はTCの具体的な前提・手順・期待結果を所有する。
 - 現行の`test-execution`と`e2e-test-implementation`／`e2e-test-execution`はPlaywrightに限定された実行／実装契約を持つ。
+- 現行`test-execution/SKILL.md`はPlaywright MCP→CLI→Libraryの順に実行手段を選択する。案件がCLI限定を要求する場合は既存契約と競合するため、`test-execution` ownerの契約変更と既存回帰テストを別途確認する。新しい非Web Skillによる暗黙のモード切替やPlaywright既存動作の上書きは行わない。
 - `regression-testing`はRun選定とActivityを、実行ownerは実測・raw結果・attempt・cleanupを所有する。
 - `test-analysis`はProduct Riskとテスト重点、`test-architecture-design`（[親Plan](./2026-11-07_170134_qa-full-process-implementation.md)）はテストレベル／タイプ／方式の全体割当を所有する。
 - PR #22の`feature-analysis`、`test-item-analysis`、`test-condition-analysis`等は計画段階。これらがない現在でも、既存TCと明示的な対象scopeから実行できる経路を維持する。
