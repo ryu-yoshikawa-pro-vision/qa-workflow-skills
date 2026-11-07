@@ -134,15 +134,15 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 ## PR #22との依存関係と責務境界
 
-| PR #22の成果物／担当（計画中） | このPlanの利用先 | 整合・移行条件 |
-|---|---|---|
-| `project-context` | 6領域すべて | 案件設定と参照を読む。計画本文／実行結果／正式IssueをProject Contextに複製しない |
-| `feature-analysis` | 要求分析、アーキテクチャ、管理、報告 | 機能ID・source完全性を参照し、未発見機能を独自に再採番しない |
-| `ui-target-analysis` | アーキテクチャ、実装／実行連携 | UI事実は観測／構造の正本を参照。期待仕様は`spec-analysis` |
-| `test-item-analysis` | アーキテクチャ、計画、report | itemの階層・機能参照とtest level/typeの扱いを保つ |
-| `test-condition-analysis` | アーキテクチャ、report | 共通条件候補を正式TCN、正式coverage、実行済みと誤認しない |
-| `e2e-test-selection` | アーキテクチャ、計画、実行接続 | 自動化価値の選定を重複採点せず、Playwright固有の実装可否は既存E2E owner |
-| `qa-workflow`／既存runtime | 全6領域のrouting・部分再開・currentness | 工程固有logicの重複、state正本の二重化、既存直接開始経路の破壊を防ぐ |
+| PR #22の成果物／担当（計画中） | このPlanの利用先                        | 整合・移行条件                                                                   |
+| ------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------- |
+| `project-context`              | 6領域すべて                             | 案件設定と参照を読む。計画本文／実行結果／正式IssueをProject Contextに複製しない |
+| `feature-analysis`             | 要求分析、アーキテクチャ、管理、報告    | 機能ID・source完全性を参照し、未発見機能を独自に再採番しない                     |
+| `ui-target-analysis`           | アーキテクチャ、実装／実行連携          | UI事実は観測／構造の正本を参照。期待仕様は`spec-analysis`                        |
+| `test-item-analysis`           | アーキテクチャ、計画、report            | itemの階層・機能参照とtest level/typeの扱いを保つ                                |
+| `test-condition-analysis`      | アーキテクチャ、report                  | 共通条件候補を正式TCN、正式coverage、実行済みと誤認しない                        |
+| `e2e-test-selection`           | アーキテクチャ、計画、実行接続          | 自動化価値の選定を重複採点せず、Playwright固有の実装可否は既存E2E owner          |
+| `qa-workflow`／既存runtime     | 全6領域のrouting・部分再開・currentness | 工程固有logicの重複、state正本の二重化、既存直接開始経路の破壊を防ぐ             |
 
 **移行規則**：PR #22の未マージheadのschemaを実装済みとして参照しない。PR #22のmerge／実装完了前は現行のsource ref・scopeを使う。実装後は参照追加・currentness比較・legacy読取の移行と回帰を実行し、既存成果物の情報が不足する場合は局所的に未確認／blocked。ID自動再採番、全成果物の無条件stale化はしない。
 
