@@ -288,3 +288,38 @@ Q02とQ04は矛盾しない。**外部資料の変更を入力として扱うこ
 - 今回は**Plan文書の修正のみ**。新規予定Skill、runtime、保存provider、外部Issue更新、製品CI接続、Playwright／Vitest実受入は未実装・未実行。
 - 製品CIの受渡し先が未決定であるため、方式決定・権限・実保存・内容hash／source revision照合・CIのfail検証を終えるまで、その完了条件を満たしたとは扱わない。
 - Agentが複合Skillを実際に発火・停止・再開し、既存E2Eへ接続できるかは独立fixtureと実受入で検証する。PR #17の開発用Agent評価経路を運用時のAgent起動装置とみなさない。
+
+## 12. 複数モデルの指摘統合と採用根拠（2026-11-07）
+
+この節は複数モデルが提出した計22件の指摘について、実コード・既存Planと照合して重複を整理した記録である。**実装要件の正本は[Planインデックス](../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)とその詳細Planに置く。** このレポートの優先度・評価理由をそのまま実装上の分岐にしない。
+
+### 実装コードで確認した制限と採用した設計
+
+1. **新設Skillの完了検証**：`skills/qa-workflow/scripts/runtime_contract.py::_default_expected_runtime_units()`のroot unitは既存6 Skillに基づく。一方、`workflow_runtime.py::_scope_rows()`はその6件への限定ではない。未登録scopeや検証結果空を完了扱いしないこと、管理のみ／報告のみ等で検証済みowner成果物を使えることを[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)へ記載した。全Skillを同じMachine Entityへ移すことは要求しない。
+2. **Regressionの非E2E経路**：`regression_runtime.py::validate_required_routes()`の正式routeは`manual`と`e2e`のみ。`auxiliary_testware_refs`はTCなしの補助経路として既に存在する。TCに紐付く`testware` required routeを追加し、旧manual／e2e／補助を回帰させない契約を[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)に追加した。
+3. **実行方式の分類軸**：従来Planの「Playwright E2E以外の実装」「非Playwright runner実行」は分類が一致していなかった。Playwright Test製APIテスト、Vitest、非ブラウザTC単発実行を区別し、実行目的・既存実行ownerでrouteする契約に変更した。詳細は[05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)。
+4. **静的テストの実施空白**：`adversarial-review`の既存主対象はQA成果物とE2E testware。製品要求・設計・コードの意味的レビューを同Skillに拡張し、採用したツールによる静的解析は`testware-execution`で扱うと決めた。新設Skillを増やさず、Finding・再確認・集計まで[詳細06](../plans/2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)で閉じる。
+5. **非E2E testware編集の安全性**：`e2e-test-implementation/references/guidance.md`にはinspection後のbranch／commit／working tree比較と副作用確認がある。新設testware実装へ同じ技術非依存のpreflightを適用し、上書き・未許可パス・危険な検証scriptを拒否する[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)を追加した。
+6. **実行結果と品質の区別**：Vitest等のrunnerがPASSした事実だけではTCの期待結果がassertionで実証されたことにならない。`adversarial-review`の非E2E testwareレビューを要求し、TC／仕様／assertion・実観測の対応と、重要検証の欠落を独立判定する[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)を追加した。
+7. **runnerテスト単位の追跡**：file／suite／個別testとTC／testware／attemptの単位を分離し、部分選択・skip／todo・改名・未取得結果が全体PASSに化けない契約を[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)に追加した。
+8. **複数ownerの部分保存からの再開**：`artifact_graph.py::claim_mutable_operation()`は存在するが、複数owner成果物の保存を横断的に確定する台帳ではない。既存workflow state／owner保存先に操作開始前のidentityと期待revisionを永続化し、実保存結果・run・cleanupを独立再読込する契約を[詳細02](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)へ補足した。第二の中央graphは要求しない。
+
+### 既存能力を維持したうえで補完した事項
+
+9. **一般TC失敗の診断**：`test-execution`は実測と期待結果比較・FAIL／判定不能を既に持つ。欠けていた原因仮説・反証・不足証拠・修正先を既存`test-execution`へ拡張する契約とし、新分析Skillは作らない（[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)）。
+10. **別セッションへの引継ぎ**：同一Agentの全Skill同時利用評価を維持し、別セッションが保存済みsource／成果物・未完了範囲から再開する受入を追加した。外部のAgent自動切替は要求しない（[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)）。
+11. **改善の循環**：`test-evaluation`は改善項目・効果測定を既に所有する。採用・承認後に`test-management`／`test-architecture-design`／設計ownerへ正式に戻し、実施と次回測定を確認する契約を[詳細06](../plans/2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)へ追加した。
+12. **探索とKnowledgeの直接開始**：`exploratory-testing`のCharterとinvestigation、`qa-knowledge`のlookup／revalidationは既存の直接開始経路。全体フロー図と[継続workflow受入S11〜S16](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)に独立入口を明記した。
+13. **実行後の永続化確認**：保存・再開の基本契約は既存Plan本文に存在していたため独立の新機能とは扱わない。Mermaid図にrun結果／cleanupの保存・readback・状態不明の復旧を加えた。
+14. **受入証拠の分類**：`qa-training-store`の固定SHA `2a8bcf57ff091e84a8b3bf7b123568e967000d88`にある`tests/contracts/test-api.test.ts`はテスト制御APIの公開境界を検証する。一般HTTP APIの要求・応答・副作用の受入とは区別し、独立fixtureの証拠を製品受入と合算しない（[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)）。
+
+### シラバス照合の位置付け
+
+- **IVEC Designer V3.2**：公式配布の参照先は[IT検証産業協会](https://www.ivia.or.jp/item43/item38)。テスト詳細設計、テスト実装、実行・報告等の工程をSkillに一対一で変換しない。原本で確認した活動と、個別のSkill実装を検証した事実を分ける。
+- **ISTQB CTFL v4.0.1**：[公式PDF](https://istqb.org/wp-content/uploads/2024/11/ISTQB_CTFL_Syllabus_v4.0.1.pdf)の§1.4.1（テストの実装・実行）と第3章（静的テスト）を参照する。これらが特定のSkill名・Agent起動方式・保存形式を要求しているとは扱わない。
+- **ISTQB CTAL-TA v4.0／CTAL-TM v3.0／CTAL-TAE v2.0**：各公式版の対象活動・成果物を、既存責務と設計判断の照合材料とする。日本語JSTQB版と国際版は版番号・公開状態・試験適用を区別する。
+- **照合記録の原則**：公式名称・版・節、明示された活動と成果物、確認したコード証拠、当repo固有の設計要件、未検証事項を区別する。各活動の全シラバス節について原本への照合が終わっていない部分を「全体適合済み」と表示しない。
+
+### 反映の範囲と未実装の区別
+
+本レビューは**Planに必要な契約を確定する作業**であり、`qa-workflow`／Regression／新設Skill／静的レビューのコード変更や実Agent・実runnerでの受入を実施した記録ではない。実装時は[継続workflow S1〜S16](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)と各詳細Planの負例を用い、結果を独立に記録する。
