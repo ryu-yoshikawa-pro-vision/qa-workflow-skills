@@ -65,6 +65,17 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 - `e2e-test-execution`／`test-execution`／`testware-execution`：**今回run**の必要条件、実環境・認証・データ／外部依存のreadyをpreflightで確認。source revision、実準備の証拠と失敗理由を記録し、準備不能なら実操作を開始しない。
 - `regression-testing`：Regressionの場合だけSuite membership・選定・required route・Activityを所有。非RegressionのスイートをこのSkillへ押し込まない。
 
+### テストデータの実行時引継ぎ・再利用
+
+テストデータ専用Skill・中央台帳は追加しない。論理的なデータ要件は`test-condition-design`、TCの具体値・開始状態・期待結果は`test-case-design`、fixture／seed／準備手順の定義は対象repoと担当実装Skill、今回の実データの利用・副作用・後処理は実行ownerがそれぞれ正本とする。`qa-workflow`と`regression-testing`はそれらの参照・現在性・完了状態を確認し、実データを複製管理しない。
+
+- **引継ぎ**：TCに基づく実行はcurrentなTC・データ要件を、TCなしの既存testware実行は当該testwareを起点とする。実行ownerは使用したfixture／seed／準備手順と実装revision、対象環境・build、必要なデータ範囲、準備の実測・未確認理由を既存run／attempt成果物に関連付ける。既存参照で確認できる値を新たな共通schemaや別正本へ複製しない。
+- **準備と確認の時点**：preflightでは対象・認可・必要な開始状態・準備方法・副作用と後処理を確認する。runner管理のsetup／fixtureが生成する実データは、その処理後に開始状態・生成結果を確認する。runner外から同じseed／reset／cleanupを二重実行しない。実行に必要な確認が不能なら該当scopeのみ`blocked`とする。
+- **データの共有と再開**：隔離されたデータと共有の可変データを区別し、共有更新では実際のデータ提供元で有効な隔離・原子的予約・条件付き更新のいずれかを確認する。workflowのoperation claimだけで外部データの排他を保証したとみなさない。準備・削除・resetの結果が不明なら元のrun／操作参照と実状態を照合し、安全な再実行が確認できるまで繰り返さない。
+- **再利用と後処理**：currentなTC・fixture／seedの**定義を再利用できること**と、前runの**実データを再利用できること**は別に判断する。実データの利用前には必要な環境・開始状態・占有・前回cleanupの影響を確認する。テスト結果とcleanup結果は別に保持し、必要なcleanupが未完了なら対象データの再利用と関連scopeの完了を止める。確定済みテストのPASS／FAILはcleanup失敗だけで書き換えない。
+
+**受入**：既存Playwright fixtureの各テストresetとVitestの隔離DBを維持し、既存testwareの直接再実行で不要な設計・実装Skillを起動しない。独立fixtureでは共有データの競合、準備応答消失後のretry、cleanup失敗後の再利用拒否を検証する。実保存先の排他・権限が確認できない方式は未検証／`blocked`とし、fixture成功だけで外部環境の安全を実証済みとしない。
+
 非E2Eの実行異常は`testware-execution`が**第一分析owner**となり、観測された失敗と次の追加証拠、原因仮説、原因分類（SUT／テストデータ／testware／環境／runner／仕様不明／判定不能）、確度、次の再実行・修正の担当先を診断成果物に保持する。ブラウザ直接TC実行の異常は`test-execution`、PlaywrightブラウザE2Eの異常は既存`e2e-test-result-analysis`が第一分析ownerであり、`defect-management`は欠陥候補の追跡に限定する。証拠不足を製品欠陥に自動昇格しない。
 
 ## 変更・並行処理・途中失敗の再開
