@@ -17,7 +17,8 @@
 7. **[workflow runtime・Regression・セッション間引継ぎ](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)**：未登録Skill／空evidenceを完了にしない検証契約、非E2E正式required route、別セッションからの再開。
 8. **[テスト実装・実行方式と品質確認](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)**：E2Eか否かによる実行owner、非ブラウザTC直接実行、testwareの変更安全性・assertion品質・Vitest個別結果とTCの対応。
 9. **[静的テスト・探索／Knowledge・継続改善](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)**：製品要求／設計／コードの静的テスト、Charter／Knowledgeからの直接開始、評価結果から計画等の正本改版と効果測定。
-10. **[目的・工程対応とレビュー記録](../reports/2026-11-07_qa-process-responsibility-and-artifact-contract-review.md)**：確定済みQ01〜Q08、現行23 Skillとの工程対応、当時の未解決課題・判断根拠。実装契約の正本ではなく調査時点の記録として読む。
+10. **[QA遂行効率の比較評価・受入](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)**：同一QA目的の変更前後を実Agentで測定し、処理時間・Agent利用・人間の確認・再利用と再実行・品質／安全の独立基準を比較する。QA案件の改善を担当する`test-evaluation`とは別の開発時受入。
+11. **[目的・工程対応とレビュー記録](../reports/2026-11-07_qa-process-responsibility-and-artifact-contract-review.md)**：確定済みQ01〜Q08、現行23 Skillとの工程対応、当時の未解決課題・判断根拠。実装契約の正本ではなく調査時点の記録として読む。
 
 ## 全体フローと責務
 
@@ -81,7 +82,7 @@ flowchart TD
 - **外側との境界**：起動、常時監視、通知、定期照合はSkillの責務外。図の矢印が自動起動・常時接続を意味するわけではない。
 - **判定の正本**：`qa-workflow`はルーティングと状態を管理し、仕様・Risk・TC・実行結果・欠陥候補・計画・報告の判断は各ownerが保持する。修正確認の再実行は元の実行Skillに戻す。
 - **継続と例外**：変更時は依存する成果物だけ再検証する。未確認・権限不足・保存／実行失敗は該当scopeをblockedにし、再依頼時にcurrentを検証する。CI受渡し方式が未選定の実接続は未完了とする。
-- **実行経路の詳細**：[開発連動QA Plan](./2026-11-07_122247_development-qa-traceability.md)と[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を参照する。
+- **実行経路の詳細**：[開発連動QA Plan](./2026-11-07_122247_development-qa-traceability.md)と[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を参照する。図は1回のQA依頼の成果物連携を示す。**Skill構成自体の効率化の比較受入**は[詳細07](./2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)で開発時に実測するものであり、通常QAの処理に必ず新しいSkillを起動する矢印ではない。
 
 ## Planごとの責務
 
@@ -105,7 +106,7 @@ flowchart TD
 - `defect-management`：欠陥候補の根拠・外部Issue引継ぎと追跡、修正確認の依頼・結果参照。正式Issueの状態は外部サービス、再実行・判定は既存実行owner。
 - `test-reporting`：複数のテスト方式のraw結果・対象build・計画上の母集団を参照する統合snapshot。元runとPASS/FAILを更新しない。
 - `test-evaluation`：QA活動の効果・効率・改善・保管・引継ぎの評価。Skill自体の評価は`EVALS.md`。
-- **E2E以外**の保存可能な自動テストコード実装・更新は新設`testware-implementation`、E2E以外のrunner実行・非ブラウザTC直接実行・診断は新設`testware-execution`が担当する。Playwright Test製APIテストを含める。静的レビューは`adversarial-review`の対象を拡張し、静的解析ツールの実行は`testware-execution`が担当する。詳細は追加契約_04〜_06を正本とする。
+- **E2E以外**の保存可能な自動テストコード実装・更新は新設`testware-implementation`、E2E以外のrunner実行・非ブラウザTC直接実行・診断は新設`testware-execution`が担当する。Playwright Test製APIテストを含める。静的レビューは`adversarial-review`の対象を拡張し、静的解析ツールの実行は`testware-execution`が担当する。実行・workflow／Knowledge等の責務は詳細契約_04〜_06、Skill構成の効率比較は詳細契約_07を正本とする。
 
 **担当しないこと**：開発連動QAの機能ID・アイテムID・共通条件候補の採番／更新、製品仕様Authority、Product Risk、既存TR／正式TCN／CI／TC、Regression Run、実行ownerのraw結果や製品CIの開発差分検証。
 
@@ -125,10 +126,10 @@ flowchart TD
 4. **テストレベル／タイプの割当**：案件・ユーザーの明示指定、承認済みアーキテクチャ割当、既存`test-analysis`既定システムテストの順。矛盾した部分だけ判断元へ戻し、変更影響があるTR/TCN/CI/TCを再検証する。
 5. **テストアイテム・共通条件候補と正式TCNの識別**：前二者は開発連動QA Plan、正式採否・TCNは既存`test-condition-design`、具体的TCは`test-case-design`。
 6. **テスト実装・実行**：PlaywrightブラウザE2Eとブラウザ直接TC実行の既存Skillを維持する。テストアーキテクチャが方式・環境、`test-management`が非Regressionのsuite・順序、実装ownerがfixture／設定、実行ownerが実runのpreflightを担当する。API・バッチ等は`testware-implementation`がテストコード、`testware-execution`が実runnerによる実測を担当する。対象SUTの製品改修は含めない。
-7. **FAIL・Observationから欠陥候補を管理**：実測・原因分析の正本は実行owner（非Playwrightでは`testware-execution`が第一分析owner）、QA側の追跡は`defect-management`、正式Issueは外部システム。修正確認は既存TC／testwareを使って実行ownerへ依頼する。
+7. **FAIL・Observationから欠陥候補を管理**：実測・原因分析の正本は実行owner（非E2Eでは`testware-execution`が第一分析owner）、QA側の追跡は`defect-management`、正式Issueは外部システム。修正確認は既存TC／testwareを使って実行ownerへ依頼する。
 8. **集計・完了判断**：計画上の対象source一覧は`test-management`、各実測はsource owner、横断集計は`test-reporting`、活動評価は`test-evaluation`。workflowの完了と製品テストのPASS／リリース可否を混同しない。
 9. **保存・承認・競合**：担当するデータのownerは各Skillのまま。provider-native CAS、対象scope／revisionと認証された承認主体、取得完全性・受入証拠の共通条件は保存・承認・集計の詳細文書で検証する。
-10. **Skill選択・局所停止・再開**：既存`qa-workflow`を再利用する。未登録Skill・検証証拠のないscopeを完了にしない。別セッションから既存owner成果物を再読込して再開する。別の中央オーケストレーターや第二のartifact graphを追加しない。
+10. **Skill選択・局所停止・再開**：既存`qa-workflow`を再利用する。`qa-knowledge`はidentityとscopeの一致・検索対象別の現在性を検証する。Regressionは補助testwareの実施義務をActivity完了条件に含める。testware編集は反映時の競合を拒否する。未登録Skill・検証証拠のないscopeを完了にしない。別セッションから既存owner成果物を再読込して再開する。別の中央オーケストレーターや第二のartifact graphを追加しない。
 
 ## 依存・実装順序と完了の扱い
 
@@ -136,7 +137,7 @@ flowchart TD
 2. **開発連動QAの作業**：開発差分・製品機能・spec／UI・item／条件候補・正式テスト設計への追跡と、CI・保存・承認・移行を既存Planの全完了条件に従って実装・検証する。
 3. **QA全工程の追加責務**：PR #22の新Skillがない状態でも既存仕様／TC／実行結果を利用した単独経路を実装・受入できる。6つの担当領域と非Webの実装・実行、共通契約を欠かさない。
 4. **実成果物間の統合**：PR #22実装後、feature／item／条件候補のID・source revision・履歴とQA要求・計画・報告を実際に接続する。**計画上の型だけの照合は統合受入を満たさない**。ID移行、並行更新、既存成果物再利用、局所stale・復旧を確認する。
-5. **最終完了ゲート**：開発連動QAの既存Planの15完了条件と、QA全工程Planの10完了条件、6詳細文書の完了条件、実Agent／実runner／実provider受入をそれぞれ確認する。一方の成功を他方の未検証の代用にせず、未実行／SKIP／権限不足は独立して記録する。
+5. **最終完了ゲート**：開発連動QAの既存Planの15完了条件と、QA全工程Planの10完了条件、7詳細文書の完了条件、実Agent／実runner／実provider受入をそれぞれ確認する。一方の成功を他方の未検証の代用にせず、未実行／SKIP／権限不足は独立して記録する。
 
 **PRの位置付け**：PR #22はこれらの計画・調査文書を保存する文書変更PR。Skill・runtime・CI・製品実装を変更したわけではない。将来の実装PRの数や担当は別途作業指示に従い、どの実装PRでも上記の契約と未完了条件を維持する。
 
