@@ -37,7 +37,7 @@
 - `defect-management`：欠陥候補の根拠・外部Issue引継ぎと追跡、修正確認の依頼・結果参照。正式Issueの状態は外部サービス、再実行・判定は既存実行owner。
 - `test-reporting`：複数のテスト方式のraw結果・対象build・計画上の母集団を参照する統合snapshot。元runとPASS/FAILを更新しない。
 - `test-evaluation`：QA活動の効果・効率・改善・保管・引継ぎの評価。Skill自体の評価は`EVALS.md`。
-- 非Web・非機能・静的テストの実装・実行の接続、追加責務の保存・承認・集計・実Agent受入については、上記2詳細文書を正本とする。
+- 非Webのテストコード実装・更新は新設`testware-implementation`、非Playwright runnerの実行・結果・cleanupは新設`testware-execution`を担当Skillとする。非機能・静的テストの専門方式および保存・承認・集計・実Agent受入は上記2詳細文書を正本とし、既存Playwright系へ責務を移さない。
 
 **担当しないこと**：開発連動QAの機能ID・アイテムID・共通条件候補の採番／更新、製品仕様Authority、Product Risk、既存TR／正式TCN／CI／TC、Regression Run、実行ownerのraw結果や製品CIの開発差分検証。
 
@@ -48,7 +48,7 @@
 3. **QA活動の要求・目標・開始／終了基準が不明**：QA全工程Planの要求分析／`test-management`へ戻す。個別TRと案件QA目標を混同しない。
 4. **テストレベル／タイプの割当**：案件・ユーザーの明示指定、承認済みアーキテクチャ割当、既存`test-analysis`既定システムテストの順。矛盾した部分だけ判断元へ戻し、変更影響があるTR/TCN/CI/TCを再検証する。
 5. **テストアイテム・共通条件候補と正式TCNの識別**：前二者は開発連動QA Plan、正式採否・TCNは既存`test-condition-design`、具体的TCは`test-case-design`。
-6. **テスト実装・実行**：Playwright固有の既存Skillを維持する。API・バッチ等の実装・実行の責務は非Web詳細Planへ。対象SUTの製品改修は含めない。
+6. **テスト実装・実行**：Playwright固有の既存Skillを維持する。API・バッチ等は`testware-implementation`がテストコード、`testware-execution`が実runnerによる実測を担当する。対象SUTの製品改修は含めない。
 7. **FAIL・Observationから欠陥候補を管理**：実測・原因分析の正本は実行owner、QA側の追跡は`defect-management`、正式Issueは外部システム。修正確認は既存TC／testwareを使って実行ownerへ依頼する。
 8. **集計・完了判断**：計画上の対象source一覧は`test-management`、各実測はsource owner、横断集計は`test-reporting`、活動評価は`test-evaluation`。workflowの完了と製品テストのPASS／リリース可否を混同しない。
 9. **保存・承認・競合**：担当するデータのownerは各Skillのまま。provider-native CAS、対象scope／revisionと認証された承認主体、取得完全性・受入証拠の共通条件は保存・承認・集計の詳細文書で検証する。
