@@ -16,6 +16,47 @@
 6. **[工程間handoff・継続・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)**：初回・PR／rebase／merge・資料のみの改版・計画改版・欠陥・E2E・Regressionの各入口、停止・再開、実行準備、E2E実受入、全current Skill発火評価。QA全工程Planの詳細文書であり、Agent起動／監視やE2E本体を再実装しない。
 7. **[目的・工程対応とレビュー記録](../reports/2026-11-07_qa-process-responsibility-and-artifact-contract-review.md)**：確定済みQ01〜Q08、現行23 Skillとの工程対応、当時の未解決課題・判断根拠。実装契約の正本ではなく調査時点の記録として読む。
 
+## 全体フローと責務
+
+以下は**責務間の成果物の依存**を示す。上から順に全Skillを起動する手順ではない。既存成果物が有効なら途中から開始できる。図中の「予定」はPR #22とQA全工程Planで新設を計画したSkillで、まだ実装されていない。
+
+```mermaid
+flowchart TD
+    caller["利用者・外部の仕組み：依頼と変更入力（Skill外）"]
+    route["既存 qa-workflow：Skill選択・局所停止・再開"]
+    caller --> route
+
+    manage["予定：QA要求・テストアーキテクチャ・テスト管理"]
+    develop["予定：機能・UI・item／条件候補の分析"]
+    design["既存：仕様Authority・Product Risk・TR／TCN／CI／TC"]
+    e2e["既存：Playwright E2Eの実装・実行・分析"]
+    nonweb["予定：非Web testwareの実装・実行・分析"]
+    defect["予定：欠陥候補の追跡・修正確認の引継ぎ"]
+    report["予定：統合報告"]
+    evaluate["予定：QA活動評価・改善"]
+
+    route -->|QAの目的・計画| manage
+    route -->|開発差分・外部資料改版| develop
+    route -->|有効な既存TCから直接開始| design
+    route -->|有効な既存E2Eから直接開始| e2e
+    manage -.->|対象・レベル・方式・開始基準| design
+    develop -->|機能・仕様・item／条件候補| design
+    design -->|E2E対象なら| e2e
+    design -->|非Web対象なら| nonweb
+    e2e -->|raw結果・診断| defect
+    nonweb -->|raw結果・診断| defect
+    e2e -->|実測とcleanup| report
+    nonweb -->|実測とcleanup| report
+    manage -->|計画・終了基準| report
+    defect -->|候補と外部Issue参照| report
+    report -->|集計根拠| evaluate
+```
+
+- **外側との境界**：起動、常時監視、通知、定期照合はSkillの責務外。図の矢印が自動起動・常時接続を意味するわけではない。
+- **判定の正本**：`qa-workflow`はルーティングと状態を管理し、仕様・Risk・TC・実行結果・欠陥候補・計画・報告の判断は各ownerが保持する。修正確認の再実行は元の実行Skillに戻す。
+- **継続と例外**：変更時は依存する成果物だけ再検証する。未確認・権限不足・保存／実行失敗は該当scopeをblockedにし、再依頼時にcurrentを検証する。CI受渡し方式が未選定の実接続は未完了とする。
+- **実行経路の詳細**：[開発連動QA Plan](./2026-11-07_122247_development-qa-traceability.md)と[継続workflow・E2E受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を参照する。
+
 ## Planごとの責務
 
 ### 開発連動QA Planが変更・検証するもの
