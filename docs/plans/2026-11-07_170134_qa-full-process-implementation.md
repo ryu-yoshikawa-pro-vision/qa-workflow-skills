@@ -8,7 +8,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 全工程支援は、全工程の強制実行、あらゆるrunnerの自前実装、AIによる仕様確定／リスク受容／リリース承認を意味しない。依頼された成果物からの直接開始、既存current成果物の再利用、部分再実行、blockedと再開を維持する。
 
-**Planの位置付け**：この文書はQA要求・テストアーキテクチャ・管理・欠陥追跡・統合報告・活動評価という6つの追加責務を担当し、PR #22の機能抽出／設計Planを変更・置換しない。[Planインデックス](./INDEX.md)を入口とし、[非Webテスト実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)と[保存・承認・集計・受入の共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を詳細文書とする。PR #22の未確定Q06・Q20・Q24を推測で確定しない。今回の文書修正ではSkill・runtime・CIや製品コードの実装は行わない。
+**Planの位置付け**：この文書はQA要求・テストアーキテクチャ・管理・欠陥追跡・統合報告・活動評価という6つの追加責務を担当し、PR #22の機能抽出／設計Planを変更・置換しない。[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を入口とし、[非Webテスト実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)と[保存・承認・集計・受入の共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を詳細文書とする。PR #22の未確定Q06・Q20・Q24を推測で確定しない。今回の文書修正ではSkill・runtime・CIや製品コードの実装は行わない。
 
 ## 現状と根拠
 
