@@ -67,6 +67,23 @@
 5. 既存Baselineのmember判定・全列挙・scope identity、Runの部分選択、Activityの状態・raw結果参照・未解決を保持する。route追加後も旧保存物を誤読・再採番しない。必要なversion移行と旧形式読取を検証する。
 6. Regression Skillはrunnerを起動する責務を持たない。実行ownerは[テスト実行と品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)の方式選定に従って決め、選択Runの計画・要求route・実結果をRegressionへ渡す。
 
+### TCなし補助testwareの実施義務とActivity完了
+
+**変更対象**：`skills/regression-testing/scripts/regression_runtime.py::select_auxiliary_testware()`、`project_activity()`、`skills/regression-testing/evals/deterministic/validator.py`の`REG-D011`／`REG-D015`、Run／Activityのdata contract・template／fixture、既存Regression履歴の読取・version互換性。
+
+現在の`project_activity()`は`auxiliary_route_results`と補助件数を生成する一方、`activity_state`の完了／未開始判定に補助routeを含めない。**今回Runで実行義務を持つ補助testware**を明示し、正式TCのrequired routeとは別の集合としてActivity完了を判定する。
+
+1. **予定集合の確定**：Runの`auxiliary_routes`各entryに、`testware_ref`・対象実行owner・実装revision・run selection根拠・`completion_required`（真偽）を保持する。利用者の明示実行指示または有効なpolicyによって**今回実行する補助testwareとして選定された場合は`completion_required=true`**。参照候補・実行不要として記録するだけのentryは`false`とし、選定根拠が不明なまま値を推測しない。
+2. **独立した元結果**：`auxiliary_route_results`に元run／attempt ref、実開始・開始確認、raw結果、`result_finalized`、取得完全性、必要なcleanup・証拠を投影する。正式TCの`route_results`／`tc_execution_state`へ補助routeを混ぜない。
+3. **完了の必要十分条件**：Activityが`完了`となるには、今回Runの全required TC routeと`completion_required=true`の全補助routeの実開始、元結果確定、必要なraw結果の投影、cleanup終了、未解決事項なしを確認する。両集合が空なら`完了`にしない。`completion_required=false`の候補が未開始であることだけで完了を妨げない。
+4. **状態の区別**：義務のある補助routeが未開始・blockedならActivity全体は`完了`にせず、現在の開始済み件数に応じて既存の`ブロック中`／`部分完了（ブロック中あり）`を使用する。実開始済みだが元結果未確定なら`実行中`。補助のみのRunも必要な補助routeの実測に応じて`未開始`→`実行中`／`ブロック中`→`完了`の既存状態へ投影する。実行開始前のblockを実行済みにしない。
+5. **件数の分離**：`tc_member_count`、`executed_tc_count`、coverage分子・分母は正式TCだけに基づく。`auxiliary_testware_count`・`auxiliary_executed_count`・補助元結果件数は別計測し、補助PASSをTC PASSに加算しない。
+6. **schemaと旧履歴**：現行Runには`completion_required`がないため、旧Run・Activityを読取互換で保持し、過去の記録を遡って`完了`へ変更しない。旧Runを新しい実行へ再開する場合、現在の利用者指示・policyと旧選定証拠から実施義務を解決し、解決不能な補助が残る範囲は`blocked`とする。必要なRun／Activityの新revisionまたは新Activityを使用し、完了済みActivityの不変性を守る。
+7. **validator整合**：`project_activity()`で導出した状態だけでなく、決定論的validatorが元source実開始・確定・raw投影・cleanup・補助義務を独立に再計算する。`REG-D011`は正式routeと必須補助routeの両方を検証し、`REG-D015`はTC件数との分離と補助結果の取得完全性を検証する。
+8. **実行owner**：補助testwareの実行・診断・cleanupは元の`e2e-test-execution`または`testware-execution`の担当。`regression-testing`は実行を再起動せず、保存済み実測・参照と選定義務を集約する。
+
+**必須負例**：全TC required routeが完了していても必須補助routeが未開始なら`完了`を拒否する。補助routeのみの実行は`未開始`に固定されず、実測と確定状態を反映する。任意補助候補の未実行、TC＋補助の混在、partial Run、retry、skip、timeout、cleanup未確認、旧Activity、旧Runの義務不明を検証する。
+
 ### 必須検証
 
 - 固定`qa-training-store` commitで、TCに紐付いたVitestの選定→必要route→実開始→結果確定→Activityまでを通す。
@@ -90,6 +107,6 @@
 ## 完了条件
 
 1. 未登録Skill・未検証のowner成果物がworkflow完了を発生させない。対応登録済みの新設Skillが、単独・複合両方で検証済み成果物として扱える。
-2. RegressionのTCに紐付く非E2E実行が正式required routeに接続され、既存manual／E2E／TCなし補助経路の履歴・件数・状態が回帰しない。
+2. RegressionのTCに紐付く非E2E実行が正式required routeに接続され、TCなし補助testwareの実施義務・完了／未開始・結果確定がActivityに反映される。既存manual／E2E／TCなし補助経路の履歴・件数・状態、旧Run／Activityの読取互換性を回帰させない。
 3. 別セッションでも参照・現在性・停止理由から再開でき、Agent製品・モデル・CLIや外部自動起動を前提としない。
 4. ownerの責務境界、source／artifact currentness、必要な完了証拠は、実コード・fixture・実Agent・実runnerで確認する。Planへの記載だけでは完了としない。
