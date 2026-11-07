@@ -88,13 +88,13 @@ flowchart TD
 
 ### 開発連動QA Planが変更・検証するもの
 
-- `project-context`：案件のProject Contextの発見・作成・更新・参照・履歴を管理する。既存16節／stable key／DEC・ASMの互換性を守る。
+- `project-context`：案件のProject Contextの発見・作成・更新・参照・履歴に加え、人間も直接編集・レビューする成果物の配置・編集方針について、初回／変更時の提案・合意記録を担当する。既存16節／stable key／DEC・ASMの互換性を守り、既存成果物の無承認移動を行わない。
 - `feature-analysis`：製品機能の候補・安定ID・根拠・ソース範囲・変更差分を管理する。
 - `ui-target-analysis`：UI構造・操作・画面状態を管理し、製品の期待仕様Authorityは`spec-analysis`に残す。
 - `test-item-analysis`：テストアイテムを製品機能とは別IDで管理する。
 - `test-condition-analysis`：共通テスト条件候補の識別・安定ID・履歴を管理する。正式TCNは`test-condition-design`。
 - `e2e-test-selection`：技術非依存のE2E選定・理由・履歴を管理する。
-- 上記の既存Skill／runtimeへの接続、開発差分の正規化、PR／merge／releaseの現在性検証、製品CIへの保存成果物の受渡し、既存UI package移行、既存設計・coverageの互換性。
+- 上記の既存Skill／runtimeへの接続、開発差分の正規化、PR／merge／releaseの現在性検証、製品CIへの保存成果物の受渡し、既存UI package移行、既存設計・coverageの互換性。機能別に正本と影響範囲を確認できる参照を提供し、人間の編集をownerの検証・履歴へ取り込む。
 
 **担当しないこと**：QA案件のテスト計画・工数・進捗管理、正式欠陥の外部追跡、全方式の統合報告、QA活動効果の評価、非Web向けのテストコード・runner実装。機能抽出と製品CIだけでこれらの責務を完了したと扱わない。
 
@@ -133,8 +133,8 @@ flowchart TD
 
 ## 依存・実装順序と完了の扱い
 
-1. **既存baseline**：`main`とPR #22／PR #17／PR #10の差分・CI、既存owner・consumer・runtime・storageと直接開始経路を確認する。PR #17は`qa-workflow`、`test-analysis`、評価runtime／CIの変更を含むので、該当実装時に競合を再点検する。
-2. **開発連動QAの作業**：開発差分・製品機能・spec／UI・item／条件候補・正式テスト設計への追跡と、CI・保存・承認・移行を既存Planの全完了条件に従って実装・検証する。
+1. **既存baseline**：`main`とPR #22／PR #17／PR #10の差分・CI、既存owner・consumer・runtime・storage、成果物配置・人間編集の現状と直接開始経路を確認する。PR #17は`qa-workflow`、`test-analysis`、評価runtime／CIの変更を含むので、該当実装時に競合を再点検する。
+2. **開発連動QAの作業**：初回／配置変更時の成果物配置と人間編集の合意から、開発差分・製品機能・spec／UI・item／条件候補・正式テスト設計への追跡と、CI・保存・承認・移行を既存Planの全完了条件に従って実装・検証する。既存の合意済み構成は再確認を強制せず再利用する。
 3. **QA全工程の追加責務**：PR #22の新Skillがない状態でも既存仕様／TC／実行結果を利用した単独経路を実装・受入できる。6つの担当領域と非Webの実装・実行、共通契約を欠かさない。
 4. **実成果物間の統合**：PR #22実装後、feature／item／条件候補のID・source revision・履歴とQA要求・計画・報告を実際に接続する。**計画上の型だけの照合は統合受入を満たさない**。ID移行、並行更新、既存成果物再利用、局所stale・復旧を確認する。
 5. **最終完了ゲート**：開発連動QAの既存Planの15完了条件と、QA全工程Planの10完了条件、7詳細文書の完了条件、実Agent／実runner／実provider受入をそれぞれ確認する。一方の成功を他方の未検証の代用にせず、未実行／SKIP／権限不足は独立して記録する。
