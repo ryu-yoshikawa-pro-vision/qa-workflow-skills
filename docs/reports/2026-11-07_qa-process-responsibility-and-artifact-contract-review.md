@@ -322,7 +322,7 @@ Q02とQ04は矛盾しない。**外部資料の変更を入力として扱うこ
 
 ### 反映の範囲と未実装の区別
 
-本レビューは**Planに必要な契約を確定する作業**であり、`qa-workflow`／Regression／新設Skill／静的レビューのコード変更や実Agent・実runnerでの受入を実施した記録ではない。実装時は[継続workflow S1〜S16](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)と各詳細Planの負例を用い、結果を独立に記録する。
+本レビューは**Planに必要な契約を確定する作業**であり、`qa-workflow`／Regression／新設Skill／静的レビューのコード変更や実Agent・実runnerでの受入を実施した記録ではない。実装時は[継続workflow S1〜S17](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)と各詳細Planの負例を用い、結果を独立に記録する。
 
 ## 13. QA Knowledge・補助Regression・並行編集・効率化の追加レビュー（2026-11-07）
 
