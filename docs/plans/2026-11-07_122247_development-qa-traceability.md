@@ -13,7 +13,7 @@
 
 ## 本PlanとQA全工程Planの境界
 
-本Planは**開発連動QA**（開発差分から製品機能・仕様・アイテム・共通条件候補・正式設計への追跡、保存、製品CI連携）を担当する。QA案件全体の要求分析・アーキテクチャ・計画／進捗・欠陥追跡・統合報告・QA活動評価および非Webテストコードの実装・実行は[QA全工程の追加責務Plan](./2026-11-07_170134_qa-full-process-implementation.md)とその詳細文書が担当する。全体の依存関係、正本、実装順序、未実装時の受入条件は[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を参照する。工程間handoff、外部資料改版、E2Eへの接続と受入の詳細は[継続workflow・受入契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を正本とする。本Planの既存の15完了条件は変更しない。
+本Planは**開発連動QA**（開発差分から製品機能・仕様・アイテム・共通条件候補・正式設計への追跡、保存、製品CI連携）を担当する。QA案件全体の要求分析・アーキテクチャ・計画／進捗・欠陥追跡・統合報告・QA活動評価および非Webテストコードの実装・実行は[QA全工程の追加責務Plan](./2026-11-07_170134_qa-full-process-implementation.md)とその詳細文書が担当する。全体の依存関係、正本、実装順序、未実装時の受入条件は[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を参照する。工程間handoff、外部資料改版、E2Eへの接続と受入の詳細は[継続workflow・受入契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を正本とする。新設Skillの成果物を検証してworkflow完了に反映する規則は[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)、実装・実行方式は[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)に従う。本Planの既存の15完了条件は変更しない。
 
 ## 合意済みの要求
 
@@ -173,7 +173,7 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 ### 未確定の案件選定と共通受入
 
-当初の`Q01`では受入製品が未確定だったが、2026-11-07の後続回答で**`ryu-yoshikawa-pro-vision/qa-training-store`の固定commitを主要な実受入対象にする**と確定した。実施開始時に対象SHAを記録し、Playwrightと実在するVitestのcomponent／contracts／API関連テストを対象とする。足りないバッチ・外部連携・非機能等は独立fixtureで補い、fixtureだけの成功を対象製品の実受入に代えない。製品本体・既存正式仕様・既存テストは必要な許可がない限り読取専用とする。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
+**実受入対象は`ryu-yoshikawa-pro-vision/qa-training-store`の開始時固定commit**とする。実施開始時に対象SHAを記録し、Playwrightと実在するVitestのcomponent／contracts／API関連テストを対象とする。同repoの`tests/contracts/test-api.test.ts`はテスト制御API公開境界の検証であり、HTTP APIの検証能力を証明しない。HTTP API・バッチ・外部連携・非機能等の不足は独立fixtureで補い、fixtureだけの成功を対象製品の実受入に代えない。製品本体・既存正式仕様・既存テストは必要な許可がない限り読取専用とする。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
 
 ## データ・計算契約
 
@@ -321,6 +321,10 @@ flowchart TD
 - **Risk再評価の循環**：3cの相互照合結果、条件候補・認可・状態・開発差分が新しい失敗機構を示したら`test-analysis`へ影響範囲だけ戻す。そのRiskに依存するTR/TCN/CI/TCを`要再検証`とし、無関係なcurrent成果物を維持する。
 - **期待結果の不明点**：有効仕様がない場合は`spec-analysis`/`question-analysis`、条件候補の欠落・重複は`test-condition-analysis`、アイテム候補の不足は`test-item-analysis`、正式な適用関係の誤りは`test-condition-design`、具体的ケースの不整合は`test-case-design`へ戻す。観測事実と仕様Authorityを混同しない。
 - **継続確認**：Draft PRを含むPR/merge/releaseで開発差分→機能→仕様→アイテム候補/条件候補→Risk→TR→正式TCN/期待結果候補→CI/TCの鮮度を確認する。製品CIでは保存済みの分類・参照・現在性を決定論的に検証し、AIによる新しい意味判断をしない。
+
+**workflow完了検証の接続**：`qa-workflow`の`_default_expected_runtime_units()`は現行6 Skillに対応する。未登録の新設Skillや成果物検証結果を持たないscopeを、期待unitが空という理由で完了にしない。新設各Skillの検証正本を用い、必要な成果物ref・revision・検証結果の受渡しを[workflow runtime・Regression契約](./2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)で実装する。設計runtimeを持たない管理・報告のみの開始でも、各ownerの有効な結果で完了可能とする。
+
+**実行・改善への接続**：PlaywrightブラウザE2Eの正本は既存Skillのままとする。Playwright製API専用テストを含む非E2E実行、TCとrunnerの結果対応、静的テスト、探索・Knowledgeの直接開始、評価結果から計画への差戻しは[テスト実行・品質契約](./2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)と[静的テスト・改善契約](./2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)を適用する。
 
 ## 開発イベントとCIの契約
 
