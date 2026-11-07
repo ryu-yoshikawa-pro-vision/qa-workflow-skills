@@ -13,7 +13,7 @@
 
 ## 本PlanとQA全工程Planの境界
 
-本Planは**開発連動QA**（開発差分から製品機能・仕様・アイテム・共通条件候補・正式設計への追跡、保存、製品CI連携）を担当する。QA案件全体の要求分析・アーキテクチャ・計画／進捗・欠陥追跡・統合報告・QA活動評価および非Webテストコードの実装・実行は[QA全工程の追加責務Plan](./2026-11-07_170134_qa-full-process-implementation.md)とその詳細文書が担当する。全体の依存関係、正本、実装順序、未実装時の受入条件は[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を参照する。本Planの既存の完了条件は変更しない。
+本Planは**開発連動QA**（開発差分から製品機能・仕様・アイテム・共通条件候補・正式設計への追跡、保存、製品CI連携）を担当する。QA案件全体の要求分析・アーキテクチャ・計画／進捗・欠陥追跡・統合報告・QA活動評価および非Webテストコードの実装・実行は[QA全工程の追加責務Plan](./2026-11-07_170134_qa-full-process-implementation.md)とその詳細文書が担当する。全体の依存関係、正本、実装順序、未実装時の受入条件は[Planインデックス](./2026-11-07_170134_qa-full-process-implementation_00_index.md)を参照する。工程間handoff、外部資料改版、E2Eへの接続と受入の詳細は[継続workflow・受入契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を正本とする。本Planの既存の15完了条件は変更しない。
 
 ## 合意済みの要求
 
@@ -156,11 +156,11 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 ### Skill外の責務と案件固有設定
 
 - **情報源接続アダプタ**（Skillではない）：案件で許可されたGit / GitHub / Issue / 仕様書・設計資料サービス等から情報を取得し、取得範囲・revision・完全列挙可否・失敗・証拠参照を正規化して`feature-analysis`へ渡す。サービスごとに新Skillを増やさない。
-- **ローカルAgent**：担当Skillの規則を使って機能候補の意味判断・統合/分割、仕様分析を行う。モデルや認証方法は案件に従う。CI内では意味判断を実施しない。
+- **ローカルAgentとSkill**：Agentは担当Skillの規則で機能候補の意味判断・統合／分割、仕様分析を行う。**Agentの起動指示、CLIの選択、通知・定期実行・常時監視はSkill外**。Skillは渡された依頼・source revisionを受け、現在性、成果物、必要な再検証、停止・再開条件を返す。特定モデル・Agent製品・ハーネスを固定しない。CI内で意味判断を実施しない。
 - **製品repositoryのCI**：保存済みのローカル解析成果物と今回のPR / source revisionを、**決定論的に検証するだけ**とする。Draftを含む全PRに適用し、未分類差分、必須証拠不足、古いsnapshotを失敗させる。CI自身が候補や承認を生成しない。
 - **案件の承認者**：初回範囲、機能抽出結果、「影響なし」「対象外」、仕様未確定の進行可否、例外・残存リスク・リリースの承認を案件ポリシーに基づき行う。Skillは承認者を推測せず、必要な承認がない範囲はblockedにする。
 
-`project-context`がProject Contextの有効な参照とrevisionを確定し、各Skillはそこから情報源とアクセス方法・権限、対象repository / base branch、保存先、条件付き更新能力、許可されたAgent環境、承認者・例外ルール、通知・是正先、リリース台帳とbuild / deployment参照を受け取る。**未設定事項のサービスや承認者を固定値で補わない**。保存先が不明なら永続保存を実行せず、該当部分をblockedとする。取得可能な独立範囲の分析は続行できる。
+`project-context`がProject Contextの有効な参照とrevisionを確定し、各Skillはそこから情報源とアクセス方法・権限、対象repository / base branch、保存先、条件付き更新能力、案件の承認・例外ルール、是正先、リリース台帳とbuild / deployment参照を受け取る。通知／定期照合の設定と実行は呼び出し側の責務であり、Skillに起動設定・監視基盤を追加しない。**未設定事項のサービスや承認者を固定値で補わない**。保存先が不明なら永続保存を実行せず、該当部分をblockedとする。取得可能な独立範囲の分析は続行できる。
 
 ### 成果物の正本と既存契約
 
@@ -173,7 +173,7 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 ### 未確定の案件選定と共通受入
 
-`Q01`の受入製品は未確定。アクセスできる`ryu-yoshikawa-pro-vision/qa-training-store`を候補とし、UI以外の機能種別を十分に検証できるか調査する。製品にない種類は独立fixtureでも検証し、対象製品で未確認のものを「実製品受入済み」と報告しない。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
+当初の`Q01`では受入製品が未確定だったが、2026-11-07の後続回答で**`ryu-yoshikawa-pro-vision/qa-training-store`の固定commitを主要な実受入対象にする**と確定した。実施開始時に対象SHAを記録し、Playwrightと実在するVitestのcomponent／contracts／API関連テストを対象とする。足りないバッチ・外部連携・非機能等は独立fixtureで補い、fixtureだけの成功を対象製品の実受入に代えない。製品本体・既存正式仕様・既存テストは必要な許可がない限り読取専用とする。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
 
 ## データ・計算契約
 
@@ -293,9 +293,9 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 | マージ後     | 実際のmerge commit / target branchを新基準として検証。PR headの解析結果だけでマージ済みrevisionのcurrentを証明しない                                                                                  |
 | リリース前   | リリース対象のcommit / build、必要な環境・ロール・feature flagと成果物の基準revisionを照合。機能・仕様・テスト・実行状態と未解決リスクをまとめて判定する                                              |
 
-CIが扱う「変更差分の全件」は、イベントから決まるbase / headと確認対象に対して列挙できた全差分を意味する。外部Issueや設計資料の変更が観測できないときは、それを監視済みと偽らず、対応するsourceの未確認と再確認条件を示す。PR間に変更された外部資料もsource revision比較で検出する。
+CIが扱う「変更差分の全件」は、イベントから決まるbase / headと確認対象に対して列挙できた全差分を意味する。外部Issueや設計資料の変更が観測できないときは、それを監視済みと偽らず、対応するsourceの未確認と再確認条件を示す。PR間に変更された外部資料もsource revision比較で検出する。**PRが存在しない外部資料の改版**は、外側から渡された文書refと旧／新revision（または比較すべきsource snapshot）を独立起点として受け取り、`spec-analysis`等の正本に局所再確認を依頼する。通知・定期照合の実行とAgent起動はSkill外にあり、Skillが自ら常駐・ポーリングして変更を検知する設計にはしない。
 
-製品repository向けGitHub Actions接続、ローカルCLI、入力 / 出力schema、権限、導入手順を実装対象とする。既存CIを利用して必要な検証を実行し、再利用可能なworkflowまたは同等の手順で対象repositoryのPR・merge・releaseイベントに接続する。外部repositoryのCIに検証を追加しただけで、製品固有の実行環境に接続済みと誤認しない。
+製品repository向けの**決定論的検証の入力／出力契約**、対象source／artifact revision・hash、権限、導入・手動受渡し時の検証方法を実装対象とする。GitHub Actions等の実CI接続は、**案件で成果物の保存先・取得方式を選定した後**に、既存の製品CIへ必要な検証を接続して実証する。受渡し方式は現時点では未決定であり、選定前の製品CI統合受入を`blocked`とする。方式が設定済みのCIでは必須成果物の欠落・古いsnapshot・未分類差分をfailする。CIはAgentを起動せず、SkillにCLI・モデル・監視・通知の仕組みを実装させない。外部repositoryのCIに検証を追加しただけで、製品固有の実行環境に接続済みと誤認しない。
 
 CI判定方針：
 
@@ -304,6 +304,18 @@ CI判定方針：
 3. CI上でリスクを自動採点し直さない。Riskは`test-analysis`、仕様は`spec-analysis`、テスト網羅は`coverage-analysis`、実行事実はexecution ownerを正本とする。
 4. informational reportと合否の機械可読結果を同時に出す。GitHub UIのcheck結果やコメントだけを成果物の正本にしない。
 5. 変更のないPRでもsource範囲・revisionの妥当性を確認し、空差分を「全製品網羅100%」として扱わない。
+
+### Skill外から受け取る変更起点とCI受渡しの未確定事項
+
+2026-11-07の確定回答は次のとおり。過去の再設計Q01〜Q25、元Planの完了条件とは別の決定事項である。
+
+1. **起動と通知**：人間等が外側で必要な依頼を判断し、CLI等でAgentを起動する。Skillにはイベント監視・自動起動・定期ジョブ・通知の実装を求めない。Skillの責務は入力からの分析、正本への引継ぎ、revision照合、blocked／resumeの判断。
+2. **外部資料の改版**：コードPRとは独立に、Issue・仕様書・設計資料の変更をsource revisionの差として解析できること。通知／定期照合のどちらで入力を渡すかは案件側で選択するが、その仕組み自体はSkill外。改版通知だけでは仕様Authorityの変更を確定しない。
+3. **CI受渡し**：ローカルAgent成果物を製品CIが取得する方式・保存先・承認ポリシーは**案件ごとに実装時に選定**する。現時点でGit commit、共有ストレージ、artifact uploadなどを標準方式として固定しない。選定まで実CI統合受入は未完了／blockedであり、必須成果物の存在を仮定したCI成功を報告しない。
+4. **再実行の同一性**：入力sourceのbase/head、外部文書revision、対象build、Project Context、計画、Agent出力のartifact ref・hash、必要な承認revisionを明示。再開時はcurrentを再読込し、旧HEADの遅延結果や重複イベントを下流へ受理しない。
+5. **実受入製品**：`qa-training-store`の受入開始時に固定したcommitを中心に、存在が確認できるPlaywrightとVitestのテスト資産を利用し、不足技術だけ独立fixtureで補う。未実施の実製品受入をfixture成功で代替しない。
+
+工程間の入口別handoff、E2Eとの統合受入、保存途中の失敗・局所再開は[継続workflow・受入契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)を正本とする。実装者はこの契約に従って`qa-workflow`を拡張し、別オーケストレーターやSkill専用スケジューラを追加しない。
 
 ## セキュリティ・運用
 
@@ -355,8 +367,8 @@ CI判定方針：
 
 ### 6. 継続workflow・CI接続
 
-- `qa-workflow`でProject Context→feature / spec / UI→**item識別∥condition識別→候補相互照合**→Risk→TR→正式TCN / CI→TC→coverageと、必要時のE2E / Regressionをroutingする。初回 / PR更新 / マージ後 / リリース前の開始・再利用・再開を実装。旧revisionと最新revisionの区別、局所stale、影響なしの証拠、未分類時のfailを確認。
-- 製品repository向けの呼び出し方法、GitHub Actions連携、必要なsource input / artifact root / permissionを明示し、GitHub eventの重複・競合・fork・secretへの安全対策を実装。
+- `qa-workflow`でProject Context→feature / spec / UI→**item識別∥condition識別→候補相互照合**→Risk→TR→正式TCN / CI→TC→coverageと、必要時の既存E2E / Regressionをroutingする。[継続workflow・受入契約](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)に従い、初回／PR更新／rebase／merge後／リリース前／**外部資料のみの改版**を受け付け、現在のQA要求・アーキテクチャ・計画と照合し、局所再評価・停止・再開する。外側の起動・監視方式は実装しない。
+- 製品repository向けの決定論的検証入口と、必要なsource input / artifact ref／hash / permission、CIによるsource整合と旧HEAD拒否を明示する。**成果物受渡し方式が未選定のうちは実CI接続を未完了**とし、選定後に必要な連携とGitHub eventの重複・競合・fork・secret対策を検証する。呼び出し元の起動方法・モデル・Agent CLIは固定しない。
 - reportには開発差分全件、機能抽出、テストアイテム、独立した共通条件候補、双方の不足候補、item×condition候補と正式採否、期待結果候補のAuthority、仕様対応、TR / TCN / CI / TC、実行状況、未確認source、Riskと判断根拠を別々に表示する。
 
 ### 7. 評価・文書・検証
@@ -397,7 +409,7 @@ CI判定方針：
 - **Risk循環**：TR前の一次Riskが権限/条件/実装変更の新証拠で一部更新され、依存するTR/TCN/CI/TCのみstaleへ戻る。無関係なcurrent成果物と直前完了baselineは保持する。
 - **UI mode・E2E選定の移行**：`ui-target-v1`の00〜09、SPEC/DEC/UNKNOWN、AC/UIOP/SCOPE、Manifestとstable ID、scope readiness、旧callerとlegacy/retired/blockedを検証する。E2E対象選定を新Skillへ移した後も既存TCを使う直接E2E実装/実行を妨げない。
 - **統合受入**：独立fixtureで、確定済み注文の変更禁止・管理者権限・監査要件をUI/APIで確認する例を用い、機能→Authority/UI→アイテム候補∥条件候補→相互照合→Risk→TR→正式な適用判定・個別TCN→期待結果候補→CI→TC→実行まで検証する。バッチ/非UIのみ、横断非機能要件、変更後の再評価も検証する。fixtureは未決定の受入製品そのものではない。
-- **CIと実Agent**：Draft PR、merge、release、並行PR、旧baselineからのmigration、保存先への権限不足、改変された証拠の拒否、欠損・未知refとsafe blockについて、決定論的validatorと実Agentの意味品質を別々に検証する。未実行はPASS扱いしない。
+- **CIと実Agent**：Draft PR、merge、release、**コードPRのない外部資料改版**、並行PR、旧baselineからのmigration、保存先への権限不足、改変された証拠の拒否、欠損・未知refとsafe blockについて、決定論的validatorと実Agentの意味品質を別々に検証する。受渡し未選定時の`blocked`と、設定済みCIで必須artifactがない場合のfailを区別する。実Agent・実runnerの受入は固定`qa-training-store` SHAを使い、既存Playwright E2EのTCあり／TCなし／実行のみ経路も確認する。未実行はPASS扱いしない。
 
 ### 意味品質・統合テスト
 
