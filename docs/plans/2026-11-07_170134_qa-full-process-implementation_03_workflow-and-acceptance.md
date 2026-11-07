@@ -166,18 +166,18 @@ flowchart TD
 
 **受入環境**：`ryu-yoshikawa-pro-vision/qa-training-store`の**開始時に記録した固定commit SHA**を中心に、そこに実在するPlaywright E2EとVitestのcomponent／integration／contractsテストを確認して使う。`tests/contracts/test-api.test.ts`はテスト制御APIの公開境界を検証するため、HTTP APIの要求・応答・副作用の受入には使わない。実HTTPは独立fixtureで別受入にする。対象repoの製品実装・正式仕様・既存テストへ無断変更を加えない。実装を伴うテストは許可済みの作業用copy／branchで検証し、基準commitを不変にする。バッチ・非同期・非機能等の不足技術は独立fixtureで補い、fixture PASSを実製品受入済みとは報告しない。
 
-| 受入ケース          | 入口・入力                                     | 必須観測・拒否する誤り                                                                                                                           |
-| ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| S1 初回案件         | 固定製品source＋QA目的／仕様                   | Project Contextで既存配置・正本・人間編集手順を調べ、初回に必要な配置合意を保存。機能別参照から正本へ到達し、QA要求→アーキテクチャ→計画とfeature／spec／Risk／詳細設計の担当・未確定・承認を追跡できる                                                  |
-| S2 開発変更         | 固定base/headのPR／rebase                      | 差分網羅・feature／item／condition候補→Risk→正式設計、局所stale、旧HEAD結果の誤受容なし                                                          |
-| S3 E2E接続          | current TR/TCN/CI/TCとE2E選定                  | **既存**Playwright inspection→implementation→review／coverage→execution→結果分析／報告。TCあり・TCなし明示対象・既存E2E実行のみの3経路を独立検証 |
-| S4 非Web            | Vitest component／contracts・必要な独立fixture | TC/testware→runner準備→actual start→raw結果・cleanup→異常診断→統合報告。元runからPASS/FAILを再採点しない                                         |
-| S5 計画変更         | 日程・予算・環境・終了基準の改版               | 計画→構成割当→Risk／設計／必要実行だけ再確認し、無関係なcurrent成果物を維持                                                                      |
-| S6 異常・再開       | ソース取得失敗／CAS競合／承認失効／実行中断    | 未確認と0件を分離、状態不明副作用を再実行しない、旧revisionの誤採用・二重登録を防ぐ                                                              |
-| S7 欠陥・Regression | FAIL→外部Issue参照→修正通知                    | 原因の仮説と事実を分け、修正確認は既存実行owner、周辺Regressionは別Run、raw結果維持                                                              |
-| S8 外部資料改版     | **コードPRなし**の旧／新文書revision           | Skillが改版を独立入力として受付・局所再評価。通知／定期監視は外側の責務、取得不能は`unknown`                                                     |
-| S9 リリース前       | merge commit／実buildと現行計画・各実行結果    | source inventoryと終了基準を照合、残存Risk・未実行・必要承認を示し、自動releaseしない                                                            |
-| S10 評価・継続改善  | 計画・進捗・実績・過去改善・引継ぎ             | 5軸の根拠と分母、未測定・比較不能・改善未完を可視化し、`qa-knowledge`へ必要な候補だけ引渡す                                                      |
+| 受入ケース          | 入口・入力                                     | 必須観測・拒否する誤り                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S1 初回案件         | 固定製品source＋QA目的／仕様                   | Project Contextで既存配置・正本・人間編集手順を調べ、初回に必要な配置合意を保存。機能別参照から正本へ到達し、QA要求→アーキテクチャ→計画とfeature／spec／Risk／詳細設計の担当・未確定・承認を追跡できる |
+| S2 開発変更         | 固定base/headのPR／rebase                      | 差分網羅・feature／item／condition候補→Risk→正式設計、局所stale、旧HEAD結果の誤受容なし                                                                                                                |
+| S3 E2E接続          | current TR/TCN/CI/TCとE2E選定                  | **既存**Playwright inspection→implementation→review／coverage→execution→結果分析／報告。TCあり・TCなし明示対象・既存E2E実行のみの3経路を独立検証                                                       |
+| S4 非Web            | Vitest component／contracts・必要な独立fixture | TC/testware→runner準備→actual start→raw結果・cleanup→異常診断→統合報告。元runからPASS/FAILを再採点しない                                                                                               |
+| S5 計画変更         | 日程・予算・環境・終了基準の改版               | 計画→構成割当→Risk／設計／必要実行だけ再確認し、無関係なcurrent成果物を維持                                                                                                                            |
+| S6 異常・再開       | ソース取得失敗／CAS競合／承認失効／実行中断    | 未確認と0件を分離、状態不明副作用を再実行しない、旧revisionの誤採用・二重登録を防ぐ                                                                                                                    |
+| S7 欠陥・Regression | FAIL→外部Issue参照→修正通知                    | 原因の仮説と事実を分け、修正確認は既存実行owner、周辺Regressionは別Run、raw結果維持                                                                                                                    |
+| S8 外部資料改版     | **コードPRなし**の旧／新文書revision           | Skillが改版を独立入力として受付・局所再評価。通知／定期監視は外側の責務、取得不能は`unknown`                                                                                                           |
+| S9 リリース前       | merge commit／実buildと現行計画・各実行結果    | source inventoryと終了基準を照合、残存Risk・未実行・必要承認を示し、自動releaseしない                                                                                                                  |
+| S10 評価・継続改善  | 計画・進捗・実績・過去改善・引継ぎ             | 5軸の根拠と分母、未測定・比較不能・改善未完を可視化し、`qa-knowledge`へ必要な候補だけ引渡す                                                                                                            |
 
 ### 独立開始と追加受入
 
