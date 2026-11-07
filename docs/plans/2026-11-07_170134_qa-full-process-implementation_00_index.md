@@ -29,7 +29,10 @@ flowchart TD
     manage["予定：QA要求・テストアーキテクチャ・テスト管理"]
     develop["予定：機能・UI・item／条件候補の分析"]
     design["既存：仕様Authority・Product Risk・TR／TCN／CI／TC"]
+    selection["予定：e2e-test-selection（E2E対象の選定）"]
     e2e["既存：Playwright E2Eの実装・実行・分析"]
+    normal["既存：test-execution／exploratory-testing"]
+    regression["既存：regression-testing（Run選定）"]
     nonweb["予定：非Web testwareの実装・実行・分析"]
     defect["予定：欠陥候補の追跡・修正確認の引継ぎ"]
     report["予定：統合報告"]
@@ -41,15 +44,22 @@ flowchart TD
     route -->|有効な既存E2Eから直接開始| e2e
     manage -.->|対象・レベル・方式・開始基準| design
     develop -->|機能・仕様・item／条件候補| design
-    design -->|E2E対象なら| e2e
+    design -->|E2E価値を判断する場合| selection
+    selection -->|対象に選定| e2e
+    design -->|一般TC／探索| normal
+    design -->|Regression対象| regression
+    regression -.->|選定結果を実行ownerへ| e2e
+    regression -.->|選定結果を実行ownerへ| nonweb
     design -->|非Web対象なら| nonweb
-    e2e -->|raw結果・診断| defect
-    nonweb -->|raw結果・診断| defect
+    e2e -->|異常時の診断| defect
+    normal -->|異常時の診断| defect
+    nonweb -->|異常時の診断| defect
     e2e -->|実測とcleanup| report
+    normal -->|実行・探索の結果| report
     nonweb -->|実測とcleanup| report
     manage -->|計画・終了基準| report
     defect -->|候補と外部Issue参照| report
-    report -->|集計根拠| evaluate
+    report -->|必要時：集計根拠| evaluate
 ```
 
 - **外側との境界**：起動、常時監視、通知、定期照合はSkillの責務外。図の矢印が自動起動・常時接続を意味するわけではない。
