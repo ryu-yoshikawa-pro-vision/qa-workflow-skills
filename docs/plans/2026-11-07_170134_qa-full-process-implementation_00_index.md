@@ -140,17 +140,6 @@ flowchart TD
 
 **PRの位置付け**：PR #22はこれらの計画・調査文書を保存する文書変更PR。Skill・runtime・CI・製品実装を変更したわけではない。将来の実装PRの数や担当は別途作業指示に従い、どの実装PRでも上記の契約と未完了条件を維持する。
 
-## レビュー指摘と修正箇所
-
-- P1-1 非Webテストコード実装のowner欠落 → 非Web実装・実行詳細Plan。
-- P1-2 テストレベル決定の重複 → QA全工程Planの`test-architecture-design`と本索引の優先順位。
-- P1-3 native CASと保存先の未確定 → 保存・承認・集計の詳細文書（provider検証・競合試験・blocked）。
-- P1-4 統合報告の母集団不明 → `test-management`と`test-reporting`のsource inventory契約。
-- P1-5 承認・外部Issue認可の証拠不足 → 保存・承認・集計の詳細文書（認証主体・scope・revision・重複防止）。
-- P2-1 PR #22未実装時と実装後の受入の混同 → 本索引の順序・QA全工程Planの独立した完了ゲート。
-- P2-2 実Agent受入の正解／負例不足 → 保存・承認・集計の詳細文書の独立基準ケース。
-- P2-3 PR本文の変更内容が古い → PR本文に現行の文書構成・検証状況を反映する。
-
 ## 実装開始時の確認事項
 
 - 各Skillで利用するsource ref、stable ID、現在性・schema・Migrationの既存契約と参照先。
