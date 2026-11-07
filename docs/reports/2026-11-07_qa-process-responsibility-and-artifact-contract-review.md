@@ -249,38 +249,39 @@ PR #22は**開発情報源→製品機能→仕様・UI→テストアイテム�
 
 **今回実施したこと**：既存資料・PRの読み取り、過去のレビュー結果と確定方針の統合、工程別の責務・成果物契約とSkill新設／拡張の判断案の作成。\
 **未実施**：Skill/runtimes/CIの変更、実行テスト、実Agent受入、案件ごとの承認・保存先の決定、製品改修、PR #22のPlan更新・完了宣言。
+
 ## 11. 追加レビュー10件と利用者回答の反映（2026-11-07）
 
 この節は、本レポート作成後の再レビューと利用者の確定回答を追記したもの。上記1〜10節は調査時点の事実・提案として保持する。実装契約の最新の正本は[Planインデックス](../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)および参照先Planであり、この報告をSkillやruntimeの実装済み証拠として扱わない。
 
 ### 利用者が確定した作業範囲と境界
 
-| 確認 | 回答・影響 |
-| --- | --- |
-| Q01 今回の変更 | PR #22のPlan・索引・調査レポート・PR本文に限る。Skill／runtime／CI実装は明示依頼まで実施しない |
-| Q02 Agent起動 | 外部の担当者等がCLIなどで起動する。指示・常時監視・通知・定期実行はSkillの責務外。Skillが入力後の分析・成果物・handoff・局所停止・再開を担当 |
-| Q03 CI受渡し | ローカル成果物の製品CIへの受渡し方式は未決定。実装時に案件ごとに選び、選定まで実CI受入はblocked。設定済み経路で必須成果物が欠落した場合はfail |
-| Q04 コードPRなしの外部資料改版 | Issue・仕様書・設計資料のrevision変更を独立した分析入力にする。通知／定期照合の切替は案件側で行い、その実装をSkillへ含めない |
-| Q05 受入対象 | `qa-training-store`の受入開始時に固定したcommitを中心にPlaywright・Vitestで検証。バッチ・非機能等の不足は独立fixtureで補う |
-| Q06 特定CLI／モデル | 指定・固定しない。利用先のAgent製品・起動方式に依存しないSkillの正本・引継ぎ・検証を重視 |
-| Q07 非Web原因分析 | Skill数は固定しない。ただし第一分析ownerと、観測／仮説／確度／不足証拠／再実行先の成果物を必須にする。現Planでは`testware-execution`が第一owner。独立Skillへ分けるかは実装・評価を確認して判断 |
+| 確認                           | 回答・影響                                                                                                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q01 今回の変更                 | PR #22のPlan・索引・調査レポート・PR本文に限る。Skill／runtime／CI実装は明示依頼まで実施しない                                                                                                 |
+| Q02 Agent起動                  | 外部の担当者等がCLIなどで起動する。指示・常時監視・通知・定期実行はSkillの責務外。Skillが入力後の分析・成果物・handoff・局所停止・再開を担当                                                   |
+| Q03 CI受渡し                   | ローカル成果物の製品CIへの受渡し方式は未決定。実装時に案件ごとに選び、選定まで実CI受入はblocked。設定済み経路で必須成果物が欠落した場合はfail                                                  |
+| Q04 コードPRなしの外部資料改版 | Issue・仕様書・設計資料のrevision変更を独立した分析入力にする。通知／定期照合の切替は案件側で行い、その実装をSkillへ含めない                                                                   |
+| Q05 受入対象                   | `qa-training-store`の受入開始時に固定したcommitを中心にPlaywright・Vitestで検証。バッチ・非機能等の不足は独立fixtureで補う                                                                     |
+| Q06 特定CLI／モデル            | 指定・固定しない。利用先のAgent製品・起動方式に依存しないSkillの正本・引継ぎ・検証を重視                                                                                                       |
+| Q07 非Web原因分析              | Skill数は固定しない。ただし第一分析ownerと、観測／仮説／確度／不足証拠／再実行先の成果物を必須にする。現Planでは`testware-execution`が第一owner。独立Skillへ分けるかは実装・評価を確認して判断 |
 
 Q02とQ04は矛盾しない。**外部資料の変更を入力として扱うこと**はSkillの責務、**通知や定期照合で入力を生成しAgentを起動すること**はSkill外の責務とする。受渡し方式・案件の保存先や承認主体を推測して確定しない。
 
 ### 再レビューP1・P2の反映先
 
-| 指摘 | Planで補った責務／成果物 |
-| --- | --- |
-| P1-1 開発イベント→Agent→CI | [開発連動QA Plan](../plans/2026-11-07_122247_development-qa-traceability.md)に受付入力と意味判断・結果の責務境界を追加。[継続workflow・受入Plan](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)でsource snapshot、artifact ref/hash、保存・CI検証・blocked再開を定義。Agent起動はSkill外 |
-| P1-2 2つのPlanの工程間接続 | [Planインデックス](../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)と継続workflow・受入Planに、初回・PR・外部資料改版・計画改版・欠陥・E2E等の入口別owner・currentness・戻り先を追加 |
-| P1-3 テスト実行準備 | [非Web実装・実行Plan](../plans/2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)に、非Regressionスイート／順序、テストデータ・fixture・環境、今回runのpreflightの各正本と実行準備handoffを定義 |
-| P1-4 非Web実行の原因分析 | `testware-execution`を第一分析ownerとし、診断成果物・証拠・確度・再実行／修正の戻り先を必須にする。独立Skill新設は前提にしない |
-| P1-5 E2Eまでの受入 | `qa-training-store`固定commitで、新しいfeature/item/condition・正式TR/TCN/CI/TCから**既存E2E Skill**へ接続。TCあり／なし／既存E2Eだけの経路と実run／cleanup／報告を区別 |
-| P2-1 アーキテクチャと管理の改版 | [QA全工程Plan](../plans/2026-11-07_170134_qa-full-process-implementation.md)と継続workflow・受入Planで、日程・資源・品質特性・環境の変更を関連構成→Risk／設計へ差戻す |
-| P2-2 コードPRなし外部資料改版 | 外部から渡された資料revisionの独立入力と局所再評価を明記し、外部監視・通知の実装を除外 |
-| P2-3 静的／非機能テスト | 専門owner、採用基準Authority、ツール／測定、Finding・raw evidence、再検証と報告の分離を非WebPlanへ明記 |
-| P2-4 複数成果物途中失敗 | [保存・承認・集計の共通契約](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)でowner別の保存確定・状態不明・未開始、再読込と局所再開を定義 |
-| P2-5 全Skill発火・競合 | 全current Skill同時利用、近接Skillの負例、複合・途中開始・再開、観測可能な実Agent証拠を継続workflow・受入Planに追加。Skill数・モデル・CLIを固定しない |
+| 指摘                            | Planで補った責務／成果物                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1 開発イベント→Agent→CI      | [開発連動QA Plan](../plans/2026-11-07_122247_development-qa-traceability.md)に受付入力と意味判断・結果の責務境界を追加。[継続workflow・受入Plan](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)でsource snapshot、artifact ref/hash、保存・CI検証・blocked再開を定義。Agent起動はSkill外 |
+| P1-2 2つのPlanの工程間接続      | [Planインデックス](../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)と継続workflow・受入Planに、初回・PR・外部資料改版・計画改版・欠陥・E2E等の入口別owner・currentness・戻り先を追加                                                                                                                         |
+| P1-3 テスト実行準備             | [非Web実装・実行Plan](../plans/2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)に、非Regressionスイート／順序、テストデータ・fixture・環境、今回runのpreflightの各正本と実行準備handoffを定義                                                                                             |
+| P1-4 非Web実行の原因分析        | `testware-execution`を第一分析ownerとし、診断成果物・証拠・確度・再実行／修正の戻り先を必須にする。独立Skill新設は前提にしない                                                                                                                                                                                                     |
+| P1-5 E2Eまでの受入              | `qa-training-store`固定commitで、新しいfeature/item/condition・正式TR/TCN/CI/TCから**既存E2E Skill**へ接続。TCあり／なし／既存E2Eだけの経路と実run／cleanup／報告を区別                                                                                                                                                            |
+| P2-1 アーキテクチャと管理の改版 | [QA全工程Plan](../plans/2026-11-07_170134_qa-full-process-implementation.md)と継続workflow・受入Planで、日程・資源・品質特性・環境の変更を関連構成→Risk／設計へ差戻す                                                                                                                                                              |
+| P2-2 コードPRなし外部資料改版   | 外部から渡された資料revisionの独立入力と局所再評価を明記し、外部監視・通知の実装を除外                                                                                                                                                                                                                                             |
+| P2-3 静的／非機能テスト         | 専門owner、採用基準Authority、ツール／測定、Finding・raw evidence、再検証と報告の分離を非WebPlanへ明記                                                                                                                                                                                                                             |
+| P2-4 複数成果物途中失敗         | [保存・承認・集計の共通契約](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)でowner別の保存確定・状態不明・未開始、再読込と局所再開を定義                                                                                                                                              |
+| P2-5 全Skill発火・競合          | 全current Skill同時利用、近接Skillの負例、複合・途中開始・再開、観測可能な実Agent証拠を継続workflow・受入Planに追加。Skill数・モデル・CLIを固定しない                                                                                                                                                                              |
 
 ### 未検証・実装時の確認事項
 
