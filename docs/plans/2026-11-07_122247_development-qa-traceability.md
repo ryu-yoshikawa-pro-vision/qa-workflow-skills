@@ -23,18 +23,18 @@
 
 ### 確認した実装
 
-| 現行owner / ファイル | 再利用する契約 | 残る不足 |
-| --- | --- | --- |
-| `skills/spec-analysis/SKILL.md`、`references/ui-test-target-analysis.md` | 有効な仕様根拠、SPEC / DECISION / INFERENCE / UNKNOWN、UI target package | UI以外を含む製品全体の機能母集団・抽出網羅率の正本がない |
-| `skills/spec-analysis/assets/ui-test-target-analysis/00_scope_and_context.md` | `SCOPE`の対象範囲とready / blocked、`UIOP → US → UC → Behavior → AC` | SCOPEには親Scope列がなく、製品機能全体の階層とは一致しない |
-| `skills/spec-analysis/assets/ui-test-target-analysis/01_ui_structure_and_navigation.md` | 画面・状態等のUI構造の親子参照 | 機能階層の代替にはできない |
-| `skills/spec-analysis/assets/ui-test-target-analysis/08_repository_implementation_status.md` | 確認済みRepositoryのrevision・実装事実 | 開発情報源全件の発見・差分母集団の完了判定ではない |
-| `skills/spec-analysis/scripts/ui_target_package.py` | UI packageのID、参照検証、UNKNOWN、snapshot、Machine Entity、原子的更新 | 追加責務を同ファイルへ集中させない（調査時約218 KB） |
-| `skills/test-analysis/scripts/change_impact.py` | 既知変更からの最短影響経路 | ノード型はAuthority / Risk / TR / TCN / CI / TCで、開発差分・製品機能を直接扱わない |
-| `skills/coverage-analysis/scripts/traceability.py` | 仕様・Risk・TR・TCN・CI・TCの追跡性と閉鎖性 | 抽出前の開発機能候補、情報源確認の完全性は対象外 |
-| `skills/qa-workflow/SKILL.md`、`scripts/artifact_graph.py`、`scripts/workflow_runtime.py` | routing、局所blocked、freshness、状態・revision・CAS、previous baseline | 開発差分を起点とした機能抽出・再分析の入口を追加する |
-| `skills/test-target-inspection/SKILL.md` | 実対象の観測事実、条件、鮮度、安全・cleanup | 観測事実を仕様Authorityに自動昇格しない |
-| `skills/regression-testing/`、既存E2E Skill | baseline、対象選定、実装・実行結果 | 機能差分から関連TC / E2E / Regressionの再評価に接続する |
+| 現行owner / ファイル                                                                         | 再利用する契約                                                           | 残る不足                                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `skills/spec-analysis/SKILL.md`、`references/ui-test-target-analysis.md`                     | 有効な仕様根拠、SPEC / DECISION / INFERENCE / UNKNOWN、UI target package | UI以外を含む製品全体の機能母集団・抽出網羅率の正本がない                            |
+| `skills/spec-analysis/assets/ui-test-target-analysis/00_scope_and_context.md`                | `SCOPE`の対象範囲とready / blocked、`UIOP → US → UC → Behavior → AC`     | SCOPEには親Scope列がなく、製品機能全体の階層とは一致しない                          |
+| `skills/spec-analysis/assets/ui-test-target-analysis/01_ui_structure_and_navigation.md`      | 画面・状態等のUI構造の親子参照                                           | 機能階層の代替にはできない                                                          |
+| `skills/spec-analysis/assets/ui-test-target-analysis/08_repository_implementation_status.md` | 確認済みRepositoryのrevision・実装事実                                   | 開発情報源全件の発見・差分母集団の完了判定ではない                                  |
+| `skills/spec-analysis/scripts/ui_target_package.py`                                          | UI packageのID、参照検証、UNKNOWN、snapshot、Machine Entity、原子的更新  | 追加責務を同ファイルへ集中させない（調査時約218 KB）                                |
+| `skills/test-analysis/scripts/change_impact.py`                                              | 既知変更からの最短影響経路                                               | ノード型はAuthority / Risk / TR / TCN / CI / TCで、開発差分・製品機能を直接扱わない |
+| `skills/coverage-analysis/scripts/traceability.py`                                           | 仕様・Risk・TR・TCN・CI・TCの追跡性と閉鎖性                              | 抽出前の開発機能候補、情報源確認の完全性は対象外                                    |
+| `skills/qa-workflow/SKILL.md`、`scripts/artifact_graph.py`、`scripts/workflow_runtime.py`    | routing、局所blocked、freshness、状態・revision・CAS、previous baseline  | 開発差分を起点とした機能抽出・再分析の入口を追加する                                |
+| `skills/test-target-inspection/SKILL.md`                                                     | 実対象の観測事実、条件、鮮度、安全・cleanup                              | 観測事実を仕様Authorityに自動昇格しない                                             |
+| `skills/regression-testing/`、既存E2E Skill                                                  | baseline、対象選定、実装・実行結果                                       | 機能差分から関連TC / E2E / Regressionの再評価に接続する                             |
 
 現行UI target packageは`ui-target-v1`、既存Machine Entityは`entity-state-v2`。Scope ownership、部分再実行、stale / deleted / legacy、Machine Runtime証拠、前回成果物からの復元と移行経路は既存契約を尊重する。`qa-workflow`と`qa-knowledge`の保存先・並行更新・現在性の契約を別実装で置換しない。UI target packageは案件側の成果物であり、このSkillリポジトリに製品固有データを書き込まない。
 
@@ -59,19 +59,48 @@ CIの正本：`.github/workflows/validate-skills.yml`、`deterministic-output-ev
 
 Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠とは異なる正本だからである。情報源ごと、画面/APIごと、指標ごとのSkillを増やさない。内部Pythonモジュールは入力正規化、候補照合、階層・参照検証、網羅率、履歴・永続化の責務で分割し、巨大な単一スクリプトを作らない。
 
-### 既存Skillとの接続
+### Skillごとに固定する責務
 
-| owner | 変更する責務 |
-| --- | --- |
-| `feature-analysis` | 開発側の機能候補と機能構造の正本、抽出網羅率、開発変更の分類 |
-| `spec-analysis` | 新機能IDから現在有効なAuthority / UNKNOWN / 既存SCOPE・UI構造・ACへの明示的対応。仕様の正本は継続して本Skill |
-| `test-analysis` | 変更機能と関連Authority・Riskを入力に既存影響分析を利用。リスク採点・深度判断は現行owner |
-| `test-requirement-design`以下 | 既存のAuthority / AC→TR→TCN→CI→TCを維持。機能IDを理由に重複TRやTCを強制生成しない |
-| `coverage-analysis` | 新Skillで確認済みの機能・仕様対応結果を受け、機能→仕様→テスト設計のギャップを分析。抽出母集団は再計算しない |
-| `qa-workflow` | 初回・PR更新・マージ後・リリース前から開始し、blocked / stale / 再開 / 局所再検証をroutingする |
-| `regression-testing` / E2E | 変更影響の確定した既存TC / 自動テストとリリース対象revisionの実行状態を再評価する |
+情報源・AI実行環境・保存先・承認者・リリース方式は案件ごとに変わる。ただし**Skillの責務と正本ownerは案件ごとに変えない**。入力不足を理由に別Skillが責務を肩代わりせず、該当する範囲を未確認またはブロック中として残す。
 
-既存`ui-target-v1`のSCOPEは**仕様分析の作業範囲**として維持し、新しい機能IDと同一視しない。初期接続は`feature-analysis`側の明示的な`(package ref, Scope ID)`参照で行い、既存package schemaを無断で変更しない。複数機能↔複数SCOPE、機能↔UI構造・API・ジョブ等の多対多を許すが、機能階層の親は一つとし、共有・横断的な依存は別の参照で表す。既存データの無根拠な機能ID再採番は禁止する。
+| 担当                            | 固定する入力・責務・正本                                                                                                                                                | 担当しないこと                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `feature-analysis`（新設）      | 正規化された情報源・変更証拠を受け、確認済み情報源の範囲、予定/実装済みを区別した機能候補、安定した機能IDと階層、実装要素、機能影響の分類、抽出網羅率、未確認候補を管理 | 外部サービスの認証・直接取得、仕様Authority、QA影響とRisk、テスト設計・実行  |
+| `spec-analysis`                 | 機能IDを参照し、現在有効な仕様根拠とUNKNOWN、正常・代替・例外・権限・状態・制約（非UIを含む）、機能→Authority / SCOPE / ACの対応を管理                                  | 開発機能の母集団や機能IDの採番、Risk・テスト設計、実装・観測を仕様へ無断昇格 |
+| `question-analysis`             | 不明点・矛盾の分類、回答と元ownerへの差戻し                                                                                                                             | 機能・仕様・テストの第二の正本                                               |
+| `test-target-inspection`        | 許可された生きたUIの観測事実、確認条件、鮮度、安全・cleanup                                                                                                             | 仕様上の期待結果の確定、機能IDの採番                                         |
+| `test-analysis`                 | 開発変更と機能影響を入力に、**QA影響を別に判定**し、Product Risk・重点・テストレベル・変更影響を扱う                                                                    | 開発差分の機能分類、仕様の決定、Regression Runの最終選定                     |
+| `test-requirement-design`       | 有効なAuthority / ACとRiskからTRまたは正当なDispositionを定める                                                                                                         | 機能候補の抽出、仕様根拠の決定                                               |
+| `test-condition-design`         | TRからTCN、技法、coverage基準とCI（coverage item）を管理                                                                                                                | Risk再採点、テスト実行                                                       |
+| `test-case-design`              | TCN / CIから具体的TCと根拠ある期待結果を設計                                                                                                                            | 仕様の創作、テスト実測結果の判定                                             |
+| `coverage-analysis`             | 機能母集団・仕様対応・TR / TCN / CI / TCの証拠を読み、仕様対応率、テスト設計の閉鎖性、実設計済みとDispositionの内訳、横断的非機能要件の対応を評価                       | 情報源の再列挙、抽出網羅率の再計算、仕様やRiskの再判断                       |
+| `qa-workflow`                   | 初回・PR更新・マージ後・リリース前のrouting、再利用、局所停止、要再検証、再開と全体完了                                                                                 | 各Skill固有の意味判断、母集団・カバレッジの再計算、承認                      |
+| `regression-testing`            | 変更影響・Risk・既存TC baselineからRun対象と必要実行経路を決める                                                                                                        | Product Risk再採点、テストの実行と合否判定                                   |
+| `test-execution` / `e2e-test-*` | 担当するTC / E2Eのinspection・実装・実行・結果・分析・報告とbuild / 環境条件の記録                                                                                      | 機能・仕様・Risk・既存TCの第二の正本化                                       |
+| `qa-knowledge`                  | 未整理の知見を正本ownerへroutingし、他に正本がない継続QA知識だけを管理                                                                                                  | 機能一覧、Authority、Risk、TR / TCN / CI / TCの複製管理                      |
+
+**機能影響とQA影響は別判断**とする。例えば依存更新や設定変更を`feature-analysis`が「機能影響なし」と判断しても、`test-analysis`はQA影響とRiskを独立評価する。「機能影響なし」を「QA不要」へ自動変換しない。
+
+### Skill外の責務と案件固有設定
+
+- **情報源接続アダプタ**（Skillではない）：案件で許可されたGit / GitHub / Issue / 仕様書・設計資料サービス等から情報を取得し、取得範囲・revision・完全列挙可否・失敗・証拠参照を正規化して`feature-analysis`へ渡す。サービスごとに新Skillを増やさない。
+- **ローカルAgent**：担当Skillの規則を使って機能候補の意味判断・統合/分割、仕様分析を行う。モデルや認証方法は案件に従う。CI内では意味判断を実施しない。
+- **製品repositoryのCI**：保存済みのローカル解析成果物と今回のPR / source revisionを、**決定論的に検証するだけ**とする。Draftを含む全PRに適用し、未分類差分、必須証拠不足、古いsnapshotを失敗させる。CI自身が候補や承認を生成しない。
+- **案件の承認者**：初回範囲、機能抽出結果、「影響なし」「対象外」、仕様未確定の進行可否、例外・残存リスク・リリースの承認を案件ポリシーに基づき行う。Skillは承認者を推測せず、必要な承認がない範囲はblockedにする。
+
+Project Contextまたは指定された正本から、情報源とアクセス方法・権限、対象repository / base branch、保存先、条件付き更新能力、許可されたAgent環境、承認者・例外ルール、通知・是正先、リリース台帳とbuild / deployment参照を受け取る。**未設定事項のサービスや承認者を固定値で補わない**。保存先が不明なら永続保存を実行せず、該当部分をblockedとする。取得可能な独立範囲の分析は続行できる。
+
+### 成果物の正本と既存契約
+
+1. 製品機能ID・機能階層・実装要素・抽出母集団の正本は`feature-analysis`。Git管理の製品では`main`に対応した確定済み一覧を基準とし、PRごとは派生snapshotにする。複数PRの結果を無条件mergeせず、実際のmerge後に最新`main`へ再照合する。
+2. 機能IDとAuthority / UNKNOWN / SCOPE / AC等の**意味上の対応表の正本は`spec-analysis`**。既存`ui-target-v1`のSCOPEは仕様分析の作業範囲であり、機能IDと同一視しない。複数機能と複数SCOPEの参照を許す。非UIの仕様分解も`spec-analysis`が担当し、既存UI package契約を壊さず必要な出力を追加する。
+3. 抽出網羅率の計算は`feature-analysis`、仕様とテスト設計の網羅性の評価は`coverage-analysis`。正当なDispositionをテスト実設計済み件数に含めない。テスト実行状況はexecution ownerのsource resultを参照し、実行とPASSを区別する。
+4. workflow stateは既存`qa-workflow`。一方、`artifact_graph.py`のworkflow baseline保存は、案件共通の機能一覧の保存・同時更新を保証するとは扱わない。新しい機能一覧の保存先には、原子的条件付き更新・履歴参照・競合検出を独立に検証し、既存のhelperを使える範囲だけ再利用する。
+5. 新SkillのMachine Entity、`runtime-v2`、`entity-state-v2`、既存`change_impact.py`の型は実際の入出力契約に応じて変更する。新たな型を暗黙受理せず、shared runtimeの既存契約・migration・回帰テストを確認する。
+
+### 未確定の案件選定と共通受入
+
+`Q01`の受入製品は未確定。アクセスできる`ryu-yoshikawa-pro-vision/qa-training-store`を候補とし、UI以外の機能種別を十分に検証できるか調査する。製品にない種類は独立fixtureでも検証し、対象製品で未確認のものを「実製品受入済み」と報告しない。`Q04`の母集団は既存機能台帳があれば優先し、ない場合は独立した情報源一覧・差分列挙と突き合わせる。抽出処理が単独生成した候補集合を製品全体の独立した正解とみなさない。受入精度は既知の機能・変更と意図的な漏れを含む独立基準データで評価する。`Q20`の共通時間・費用上限は設けず、タイムアウト・権限不足・取得失敗の未完了判定と実行実績を残す。
 
 ## データ・計算契約
 
@@ -107,36 +136,36 @@ Skillの新設は、機能の母集団と階層がUI対象分析や仕様根拠�
 
 計算結果には数値だけでなく、母集団の証拠、対象revision、分母・分子の対象ID、対象外、未解決、情報源の取得完了状態を含める。以下は別指標とし、片方の100%を他方の完了の代用にしない。
 
-| 指標 | 計算・判定 |
-| --- | --- |
-| 開発差分分類率 | 確認できた開発差分のうち、理由付きで機能影響あり / 影響なし / 対象外に分類した件数 ÷ 全確認差分。未分類・未解決は分子に含めない |
-| 機能抽出網羅率 | 確認済みの対象機能候補のうち、安定した機能IDに対応し証拠付きで抽出した件数 ÷ 確認済みの対象機能候補総数。重複候補の正規化・除外理由を記録する |
-| 仕様対応率 | 有効な仕様根拠へ対応付けられた対象機能 ÷ 対象機能。UNKNOWN、実装観測のみ、未確認を分子へ含めない。仕様が不要と判断された場合は別の理由付き扱いとする |
-| テスト設計対応率 | 対象機能に関連する有効なAuthority / ACの下流が、現行のTR・TCN・CI・TCまたは正当なDispositionに閉じている割合。実際の適切性は`coverage-analysis`で意味確認する |
-| テスト実行状況 | 対象revision・環境のrequired execution routeに対する実行済み / 未実行 / blockedと結果内訳。実行とPASSを混同しない |
+| 指標             | 計算・判定                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 開発差分分類率   | 確認できた開発差分のうち、理由付きで機能影響あり / 影響なし / 対象外に分類した件数 ÷ 全確認差分。未分類・未解決は分子に含めない                               |
+| 機能抽出網羅率   | 独立した情報源一覧・機能台帳・根拠から同定した対象機能候補のうち、安定した機能IDへ対応付けた件数 ÷ 確認済み候補の総数。未確認情報源と母集団の限界を別表示する |
+| 仕様対応率       | 有効な仕様根拠へ対応付けられた対象機能 ÷ 対象機能。UNKNOWN、実装観測のみ、未確認を分子へ含めない。仕様が不要と判断された場合は別の理由付き扱いとする          |
+| テスト設計対応率 | 必要なテストレベルで現在有効なTR・TCN・CI・TCと意味上の対応が確認された割合。正当なDispositionは別集計し、実設計済み件数には含めない                          |
+| テスト実行状況   | 対象revision・環境のrequired execution routeに対する実行済み / 未実行 / blockedと結果内訳。実行とPASSを混同しない                                             |
 
 分母0、情報源の列挙未完了、候補同定不能、未解決差分、対象revision不一致、必要な上流成果物不足には、数値とは別に`complete=false` / `blocked` / `unknown`相当の判定を付ける。分母0を機械的に100%にしない。現在確認できた情報源に対する100%を「製品全体の全機能を確認」と報告しない。
 
 ### 5. 変更影響・鮮度・保存
 
-- `開発差分→機能→Authority / AC→Risk / TR→TCN→CI→TC→実装 / 実行`の明示関係を既存のEntity・変更影響・freshnessに接続する。機能とAuthorityの意味対応はAgent / ownerが判定し、近接pathや同じScopeだけで自動推定しない。
+- `開発差分→機能→Authority / AC→Risk / TR→TCN→CI→TC→実装 / 実行`の明示関係を既存のEntity・変更影響・freshnessに接続する。機能とAuthorityの意味対応は`spec-analysis`が根拠に基づき判定し、近接pathや同じScopeだけで自動推定しない。
 - 変更機能の下流のみ`要再検証`。依存が不明な範囲は「影響なし」ではなく`unknown`とし、確認完了まで該当判定を止める。無関係なcurrent成果物は再利用する。
 - 候補・機能・参照の履歴を保持し、削除後に同じIDを別の意味へ再利用しない。差分比較は前回と今回の明示的snapshot、artifact revision、source SHAを用いる。
-- 保存先は対象プロジェクトが管理するartifact root。製品固有の仕様・コード断片・証跡を`qa-workflow-skills` repositoryに保存しない。既存`qa-workflow`の保存・CAS・revision / snapshot契約を再利用し、共有mutable rootを単純なread→比較→無条件writeで更新しない。
+- 保存先は対象プロジェクトが管理するartifact root。製品固有の仕様・証跡を`qa-workflow-skills` repositoryに保存しない。既存`qa-workflow`のworkflow状態とは別に、機能一覧の原子的条件付き更新・履歴・競合検出を検証する。read→比較→無条件writeをCASと呼ばない。
 - 履歴・currentnessは「いつ分析したか」だけでなく「どの開発revisionと情報源で分析したか」で判断する。過去の結果と最新結果は書き換えずに比較可能にする。
 - 既存`ui-target-v1` packageや下流成果物との連携では、新機能IDとのcrosswalkを明示して移行。対応が一意でない旧成果物を推測移行せずblocked。移行検証前の旧成果物を削除しない。
 
 ## 開発イベントとCIの契約
 
-共通解析・検証はAgentからの手動実行とCIからの実行の両方を提供する。GitHub依存を新Skillの意味モデルへ埋め込まず、Git / GitHubの入力収集と正規化された検証を分ける。
+抽出・意味判断は許可されたローカルAgentで行い、CIは保存済みの成果物を決定論的に検証する。GitHub依存を新Skillの意味モデルへ埋め込まず、Git / GitHubの入力収集と正規化された検証を分ける。
 
-| 時点 | 処理と判定 |
-| --- | --- |
-| 初回全体分析 | 対象製品の明示baselineを全列挙し、情報源確認・機能抽出・階層・対応を確定。未確認領域があれば全体完了にしない |
-| PR作成・更新 | base/headを固定して変更ファイル・Issue / 文書等の関連差分を取得し、全差分を分類。前回PR更新からの差分と、新しいbaseとの差分の両方を取りこぼさない |
-| PR CI | 情報源列挙の失敗、未分類差分、欠落した分析証拠、旧revision結果の使い回し、参照不整合はfail。分類済み仕様 / テストのギャップは承認済みルールとRisk・理由でfail / warning / blockedを判定 |
-| マージ後 | 実際のmerge commit / target branchを新基準として検証。PR headの解析結果だけでマージ済みrevisionのcurrentを証明しない |
-| リリース前 | リリース対象のcommit / build、必要な環境・ロール・feature flagと成果物の基準revisionを照合。機能・仕様・テスト・実行状態と未解決リスクをまとめて判定する |
+| 時点         | 処理と判定                                                                                                                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 初回全体分析 | 対象製品の明示baselineを全列挙し、情報源確認・機能抽出・階層・対応を確定。未確認領域があれば全体完了にしない                                                                                          |
+| PR作成・更新 | base/headを固定して変更ファイル・Issue / 文書等の関連差分を取得し、全差分を分類。前回PR更新からの差分と、新しいbaseとの差分の両方を取りこぼさない                                                     |
+| PR CI        | 情報源列挙の失敗、未分類差分、欠落したローカル分析・承認証拠、旧revision結果の使い回し、参照不整合はfail。分類済み仕様 / テストのギャップは承認済みルールとRisk・理由でfail / warning / blockedを判定 |
+| マージ後     | 実際のmerge commit / target branchを新基準として検証。PR headの解析結果だけでマージ済みrevisionのcurrentを証明しない                                                                                  |
+| リリース前   | リリース対象のcommit / build、必要な環境・ロール・feature flagと成果物の基準revisionを照合。機能・仕様・テスト・実行状態と未解決リスクをまとめて判定する                                              |
 
 CIが扱う「変更差分の全件」は、イベントから決まるbase / headと確認対象に対して列挙できた全差分を意味する。外部Issueや設計資料の変更が観測できないときは、それを監視済みと偽らず、対応するsourceの未確認と再確認条件を示す。PR間に変更された外部資料もsource revision比較で検出する。
 
@@ -182,7 +211,7 @@ CI判定方針：
 
 ### 4. 既存仕様・設計成果物への接続と移行
 
-- `feature-analysis`→`spec-analysis`のAuthority / UNKNOWN / SCOPE crosswalk、`test-analysis`の変更影響、`coverage-analysis`の上流機能対応を追加する。
+- `feature-analysis`が機能一覧、`spec-analysis`が機能ID→Authority / UNKNOWN / SCOPE / AC対応表と非UIの仕様分解を所有し、`test-analysis`のQA影響判定と`coverage-analysis`の追跡性に接続する。
 - 既存`entity-state-v2` / Runtime evidence / scope ownership / currentnessを尊重し、必要な型・参照を既存ownerのcontractに沿って追加。未知ノードを既存runtimeが無条件受け入れる実装にしない。
 - 既存UI target package、通常spec-analysis、legacy成果物、既存TR/TCN/CI/TC、partial rerunの互換性を保ち、migration前後のID・依存・履歴・再開位置を検証する。関連が不明な旧artifactはblockedにする。
 
@@ -243,6 +272,7 @@ CI判定方針：
 7. 同じ製品の並行PR・失敗再試行・rebase・merge・releaseに対して、currentness、CAS、過去結果保護、秘密情報保護、実対象操作の安全契約が満たされる。
 8. 既存UI target package、通常spec-analysis、legacy、現行QA workflowsの互換性 / migration / rollback判定と回帰テストが成立する。
 9. Skill / runtime / CI / 評価データ / README・利用手順・運用文書を更新し、記載した独立検証および実製品相当の統合受入がPASSする。未検証・SKIP・失敗は成功扱いしない。
+10. 案件設定にかかわらず各Skillの正本と責務が一定で、情報源・保存先・承認者・実行環境が不足する場合は該当範囲を未確認またはblockedとする。CIは意味判断を代行しない。
 
 ## リスク・実装時の確認事項
 
