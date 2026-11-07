@@ -226,7 +226,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 ### 実Agent・対象案件受入
 
-[継続workflow・受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)のS1〜S16を対象とする。`qa-training-store`の受入開始時に固定したcommitを用い、既存PlaywrightのTCあり／TCなし／既存E2Eのみの経路とVitestの実runnerを確認する。足りない技術は独立fixtureで補うが実製品受入と区別する。
+[継続workflow・受入Plan](./2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)のS1〜S17を対象とする。`qa-training-store`の受入開始時に固定したcommitを用い、既存PlaywrightのTCあり／TCなし／既存E2Eのみの経路とVitestの実runnerを確認する。足りない技術は独立fixtureで補うが実製品受入と区別する。
 
 [共通契約の受入項目](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を用い、要求見落とし・欠陥の誤登録・二重計上・未確認事項の誤承認・競合更新について独立の正解／拒否条件を設定する。
 
