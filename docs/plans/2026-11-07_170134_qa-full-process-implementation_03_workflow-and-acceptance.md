@@ -69,6 +69,65 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 
 ## 変更・並行処理・途中失敗の再開
 
+### 依頼受付から局所再評価・保存・実行・CI検証まで
+
+```mermaid
+flowchart TD
+    external["利用者・外側の仕組み：依頼・source変更を渡す"]
+    routing["qa-workflow：必要Skill・対象scope・再開先を決定"]
+    owner["担当Skill：必要な正本とsource revisionを照合"]
+    current{"入力・成果物はcurrentか"}
+    reuse["有効な成果物を再利用"]
+    update["該当Skillだけ局所再評価"]
+    saveNeeded{"正本への書込みが必要か"}
+    available{"保存先のCAS・権限・必要承認は有効か"}
+    save["担当正本へ条件付き保存・読戻し"]
+    check{"source・依存revisionが一致するか"}
+    blocked["該当scopeだけblocked：理由・担当・再開条件"]
+    next{"依頼された次の工程"}
+    preflight["実行owner：build・環境・データ・権限を確認"]
+    ready{"実行とcleanupを安全に実施できるか"}
+    execute["既存E2E／非Web実行owner：実測・診断・cleanup"]
+    handoff["担当成果物・run／報告参照を返す"]
+    ciRequired{"外側で製品CI検証が必要か"}
+    ciReady{"成果物のCI受渡し方式は設定済みか"}
+    ci["製品CI：保存済み成果物とsourceを決定論的検証"]
+    failed["製品CI fail：欠落・旧版・未分類"]
+    finish["今回の依頼範囲の結果を返す"]
+
+    external --> routing
+    routing --> owner
+    owner --> current
+    current -->|有効| reuse
+    current -->|変更あり| update
+    current -->|必須情報・権限が不足| blocked
+    reuse --> next
+    update --> saveNeeded
+    saveNeeded -->|不要| next
+    saveNeeded -->|必要| available
+    available -->|不足・競合| blocked
+    available -->|有効| save
+    save --> check
+    check -->|一致| next
+    check -->|不一致| blocked
+    next -->|分析・設計・管理・報告| handoff
+    next -->|E2E・非Web実行| preflight
+    preflight --> ready
+    ready -->|不足・不明| blocked
+    ready -->|ready| execute
+    execute --> handoff
+    handoff --> ciRequired
+    ciRequired -->|不要| finish
+    ciRequired -->|必要| ciReady
+    ciReady -->|未選定| blocked
+    ciReady -->|設定済み| ci
+    ci -->|整合| finish
+    ci -->|不整合| failed
+    blocked -.->|条件解消後に外側から再依頼| external
+```
+
+図中の各判定は**担当Skillや既存実行ownerが返す結果に基づく論理的な引継ぎ**を示す。`qa-workflow`自身が仕様・Risk・欠陥・合否を再判定するわけではない。また、Skillが自動でAgentや製品CIを起動する意味でもない。外側から再依頼がなければblockedのまま保持する。保存先・CI受渡し方式が未選定なら、必要な実接続の受入はblockedであり、設定済みCIにおける必須成果物の不整合はfailとする。
+
 - source／計画／承認／runのrevisionごとに、どのownerがcurrentな成果物を持つかを固定する。上流変更は該当依存にだけ`要再検証`を付ける。
 - 個々のmutable書込みは実保存先のnative CAS／履歴で競合を検出する。**複数ファイル・複数ownerの更新は原子的とはみなさない**。途中で止まった場合は保存済み成果物と未保存成果物を別々に再読込し、必要な全参照・source revisionsが揃うまで新しい横断結果をcurrentとしない。
 - crash／timeout／権限拒否／CI失敗／承認失効での再開は、`既に完了した操作`、`状態不明の操作`、`未開始`を区別する。状態不明の副作用を無条件に再実行せず、元runの証拠とcleanupを確認する。
