@@ -323,3 +323,25 @@ Q02とQ04は矛盾しない。**外部資料の変更を入力として扱うこ
 ### 反映の範囲と未実装の区別
 
 本レビューは**Planに必要な契約を確定する作業**であり、`qa-workflow`／Regression／新設Skill／静的レビューのコード変更や実Agent・実runnerでの受入を実施した記録ではない。実装時は[継続workflow S1〜S16](../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)と各詳細Planの負例を用い、結果を独立に記録する。
+
+## 13. QA Knowledge・補助Regression・並行編集・効率化の追加レビュー（2026-11-07）
+
+この節はPR #22 HEAD `5f1f032613f466475c5178292ac6f25866098219`を基準に、複数モデルが提示した11件の指摘をコード・validator・既存Planへ照合した記録。重複を6論点に統合した。**確定した実装契約は各詳細Planに置き、レビューの判断理由は本節に記録する**。今回の変更は文書のみ。
+
+### Plan契約を追加した4論点
+
+1. **QA Knowledgeのidentity・適用対象・現在性（P1）**：`skills/qa-knowledge/scripts/knowledge_runtime.py::validate_entry()`は`entry_ref`と`identity`を照合するが、`identity.kind/scope_refs`と直下の`kind/scope_refs`の一致を検証しない。`lookup()`は直下の値でscopeを選び、適用判定前に全entryを検証するため、異なるscopeへの誤適用と、無関係なentryの依存不明による全体停止の両方が成立する。`read_entry()`の`entry_revision`はentry本文の外に返るためlookupへの受渡しも必要。[詳細06](../plans/2026-11-07_170134_qa-full-process-implementation_06_static-testing-and-improvement.md)で識別不変条件・適用範囲確定後の現在性確認・root不完全時の停止・revision引継ぎ・部分再検証を定義した。新Knowledge台帳は作らない。
+2. **testware編集後の競合（P1）**：`e2e-test-implementation/references/guidance.md`と以前の[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)は編集前HEAD／working tree検査を要求している。しかし`artifact_graph.py::claim_mutable_operation()`はworkflow／operation単位のclaimで、別operation IDによる同じpathへの編集を排他しない。同ファイルの並行更新では編集確定時にも競合確認が必要。[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)で隔離worktreeの条件付き反映と、共有workspaceの資源予約・原子的な確定を使い分け、競合・再試行・復旧を検証する契約にした。新lock基盤は設けない。
+3. **Regressionの補助routeとActivity完了（P1）**：`regression_runtime.py::project_activity()`は補助結果・件数を投影するが、Activity stateをrequired TC routeだけで導出する。そのため必須補助routeが未開始でもTC側が完了していればActivityは完了し得る一方、補助routeだけ実行したActivityは`未開始`となる。`REG-D011`／`REG-D015`も補助routeの実施義務を検証していない。[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)で今回実行必須か否かの区別、必須補助の結果・cleanupとActivity stateの一致、正式TC件数との分離、旧Run／Activity互換を確定した。
+4. **Skill構成の効率化比較（P2）**：`test-evaluation`は案件のQA活動の評価を担い、`EVALS.md`はSkillの開発評価を担う。これらを一つのSkillへ統合しない。[詳細07](../plans/2026-11-07_170134_qa-full-process-implementation_07_process-efficiency-acceptance.md)では初回・変更なし・局所コード変更・仕様のみ改版・中断後再開を同一QA目的で比較し、Agent／人間の処理負担と独立品質基準を測る。比較不成立、重要指標の未測定、品質低下による時間短縮を効率化成功にしない。実案件ごとの課金・工数閾値をシラバスの要求として創作しない。
+
+### 以前のPlanで対応済みだった2論点
+
+- **未登録Skillの未検証完了（P1）**：`workflow_runtime.py::_scope_rows()`は任意Skill名を受理し、`runtime_contract.py::_default_expected_runtime_units()`の既定rootは既存6 Skillを主対象とする。`_build()`の`can_complete`で期待集合が空なら空証拠による誤完了の危険がある。現行実装は未変更だが、[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)は検証結果のないSkillの完了禁止・owner validatorの引継ぎ・単独開始・回帰をすでに要求しているため、契約を重複して増やさない。
+- **TC対応非E2E実行のRegression route（P1）**：`regression_runtime.py::validate_required_routes()`は`manual`／`e2e`だけを許す。非E2Eの正式`testware` route追加・元実行結果の証拠・旧履歴の維持は[詳細04](../plans/2026-11-07_170134_qa-full-process-implementation_04_workflow-runtime-and-regression.md)と[詳細05](../plans/2026-11-07_170134_qa-full-process-implementation_05_testware-execution-and-quality.md)にある。今回の追加点は**TCなし補助routeの完了義務**であり、TC対応route不足と重複させない。
+
+### 実装・検証との区別
+
+- コード、Skill、評価基盤、製品CIは今回変更していない。追加した修正契約・S17等が成立した実測証拠ではない。
+- QA Knowledgeの異常検索・Regression補助のみのActivity・並行testware編集・Agent効率の比較を実行再現したわけではない。既存コード・Planの処理経路を根拠とする。
+- QA遂行効率は、機能として成立したことと、同じ品質で処理負担を減らせたことを区別する。従来経路が機能を持たなかった範囲は機能追加として記録し、比較不能を「効率改善」と数えない。
