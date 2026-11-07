@@ -8,7 +8,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 全工程支援は、全工程の強制実行、あらゆるrunnerの自前実装、AIによる仕様確定／リスク受容／リリース承認を意味しない。依頼された成果物からの直接開始、既存current成果物の再利用、部分再実行、blockedと再開を維持する。
 
-**Planの位置付け**：この文書はリポジトリ全体の追加責務に関する**別の実装Plan**であり、PR #22が所有する開発差分・機能抽出・テスト設計のPlanを改訂・置換しない。本PR上に調査・設計経緯を保存するために追加する。今後の実装では、PR #22の未確定Q06・Q20・Q24を推測で確定しない。実装、コード変更、対象製品への書込みは本Plan作成作業には含まない。
+**Planの位置付け**：この文書はQA要求・テストアーキテクチャ・管理・欠陥追跡・統合報告・活動評価という6つの追加責務を担当し、PR #22の機能抽出／設計Planを変更・置換しない。[Planインデックス](./INDEX.md)を入口とし、[非Webテスト実装・実行](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)と[保存・承認・集計・受入の共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を詳細文書とする。PR #22の未確定Q06・Q20・Q24を推測で確定しない。今回の文書修正ではSkill・runtime・CIや製品コードの実装は行わない。
 
 ## 現状と根拠
 
@@ -70,16 +70,16 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 - **入力**：QA要求、現行仕様・Product Risk、機能・アイテム・条件候補がある場合はその有効参照、テストレベル／タイプ、製品構成、環境・データ・既存testware、非機能の品質特性。
 - **正本**：対象アイテム・品質特性・リスクをどのテストレベル／タイプ／技法・テスト方式で担保するかという全体構成・依存と、制約付きの代替方式。局所技法の採否や正式CIは`test-condition-design`が正本。
 - **成果物**：テストレベル／タイプ別の対象と根拠、検証分担、データ／環境構成・接続点、テストモデル・観測方法、手動／自動、runner・道具・実装要否、非機能の測定可能性、制約・リスク、依存・revision、判断・承認参照。
-- **動作**：`test-analysis`がProduct Risk／深度、`e2e-test-selection`がE2E価値判断、`e2e-test-inspection`がPlaywright実装条件を担当。アーキテクチャはそれらを参照する。初期構成を固める際のRiskとテストレベルの循環は、暫定案→Product Risk再評価→影響する構成だけ再確認する手順で扱う。
-- **完了条件**：各要求・重要リスク・品質特性の担当レベル／方式と、対象外・未実装・別レベル・技術的ブロッカーが検証できる。依存環境の欠落を実行可能と報告しない。
+- **動作**：`test-analysis`がProduct Risk／深度、`e2e-test-selection`がE2E価値判断、`e2e-test-inspection`がPlaywright固有の実装可能性を担当する。テストレベルの優先順位は①案件・ユーザーの明示指定、②有効なアーキテクチャのアイテム／品質特性別割当、③いずれもない場合に限る`test-analysis`既定のシステムテストとする。①と②の矛盾を無断で上書きせず、該当範囲の判断元に戻す。複数レベルの割当は一つに丸めない。初期構成とProduct Risk評価の相互再確認は入力revisionの変化がある影響範囲だけで行い、同じ条件で再実行し続けない。
+- **完了条件**：各要求・重要リスク・品質特性のレベル／方式と、対象外・未実装・別レベル・技術的ブロッカーが検証できる。先に`test-analysis`がシステムテストを既定とした後、アーキテクチャで別レベルが確定した場合は、その割当に依存するProduct Risk・TR/TCN/CI/TCのみ要再検証に戻す。無関係なcurrent成果物を維持し、環境欠落を実行可能と報告しない。
 - **変更・検証**：新Skill一式、`test-analysis`と`qa-workflow`の参照契約、必要時に`test-requirement-design`、`test-condition-design`の既存入力へ構成refを追加する。E2E選定との責任分離、非UIのみ・レベル重複・依存環境不足のfixtureを評価。
 
 ### 3. テスト計画・モニタリング／コントロール — `skills/test-management/`
 
 - **入力**：QA要求・アーキテクチャ・Project Context、対象release／版、担当・要員・工数・予算・日程・環境、各run/Regression Activity／欠陥・未実行・Riskの実績。
 - **正本**：テスト計画、開始／終了基準、計画の承認・改版、プロジェクトリスク、進捗監視、差異、是正処置。Product Riskは`test-analysis`、workflow実行stateは`qa-workflow`、Regression membership/Runは`regression-testing`のまま。
-- **成果物**：計画版・対象範囲・対象期間、必要な人員・役割・資源、見積り・日程・予算・テストレベル／タイプの参照、環境／データ・前提・開始／終了基準、承認根拠。監視対象scope／時点・分母／実績・差異・要因・プロジェクトリスク・是正処置の担当／期限／結果・履歴。
-- **動作**：`計画作成／改版`、`進捗参照`、`差異・是正管理`を同じ責務のmodeとして扱い、最初から別Skillに分けない。未確定の期限・予算・担当者は捏造せず、必要なscopeだけblocked。監視入力が不完全なら「未測定」とする。承認済み計画版と差分案を区別。
+- **成果物**：計画版・対象範囲・期間、担当・資源・日程・予算・レベル／タイプ、環境／データ、開始／終了基準、承認。要求される実行方式・TC／testware／run・source owner・対象build／環境を集計母集団として明記する。監視時点の分母／実績・差異・プロジェクトリスク・是正処置と担当／期限／結果／履歴を保持する。
+- **動作**：`計画作成／改版`、`進捗参照`、`差異・是正管理`を同じ責務のmodeとする。期限・予算・担当を捏造せず、必要な範囲のみblockedにする。承認済みの計画版と変更案を区別し、予定sourceと取得結果の差を[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)で照合する。欠落した実績を0件実施とせず未測定とする。
 - **完了条件**：計画の範囲・終了基準・責任者・承認状態が明示され、各進捗値が元データと測定単位へ遡れる。見積りと実績を混同せず、未処理の差異／プロジェクトリスクを隠さない。
 - **変更・検証**：新Skill一式、`qa-workflow`、Project Context Section 14の正本参照方法、`regression-testing`のActivity、実行ownerの結果を読取参照する契約。複数version計画、承認失効、部分runと全体進捗、工数不足、並行更新を評価。
 
@@ -88,7 +88,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 - **入力**：`test-execution`／`e2e-test-execution`／`e2e-test-result-analysis`／`exploratory-testing`／Regressionのsource結果・Observation・Finding、`spec-analysis`の期待仕様根拠、build／環境、案件の正式欠陥管理先。
 - **正本**：QAによる欠陥候補の整理、証拠・重複照合、正式な報告先への引継ぎ、外部Issueとの対応、修正確認計画と結果参照。正式欠陥の状態・優先度決定・修正実施は案件の外部正本・権限者。
 - **成果物**：候補のscope・provenance・症状／再現条件／実際結果、仕様に基づく期待結果、証拠参照・機密扱い、判定可能性、類似／既知Issueの対応、未登録理由・引継ぎ履歴、外部Issue参照・取得時点とrevision、修正確認TC/runと結果／未実施理由。
-- **動作**：`FAIL`、`Finding`、`Observation`から自動的に正式`Defect`へ昇格しない。原因未確定はそのまま扱い、`e2e-test-result-analysis`等の担当に戻す。外部サービスへ書き込む場合は案件の個別許可と変更権限が必要で、未許可では読取・報告のみ。外部Issueの状態変更後、差分・対象buildを検証して`test-execution`／`e2e-test-execution`へ修正確認を依頼し、`regression-testing`の別目的のRunを混同しない。
+- **動作**：`FAIL`／`Finding`／`Observation`を自動的に正式Defectにしない。原因未確定は実行分析ownerへ戻す。外部サービスの登録・更新は、[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)に従い認証された主体・権限、操作対象scope・revision・承認と重複防止を確認した場合だけ実行する。未認可なら読取・報告のみ。外部Issue変更時は修正対象build・TCを検証して既存`test-execution`／`e2e-test-execution`へ再実行を依頼し、`regression-testing`のRun選定と混同しない。修正確認の実操作と合否判定は実行ownerで行う。
 - **完了条件**：候補ごとの提出先・未登録／保留の根拠・追跡可否・外部Issue確認状態・修正確認結果が閉じている。欠陥解決や製品修正の完了をQA Skillが無根拠に確定しない。
 - **変更・検証**：新Skill一式と読み取り専用の外部Issue入力契約、必要なtool接続手順、`qa-workflow`のhandoff。二重登録、権限不足、staleな外部状態、誤ったFAIL分類、修正確認対象の誤version、cleanup未完了を評価。
 
@@ -96,8 +96,8 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 - **入力**：承認済みまたは状態が明示された計画・終了基準、TC一般実行、E2E、Regression、Exploration、非Web・非機能run、UI/UX・WCAG、coverage、Product Risk、欠陥候補／外部Issueのcurrent projection。各ref・revision・対象build/環境を含む。
 - **正本**：対象時点の**横断的な報告snapshot**だけ。元の実行結果、原因分析、正式欠陥状態、計画、Risk、リリース決定を更新しない。
-- **成果物**：報告scope・期間・build・テストレベル／タイプ、情報源集合と取得完全性、対象TC／実行run／try数等の分母と単位、未開始／未実行／判定不能／FAIL／PASS／blocked／cleanup、欠陥・残存リスク・未対応、進捗と終了基準の充足／未達／不明、報告者・対象revision・次の判断先。
-- **動作**：各ownerから読み取り専用で集計。`logical primary`と`resolved TestCase`、`attempt`、Exploration session、TC、別テストレベルのcoverageを同じ件数へ加算しない。source runの列挙不全は`complete=false`相当の未確認として表示。データがない項目を0件PASSにしない。正式リリース可否の判断は行わない。
+- **成果物**：報告scope・期間・build・レベル／タイプ、**計画上要求されるsource owner・run・対象TC／testwareと実際に取得した集合の差**、取得範囲・source revision・完全性、TC／run／attempt等の分母・単位、未開始／未実行／判定不能／FAIL／PASS／blocked／cleanup、欠陥・残存リスク、終了基準の充足／未達／不明、報告時点・次の判断先。
+- **動作**：各ownerから読み取り専用で集計。`logical primary`、`resolved TestCase`、`attempt`、Exploration session、TCを同じ件数に足さない。計画で要求するsource inventory・対象build／期間・scopeと取得した結果を照合する。Reportだけ直接開始した場合は明示scopeと許可された探索範囲を固定し、母集団が未知なら全体率を未確定とする。source列挙の失敗を0件PASSにせず、正式リリース可否の判断は行わない。詳細は[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)。
 - **完了条件**：全数値が元run・baseline・計画へ追跡でき、集計単位・重複排除・不完全分母・報告時点のrevisionが機械検証できる。意思決定に影響する欠落があれば完了ではなく影響範囲と再取得条件を示す。
 - **変更・検証**：新Skill一式、実行owner／Regression／QA Knowledge等の読取projectionと`qa-workflow`のreport routing。retry増加だけでTC件数不変、部分run／結果遅延／build混在／欠陥更新による鮮度変化を検証。
 
@@ -114,15 +114,19 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 ### 既存体系との関係
 
+保存・承認・集計完全性・独立受入の実行契約は[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を正本とする。以下はSkill間の論理項目であり、共通mutable storageを作る指示ではない。
+
 - 正規の人間向け出力は既存の`assets/output-template.md`によるMarkdownに合わせ、`scripts/`の決定論的helper／`evals/deterministic/`のvalidatorで機械検証できる項目を限定する。既存`TR/TCN/CI/TC`を新成果物へ統合しない。
 - 新成果物ごとにowner、scope、安定した識別、source refsとrevisions、現在性を判断する依存、作成／改版、過去結果参照、block理由、次の担当を持つ。識別子のprefix・履歴は実際の既存runtime／storage能力に合わせて決め、既存IDを再採番せず、global mutable ID counterも追加しない。
 - 生成時の`草案`、`確認依頼`、`承認`、`要再検証`、`置換`等の状態は、その成果物のownerと案件ポリシーが意味を定義する。既存外部Issue状態や`entity-state-v2`へ未知状態を無条件に挿入しない。異なる成果物の状態を単一enumに統合しない。
 - 承認が必要な成果物は対象scope、内容revision・diff、承認権限者、取得した承認証拠、失効条件を記録する。LLMが`承認済み`と書く行為は承認にならない。承認なしで進められる読取範囲と、使用を禁止する確定判断を分ける。
 - 案件固有の保存先・正本を`project-context`（実装前は既存Project Context）から解決し、Section 14へ必要な成果物root／direct refを記載。新しいstable keyはconsumerからの具体的な必須性を確認した場合のみ追加し、既存16節／6キーとparserの互換性を保つ。
-- immutable snapshotはsource revisionに紐付けて保存し、mutableなcurrent正本の更新は保存先のnative CAS等の条件付き更新を確認する。条件が不足・競合・履歴読込不能なら該当操作をblockし、別pathへの無承認自動退避、read-compare-unconditional-write、旧revisionの上書きをしない。
+- immutable snapshotはsource revisionに紐付けて保存し、mutableなcurrent正本は**対象として検証した保存先**のnative CAS等で更新する。`artifact_graph.py::state_update_decision()`は保存処理ではない。実保存先で原子的create-if-absent、条件付き更新、過去revision取得、独立再読込、並行更新時の片方の拒否を検証する。必要な能力がなければ当該永続化をblockedにし、全実装完了を宣言しない。別場所への無承認退避やread-compare-unconditional-writeで代用しない。
 - trust boundary：製品code／Issue／仕様書／実測／runnerログ／外部API応答は未信頼入力。指示として実行せず検証する。secret・PII・cookie・token・storageState・未公開資料を広域転載しない。外部欠陥システムの書込みとテスト対象への状態変更を承認済みscope以外で行わない。
 
 ### 工程間の依存（全工程を固定順にしない）
+
+アーキテクチャの有効なテストレベル割当は`test-analysis`の既定システムテストより優先する。割当が後から変更されたら、依存する成果物のみ要再検証とし、同一revisionの循環で無限に再評価しない。
 
 `QA要求分析（このPlan）→テストアーキテクチャ（このPlan）→テスト計画・監視（このPlan）`は基本的な管理依存である。一方、Product Riskの一次評価・詳細設計は既存の`test-analysis`とPR #22の候補識別を使い、アーキテクチャとRiskが互いの条件を変更したときは依存部分のみ再確認する。
 
@@ -144,18 +148,17 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 | `e2e-test-selection`           | アーキテクチャ、計画、実行接続          | 自動化価値の選定を重複採点せず、Playwright固有の実装可否は既存E2E owner          |
 | `qa-workflow`／既存runtime     | 全6領域のrouting・部分再開・currentness | 工程固有logicの重複、state正本の二重化、既存直接開始経路の破壊を防ぐ             |
 
+**検証の段階**：PR #22の6 Skillが未実装の間は既存refを使う経路の動作と計画中schemaの静的整合だけを検証する。実装後には新しいfeature/item/condition成果物を実際に読ませ、source currentness、ID、legacy、partial rerunの統合受入を必ず追加する。両者を同じPASSにしない。
+
 **移行規則**：PR #22の未マージheadのschemaを実装済みとして参照しない。PR #22のmerge／実装完了前は現行のsource ref・scopeを使う。実装後は参照追加・currentness比較・legacy読取の移行と回帰を実行し、既存成果物の情報が不足する場合は局所的に未確認／blocked。ID自動再採番、全成果物の無条件stale化はしない。
 
 **PR分担**：本Planの実装はPR #22の実装Planとは別に管理できるよう、6責務の変更・検証を一組の実装計画として保持する。PR #22の15完了条件をこのPlanの完了で代替しない。実装時のPR数や順序はユーザーの作業指示を優先し、工程の必要機能・検証を無断で省略しない。
 
 ## API・バッチ・非機能・静的テストとの接続
 
-1. **実装／実行の責務**：`test-execution`と`e2e-test-implementation`／`e2e-test-execution`のPlaywright固有契約は維持する。対象repoで実在するAPI、バッチ、コンポーネント、非機能計測用runner／CLI／toolを確認して、実行前の環境・認証・scope、実開始、raw結果、証跡ref、retry、後処理を技術別に取得する。未確認のツールや実装を存在するものとしてPlan完了としない。
-2. **接続形式**：元runnerの`raw outcome`、実行unit、TC/item/test level/type/quality characteristic、対象build・環境、source revision、actual start、未実行／判定不能、cleanupを持つ読取projectionを定める。新しい中央runnerに全実行logicを移さず、対応する既存の実行手段をownerとして参照する。実際のツールに応じたadapterが必要なら必要な境界に限って追加する。
-3. **非機能品質特性**：性能、信頼性、セキュリティ、互換性、アクセシビリティ、使用性等について、分析／設計／実装／実行／評価の対応・測定方法・閾値Authority・入力不足を一覧化し、対応可能なrunnerで検証する。閾値・実測がない特性の`合格`を生成しない。既存WCAG正式評価のscope・claim条件を流用して他特性の適合宣言を作らない。
-4. **静的テスト**：`adversarial-review`が担う既存QA成果物レビューを維持。要件／設計資料／コードに対するレビュー目的・規則・対象版・独立性・Findingの出力について、既存能力を確認し、足りない入力／評価条件だけを追加する。製品コード修正へ越境しない。
-5. **環境がない場合**：対象tool／認証／権限が欠けても計画・アーキテクチャと実行候補の説明は完了しうる。ただし実装・実行の受入および該当品質特性の検証済み判定は`未実施／blocked`にし、全技術受入完了と表示しない。独立fixtureでの契約試験と実案件での受入を別々に記録する。
-6. **運用方針の競合検査**：現行`test-execution/SKILL.md`はPlaywright MCP→CLI→Libraryを選択する。案件がCLI限定なら、既存契約との不整合を入力制約として検出し、無断でモード切替・コード改変せず、既存ownerの変更と回帰確認を別途計画する。
+[非Webテストの実装・実行Plan](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)を正本とする。API・バッチ・コンポーネント等では**実行結果の取込だけでなく、新規・既存テストコード／fixture／設定の実装・更新・検証・起動・実測・後処理まで**を対象にする。既存PlaywrightやRegressionの正本を再実装しない。
+
+静的テストと非機能テストは既存専門Skillの実対応を先に調査する。案件で有効なrunner／権限／測定閾値が不足する対象は該当実装・実行の受入を未検証として残し、全体完了としない。製品業務ロジックの改修は対象外であり、利用先repoのテストコード変更も別途権限を確認する。
 
 ## リスク・前提・未確定事項
 
@@ -167,7 +170,7 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 
 ### 未解決・実装着手時の判断
 
-- 保存先がnative conditional write・歴史revisionの参照をサポートするか。未対応時の全体保存を無断で回避しない。
+- 保存先のnative conditional write・過去revision参照を[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)に従い実証する。providerが未確定なら永続更新は未完成であり全体完了を宣言しない。
 - 外部欠陥管理の読み取り／書込み権限・監査証跡。未許可の外部更新を自動実行しない。
 - 非Web実行および各非機能測定に使う具体的runner。実在する対象案件・依存・CIを調査し、未検証範囲を記録する。
 - 作業中のPR #22／PR #17／PR #10と同じファイル・runtime・評価データに触れるときは、merge状態・base差分・正本を再確認する。
@@ -184,8 +187,8 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 3. **QA要求分析とアーキテクチャ**：QA目標・要求元→レベル／タイプ／環境／方式の引継ぎを実装。`spec-analysis`／`test-analysis`／`test-requirement-design`との責務分離、PR #22のfeature/item/condition候補への条件付き参照を検証する。
 4. **テストマネジメント**：計画・改版・承認、モニタリング・差異・是正・プロジェクトリスクを実装。`qa-workflow`の状態やRegression Activityを第二の正本にせず、計画対実績を対応付ける。
 5. **欠陥管理**：現行の実行／原因分析／Exploration・Regressionのsource結果から候補→外部Issue参照→修正確認の引継ぎを実装。読み取りを先に成立させ、書込みを必要とする経路には認可・監査・競合条件を設ける。
-6. **非Web／非機能／静的テストの実行連携**：実在するAPI／バッチ／コンポーネント、各非機能品質特性、静的レビューの道具・実行条件を検証。raw result projectionと証跡・cleanup・ブロックを実装し、専門ownerで判定する。
-7. **統合報告**：一般TC・Playwright・Regression・Exploration・非Web・非機能・欠陥・計画をsource refsで集計。報告時点のsnapshot・分母・欠落と終了基準を区別する。
+6. **非Web／非機能／静的テストの実装・実行**：[詳細Plan](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)に従い既存TCからAPI／バッチ／コンポーネント等のテストコード・fixture・設定を実装／更新／検証し、技術別runnerで安全に実行する。非機能測定・静的テストも専門ownerを維持し、raw result／証跡／cleanupを記録する。
+7. **統合報告**：一般TC・Playwright・Regression・Exploration・非Web／非機能・欠陥・計画をsource refsで集計する。計画上のsource inventoryと取得範囲を[共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)で突き合わせ、欠落・分母・版と終了条件を独立に判定する。
 8. **テスト評価**：報告・計画・工数・履歴から5軸の評価・改善・完了／引継ぎを実装。未測定・比較不能・未承認の判断を保持する。
 9. **workflow／既存契約へ統合**：`qa-workflow`のrouting・状態・開始点／停止／再開、Project Context参照、`coverage-analysis`／`adversarial-review`、PR #22実装後のfeature/item/condition ref、legacyとpartial rerunの回帰を確認する。大規模な中央orchestratorを新設しない。
 10. **評価・CI・READMEの更新**：各Skillのtrigger、出力契約、決定論的・意味評価、実Agent統合、ポータビリティを追加。READMEの目的・工程一覧・対応／未対応技術・導入手順と`EVALS.md`を更新し、全テスト・CIを確認する。
@@ -201,25 +204,27 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 ### QA要求・計画・アーキテクチャ
 
 - 要求元の異なる品質要求、変更で失効した要求、仕様AuthorityとQA目標の衝突、要求不明時の部分継続。
-- 1アイテムを複数テストレベル／タイプで確認する構成、E2Eに不適な対象、非UIのみ、非機能の閾値不明、既存testware再利用、環境不足。
+- 1アイテムを複数レベル／タイプで確認する構成、案件明示指定／アーキテクチャ割当／`test-analysis`既定値の優先順位、後からの割当変更による局所再検証。E2Eに不適な対象、非UIのみ、非機能の閾値不明、既存testware再利用、環境不足。
 - 承認前／承認後の計画revision、計画日程と実績の差、部分run／Regression selected Run、Product Riskとプロジェクトリスクの分離、是正処置の未完了。
 
 ### 欠陥・実行・報告・評価
 
 - `PASS`／`FAIL`／`Finding`／`Observation`／`判定不能`の区別、原因未確定、既知Issue照合・重複検出、外部Issueの権限不足／stale read、未登録時の引継ぎ、修正確認で旧buildを誤使用しない。
 - 一般TC／E2E／Regression／探索／API／バッチ／コンポーネントのsource結果のraw値保持、実開始前停止、retry、cleanup失敗、異なるreporter、重複run、複数環境／buildの混在。
-- 対象集計：件数0・分母0・不完全列挙・未実行・部分完了・旧revisionが`PASS 100%`や全体完了に誤投影されないこと。
+- 対象集計：計画で必要とされたsource owner／runと実際に取得した集合を照合する。pagination失敗、権限不足、件数0／分母0、未実行、部分完了、旧revisionを`PASS 100%`へ誤投影しない。
 - 評価：品質基準不足、監視実績不足、時間削減のみ、未測定／改善未実施、比較条件不一致、案件を跨ぐ再利用時の制約を適切に表示すること。
 
 ### 保存・変更追従・安全性
 
-- create-if-absent／native CAS競合、同時更新・並行PR、読み直し不一致、履歴欠落、旧revisionの再利用禁止、source部分変更による局所stale。
-- 外部Issue／runner／製品repoからの未信頼文字列、secret／PII／未公開資料の証跡、権限不足、危険な副作用、cleanup未確認。未承認の外部Issue mutation・製品改修・リリース操作を発生させない。
+- 対象とする実保存先のAPI／transactionでcreate-if-absent・native CASの競合を検証する。同時更新、保存後再読込不一致、履歴欠落、旧revision、source部分変更と局所staleを評価する。
+- 外部Issue／runner／製品repoの未信頼文字列、secret／PII／未公開資料、権限不足、副作用、cleanup未確認。承認対象scope・revisionと認証済みの権限主体を検証し、無許可のIssue更新・二重登録・製品改修・リリース操作を起こさない。
 - PR #22が未実装／実装済みの両経路で、既存source refだけを使う開始と新たなfeature/item/condition参照を使う開始を区別して検証。旧仕様・UI package・TC・Regression・Knowledgeを失わない。
 
 ### 実Agent・対象案件受入
 
-- 独立fixtureでQA要求→アーキテクチャ→計画→仕様／Risk／設計→対象runner実行→欠陥追跡→統合報告→活動評価を通し、意思決定・未測定・blocked・修正確認・rollbackまで検証する。
+[共通契約の受入項目](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)を用い、要求見落とし・欠陥の誤登録・二重計上・未確認事項の誤承認・競合更新について独立の正解／拒否条件を設定する。
+
+- [共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)の独立した期待結果と拒否例を用い、QA要求→アーキテクチャ→計画→仕様／Risk／設計→テスト実装→実runner→欠陥追跡→統合報告→活動評価を検証する。未測定、blocked、修正確認、rollbackも対象とする。
 - 案件や外部サービスの接続が必要な経路は権限・環境・source revisionを固定し、実Agentと実runnerで確認。利用不能な範囲は「未検証」と記録し、fixture成功で実案件受入を代替しない。
 - 性能・セキュリティ・信頼性等の対象品質特性は、それぞれ有効な受入基準、測定method、runner、evidenceを確認し、実行可能な場合は実測と独立した検証を行う。環境のない特性に合格を付けない。
 
@@ -245,15 +250,15 @@ QAの全工程を支援するリポジトリとして、現行23 SkillとPR #22�
 2. QA要求・製品仕様・Product Risk・TR／TCN／CI／TC、QA計画・アーキテクチャを混同せず、上下流の不足・承認・残存リスクへ辿れる。
 3. テスト計画・監視・是正・プロジェクトリスク・終了基準を管理でき、`qa-workflow`のrouting／Regression Runの第二の正本を作らない。
 4. FAIL／Finding／Observationから欠陥候補・外部Issue参照・修正確認へ接続できる。正式欠陥状態は外部正本を保持し、製品コード修正を行わない。
-5. 一般TC、E2E、Regression、Exploration、非Web／非機能の結果を技術別の単位と対象versionのまま集約でき、未実行・不完全列挙・retry・旧revisionで偽の100%やPASSが発生しない。
+5. 一般TC、E2E、Regression、Exploration、非Web／非機能の結果を技術別単位・対象versionのまま集約し、**計画のsource inventoryと取得完全性**を確認する。未実行・部分取得・retry・旧revisionにより偽の100%やPASSが発生しない。
 6. QA活動を5軸で評価し、計画比較・根拠・未測定・改善と引継ぎを追跡できる。`EVALS.md`のSkill評価とは分離する。
-7. UI・API・バッチ・コンポーネント等の技術別実行連携、非機能各品質特性、静的テストの対象範囲・有効手段・未対応・blockedを明示でき、実行できる対象では検証済みevidenceを持つ。
-8. 承認・source currentness、native CASが必要なmutable保存、セキュリティ・副作用・cleanup、並行更新・履歴・再開・migrationが検証できる。
-9. 現行23 SkillとPR #22の計画中6 Skillの責務・正本・既存ID・直接開始・過去成果物との整合を保つ。PR #22の15完了条件とQ06／Q20／Q24の未確定事項を変更しない。
-10. 新Skillの仕様適合・発火・決定論的出力・意味評価・workflow統合・実Agent受入、関連回帰テストとCI、README・EVALS・導入／運用文書がすべて検証される。未実施・SKIP・実案件への未接続をPASSと報告しない。
+7. [非Webの実装・実行Plan](./2026-11-07_170134_qa-full-process-implementation_01_test-implementation-and-execution.md)の全完了条件を満たす。API／バッチ／コンポーネント等でテスト実装・更新からrunner実行・結果まで接続し、非機能品質特性と静的テストの対応・未対応範囲を証拠付きで示す。
+8. [共通契約](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)の全完了条件を満たす。対象保存先のnative CAS・履歴、承認主体の認証と対象scope／revision、変更影響、セキュリティ・cleanup、並行更新・再開を実証する。
+9. 現行23 SkillとPR #22の計画中6 Skillの責務・正本・既存ID・直接開始・履歴との整合を保つ。**PR #22実装前は単独受入と参照仕様の照合、実装後は実成果物との統合・ID・migration・回帰受入**を別々に実施する。後者が未検証ならQA全工程の最終実装完了を宣言しない。PR #22の15完了条件と未確定Q06／Q20／Q24を変更しない。
+10. 新Skillの仕様適合・発火・決定論的出力・意味評価・workflow統合・実Agent受入について、**Agentの候補から独立した期待成果物・誤判定拒否例**で検証する。関連回帰テスト・CI・README・EVALS・導入文書を更新し、未実施・SKIP・実案件未接続をPASS扱いしない。
 
 ## 次の作業で確認する事項
 
 - 実装着手時の`main`、PR #22、PR #17、PR #10の差分とCI。プランニング時点の推奨Skill名・構成を、既存ownerとの最新衝突があれば根拠付きで更新する。
-- 案件ごとのstorage provider、外部欠陥管理システム、role／承認者、runnerと有効な非機能基準を確認する。未確認部分だけ安全にblockedとし、他の読取・設計工程まで一律に停止しない。
+- 案件のstorage providerとCAS・履歴の実能力、外部Issue管理サービスと認証された承認主体・対象操作・revision、技術別runnerと非機能基準を確認する。未確定部分だけblockedにし、独立した読取・設計まで停止しない。
 - 実装時には各工程の計画・テスト・CI実績と、実Agent・実案件の受入結果を独立に記録する。未検証の工程を削って完了宣言しない。
