@@ -1994,10 +1994,11 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
             reservation = next(
                 item for item in reservations if item["status"] == "reserved"
             )
-            reservation_data = json.loads(
-                Path(reservation["reservation_ref"]).read_text(encoding="utf-8")
+            reservation_data = workflow.read_sqlite_shared_resource(
+                reservation_root, "resource:shared-user-1"
             )
-            owner_ref = reservation_data["workflow_ref"]
+            self.assertEqual(reservation_data["reservation_status"], "reserved")
+            owner_ref = reservation_data["owner_workflow_ref"]
             self.assertEqual(
                 workflow.release_shared_resource(
                     current_workflow_ref=owner_ref,
