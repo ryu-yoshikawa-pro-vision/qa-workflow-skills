@@ -112,7 +112,6 @@
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
 
-
 ## 現行実装の公開契約と担当別引継ぎ（2026-11-08）
 
 以下はPR #23の実装と固定fixtureで確認できる契約。担当B〜Jの未統合成果物、未選定の外部provider、製品CIの本番接続を確定済みとは扱わない。
@@ -144,4 +143,3 @@
 - `python scripts/format_tracked.py check`：共有フォーマット・lint。GitHub Actionsの`Code Quality`で確認する。
 - `Validate Deterministic Output Evals`、`Validate Agent Skills`、`Validate Semantic Output Evals`、`Codex Harness`：各HEADの完了結果をPR #23のChecksで確認する。途中HEADの失敗を最新HEADの成功に読み替えない。
 - 独立fixtureの検証は他ownerの実成果物を使った統合証拠ではない。**未実施**：新設14 Skillの各owner validator正式登録、実providerの競合・履歴・認可受入、実製品CI受渡し、実Agentの5シナリオ測定、A〜J横断S1〜S17／全条件の最終受入（PR #22担当）。
-
