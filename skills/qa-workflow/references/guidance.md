@@ -229,8 +229,9 @@ resource ref、workflow間のisolation条件、外部reservationの取得状態�
 
 1. resourceがworkflowごとにisolatedならreservationは`not_required`です。
 2. 既存external reservationが取得済みならそれを使います。
-3. project-local reservationはatomic create-if-absentに加えてlifecycleを閉じるnative atomic conditional release能力も確認できる場合だけ取得します。release capabilityがないlocal filesystemではreservation fileを作らず`blocked`にします。
-4. いずれも満たさなければshared resource使用を`blocked`にします。recovery / releaseはowner execution state、cleanup確認、expected revisionを確認し、native conditional releaseがなければ実行しません。
+3. 単一hostのlocal filesystemで`qa.reservation_root`を使用する場合は、`reserve_shared_resource(..., native_atomic_conditional_release=True)`が既存の`reserve_sqlite_shared_resource`経路へ進み、SQLiteの`BEGIN IMMEDIATE`と一意制約で予約します。`read_sqlite_shared_resource`で保存revisionを独立取得し、`release_shared_resource(..., reservation_root=..., resource_ref=...)`でowner／expected revision／cleanupを確認してnative conditional releaseを実行します。解放済みのresourceは新revisionで再取得できます。ローカルSQLite以外へ`native_atomic_conditional_release=True`を渡しただけでは遠隔providerの保証になりません。
+4. 旧形式`<resource identity>.json`の予約記録が残っている場合は、SQLite providerへの無条件移行をせず`legacy_reservation_requires_reconciliation`でblockします。旧バージョンのfile-based予約を併走させないでください。既存reservationの元owner／cleanup／releaseを確認してから運用移行します。
+5. いずれも満たさなければshared resource使用を`blocked`にします。recovery / releaseはowner execution state、cleanup確認、expected revisionを確認し、native conditional releaseがなければ実行しません。
 
 ### current完了直前 / current成果物再利用直前
 
