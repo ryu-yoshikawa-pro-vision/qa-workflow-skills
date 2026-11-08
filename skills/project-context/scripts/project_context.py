@@ -274,9 +274,7 @@ def _id_table_lines(markdown: str, section: int) -> tuple[list[str], int, int]:
         len(lines),
     )
     indices = [
-        i
-        for i in range(start + 1, end)
-        if lines[i].lstrip().startswith("| ID |")
+        i for i in range(start + 1, end) if lines[i].lstrip().startswith("| ID |")
     ]
     if len(indices) != 1:
         raise Invalid("id_table_ambiguous")
@@ -296,9 +294,7 @@ def _overlay_id_tables(original: str, materialized: str) -> str:
         base_lines, first, last = _id_table_lines(merged, section)
         new_lines, new_first, new_last = _id_table_lines(materialized, section)
         merged = "".join(
-            base_lines[:first]
-            + new_lines[new_first:new_last]
-            + base_lines[last:]
+            base_lines[:first] + new_lines[new_first:new_last] + base_lines[last:]
         )
     return merged
 
@@ -337,9 +333,7 @@ def prepare_ids(request: dict[str, Any]) -> dict[str, Any]:
     )
     if not result["valid"]:
         raise Invalid("dec_asm_materialize_invalid")
-    merged = _overlay_id_tables(
-        markdown, result["payload"]["artifact_markdown"]
-    )
+    merged = _overlay_id_tables(markdown, result["payload"]["artifact_markdown"])
     _inspection(merged, [])
     check = identity_handle(
         {

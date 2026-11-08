@@ -125,9 +125,11 @@ class ProjectContextOwnerTests(unittest.TestCase):
         )
 
     def test_dec_asm_materialize_preserves_existing_prose(self) -> None:
-        original = context().replace(
-            "## 13. 仮定", "決定事項の根拠メモ。\n\n## 13. 仮定"
-        ).replace("## 14. 既存QA成果物", "仮定の注釈。\n\n## 14. 既存QA成果物")
+        original = (
+            context()
+            .replace("## 13. 仮定", "決定事項の根拠メモ。\n\n## 13. 仮定")
+            .replace("## 14. 既存QA成果物", "仮定の注釈。\n\n## 14. 既存QA成果物")
+        )
         cells = {
             "確定内容": "承認済み配置",
             "状態": "有効",
@@ -160,9 +162,10 @@ class ProjectContextOwnerTests(unittest.TestCase):
         }
         result = handle(request)
         self.assertEqual(result["status"], "draft", result)
-        self.assertEqual(result["allocated_ids"], [
-            {"draft_key": "placement", "stable_id": "DEC-001"}
-        ])
+        self.assertEqual(
+            result["allocated_ids"],
+            [{"draft_key": "placement", "stable_id": "DEC-001"}],
+        )
         self.assertIn("決定事項の根拠メモ。", result["artifact_markdown"])
         self.assertIn("仮定の注釈。", result["artifact_markdown"])
         self.assertEqual(
