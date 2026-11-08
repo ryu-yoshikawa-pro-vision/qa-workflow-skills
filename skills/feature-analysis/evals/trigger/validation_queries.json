@@ -22,5 +22,13 @@
   {
     "query": "現在の画面のaccessible nameを実機で観測して。",
     "should_trigger": false
+  },
+  {
+    "query": "既知のTest Caseの実行結果を照合して。",
+    "should_trigger": false
+  },
+  {
+    "query": "UIのアクセシビリティ適合検査を実施して。",
+    "should_trigger": false
   }
 ]

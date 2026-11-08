@@ -26,5 +26,9 @@
   {
     "query": "Regression対象を選択して実行して。",
     "should_trigger": false
+  },
+  {
+    "query": "製品の対象ブラウザのスクリーンショットだけを撮って。",
+    "should_trigger": false
   }
 ]

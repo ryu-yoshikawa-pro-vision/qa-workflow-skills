@@ -26,5 +26,9 @@
   {
     "query": "製品全体の機能をPR差分から列挙して。",
     "should_trigger": false
+  },
+  {
+    "query": "既存Test Caseを使ってE2Eテストを実行して。",
+    "should_trigger": false
   }
 ]

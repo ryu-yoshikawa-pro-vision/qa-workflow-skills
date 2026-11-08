@@ -17,7 +17,9 @@ def context() -> str:
 
 class ProjectContextOwnerTests(unittest.TestCase):
     def test_reuses_shared_parser_and_preserves_dec_asm(self) -> None:
-        output = handle({"operation": "inspect", "markdown": context(), "required_keys": []})
+        output = handle(
+            {"operation": "inspect", "markdown": context(), "required_keys": []}
+        )
         self.assertEqual(output["status"], "current", output)
         self.assertIn("qa.workflow_state_root", output["fields"])
 
@@ -33,7 +35,12 @@ class ProjectContextOwnerTests(unittest.TestCase):
         self.assertEqual(output["required"]["missing_keys"], ["qa.workflow_state_root"])
 
     def test_existing_and_duplicate_candidates(self) -> None:
-        row = {"ref": "a", "status": "readable", "markdown": context(), "revision": "v1"}
+        row = {
+            "ref": "a",
+            "status": "readable",
+            "markdown": context(),
+            "revision": "v1",
+        }
         req = {
             "operation": "discover",
             "project_name": "Sample",
@@ -101,7 +108,9 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "blocked",
         )
         self.assertEqual(
-            handle({**base, "updates": {"qa.workflow_state_root": "<!-- fake -->"}})["status"],
+            handle({**base, "updates": {"qa.workflow_state_root": "<!-- fake -->"}})[
+                "status"
+            ],
             "blocked",
         )
 

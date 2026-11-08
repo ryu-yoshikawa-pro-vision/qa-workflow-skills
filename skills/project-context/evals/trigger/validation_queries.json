@@ -22,5 +22,13 @@
   {
     "query": "製品の機能影響なしを決めて。",
     "should_trigger": false
+  },
+  {
+    "query": "この新しい機能の仕様根拠を確定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Product Riskを数値評価して。",
+    "should_trigger": false
   }
 ]

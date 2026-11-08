@@ -116,7 +116,9 @@ def inspect(request: dict[str, Any]) -> dict[str, Any]:
     required = request.get("required_keys")
     view = _inspection(markdown, required)
     return {
-        "status": "current" if view["required"]["status"] == "resolved" else "incomplete",
+        "status": "current"
+        if view["required"]["status"] == "resolved"
+        else "incomplete",
         "project_name": _project_name(markdown),
         "required": view["required"],
         "fields": view["fields"],
@@ -160,12 +162,20 @@ def discover(request: dict[str, Any]) -> dict[str, Any]:
             continue
         current.append({"ref": ref, "revision": revision})
     if len(current) > 1:
-        return {"status": "ambiguous", "reasons": ["multiple_canonical_candidates"], "candidates": current}
+        return {
+            "status": "ambiguous",
+            "reasons": ["multiple_canonical_candidates"],
+            "candidates": current,
+        }
     if issues:
         return {"status": "unconfirmed", "reasons": issues, "candidates": current}
     if current:
         return {"status": "existing", "reasons": [], "candidate": current[0]}
-    return {"status": "absent", "reasons": [], "authorized_candidate_refs": sorted(paths)}
+    return {
+        "status": "absent",
+        "reasons": [],
+        "authorized_candidate_refs": sorted(paths),
+    }
 
 
 def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
@@ -178,11 +188,17 @@ def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
         }
     )
     if discovery["status"] != "absent":
-        return {"status": "blocked", "reason": "existing_or_unconfirmed_context", "discovery": discovery}
+        return {
+            "status": "blocked",
+            "reason": "existing_or_unconfirmed_context",
+            "discovery": discovery,
+        }
     template = TEMPLATE.read_text(encoding="utf-8")
     if len(PROJECT.findall(template)) != 1:
         raise Invalid("shared_template_identity_invalid")
-    markdown = _identity_compat(PROJECT.sub(lambda _: "- プロジェクト: " + project, template))
+    markdown = _identity_compat(
+        PROJECT.sub(lambda _: "- プロジェクト: " + project, template)
+    )
     _inspection(markdown, [])
     return {
         "status": "draft",

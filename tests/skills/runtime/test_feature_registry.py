@@ -5,7 +5,12 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"))
+sys.path.insert(
+    0,
+    str(
+        Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
+    ),
+)
 from feature_registry import handle  # noqa: E402
 
 
@@ -137,7 +142,9 @@ class FeatureRegistryTests(unittest.TestCase):
         next_step["snapshot"]["previous_artifact_revision"] = "art-v1"
         next_step["snapshot"]["artifact_revision"] = "art-v2"
         next_step["snapshot"]["operation_id"] = "op-v2"
-        next_step["snapshot"]["features"][0]["implementation_refs"] = ["src/new-auth.py"]
+        next_step["snapshot"]["features"][0]["implementation_refs"] = [
+            "src/new-auth.py"
+        ]
         self.assertEqual(handle(next_step)["status"], "complete")
 
     def test_reuse_of_id_with_new_semantics_is_blocked(self) -> None:

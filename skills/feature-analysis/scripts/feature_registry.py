@@ -108,7 +108,10 @@ def _features(snapshot: dict[str, Any], sources: dict) -> tuple[dict, list[str]]
             raise ContractError("duplicate_semantic_identity")
         identities.add(identity)
         _text(row.get("name"), f"{fid}_name")
-        if row.get("kind") not in FEATURE_KINDS or row.get("status") not in FEATURE_STATES:
+        if (
+            row.get("kind") not in FEATURE_KINDS
+            or row.get("status") not in FEATURE_STATES
+        ):
             raise ContractError(f"{fid}_kind_or_status_invalid")
         parent = row.get("parent_id")
         if parent is not None and parent not in features:
@@ -140,7 +143,9 @@ def _features(snapshot: dict[str, Any], sources: dict) -> tuple[dict, list[str]]
     return features, issues
 
 
-def _candidates(snapshot: dict[str, Any], sources: dict, features: dict) -> tuple[dict, list[str]]:
+def _candidates(
+    snapshot: dict[str, Any], sources: dict, features: dict
+) -> tuple[dict, list[str]]:
     candidates = _rows(snapshot.get("candidates"), "candidates", "CAND")
     issues: list[str] = []
     for cid, row in candidates.items():
@@ -163,7 +168,9 @@ def _candidates(snapshot: dict[str, Any], sources: dict, features: dict) -> tupl
     return candidates, issues
 
 
-def _changes(snapshot: dict[str, Any], sources: dict, features: dict) -> tuple[dict, list[str]]:
+def _changes(
+    snapshot: dict[str, Any], sources: dict, features: dict
+) -> tuple[dict, list[str]]:
     changes = _rows(snapshot.get("changes"), "changes", "DIF")
     issues: list[str] = []
     for did, row in changes.items():
@@ -218,8 +225,7 @@ def _history(snapshot: dict[str, Any], previous: dict | None, features: dict) ->
         )
     for fid in new_features:
         if not any(
-            event["kind"] in {"added", "split", "merged"}
-            and fid in event["to_ids"]
+            event["kind"] in {"added", "split", "merged"} and fid in event["to_ids"]
             for event in events
         ):
             raise ContractError(f"feature_creation_evidence_missing:{fid}")
@@ -252,22 +258,37 @@ def _history(snapshot: dict[str, Any], previous: dict | None, features: dict) ->
 
 def analyze(request: Any) -> dict[str, Any]:
     if not isinstance(request, dict) or set(request) != {
-        "snapshot", "previous_snapshot", "observed_head_revision"
+        "snapshot",
+        "previous_snapshot",
+        "observed_head_revision",
     }:
         raise ContractError("request_schema_mismatch")
     snapshot = request["snapshot"]
     previous = request["previous_snapshot"]
-    if not isinstance(snapshot, dict) or (previous is not None and not isinstance(previous, dict)):
+    if not isinstance(snapshot, dict) or (
+        previous is not None and not isinstance(previous, dict)
+    ):
         raise ContractError("snapshot_invalid")
     if snapshot.get("schema_version") != "feature-inventory-v1":
         raise ContractError("schema_version_invalid")
-    for field in ("project_ref", "artifact_ref", "artifact_revision", "source_revision", "operation_id"):
+    for field in (
+        "project_ref",
+        "artifact_ref",
+        "artifact_revision",
+        "source_revision",
+        "operation_id",
+    ):
         _text(snapshot.get(field), field)
     if snapshot.get("event") not in EVENTS:
         raise ContractError("event_invalid")
-    if _text(request["observed_head_revision"], "observed_head_revision") != snapshot["source_revision"]:
+    if (
+        _text(request["observed_head_revision"], "observed_head_revision")
+        != snapshot["source_revision"]
+    ):
         return {"status": "stale", "reasons": ["source_head_changed"], "metrics": None}
-    if previous is not None and snapshot["operation_id"] == previous.get("operation_id"):
+    if previous is not None and snapshot["operation_id"] == previous.get(
+        "operation_id"
+    ):
         if snapshot == previous:
             return {"status": "idempotent", "reasons": [], "metrics": None}
         raise ContractError("operation_id_reused")
@@ -283,11 +304,13 @@ def analyze(request: Any) -> dict[str, Any]:
     if unknown:
         issues.append("unknown_areas_present")
     classified = sorted(
-        did for did, row in changes.items()
+        did
+        for did, row in changes.items()
         if row["classification"] in {"impact", "no_impact", "out_of_scope"}
     )
     mapped = sorted(
-        cid for cid, row in candidates.items()
+        cid
+        for cid, row in candidates.items()
         if row["status"] in {"mapped", "excluded"}
     )
     if not changes:
@@ -339,7 +362,12 @@ def main() -> int:
             raise ContractError("input_too_large")
         request = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs)
         result = handle(request)
-    except (ContractError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+    except (
+        ContractError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+    ) as exc:
         result = {"status": "blocked", "reasons": [str(exc)], "metrics": None}
     sys.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n")
     return 0
