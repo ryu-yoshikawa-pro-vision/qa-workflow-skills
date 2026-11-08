@@ -36,6 +36,19 @@ SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
 GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
 SCRIPT_PATH = Path(__file__).resolve()
+# Only these Skills currently provide runtime-v2 root derivation and evidence.
+# A name appearing in workflow_scopes is not itself a verification contract.
+RUNTIME_V2_SKILL_ROOTS = frozenset(
+    {
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "qa-workflow",
+    }
+)
+
 _WCAG_STATE_OPERATIONS = {
     "register-wcag-evaluation-plan",
     "read-wcag-evaluation-state",
@@ -648,13 +661,28 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         input_value["unsupported_item_closures"],
         current_runtime_rows,
         entities,
-        normalized=[scope["normalized_input"] for scope in scopes],
+        normalized=[
+            scope["normalized_input"]
+            for scope in scopes
+            if scope["skill"] in RUNTIME_V2_SKILL_ROOTS
+        ],
     )
 
     expected_units: list[dict[str, Any]] = []
     expected_entities: list[dict[str, str]] = []
+    unverified_scopes: list[dict[str, Any]] = []
     for scope in scopes:
         scope_skill = scope["skill"]
+        if scope_skill not in RUNTIME_V2_SKILL_ROOTS:
+            unverified_scopes.append(
+                {
+                    "skill": scope_skill,
+                    "target": scope["target"],
+                    "execution_range": scope["execution_range"],
+                    "reason": "owner_verifier_not_registered",
+                }
+            )
+            continue
         normalized = scope["normalized_input"]
         validate_current_structure_state(
             scope_skill,
@@ -752,7 +780,14 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         list(value)
         for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))
     ]
-    issues = []
+    issues = [
+        {
+            "issue_type": "unsupported_skill_verifier",
+            "blocking": True,
+            **scope,
+        }
+        for scope in unverified_scopes
+    ]
     if missing_units:
         issues.append(
             {
@@ -797,6 +832,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities))
     for scope in scopes:
+        if scope["skill"] not in RUNTIME_V2_SKILL_ROOTS:
+            continue
         issues.extend(
             evaluate_materialize_completion(
                 scope["normalized_input"], current_runtime_rows, entities, closures
@@ -829,6 +866,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "deterministic_generated": True,
         "payload": {
             "workflow_ref": workflow_ref,
+            "unverified_scopes": unverified_scopes,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,
