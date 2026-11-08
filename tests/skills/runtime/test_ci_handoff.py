@@ -133,6 +133,60 @@ class CiHandoffTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.result()
 
+    def test_required_artifact_must_identify_current_source(self) -> None:
+        self.expected["artifacts"][0]["source_refs"] = []
+        with self.assertRaises(ValueError):
+            self.result()
+        self.expected["artifacts"][0]["source_refs"] = [
+            {"ref": "repo-source", "revision": HEAD}
+        ]
+        self.manifest["artifacts"][0]["source_refs"] = []
+        with self.assertRaises(ValueError):
+            self.result()
+
+    def test_corrupt_artifact_does_not_hide_behind_missing_approval(self) -> None:
+        self.expected["required_approvals"] = ["plan-approval:rev-5"]
+        self.manifest["source"]["head_sha"] = BASE
+        result = self.result()
+        self.assertEqual(result["status"], "fail", result)
+        self.assertIn(
+            "approval_provider_unconfigured",
+            {row["code"] for row in result["issues"]},
+        )
+        self.assertIn("source_revision_mismatch", {row["code"] for row in result["issues"]})
+
+    def test_noncanonical_artifact_path_is_rejected(self) -> None:
+        self.manifest["artifacts"][0]["path"] = "subdir//artifact.md"
+        with self.assertRaises(ValueError):
+            self.result()
+
+    def test_nested_symlink_directory_is_rejected(self) -> None:
+        external = self.root / "external"
+        external.mkdir()
+        (external / "artifact.md").write_bytes(self.content)
+        link = self.root / "alias"
+        try:
+            link.symlink_to(external, target_is_directory=True)
+        except (NotImplementedError, OSError):
+            self.skipTest("symlink unsupported")
+        self.manifest["artifacts"][0]["path"] = "alias/artifact.md"
+        self.assert_rejects("artifact_readback_failed")
+
+    def test_artifact_read_enforces_limit(self) -> None:
+        from unittest.mock import patch
+
+        with patch.object(handoff, "MAX_ARTIFACT_BYTES", 4):
+            self.assert_rejects("artifact_readback_failed")
+
+    def test_json_input_is_bounded_and_duplicate_keys_rejected(self) -> None:
+        candidate = self.root / "duplicate.json"
+        candidate.write_text('{"a":1,"a":2}', encoding="utf-8")
+        with self.assertRaises(ValueError):
+            handoff._read_json(candidate)
+        with patch.object(handoff, "MAX_JSON_BYTES", 5):
+            with self.assertRaises(ValueError):
+                handoff._read_json(candidate)
+
     def test_cli_output_and_fail_closed_exit_code(self) -> None:
         expected = self.root / "expected.json"
         manifest = self.root / "manifest.json"

@@ -123,6 +123,7 @@
 - **履歴・native更新**：既存`artifact_graph.py`の`create_workflow_state`、`commit_qa_workflow_baseline_local`、`read_qa_workflow_artifact_revision_local`、SQLite conditional write、操作claim／復旧の既存経路を再利用する。ローカルの単一hostに限る原子性・exact historical readbackであり、遠隔providerにも保証があるとは扱わない。
 - **操作開始前の記録**：`claim_mutable_operation(..., operation_details=...)`はowner／scope／操作種類／対象ref／source・artifact revision／期待revision／承認ref／必要権限／resume ownerを、既存workflowのclaim rootに原子的作成・独立読戻しします。同一operation identityの再受付、権限不足で読戻し不能、metadata不正、symlink先への作成をblockし、未実施の副作用を再実行しません。これは実ownerの認可を証明する機能ではありません。
 - **製品CI受渡し**：`skills/qa-workflow/scripts/ci_handoff.py`は`qa-ci-handoff-v1`形式の信頼済み`expected`、候補`manifest`、読戻し済みartifactを比較する。必要なbase／head SHA・build ref、source inventoryのref／revision、変更パスの全件、許容分類、owner／scope／artifact ref／revision／SHA-256、source依存を照合する。結果`pass`は機械的受渡し整合のみ。外部保存先から信頼済み`expected`を生成する経路、認可・承認、実製品CIでの実行はまだ接続していない。承認必須の入力は`approval_provider_unconfigured`で`blocked`。詳細は`skills/qa-workflow/references/ci-handoff.md`。
+  - artifactはsource ref／revisionが必須。POSIX CIでのsymlink経由読戻しとサイズ超過を拒否し、承認未接続とrevision不一致が同時にある場合は不一致を`fail`として残す。
 - **効率比較**：`scripts/skills/evals/workflow_efficiency.py`はPlan詳細07の5シナリオについて、比較元／変更後各2回以上の試行ref・source revision・scope・独立期待基準・品質／安全の判定ref・実測取得元を比較する。測定不能はnullと理由で表し、必要指標不足・品質未PASS・条件不一致では効率改善と判定しない。実Agentを起動せず、実測値や意味評価は作成しない。形式は`EVALS.md`を参照。
 
 ### B〜Jが引き渡す入力・owner責務

@@ -57,4 +57,6 @@ python skills/qa-workflow/scripts/ci_handoff.py \
 
 JSONの`status`は`pass`／`fail`／`blocked`。終了コードは0（受渡し整合）、1（不一致／blocked）、2（入力契約違反）。期待source、全変更集合、情報源revision、正本revision・hash、欠落、未分類を照合する。承認が必要な場合、**現在は認証済みprovider接続がないため常にblocked**となる。候補manifestの`approved`等を権限証拠にはしない。
 
+各artifactの`source_refs[]`は1件以上が必須で、期待source inventoryのrevisionと照合します。受渡しファイルは上限16 MiBで読み込み、Linux等のPOSIX CIではdir/file descriptorを`O_NOFOLLOW`で開き、symlink経由の読戻しを拒否します。変更履歴や承認対象の検証をこのhash照合だけで代替しません。承認が未接続でも旧HEAD・欠落・hash不一致等があれば`fail`を返し、不一致がなく承認だけ未確認なら`blocked`です。
+
 対象製品repositoryへこのCLIを接続するには、案件の保存先・取得方法・権限・信頼済みexpectedの生成元と承認確認方式の決定・実証が必要。未選定のため、現時点では製品CIの実接続は未検証である。
