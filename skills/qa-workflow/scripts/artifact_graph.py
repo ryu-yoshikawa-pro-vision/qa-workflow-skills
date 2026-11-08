@@ -2932,7 +2932,9 @@ def read_mutable_operation_claim(
             "operation_details": record.get("operation_details"),
         }
     except (_LocalBaselineError, OSError, UnicodeError, ValueError, TypeError) as exc:
-        reason = exc.reason if isinstance(exc, _LocalBaselineError) else "claim_unreadable"
+        reason = (
+            exc.reason if isinstance(exc, _LocalBaselineError) else "claim_unreadable"
+        )
         return {"status": "blocked", "may_start": False, "reason": reason}
 
 
