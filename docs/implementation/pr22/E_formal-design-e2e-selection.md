@@ -13,10 +13,10 @@
 
 ## 参照するPlan
 
-- - [PR #22：開発連動QA・QA全工程の実装Plan](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/22)
-- - [Plan索引](../../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)
-- - [開発連動QA Plan（15完了条件）](../../plans/2026-11-07_122247_development-qa-traceability.md)
-- - [QA全工程Plan（10完了条件）](../../plans/2026-11-07_170134_qa-full-process-implementation.md)
+- [PR #22：開発連動QA・QA全工程の実装Plan](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/22)
+- [Plan索引](../../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)
+- [開発連動QA Plan（15完了条件）](../../plans/2026-11-07_122247_development-qa-traceability.md)
+- [QA全工程Plan（10完了条件）](../../plans/2026-11-07_170134_qa-full-process-implementation.md)
 - [詳細03：E2E・直接開始](../../plans/2026-11-07_170134_qa-full-process-implementation_03_workflow-and-acceptance.md)
 
 関連完了条件の主な担当：開発連動QA 5・8・12・13・14、QA全工程 2・9の正式設計部分。
@@ -28,6 +28,28 @@
 - それらの既存runtime／validator／fixture／migrationテスト（共有runtimeの改変はAへ）
 
 **変更境界**：以下に記載のない共有ファイルを変更したくなった場合は、書込みownerへ変更内容・必要な入力出力・検証例を渡す。既存実装の回帰を避けるため、既存helperの再利用を優先し、他担当の正本を新設Skillに複製しない。新規テスト・fixture・評価データは可能な限り担当固有のファイルに分ける。
+
+## 担当branchで実施する作業とPR #22で実施する作業
+
+### このbranchで実施・検証する
+
+- 本書の担当対象のSkill・runtime・helper・データ契約・既存consumerとの局所接続を実装し、担当範囲の既存テスト・回帰・負例・権限／保存・履歴互換性を検証する。
+- 担当機能の受入に必要な実runner・実保存先・実Agentの**単独経路**は、利用可能な環境で実施する。外部権限・実接続が不足する場合はその条件を未検証／blockedと明示し、独立に検証できる部分は完成させる。
+- 他branchの未統合実装は合意した契約と独立fixtureで代替して局所検証する。fixtureは他ownerの実成果物を統合した証拠にはしない。
+- 担当が所有する実装不具合、局所結合・回帰不具合は**このbranchで修正**し、対応したテスト・実施証拠を残す。
+
+### PR #22だけで実施・判定する
+
+- A〜Jの実装PRの取り込み、競合解消・全体再検証、**各ownerが実際に保存した成果物同士**のID／revision／currentness／承認・run参照による横断接続。
+- 全current Skill同時利用時の発火／routing、工程をまたぐ実Agent・実runner・実provider・製品CIの一連の受入、S1〜S17の総合試験、人間編集8ケースの**全体経路としての再検証**。
+- 開発連動QAの15条件、QA全工程の10条件と詳細Plan 01〜08の最終照合、Plan詳細07の5シナリオの**変更前後の横断実測・効率化判定**、統合後の全CI・回帰評価。
+- 横断試験で見つかった問題はownerを特定し、分割可能な実装・修正は対象branchに戻す。統合固有の接続・設定・複数owner間の確認作業だけをPR #22で実施する。
+
+### PR #22へ引き渡す証拠
+
+- 担当の変更ファイル、公開入出力契約、参照するowner／source／artifact IDとrevision、schema／fixture、保存・承認・失敗／再開条件。
+- 局所検証のコマンドと結果、実runner／実providerの担当経路の証拠、回帰・負例、未実行／SKIP／blockedと再開条件。
+- 他担当の実成果物が必要な横断検証項目。**これらの未実施は担当branchの局所検証を失敗扱いする理由にはしないが、PR #22の最終受入完了には必ず必要**とする。
 
 ## 着手基準
 
@@ -50,11 +72,11 @@
 - E→G/H/J：正式TCとE2E選定ref・coverage評価。
 - A：共有runtime登録依頼。Fが必要とする既存`test-analysis`変更はEが実施する。
 
-**並行作業**：依存先のコード完成を待たずに固定fixtureで開発してよい。ただし、最終的には保存済みの実成果物ref・source revision・履歴・現在性を照合し、fixture成功を実統合成功と混同しない。必要な情報・権限・環境が欠けるときは、該当scopeを未確認／blockedと記録して別scopeの作業を継続する。
+**並行作業**：依存先の完成前でも固定fixtureで担当範囲を実装・局所検証する。実際の他owner成果物を用いた横断照合はPR #22で行う。必要な外部情報・権限・環境が不足する箇所は未検証／blockedと記録し、独立して実装可能な箇所は継続する。
 
 ## 完了基準
 
-- [ ] 各正本とauthorityを守り、feature/item/condition/architectureから既存設計まで実ID・revisionで追跡できる。
+- [ ] 各正本・Authorityを守り、feature/item/condition/architectureの契約fixtureから既存設計までID・revision付きで局所検証した。B/C/D/Fの正規実成果物との横断追跡はPR #22へ引き継いだ。
 - [ ] 採否・不採用・blocked・複数expected result・別レベル・既存技法CIが互いに混同されない。
 - [ ] 技術非依存のE2E選定がE2E実装・実行とは独立して発火し、既存E2E直接利用を妨げない。
 - [ ] Risk・TR・TCN・CI・TC・coverageのlegacy／migration／partial rerun回帰と、authorityなし期待結果・誤100%等の負例がPASSする。
@@ -65,11 +87,11 @@
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
 - [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由をPR本文へ記載した。
 - [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
-- [ ] 他担当へ渡す入出力と、PR #22でのみ確認できる未完了の全体条件を区別して報告した。
+- [ ] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
 1. 自branchの差分が担当範囲に収まり、他担当の変更・main／PR #17の最新変更と衝突しないか再確認する。
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響をPR本文に記載する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
-4. PR #22の統合担当Aに引継ぎ、統合先で関連Plan条件を再検証する。
+4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
