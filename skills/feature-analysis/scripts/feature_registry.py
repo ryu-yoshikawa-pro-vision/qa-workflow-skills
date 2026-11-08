@@ -308,11 +308,7 @@ def analyze(request: Any) -> dict[str, Any]:
         for did, row in changes.items()
         if row["classification"] in {"impact", "no_impact", "out_of_scope"}
     )
-    mapped = sorted(
-        cid
-        for cid, row in candidates.items()
-        if row["status"] == "mapped"
-    )
+    mapped = sorted(cid for cid, row in candidates.items() if row["status"] == "mapped")
     if not changes:
         issues.append("change_denominator_zero")
     if not candidates:
