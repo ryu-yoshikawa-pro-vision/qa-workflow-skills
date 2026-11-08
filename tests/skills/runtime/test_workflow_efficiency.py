@@ -83,6 +83,26 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             "not_measured",
         )
 
+    def test_missing_required_metric_prevents_efficiency_claim(self) -> None:
+        data = dataset()
+        for item in data["scenarios"][0]["candidate"]:
+            item["metrics"]["wall_seconds"] = metric(None, "seconds")
+        result = mod.evaluate(data)
+        self.assertEqual(result["status"], "unproven")
+        self.assertIn(
+            "required_measurement_unavailable",
+            result["scenarios"][0]["reasons"],
+        )
+
+    def test_mismatched_metric_units_prevent_comparison(self) -> None:
+        data = dataset()
+        for item in data["scenarios"][0]["candidate"]:
+            item["metrics"]["human_review_seconds"] = metric(3, "seconds")
+        result = mod.evaluate(data)
+        self.assertIn(
+            "required_measurement_unavailable", result["scenarios"][0]["reasons"]
+        )
+
     def test_quality_failure_disallows_efficiency_pass(self) -> None:
         data = dataset()
         data["scenarios"][1]["candidate"][0]["quality"]["safety"] = "fail"
@@ -112,7 +132,7 @@ class WorkflowEfficiencyTests(unittest.TestCase):
     def test_regression_visible_even_when_other_metrics_improve(self) -> None:
         data = dataset()
         for item in data["scenarios"][2]["candidate"]:
-            item["metrics"]["human_review_seconds"] = metric(30, "seconds")
+            item["metrics"]["human_review_seconds"] = metric(30)
         result = mod.evaluate(data)
         self.assertEqual(result["scenarios"][2]["status"], "needs_review")
         self.assertEqual(

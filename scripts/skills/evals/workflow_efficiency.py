@@ -33,6 +33,19 @@ METRICS = {
     "cost_amount": "lower",
 }
 REQUIRED_QUALITY = ("functional", "quality", "safety", "traceability")
+REQUIRED_MEASUREMENTS = frozenset(
+    {
+        "wall_seconds",
+        "skill_call_count",
+        "skill_restart_count",
+        "human_review_seconds",
+        "human_approval_seconds",
+        "reanalyze_count",
+        "retry_count",
+        "reused_artifact_count",
+        "regenerated_artifact_count",
+    }
+)
 
 
 def _obj(value: Any, fields: set[str], label: str) -> dict[str, Any]:
@@ -249,6 +262,11 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                     change = "regressed"
                     regressed = True
             metrics[key] = {"baseline": before, "candidate": after, "change": change}
+        if any(
+            metrics[key]["change"] == "not_comparable"
+            for key in REQUIRED_MEASUREMENTS
+        ):
+            reasons.append("required_measurement_unavailable")
         if reasons:
             status = "not_comparable"
         elif regressed:
