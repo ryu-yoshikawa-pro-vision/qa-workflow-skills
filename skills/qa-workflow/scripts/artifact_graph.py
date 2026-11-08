@@ -2757,7 +2757,12 @@ def _validate_claim_details(value: Any) -> dict[str, Any]:
             not isinstance(value, str)
             or not value.strip()
             or len(value) > 512
-            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+            or any(
+                ord(char) < 32
+                or ord(char) == 127
+                or 0xD800 <= ord(char) <= 0xDFFF
+                for char in value
+            )
         ):
             raise ValueError(f"claim_details_{field}_invalid")
         return value
@@ -2815,6 +2820,12 @@ def claim_mutable_operation(
             not isinstance(operation_ref, str)
             or not operation_ref.strip()
             or len(operation_ref) > 512
+            or any(
+                ord(char) < 32
+                or ord(char) == 127
+                or 0xD800 <= ord(char) <= 0xDFFF
+                for char in operation_ref
+            )
         ):
             raise ValueError("operation_ref_invalid")
         details = (
@@ -2884,7 +2895,8 @@ def read_mutable_operation_claim(
         root = _local_baseline_root(workflow_state_root, create=False)
         target = _claim_path(root, ref, operation_ref)
         _assert_local_regular_file(target, "workflow_claim")
-        raw = target.read_bytes()
+        with target.open("rb") as stream:
+            raw = stream.read(2 * 1024 * 1024 + 1)
         if len(raw) > 2 * 1024 * 1024:
             raise ValueError("claim_limit_exceeded")
         record = json.loads(raw.decode("utf-8"))
