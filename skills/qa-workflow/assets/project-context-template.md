@@ -150,7 +150,7 @@
 
 ## 16. QA artifact graphの固定rootとcurrentness項目
 
-各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`はproject-local reservationの保存rootです。単一hostのSQLite providerはこのroot配下の`resource-reservations.sqlite3`を利用します。旧形式の予約JSONを残したまま同じresourceを自動移行しません。resourceのisolation / external reservation / cleanup policyはこのroot値ではなく、Section 4の環境・resource条件へ記録します。
+各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`は予約保存先のroot候補であって、providerの選択やatomic conditional releaseの保証ではありません。共有resourceを使用する案件では、利用するprovider、認証されたowner、revisionとcleanup・解放方法をSection 4の環境・resource条件で決めます。未選定の場合は予約をblockし、SQLiteや旧JSONへ暗黙に作成しません。旧予約データを削除・自動移行しません。
 
 <!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->
 

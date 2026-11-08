@@ -121,12 +121,12 @@
 - **workflowの完了判定**：`skills/qa-workflow/scripts/workflow_runtime.py`では既存のruntime-v2 rootを持つ6 Skill（`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`qa-workflow`）だけを既存verifier経路へ通す。未登録Skillは`unsupported_skill_verifier`をblocking issueに追加し、対象`skill`・`target`・`execution_range`を`payload.unverified_scopes[]`へ保持する。既存対応Skillの`runtime_units`／Entityのcurrent結果は捨てない。新設14 Skillをこの6 SkillのMachine Entity契約へ無条件に移行しない。
 - **既存のverified state**：対応済みSkillは`verify_runtime_evidence`が返した`current_structure_state`の`runtime_results`／`carry_forward_entities`／`previous_ci_id_state`を既存`validate_current_structure_state`で検証する。入力は`workflow_ref`（canonical UUID）、`workflow_scopes[]`の`skill`・`target`・`execution_range`・`normalized_input`、`runtime_units[]`、`current_runtime_units[]`、`current_entities[]`、`unsupported_item_closures[]`。保存済みの旧versionや他workflowの検証済みという文面だけをcurrent証拠として受理しない。
 - **履歴・native更新**：既存`artifact_graph.py`の`create_workflow_state`、`commit_qa_workflow_baseline_local`、`read_qa_workflow_artifact_revision_local`、SQLite conditional write、操作claim／復旧の既存経路を再利用する。SQLiteのworkflow stateはcurrent更新と旧／新revisionのsnapshotを同じtransactionで保存し、`read_sqlite_workflow_state_revision`で過去revisionを取得する。履歴のない旧DBでは過去記録を捏造せず、履歴連続性がないことを`historical_revision_available=false`で示す。ローカルの単一hostに限る原子性・exact historical readbackであり、遠隔providerにも保証があるとは扱わない。
-- **shared resourceの予約・解放**：`reserve_shared_resource`のlocal経路は`reserve_sqlite_shared_resource`へ統一し、`read_sqlite_shared_resource`でowner／provider revisionを取得する。`release_shared_resource(..., reservation_root=..., resource_ref=...)`がowner状態・cleanup・expected revisionを検証し、SQLite transactionでstatusとrevisionを条件付き更新する。旧JSON予約があれば移行をblockし、旧版file予約と同時運用しない。これは単一hostのlocal providerだけの実装であり、承認事実の認証や複数hostの排他性を証明しない。
+- **shared resourceの予約・解放**：新規に追加したSQLiteの予約・解放DBを除去し、`reserve_shared_resource()`はprovider未選定なら`reservation_provider_not_selected`で停止する。`native_atomic_conditional_release=True`はprovider選択・認証・実解放の証拠にならない。既存外部providerからの予約ref・revisionは引継ぎ可能だが、実ownerとprovider状態の認証・解放はその実装責務に残す。`release_shared_resource()`はprovider未接続で`reservation_release_provider_not_connected`となり、解放したと誤表示しない。既存JSON予約やDBは自動削除・移行しない。
 - **操作開始前の記録**：`claim_mutable_operation(..., operation_details=...)`はowner／scope／操作種類／対象ref／source・artifact revision／期待revision／承認ref／必要権限／resume ownerを、既存workflowのclaim rootに原子的作成・独立読戻しします。同一operation identityの再受付、権限不足で読戻し不能、metadata不正、symlink先への作成をblockし、未実施の副作用を再実行しません。これは実ownerの認可を証明する機能ではありません。
-  - `read_mutable_operation_claim(..., expected_claim_revision=...)`で後続セッションが同じclaimとrevisionを再取得し、履歴不一致・欠落・非正規化内容を拒否。読戻しでは`may_start`を返さず、副作用の二重実行を許可しない。
+  - `operation_details`なしの新規claimは`operation_details_required`で停止。旧形式は読取互換のみ。`read_mutable_operation_claim(..., expected_claim_revision=...)`で別セッションがclaimを読んでも`may_start=false`。`recover_claim()`は元ownerの実状態・cleanupとprovider-native解放の接続がない限り復旧を許可しない。
 - **製品CI受渡し**：`skills/qa-workflow/scripts/ci_handoff.py`は`qa-ci-handoff-v1`形式の信頼済み`expected`、候補`manifest`、読戻し済みartifactを比較する。必要なbase／head SHA・build ref、source inventoryのref／revision、変更パスの全件、許容分類、owner／scope／artifact ref／revision／SHA-256、source依存を照合する。結果`pass`は機械的受渡し整合のみ。外部保存先から信頼済み`expected`を生成する経路、認可・承認、実製品CIでの実行はまだ接続していない。承認必須の入力は`approval_provider_unconfigured`で`blocked`。詳細は`skills/qa-workflow/references/ci-handoff.md`。
   - artifactはsource ref／revisionが必須。POSIX CIでのsymlink経由読戻しとサイズ超過を拒否し、承認未接続とrevision不一致が同時にある場合は不一致を`fail`として残す。
-- **効率比較**：`scripts/skills/evals/workflow_efficiency.py`はPlan詳細07の5シナリオについて、比較元／変更後各2回以上の試行ref・source revision・scope・独立期待基準・品質／安全の判定ref・実測取得元を比較する。測定不能はnullと理由で表し、必要指標不足・品質未PASS・条件不一致では効率改善と判定しない。実Agentを起動せず、実測値や意味評価は作成しない。形式は`EVALS.md`を参照。
+- **効率比較**：`scripts/skills/evals/workflow_efficiency.py`はPlan詳細07の5シナリオについて、比較元／変更後各2回以上の試行ref・source revision・scope・独立期待基準・品質／安全の判定ref・実測取得元を比較する。各試行の時刻、Skillの実行ref・開始終了時刻、owner成果物ref／revision、attempt・runner・cleanupと中断再開の参照を追加した。欠落した旧入力は読めるが改善を実証しない。測定不能はnullと理由で表し、必要指標不足・品質未PASS・条件不一致でも効率改善と判定しない。実Agentを起動せず、実測値や意味評価は作成しない。形式は`EVALS.md`を参照。
   - 同じrunを複数回の独立試行として数えることを禁止し、重複`trial_ref`／`run_ref`、JSON重複キー、入力サイズ超過を拒否する。
 
 ### B〜Jが引き渡す入力・owner責務
@@ -160,14 +160,22 @@
 
 上記の元ログは[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465992406)に保存している。[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465992453)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465995075)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465994895)はSUCCESS。Codex Harnessは同一commitの[実行記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465992421)を確認する（本文更新時点でWindows job実行中）。
 
-特に`test_qa_operation_claim.py`は同一操作の並行claim、pre-start metadataの保存と別セッション読戻し、旧claim revision、改ざん、symlink、サイズ超過、既存3引数claim互換を検証した。`test_ci_handoff.py`は旧HEAD、未分類差分、source未対応、成果物hash／revision不一致、symlink経由読取り、承認provider未設定と不一致の同時発生を検証した。`test_workflow_efficiency.py`は5条件の比較、独立run重複、品質未PASS、条件不一致、未測定、悪化、JSON重複キー・サイズ制限を検証した。
+特に`test_qa_operation_claim.py`は同一操作の並行claim、pre-start metadataの保存と別セッション読戻し、旧claim revision、改ざん、symlink、サイズ超過、旧3引数claimの読取互換を検証した。`test_ci_handoff.py`は旧HEAD、未分類差分、source未対応、成果物hash／revision不一致、symlink経由読取り、承認provider未設定と不一致の同時発生を検証した。`test_workflow_efficiency.py`は5条件の比較、独立run重複、品質未PASS、条件不一致、未測定、悪化、JSON重複キー・サイズ制限を検証した。
 
-SQLite予約の追加テスト`test_sqlite_shared_reservation.py`は、並行予約の単一取得、owner不一致・旧revision、cleanup未確認、解放の二重要求、再取得、旧JSON予約との共存拒否、DB障害・symlinkを検証する。既存`test_qa_artifact_graph_skills.py`の公開helper回帰もSQLite readbackへ更新した。
+当初追加した`test_sqlite_shared_reservation.py`は、共通providerとしてのSQLite未選定を受け削除した。代わりに`test_shared_resource_contract.py`で、未設定時のblockと副作用ゼロ、旧予約の不変更、isolated resource、外部reservationのrevision引継ぎ、認証されていないowner／cleanupフラグでは解放しない条件を検証する。
 
 SQLite履歴の追加テスト`test_sqlite_workflow_history.py`は、create／CAS更新での旧・新revision保存、履歴のworkflow分離、同一revisionの並行更新、履歴保存失敗時の原子的ロールバック、直接変更された履歴の拒否、旧DBの欠落revision、旧形式JSON、未来revision、過大なrevision tokenを検証した。SQLiteへの実接続はGitHub Actionsの単一host環境に限り、network filesystemや複数hostを検証していない。
 
 製品CIの現状を[qa-training-storeのWeb CI](https://github.com/ryu-yoshikawa-pro-vision/qa-training-store/blob/main/.github/workflows/ci.yml)で確認した。既存CIはbuild成果物・テスト証跡の`actions/upload-artifact`／`actions/download-artifact`を利用しているが、確認したWeb CI workflowには`qa-ci-handoff-v1`の信頼済み`expected`、候補`manifest`と正本のrevisionを取得・照合するジョブはない。既存のbuild成果物をQA解析成果物の受渡しとして認定せず、転送方式と正本取得の決定をblockedとして残す。
 
-予約保存の移行条件：既存の`qa.reservation_root`内に同一resourceの旧`<identity>.json`がある場合、新SQLite予約をblockする。既存ownerの実行／cleanupを調査せずにJSONを削除しない。旧版file-based予約と新版SQLite予約の同時運用は対象外とし、切替前に既存予約をすべて解消してから適用する。rollback時もSQLite上の予約を解放／照合するまでは旧版file-based経路を再開しない。
+予約保存の移行条件：PR #23ではshared resource向けSQLite providerを採用しない。旧`<identity>.json`が残る場合も、その予約を削除・再作成・自動移行しない。以前のPR #23中間HEADの試験で`resource-reservations.sqlite3`を生成していた場合は、実利用データではないことを確認するまで削除しない。案件の保存先と認証されたowner／解放条件が確定するまでは共有resourceをblockする。
 
-**未検証／blocked**：新設Skillの正式owner結果が未提供のためowner verifier登録と単独完了経路は未完成。遠隔保存providerのnative CAS／履歴／独立readback、承認主体の実認証、製品CIの実成果物取得、実Agentの5条件比較は未実施。複数host・遠隔providerへの安全性をローカル単一hostのclaimから推定しない。PR #22の全体受入に転用する際は、source・artifact revision・承認・cleanupを各ownerの正本から再取得する。
+**未検証／blocked**：claimの安全な実解放・再開とshared resourceのnative条件付き解放はprovider／owner実状態の取得元が決まらず未接続。新設Skillの正式owner結果が未提供のためowner verifier登録と単独完了経路は未完成。遠隔保存providerのnative CAS／履歴／独立readback、承認主体の実認証、製品CIの実成果物取得、実Agentの5条件比較は未実施。複数host・遠隔providerへの安全性をローカル単一hostのclaimから推定しない。PR #22の全体受入に転用する際は、source・artifact revision・承認・cleanupを各ownerの正本から再取得する。
+
+## レビュー後の修正（2026-11-08）
+
+- 利用者からSQLiteの共通採用を決定していない旨の指摘があり、Aが今回追加したshared resource用SQLite保存・解放経路を撤回した。WCAG評価向けの既存SQLite経路とworkflow stateの局所履歴強化は維持する。SQLiteは汎用の既定providerではない。
+- 詳細のない3引数`claim_mutable_operation()`は新規副作用の開始を許可せず、過去形式の読込だけを維持する。`recover_claim()`と`release_shared_resource()`は、条件付き解放の実providerがないまま成功・再実行可能と返さない。
+- 効率比較にrunの時刻・Skill実行ref・owner成果物revision・runner／cleanupと中断再開参照を追加した。旧入力からの改善主張を禁止する。
+- 依存関係：B〜Jの正式validator・成果物と、案件のprovider／承認主体／製品CI受渡し方式が決まらない限り、対応する実接続はblocked。A側の独立テストの成功を横断実証に読み替えない。
+- 最新HEADのCI実行結果はPR #23のChecksを正本として確認する。以前のHEADで記録したテスト件数・結果はそのcommit限定である。
