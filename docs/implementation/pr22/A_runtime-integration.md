@@ -111,3 +111,37 @@
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+
+## 現行実装の公開契約と担当別引継ぎ（2026-11-08）
+
+以下はPR #23の実装と固定fixtureで確認できる契約。担当B〜Jの未統合成果物、未選定の外部provider、製品CIの本番接続を確定済みとは扱わない。
+
+### 実装した共通経路
+
+- **workflowの完了判定**：`skills/qa-workflow/scripts/workflow_runtime.py`では既存のruntime-v2 rootを持つ6 Skill（`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`qa-workflow`）だけを既存verifier経路へ通す。未登録Skillは`unsupported_skill_verifier`をblocking issueに追加し、対象`skill`・`target`・`execution_range`を`payload.unverified_scopes[]`へ保持する。既存対応Skillの`runtime_units`／Entityのcurrent結果は捨てない。新設14 Skillをこの6 SkillのMachine Entity契約へ無条件に移行しない。
+- **既存のverified state**：対応済みSkillは`verify_runtime_evidence`が返した`current_structure_state`の`runtime_results`／`carry_forward_entities`／`previous_ci_id_state`を既存`validate_current_structure_state`で検証する。入力は`workflow_ref`（canonical UUID）、`workflow_scopes[]`の`skill`・`target`・`execution_range`・`normalized_input`、`runtime_units[]`、`current_runtime_units[]`、`current_entities[]`、`unsupported_item_closures[]`。保存済みの旧versionや他workflowの検証済みという文面だけをcurrent証拠として受理しない。
+- **履歴・native更新**：既存`artifact_graph.py`の`create_workflow_state`、`commit_qa_workflow_baseline_local`、`read_qa_workflow_artifact_revision_local`、SQLite conditional write、操作claim／復旧の既存経路を再利用する。ローカルの単一hostに限る原子性・exact historical readbackであり、遠隔providerにも保証があるとは扱わない。
+- **製品CI受渡し**：`skills/qa-workflow/scripts/ci_handoff.py`は`qa-ci-handoff-v1`形式の信頼済み`expected`、候補`manifest`、読戻し済みartifactを比較する。必要なbase／head SHA・build ref、source inventoryのref／revision、変更パスの全件、許容分類、owner／scope／artifact ref／revision／SHA-256、source依存を照合する。結果`pass`は機械的受渡し整合のみ。外部保存先から信頼済み`expected`を生成する経路、認可・承認、実製品CIでの実行はまだ接続していない。承認必須の入力は`approval_provider_unconfigured`で`blocked`。詳細は`skills/qa-workflow/references/ci-handoff.md`。
+- **効率比較**：`scripts/skills/evals/workflow_efficiency.py`はPlan詳細07の5シナリオについて、比較元／変更後各2回以上の試行ref・source revision・scope・独立期待基準・品質／安全の判定ref・実測取得元を比較する。測定不能はnullと理由で表し、必要指標不足・品質未PASS・条件不一致では効率改善と判定しない。実Agentを起動せず、実測値や意味評価は作成しない。形式は`EVALS.md`を参照。
+
+### B〜Jが引き渡す入力・owner責務
+
+- **B**：Project Contextが指定した有効なsource snapshot、source inventoryの完全性と各source ref／revision、base／headと変更パスの全件、差分分類の正規成果物。機能分析の識別と意味判断はBの正本に残す。
+- **C／D／E／F／G／H／I／J**：各担当が所有する成果物の`owner skill`、scope、artifact refと保存revision／content hash、入力source refs／revisions、利用したvalidator／runtimeと実際の検証結果ref、必要な承認、依存するownerのref／revision、現状態（current・stale・blocked・unsupported）、未解決・再開先を提供する。既存の成果物形式・stable ID・正本ownerを上書きせず、担当内の正常／拒否fixtureを添える。
+- **G／H／Jの実行／報告**：元run／attempt ref、runの開始証拠、結果の最終確定、必要cleanupの実施と保存readback、部分取得・未実行を区別する。共通runtimeは実測を再採点しない。実行や集計の判定は各担当Skillの責務。
+- **共通契約変更の窓口**：`skills/qa-workflow/scripts/**`、`EVALS.md`、Project Context templateおよび共通CIはAが編集する。他担当から新Skillの正式validator入口、scopeの粒度、正本参照形式と検証fixtureを受け取ってから登録を追加する。現時点で未登録の新Skillは、検証済みの成果物があると自己宣言しても完了できない。
+
+### 保存・承認と失敗／再開の条件
+
+新規保存はprovider-native create-if-absent、更新は提供側が原子的に保証するexpected revisionによるCASを必要とする。旧revisionの履歴取得と書込み後の独立readbackがない操作はblocked。複数ownerの個別CASだけで横断commitが成立したとは扱わない。
+
+承認対象の操作／scope／成果物revision／source buildと、信頼できるサービスで認証した主体・ロール・有効期間・policy revisionが一致する場合だけ副作用を許可する。文書やIssueに書かれた`approved`は単独の証拠にならない。状態不明の副作用を再実行せず、開始前operation identityと元ownerの実保存状態から復旧する。実provider・承認主体・操作対象repoの権限は案件側の決定がなく未接続。決定元は案件Project Context／正式な認可サービスと製品CI管理者。受入再開には提供先と資格情報を安全に用意し、native CAS／履歴／readbackと権限を実証する必要がある。
+
+### PR #22で再取得する証拠
+
+- `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`：既存runtime・履歴互換・新たなowner gate／CI受渡し／効率比較の回帰。
+- `python scripts/format_tracked.py check`：共有フォーマット・lint。GitHub Actionsの`Code Quality`で確認する。
+- `Validate Deterministic Output Evals`、`Validate Agent Skills`、`Validate Semantic Output Evals`、`Codex Harness`：各HEADの完了結果をPR #23のChecksで確認する。途中HEADの失敗を最新HEADの成功に読み替えない。
+- 独立fixtureの検証は他ownerの実成果物を使った統合証拠ではない。**未実施**：新設14 Skillの各owner validator正式登録、実providerの競合・履歴・認可受入、実製品CI受渡し、実Agentの5シナリオ測定、A〜J横断S1〜S17／全条件の最終受入（PR #22担当）。
+
