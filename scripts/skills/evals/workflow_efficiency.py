@@ -48,6 +48,19 @@ REQUIRED_MEASUREMENTS = frozenset(
 )
 
 
+def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON field: {key}")
+        value[key] = item
+    return value
+
+
+def _reject_constant(value: str) -> Any:
+    raise ValueError(f"invalid numeric constant: {value}")
+
+
 def _obj(value: Any, fields: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != fields:
         raise ValueError(f"{label} fields invalid")
@@ -204,6 +217,7 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ValueError("all five independent scenarios are required exactly once")
     seen_trials: set[str] = set()
+    seen_runs: set[str] = set()
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
         _obj(scenario, {"scenario", "baseline", "candidate"}, "scenario")
@@ -218,6 +232,10 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                 if ref in seen_trials:
                     raise ValueError("duplicate trial_ref across comparisons")
                 seen_trials.add(ref)
+                run_ref = trial["run_ref"]
+                if run_ref in seen_runs:
+                    raise ValueError("duplicate run_ref across independent trials")
+                seen_runs.add(run_ref)
         reasons: list[str] = []
         combined = groups["baseline"] + groups["candidate"]
         if len(groups["baseline"]) < 2 or len(groups["candidate"]) < 2:
@@ -303,9 +321,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
-        if not args.input.is_file() or args.input.stat().st_size > 2 * 1024 * 1024:
-            raise ValueError("evaluation input missing or too large")
-        data = json.loads(args.input.read_text(encoding="utf-8"))
+        if not args.input.is_file():
+            raise ValueError("evaluation input must be a regular file")
+        with args.input.open("rb") as stream:
+            raw = stream.read(2 * 1024 * 1024 + 1)
+        if len(raw) > 2 * 1024 * 1024:
+            raise ValueError("evaluation input is too large")
+        data = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_fields,
+            parse_constant=_reject_constant,
+        )
         report = evaluate(data)
     except (OSError, UnicodeError, ValueError, TypeError) as exc:
         print(
