@@ -1336,18 +1336,19 @@ def read_sqlite_workflow_state(
                     }
                 # The persisted history origin makes missing snapshots corruption,
                 # including when the current snapshot itself has disappeared.
-                history_complete = _sqlite_history_is_complete(
-                    connection, ref, number
-                )
+                history_complete = _sqlite_history_is_complete(connection, ref, number)
             else:
                 origin_table = connection.execute(
                     "SELECT 1 FROM sqlite_master "
                     "WHERE type='table' AND name='workflow_state_history_origin'"
                 ).fetchone()
-                if origin_table and connection.execute(
-                    "SELECT 1 FROM workflow_state_history_origin WHERE workflow_ref=?",
-                    (ref,),
-                ).fetchone():
+                if (
+                    origin_table
+                    and connection.execute(
+                        "SELECT 1 FROM workflow_state_history_origin WHERE workflow_ref=?",
+                        (ref,),
+                    ).fetchone()
+                ):
                     return {
                         "status": "blocked",
                         "reason": "workflow_state_history_missing",
