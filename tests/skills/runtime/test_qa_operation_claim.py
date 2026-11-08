@@ -107,7 +107,7 @@ class WorkflowOperationClaimTests(unittest.TestCase):
 
     def test_invalid_unicode_in_operation_metadata_is_blocked(self) -> None:
         details = operation_details()
-        details["target_ref"] = "\\ud800"
+        details["target_ref"] = chr(0xD800)
         result = self.claim(details)
         self.assertEqual(result["status"], "blocked")
         self.assertFalse(result["may_start"])
