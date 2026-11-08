@@ -105,6 +105,23 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         self.assertEqual(result["status"], "blocked")
         self.assertFalse((self.root / "claims").exists())
 
+    def test_invalid_unicode_in_operation_metadata_is_blocked(self) -> None:
+        details = operation_details()
+        details["target_ref"] = "\\ud800"
+        result = self.claim(details)
+        self.assertEqual(result["status"], "blocked")
+        self.assertFalse(result["may_start"])
+
+    def test_oversized_persisted_claim_is_blocked_before_json_parse(self) -> None:
+        first = self.claim()
+        path = Path(first["path"])
+        path.write_bytes(b" " * (2 * 1024 * 1024 + 1))
+        result = artifact_graph.read_mutable_operation_claim(
+            self.root, WORKFLOW_REF, "runner:attempt-001"
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertFalse(result["may_start"])
+
     def test_unreadable_claim_does_not_authorize_start(self) -> None:
         with patch.object(
             artifact_graph,
