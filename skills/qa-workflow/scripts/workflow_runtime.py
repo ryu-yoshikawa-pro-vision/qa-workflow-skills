@@ -12,8 +12,8 @@ from typing import Any
 import artifact_graph
 from runtime_contract import (
     FULL_DIGEST_RE,
-    InvalidInput,
     RUNTIME_V2_SKILL_ROOTS,
+    InvalidInput,
     _default_expected_runtime_units,
     _expected_entities,
     canonical_json_text,
