@@ -273,6 +273,8 @@ class WcagObservationHandoffTests(unittest.TestCase):
             external_reservation_acquired=True,
             external_reservation_revision="sqlite:7",
         )
+        self.assertEqual(reserved["status"], "blocked")
+        self.assertEqual(reserved["reason"], "external_reservation_readback_required")
         self.assertEqual(reserved["reservation_revision"], "sqlite:7")
 
 
@@ -401,7 +403,7 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
             acquired = provider.acquire_reservation(
                 "fixture-browser-session", workflow_ref
             )
-            reserved = graph.reserve_shared_resource(
+            candidate = graph.reserve_shared_resource(
                 "unused",
                 "fixture-browser-session",
                 workflow_ref,
@@ -410,13 +412,19 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
                 external_reservation_acquired=True,
                 external_reservation_revision=f"sqlite:{acquired['revision']}",
             )
+            self.assertEqual(candidate["status"], "blocked")
+            self.assertEqual(candidate["reason"], "external_reservation_readback_required")
+            # The actual fixture provider owns the atomic reservation; a
+            # self-attested helper result cannot grant browser start permission.
+            self.assertEqual(acquired["status"], "reserved")
+            self.assertEqual(acquired["owner_workflow_ref"], workflow_ref)
             handoff["operation_claim_ref"] = claim["path"]
             handoff["operation_claim_revision"] = claim["claim_revision"]
             reservation_row = {
                 "resource_ref": "fixture-browser-session",
-                "reservation_ref": reserved["reservation_ref"],
-                "provider": reserved["provider"],
-                "reservation_revision": reserved["reservation_revision"],
+                "reservation_ref": acquired["reservation_ref"],
+                "provider": "sqlite_test_handoff_provider",
+                "reservation_revision": f"sqlite:{acquired['revision']}",
                 "status": "reserved",
             }
             handoff["resource_reservations"] = [reservation_row]

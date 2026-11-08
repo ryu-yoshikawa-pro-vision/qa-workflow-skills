@@ -2046,8 +2046,9 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 external_reservation_acquired=True,
                 external_reservation_revision="provider:revision-1",
             )
-            self.assertEqual(external["status"], "reserved")
-            self.assertEqual(external["provider"], "existing_external_reservation")
+            self.assertEqual(external["status"], "blocked")
+            self.assertEqual(external["reason"], "external_reservation_readback_required")
+            self.assertEqual(external["provider"], "unverified_external_reservation")
 
             unsafe_resource = "resource:local-without-release"
             unsafe_target = (

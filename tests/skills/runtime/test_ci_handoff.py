@@ -140,7 +140,7 @@ class CiHandoffTests(unittest.TestCase):
         path = r"src/back\slash.ts"
         self.expected["changed_paths"] = [path]
         self.manifest["changes"] = [
-            {"path": path, "classification": "source"}
+            {"path": path, "classification": "implementation"}
         ]
         self.assertEqual(self.result()["status"], "pass")
 

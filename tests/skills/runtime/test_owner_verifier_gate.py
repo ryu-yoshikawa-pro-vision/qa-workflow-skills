@@ -65,6 +65,42 @@ class OwnerVerifierGateTests(unittest.TestCase):
         self.assertEqual(result["payload"]["missing_runtime_units"], [])
         self.assertEqual(result["payload"]["missing_entities"], [])
 
+    def test_unregistered_model_metadata_cannot_abort_supported_scope(self) -> None:
+        request = WorkflowRuntimeTests()._request()
+        baseline = run(request)
+        self.assertEqual(baseline["runtime_status"], "ok")
+        unsupported = unregistered_scope()
+        unsupported["normalized_input"] = {
+            "models": [
+                {"model_key": "ep-001", "model_type": "ep", "untrusted": "metadata"}
+            ]
+        }
+        request["input"]["workflow_scopes"].append(unsupported)
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertEqual(result["payload"]["runtime_units"], baseline["payload"]["runtime_units"])
+        self.assertEqual(result["payload"]["entity_freshness"], baseline["payload"]["entity_freshness"])
+        self.assertEqual(len(result["payload"]["unverified_scopes"]), 1)
+        self.assertEqual(
+            {issue["issue_type"] for issue in result["issues"]},
+            {"unsupported_skill_verifier"},
+        )
+
+    def test_unregistered_model_does_not_enter_materialize_completion(self) -> None:
+        request = WorkflowRuntimeTests()._request()
+        unsupported = unregistered_scope()
+        unsupported["normalized_input"] = {
+            "models": [{"model_key": "unknown-only", "model_type": "ep"}]
+        }
+        request["input"]["workflow_scopes"].append(unsupported)
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(
+            {issue["issue_type"] for issue in result["issues"]},
+            {"unsupported_skill_verifier"},
+        )
+
     def test_unregistered_skill_has_no_runtime_v2_root(self) -> None:
         self.assertEqual(
             runtime._default_expected_runtime_units("test-management", {}, ""), []

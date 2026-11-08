@@ -84,8 +84,10 @@ class SharedResourceProviderSelectionTests(unittest.TestCase):
             external_reservation_acquired=True,
             external_reservation_revision="provider:r1",
         )
-        self.assertEqual(handoff["status"], "reserved")
-        self.assertEqual(handoff["provider"], "existing_external_reservation")
+        self.assertEqual(handoff["status"], "blocked")
+        self.assertEqual(handoff["reason"], "external_reservation_readback_required")
+        self.assertEqual(handoff["provider"], "unverified_external_reservation")
+        self.assertEqual(handoff["reservation_revision"], "provider:r1")
         self.assertFalse(self.root.exists())
 
     def test_owner_assertion_does_not_release_shared_resource(self) -> None:
