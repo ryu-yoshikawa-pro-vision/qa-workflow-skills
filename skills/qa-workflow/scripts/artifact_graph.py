@@ -1162,10 +1162,19 @@ def _sqlite_history_is_complete(
             or not isinstance(envelope.get("state"), dict)
         ):
             raise ValueError("workflow_state_history_corrupt")
-    origin = connection.execute(
-        "SELECT first_revision FROM workflow_state_history_origin WHERE workflow_ref=?",
-        (workflow_ref,),
+    has_origin_table = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name='workflow_state_history_origin'"
     ).fetchone()
+    origin = (
+        connection.execute(
+            "SELECT first_revision FROM workflow_state_history_origin "
+            "WHERE workflow_ref=?",
+            (workflow_ref,),
+        ).fetchone()
+        if has_origin_table
+        else None
+    )
     first = origin[0] if origin else 1
     if not isinstance(first, int) or first < 1 or first > revision:
         raise ValueError("workflow_state_history_origin_invalid")
