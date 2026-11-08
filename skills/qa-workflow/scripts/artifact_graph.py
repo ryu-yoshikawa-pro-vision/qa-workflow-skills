@@ -1334,9 +1334,24 @@ def read_sqlite_workflow_state(
                         "status": "blocked",
                         "reason": "workflow_state_history_mismatch",
                     }
-                history_complete = stored is not None and _sqlite_history_is_complete(
+                # The persisted history origin makes missing snapshots corruption,
+                # including when the current snapshot itself has disappeared.
+                history_complete = _sqlite_history_is_complete(
                     connection, ref, number
                 )
+            else:
+                origin_table = connection.execute(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='table' AND name='workflow_state_history_origin'"
+                ).fetchone()
+                if origin_table and connection.execute(
+                    "SELECT 1 FROM workflow_state_history_origin WHERE workflow_ref=?",
+                    (ref,),
+                ).fetchone():
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_history_missing",
+                    }
             return {
                 "status": "current",
                 "state": envelope["state"],
@@ -1387,6 +1402,17 @@ def read_sqlite_workflow_state_revision(
             ).fetchone()
             if row is None:
                 return {"status": "blocked", "reason": "historical_state_unavailable"}
+            # An exact historical row is not sufficient if another tracked
+            # revision has been lost. Legacy databases without an origin
+            # marker retain their existing individual-revision read behavior.
+            _sqlite_history_is_complete(connection, ref, current[1])
+            current_snapshot = connection.execute(
+                "SELECT envelope_json FROM workflow_state_history "
+                "WHERE workflow_ref=? AND provider_revision=?",
+                (ref, current[1]),
+            ).fetchone()
+            if current_snapshot is not None and current_snapshot[0] != current[0]:
+                return {"status": "blocked", "reason": "historical_state_conflict"}
             encoded = row[0]
             if revision == current[1] and encoded != current[0]:
                 return {"status": "blocked", "reason": "historical_state_conflict"}

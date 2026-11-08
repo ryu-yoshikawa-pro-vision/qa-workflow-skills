@@ -25,6 +25,10 @@ MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_ARTIFACT_BYTES = 16 * 1024 * 1024
 
 
+class _SecureReadbackUnavailable(ValueError):
+    """The runner cannot guarantee descriptor-bound artifact reads."""
+
+
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -170,7 +174,9 @@ def _read_artifact(root: Path, relative: str) -> bytes:
     if os.name != "posix" or not all(
         hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")
     ):
-        raise ValueError("race-safe artifact reading unavailable on this platform")
+        raise _SecureReadbackUnavailable(
+            "race-safe artifact reading unavailable on this platform"
+        )
     directory_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
     with ExitStack() as stack:
         descriptor = os.open(root, directory_flags)
@@ -305,6 +311,9 @@ def verify(
             continue
         try:
             content = _read_artifact(artifacts_root, actual["path"])
+        except _SecureReadbackUnavailable:
+            _issues_add(issues, "artifact_readback_unavailable", label)
+            continue
         except (OSError, ValueError):
             _issues_add(issues, "artifact_readback_failed", label)
             continue
@@ -324,9 +333,13 @@ def verify(
     if approvals:
         for approval in approvals:
             _issues_add(issues, "approval_provider_unconfigured", approval)
-    if any(issue["code"] != "approval_provider_unconfigured" for issue in issues):
+    blocked_codes = {
+        "approval_provider_unconfigured",
+        "artifact_readback_unavailable",
+    }
+    if any(issue["code"] not in blocked_codes for issue in issues):
         status = "fail"
-    elif approvals:
+    elif issues:
         status = "blocked"
     else:
         status = "pass"

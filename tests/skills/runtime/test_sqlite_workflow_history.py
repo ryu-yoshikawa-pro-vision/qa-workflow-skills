@@ -244,6 +244,7 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             )
         current = artifact_graph.read_sqlite_workflow_state(self.root, REF)
         self.assertEqual(current["status"], "blocked")
+        self.assertEqual(self.read_history("sqlite:2")["status"], "blocked")
         written = self.update("sqlite:2", "forbidden")
         self.assertEqual(written["status"], "blocked")
         with sqlite3.connect(database) as connection:
@@ -267,12 +268,32 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
                 "DELETE FROM workflow_state_history WHERE workflow_ref=?", (REF,)
             )
         self.assertEqual(self.update()["status"], "blocked")
+        self.assertEqual(
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)["status"],
+            "blocked",
+        )
         with sqlite3.connect(database) as connection:
             count = connection.execute(
                 "SELECT COUNT(*) FROM workflow_state_history WHERE workflow_ref=?",
                 (REF,),
             ).fetchone()[0]
         self.assertEqual(count, 0)
+
+    def test_missing_latest_tracked_snapshot_blocks_earlier_history_read(self) -> None:
+        self.create()
+        self.assertEqual(self.update()["status"], "written")
+        database = self.root / "workflow-state.sqlite3"
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "DELETE FROM workflow_state_history "
+                "WHERE workflow_ref=? AND provider_revision=2",
+                (REF,),
+            )
+        self.assertEqual(
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)["status"],
+            "blocked",
+        )
+        self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
 
     def test_unmarked_complete_database_can_adopt_history_origin(self) -> None:
         self.create()

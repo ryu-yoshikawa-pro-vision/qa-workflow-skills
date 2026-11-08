@@ -160,8 +160,8 @@ def _execution_evidence(value: Any, label: str) -> float:
     if finished < started:
         raise ValueError(f"{label} ends before it starts")
     skill_runs = row["skill_runs"]
-    if not isinstance(skill_runs, list) or not skill_runs:
-        raise ValueError(f"{label}.skill_runs missing")
+    if not isinstance(skill_runs, list):
+        raise ValueError(f"{label}.skill_runs must be a list")
     skill_refs: set[str] = set()
     for item in skill_runs:
         skill = _obj(

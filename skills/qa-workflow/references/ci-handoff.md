@@ -57,6 +57,6 @@ python skills/qa-workflow/scripts/ci_handoff.py \
 
 JSONの`status`は`pass`／`fail`／`blocked`。終了コードは0（受渡し整合）、1（不一致／blocked）、2（入力契約違反）。期待source、全変更集合、情報源revision、正本revision・hash、欠落、未分類を照合する。承認が必要な場合、**現在は認証済みprovider接続がないため常にblocked**となる。候補manifestの`approved`等を権限証拠にはしない。
 
-各artifactの`source_refs[]`は1件以上が必須で、期待source inventoryのrevisionと照合します。受渡しファイルは上限16 MiBです。対応するPOSIX CIではrootからのdirectory descriptorを保持し、`O_NOFOLLOW`と`O_NONBLOCK`で通常ファイルのみを読み取ります。FIFO・symlink・root外参照を拒否し、競合なくファイルを開く機能がないWindows等の環境では`artifact_readback_failed`で停止します。`changed_paths`／`changes[].path`はPOSIXリポジトリの**比較キー**であり、バックスラッシュを含むファイル名も受理します。成果物読取りの`artifacts[].path`とは別の検証で、後者にバックスラッシュは許可しません。JSON入力の深いネストは不正入力として扱い、CLIの失敗レポートはUnicodeエスケープを用いて確実に出力します。変更履歴や承認対象の検証をhash照合で代替しません。承認が未接続でも旧HEAD・欠落・hash不一致等があれば`fail`、不一致がなく承認だけ未確認なら`blocked`です。
+各artifactの`source_refs[]`は1件以上が必須で、期待source inventoryのrevisionと照合します。受渡しファイルは上限16 MiBです。対応するPOSIX CIではrootからのdirectory descriptorを保持し、`O_NOFOLLOW`と`O_NONBLOCK`で通常ファイルのみを読み取ります。FIFO・symlink・root外参照を拒否し、競合なくファイルを開く機能がないWindows等の環境では`artifact_readback_unavailable`を付けて`blocked`にします。成果物の欠落・不正読取りは従来どおり`artifact_readback_failed`による`fail`であり、両者が同時に存在する場合は`fail`を優先します。`changed_paths`／`changes[].path`はPOSIXリポジトリの**比較キー**であり、バックスラッシュを含むファイル名も受理します。成果物読取りの`artifacts[].path`とは別の検証で、後者にバックスラッシュは許可しません。JSON入力の深いネストは不正入力として扱い、CLIの失敗レポートはUnicodeエスケープを用いて確実に出力します。変更履歴や承認対象の検証をhash照合で代替しません。承認が未接続でも旧HEAD・欠落・hash不一致等があれば`fail`、不一致がなく承認だけ未確認なら`blocked`です。
 
 対象製品repositoryへこのCLIを接続するには、案件の保存先・取得方法・権限・信頼済みexpectedの生成元と承認確認方式の決定・実証が必要。未選定のため、現時点では製品CIの実接続は未検証である。

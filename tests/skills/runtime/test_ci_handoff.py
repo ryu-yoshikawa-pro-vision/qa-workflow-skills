@@ -154,7 +154,29 @@ class CiHandoffTests(unittest.TestCase):
 
     def test_no_unsafe_readback_fallback_when_secure_open_is_unavailable(self) -> None:
         with patch.object(handoff, "os", SimpleNamespace(name="nt")):
-            self.assert_rejects("artifact_readback_failed")
+            result = self.result()
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(
+            [item["code"] for item in result["issues"]],
+            ["artifact_readback_unavailable"],
+        )
+
+    def test_source_mismatch_takes_priority_over_unsupported_readback(self) -> None:
+        self.manifest["source"]["head_sha"] = BASE
+        with patch.object(handoff, "os", SimpleNamespace(name="nt")):
+            result = self.result()
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(
+            {item["code"] for item in result["issues"]},
+            {"source_revision_mismatch", "artifact_readback_unavailable"},
+        )
+
+    def test_missing_artifact_still_fails_on_unsupported_platform(self) -> None:
+        self.manifest["artifacts"] = []
+        with patch.object(handoff, "os", SimpleNamespace(name="nt")):
+            result = self.result()
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("missing_artifact", [item["code"] for item in result["issues"]])
 
     def test_duplicate_changes_are_rejected(self) -> None:
         self.manifest["changes"].append(dict(self.manifest["changes"][0]))

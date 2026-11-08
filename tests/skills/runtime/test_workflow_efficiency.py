@@ -121,6 +121,42 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         self.assertEqual(first["metrics"]["wall_seconds"]["baseline"]["median"], 100)
         self.assertEqual(first["metrics"]["wall_seconds"]["candidate"]["median"], 70)
 
+    def test_recorded_human_baseline_with_zero_skill_runs_is_comparable(self) -> None:
+        data = dataset()
+        for item in data["scenarios"][0]["baseline"]:
+            item["execution_evidence"]["skill_runs"] = []
+            item["execution_evidence"]["attempt_refs"] = []
+            item["metrics"]["skill_call_count"] = metric(0)
+            item["metrics"]["skill_restart_count"] = metric(0)
+            item["metrics"]["retry_count"] = metric(0)
+        result = mod.evaluate(data)
+        first = result["scenarios"][0]
+        self.assertEqual(first["metrics"]["skill_call_count"]["baseline"]["median"], 0)
+        self.assertEqual(first["metrics"]["skill_call_count"]["change"], "regressed")
+        self.assertEqual(first["status"], "needs_review")
+        self.assertNotIn("required_measurement_unavailable", first["reasons"])
+
+    def test_zero_skill_runs_cannot_hide_unrecorded_calls_or_restarts(self) -> None:
+        for key in ("skill_call_count", "skill_restart_count"):
+            with self.subTest(metric=key):
+                data = dataset()
+                target = data["scenarios"][0]["candidate"][0]
+                target["execution_evidence"]["skill_runs"] = []
+                target["metrics"]["skill_call_count"] = metric(0)
+                target["metrics"]["skill_restart_count"] = metric(0)
+                target["metrics"][key] = metric(1)
+                with self.assertRaises(ValueError):
+                    mod.evaluate(data)
+
+    def test_skill_runs_must_be_a_list_even_when_zero_calls_expected(self) -> None:
+        data = dataset()
+        trial = data["scenarios"][0]["candidate"][0]
+        trial["execution_evidence"]["skill_runs"] = None
+        trial["metrics"]["skill_call_count"] = metric(0)
+        trial["metrics"]["skill_restart_count"] = metric(0)
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
     def test_direction_uses_independent_median_values(self) -> None:
         data = dataset()
         baseline_values = (10, 20)

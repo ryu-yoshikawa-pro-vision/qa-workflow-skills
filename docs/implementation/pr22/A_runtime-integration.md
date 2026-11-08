@@ -219,3 +219,11 @@ CodeRabbitのSQLite shared reservation再取得時revision上限の指摘は、�
 これらの局所テストは`test_workflow_efficiency.py`と`test_sqlite_workflow_history.py`に追加した。実装後のGitHub Actionsでruntime・統合テスト489件、repository決定論的評価290件が成功した（実行HEAD `08bdafdb5720b2425fd9255c6def82bc2fc5f839`、[実行記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42474191866)）。文書変更を含む最終HEADのCI結果はPR #23 Checksを再取得して確認する。
 
 担当A単独で実装できる今回の指摘は修正した。ただし、正式な保存・承認provider、owner実成果物、製品CI実接続、複数hostでのCAS・cleanup・再開、B〜Jの正式validatorと全体受入は未接続のまま。これらをfixtureの結果で完了扱いしない。
+
+## 追加レビュー3件への対応（2026-11-08）
+
+- **SQLite履歴**：追跡開始revisionが永続化されているworkflowでは、最新または途中の履歴snapshotが欠落した場合にcurrent readとhistorical readをblockする。CASによる欠落の自動修復も禁止する。開始revisionを持たない旧DBの読取互換と、移行開始revision以降のみ追跡する動作は維持する。回帰は`test_sqlite_workflow_history.py`の履歴欠落・旧DBテストで確認する。
+- **製品CI受渡しの状態分類**：安全なdescriptor-bound readbackが利用できないplatformは`artifact_readback_unavailable`による`blocked`とし、成果物の不正・欠落は`fail`とする。source revision不一致などの確定した不整合が同時にあれば`fail`を優先する。Windowsで安全な読取りが実装されたという意味ではなく、未対応platformのfail-closed動作を維持する。回帰は`test_ci_handoff.py`に追加する。
+- **Skill呼出0件の比較**：人手のみの比較元、検証済み成果物の再利用でSkillを起動しない試行では、空の`skill_runs[]`を認める。実測された呼出・再起動件数は0と照合し、非0件の虚偽記録は拒否する。owner成果物・品質判定・run識別子・時刻などの既存必須証拠は緩和しない。回帰は`test_workflow_efficiency.py`に追加する。
+
+この修正も担当Aの局所契約とfixtureを対象とし、未接続の実provider／承認元／製品CI、B〜Jのowner validator、PR #22で行う総合受入を完了扱いしない。実行したCIのcommit・結果はPR #23 Checksを正本として確認する。
