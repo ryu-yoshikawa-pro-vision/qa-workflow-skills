@@ -36,13 +36,17 @@ class OwnerVerifierGateTests(unittest.TestCase):
         self.assertEqual(result["runtime_status"], "ok", result)
         self.assertFalse(result["payload"]["can_complete"])
         self.assertEqual(result["payload"]["expected_runtime_units"], [])
-        self.assertEqual(result["payload"]["unverified_scopes"][0]["skill"], "test-management")
+        self.assertEqual(
+            result["payload"]["unverified_scopes"][0]["skill"], "test-management"
+        )
         self.assertIn(
             "unsupported_skill_verifier",
             {issue["issue_type"] for issue in result["issues"]},
         )
 
-    def test_supported_scope_stays_current_when_another_scope_is_unregistered(self) -> None:
+    def test_supported_scope_stays_current_when_another_scope_is_unregistered(
+        self,
+    ) -> None:
         request = WorkflowRuntimeTests()._request()
         baseline = run(request)
         self.assertTrue(baseline["payload"]["can_complete"], baseline)

@@ -18,7 +18,12 @@ SPEC.loader.exec_module(handoff)
 
 BASE = "1" * 40
 HEAD = "2" * 40
-SOURCE = {"repository": "owner/product", "base_sha": BASE, "head_sha": HEAD, "build_ref": "build-12"}
+SOURCE = {
+    "repository": "owner/product",
+    "base_sha": BASE,
+    "head_sha": HEAD,
+    "build_ref": "build-12",
+}
 
 
 class CiHandoffTests(unittest.TestCase):

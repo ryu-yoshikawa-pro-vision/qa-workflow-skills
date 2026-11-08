@@ -97,7 +97,9 @@ def _source(value: Any) -> dict[str, str]:
     return result
 
 
-def _artifacts(value: Any, *, expected: bool) -> dict[tuple[str, str, str], dict[str, Any]]:
+def _artifacts(
+    value: Any, *, expected: bool
+) -> dict[tuple[str, str, str], dict[str, Any]]:
     if not isinstance(value, list):
         raise ValueError("artifacts must be a list")
     keys = {
@@ -194,9 +196,12 @@ def verify(
     if len(paths) != len(set(paths)):
         raise ValueError("duplicate expected changed path")
     allowed = expected["allowed_classifications"]
-    if not isinstance(allowed, list) or not allowed or any(
-        not isinstance(value, str) or not value.strip() for value in allowed
-    ) or len(set(allowed)) != len(allowed):
+    if (
+        not isinstance(allowed, list)
+        or not allowed
+        or any(not isinstance(value, str) or not value.strip() for value in allowed)
+        or len(set(allowed)) != len(allowed)
+    ):
         raise ValueError("trusted classification policy is missing or invalid")
     changes = manifest["changes"]
     if not isinstance(changes, list):
@@ -212,9 +217,11 @@ def verify(
     expected_artifacts = _artifacts(expected["artifacts"], expected=True)
     actual_artifacts = _artifacts(manifest["artifacts"], expected=False)
     approvals = expected["required_approvals"]
-    if not isinstance(approvals, list) or any(
-        not isinstance(value, str) or not value.strip() for value in approvals
-    ) or len(set(approvals)) != len(approvals):
+    if (
+        not isinstance(approvals, list)
+        or any(not isinstance(value, str) or not value.strip() for value in approvals)
+        or len(set(approvals)) != len(approvals)
+    ):
         raise ValueError("invalid required approvals")
 
     issues: list[dict[str, str]] = []
