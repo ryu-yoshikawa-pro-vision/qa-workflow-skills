@@ -79,8 +79,13 @@ class OwnerVerifierGateTests(unittest.TestCase):
         result = run(request)
         self.assertEqual(result["runtime_status"], "ok", result)
         self.assertFalse(result["payload"]["can_complete"])
-        self.assertEqual(result["payload"]["runtime_units"], baseline["payload"]["runtime_units"])
-        self.assertEqual(result["payload"]["entity_freshness"], baseline["payload"]["entity_freshness"])
+        self.assertEqual(
+            result["payload"]["runtime_units"], baseline["payload"]["runtime_units"]
+        )
+        self.assertEqual(
+            result["payload"]["entity_freshness"],
+            baseline["payload"]["entity_freshness"],
+        )
         self.assertEqual(len(result["payload"]["unverified_scopes"]), 1)
         self.assertEqual(
             {issue["issue_type"] for issue in result["issues"]},

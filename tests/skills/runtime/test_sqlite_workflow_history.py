@@ -233,11 +233,14 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         current = artifact_graph.read_sqlite_workflow_state(self.root, REF)
         self.assertEqual(current["status"], "blocked")
         self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
-        self.assertEqual(self.update("sqlite:2", "should-not-write")["status"], "blocked")
+        self.assertEqual(
+            self.update("sqlite:2", "should-not-write")["status"], "blocked"
+        )
         with sqlite3.connect(database) as connection:
             row = connection.execute(
                 "SELECT provider_revision,envelope_json FROM workflow_state "
-                "WHERE workflow_ref=?", (REF,)
+                "WHERE workflow_ref=?",
+                (REF,),
             ).fetchone()
         self.assertEqual(row[0], 2)
         self.assertEqual(json.loads(row[1])["state"], {"marker": "changed"})
@@ -257,7 +260,8 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             current = connection.execute(
                 "SELECT provider_revision,envelope_json FROM workflow_state "
-                "WHERE workflow_ref=?", (REF,)
+                "WHERE workflow_ref=?",
+                (REF,),
             ).fetchone()
             additions = connection.execute(
                 "SELECT COUNT(*) FROM workflow_state_history WHERE workflow_ref=?",

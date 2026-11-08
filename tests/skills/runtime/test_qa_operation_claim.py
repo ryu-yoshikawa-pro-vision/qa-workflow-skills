@@ -70,7 +70,8 @@ class WorkflowOperationClaimTests(unittest.TestCase):
 
     def test_storage_permission_failure_returns_blocked_not_exception(self) -> None:
         with patch.object(
-            artifact_graph, "_local_baseline_root",
+            artifact_graph,
+            "_local_baseline_root",
             side_effect=PermissionError("inaccessible"),
         ):
             result = self.claim()

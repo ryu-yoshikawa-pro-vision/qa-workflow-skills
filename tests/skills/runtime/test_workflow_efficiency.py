@@ -113,7 +113,9 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         result = mod.evaluate(data)
         first = result["scenarios"][0]
         self.assertEqual(first["metrics"]["skill_call_count"]["baseline"]["median"], 15)
-        self.assertEqual(first["metrics"]["skill_call_count"]["candidate"]["median"], 35)
+        self.assertEqual(
+            first["metrics"]["skill_call_count"]["candidate"]["median"], 35
+        )
         self.assertEqual(first["metrics"]["skill_call_count"]["change"], "regressed")
         self.assertEqual(first["status"], "needs_review")
         self.assertEqual(result["status"], "unproven")
@@ -295,22 +297,24 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             path.write_text(json.dumps(dataset()), encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--input", str(path)],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "efficiency_evidenced")
 
     def test_cli_oversized_numeric_value_is_structurally_blocked(self) -> None:
         data = dataset()
-        data["scenarios"][0]["candidate"][0]["metrics"]["token_count"] = metric(
-            10**400
-        )
+        data["scenarios"][0]["candidate"][0]["metrics"]["token_count"] = metric(10**400)
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "huge-int.json"
             path.write_text(json.dumps(data), encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--input", str(path)],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "blocked")
@@ -321,7 +325,9 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             path.write_bytes(b"[" * 1100 + b"0" + b"]" * 1100)
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--input", str(path)],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "blocked")

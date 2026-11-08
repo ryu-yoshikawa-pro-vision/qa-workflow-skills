@@ -136,12 +136,12 @@ class CiHandoffTests(unittest.TestCase):
         self.manifest["artifacts"][0]["path"] = "alias.md"
         self.assert_rejects("artifact_readback_failed")
 
-    def test_backslash_in_posix_changed_filename_is_a_valid_comparison_key(self) -> None:
+    def test_backslash_in_posix_changed_filename_is_a_valid_comparison_key(
+        self,
+    ) -> None:
         path = r"src/back\slash.ts"
         self.expected["changed_paths"] = [path]
-        self.manifest["changes"] = [
-            {"path": path, "classification": "implementation"}
-        ]
+        self.manifest["changes"] = [{"path": path, "classification": "implementation"}]
         self.assertEqual(self.result()["status"], "pass")
 
     def test_fifo_is_never_opened_in_blocking_mode(self) -> None:
@@ -229,10 +229,18 @@ class CiHandoffTests(unittest.TestCase):
         manifest.write_text(json.dumps(self.manifest), encoding="utf-8")
         response = subprocess.run(
             [
-                sys.executable, str(SCRIPT), "--expected", str(expected),
-                "--manifest", str(manifest), "--artifacts-root", str(self.root),
+                sys.executable,
+                str(SCRIPT),
+                "--expected",
+                str(expected),
+                "--manifest",
+                str(manifest),
+                "--artifacts-root",
+                str(self.root),
             ],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         self.assertEqual(response.returncode, 1, response.stderr)
         self.assertEqual(json.loads(response.stdout)["status"], "fail")
