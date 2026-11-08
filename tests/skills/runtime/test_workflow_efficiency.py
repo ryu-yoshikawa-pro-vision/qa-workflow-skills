@@ -27,42 +27,60 @@ def metric(value: float | None, unit: str = "count") -> dict:
 
 
 def trial(scenario: str, group: str, index: int) -> dict:
-    values = {key: metric(10 if group == "baseline" else 5) for key in mod.METRICS}
-    values["reused_artifact_count"] = metric(2 if group == "baseline" else 4)
-    elapsed = 100 if group == "baseline" else 70
+    baseline = group == "baseline"
+    calls = 10 if baseline else 5
+    elapsed = 100 if baseline else 70
+    values = {key: metric(calls) for key in mod.COUNT_METRICS}
     values["wall_seconds"] = metric(elapsed, "seconds")
+    values["human_review_seconds"] = metric(30 if baseline else 20, "seconds")
+    values["human_approval_seconds"] = metric(5, "seconds")
+    values["cost_amount"] = metric(120 if baseline else 100, "JPY")
+    values["reused_artifact_count"] = metric(2 if baseline else 4)
+    values["retry_count"] = metric(1 if baseline else 0)
+    values["skill_restart_count"] = metric(2 if baseline else 1)
     started = datetime(2026, 11, 8, 9, 0, tzinfo=timezone.utc)
     finished = started + timedelta(seconds=elapsed)
+    skill_runs = [
+        {
+            "skill": "test-analysis",
+            "run_ref": f"skill-{scenario}-{group}-{index}-{n}",
+            "started_at": started.isoformat(),
+            "finished_at": finished.isoformat(),
+        }
+        for n in range(calls)
+    ]
+    attempts = [
+        f"attempt-{scenario}-{group}-{index}-{n}"
+        for n in range(2 if baseline else 1)
+    ]
     return {
         "trial_ref": f"{scenario}-{group}-{index}",
         "run_ref": f"run-{scenario}-{group}-{index}",
-        "product_commit": "1" * 40,
-        "source_revisions": [{"ref": "spec", "revision": "rev-1"}],
+        "product_commit": ("2" if scenario == "local_code_change" else "1") * 40,
+        "source_revisions": [
+            {
+                "ref": "spec",
+                "revision": "rev-2" if scenario == "external_spec_revision" else "rev-1",
+            }
+        ],
         "scope_refs": ["SCOPE-001"],
-        "qa_goal_ref": "goal-1",
-        "expectation_ref": "expect-1",
-        "test_set_ref": "tests-1",
+        "qa_goal_ref": f"goal-{scenario}",
+        "expectation_ref": f"expect-{scenario}",
+        "test_set_ref": f"tests-{scenario}",
         "environment_ref": "env-1",
-        "agent_config_ref": "agent-config-1",
+        "agent_config_ref": "agent-config-before" if baseline else "agent-config-after",
         "execution_evidence": {
             "started_at": started.isoformat(),
             "finished_at": finished.isoformat(),
-            "skill_runs": [
-                {
-                    "skill": "test-analysis",
-                    "run_ref": f"skill-{scenario}-{group}-{index}",
-                    "started_at": started.isoformat(),
-                    "finished_at": finished.isoformat(),
-                }
-            ],
+            "skill_runs": skill_runs,
             "owner_artifacts": [
                 {
                     "owner": "test-analysis",
-                    "artifact_ref": "analysis-1",
+                    "artifact_ref": f"analysis-{scenario}",
                     "revision": "rev-1",
                 }
             ],
-            "attempt_refs": [f"attempt-{scenario}-{group}-{index}"],
+            "attempt_refs": attempts,
             "runner_refs": [],
             "cleanup_refs": [],
             "interruption_ref": f"resume-{scenario}-{group}-{index}"
@@ -78,7 +96,6 @@ def trial(scenario: str, group: str, index: int) -> dict:
         },
         "metrics": values,
     }
-
 
 def dataset() -> dict:
     return {
@@ -107,16 +124,20 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         baseline_values = (10, 20)
         candidate_values = (30, 40)
         for index, item in enumerate(data["scenarios"][0]["baseline"]):
-            item["metrics"]["skill_call_count"] = metric(baseline_values[index])
+            item["metrics"]["human_review_seconds"] = metric(
+                baseline_values[index], "seconds"
+            )
         for index, item in enumerate(data["scenarios"][0]["candidate"]):
-            item["metrics"]["skill_call_count"] = metric(candidate_values[index])
+            item["metrics"]["human_review_seconds"] = metric(
+                candidate_values[index], "seconds"
+            )
         result = mod.evaluate(data)
         first = result["scenarios"][0]
-        self.assertEqual(first["metrics"]["skill_call_count"]["baseline"]["median"], 15)
+        self.assertEqual(first["metrics"]["human_review_seconds"]["baseline"]["median"], 15)
         self.assertEqual(
-            first["metrics"]["skill_call_count"]["candidate"]["median"], 35
+            first["metrics"]["human_review_seconds"]["candidate"]["median"], 35
         )
-        self.assertEqual(first["metrics"]["skill_call_count"]["change"], "regressed")
+        self.assertEqual(first["metrics"]["human_review_seconds"]["change"], "regressed")
         self.assertEqual(first["status"], "needs_review")
         self.assertEqual(result["status"], "unproven")
 
@@ -132,6 +153,57 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         self.assertEqual(first["candidate"]["median"], 1e308)
         self.assertEqual(first["change"], "unchanged")
         self.assertNotIn("Infinity", json.dumps(result, allow_nan=False))
+
+    def test_invalid_units_cannot_bypass_time_or_charge_validation(self) -> None:
+        for key, unit in [
+            ("wall_seconds", "count"),
+            ("human_review_seconds", "count"),
+            ("human_approval_seconds", "count"),
+            ("skill_call_count", "seconds"),
+            ("cost_amount", "count"),
+        ]:
+            with self.subTest(key=key, unit=unit):
+                data = dataset()
+                data["scenarios"][0]["candidate"][0]["metrics"][key]["unit"] = unit
+                with self.assertRaises(ValueError):
+                    mod.evaluate(data)
+
+    def test_skill_run_and_attempt_counts_must_match_recorded_evidence(self) -> None:
+        for metric_key in ("skill_call_count", "retry_count"):
+            with self.subTest(metric=metric_key):
+                data = dataset()
+                data["scenarios"][0]["candidate"][0]["metrics"][metric_key] = metric(2)
+                with self.assertRaises(ValueError):
+                    mod.evaluate(data)
+
+    def test_fractional_count_is_rejected(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["metrics"]["request_count"] = metric(1.5)
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
+    def test_scenario_specific_revisions_and_expected_inputs_are_independent(self) -> None:
+        data = dataset()
+        by_name = {item["scenario"]: item for item in data["scenarios"]}
+        unchanged = by_name["unchanged_request"]["baseline"][0]
+        code = by_name["local_code_change"]["baseline"][0]
+        spec = by_name["external_spec_revision"]["baseline"][0]
+        self.assertNotEqual(unchanged["product_commit"], code["product_commit"])
+        self.assertEqual(unchanged["product_commit"], spec["product_commit"])
+        self.assertNotEqual(
+            unchanged["source_revisions"], spec["source_revisions"]
+        )
+        self.assertNotEqual(unchanged["qa_goal_ref"], code["qa_goal_ref"])
+        self.assertEqual(mod.evaluate(data)["status"], "efficiency_evidenced")
+
+    def test_scenario_specific_drift_is_not_comparable(self) -> None:
+        data = dataset()
+        data["scenarios"][2]["candidate"][0]["product_commit"] = "f" * 40
+        data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = "rev-3"
+        result = mod.evaluate(data)
+        self.assertEqual(result["scenarios"][2]["status"], "not_comparable")
+        self.assertEqual(result["scenarios"][3]["status"], "not_comparable")
+        self.assertEqual(result["status"], "unproven")
 
     def test_missing_execution_evidence_is_not_efficiency_proof(self) -> None:
         data = dataset()
@@ -212,14 +284,13 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             result["scenarios"][0]["reasons"],
         )
 
-    def test_mismatched_metric_units_prevent_comparison(self) -> None:
+    def test_missing_cost_currency_when_measured_is_rejected(self) -> None:
         data = dataset()
-        for item in data["scenarios"][0]["candidate"]:
-            item["metrics"]["human_review_seconds"] = metric(3, "seconds")
-        result = mod.evaluate(data)
-        self.assertIn(
-            "required_measurement_unavailable", result["scenarios"][0]["reasons"]
+        data["scenarios"][0]["candidate"][0]["metrics"]["cost_amount"] = metric(
+            100, "unknown"
         )
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
 
     def test_quality_failure_disallows_efficiency_pass(self) -> None:
         data = dataset()
@@ -234,7 +305,7 @@ class WorkflowEfficiencyTests(unittest.TestCase):
     def test_source_revision_drift_is_not_comparable(self) -> None:
         data = dataset()
         data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = (
-            "rev-2"
+            "rev-3"
         )
         result = mod.evaluate(data)
         self.assertEqual(result["scenarios"][3]["status"], "not_comparable")
@@ -250,7 +321,7 @@ class WorkflowEfficiencyTests(unittest.TestCase):
     def test_regression_visible_even_when_other_metrics_improve(self) -> None:
         data = dataset()
         for item in data["scenarios"][2]["candidate"]:
-            item["metrics"]["human_review_seconds"] = metric(30)
+            item["metrics"]["human_review_seconds"] = metric(120, "seconds")
         result = mod.evaluate(data)
         self.assertEqual(result["scenarios"][2]["status"], "needs_review")
         self.assertEqual(
@@ -318,6 +389,22 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             )
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "blocked")
+
+    def test_cli_invalid_unicode_in_duplicate_key_returns_json_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "invalid-unicode.json"
+            path.write_text(
+                '{"\\ud800": 1, "\\ud800": 2}', encoding="utf-8"
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--input", str(path)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "blocked")
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_cli_deeply_nested_json_returns_blocked_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
