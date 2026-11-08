@@ -401,9 +401,7 @@ class WorkflowEfficiencyTests(unittest.TestCase):
     def test_cli_invalid_unicode_in_duplicate_key_returns_json_error(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "invalid-unicode.json"
-            path.write_text(
-                '{"\\ud800": 1, "\\ud800": 2}', encoding="utf-8"
-            )
+            path.write_text('{"\\ud800": 1, "\\ud800": 2}', encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--input", str(path)],
                 capture_output=True,
