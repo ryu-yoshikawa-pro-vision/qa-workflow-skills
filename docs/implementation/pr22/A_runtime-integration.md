@@ -58,7 +58,7 @@
 ## 共通契約の確定と共有（後続実装の前提）
 
 - [ ] 実装開始時点の既存runtime／正本schema・呼び出し元／下流・CI・PR #17／#10を確認し、既存契約の再利用と変更が必要な契約を区別した。
-- [ ] B〜Jで共通利用するsource／artifact ID、revision／currentness、scope、owner、保存先のnative CAS・履歴／readback、承認主体・対象revision、blocked／resume、証拠・実行結果・cleanupの**公開引継ぎ条件**を、各正本ownerの責務を保ってPR #23に明記した。
+- [ ] B〜Jで共通利用するsource／artifact ID、revision／currentness、scope、owner、保存先のnative CAS・履歴／readback、承認主体・対象revision、blocked／resume、証拠・実行結果・cleanupの**公開引継ぎ条件**を、各正本ownerの責務を保って担当Markdownまたは検証レポートへ記録し、PR #23から参照できるようにした。
 - [ ] 契約ごとのschema・固定fixture・正常例／拒否例、既存資産・legacyの互換性、共有ファイルの編集ownerをB〜Jへ伝達した。
 - [ ] 保存provider・製品CI受渡し・承認者等の案件固有の未決定事項は仮の既定値にせず、未決定／blockedの範囲、決定元、再開条件を記録した。
 - [ ] 共通契約を確認しただけでA〜Jの実成果物の横断接続を完了扱いしていない。実成果物による統合受入はPR #22へ引き継ぐ。
@@ -101,13 +101,13 @@
 
 - [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由をPR本文へ記載した。
+- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
 - [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をA担当の共通契約として実装・局所検証し、PR #22で再取得できる証拠を残した。
 - [ ] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
 1. 自branchの差分が担当範囲に収まり、他担当の変更・main／PR #17の最新変更と衝突しないか再確認する。
-2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響をPR本文に記載する。
+2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
