@@ -279,6 +279,18 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(count, 0)
 
+    def test_dropped_tracked_history_table_blocks_current_read(self) -> None:
+        self.create()
+        database = self.root / "workflow-state.sqlite3"
+        with sqlite3.connect(database) as connection:
+            connection.execute("DROP TABLE workflow_state_history")
+        self.assertEqual(
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)["status"],
+            "blocked",
+        )
+        self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
+        self.assertEqual(self.update()["status"], "blocked")
+
     def test_missing_latest_tracked_snapshot_blocks_earlier_history_read(self) -> None:
         self.create()
         self.assertEqual(self.update()["status"], "written")
