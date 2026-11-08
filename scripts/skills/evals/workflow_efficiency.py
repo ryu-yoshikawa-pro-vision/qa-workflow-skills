@@ -33,9 +33,7 @@ METRICS = {
     "request_count": "lower",
     "cost_amount": "lower",
 }
-COUNT_METRICS = frozenset(
-    key for key in METRICS if key.endswith("_count")
-)
+COUNT_METRICS = frozenset(key for key in METRICS if key.endswith("_count"))
 TIME_METRICS = frozenset(
     {"wall_seconds", "human_review_seconds", "human_approval_seconds"}
 )
@@ -104,7 +102,9 @@ def _metric(value: Any, label: str) -> tuple[float | None, str]:
     if label == "cost_amount" and not (
         re.fullmatch(r"[A-Z]{3}", unit) or (raw is None and unit == "unknown")
     ):
-        raise ValueError("cost_amount requires a currency code or unknown when unmeasured")
+        raise ValueError(
+            "cost_amount requires a currency code or unknown when unmeasured"
+        )
     if raw is None:
         if (
             row["source_ref"] is not None
@@ -255,10 +255,7 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
         evidence = row["execution_evidence"]
         duration = _execution_evidence(evidence, label)
         wall, _ = _metric(metrics["wall_seconds"], "wall_seconds")
-        if (
-            wall is not None
-            and abs(wall - duration) > max(1.0, duration * 0.01)
-        ):
+        if wall is not None and abs(wall - duration) > max(1.0, duration * 0.01):
             raise ValueError("recorded wall_seconds contradict trial timestamps")
         calls, _ = _metric(metrics["skill_call_count"], "skill_call_count")
         if calls is not None and calls != len(evidence["skill_runs"]):
