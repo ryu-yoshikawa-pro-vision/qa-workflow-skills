@@ -2758,9 +2758,7 @@ def _validate_claim_details(value: Any) -> dict[str, Any]:
             or not value.strip()
             or len(value) > 512
             or any(
-                ord(char) < 32
-                or ord(char) == 127
-                or 0xD800 <= ord(char) <= 0xDFFF
+                ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
                 for char in value
             )
         ):
@@ -2821,9 +2819,7 @@ def claim_mutable_operation(
             or not operation_ref.strip()
             or len(operation_ref) > 512
             or any(
-                ord(char) < 32
-                or ord(char) == 127
-                or 0xD800 <= ord(char) <= 0xDFFF
+                ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
                 for char in operation_ref
             )
         ):
