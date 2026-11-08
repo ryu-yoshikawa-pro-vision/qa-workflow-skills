@@ -159,6 +159,57 @@ class SqliteSharedReservationTests(unittest.TestCase):
         self.assertEqual(self.acquire(owner="bad-workflow")["status"], "blocked")
         self.assertEqual(self.read("missing")["status"], "blocked")
 
+    def test_existing_public_helper_uses_same_native_provider(self) -> None:
+        reserved = artifact_graph.reserve_shared_resource(
+            self.root,
+            RESOURCE,
+            OWNER_A,
+            native_atomic_conditional_release=True,
+        )
+        self.assertEqual(reserved["status"], "reserved", reserved)
+        self.assertEqual(self.read()["reservation_revision"], "sqlite:1")
+        decision = artifact_graph.release_shared_resource(
+            current_workflow_ref=OWNER_A,
+            expected_workflow_ref=OWNER_A,
+            expected_reservation_revision=reserved["reservation_revision"],
+            current_reservation_revision=reserved["reservation_revision"],
+            native_atomic_conditional_release=True,
+            owner_state_verified=True,
+            owner_execution_state="complete",
+            cleanup_confirmed=True,
+            reservation_root=self.root,
+            resource_ref=RESOURCE,
+        )
+        self.assertEqual(decision["status"], "released", decision)
+        self.assertEqual(self.read()["reservation_revision"], "sqlite:2")
+        self.assertEqual(
+            artifact_graph.release_shared_resource(
+                current_workflow_ref=OWNER_A,
+                expected_workflow_ref=OWNER_A,
+                expected_reservation_revision="sqlite:2",
+                current_reservation_revision="sqlite:2",
+                native_atomic_conditional_release=True,
+                owner_state_verified=True,
+                owner_execution_state="complete",
+                cleanup_confirmed=True,
+                reservation_root=self.root,
+            )["reason"],
+            "reservation_target_missing",
+        )
+
+    def test_legacy_file_claim_blocks_sqlite_provider_migration(self) -> None:
+        self.root.mkdir(parents=True)
+        old_path = self.root / (
+            artifact_graph.content_identity({"resource_ref": RESOURCE}) + ".json"
+        )
+        old_path.write_bytes(b'{"status":"reserved"}')
+        result = self.acquire()
+        self.assertEqual(
+            result["reason"], "legacy_reservation_requires_reconciliation"
+        )
+        self.assertEqual(old_path.read_bytes(), b'{"status":"reserved"}')
+        self.assertFalse((self.root / "resource-reservations.sqlite3").exists())
+
     def test_corrupt_database_is_blocked(self) -> None:
         self.root.mkdir()
         (self.root / "resource-reservations.sqlite3").write_bytes(b"not sqlite")
