@@ -13,6 +13,7 @@ import artifact_graph
 from runtime_contract import (
     FULL_DIGEST_RE,
     InvalidInput,
+    RUNTIME_V2_SKILL_ROOTS,
     _default_expected_runtime_units,
     _expected_entities,
     canonical_json_text,
@@ -653,8 +654,19 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
 
     expected_units: list[dict[str, Any]] = []
     expected_entities: list[dict[str, str]] = []
+    unverified_scopes: list[dict[str, Any]] = []
     for scope in scopes:
         scope_skill = scope["skill"]
+        if scope_skill not in RUNTIME_V2_SKILL_ROOTS:
+            unverified_scopes.append(
+                {
+                    "skill": scope_skill,
+                    "target": scope["target"],
+                    "execution_range": scope["execution_range"],
+                    "reason": "owner_verifier_not_registered",
+                }
+            )
+            continue
         normalized = scope["normalized_input"]
         validate_current_structure_state(
             scope_skill,
@@ -752,7 +764,14 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         list(value)
         for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))
     ]
-    issues = []
+    issues = [
+        {
+            "issue_type": "unsupported_skill_verifier",
+            "blocking": True,
+            **scope,
+        }
+        for scope in unverified_scopes
+    ]
     if missing_units:
         issues.append(
             {
@@ -829,6 +848,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "deterministic_generated": True,
         "payload": {
             "workflow_ref": workflow_ref,
+            "unverified_scopes": unverified_scopes,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,
