@@ -6,13 +6,13 @@
 
 新しい配置管理Skill、全成果物共通の編集台帳、汎用schema、別のcanonical writerは作らない。案件の配置・編集方針は新設予定の`project-context`、受付・停止・再開・変更影響のroutingは既存`qa-workflow`、差分の意味確認・正式保存は**対象成果物のowner**が担当する。既存`ui-target-v1`の正本更新は`ui_target_package.py`の`materialize`経路に集約する。
 
-| 対象 | 編集・判断の担当 | 正本への反映 |
-| --- | --- | --- |
-| 案件の成果物配置・編集方針 | `project-context`が調査・提案し、利用者が合意 | Project Contextの既存Section 12・14、または既存外部正本へのref／revision |
-| 期待仕様・Authority・AC・UNKNOWN | `spec-analysis`、必要時`question-analysis`・正本の承認者 | 現行UI packageの該当箇所は`ui_target_package.py materialize`へ意味更新を渡す |
-| UI構造・操作・表示状態 | 新設予定の`ui-target-analysis` | 同じUI package writerを利用。旧`spec-analysis`からの移行前は現行ownerを維持 |
-| その他のQA成果物 | TR／TCN／CI／TC等の各既存owner | 各ownerの既存正本更新・履歴・validator。UI packageの編集方式を無条件に流用しない |
-| 人間が編集する作業用branch／作業用copy | 人間の編集者・レビュー担当 | **未確定の変更案**。正式成果物の第二の正本として参照・再利用しない |
+| 対象                                   | 編集・判断の担当                                         | 正本への反映                                                                     |
+| -------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 案件の成果物配置・編集方針             | `project-context`が調査・提案し、利用者が合意            | Project Contextの既存Section 12・14、または既存外部正本へのref／revision         |
+| 期待仕様・Authority・AC・UNKNOWN       | `spec-analysis`、必要時`question-analysis`・正本の承認者 | 現行UI packageの該当箇所は`ui_target_package.py materialize`へ意味更新を渡す     |
+| UI構造・操作・表示状態                 | 新設予定の`ui-target-analysis`                           | 同じUI package writerを利用。旧`spec-analysis`からの移行前は現行ownerを維持      |
+| その他のQA成果物                       | TR／TCN／CI／TC等の各既存owner                           | 各ownerの既存正本更新・履歴・validator。UI packageの編集方式を無条件に流用しない |
+| 人間が編集する作業用branch／作業用copy | 人間の編集者・レビュー担当                               | **未確定の変更案**。正式成果物の第二の正本として参照・再利用しない               |
 
 ## 既存UI packageの制約
 
