@@ -129,6 +129,53 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         self.assertFalse(result["may_start"])
         self.assertEqual(list(other.iterdir()), [])
 
+    def test_separate_session_reloads_claim_without_start_permission(self) -> None:
+        first = self.claim()
+        loaded = artifact_graph.read_mutable_operation_claim(
+            self.root,
+            WORKFLOW_REF,
+            "runner:attempt-001",
+            expected_claim_revision=first["claim_revision"],
+        )
+        self.assertEqual(loaded["status"], "current", loaded)
+        self.assertFalse(loaded["may_start"])
+        self.assertEqual(loaded["operation_details"], operation_details())
+        self.assertEqual(loaded["claim_revision"], first["claim_revision"])
+
+    def test_claim_revision_change_blocks_old_resume(self) -> None:
+        first = self.claim()
+        data = json.loads(Path(first["path"]).read_text(encoding="utf-8"))
+        data["operation_details"]["target_ref"] = "RUN-002"
+        Path(first["path"]).write_text(
+            json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        loaded = artifact_graph.read_mutable_operation_claim(
+            self.root,
+            WORKFLOW_REF,
+            "runner:attempt-001",
+            expected_claim_revision=first["claim_revision"],
+        )
+        self.assertEqual(loaded["status"], "conflict")
+        self.assertFalse(loaded["may_start"])
+
+    def test_noncanonical_claim_is_not_recovered(self) -> None:
+        first = self.claim()
+        path = Path(first["path"])
+        path.write_bytes(path.read_bytes() + b"\\n")
+        loaded = artifact_graph.read_mutable_operation_claim(
+            self.root, WORKFLOW_REF, "runner:attempt-001"
+        )
+        self.assertEqual(loaded["status"], "blocked")
+        self.assertFalse(loaded["may_start"])
+
+    def test_absent_claim_has_no_recovery_or_start_permission(self) -> None:
+        loaded = artifact_graph.read_mutable_operation_claim(
+            self.root, WORKFLOW_REF, "runner:attempt-001"
+        )
+        self.assertEqual(loaded["status"], "blocked")
+        self.assertFalse(loaded["may_start"])
+
     def test_legacy_claim_remains_readable_and_never_restarts(self) -> None:
         first = artifact_graph.claim_mutable_operation(
             self.root, WORKFLOW_REF, "legacy:operation"

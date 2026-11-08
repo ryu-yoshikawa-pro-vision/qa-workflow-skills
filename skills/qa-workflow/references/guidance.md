@@ -220,7 +220,8 @@ WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-
 
 1. owner execution contractに同一operation identity向けatomic pre-start claimまたはidempotent startがあるか確認し、ある場合はowner contractを利用します。
 2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref, operation_details=...)`を使います。`operation_details`には`owner_skill`、`scope_ref`、`operation_type`、`target_ref`、`source_revisions[]`、`artifact_revisions[]`、`expected_revision`、`approval_ref`、`permission_scope`、`resume_owner`を入れます。source／成果物のrevisionは操作前にownerの正本から確定し、秘密情報の実値は渡しません。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へatomic create-if-absentで記録し、独立readbackを照合してから`may_start=true`を返します。既存3引数のclaimは互換用であり、新規の副作用操作に必要な履歴・承認情報を記録できません。
-3. claimが重複・改ざん・読戻し不一致・保存失敗になった場合は、同じoperation identityを再実行せず`blocked`にします。state CASだけで実operationの二重開始を防止済みと扱いません。claimは承認主体の認証や遠隔providerのCASを代行しません。
+3. 別セッションでの再開時は、保存時の`claim_revision`を保持して`read_mutable_operation_claim(..., expected_claim_revision=...)`で独立読戻しします。`status=current`でも`may_start=false`であり、元ownerの実開始・実保存・cleanupを再取得するまで同じoperation identityの副作用を再実行しません。revision不一致は`conflict`、欠落・改ざん・読取権限不足は`blocked`です。
+4. claimが重複・改ざん・読戻し不一致・保存失敗になった場合は、同じoperation identityを再実行せず`blocked`にします。state CASだけで実operationの二重開始を防止済みと扱いません。claimは承認主体の認証や遠隔providerのCASを代行しません。
 
 ### shared resource使用前
 
