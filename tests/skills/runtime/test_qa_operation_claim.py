@@ -45,6 +45,15 @@ class WorkflowOperationClaimTests(unittest.TestCase):
             operation_details=details if details is not None else operation_details(),
         )
 
+    def test_missing_details_does_not_create_claim_or_authorize_start(self) -> None:
+        result = artifact_graph.claim_mutable_operation(
+            self.root, WORKFLOW_REF, "runner:attempt-001"
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "operation_details_required")
+        self.assertFalse(result["may_start"])
+        self.assertFalse(self.root.exists())
+
     def test_claim_persists_scope_revision_and_resume_details(self) -> None:
         first = self.claim()
         self.assertEqual(first["status"], "claim_acquired", first)
@@ -194,15 +203,41 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         self.assertFalse(loaded["may_start"])
 
     def test_legacy_claim_remains_readable_and_never_restarts(self) -> None:
-        first = artifact_graph.claim_mutable_operation(
-            self.root, WORKFLOW_REF, "legacy:operation"
+        # An earlier version may have persisted a detail-free claim.
+        operation_ref = "legacy:operation"
+        path = artifact_graph._claim_path(self.root, WORKFLOW_REF, operation_ref)
+        raw = json.dumps(
+            {"workflow_ref": WORKFLOW_REF, "operation_ref": operation_ref, "status": "claimed"},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+        self.assertEqual(artifact_graph.create_if_absent(path, raw)["status"], "created")
+        saved = artifact_graph.read_mutable_operation_claim(
+            self.root, WORKFLOW_REF, operation_ref
         )
-        second = artifact_graph.claim_mutable_operation(
-            self.root, WORKFLOW_REF, "legacy:operation"
-        )
-        self.assertEqual(first["status"], "claim_acquired")
+        self.assertEqual(saved["status"], "current")
+        self.assertIsNone(saved["operation_details"])
+        self.assertFalse(saved["may_start"])
+        second = artifact_graph.claim_mutable_operation(self.root, WORKFLOW_REF, operation_ref)
         self.assertEqual(second["status"], "blocked")
         self.assertFalse(second["may_start"])
+
+    def test_recovery_does_not_claim_success_without_native_release(self) -> None:
+        claim = self.claim()
+        result = artifact_graph.recover_claim(
+            owner_source_state="not_started",
+            cleanup_confirmed=True,
+            expected_claim_revision=claim["claim_revision"],
+            native_atomic_conditional_release=True,
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "claim_release_provider_not_connected")
+        self.assertFalse(result["may_start"])
+        self.assertEqual(
+            artifact_graph.read_mutable_operation_claim(
+                self.root, WORKFLOW_REF, "runner:attempt-001"
+            )["status"],
+            "current",
+        )
 
 
 if __name__ == "__main__":
