@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "skills" / "qa-workflow" / "scripts" / "ci_handoff.py"
@@ -173,8 +174,6 @@ class CiHandoffTests(unittest.TestCase):
         self.assert_rejects("artifact_readback_failed")
 
     def test_artifact_read_enforces_limit(self) -> None:
-        from unittest.mock import patch
-
         with patch.object(handoff, "MAX_ARTIFACT_BYTES", 4):
             self.assert_rejects("artifact_readback_failed")
 
