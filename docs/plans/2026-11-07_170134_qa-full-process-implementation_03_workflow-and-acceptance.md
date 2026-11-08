@@ -82,7 +82,7 @@ CI経路の外部接続が未選定でも、Skill自体の分析・出力・局�
 
 新規案件や成果物配置の変更時は、`qa-workflow`が既存成果物とProject Contextの配置方針を確認し、必要な場合だけ`project-context`に**ファイル構成・編集可能な正本・機能別の参照・レビュー手順の提案と利用者合意**を依頼する。採用した方針と承認根拠はProject Contextの既存Section 12／14または明示された外部正本のrefへ保存する。合意済みの案件では通常のQA実行時に再確認を強制しない。
 
-各ownerは人間が編集した正本の変更を履歴・ID・source revision・競合とともに取り込み、validatorと必要な条件付き保存・readbackを通す。生成された一覧や`MANIFEST.md`を編集用の第二の正本として扱わない。`ui-target-v1`の標準ファイル配置・既存writerを維持し、機能別参照は導出情報として用意する。新規配置・ファイル移動が未合意でも既存の読取専用分析は続行し、未合意の書込み・移管だけ`blocked`とする。詳細は[開発連動QA PlanのQ06](./2026-11-07_122247_development-qa-traceability.md#成果物の配置人間編集方針の初期合意q06)に従う。
+人間は合意した作業用branch／独立copyの正本Markdownを直接編集する。各ownerは元の有効snapshotと編集差分を読み、ID・Authority・変更元と変更先のrevision・競合・承認を確認してから既存writerの更新入力へ変換し、生成されたManifest・履歴を保存後に独立readbackする。編集案の`MANIFEST.md`や生成一覧を第二の正本として受け入れない。`ui-target-v1`の標準ファイル配置・既存writerを維持し、機能別参照は導出情報として用意する。canonical rootを直接書き換えてManifest不一致になった場合は編集内容を保全して更新をblockedにし、検証可能な元revisionと差分を分離できる場合のみ安全に復旧・正式反映する。未合意の書込み・移管だけblockedとし、読取専用分析は継続する。配置は[開発連動QA PlanのQ06](./2026-11-07_122247_development-qa-traceability.md#成果物の配置人間編集方針の初期合意q06)、編集差分の正式反映は[詳細契約08](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)を正本とする。
 
 ## 変更・並行処理・途中失敗の再開
 
@@ -209,7 +209,7 @@ flowchart TD
 
 ### 完了条件
 
-1. S1〜S17を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。新規案件の配置合意・既存合意の再利用、人間の直接編集に対する正本の検証・変更影響の追跡、無承認の再配置と生成一覧の編集拒否を確認する。全工程の固定順実行を強制しない。
+1. S1〜S17を独立fixtureと必要な実repo／実runnerで確認し、各入口で要求された成果物まで正しいownerが引継げる。新規案件の配置合意・既存合意の再利用、人間の作業用Markdown直接編集から正式revisionへの反映、変更後の下流の局所再検証、無承認の再配置と生成一覧の編集拒否を確認する。[詳細契約08](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)の8件の受入も必須とし、Manifest不一致・競合・変更案喪失・失敗後再開を正しく拒否・回復する。全工程の固定順実行を強制しない。
 2. S3ではPR #22新Skillの計画成果物から既存Playwright E2Eの**実**inspection・implementation・execution・source結果／cleanup・reportingへ接続できる。E2E本体は再実装せず、既存E2E単独／TCなし経路に回帰がない。
 3. 実行準備は全ownerのrefsとrun preflightのready／blockedを示す。非Web異常には明示した分析owner・根拠・仮説・担当先を持ち、欠陥候補とは分離する。
 4. 外部資料変更をコードPRなしでも入力として受け付け、必要範囲だけ再評価できる。通知・定期照合やAgentの実起動をSkill内部の完了条件にしない。
