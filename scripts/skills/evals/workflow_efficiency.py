@@ -65,9 +65,11 @@ def _metric(value: Any, label: str) -> tuple[float | None, str]:
     unit = _nonempty(row["unit"], f"{label} unit")
     raw = row["value"]
     if raw is None:
-        if row["source_ref"] is not None or not isinstance(
-            row["unmeasured_reason"], str
-        ) or not row["unmeasured_reason"].strip():
+        if (
+            row["source_ref"] is not None
+            or not isinstance(row["unmeasured_reason"], str)
+            or not row["unmeasured_reason"].strip()
+        ):
             raise ValueError(f"{label} unmeasured provenance invalid")
         return None, unit
     if (
@@ -120,7 +122,10 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
     for item in source:
         ref = _obj(item, {"ref", "revision"}, "source revision")
         revisions.append(
-            (_nonempty(ref["ref"], "source ref"), _nonempty(ref["revision"], "revision"))
+            (
+                _nonempty(ref["ref"], "source ref"),
+                _nonempty(ref["revision"], "revision"),
+            )
         )
     if len({ref for ref, _ in revisions}) != len(revisions):
         raise ValueError("duplicate source revision")
@@ -178,9 +183,12 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
     if data["schema_version"] != SCHEMA:
         raise ValueError("unsupported evaluation schema")
     scenarios = data["scenarios"]
-    if not isinstance(scenarios, list) or {
-        row.get("scenario") for row in scenarios if isinstance(row, dict)
-    } != set(SCENARIOS) or len(scenarios) != len(SCENARIOS):
+    if (
+        not isinstance(scenarios, list)
+        or {row.get("scenario") for row in scenarios if isinstance(row, dict)}
+        != set(SCENARIOS)
+        or len(scenarios) != len(SCENARIOS)
+    ):
         raise ValueError("all five independent scenarios are required exactly once")
     seen_trials: set[str] = set()
     results: list[dict[str, Any]] = []
@@ -213,12 +221,16 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
         improved = False
         regressed = False
         for key, direction in METRICS.items():
-            before = _summary(groups["baseline"], key) if groups["baseline"] else {
-                "status": "not_measured", "reason": "baseline_missing"
-            }
-            after = _summary(groups["candidate"], key) if groups["candidate"] else {
-                "status": "not_measured", "reason": "candidate_missing"
-            }
+            before = (
+                _summary(groups["baseline"], key)
+                if groups["baseline"]
+                else {"status": "not_measured", "reason": "baseline_missing"}
+            )
+            after = (
+                _summary(groups["candidate"], key)
+                if groups["candidate"]
+                else {"status": "not_measured", "reason": "candidate_missing"}
+            )
             change = "not_comparable"
             if (
                 before["status"] == "measured"
@@ -262,7 +274,11 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
         if all(row["status"] == "improvement_evidenced" for row in results)
         else "unproven"
     )
-    return {"schema_version": "qa-workflow-efficiency-result-v1", "status": overall, "scenarios": results}
+    return {
+        "schema_version": "qa-workflow-efficiency-result-v1",
+        "status": overall,
+        "scenarios": results,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

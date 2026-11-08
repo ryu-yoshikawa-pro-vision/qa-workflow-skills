@@ -20,7 +20,10 @@
     "build_ref": "build-12"
   },
   "source_inventory": [
-    {"ref": "repo-source", "revision": "2222222222222222222222222222222222222222"}
+    {
+      "ref": "repo-source",
+      "revision": "2222222222222222222222222222222222222222"
+    }
   ],
   "changed_paths": ["src/a.ts"],
   "allowed_classifications": ["implementation", "specification"],
@@ -31,14 +34,19 @@
       "artifact_ref": "feature-1",
       "revision": "rev-5",
       "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "source_refs": [{"ref": "repo-source", "revision": "2222222222222222222222222222222222222222"}]
+      "source_refs": [
+        {
+          "ref": "repo-source",
+          "revision": "2222222222222222222222222222222222222222"
+        }
+      ]
     }
   ],
   "required_approvals": []
 }
 ```
 
-manifestは`source`を同じ形で持ち、`source_inventory`を`{"complete": true, "entries": [...]} `で渡す。`changed_paths`の代わりに`changes: [{"path": "src/a.ts", "classification": "implementation"}]`、各成果物に`path`を含める。各ownerが作成したschema自体は変更せず、正本内容のhash・revisionを参照する。
+manifestは`source`を同じ形で持ち、`source_inventory`を`{"complete": true, "entries": [...]}`で渡す。`changed_paths`の代わりに`changes: [{"path": "src/a.ts", "classification": "implementation"}]`、各成果物に`path`を含める。各ownerが作成したschema自体は変更せず、正本内容のhash・revisionを参照する。
 
 ```bash
 python skills/qa-workflow/scripts/ci_handoff.py \

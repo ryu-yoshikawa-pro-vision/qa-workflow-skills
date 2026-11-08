@@ -95,7 +95,9 @@ class WorkflowEfficiencyTests(unittest.TestCase):
 
     def test_source_revision_drift_is_not_comparable(self) -> None:
         data = dataset()
-        data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = "rev-2"
+        data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = (
+            "rev-2"
+        )
         result = mod.evaluate(data)
         self.assertEqual(result["scenarios"][3]["status"], "not_comparable")
 
