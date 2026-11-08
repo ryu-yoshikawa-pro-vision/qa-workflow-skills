@@ -48,6 +48,16 @@
 - 他ownerの**実成果物がないと検証できない**横断条件、必要fixture・期待結果・失敗時の修正owner。
 - 統合時に担当実装の不具合を発見した場合は原則その担当branchへ差し戻し、修正・テスト後にPR #22で再検証する。PR #22に担当機能を重複実装しない。
 
+## 並行着手の前提と契約の確定
+
+**A（PR #23）は共通runtime・保存／承認・成果物引継ぎ・評価／CIの変更ownerであり、PR #22の統合試験担当ではない。** Aが既存実装・関連PR #17／#10を確認して、B〜Jが参照すべき公開入出力契約を担当MarkdownおよびPR #23で記録・共有する。契約が未確定である範囲を、他担当が推測で固定しない。
+
+- **Aの先行確認**：現行Project Context／artifact graph・runtime／Regression・Knowledgeの既存契約、正本owner、source／artifact ref・安定ID、schema／revision／currentness、保存先native CAS／readback、承認scope・認証主体、blocked／resume、実行結果・cleanup、評価／CIの引継ぎ条件を確認する。既存契約を再利用し、案件固有で未決定の保存provider・CI受渡し方式・承認者を仮に確定しない。
+- **Aが共有するもの**：担当ごとに必要な入出力・参照先・版・状態・拒否例、変更owner、固定fixture・負例、互換性・移行条件、未決定事項と決定責任者をPR #23で明示する。確認済み仕様・実装・未確定の設計判断を分ける。
+- **B〜Jの着手判断**：既存契約のみで成立する調査、Skill固有の処理・テスト、独立fixtureの作成は先行できる。Aの確定・共有待ちの横断schema、共通保存／承認、runtime登録やprovider接続を独断で実装・再定義しない。該当作業だけ待機・blockedと記録する。
+- **契約変更時**：依存する担当に変更対象、互換性、移行とテストの影響を通知する。共有ファイルの編集はownerのみが行い、統合済み他担当の実成果物との接続・最終受入はPR #22で確認する。
+- **実装開始の扱い**：本README更新だけでAの技術契約が確定したとは判定しない。Aの調査・契約の証拠が揃ってから、依存するB〜Jの実装を進める。
+
 ## 実装開始の共通条件
 
 - [ ] [Plan索引](../../plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)と[開発連動QA Plan](../../plans/2026-11-07_122247_development-qa-traceability.md)、[QA全工程Plan](../../plans/2026-11-07_170134_qa-full-process-implementation.md)、詳細01〜08を担当ごとに確認した。
