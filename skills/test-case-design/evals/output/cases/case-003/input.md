@@ -1,4 +1,4 @@
-# Eval Input: 正方向のCheckout完了ケース
+# Eval Input: 正方向のCheckout Complete画面表示ケース
 
 これは固定QTS revisionを根拠にした、自己完結した**合成上流QA成果物**です。以下の`TR`、`TCN`、`CI`、`SPEC` IDはこの評価入力内だけの安定IDであり、QTS repositoryが同じIDで管理する成果物だとは主張しません。
 
@@ -7,7 +7,6 @@
 - Product source: `qa-training-store` revision `84ce165493649550832731a60cf436f8ae29c56b`
 - Current Authority Entity: `SPEC-001`、種別`SPEC`、状態`current`
 - Source: `docs/spec/features/checkout-and-payment.md`、SHA-256 `8feab2db05f6e3c46f909539bb6b5136ed7705ccdc3265c25f124f349a9ad901`
-- `BR-CHECKOUT-003`（source lines 17-19）: `TEST-SUCCESS`だけが在庫を再検証し、Paymentを`succeeded`、Orderを`paid`、在庫減算を確定する。
 - `SCREEN-CHECKOUT-COMPLETE`（source lines 181-187）: 完了画面にPayment成功、Order番号、注文履歴への導線を表示する。
 
 このAuthority本文は上記の固定sourceから採った仕様内容をまとめた合成評価Entityです。Riskや一般慣習を製品仕様として追加しません。
@@ -16,19 +15,19 @@
 
 ### Test Requirement Entity
 
-- `TR-001` (current): 顧客がcurrentなCartとCheckoutで`TEST-SUCCESS`を確定したとき、Checkout Completeへ到達し、完了画面にPayment成功、Order番号、注文履歴への導線が表示されることを確認する。
+- `TR-001` (current): Checkout Complete画面にPayment成功、Order番号、注文履歴への導線が表示されることを確認する。
 - Priority: `高`
 
 ### Test Condition Entity
 
-- `TCN-001` (current): Web system test。対象はcurrentなCheckoutの`TEST-SUCCESS`成功経路。現在の仕様根拠は`SPEC-001`。Priority: `高`。Scope: `SCOPE-001`。
+- `TCN-001` (current): Web UI test。対象はCheckout Complete画面の表示契約。現在の仕様根拠は`SPEC-001`。Priority: `高`。Scope: `SCOPE-001`。
 
 ### Coverage Item Machine Entity
 
 - `TCN-001-CI01` (current, active, priority `高`)
 - Source kind: `semantic_item`
-- Semantic item key: `checkout-test-success-complete`
-- Semantic item: `TEST-SUCCESS`でCheckoutを確定した結果、CustomerにCheckout Completeが表示され、Payment成功、Order番号、注文履歴への導線を確認できる。
+- Semantic item key: `checkout-complete-display`
+- Semantic item: Checkout Complete画面にPayment成功、Order番号、注文履歴への導線が表示される。
 - Authority refs: `SPEC-001`
 - Parent TCN: `TCN-001`
 - Scope: `SCOPE-001`
@@ -40,16 +39,13 @@
 ## Prepared test data and start state
 
 - Customer: `CUST-001`としてログイン済み
-- Cart: `CART-001`、商品`SKU-001`を数量1で保持し、Cart Versionはcurrent
-- Product: active、購入数量を満たす在庫あり
-- Address: `ADDR-001`がCheckout Sessionへ選択済み
-- Payment Test Control: 結果`TEST-SUCCESS`
-- Checkout Session: Cart Versionと価格がcurrentで、Confirm画面から開始できる
-- Test level: QTS Web system/E2E。合否に使う観測はCheckout Complete画面に限定する。一般的な注文メールや未記載UIを期待しない。
+- 合成テストデータ: Paymentは成功状態、Orderは支払済みでOrder番号`ORD-001`を持つ
+- 開始状態: Checkout Complete画面を開き、`ORD-001`の成功注文データを対象として表示を始める。表示項目は事前確認しない。
+- Test level: QTS Web UI screen-contract test。開始前に画面を開いた状態とし、Checkout確定から画面へ遷移することは検査しない。合否は画面に表示される3項目だけで判断し、DB/API/ログや未記載UIを期待しない。
 
 ## Required behavior
 
-この入力は必要な上流本文・実行条件・期待結果根拠を含む正方向ケースです。仕様から詳細ケースを設計してください。`TCN-001-CI01`を少なくとも1つの実行可能ケースまたはruntimeが根拠付きで返す扱いへ閉じてください。仕様にない振る舞いを追加しないでください。
+この入力は必要な上流本文・実行条件・期待結果根拠を含む正方向ケースです。仕様から画面表示を検証する詳細ケースを設計してください。`TCN-001-CI01`を少なくとも1つの実行可能ケースまたはruntimeが根拠付きで返す扱いへ閉じてください。単一の合否条件を番号付き期待結果1として示し、output-templateの番号形式で同じAuthorityへ対応付けてください。Checkout成功から当該画面へ遷移することはこの入力の検証対象ではありません。仕様にない振る舞いを追加しないでください。
 
 既定の`assets/output-template.md`を使用し、`case_structure.py`を実際のcanonical normalized inputで実行してください。Machine Runtime Input / Result / Entitiesを最終成果物へ含め、生成したケースのstable IDとcurrent upstream dependenciesを保ってください。
 
@@ -83,7 +79,7 @@
           "source_path": "docs/spec/features/checkout-and-payment.md",
           "source_revision": "84ce165493649550832731a60cf436f8ae29c56b",
           "source_sha256": "sha256:8feab2db05f6e3c46f909539bb6b5136ed7705ccdc3265c25f124f349a9ad901",
-          "body": "BR-CHECKOUT-003 (lines 17-19): TEST-SUCCESSだけが在庫を再検証しPayment succeeded、Order paid、在庫減算を確定する。SCREEN-CHECKOUT-COMPLETE (lines 181-187): Payment成功、Order番号、注文履歴への導線を表示する。"
+          "body": "SCREEN-CHECKOUT-COMPLETE (lines 181-187): Payment成功、Order番号、注文履歴への導線を表示する。"
         }
       },
       {
@@ -95,7 +91,7 @@
           "priority": "高",
           "authority_refs": ["SPEC-001"],
           "scope_refs": ["SCOPE-001"],
-          "statement": "currentなCartとCheckoutでTEST-SUCCESSを確定したとき、Checkout Completeへ到達し、Payment成功、Order番号、注文履歴への導線を確認する。"
+          "statement": "Checkout Complete画面にPayment成功、Order番号、注文履歴への導線が表示されることを確認する。"
         }
       },
       {
@@ -120,8 +116,8 @@
           "authority_refs": ["SPEC-001"],
           "source_kind": "semantic_item",
           "execution": null,
-          "semantic_item_key": "checkout-test-success-complete",
-          "semantic_item_text": "TEST-SUCCESSでCheckoutを確定した結果、CustomerにCheckout Completeが表示され、Payment成功、Order番号、注文履歴への導線を確認できる。",
+          "semantic_item_key": "checkout-complete-display",
+          "semantic_item_text": "Checkout Complete画面にPayment成功、Order番号、注文履歴への導線が表示される。",
           "semantic_source_targets": [],
           "test_data_requirement_refs": [],
           "scope_refs": ["SCOPE-001"]
@@ -153,8 +149,8 @@
         "authority_refs": ["SPEC-001"],
         "source_kind": "semantic_item",
         "execution": null,
-        "semantic_item_key": "checkout-test-success-complete",
-        "semantic_item_text": "TEST-SUCCESSでCheckoutを確定した結果、CustomerにCheckout Completeが表示され、Payment成功、Order番号、注文履歴への導線を確認できる。",
+        "semantic_item_key": "checkout-complete-display",
+        "semantic_item_text": "Checkout Complete画面にPayment成功、Order番号、注文履歴への導線が表示される。",
         "semantic_source_targets": [],
         "test_data_requirement_refs": [],
         "scope_refs": ["SCOPE-001"]
