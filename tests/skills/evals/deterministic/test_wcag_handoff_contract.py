@@ -474,8 +474,8 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
             release_decision = graph.release_shared_resource(
                 current_workflow_ref=workflow_ref,
                 expected_workflow_ref=workflow_ref,
-                expected_reservation_revision=reserved["reservation_revision"],
-                current_reservation_revision=reserved["reservation_revision"],
+                expected_reservation_revision=f"sqlite:{acquired['revision']}",
+                current_reservation_revision=f"sqlite:{acquired['revision']}",
                 native_atomic_conditional_release=True,
                 owner_state_verified=True,
                 owner_execution_state="complete",
