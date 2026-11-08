@@ -202,6 +202,17 @@ class FeatureRegistryTests(unittest.TestCase):
         data["snapshot"]["features"][0]["name"] = "Different"
         self.assertEqual(handle(data)["status"], "blocked")
 
+    def test_duplicate_operation_does_not_bypass_schema_or_history(self) -> None:
+        data = fixture()
+        data["snapshot"]["features"][0]["source_ids"] = ["SRC-404"]
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        self.assertEqual(handle(data)["status"], "blocked")
+
+        data = fixture()
+        data["snapshot"]["history"][0]["from_ids"] = ["FEAT-999"]
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        self.assertEqual(handle(data)["status"], "blocked")
+
     def test_out_of_scope_requires_approval_reference(self) -> None:
         data = fixture()
         change = data["snapshot"]["changes"][0]

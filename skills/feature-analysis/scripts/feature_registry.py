@@ -195,7 +195,13 @@ def _changes(
     return changes, issues
 
 
-def _history(snapshot: dict[str, Any], previous: dict | None, features: dict) -> None:
+def _history(
+    snapshot: dict[str, Any],
+    previous: dict | None,
+    features: dict,
+    *,
+    idempotent: bool = False,
+) -> None:
     events = _list(snapshot.get("history"), "history")
     event_ids: set[str] = set()
     for event in events:
@@ -235,7 +241,10 @@ def _history(snapshot: dict[str, Any], previous: dict | None, features: dict) ->
         raise ContractError("project_changed")
     if snapshot.get("artifact_ref") != previous.get("artifact_ref"):
         raise ContractError("artifact_changed")
-    if snapshot.get("previous_artifact_revision") != previous.get("artifact_revision"):
+    if (
+        not idempotent
+        and snapshot.get("previous_artifact_revision") != previous.get("artifact_revision")
+    ):
         raise ContractError("previous_artifact_revision_conflict")
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
@@ -286,11 +295,10 @@ def analyze(request: Any) -> dict[str, Any]:
         != snapshot["source_revision"]
     ):
         return {"status": "stale", "reasons": ["source_head_changed"], "metrics": None}
-    if previous is not None and snapshot["operation_id"] == previous.get(
+    idempotent = previous is not None and snapshot["operation_id"] == previous.get(
         "operation_id"
-    ):
-        if snapshot == previous:
-            return {"status": "idempotent", "reasons": [], "metrics": None}
+    )
+    if idempotent and snapshot != previous:
         raise ContractError("operation_id_reused")
     sources, issues = _source_inventory(snapshot)
     features, more = _features(snapshot, sources)
@@ -299,7 +307,7 @@ def analyze(request: Any) -> dict[str, Any]:
     issues.extend(more)
     changes, more = _changes(snapshot, sources, features)
     issues.extend(more)
-    _history(snapshot, previous, features)
+    _history(snapshot, previous, features, idempotent=idempotent)
     unknown = _refs(snapshot.get("unknown_areas"), "unknown_areas")
     if unknown:
         issues.append("unknown_areas_present")
@@ -313,6 +321,12 @@ def analyze(request: Any) -> dict[str, Any]:
         issues.append("change_denominator_zero")
     if not candidates:
         issues.append("candidate_denominator_zero")
+    if idempotent:
+        return {
+            "status": "idempotent",
+            "reasons": sorted(set(issues)),
+            "metrics": None,
+        }
     return {
         "status": "complete" if not issues else "incomplete",
         "reasons": sorted(set(issues)),
