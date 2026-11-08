@@ -135,6 +135,17 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertIsNone(result["metrics"]["change_classification"]["rate"])
         self.assertIsNone(result["metrics"]["observed_candidate_mapping"]["rate"])
 
+    def test_exclusion_is_reported_but_not_counted_as_mapped(self) -> None:
+        data = fixture()
+        candidate = data["snapshot"]["candidates"][0]
+        candidate["status"] = "excluded"
+        candidate["feature_id"] = None
+        candidate["reason"] = "Approved out of scope"
+        candidate["approval_ref"] = "approval/1"
+        metrics = handle(data)["metrics"]
+        self.assertEqual(metrics["observed_candidate_mapping"]["rate"], 0.0)
+        self.assertEqual(metrics["excluded_candidate_ids"], ["CAND-001"])
+
     def test_path_change_preserves_semantic_feature_id(self) -> None:
         first = fixture()
         next_step = copy.deepcopy(first)

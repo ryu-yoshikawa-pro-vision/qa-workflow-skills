@@ -311,7 +311,7 @@ def analyze(request: Any) -> dict[str, Any]:
     mapped = sorted(
         cid
         for cid, row in candidates.items()
-        if row["status"] in {"mapped", "excluded"}
+        if row["status"] == "mapped"
     )
     if not changes:
         issues.append("change_denominator_zero")
@@ -335,6 +335,9 @@ def analyze(request: Any) -> dict[str, Any]:
                 v.startswith("source_") for v in issues
             ),
             "unknown_areas": unknown,
+            "excluded_candidate_ids": sorted(
+                cid for cid, row in candidates.items() if row["status"] == "excluded"
+            ),
             "all_product_features_discovered": None,
         },
         "handoff": {

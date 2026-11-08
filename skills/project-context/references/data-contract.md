@@ -2,13 +2,11 @@
 
 Python 3.11のscripts/project_context.pyは、UTF-8 JSONを標準入力から読み、JSON1件を標準出力へ返します。重複JSON key・16節欠損・DEC/ASM破損・stable key重複を拒否します。
 
-| operation | 入力 | 結果 |
-| --- | --- | --- |
-| inspect | markdown, required_keys[], artifact_ref, artifact_revision | current / incomplete / blocked。既存parserで必要keyとIDを検証 |
-| discover | project_name, enumeration_complete, candidates[] | existing / absent / ambiguous / unconfirmed / blocked |
-| prepare-create | project_name, enumeration_complete, candidates[] | 不存在確認済み時のみdraft |
-| prepare-update | markdown, artifact_ref, expected_revision, source_ref, source_revision, updates | 既存stable keyだけを差分変更したdraft |
-| placement | owner, scope, target_ref, existing_policy | approval_required / reuse_candidate |
+- **inspect**：入力 = markdown, required_keys[], artifact_ref, artifact_revision；結果 = current / incomplete / blocked。既存parserで必要keyとIDを検証
+- **discover**：入力 = project_name, enumeration_complete, candidates[]；結果 = existing / absent / ambiguous / unconfirmed / blocked
+- **prepare-create**：入力 = project_name, enumeration_complete, candidates[]；結果 = 不存在確認済み時のみdraft
+- **prepare-update**：入力 = markdown, artifact_ref, expected_revision, source_ref, source_revision, updates；結果 = 既存stable keyだけを差分変更したdraft
+- **placement**：入力 = owner, scope, target_ref, existing_policy；結果 = approval_required / reuse_candidate
 
 discoverの各候補はrefとstatus（readable / absent / denied / unavailable）、readable時はmarkdownとrevisionを持ちます。enumeration_completeがfalseなら不存在を確定しません。候補が複数あればauto-mergeしません。既存文書の案件名はSection 1のプロジェクト欄と一致させます。
 

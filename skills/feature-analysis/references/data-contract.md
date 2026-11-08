@@ -4,15 +4,13 @@ scripts/feature_registry.pyはPython 3.11のstdinにJSON objectを受け、stdou
 
 入力トップレベルはsnapshot、previous_snapshot（初回null）、observed_head_revision。snapshotはschema_version=feature-inventory-v1、project_ref、artifact_ref、artifact_revision、source_revision、previous_artifact_revision、operation_id、eventを必須とします。eventはinitial / pr_update / merge / release / external_revisionです。
 
-| 項目 | 内容 |
-| --- | --- |
-| expected_source_ids | 当該分析で列挙すべきSRC ID配列 |
-| sources | id, kind, ref, scope, status, revision, evidence_ref, enumeration_complete, unretrieved[], reason |
-| features | id, identity, name, kind, status, parent_id, source_ids[], implementation_refs[], spec_refs[], qa_refs[] |
-| candidates | id, source_ids[], evidence_ref, status, feature_id, reason, approval_ref |
-| changes | id, source_id, before_revision, after_revision, locator, evidence_ref, classification, feature_ids[], reason, approval_ref |
-| history | event_id, kind, revision, evidence_ref, from_ids[], to_ids[]を追記専用 |
-| unknown_areas | 取得不能・発見不能な分析範囲の参照配列 |
+- **expected_source_ids**：内容 = 当該分析で列挙すべきSRC ID配列
+- **sources**：内容 = id, kind, ref, scope, status, revision, evidence_ref, enumeration_complete, unretrieved[], reason
+- **features**：内容 = id, identity, name, kind, status, parent_id, source_ids[], implementation_refs[], spec_refs[], qa_refs[]
+- **candidates**：内容 = id, source_ids[], evidence_ref, status, feature_id, reason, approval_ref
+- **changes**：内容 = id, source_id, before_revision, after_revision, locator, evidence_ref, classification, feature_ids[], reason, approval_ref
+- **history**：内容 = event_id, kind, revision, evidence_ref, from_ids[], to_ids[]を追記専用
+- **unknown_areas**：内容 = 取得不能・発見不能な分析範囲の参照配列
 
 IDはSRC-001、FEAT-001、CAND-001、DIF-001形式。featureのidentityは同一案件で同じ意味を表す安定値で、path・名称変更による再採番を防ぎます。sourceのcompleteはrevisionとevidence_ref、enumeration_complete=true、unretrieved=[]を必須とします。候補・差分の対象外には理由とapproval_refが必須ですが、承認主体の真正性は本helperでは確認しません。
 
