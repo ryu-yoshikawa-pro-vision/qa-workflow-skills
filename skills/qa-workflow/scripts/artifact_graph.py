@@ -2811,9 +2811,11 @@ def claim_mutable_operation(
     """
     try:
         ref = _local_baseline_identity(workflow_ref)
-        if not isinstance(operation_ref, str) or not operation_ref.strip() or len(
-            operation_ref
-        ) > 512:
+        if (
+            not isinstance(operation_ref, str)
+            or not operation_ref.strip()
+            or len(operation_ref) > 512
+        ):
             raise ValueError("operation_ref_invalid")
         details = (
             _validate_claim_details(operation_details)
