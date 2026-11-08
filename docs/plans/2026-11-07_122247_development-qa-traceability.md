@@ -95,18 +95,20 @@ CIの正本：`.github/workflows/validate-skills.yml`、`deterministic-output-ev
 
 ### 成果物の配置・人間編集方針の初期合意（Q06）
 
+人間が直接編集したQA成果物を正式revisionへ取り込む処理、競合・保全・回復、実Agent受入の正本は[人間によるQA成果物の編集・正式取り込み・構成管理](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)とする。ここでは初回の配置合意と責務境界を定義する。
+
 **担当**：新設予定の`project-context`が、初回案件設定の一部として成果物の保存先・配置・人間編集の方針を提案し、利用者の合意を確認して記録する。`qa-workflow`は初回／配置変更時にだけ`project-context`へ振り分ける。各ファイルのschema・構造検証・書込み・履歴の正本は引き続き担当Skillが所有する。**配置合意のための新Skillは追加しない**。
 
 1. **既存構成の確認**：許可された案件rootと関連repo、正本の所在、既存のファイル命名・フォルダ、機能別の参照、手動編集の入口、generated／control file、既存writer・validator、ID・相互参照・revision・履歴を取得する。確認していない構成を新規案件の既定と推測しない。
 2. **提案の対象**：成果物の正本owner、機能別に編集・レビューできる単位、横断条件・共通成果物の配置、元ファイルと生成一覧の区別、ファイル移動・改名時の参照維持、人間の編集後に必要な検証・保存手順を提示する。機能横断の条件や仕様根拠を機能別フォルダへ重複保存しない。
 3. **初回合意**：新規案件または有効な配置方針のない案件では、既存構成の維持案と変更が必要な箇所を利用者へ提示し、**実成果物の新規保存・構成変更の前に**採用方針・保存先・編集権限を確認する。明示承認のないファイル移動、再配置、新しい保存形式への変換は行わない。読取専用の分析や、既に許可された既存操作は配置方針の未確定だけで止めない。
 4. **合意の記録**：承認済み配置方針の説明・対象scope・承認根拠・変更条件をProject ContextのSection 12（DECの正本がここにある案件）へ、正本成果物・場所・revisionと機能別参照の入口をSection 14へ記録する。別の承認済み設定文書が正本なら、そのref／revisionを保持する。新しい`qa-context-field`、重複manifest、成果物の第二の正本を無条件に追加しない。
-5. **人間による直接編集**：各担当Skillは、編集可能な**正本**と再生成される読取専用の一覧・control fileを区別する。人間が正本を直接編集した変更は、元のID・source revision・差分・権限を確認し、担当ownerのvalidator・条件付き保存・再読込を通して採用する。生成一覧やMANIFESTを直接編集して正本化しない。競合・不正参照・古いversionは既存の有効な成果物を維持して対象変更をblockedにする。
+5. **人間による直接編集**：各担当Skillは、編集可能な**正本の内容**と再生成される読取専用の一覧・control fileを区別する。人間は正本に対応する承認済み作業用branch／独立copyのMarkdownを直接編集し、元の有効revisionを維持したままownerが差分を確認する。採用する変更だけ既存writerの意味更新入力へ変換し、validator・条件付き保存・再読込を通して正式revisionにする。編集案のManifestを正本として取り込まず、正本rootを直接改変した場合は差分保全と有効baselineの確認を先行する。競合・不正参照・古いversionは対象scopeをblockedとし、人間の編集案や以前の正本を無断破棄しない。
 6. **機能別の確認**：機能IDから関連する仕様・UI・テストアイテム・条件・TR／TCN／CI／TC・実行結果・変更影響へ辿れる一覧または参照を用意する。この一覧は正本のIDとrevisionから導出し、別途更新すべき機能別の複製を作らない。人間が目的の正本ファイルと変更範囲を確認できることを受入とする。
 7. **既存`ui-target-v1`の扱い**：現行の`00〜09`標準ファイル、`README.md`、`CHANGELOG.md`、`MANIFEST.md`、条件付きfileと`ui_target_package.py`のwriter・schema・ID・版・履歴・scope readinessを維持する。既存形式は原則として現行のまま利用し、機能別の確認はID参照・読取専用の導出一覧で補う。人間の編集・並行変更・PR差分の管理に実害があり、物理的な分割が必要と確認された場合に限り、各ownerの移行形式、互換読取、原子的切替、rollbackと回帰検証を用意してから変更する。
 8. **繰返し確認の抑制**：有効な合意があり保存先・編集方法・owner境界が変わらない場合は再承認しない。配置変更の依頼、正本ownerの移管、既存path廃止、既存編集方式では安全に扱えない範囲が出たときのみ合意・必要な移行を更新する。
 
-**受入**：新規案件の初回合意、既存案件の方針再利用、未承認の配置変更拒否、機能別参照から正本編集対象への到達、人間の直接編集を次回のAgent処理が正しく検出・検証、生成一覧の編集拒否、共通条件の正本重複防止、ファイル改名／移動によるID・履歴・下流参照・rollbackの維持を確認する。
+**受入**：新規案件の初回合意、既存案件の方針再利用、未承認の配置変更拒否、機能別参照から正本編集対象への到達、人間の編集差分を既存writerで正式revisionへ採用、生成一覧の編集拒否、共通条件の正本重複防止、ファイル改名／移動によるID・履歴・下流参照・rollbackの維持を確認する。Manifest不一致・旧snapshot・同時編集・作業中断の負例は[詳細契約08](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md#実装対象と受入テスト)を必須とする。
 
 ### 新規の機能分析Skill
 
@@ -489,7 +491,7 @@ CI判定方針：
 ### 5. UI・テストアイテム・テスト設計の接続と互換移行
 
 - `feature-analysis`が機能一覧、`spec-analysis`がAuthority / AC・業務状態/権限、`ui-target-analysis`がUI構造/操作/画面状態、`test-item-analysis`がテスト対象を所有する。各成果物を参照で接続し、別の正本を複製しない。
-- 既存UI modeの`ui-target-v1`全fileと`ui_target_package.py`、Materialize / Inspect / Validate / Manifest、scope readiness、Authority / AC / UNKNOWNのMachine Entity、migration preflight、直下のTRD / TCD / TCの入力を列挙してowner移管表を作る。**Q06の初期合意**に従い、現在の00〜09形式を維持しながら人間向けの機能別参照と正本編集の入口を整える。物理分割が合意された場合だけ、writer・reader・ID・version・参照・rollbackを伴う正式な移行として実装する。read-only projectionと単一writerの境界を維持する。
+- 既存UI modeの`ui-target-v1`全fileと`ui_target_package.py`、Materialize / Inspect / Validate / Manifest、scope readiness、Authority / AC / UNKNOWNのMachine Entity、migration preflight、直下のTRD / TCD / TCの入力を列挙してowner移管表を作る。**Q06の初期合意**に従い、00〜09形式を維持しながら人間向けの機能別参照と作業用branch／copyでの直接編集入口を整える。[詳細契約08](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)に従い、編集前の有効snapshotからの差分を各ownerの意味更新として既存`materialize(update)`へ引き渡し、Manifest・revision・履歴の更新と独立readbackを検証する。物理分割が合意された場合だけ、writer・reader・ID・version・参照・rollbackを伴う正式な移行として実装する。read-only projectionと単一writerの境界を維持する。
 - `test-analysis`内のE2E対象選定成果物を`e2e-test-selection`へ移す。`qa-workflow`の旧routingと既存のTCなし/TCあり/実行だけのE2E経路を検証し、既存選定結果を無断廃棄しない。
 - `test-item-analysis`でテストアイテムの安定ID・階層・計画/実装/廃止・多対多feature参照を実装。`test-condition-analysis`で共通条件候補の独立識別・ID・根拠・lifecycle・部分更新・条件一覧を実装し、両Skillの並行入力と相互不足照合を定義する。`test-requirement-design`でTR⇄itemの明示参照とレベル、`test-condition-design`で候補IDへの参照、アイテム別TCN・適用/Disposition・期待結果候補を実装する。
 - `test-condition-analysis`の出力検証と`test-condition-design`への正規化handoffを追加する。既存`test-condition-design/scripts/condition_structure.py`、`materialize_coverage.py`、`test-case-design/scripts/case_structure.py`、`coverage-analysis/scripts/traceability.py`を契約別に変更。現在のcoverage graphの`Authority / Risk / TR / TCN / CI / TC`へアイテム・適用関係を無条件に詰め込まず、参照の型・方向・欠損時の扱いを明示する。`scope_refs`をテストアイテムIDとして流用しない。
@@ -521,7 +523,7 @@ CI判定方針：
 - 従来の`artifact_graph.py`の`parse_project_context`、`validate_required_context_fields`、`compare_used_context`と同じ結果を出し、追加stable key、旧形式の未設定・重複・不正type・欠損marker・順序保持を回帰検証する。
 - 同時新規作成、更新のCAS競合、保存直後の読戻し不一致、保存先未指定／書込拒否／symlink／path脱出／失敗後再開／履歴欠落を検証する。失敗時に旧文書・直前のworkflow baselineを保持する。
 - Project Contextのみ新規作成した案件から機能分析へ進む例、未設定の機能一覧rootで保存だけblockedになる例、変更した使用fieldのみ下流をstaleにする例、無関係なfield更新で下流がcurrentのままの例をAgent routingと統合テストで確認する。
-- 新規案件の配置提案・合意記録、既存案件の合意再利用、構成変更時だけの再合意、未承認の物理移動拒否、人間の正本直接編集と検証、機能別参照の更新、共通条件の重複保存拒否、MANIFEST／生成一覧の編集不採用を検証する。
+- 新規案件の配置提案・合意記録、既存案件の合意再利用、構成変更時だけの再合意、未承認の物理移動拒否、人間の作業用Markdown直接編集を有効snapshotから正式revisionへ取り込む経路、機能別参照の更新、共通条件の重複保存拒否、MANIFEST／生成一覧の編集不採用を検証する。[詳細契約08](./2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)の同時編集・直接改変・保存失敗・再開・無承認仕様変更の負例を独立検証する。
 
 1. 初回全体source列挙：複数repo、複数形式、API / バッチ / UI / 権限 / データ処理、文書のみ、コードのみ、既存テストのみの候補。
 2. PR差分：追加・変更・削除・rename、同一機能の複数ファイル、共通処理、重複候補、formatのみ、外部Issue・文書変更、途中pagination失敗、未知形式。
@@ -591,7 +593,7 @@ CI判定方針：
 
 - **完全性の限界**：コード・資料から発見できない機能の存在は機械的に証明できない。確認した情報源と分析対象境界、未知領域を表示し、誤った完全性主張を防ぐ。
 - **候補の粒度**：ファイル、コード関数、画面、業務機能は一対一ではない。機能同定・重複解消・分割・統合は意味判断を要する。数だけ合わせる処理は禁止。
-- **合意済みQ06と残る未確定事項**：人間の直接編集・レビューに対応し、初回の成果物配置方針は`project-context`で合意する。既存UI packageの00〜09を無条件に物理分割せず、機能別参照・安定ID・単一writerを維持する。再設計Q20（入力選択肢の個別確定）は未回答であり、既存の条件付き必須ルールを適用して根拠のない一律必須化をしない。影響する範囲だけblockedとする。
+- **合意済みQ06と残る未確定事項**：人間の直接編集・レビューに対応し、初回の成果物配置方針は`project-context`で合意する。既存UI packageの00〜09を無条件に物理分割せず、機能別参照・安定ID・単一writerを維持する。人間の作業用編集案は有効な元snapshotと照合して各ownerの正式更新経路へ通し、編集案のManifestを正本へ直接取り込まない。再設計Q20（入力選択肢の個別確定）は未回答であり、既存の条件付き必須ルールを適用して根拠のない一律必須化をしない。影響する範囲だけblockedとする。
 - **標準との相違**：IVEC V3.2のPDF詳細本文は未確認。ISTQB CTFLのtest analysisと本`test-analysis`、ISO/IEC/IEEE 29119-1:2022のtest modelとTCNをそのまま同一視しない。
 - **二重正本の防止**：共通条件候補とそのID/履歴を`test-condition-analysis`、正式なitem×condition採否・TCN/CI・期待結果候補を`test-condition-design`に固定する。既存TCDの技法別候補母集団（partition / boundary / rule等）は正式カバレッジのための局所成果物として残し、新Skillの共通条件一覧と混同・重複保存しない。
 
