@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -164,6 +168,46 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         ][0]["trial_ref"]
         with self.assertRaises(ValueError):
             mod.evaluate(data)
+
+    def test_distinct_trial_refs_cannot_alias_same_owner_run(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["run_ref"] = data["scenarios"][0][
+            "baseline"
+        ][0]["run_ref"]
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
+    def test_cli_rejects_duplicate_json_properties(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "duplicate.json"
+            data = json.dumps(dataset())
+            data = data.replace(
+                '"schema_version": "qa-workflow-efficiency-v1"',
+                '"schema_version": "qa-workflow-efficiency-v1", '
+                '"schema_version": "qa-workflow-efficiency-v1"',
+                1,
+            )
+            path.write_text(data, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--input", str(path)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["status"], "blocked")
+
+    def test_cli_limits_raw_json_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "huge.json"
+            path.write_bytes(b" " * (2 * 1024 * 1024 + 1))
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--input", str(path)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
 
     def test_missing_scenario_is_rejected(self) -> None:
         data = dataset()

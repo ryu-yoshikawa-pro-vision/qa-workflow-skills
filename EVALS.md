@@ -478,3 +478,5 @@ python scripts/skills/evals/workflow_efficiency.py --input /path/to/recorded-tri
 ```
 
 同じproduct commit、source revisions、対象scope、QA目標、独立期待基準、テスト集合、実行環境のみ比較可能とします。各指標で中央値・最小・最大・試行数と改善／悪化／比較不能を返します。品質／安全が未PASS、比較元不足、同条件でない試行、必須シナリオ欠落は効率改善を実証した扱いにしません。悪化指標があれば、他指標が改善しても`needs_review`とします。実Agentの5条件の実測・改善最終判定はPR #22で実施します。
+
+反復回数は単に`trial_ref`が別であるだけでは満たさず、`run_ref`も全試行で重複を拒否します。入力JSONは2 MiBを上限とし、重複プロパティやNaN／Infinityを許可しません。これは測定証拠の偽装を防ぐ認証ではなく、実run・品質評価の正本と参照の取得は実測収集側が担当します。

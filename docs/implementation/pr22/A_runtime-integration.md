@@ -126,6 +126,7 @@
 - **製品CI受渡し**：`skills/qa-workflow/scripts/ci_handoff.py`は`qa-ci-handoff-v1`形式の信頼済み`expected`、候補`manifest`、読戻し済みartifactを比較する。必要なbase／head SHA・build ref、source inventoryのref／revision、変更パスの全件、許容分類、owner／scope／artifact ref／revision／SHA-256、source依存を照合する。結果`pass`は機械的受渡し整合のみ。外部保存先から信頼済み`expected`を生成する経路、認可・承認、実製品CIでの実行はまだ接続していない。承認必須の入力は`approval_provider_unconfigured`で`blocked`。詳細は`skills/qa-workflow/references/ci-handoff.md`。
   - artifactはsource ref／revisionが必須。POSIX CIでのsymlink経由読戻しとサイズ超過を拒否し、承認未接続とrevision不一致が同時にある場合は不一致を`fail`として残す。
 - **効率比較**：`scripts/skills/evals/workflow_efficiency.py`はPlan詳細07の5シナリオについて、比較元／変更後各2回以上の試行ref・source revision・scope・独立期待基準・品質／安全の判定ref・実測取得元を比較する。測定不能はnullと理由で表し、必要指標不足・品質未PASS・条件不一致では効率改善と判定しない。実Agentを起動せず、実測値や意味評価は作成しない。形式は`EVALS.md`を参照。
+  - 同じrunを複数回の独立試行として数えることを禁止し、重複`trial_ref`／`run_ref`、JSON重複キー、入力サイズ超過を拒否する。
 
 ### B〜Jが引き渡す入力・owner責務
 
