@@ -2869,6 +2869,61 @@ def claim_mutable_operation(
         return {"status": "blocked", "may_start": False, "reason": reason}
 
 
+def read_mutable_operation_claim(
+    workflow_state_root: str | Path,
+    workflow_ref: str,
+    operation_ref: str,
+    *,
+    expected_claim_revision: str | None = None,
+) -> dict[str, Any]:
+    """Read a persisted claim in a fresh session without restarting its action."""
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if not isinstance(operation_ref, str) or not operation_ref.strip():
+            raise ValueError("operation_ref_invalid")
+        root = _local_baseline_root(workflow_state_root, create=False)
+        target = _claim_path(root, ref, operation_ref)
+        _assert_local_regular_file(target, "workflow_claim")
+        raw = target.read_bytes()
+        if len(raw) > 2 * 1024 * 1024:
+            raise ValueError("claim_limit_exceeded")
+        record = json.loads(raw.decode("utf-8"))
+        if (
+            not isinstance(record, dict)
+            or set(record)
+            not in (
+                {"workflow_ref", "operation_ref", "status"},
+                {"workflow_ref", "operation_ref", "status", "operation_details"},
+            )
+            or record.get("workflow_ref") != ref
+            or record.get("operation_ref") != operation_ref
+            or record.get("status") != "claimed"
+            or raw != _json_bytes(record)
+        ):
+            raise ValueError("claim_identity_or_contents_invalid")
+        if "operation_details" in record:
+            _validate_claim_details(record["operation_details"])
+        revision = "sha256:" + hashlib.sha256(raw).hexdigest()
+        if expected_claim_revision is not None and expected_claim_revision != revision:
+            return {
+                "status": "conflict",
+                "may_start": False,
+                "reason": "claim_revision_changed",
+                "current_revision": revision,
+            }
+        return {
+            "status": "current",
+            "may_start": False,
+            "workflow_ref": ref,
+            "operation_ref": operation_ref,
+            "claim_revision": revision,
+            "operation_details": record.get("operation_details"),
+        }
+    except (_LocalBaselineError, OSError, UnicodeError, ValueError, TypeError) as exc:
+        reason = exc.reason if isinstance(exc, _LocalBaselineError) else "claim_unreadable"
+        return {"status": "blocked", "may_start": False, "reason": reason}
+
+
 def recover_claim(
     *,
     owner_source_state: str | None,
