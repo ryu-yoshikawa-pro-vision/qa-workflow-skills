@@ -152,3 +152,21 @@ baselineの実行エラー8件は、host launch pathの重複2件、`CreateProce
 評価範囲の確認では、現在の`test-requirement-design`出力case-001〜003は上流本文/current Entity不足による停止を主に評価し、004/005はheld-outのまま開示していない。`test-case-design` case-001/002も上流成果物不足によるblock用で、内容のあるケース生成を評価しない。今回のTCN-OUT-001は有限因子と禁止pairからpairwise構造を生成する正方向ケースとして機械採点できたが、`SPEC-001`本文がないため、現行Authorityと製品behaviorの意味評価までは確認できない。新しいTR/TC positive fixtureは独立した仕様根拠・期待値を確定していないため作成せず、意味評価を推測で補っていない。
 
 全12 attempt、manifest、grade、比較、隔離patchとhashはGit管理外の[証拠索引](../../.agent-eval-runs/pr17-positive-skill-eval-20261105-01/evidence-index.md)（SHA-256 `e48c3b5e7ba370cdc4595ae117482624ea313b9bd7e3cc92adbf93f65045e619`）に保存した。これらの成果からSkill全体の改善実証は0件で、candidateは隔離・未採用のままである。
+
+## 11. COV-OUT-001の再評価と全体の改善実績（2026-11-08）
+
+### COV-OUT-001の固定比較
+
+目的を「runtime evidence欠落が現行baselineで再現するか、既存のtemplate候補で防止できるか」に限定し、結果を見ずに2 attempt/armを固定した。Evaluator・baseline Skill revisionはPR HEAD `0a463ef40fd347a359138503dd47e0b9a5ae1f64`、入力fingerprintは`sha256:5fcfe8297aefa29c0ee515859a52222eb1b62aea295eef1c010608dca765e143`。要求Agent設定は4 attemptすべて`gpt-6-luna / max / fork_turns=none`。実効model/build、tool trace、共有workspaceからのEvaluator-only read denialは未検証である。
+
+run r1の4 attemptは全て実行基盤側で有効成果物の生成に至らなかった。起動前のexec失敗、補助コマンドのpath/syntax error、親hostのtask path typo、未開始を各attemptに保存した。run r2ではbaseline 2/2が41/41 PASS、Skill-local runtime verification validだった。candidate attempt 1は34/37 FAILし、`RUNTIME-UNITS-EXACT`、runtime identity、`RT-D016`で不適合となった。見出しのInput/Result identityが`artifact:traceability:all`で、baselineの`coverage-analysis::artifact:traceability:all`と一致しなかった。candidate attempt 2は初回preflightが未定義shell変数`WD`で失敗し、入力を読み込まずartifactも生成しなかった。失敗を置換する再試行はしていない。
+
+`improve.py compare-handoff`は全attemptにintegrity-checked gradeがないため`not_comparable`、`improvement_demonstrated=false`を維持した。今回のbaselineでは過去のruntime block欠落が再現せず、candidateにもgrade FAILがあるため、新しいSkill改善は成立していない。独立回帰は実行していない。candidate patch SHA-256 `7da356f94bbe5a291723176d844069c4e5ee5f2adbb870d720aaee20d4949bab`は隔離・未採用のまま保持する。
+
+r1/r2の全8 attempt、要求設定、sealed execution status、artifact、grade、runtime verifier、comparison、hashはGit管理外の[証拠索引](../../.agent-eval-runs/pr17-cov-causal-20261108-r2/evidence-index.md)に保存した。r2 result SHA-256はbaseline `3bdeaa76418ed6a1b4b33e514fed1f35b4dcddda6ae142064633ca7a49ceddaf`、candidate `80a79807f41049d65640bf6b27fab2ab0c672f5759518746afe3a88ef13f0051`、comparison `2bf09c39e2d1796e4f9a0af6893961160d733d6082f6b7a8f8fa195c86525fcb`。
+
+### PR全体で既に成立したSkill改善
+
+2026-11-01の[`test-requirement-design / TR-OUT-013`比較](2026-11-01_pr17-skill-improvement-promotion_v00.md)では、stable IDとrevision混同のSkill起因失敗がbaseline 2/2で再現し、Skill本文だけを修正したcandidateは2/2 PASS、runtime evidenceも全てvalidだった。修正作成に使っていない`TR-OUT-001`はbaseline/candidateとも21/21 PASSだった。この候補はPR branchへレビュー対象として反映済みであり、開発用評価としての改善実績は1件ある。共有workspace上の評価なので正式な独立評価ではない。
+
+従って、今回のCOV候補の不成立は既存`TR-OUT-013`改善の証拠を取り消さない。PR本文では、開発用の改善実績1件と今回のCOV候補が未成立であることを分けて記載する。正式Judge/QTS受入、実効model/build、tool trace、物理read-denialの未検証状態は維持する。
