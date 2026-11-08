@@ -18,6 +18,7 @@
 - runtime受入はcodex --no-daemon --strict-configのembedded / non-shared runtimeに限ります。managed/shared app-serverを検証済み扱いしません。
 - Codexのdisconnect / reconnect、recovered queue、別session由来と疑われるapprovalやoutputが出た場合は承認せず、新しいfresh sessionで作業状態を再確認します。
 - root AGENTS.mdはCodex標準のcompact復元へ委ねます。独自SessionStart Hookや重複する指示再注入を追加しません。
+- PR本文はメモ帳ではありません。目的と現在の状態のみを記載し、進捗ログ・試行履歴・検証コマンドは追記せず、状況が変わるたびに最新状態へ置き換えます。詳細と証拠は正本の文書・CI成果物・履歴へ残します。運用規則は[PR本文の運用規則](docs/reference/pr-description-guidelines.md)に従います。
 - 人間向けのrepository文書は原則日本語で記述します。
 
 ## 委譲と参照先
