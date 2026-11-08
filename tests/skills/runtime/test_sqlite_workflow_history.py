@@ -51,7 +51,9 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             "sqlite:2",
         )
 
-    def test_historical_retrieval_has_strict_workflow_and_revision_identity(self) -> None:
+    def test_historical_retrieval_has_strict_workflow_and_revision_identity(
+        self,
+    ) -> None:
         self.create()
         for revision, ref in [
             ("sqlite:2", REF),
@@ -66,7 +68,9 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
     def test_competing_updates_preserve_single_winner_and_history(self) -> None:
         self.create()
         with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(executor.map(lambda name: self.update(marker=name), ["a", "b"]))
+            results = list(
+                executor.map(lambda name: self.update(marker=name), ["a", "b"])
+            )
         self.assertEqual(
             sorted(result["status"] for result in results),
             ["conflict", "written"],
@@ -152,7 +156,9 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         self.assertEqual(latest["status"], "written", latest)
         self.assertFalse(latest["historical_revision_available"])
         self.assertEqual(self.read_history("sqlite:3")["state"], {"marker": "legacy"})
-        self.assertEqual(self.read_history("sqlite:4")["state"], {"marker": "after-migration"})
+        self.assertEqual(
+            self.read_history("sqlite:4")["state"], {"marker": "after-migration"}
+        )
         self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
 
     def test_separate_workflow_history_remains_isolated(self) -> None:
@@ -160,7 +166,9 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         self.create(OTHER)
         self.assertEqual(self.update()["status"], "written")
         self.assertEqual(self.read_history("sqlite:2", OTHER)["status"], "blocked")
-        self.assertEqual(self.read_history("sqlite:1", OTHER)["state"], {"marker": "initial"})
+        self.assertEqual(
+            self.read_history("sqlite:1", OTHER)["state"], {"marker": "initial"}
+        )
 
     def test_history_with_invalid_json_is_not_reused(self) -> None:
         self.create()

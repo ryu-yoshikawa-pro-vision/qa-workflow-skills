@@ -1286,9 +1286,8 @@ def read_sqlite_workflow_state(
                         "status": "blocked",
                         "reason": "workflow_state_history_mismatch",
                     }
-                history_complete = (
-                    stored is not None
-                    and _sqlite_history_is_complete(connection, ref, number)
+                history_complete = stored is not None and _sqlite_history_is_complete(
+                    connection, ref, number
                 )
             return {
                 "status": "current",
@@ -1360,6 +1359,7 @@ def read_sqlite_workflow_state_revision(
         ValueError,
     ):
         return {"status": "blocked", "reason": "historical_state_unavailable"}
+
 
 def conditional_write_sqlite_workflow_state(
     workflow_root: str | Path,
