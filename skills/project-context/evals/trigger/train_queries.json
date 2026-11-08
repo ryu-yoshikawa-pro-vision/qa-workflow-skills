@@ -1,0 +1,30 @@
+[
+  {
+    "query": "新しいQA案件のProject Contextが既にあるか許可済みrootを調査して。",
+    "should_trigger": true
+  },
+  {
+    "query": "この案件の既存Project Contextで必要な設定だけ確認し、足りないなら更新案を作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "16節・DEC/ASMの履歴を壊さずProject Contextの既存revisionを再利用して。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存先と人間の編集方針が承認済みか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "現在の仕様Authorityを分析して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Playwrightのテストケースを生成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "製品全体の機能をPR差分から列挙して。",
+    "should_trigger": false
+  }
+]

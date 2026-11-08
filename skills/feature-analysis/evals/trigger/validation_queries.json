@@ -1,0 +1,26 @@
+[
+  {
+    "query": "APIと非同期ジョブも含め製品の機能階層とsource revisionを更新して。",
+    "should_trigger": true
+  },
+  {
+    "query": "旧HEADのPR解析結果をcurrentとせず、機能差分を再分析して。",
+    "should_trigger": true
+  },
+  {
+    "query": "未確認ソースを0件扱いせず抽出網羅率の分母を説明して。",
+    "should_trigger": true
+  },
+  {
+    "query": "feature IDの分割・統合・廃止を履歴として検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "QA Activityの効率性を評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "現在の画面のaccessible nameを実機で観測して。",
+    "should_trigger": false
+  }
+]

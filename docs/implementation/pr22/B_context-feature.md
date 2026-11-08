@@ -103,3 +103,14 @@
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+## 実装・受入記録（2026-11-08）
+
+- 担当Bの新設ファイル：skills/project-context/、skills/feature-analysis/。共通parser・DEC/ASM helperを再利用し、共有templateとruntimeを変更しない。
+- Project Context：候補のreadable/absent/denied/unavailable、16節・stable key・DEC/ASM検証、未設定required key、未承認配置の再利用候補、既存fieldの差分更新draftを扱う。draftとreuse_candidateは保存・承認成功ではない。
+- feature-analysis：source inventory・対象revision・機能IDの意味上の同一性と親子循環・差分分類・候補対応・history追記・旧HEAD・operation重複を決定論的に検証する。全製品機能が発見されたという機械的保証は返さない。
+- 独立unit：tests/skills/runtime/test_project_context_owner.py、test_feature_registry.py。trigger train/validationとsemantic independent reference caseを追加した。CI結果は対象branchの最新HEADを参照し、未実行をPASSとしない。
+- 共通契約との差：qa-workflow/assets/project-context-template.mdのSection 12/13のID列separatorは2本のhyphenだが、qa-workflow/scripts/project_context_ids.pyは3本以上を要求する。担当Bでは検証時だけread-only copyを正規化し、旧文書の本文・DEC/ASM IDを変更せず扱う。新規draftは3本で生成する。共有template自体の変更はA担当へ依頼する。
+- 依存：A担当のProject Context追加key（qa.feature_source_refs、qa.feature_artifact_root、qa.feature_base_ref、qa.feature_approval_policy_ref）はこのbranchの共通templateへ書かない。未登録keyの更新はblocked。provider-native CAS／履歴readback／認証済み承認元／案件のsource取得元が未選定なら、永続更新および実受入はblocked。別pathへの無許可保存で代用しない。
+- 未接続：正式なsource列挙adapter、案件ごとの保存providerと権限、実Agent発火・実providerへのcreate/update/readback、owner間の実成果物接続、製品CI受渡し。準備済みのfixture検証をこれらの証拠として使わない。
+- 局所の検証コマンド：python -m unittest tests.skills.runtime.test_feature_registry tests.skills.runtime.test_project_context_owner（module import環境によってはdiscoverで個別path指定）。CI：Code Quality / Validate Agent Skills / Validate Deterministic Output Evals / Validate Semantic Output Evals。結果は各workflowの実施結果を確認後に記載する。
