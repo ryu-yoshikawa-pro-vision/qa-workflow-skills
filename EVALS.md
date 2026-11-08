@@ -460,3 +460,21 @@ PR #16では決定論的output evalを44件から46件へ、semantic evalを155�
 追加したrouting caseは`WF-UI-TARGET-001`、`WF-UI-TARGET-002`、`WF-UI-TARGET-003`、`WF-UI-TARGET-004`、`WF-UI-TARGET-005`、`WF-UI-TARGET-006`、`WF-UI-TARGET-007`、`WF-UI-TARGET-008`です。
 
 Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特定クライアントとの互換性はE2Eで確認します。
+
+---
+
+## QA workflowの効率比較（PR #22/Aの評価基盤）
+
+`scripts/skills/evals/workflow_efficiency.py` はPlan詳細07の必須5条件を、baselineとcandidateそれぞれ独立2試行以上の実測から比較します。コード本体はAgentを起動せず、評価対象の元runも書き換えません。
+
+入力は`qa-workflow-efficiency-v1`のJSONです。最上位に`schema_version`と5件の`scenarios`を置き、各scenarioに`scenario`、`baseline[]`、`candidate[]`を格納します。scenario値は`initial_qa`、`unchanged_request`、`local_code_change`、`external_spec_revision`、`interrupted_resume`です。
+
+各試行は`trial_ref`、`run_ref`、`product_commit`、`source_revisions[]`（`ref`/`revision`）、`scope_refs[]`、`qa_goal_ref`、`expectation_ref`、`test_set_ref`、`environment_ref`、`agent_config_ref`を持ちます。`quality`は`functional`、`quality`、`safety`、`traceability`の独立判定（`pass`／`fail`／`unverified`）と`independent_evidence_ref`を保持します。品質判定の独立性は入力の提供者が保証し、比較器自身は意味判定を再実行しません。
+
+`metrics`は処理時間、Skill呼出／再起動、人手確認／承認、再分析、再試行、再利用／再生成、token、request、費用の計12項目です。各項目は`value`、`unit`、`source_ref`、`unmeasured_reason`を持ち、未測定は`value: null`と理由を必須とします。実測0と未測定は別です。費用単位が異なる場合は直接比較しません。
+
+```bash
+python scripts/skills/evals/workflow_efficiency.py --input /path/to/recorded-trials.json
+```
+
+同じproduct commit、source revisions、対象scope、QA目標、独立期待基準、テスト集合、実行環境のみ比較可能とします。各指標で中央値・最小・最大・試行数と改善／悪化／比較不能を返します。品質／安全が未PASS、比較元不足、同条件でない試行、必須シナリオ欠落は効率改善を実証した扱いにしません。悪化指標があれば、他指標が改善しても`needs_review`とします。実Agentの5条件の実測・改善最終判定はPR #22で実施します。
