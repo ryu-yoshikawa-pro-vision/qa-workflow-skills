@@ -35,6 +35,8 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise ValueError("JSON input must be a regular file")
     with path.open("rb") as stream:
         raw = stream.read(MAX_JSON_BYTES + 1)
     if len(raw) > MAX_JSON_BYTES:
