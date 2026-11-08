@@ -2733,34 +2733,138 @@ def _claim_path(
     return Path(workflow_state_root) / "claims" / f"{digest}.json"
 
 
-def claim_mutable_operation(
-    workflow_state_root: str | Path, workflow_ref: str, operation_ref: str
-) -> dict[str, Any]:
-    """Claim before browser/API mutation; an existing claim never implies safe retry."""
-    claim = {
-        "workflow_ref": workflow_ref,
-        "operation_ref": operation_ref,
-        "status": "claimed",
+def _validate_claim_details(value: Any) -> dict[str, Any]:
+    """Validate pre-start facts; caller must independently verify their sources."""
+    required = {
+        "owner_skill",
+        "scope_ref",
+        "operation_type",
+        "target_ref",
+        "source_revisions",
+        "artifact_revisions",
+        "expected_revision",
+        "approval_ref",
+        "permission_scope",
+        "resume_owner",
     }
-    raw = _json_bytes(claim)
-    result = create_if_absent(
-        _claim_path(workflow_state_root, workflow_ref, operation_ref), raw
-    )
-    if result["status"] == "created":
-        return {
-            **result,
-            "status": "claim_acquired",
-            "may_start": True,
-            "claim_revision": "sha256:" + hashlib.sha256(raw).hexdigest(),
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError("claim_details_schema_invalid")
+
+    def ref(value: Any, field: str, *, optional: bool = False) -> str | None:
+        if value is None and optional:
+            return None
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > 512
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
+            raise ValueError(f"claim_details_{field}_invalid")
+        return value
+
+    validated = {
+        name: ref(value[name], name)
+        for name in (
+            "owner_skill",
+            "scope_ref",
+            "operation_type",
+            "target_ref",
+            "resume_owner",
+        )
+    }
+    for name in ("expected_revision", "approval_ref", "permission_scope"):
+        validated[name] = ref(value[name], name, optional=True)
+    for name in ("source_revisions", "artifact_revisions"):
+        rows = value[name]
+        if not isinstance(rows, list) or len(rows) > 256:
+            raise ValueError(f"claim_details_{name}_invalid")
+        identities: set[str] = set()
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"ref", "revision"}:
+                raise ValueError(f"claim_details_{name}_invalid")
+            artifact_ref = ref(row["ref"], f"{name}_ref")
+            revision = ref(row["revision"], f"{name}_revision")
+            if artifact_ref in identities:
+                raise ValueError(f"claim_details_{name}_duplicate")
+            identities.add(artifact_ref)
+            normalized.append({"ref": artifact_ref, "revision": revision})
+        validated[name] = sorted(normalized, key=lambda row: row["ref"])
+    if not validated["source_revisions"]:
+        raise ValueError("claim_details_source_revisions_required")
+    return validated
+
+
+def claim_mutable_operation(
+    workflow_state_root: str | Path,
+    workflow_ref: str,
+    operation_ref: str,
+    *,
+    operation_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist an atomic pre-start claim, then independently read it back.
+
+    A repeated claim never authorizes reexecution. Detailed claims preserve the
+    owner/scope/source/approval/resume boundary needed for a later session.
+    This local single-host claim does not authenticate approvals or prove that
+    a remote provider offers native conditional updates.
+    """
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if not isinstance(operation_ref, str) or not operation_ref.strip() or len(
+            operation_ref
+        ) > 512:
+            raise ValueError("operation_ref_invalid")
+        details = (
+            _validate_claim_details(operation_details)
+            if operation_details is not None
+            else None
+        )
+        root = _local_baseline_root(workflow_state_root, create=True)
+        _ensure_local_directory(root / "claims", reason="workflow_claim_root")
+        target = _claim_path(root, ref, operation_ref)
+        claim = {
+            "workflow_ref": ref,
+            "operation_ref": operation_ref,
+            "status": "claimed",
         }
-    if result["status"] == "conflict":
-        return {
-            **result,
-            "status": "blocked",
-            "may_start": False,
-            "reason": "operation_already_claimed; inspect_owner_execution_and_cleanup",
-        }
-    return {**result, "may_start": False}
+        if details is not None:
+            claim["operation_details"] = details
+        raw = _json_bytes(claim)
+        result = create_if_absent(target, raw)
+        if result["status"] == "created":
+            try:
+                _assert_local_regular_file(target, "workflow_claim")
+                stored = target.read_bytes()
+            except (OSError, _LocalBaselineError):
+                return {
+                    "status": "blocked",
+                    "may_start": False,
+                    "reason": "claim_readback_failed",
+                }
+            if stored != raw:
+                return {
+                    "status": "blocked",
+                    "may_start": False,
+                    "reason": "claim_readback_mismatch",
+                }
+            return {
+                **result,
+                "status": "claim_acquired",
+                "may_start": True,
+                "claim_revision": "sha256:" + hashlib.sha256(stored).hexdigest(),
+            }
+        if result["status"] == "conflict":
+            return {
+                **result,
+                "status": "blocked",
+                "may_start": False,
+                "reason": "operation_already_claimed; inspect_owner_execution_and_cleanup",
+            }
+        return {**result, "may_start": False}
+    except (_LocalBaselineError, ValueError, TypeError) as exc:
+        reason = exc.reason if isinstance(exc, _LocalBaselineError) else str(exc)
+        return {"status": "blocked", "may_start": False, "reason": reason}
 
 
 def recover_claim(
