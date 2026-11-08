@@ -150,15 +150,19 @@
 
 ## 2026-11-08 担当Aの局所検証記録
 
-検証対象の実装commitは[`19bc733932b6b5c0a72191cba30df9d6ad447756`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/19bc733932b6b5c0a72191cba30df9d6ad447756)。変更した共通helper、CI受渡し、評価処理と既存runtimeの回帰を、リポジトリのGitHub Actionsで検証した。fixtureの結果は他担当の実成果物や実providerの検証を意味しない。
+検証対象の実装commitは[`b6069e2d2ccc8d2dd120fcc45e064c8eebc5b2b5`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/b6069e2d2ccc8d2dd120fcc45e064c8eebc5b2b5)。共通helper、SQLite保存履歴、CI受渡し、効率評価処理と既存runtimeの回帰を、リポジトリのGitHub Actionsで検証した。fixtureの結果は他担当の実成果物や遠隔providerの検証を意味しない。
 
 - 共有runtime単体テスト：`python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`、12件PASS。
 - repository決定論的評価：`python -m unittest discover -s tests/skills/evals/deterministic -v`、290件PASS。
-- runtime／統合テスト：`python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`、437件PASS。
+- runtime／統合テスト：`python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`、449件PASS。
 - 既存意味評価runtimeテスト：27件＋13件PASS。
 
-上記の元ログは[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873069)に保存している。[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873074)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456872941)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873148)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873033)も同じ実装commitでSUCCESSを確認した。
+上記の元ログは[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465041459)に保存している。[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465041580)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465041503)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465041564)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42465041542)も同一commitでSUCCESSを確認した。
 
 特に`test_qa_operation_claim.py`は同一操作の並行claim、pre-start metadataの保存と別セッション読戻し、旧claim revision、改ざん、symlink、サイズ超過、既存3引数claim互換を検証した。`test_ci_handoff.py`は旧HEAD、未分類差分、source未対応、成果物hash／revision不一致、symlink経由読取り、承認provider未設定と不一致の同時発生を検証した。`test_workflow_efficiency.py`は5条件の比較、独立run重複、品質未PASS、条件不一致、未測定、悪化、JSON重複キー・サイズ制限を検証した。
+
+SQLite履歴の追加テスト`test_sqlite_workflow_history.py`は、create／CAS更新での旧・新revision保存、履歴のworkflow分離、同一revisionの並行更新、履歴保存失敗時の原子的ロールバック、直接変更された履歴の拒否、旧DBの欠落revision、旧形式JSON、未来revision、過大なrevision tokenを検証した。SQLiteへの実接続はGitHub Actionsの単一host環境に限り、network filesystemや複数hostを検証していない。
+
+製品CIの現状を[qa-training-storeのWeb CI](https://github.com/ryu-yoshikawa-pro-vision/qa-training-store/blob/main/.github/workflows/ci.yml)で確認した。既存CIはbuild成果物・テスト証跡の`actions/upload-artifact`／`actions/download-artifact`を利用しているが、確認したWeb CI workflowには`qa-ci-handoff-v1`の信頼済み`expected`、候補`manifest`と正本のrevisionを取得・照合するジョブはない。既存のbuild成果物をQA解析成果物の受渡しとして認定せず、転送方式と正本取得の決定をblockedとして残す。
 
 **未検証／blocked**：新設Skillの正式owner結果が未提供のためowner verifier登録と単独完了経路は未完成。遠隔保存providerのnative CAS／履歴／独立readback、承認主体の実認証、製品CIの実成果物取得、実Agentの5条件比較は未実施。複数host・遠隔providerへの安全性をローカル単一hostのclaimから推定しない。PR #22の全体受入に転用する際は、source・artifact revision・承認・cleanupを各ownerの正本から再取得する。
