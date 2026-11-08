@@ -471,12 +471,14 @@ Agent Skills Specificationは共通Skill-to-Skill APIを規定しません。特
 
 各試行は`trial_ref`、`run_ref`、`product_commit`、`source_revisions[]`（`ref`/`revision`）、`scope_refs[]`、`qa_goal_ref`、`expectation_ref`、`test_set_ref`、`environment_ref`、`agent_config_ref`を持ちます。`quality`は`functional`、`quality`、`safety`、`traceability`の独立判定（`pass`／`fail`／`unverified`）と`independent_evidence_ref`を保持します。品質判定の独立性は入力の提供者が保証し、比較器自身は意味判定を再実行しません。各試行には`execution_evidence`を保存します。`started_at`／`finished_at`はタイムゾーン付き時刻、`skill_runs[]`は各Skillの実行ref・開始終了時刻、`owner_artifacts[]`はowner・成果物ref・revisionです。`attempt_refs[]`、`runner_refs[]`、`cleanup_refs[]`、中断再開時の`interruption_ref`も保持します。実測wall時間が時刻と矛盾する入力、重複したSkill run、owner参照欠落は拒否します。旧`qa-workflow-efficiency-v1`入力にこのfieldがない場合は読めますが、改善の根拠には使いません。
 
-`metrics`は処理時間、Skill呼出／再起動、人手確認／承認、再分析、再試行、再利用／再生成、token、request、費用の計12項目です。各項目は`value`、`unit`、`source_ref`、`unmeasured_reason`を持ち、未測定は`value: null`と理由を必須とします。実測0と未測定は別です。費用単位が異なる場合は直接比較しません。
+`metrics`は処理時間、Skill呼出／再起動、人手確認／承認、再分析、再試行、再利用／再生成、token、request、費用の計12項目です。各項目は`value`、`unit`、`source_ref`、`unmeasured_reason`を持ち、未測定は`value: null`と理由を必須とします。`wall_seconds`／`human_review_seconds`／`human_approval_seconds`の単位は`seconds`、回数・件数は`count`（非負整数）、`cost_amount`は`JPY`／`USD`等の3文字通貨コードです。費用が未測定の場合だけ単位`unknown`も許可します。実測0と未測定は別です。費用の異なる通貨は直接比較しません。
+
+`execution_evidence.skill_runs[]`は当該試行で起動した**全Skill呼出し**を記録し、測定した`skill_call_count`と件数を照合します。`retry_count`は`attempt_refs[]`から説明できる回数（attempt数の範囲内）でなければ拒否し、`skill_restart_count`はSkill呼出回数を超えられません。記録元ログの真正性、承認・品質の独立検証、料金条件や人間工数の真偽は入力形式だけでは証明できず、実測収集側とPR #22の横断受入で確認します。
 
 ```bash
 python scripts/skills/evals/workflow_efficiency.py --input /path/to/recorded-trials.json
 ```
 
-同じproduct commit、source revisions、対象scope、QA目標、独立期待基準、テスト集合、実行環境のみ比較可能とします。各指標で中央値・最小・最大・試行数と改善／悪化／比較不能を返します。有限な大きな測定値の中央値で加算がオーバーフローしないよう計算し、異常な数値・過度に深いJSONはCLIで`blocked`として出力します。品質／安全が未PASS、比較元不足、同条件でない試行、必須シナリオ欠落は効率改善を実証した扱いにしません。悪化指標があれば、他指標が改善しても`needs_review`とします。実Agentの5条件の実測・改善最終判定はPR #22で実施します。
+同じproduct commit、source revisions、対象scope、QA目標、独立期待基準、テスト集合、実行環境のみ比較可能とします。固定fixtureは`local_code_change`では製品commitを変え、`external_spec_revision`では製品commitを維持したまま仕様revisionを変えており、各シナリオ内の比較条件は一致させています。これらは入力契約の回帰試験であり、実Agentの効率改善が達成された証拠ではありません。各指標で中央値・最小・最大・試行数と改善／悪化／比較不能を返します。有限な大きな測定値の中央値で加算がオーバーフローしないよう計算し、異常な数値・過度に深いJSONはCLIで`blocked`として出力します。品質／安全が未PASS、比較元不足、同条件でない試行、必須シナリオ欠落は効率改善を実証した扱いにしません。悪化指標があれば、他指標が改善しても`needs_review`とします。実Agentの5条件の実測・改善最終判定はPR #22で実施します。
 
 反復回数は単に`trial_ref`が別であるだけでは満たさず、`run_ref`と各Skillの実行refも全試行で重複を拒否します。入力JSONは2 MiBを上限とし、重複プロパティやNaN／Infinityを許可しません。これは測定証拠の偽装を防ぐ認証ではなく、実run・品質評価の正本と参照の取得は実測収集側が担当します。
