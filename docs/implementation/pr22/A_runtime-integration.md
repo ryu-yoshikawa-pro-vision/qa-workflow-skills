@@ -147,3 +147,21 @@
 - `python scripts/format_tracked.py check`：共有フォーマット・lint。GitHub Actionsの`Code Quality`で確認する。
 - `Validate Deterministic Output Evals`、`Validate Agent Skills`、`Validate Semantic Output Evals`、`Codex Harness`：各HEADの完了結果をPR #23のChecksで確認する。途中HEADの失敗を最新HEADの成功に読み替えない。
 - 独立fixtureの検証は他ownerの実成果物を使った統合証拠ではない。**未実施**：新設14 Skillの各owner validator正式登録、実providerの競合・履歴・認可受入、実製品CI受渡し、実Agentの5シナリオ測定、A〜J横断S1〜S17／全条件の最終受入（PR #22担当）。
+
+## 2026-11-08 担当Aの局所検証記録
+
+検証対象の実装commitは[`19bc733932b6b5c0a72191cba30df9d6ad447756`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/19bc733932b6b5c0a72191cba30df9d6ad447756)。変更した共通helper、CI受渡し、評価処理と既存runtimeの回帰を、リポジトリのGitHub Actionsで検証した。fixtureの結果は他担当の実成果物や実providerの検証を意味しない。
+
+| 検証 | 実行方法・証拠 | 結果 |
+| --- | --- | --- |
+| 共有runtime単体テスト | `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`／[Actions](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873069) | 12件PASS |
+| repository決定論的評価 | `python -m unittest discover -s tests/skills/evals/deterministic -v`／同Actions | 290件PASS |
+| runtime／統合テスト | `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`／同Actions | 437件PASS |
+| 既存意味評価runtimeテスト | 同Actionsの`Validate semantic datasets and runtime` | 27件＋13件PASS |
+| Code Quality | [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873074) | SUCCESS |
+| Agent Skills仕様・構造 | [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456872941) | SUCCESS |
+| 意味評価データ・runtime | [Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873148) | SUCCESS |
+
+特に`test_qa_operation_claim.py`は同一操作の並行claim、pre-start metadataの保存と別セッション読戻し、旧claim revision、改ざん、symlink、サイズ超過、既存3引数claim互換を検証した。`test_ci_handoff.py`は旧HEAD、未分類差分、source未対応、成果物hash／revision不一致、symlink経由読取り、承認provider未設定と不一致の同時発生を検証した。`test_workflow_efficiency.py`は5条件の比較、独立run重複、品質未PASS、条件不一致、未測定、悪化、JSON重複キー・サイズ制限を検証した。
+
+**未検証／blocked**：新設Skillの正式owner結果が未提供のためowner verifier登録と単独完了経路は未完成。遠隔保存providerのnative CAS／履歴／独立readback、承認主体の実認証、製品CIの実成果物取得、実Agentの5条件比較は未実施。複数host・遠隔providerへの安全性をローカル単一hostのclaimから推定しない。PR #22の全体受入に転用する際は、source・artifact revision・承認・cleanupを各ownerの正本から再取得する。
