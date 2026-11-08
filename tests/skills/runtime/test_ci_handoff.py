@@ -154,7 +154,9 @@ class CiHandoffTests(unittest.TestCase):
             "approval_provider_unconfigured",
             {row["code"] for row in result["issues"]},
         )
-        self.assertIn("source_revision_mismatch", {row["code"] for row in result["issues"]})
+        self.assertIn(
+            "source_revision_mismatch", {row["code"] for row in result["issues"]}
+        )
 
     def test_noncanonical_artifact_path_is_rejected(self) -> None:
         self.manifest["artifacts"][0]["path"] = "subdir//artifact.md"

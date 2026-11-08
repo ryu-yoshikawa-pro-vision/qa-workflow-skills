@@ -170,7 +170,9 @@ def _read_artifact(root: Path, relative: str) -> bytes:
             current = current / part
             if current.is_symlink():
                 raise ValueError("symlink artifact path is not allowed")
-        if not current.is_file() or not current.resolve().is_relative_to(root.resolve()):
+        if not current.is_file() or not current.resolve().is_relative_to(
+            root.resolve()
+        ):
             raise ValueError("artifact missing or outside trusted root")
         with current.open("rb") as stream:
             content = stream.read(MAX_ARTIFACT_BYTES + 1)
