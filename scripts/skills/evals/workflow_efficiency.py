@@ -263,8 +263,7 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                     regressed = True
             metrics[key] = {"baseline": before, "candidate": after, "change": change}
         if any(
-            metrics[key]["change"] == "not_comparable"
-            for key in REQUIRED_MEASUREMENTS
+            metrics[key]["change"] == "not_comparable" for key in REQUIRED_MEASUREMENTS
         ):
             reasons.append("required_measurement_unavailable")
         if reasons:
