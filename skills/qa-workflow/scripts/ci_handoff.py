@@ -10,8 +10,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import stat
 import sys
+from contextlib import ExitStack
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -32,10 +35,12 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file() or path.stat().st_size > MAX_JSON_BYTES:
-        raise ValueError("JSON input is missing or too large")
+    with path.open("rb") as stream:
+        raw = stream.read(MAX_JSON_BYTES + 1)
+    if len(raw) > MAX_JSON_BYTES:
+        raise ValueError("JSON input is too large")
     value = json.loads(
-        path.read_text(encoding="utf-8"),
+        raw.decode("utf-8"),
         object_pairs_hook=_pairs,
         parse_constant=lambda token: (_ for _ in ()).throw(
             ValueError(f"unsupported JSON number: {token}")
@@ -66,6 +71,7 @@ def _path(value: Any) -> str:
         or len(path.parts) == 0
         or any(part in {".", ".."} for part in raw.split("/"))
         or "\\" in raw
+        or raw != path.as_posix()
         or ":" in path.parts[0]
         or "\x00" in raw
     ):
@@ -126,7 +132,8 @@ def _artifacts(
             raise ValueError("artifact sha256 must be a full sha256 digest")
         if not expected:
             _path(row["path"])
-        _refs(row["source_refs"], "artifact source_refs")
+        if not _refs(row["source_refs"], "artifact source_refs"):
+            raise ValueError("artifact must reference its source revisions")
         mapped[identity] = row
     return mapped
 
@@ -136,16 +143,38 @@ def _issues_add(issues: list[dict[str, str]], code: str, target: str) -> None:
 
 
 def _read_artifact(root: Path, relative: str) -> bytes:
-    current = root
-    for part in PurePosixPath(_path(relative)).parts:
-        current = current / part
-        if current.is_symlink():
-            raise ValueError("symlink artifact path is not allowed")
-    if not current.is_file() or not current.resolve().is_relative_to(root.resolve()):
-        raise ValueError("artifact missing or outside trusted root")
-    if current.stat().st_size > MAX_ARTIFACT_BYTES:
+    """Read a bounded regular file without following symlinks on POSIX CI."""
+    parts = PurePosixPath(_path(relative)).parts
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("artifact root missing or symlinked")
+    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
+        directory_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
+        with ExitStack() as stack:
+            descriptor = os.open(root, directory_flags)
+            stack.callback(os.close, descriptor)
+            for part in parts[:-1]:
+                descriptor = os.open(part, directory_flags, dir_fd=descriptor)
+                stack.callback(os.close, descriptor)
+            file_descriptor = os.open(
+                parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=descriptor
+            )
+            with os.fdopen(file_descriptor, "rb") as stream:
+                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                    raise ValueError("artifact is not a regular file")
+                content = stream.read(MAX_ARTIFACT_BYTES + 1)
+    else:
+        current = root
+        for part in parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("symlink artifact path is not allowed")
+        if not current.is_file() or not current.resolve().is_relative_to(root.resolve()):
+            raise ValueError("artifact missing or outside trusted root")
+        with current.open("rb") as stream:
+            content = stream.read(MAX_ARTIFACT_BYTES + 1)
+    if len(content) > MAX_ARTIFACT_BYTES:
         raise ValueError("artifact exceeds size limit")
-    return current.read_bytes()
+    return content
 
 
 def verify(
@@ -280,10 +309,10 @@ def verify(
     if approvals:
         for approval in approvals:
             _issues_add(issues, "approval_provider_unconfigured", approval)
-    if approvals:
-        status = "blocked"
-    elif issues:
+    if any(issue["code"] != "approval_provider_unconfigured" for issue in issues):
         status = "fail"
+    elif approvals:
+        status = "blocked"
     else:
         status = "pass"
     return {
