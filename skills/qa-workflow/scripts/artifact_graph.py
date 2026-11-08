@@ -3027,6 +3027,8 @@ def read_mutable_operation_claim(
     expected_claim_revision: str | None = None,
 ) -> dict[str, Any]:
     """Read a persisted claim in a fresh session without restarting its action."""
+    if operation_details is None:
+        return {"status": "blocked", "may_start": False, "reason": "operation_details_required"}
     try:
         ref = _local_baseline_identity(workflow_ref)
         if not isinstance(operation_ref, str) or not operation_ref.strip():
@@ -3092,8 +3094,11 @@ def recover_claim(
         return {"status": "blocked", "reason": "owner_execution_or_cleanup_unverified"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_claim_release_unavailable"}
+    # No selected owner provider can atomically release the claim.
     return {
-        "status": "conditional_release_required",
+        "status": "blocked",
+        "may_start": False,
+        "reason": "claim_release_provider_not_connected",
         "expected_revision": expected_claim_revision,
     }
 
@@ -3131,7 +3136,8 @@ def reserve_shared_resource(
         return {"status": "blocked", "reason": "external_reservation_not_confirmed"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
-    return reserve_sqlite_shared_resource(reservation_root, resource_ref, workflow_ref)
+    # Capability flags do not constitute a project-level provider selection.
+    return {"status": "blocked", "reason": "reservation_provider_not_selected"}
 
 
 def release_shared_resource(
@@ -3162,234 +3168,9 @@ def release_shared_resource(
         return {"status": "conflict", "reason": "reservation_revision_mismatch"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
-    if reservation_root is not None or resource_ref is not None:
-        if reservation_root is None or resource_ref is None:
-            return {"status": "blocked", "reason": "reservation_target_missing"}
-        return release_sqlite_shared_resource(
-            reservation_root,
-            resource_ref,
-            expected_workflow_ref,
-            expected_reservation_revision,
-            owner_state_verified=owner_state_verified,
-            owner_execution_state=owner_execution_state,
-            cleanup_confirmed=cleanup_confirmed,
-        )
-    return {
-        "status": "conditional_release_required",
-        "expected_revision": expected_reservation_revision,
-    }
-
-
-def _reservation_sqlite_path(reservation_root: str | Path) -> Path:
-    """Reuse the local-only root checks without sharing workflow state data."""
-    path = _local_sqlite_path(reservation_root).with_name(
-        "resource-reservations.sqlite3"
-    )
-    if path.is_symlink():
-        raise ValueError("reservation_database_symlink_unsupported")
-    return path
-
-
-def _reservation_identity(resource_ref: str) -> str:
-    if (
-        not isinstance(resource_ref, str)
-        or not resource_ref.strip()
-        or len(resource_ref) > 512
-        or any(
-            ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
-            for char in resource_ref
-        )
-    ):
-        raise ValueError("reservation_resource_identity_invalid")
-    return content_identity({"resource_ref": resource_ref})
-
-
-def _initialize_reservation_table(connection: sqlite3.Connection) -> None:
-    mode = connection.execute("PRAGMA journal_mode=DELETE").fetchone()
-    if not mode or str(mode[0]).lower() != "delete":
-        raise sqlite3.OperationalError("local journal mode unavailable")
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS shared_resource_reservation ("
-        "resource_identity TEXT PRIMARY KEY,"
-        "workflow_ref TEXT NOT NULL,"
-        "reservation_status TEXT NOT NULL "
-        "CHECK(reservation_status IN ('reserved','released')),"
-        "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0))"
-    )
-
-
-def read_sqlite_shared_resource(
-    reservation_root: str | Path, resource_ref: str
-) -> dict[str, Any]:
-    """Read reservation owner and native SQLite revision through a new connection."""
-    try:
-        identity = _reservation_identity(resource_ref)
-        path = _reservation_sqlite_path(reservation_root)
-        if not path.is_file():
-            return {"status": "blocked", "reason": "reservation_not_found"}
-        with closing(_sqlite_connection(path)) as connection:
-            connection.execute("BEGIN")
-            row = connection.execute(
-                "SELECT workflow_ref,reservation_status,provider_revision "
-                "FROM shared_resource_reservation WHERE resource_identity=?",
-                (identity,),
-            ).fetchone()
-        if row is None:
-            return {"status": "blocked", "reason": "reservation_not_found"}
-        owner, status, revision = row
-        if (
-            not isinstance(owner, str)
-            or not _UUID.fullmatch(owner)
-            or status not in {"reserved", "released"}
-            or not isinstance(revision, int)
-            or revision < 1
-        ):
-            return {"status": "blocked", "reason": "reservation_corrupt"}
-        return {
-            "status": "current",
-            "reservation_ref": "sqlite-reservation:" + identity,
-            "owner_workflow_ref": owner,
-            "reservation_status": status,
-            "reservation_revision": _provider_revision_token(revision),
-            "revision_kind": "sqlite_atomic_provider_revision",
-        }
-    except (OSError, sqlite3.Error, TypeError, ValueError):
-        return {"status": "blocked", "reason": "reservation_provider_unavailable"}
-
-
-def reserve_sqlite_shared_resource(
-    reservation_root: str | Path,
-    resource_ref: str,
-    workflow_ref: str,
-) -> dict[str, Any]:
-    """Acquire a local shared resource atomically, including after a release."""
-    try:
-        identity = _reservation_identity(resource_ref)
-        ref = _local_baseline_identity(workflow_ref)
-        path = _reservation_sqlite_path(reservation_root)
-        legacy_path = path.parent / f"{identity}.json"
-        if legacy_path.exists() or legacy_path.is_symlink():
-            return {
-                "status": "blocked",
-                "reason": "legacy_reservation_requires_reconciliation",
-            }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
-        except FileExistsError:
-            descriptor = None
-        if descriptor is not None:
-            os.close(descriptor)
-        with closing(_sqlite_connection(path)) as connection:
-            _initialize_reservation_table(connection)
-            connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT workflow_ref,reservation_status,provider_revision "
-                "FROM shared_resource_reservation WHERE resource_identity=?",
-                (identity,),
-            ).fetchone()
-            if row is None:
-                next_revision = 1
-                connection.execute(
-                    "INSERT INTO shared_resource_reservation VALUES (?,?,?,?)",
-                    (identity, ref, "reserved", next_revision),
-                )
-            elif row[1] == "released":
-                next_revision = row[2] + 1
-                connection.execute(
-                    "UPDATE shared_resource_reservation SET "
-                    "workflow_ref=?,reservation_status='reserved',provider_revision=? "
-                    "WHERE resource_identity=? AND reservation_status='released' "
-                    "AND provider_revision=?",
-                    (ref, next_revision, identity, row[2]),
-                )
-            else:
-                connection.execute("ROLLBACK")
-                return {"status": "conflict", "reason": "reservation_already_held"}
-            connection.execute("COMMIT")
-        current = read_sqlite_shared_resource(reservation_root, resource_ref)
-        if (
-            current.get("status") != "current"
-            or current.get("owner_workflow_ref") != ref
-            or current.get("reservation_status") != "reserved"
-            or current.get("reservation_revision")
-            != _provider_revision_token(next_revision)
-        ):
-            return {"status": "blocked", "reason": "reservation_readback_failed"}
-        return {**current, "status": "reserved"}
-    except (_LocalBaselineError, OSError, sqlite3.Error, TypeError, ValueError):
-        return {"status": "blocked", "reason": "reservation_provider_unavailable"}
-
-
-def release_sqlite_shared_resource(
-    reservation_root: str | Path,
-    resource_ref: str,
-    workflow_ref: str,
-    expected_reservation_revision: str,
-    *,
-    owner_state_verified: bool,
-    owner_execution_state: str | None,
-    cleanup_confirmed: bool,
-) -> dict[str, Any]:
-    """Conditionally release only the verified owner's current local reservation."""
-    if (
-        owner_state_verified is not True
-        or owner_execution_state not in {"not_started", "complete"}
-        or cleanup_confirmed is not True
-    ):
-        return {"status": "blocked", "reason": "owner_execution_or_cleanup_unverified"}
-    revision = _provider_revision_number(expected_reservation_revision)
-    if revision is None:
-        return {"status": "blocked", "reason": "reservation_revision_invalid"}
-    try:
-        identity = _reservation_identity(resource_ref)
-        ref = _local_baseline_identity(workflow_ref)
-        path = _reservation_sqlite_path(reservation_root)
-        if not path.is_file():
-            return {"status": "blocked", "reason": "reservation_not_found"}
-        with closing(_sqlite_connection(path)) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT workflow_ref,reservation_status,provider_revision "
-                "FROM shared_resource_reservation WHERE resource_identity=?",
-                (identity,),
-            ).fetchone()
-            if row is None:
-                connection.execute("ROLLBACK")
-                return {"status": "blocked", "reason": "reservation_not_found"}
-            if row[0] != ref:
-                connection.execute("ROLLBACK")
-                return {"status": "blocked", "reason": "reservation_owner_mismatch"}
-            if row[2] != revision or row[1] != "reserved":
-                connection.execute("ROLLBACK")
-                return {
-                    "status": "conflict",
-                    "reason": "reservation_revision_or_status_changed",
-                    "current_revision": _provider_revision_token(row[2]),
-                }
-            connection.execute(
-                "UPDATE shared_resource_reservation SET "
-                "reservation_status='released',provider_revision=provider_revision+1 "
-                "WHERE resource_identity=? AND workflow_ref=? "
-                "AND reservation_status='reserved' AND provider_revision=?",
-                (identity, ref, revision),
-            )
-            connection.execute("COMMIT")
-        current = read_sqlite_shared_resource(reservation_root, resource_ref)
-        if (
-            current.get("status") != "current"
-            or current.get("owner_workflow_ref") != ref
-            or current.get("reservation_status") != "released"
-            or current.get("reservation_revision")
-            != _provider_revision_token(revision + 1)
-        ):
-            return {
-                "status": "blocked",
-                "reason": "reservation_release_readback_failed",
-            }
-        return {**current, "status": "released"}
-    except (_LocalBaselineError, OSError, sqlite3.Error, TypeError, ValueError):
-        return {"status": "blocked", "reason": "reservation_provider_unavailable"}
+    # Owner/cleanup flags are caller assertions, not authenticated provider evidence.
+    # The selected owner provider must perform its own conditional release.
+    return {"status": "blocked", "reason": "reservation_release_provider_not_connected"}
 
 
 def partial_update_decision(
