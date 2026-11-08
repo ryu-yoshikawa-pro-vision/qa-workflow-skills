@@ -16,13 +16,17 @@ class SharedResourceProviderSelectionTests(unittest.TestCase):
     def test_missing_provider_does_not_create_sqlite_or_legacy_file(self) -> None:
         for native in (False, True):
             result = artifact_graph.reserve_shared_resource(
-                self.root, "shared-user", WORKFLOW_REF,
+                self.root,
+                "shared-user",
+                WORKFLOW_REF,
                 native_atomic_conditional_release=native,
             )
             self.assertEqual(result["status"], "blocked")
             self.assertEqual(
                 result["reason"],
-                "reservation_provider_not_selected" if native else "atomic_conditional_release_unavailable",
+                "reservation_provider_not_selected"
+                if native
+                else "atomic_conditional_release_unavailable",
             )
         self.assertFalse(self.root.exists())
 
@@ -33,7 +37,10 @@ class SharedResourceProviderSelectionTests(unittest.TestCase):
         )
         old.write_text('{"status":"reserved"}', encoding="utf-8")
         result = artifact_graph.reserve_shared_resource(
-            self.root, "shared-user", WORKFLOW_REF, native_atomic_conditional_release=True
+            self.root,
+            "shared-user",
+            WORKFLOW_REF,
+            native_atomic_conditional_release=True,
         )
         self.assertEqual(result["status"], "blocked")
         self.assertEqual(old.read_text(encoding="utf-8"), '{"status":"reserved"}')
@@ -41,28 +48,37 @@ class SharedResourceProviderSelectionTests(unittest.TestCase):
 
     def test_isolated_resource_does_not_require_reservation(self) -> None:
         result = artifact_graph.reserve_shared_resource(
-            self.root, "isolated", WORKFLOW_REF,
-            isolated=True, native_atomic_conditional_release=False,
+            self.root,
+            "isolated",
+            WORKFLOW_REF,
+            isolated=True,
+            native_atomic_conditional_release=False,
         )
         self.assertEqual(result["status"], "not_required")
         self.assertFalse(self.root.exists())
 
     def test_external_handoff_requires_claim_and_revision(self) -> None:
         result = artifact_graph.reserve_shared_resource(
-            self.root, "shared-user", WORKFLOW_REF,
+            self.root,
+            "shared-user",
+            WORKFLOW_REF,
             native_atomic_conditional_release=False,
             external_reservation="provider:claim",
         )
         self.assertEqual(result["reason"], "external_reservation_not_confirmed")
         result = artifact_graph.reserve_shared_resource(
-            self.root, "shared-user", WORKFLOW_REF,
+            self.root,
+            "shared-user",
+            WORKFLOW_REF,
             native_atomic_conditional_release=False,
             external_reservation="provider:claim",
             external_reservation_acquired=True,
         )
         self.assertEqual(result["reason"], "external_reservation_revision_missing")
         handoff = artifact_graph.reserve_shared_resource(
-            self.root, "shared-user", WORKFLOW_REF,
+            self.root,
+            "shared-user",
+            WORKFLOW_REF,
             native_atomic_conditional_release=False,
             external_reservation="provider:claim",
             external_reservation_acquired=True,

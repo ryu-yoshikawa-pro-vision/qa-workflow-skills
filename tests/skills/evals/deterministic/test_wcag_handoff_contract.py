@@ -387,7 +387,9 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
                     "scope_ref": "wcag:scope",
                     "operation_type": "browser_observation",
                     "target_ref": "fixture-browser-session",
-                    "source_revisions": [{"ref": "wcag-evaluation", "revision": "rev-a"}],
+                    "source_revisions": [
+                        {"ref": "wcag-evaluation", "revision": "rev-a"}
+                    ],
                     "artifact_revisions": [],
                     "expected_revision": None,
                     "approval_ref": None,

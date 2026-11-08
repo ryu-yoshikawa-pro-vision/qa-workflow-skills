@@ -166,9 +166,7 @@ def _execution_evidence(value: Any, label: str) -> float:
         raise ValueError(f"{label}.owner_artifacts missing")
     artifact_keys: set[tuple[str, str]] = set()
     for item in artifacts:
-        artifact = _obj(
-            item, {"owner", "artifact_ref", "revision"}, "owner artifact"
-        )
+        artifact = _obj(item, {"owner", "artifact_ref", "revision"}, "owner artifact")
         key = (
             _nonempty(artifact["owner"], "artifact owner"),
             _nonempty(artifact["artifact_ref"], "artifact ref"),
@@ -188,16 +186,16 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
     fields = {
         "trial_ref",
         "run_ref",
-            "product_commit",
-            "source_revisions",
-            "scope_refs",
-            "qa_goal_ref",
-            "expectation_ref",
-            "test_set_ref",
-            "environment_ref",
-            "agent_config_ref",
-            "quality",
-            "metrics",
+        "product_commit",
+        "source_revisions",
+        "scope_refs",
+        "qa_goal_ref",
+        "expectation_ref",
+        "test_set_ref",
+        "environment_ref",
+        "agent_config_ref",
+        "quality",
+        "metrics",
     }
     if isinstance(value, dict) and "execution_evidence" in value:
         fields.add("execution_evidence")
@@ -241,7 +239,11 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
     if "execution_evidence" in row:
         duration = _execution_evidence(row["execution_evidence"], label)
         wall, unit = _metric(metrics["wall_seconds"], "wall_seconds")
-        if wall is not None and unit == "seconds" and abs(wall - duration) > max(1.0, duration * 0.01):
+        if (
+            wall is not None
+            and unit == "seconds"
+            and abs(wall - duration) > max(1.0, duration * 0.01)
+        ):
             raise ValueError("recorded wall_seconds contradict trial timestamps")
     return row
 
@@ -319,7 +321,9 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                     for skill_run in evidence["skill_runs"]:
                         skill_ref = skill_run["run_ref"]
                         if skill_ref in seen_skill_runs:
-                            raise ValueError("duplicate skill run across independent trials")
+                            raise ValueError(
+                                "duplicate skill run across independent trials"
+                            )
                         seen_skill_runs.add(skill_ref)
         reasons: list[str] = []
         combined = groups["baseline"] + groups["candidate"]

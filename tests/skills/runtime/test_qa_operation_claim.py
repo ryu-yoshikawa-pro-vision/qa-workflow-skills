@@ -207,17 +207,27 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         operation_ref = "legacy:operation"
         path = artifact_graph._claim_path(self.root, WORKFLOW_REF, operation_ref)
         raw = json.dumps(
-            {"workflow_ref": WORKFLOW_REF, "operation_ref": operation_ref, "status": "claimed"},
-            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            {
+                "workflow_ref": WORKFLOW_REF,
+                "operation_ref": operation_ref,
+                "status": "claimed",
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         ).encode("utf-8")
-        self.assertEqual(artifact_graph.create_if_absent(path, raw)["status"], "created")
+        self.assertEqual(
+            artifact_graph.create_if_absent(path, raw)["status"], "created"
+        )
         saved = artifact_graph.read_mutable_operation_claim(
             self.root, WORKFLOW_REF, operation_ref
         )
         self.assertEqual(saved["status"], "current")
         self.assertIsNone(saved["operation_details"])
         self.assertFalse(saved["may_start"])
-        second = artifact_graph.claim_mutable_operation(self.root, WORKFLOW_REF, operation_ref)
+        second = artifact_graph.claim_mutable_operation(
+            self.root, WORKFLOW_REF, operation_ref
+        )
         self.assertEqual(second["status"], "blocked")
         self.assertFalse(second["may_start"])
 

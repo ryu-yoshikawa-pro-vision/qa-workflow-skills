@@ -56,7 +56,11 @@ def trial(scenario: str, group: str, index: int) -> dict:
                 }
             ],
             "owner_artifacts": [
-                {"owner": "test-analysis", "artifact_ref": "analysis-1", "revision": "rev-1"}
+                {
+                    "owner": "test-analysis",
+                    "artifact_ref": "analysis-1",
+                    "revision": "rev-1",
+                }
             ],
             "attempt_refs": [f"attempt-{scenario}-{group}-{index}"],
             "runner_refs": [],
@@ -107,24 +111,30 @@ class WorkflowEfficiencyTests(unittest.TestCase):
 
     def test_missing_interruption_reference_blocks_resume_comparison(self) -> None:
         data = dataset()
-        data["scenarios"][4]["candidate"][0]["execution_evidence"]["interruption_ref"] = None
+        data["scenarios"][4]["candidate"][0]["execution_evidence"][
+            "interruption_ref"
+        ] = None
         result = mod.evaluate(data)
-        self.assertIn("interruption_evidence_missing", result["scenarios"][4]["reasons"])
+        self.assertIn(
+            "interruption_evidence_missing", result["scenarios"][4]["reasons"]
+        )
 
     def test_wall_time_mismatch_cannot_claim_measured_improvement(self) -> None:
         data = dataset()
         data["scenarios"][0]["candidate"][0]["execution_evidence"]["finished_at"] = (
             "2026-11-08T09:02:00+00:00"
         )
-        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0]["finished_at"] = (
-            "2026-11-08T09:02:00+00:00"
-        )
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0][
+            "finished_at"
+        ] = "2026-11-08T09:02:00+00:00"
         with self.assertRaises(ValueError):
             mod.evaluate(data)
 
     def test_invalid_or_missing_owner_evidence_rejected(self) -> None:
         data = dataset()
-        data["scenarios"][0]["candidate"][0]["execution_evidence"]["owner_artifacts"] = []
+        data["scenarios"][0]["candidate"][0]["execution_evidence"][
+            "owner_artifacts"
+        ] = []
         with self.assertRaises(ValueError):
             mod.evaluate(data)
 
@@ -138,9 +148,11 @@ class WorkflowEfficiencyTests(unittest.TestCase):
 
     def test_same_skill_execution_cannot_count_as_independent_trials(self) -> None:
         data = dataset()
-        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0]["run_ref"] = (
-            data["scenarios"][0]["baseline"][0]["execution_evidence"]["skill_runs"][0]["run_ref"]
-        )
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0][
+            "run_ref"
+        ] = data["scenarios"][0]["baseline"][0]["execution_evidence"]["skill_runs"][0][
+            "run_ref"
+        ]
         with self.assertRaises(ValueError):
             mod.evaluate(data)
 

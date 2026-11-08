@@ -1938,7 +1938,9 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                                 "scope_ref": "scope:order",
                                 "operation_type": "browser_mutation",
                                 "target_ref": "order:save",
-                                "source_revisions": [{"ref": "product", "revision": "v1"}],
+                                "source_revisions": [
+                                    {"ref": "product", "revision": "v1"}
+                                ],
                                 "artifact_revisions": [],
                                 "expected_revision": None,
                                 "approval_ref": None,
@@ -2002,8 +2004,15 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                         [workflow_ref, workflow.new_workflow_ref()],
                     )
                 )
-            self.assertEqual([r["status"] for r in reservations], ["blocked", "blocked"])
-            self.assertTrue(all(r["reason"] == "reservation_provider_not_selected" for r in reservations))
+            self.assertEqual(
+                [r["status"] for r in reservations], ["blocked", "blocked"]
+            )
+            self.assertTrue(
+                all(
+                    r["reason"] == "reservation_provider_not_selected"
+                    for r in reservations
+                )
+            )
             self.assertFalse(reservation_root.exists())
             self.assertEqual(
                 workflow.release_shared_resource(
