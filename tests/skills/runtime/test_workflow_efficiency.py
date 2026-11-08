@@ -50,8 +50,7 @@ def trial(scenario: str, group: str, index: int) -> dict:
         for n in range(calls)
     ]
     attempts = [
-        f"attempt-{scenario}-{group}-{index}-{n}"
-        for n in range(2 if baseline else 1)
+        f"attempt-{scenario}-{group}-{index}-{n}" for n in range(2 if baseline else 1)
     ]
     return {
         "trial_ref": f"{scenario}-{group}-{index}",
@@ -60,7 +59,9 @@ def trial(scenario: str, group: str, index: int) -> dict:
         "source_revisions": [
             {
                 "ref": "spec",
-                "revision": "rev-2" if scenario == "external_spec_revision" else "rev-1",
+                "revision": "rev-2"
+                if scenario == "external_spec_revision"
+                else "rev-1",
             }
         ],
         "scope_refs": ["SCOPE-001"],
@@ -96,6 +97,7 @@ def trial(scenario: str, group: str, index: int) -> dict:
         },
         "metrics": values,
     }
+
 
 def dataset() -> dict:
     return {
@@ -133,11 +135,15 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             )
         result = mod.evaluate(data)
         first = result["scenarios"][0]
-        self.assertEqual(first["metrics"]["human_review_seconds"]["baseline"]["median"], 15)
+        self.assertEqual(
+            first["metrics"]["human_review_seconds"]["baseline"]["median"], 15
+        )
         self.assertEqual(
             first["metrics"]["human_review_seconds"]["candidate"]["median"], 35
         )
-        self.assertEqual(first["metrics"]["human_review_seconds"]["change"], "regressed")
+        self.assertEqual(
+            first["metrics"]["human_review_seconds"]["change"], "regressed"
+        )
         self.assertEqual(first["status"], "needs_review")
         self.assertEqual(result["status"], "unproven")
 
@@ -182,7 +188,9 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.evaluate(data)
 
-    def test_scenario_specific_revisions_and_expected_inputs_are_independent(self) -> None:
+    def test_scenario_specific_revisions_and_expected_inputs_are_independent(
+        self,
+    ) -> None:
         data = dataset()
         by_name = {item["scenario"]: item for item in data["scenarios"]}
         unchanged = by_name["unchanged_request"]["baseline"][0]
@@ -190,16 +198,16 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         spec = by_name["external_spec_revision"]["baseline"][0]
         self.assertNotEqual(unchanged["product_commit"], code["product_commit"])
         self.assertEqual(unchanged["product_commit"], spec["product_commit"])
-        self.assertNotEqual(
-            unchanged["source_revisions"], spec["source_revisions"]
-        )
+        self.assertNotEqual(unchanged["source_revisions"], spec["source_revisions"])
         self.assertNotEqual(unchanged["qa_goal_ref"], code["qa_goal_ref"])
         self.assertEqual(mod.evaluate(data)["status"], "efficiency_evidenced")
 
     def test_scenario_specific_drift_is_not_comparable(self) -> None:
         data = dataset()
         data["scenarios"][2]["candidate"][0]["product_commit"] = "f" * 40
-        data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = "rev-3"
+        data["scenarios"][3]["candidate"][0]["source_revisions"][0]["revision"] = (
+            "rev-3"
+        )
         result = mod.evaluate(data)
         self.assertEqual(result["scenarios"][2]["status"], "not_comparable")
         self.assertEqual(result["scenarios"][3]["status"], "not_comparable")
