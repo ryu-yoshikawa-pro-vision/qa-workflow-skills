@@ -4,8 +4,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 SCRIPT_DIR = (
     Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
