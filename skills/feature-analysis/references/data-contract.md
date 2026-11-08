@@ -14,7 +14,7 @@ scripts/feature_registry.pyはPython 3.11のstdinにJSON objectを受け、stdou
 
 IDはSRC-001、FEAT-001、CAND-001、DIF-001形式。featureのidentityは同一案件で同じ意味を表す安定値で、path・名称変更による再採番を防ぎます。sourceのcompleteはrevisionとevidence_ref、enumeration_complete=true、unretrieved=[]を必須とします。候補・差分の対象外には理由とapproval_refが必須ですが、承認主体の真正性は本helperでは確認しません。
 
-結果はcomplete / incomplete / stale / idempotent / blocked。change_classificationは分類済み差分ID ÷ 全確認差分ID、observed_candidate_mappingはID対応済み・承認参照付き対象外候補 ÷ 全確認候補。分母0はrate=nullです。各率は分子・分母のIDを保存し、未取得sourceと未知領域を別に示します。all_product_features_discoveredは常にnullです。
+結果はcomplete / incomplete / stale / idempotent / blocked。change_classificationは分類済み差分ID ÷ 全確認差分ID、observed_candidate_mappingは機能ID対応済み候補のみ ÷ 全確認候補。承認参照付きの対象外候補は`excluded_candidate_ids`に記録し、対応済みの分子には含めません。分母0はrate=nullです。各率は分子・分母のIDを保存し、未取得sourceと未知領域を別に示します。all_product_features_discoveredは常にnullです。
 
 handoffにはartifact ref/revision、source revision、feature IDs、未分類差分IDs、expected_source_idsを返します。helperのcompleteは保存済み・承認済み・全製品発見の証明ではなく、実保存先のnative CAS・history/readbackと独立照合が必要です。仕様対応率・正式設計率・QA影響評価は別のownerが決定します。
 

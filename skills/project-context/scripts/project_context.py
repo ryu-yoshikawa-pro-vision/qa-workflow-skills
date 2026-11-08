@@ -233,9 +233,7 @@ def prepare_update(request: dict[str, Any]) -> dict[str, Any]:
         kind = parsed[key]["type"]
         if kind in {"scalar", "path"} and ("\n" in value or "\r" in value):
             raise Invalid(f"single_line_field_required:{key}")
-        if kind == "path" and value.strip() not in {
-            "", "UNKNOWN", "N/A", "（未設定）"
-        }:
+        if kind == "path" and value.strip() not in {"", "UNKNOWN", "N/A", "（未設定）"}:
             if (
                 PurePosixPath(value).is_absolute()
                 or PureWindowsPath(value).drive

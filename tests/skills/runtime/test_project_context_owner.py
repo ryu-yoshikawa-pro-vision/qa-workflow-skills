@@ -267,7 +267,13 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "source_revision": "rev-2",
             "change_reason": "review",
         }
-        for value in ("/tmp/out", "../private", "a/../out", "C:\\\\secret", "https://example.com"):
+        for value in (
+            "/tmp/out",
+            "../private",
+            "a/../out",
+            "C:\\\\secret",
+            "https://example.com",
+        ):
             with self.subTest(value=value):
                 data = {**base, "updates": {"qa.workflow_state_root": value}}
                 self.assertEqual(handle(data)["status"], "blocked")

@@ -248,7 +248,10 @@ def _history(
         "artifact_revision"
     ):
         raise ContractError("previous_artifact_revision_conflict")
-    if not idempotent and snapshot["artifact_revision"] == previous["artifact_revision"]:
+    if (
+        not idempotent
+        and snapshot["artifact_revision"] == previous["artifact_revision"]
+    ):
         raise ContractError("artifact_revision_reused")
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
