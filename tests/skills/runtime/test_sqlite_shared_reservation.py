@@ -204,9 +204,7 @@ class SqliteSharedReservationTests(unittest.TestCase):
         )
         old_path.write_bytes(b'{"status":"reserved"}')
         result = self.acquire()
-        self.assertEqual(
-            result["reason"], "legacy_reservation_requires_reconciliation"
-        )
+        self.assertEqual(result["reason"], "legacy_reservation_requires_reconciliation")
         self.assertEqual(old_path.read_bytes(), b'{"status":"reserved"}')
         self.assertFalse((self.root / "resource-reservations.sqlite3").exists())
 
