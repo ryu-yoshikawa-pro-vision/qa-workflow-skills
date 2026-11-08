@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,12 @@ METRICS = {
     "request_count": "lower",
     "cost_amount": "lower",
 }
+COUNT_METRICS = frozenset(
+    key for key in METRICS if key.endswith("_count")
+)
+TIME_METRICS = frozenset(
+    {"wall_seconds", "human_review_seconds", "human_approval_seconds"}
+)
 REQUIRED_QUALITY = ("functional", "quality", "safety", "traceability")
 REQUIRED_MEASUREMENTS = frozenset(
     {
@@ -90,6 +97,14 @@ def _metric(value: Any, label: str) -> tuple[float | None, str]:
     )
     unit = _nonempty(row["unit"], f"{label} unit")
     raw = row["value"]
+    if label in TIME_METRICS and unit != "seconds":
+        raise ValueError(f"{label} requires seconds")
+    if label in COUNT_METRICS and unit != "count":
+        raise ValueError(f"{label} requires count")
+    if label == "cost_amount" and not (
+        re.fullmatch(r"[A-Z]{3}", unit) or (raw is None and unit == "unknown")
+    ):
+        raise ValueError("cost_amount requires a currency code or unknown when unmeasured")
     if raw is None:
         if (
             row["source_ref"] is not None
@@ -103,6 +118,7 @@ def _metric(value: Any, label: str) -> tuple[float | None, str]:
         or not isinstance(raw, (int, float))
         or not math.isfinite(raw)
         or raw < 0
+        or (label in COUNT_METRICS and int(raw) != raw)
         or not isinstance(row["source_ref"], str)
         or not row["source_ref"].strip()
         or row["unmeasured_reason"] is not None
@@ -236,14 +252,23 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
     for key, value in metrics.items():
         _metric(value, key)
     if "execution_evidence" in row:
-        duration = _execution_evidence(row["execution_evidence"], label)
-        wall, unit = _metric(metrics["wall_seconds"], "wall_seconds")
+        evidence = row["execution_evidence"]
+        duration = _execution_evidence(evidence, label)
+        wall, _ = _metric(metrics["wall_seconds"], "wall_seconds")
         if (
             wall is not None
-            and unit == "seconds"
             and abs(wall - duration) > max(1.0, duration * 0.01)
         ):
             raise ValueError("recorded wall_seconds contradict trial timestamps")
+        calls, _ = _metric(metrics["skill_call_count"], "skill_call_count")
+        if calls is not None and calls != len(evidence["skill_runs"]):
+            raise ValueError("skill_call_count contradicts recorded skill_runs")
+        restarts, _ = _metric(metrics["skill_restart_count"], "skill_restart_count")
+        if restarts is not None and calls is not None and restarts > calls:
+            raise ValueError("skill_restart_count exceeds recorded skill calls")
+        retries, _ = _metric(metrics["retry_count"], "retry_count")
+        if retries is not None and retries > max(0, len(evidence["attempt_refs"]) - 1):
+            raise ValueError("retry_count contradicts recorded attempt_refs")
     return row
 
 
@@ -447,11 +472,11 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {"status": "blocked", "reason": str(exc)},
                 sort_keys=True,
-                ensure_ascii=False,
+                ensure_ascii=True,
             )
         )
         return 2
-    print(json.dumps(report, sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    print(json.dumps(report, sort_keys=True, ensure_ascii=True, separators=(",", ":")))
     return 0 if report["status"] == "efficiency_evidenced" else 1
 
 
