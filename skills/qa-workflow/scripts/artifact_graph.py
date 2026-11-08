@@ -3152,8 +3152,6 @@ def release_shared_resource(
     owner_state_verified: bool = False,
     owner_execution_state: str | None = None,
     cleanup_confirmed: bool = False,
-    reservation_root: str | Path | None = None,
-    resource_ref: str | None = None,
 ) -> dict[str, Any]:
     if current_workflow_ref != expected_workflow_ref:
         return {"status": "blocked", "reason": "reservation_owner_mismatch"}
