@@ -212,24 +212,25 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 
 ### WCAG formal evaluation state
 
-WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。これらは既存の`qa.workflow_state_root`から場所を解決し、`artifact_graph.py`のlocal SQLite providerでcurrent WCAG評価情報を読み書きします。対応範囲は単一ホストlocal filesystemです。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
+WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。この既存のWCAG固有経路は`qa.workflow_state_root`配下のlocal SQLiteを利用します。workflow stateのSQLite更新時にはrevision履歴を同じtransactionで保存し、`read_sqlite_workflow_state_revision(root, workflow_ref, revision_token)`で旧revisionを取得します。revision 1から連続する履歴がない旧DBは`historical_revision_available=false`です。新規DBには最初のhistory revisionを同一transactionで記録し、記録済みのrevisionが一つでも欠落した場合はreadback／CASをblockします。旧DBに履歴がない場合は移行開始時のcurrent revisionからのみ履歴を保持し、欠落した古いrevisionを作成しません。履歴はあるが開始revisionを証明できない旧DBは、不完全な履歴を安全な移行と推測せず更新を停止します。対応する原子性は単一hostのlocal filesystemのみであり、汎用QA成果物や共有リソースの保存先としてSQLiteを採用したことにはなりません。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
 
 登録は既存WCAG evaluation ownerが確定した評価入力、scope決定とevidence refs、selected sample / variation / processおよびsource artifact refsを引き継ぎます。caller提供Planだけから正本を作らず、同じevaluation revisionの対象縮小を拒否します。SQLite state revisionはWCAG evaluation revisionとは別です。WCAG `close-report`が返すのはunresolved candidateであり、generation fingerprint一致だけではclosure証明になりません。QA workflowはdeclared runtime dependencyの`result_fingerprint`とcandidate envelope全体を照合します。Machine Runtime freshness検証はその依存fingerprintを独立に取得したcurrent runtime rowと比較します。このcurrent rowを使うfreshness検証を通らない同一generationのpayload / 工程入力差し替えは、staleとして扱います。照合済みcandidateに含まれる有限な工程入力を、QA workflowはcurrent recordから取得したPlan・結果に結合し、既存`close_report()`を再実行してWCAG-EM工程とaccessible outputのcomplete状態を確認します。その後、期待SQLite revisionでCAS更新し、別connectionから再読込して完了を返します。ただし、現行`finalize-wcag-report`はcurrent Machine Runtime rowを独立取得せず、callerが用意したdependency metadataとcandidateの一致を確認するだけです。metadataも自己作成できる直接呼び出しは完了を偽装でき、ownerが独立してcurrent rowを結び付ける取得契約が残っています。これは既存のgeneric workflow / handoff CASを置き換えず、SQLite recordの存在だけでowner承認を証明しません。
 
 ### mutable operation開始直前
 
 1. owner execution contractに同一operation identity向けatomic pre-start claimまたはidempotent startがあるか確認し、ある場合はowner contractを利用します。
-2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)`を使います。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へclaimを導出し、callerに別claim rootを選ばせません。
-3. claimを取得できない、またはhelper / filesystem能力が失敗した場合はmutable operationを開始せず`blocked`にします。state CASだけで実operationの二重開始を防止済みと扱いません。
+2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref, operation_details=...)`を使います。`operation_details`には`owner_skill`、`scope_ref`、`operation_type`、`target_ref`、`source_revisions[]`、`artifact_revisions[]`、`expected_revision`、`approval_ref`、`permission_scope`、`resume_owner`を入れます。source／成果物のrevisionは操作前にownerの正本から確定し、秘密情報の実値は渡しません。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へatomic create-if-absentで記録し、独立readbackを照合してから`may_start=true`を返します。`operation_details`なしの3引数呼出しは`operation_details_required`でblockします。旧3引数呼出しが作成したclaimは別セッションで読取互換として保持しますが、再実行は許可しません。
+3. 別セッションでの再開時は、保存時の`claim_revision`を保持して`read_mutable_operation_claim(..., expected_claim_revision=...)`で独立読戻しします。`status=current`でも`may_start=false`であり、元ownerの実開始・実保存・cleanupを再取得するまで同じoperation identityの副作用を再実行しません。revision不一致は`conflict`、欠落・改ざん・読取権限不足は`blocked`です。
+4. claimが重複・改ざん・読戻し不一致・保存失敗になった場合は、同じoperation identityを再実行せず`blocked`にします。`recover_claim()`はprovider-nativeの条件付き解放を実行しません。現状は実行・cleanup証拠の真偽とclaim revisionを検証する接続がないため、開始前の中断でも`claim_release_provider_not_connected`で停止します。実ownerの保存済み状態と条件付き解放を接続するまで、`may_start`を復旧させません。claimは承認主体の認証や遠隔providerのCASを代行しません。
 
 ### shared resource使用前
 
-resource ref、workflow間のisolation条件、外部reservationの取得状態などはProject Contextの実施環境 / 対象条件欄で確認します。project-local reservation artifactのrootには既存`qa.reservation_root`を使い、次の順で`reserve_shared_resource`を適用します。
+resource ref、workflow間のisolation条件、利用するreservation provider、認可・解放条件をProject Contextの実施環境 / 対象条件欄で確認します。`qa.reservation_root`は場所を示すだけで、保存先のnative CASや予約・解放能力を保証しません。
 
-1. resourceがworkflowごとにisolatedならreservationは`not_required`です。
-2. 既存external reservationが取得済みならそれを使います。
-3. project-local reservationはatomic create-if-absentに加えてlifecycleを閉じるnative atomic conditional release能力も確認できる場合だけ取得します。release capabilityがないlocal filesystemではreservation fileを作らず`blocked`にします。
-4. いずれも満たさなければshared resource使用を`blocked`にします。recovery / releaseはowner execution state、cleanup確認、expected revisionを確認し、native conditional releaseがなければ実行しません。
+1. 実際にworkflowごとに分離されたresourceなら`isolated=True`を指定し、reservationは`not_required`です。分離が未確認ならこの扱いにしません。
+2. 選定済み外部providerで取得したreservationのrefとrevisionを、元providerの保存状態から独立に取得して照合します。現時点で共通helperの`reserve_shared_resource(external_reservation=..., external_reservation_acquired=True, external_reservation_revision=...)`は、その文字列だけでは所有者を証明できないため`external_reservation_readback_required`でblockします。返したref／revisionは検証待ちの情報であり、`reserved`やresource使用許可ではありません。正式なproviderの取得・readback・認可・cleanupは各ownerの実装に残します。
+3. provider未選定で`reserve_shared_resource(..., native_atomic_conditional_release=True)`を呼んでも`reservation_provider_not_selected`で停止します。SQLiteや旧JSONへ自動的に予約を作成しません。既存の予約ファイルやDBを削除・自動移行しません。
+4. `release_shared_resource()`はowner／cleanup／revisionの基本条件を確認する判定helperであり、外部providerでの原子的解放ではありません。確認フラグだけで実解放を許可せず、未接続の場合は`reservation_release_provider_not_connected`を返します。実行ownerが保存した元結果とcleanupを独立取得したうえで、選定したproviderの条件付き解放・再読込を実施してください。その経路がない場合はresourceを使用せず`blocked`にします。
 
 ### current完了直前 / current成果物再利用直前
 
@@ -352,7 +353,7 @@ adversarial-review
 
 handoff identityはorigin artifact/revisionとartifact-local handoff refの組です。`operation_ref`、expected observation集合、current result集合、lineage、close readinessはhelperが導出します。開始順はpending CAS → mutable-operation claim → canonical順resource reserve → in-progress CAS → browser開始です。owner resultはimmutable evidence refとcleanup状態を持ち、read-onlyに返します。started operationを同じidentityでbrowser再実行しません。再観測時はformal ownerが新handoff refと`retry_of_handoff_ref`をmaterializeします。
 
-結果をresumeへ返す前に、origin currentness、expected/returned集合、duplicateまたはsupersedes lineage、cleanup、reservation releaseを確認し、close-ready → closed CAS → state reread → resume decisionの順を守ります。release/CAS失敗や不一致はblockedへ閉じ、再browser実行で隠しません。開始前failureでlocal claim recoveryにnative conditional releaseがなければ`atomic_claim_release_unavailable`をexpected safe blockとして保持します。
+結果をresumeへ返す前に、origin currentness、expected/returned集合、duplicateまたはsupersedes lineage、cleanup、reservation releaseを確認し、close-ready → closed CAS → state reread → resume decisionの順を守ります。release/CAS失敗や不一致はblockedへ閉じ、再browser実行で隠しません。開始前failureでもownerの実行・cleanupと条件付きclaim解放の経路が未接続なら`claim_release_provider_not_connected`をexpected safe blockとして保持します。
 
 ## ワークフロー全体状態
 
