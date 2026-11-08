@@ -126,6 +126,13 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["change_classification"]["rate"], 0.0)
         self.assertEqual(result["handoff"]["unclassified_change_ids"], ["DIF-001"])
 
+    def test_unknown_areas_invalidate_source_boundary(self) -> None:
+        data = fixture()
+        data["snapshot"]["unknown_areas"] = ["unexamined batch scheduler"]
+        result = handle(data)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertFalse(result["metrics"]["source_boundary_complete"])
+
     def test_zero_denominators_are_unknown(self) -> None:
         data = fixture()
         data["snapshot"]["changes"] = []

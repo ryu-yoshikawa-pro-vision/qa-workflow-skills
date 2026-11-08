@@ -353,9 +353,8 @@ def analyze(request: Any) -> dict[str, Any]:
                 "denominator_ids": sorted(candidates),
                 "rate": len(mapped) / len(candidates) if candidates else None,
             },
-            "source_boundary_complete": not any(
-                v.startswith("source_") for v in issues
-            ),
+            "source_boundary_complete": not unknown
+            and not any(v.startswith("source_") for v in issues),
             "unknown_areas": unknown,
             "excluded_candidate_ids": sorted(
                 cid for cid, row in candidates.items() if row["status"] == "excluded"
