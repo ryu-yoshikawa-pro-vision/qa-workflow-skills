@@ -355,4 +355,3 @@ PR #22 HEAD `f6f49da8f6fecb94e8662a9ac6032cea8314ac2c`の設計について、�
 - 新しい配置管理Skill・汎用の編集runtime・別の正本台帳は追加しない。案件の配置合意は`project-context`、workflowのroutingは`qa-workflow`、成果物の編集検証と正式保存は各ownerに維持する。
 
 本節は**既存コードの制約と実装Planへの反映記録**である。作業用差分の正式取り込み機能・テスト・実Agent受入は、この文書更新の時点では実装・実行していない。
-
