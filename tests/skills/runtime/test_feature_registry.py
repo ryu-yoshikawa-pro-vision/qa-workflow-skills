@@ -171,6 +171,7 @@ class FeatureRegistryTests(unittest.TestCase):
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         data["snapshot"]["operation_id"] = "op-v2"
+        data["snapshot"]["artifact_revision"] = "art-v2"
         data["snapshot"]["features"][0]["status"] = "retired"
         self.assertEqual(handle(data)["status"], "blocked")
         data["snapshot"]["history"].append(
