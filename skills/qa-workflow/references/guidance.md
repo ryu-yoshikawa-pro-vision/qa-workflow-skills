@@ -228,7 +228,7 @@ WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-
 resource ref、workflow間のisolation条件、利用するreservation provider、認可・解放条件をProject Contextの実施環境 / 対象条件欄で確認します。`qa.reservation_root`は場所を示すだけで、保存先のnative CASや予約・解放能力を保証しません。
 
 1. 実際にworkflowごとに分離されたresourceなら`isolated=True`を指定し、reservationは`not_required`です。分離が未確認ならこの扱いにしません。
-2. 選定済み外部providerが取得したreservationのrefとrevisionを、元providerの状態を独立に読んで照合してから引き継ぎます。`external_reservation_acquired=True`とrevision文字列だけでは認証や所有権の証明になりません。
+2. 選定済み外部providerで取得したreservationのrefとrevisionを、元providerの保存状態から独立に取得して照合します。現時点で共通helperの`reserve_shared_resource(external_reservation=..., external_reservation_acquired=True, external_reservation_revision=...)`は、その文字列だけでは所有者を証明できないため`external_reservation_readback_required`でblockします。返したref／revisionは検証待ちの情報であり、`reserved`やresource使用許可ではありません。正式なproviderの取得・readback・認可・cleanupは各ownerの実装に残します。
 3. provider未選定で`reserve_shared_resource(..., native_atomic_conditional_release=True)`を呼んでも`reservation_provider_not_selected`で停止します。SQLiteや旧JSONへ自動的に予約を作成しません。既存の予約ファイルやDBを削除・自動移行しません。
 4. `release_shared_resource()`はowner／cleanup／revisionの基本条件を確認する判定helperであり、外部providerでの原子的解放ではありません。確認フラグだけで実解放を許可せず、未接続の場合は`reservation_release_provider_not_connected`を返します。実行ownerが保存した元結果とcleanupを独立取得したうえで、選定したproviderの条件付き解放・再読込を実施してください。その経路がない場合はresourceを使用せず`blocked`にします。
 
