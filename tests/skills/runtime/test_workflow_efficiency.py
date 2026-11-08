@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -28,7 +29,10 @@ def metric(value: float | None, unit: str = "count") -> dict:
 def trial(scenario: str, group: str, index: int) -> dict:
     values = {key: metric(10 if group == "baseline" else 5) for key in mod.METRICS}
     values["reused_artifact_count"] = metric(2 if group == "baseline" else 4)
-    values["wall_seconds"] = metric(100 if group == "baseline" else 70, "seconds")
+    elapsed = 100 if group == "baseline" else 70
+    values["wall_seconds"] = metric(elapsed, "seconds")
+    started = datetime(2026, 11, 8, 9, 0, tzinfo=timezone.utc)
+    finished = started + timedelta(seconds=elapsed)
     return {
         "trial_ref": f"{scenario}-{group}-{index}",
         "run_ref": f"run-{scenario}-{group}-{index}",
@@ -40,6 +44,27 @@ def trial(scenario: str, group: str, index: int) -> dict:
         "test_set_ref": "tests-1",
         "environment_ref": "env-1",
         "agent_config_ref": "agent-config-1",
+        "execution_evidence": {
+            "started_at": started.isoformat(),
+            "finished_at": finished.isoformat(),
+            "skill_runs": [
+                {
+                    "skill": "test-analysis",
+                    "run_ref": f"skill-{scenario}-{group}-{index}",
+                    "started_at": started.isoformat(),
+                    "finished_at": finished.isoformat(),
+                }
+            ],
+            "owner_artifacts": [
+                {"owner": "test-analysis", "artifact_ref": "analysis-1", "revision": "rev-1"}
+            ],
+            "attempt_refs": [f"attempt-{scenario}-{group}-{index}"],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": f"resume-{scenario}-{group}-{index}"
+            if scenario == "interrupted_resume"
+            else None,
+        },
         "quality": {
             "functional": "pass",
             "quality": "pass",
@@ -72,6 +97,52 @@ class WorkflowEfficiencyTests(unittest.TestCase):
         first = result["scenarios"][0]
         self.assertEqual(first["metrics"]["wall_seconds"]["baseline"]["median"], 100)
         self.assertEqual(first["metrics"]["wall_seconds"]["candidate"]["median"], 70)
+
+    def test_missing_execution_evidence_is_not_efficiency_proof(self) -> None:
+        data = dataset()
+        del data["scenarios"][0]["candidate"][0]["execution_evidence"]
+        result = mod.evaluate(data)
+        self.assertEqual(result["status"], "unproven")
+        self.assertIn("execution_evidence_missing", result["scenarios"][0]["reasons"])
+
+    def test_missing_interruption_reference_blocks_resume_comparison(self) -> None:
+        data = dataset()
+        data["scenarios"][4]["candidate"][0]["execution_evidence"]["interruption_ref"] = None
+        result = mod.evaluate(data)
+        self.assertIn("interruption_evidence_missing", result["scenarios"][4]["reasons"])
+
+    def test_wall_time_mismatch_cannot_claim_measured_improvement(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["finished_at"] = (
+            "2026-11-08T09:02:00+00:00"
+        )
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0]["finished_at"] = (
+            "2026-11-08T09:02:00+00:00"
+        )
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
+    def test_invalid_or_missing_owner_evidence_rejected(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["owner_artifacts"] = []
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
+    def test_timezone_is_required_for_logged_intervals(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["started_at"] = (
+            "2026-11-08T09:00:00"
+        )
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
+
+    def test_same_skill_execution_cannot_count_as_independent_trials(self) -> None:
+        data = dataset()
+        data["scenarios"][0]["candidate"][0]["execution_evidence"]["skill_runs"][0]["run_ref"] = (
+            data["scenarios"][0]["baseline"][0]["execution_evidence"]["skill_runs"][0]["run_ref"]
+        )
+        with self.assertRaises(ValueError):
+            mod.evaluate(data)
 
     def test_unmeasured_is_not_zero(self) -> None:
         data = dataset()
