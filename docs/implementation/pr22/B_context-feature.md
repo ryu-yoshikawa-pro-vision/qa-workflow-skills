@@ -114,3 +114,23 @@
 - 依存：A担当のProject Context追加key（qa.feature_source_refs、qa.feature_artifact_root、qa.feature_base_ref、qa.feature_approval_policy_ref）はこのbranchの共通templateへ書かない。未登録keyの更新はblocked。provider-native CAS／履歴readback／認証済み承認元／案件のsource取得元が未選定なら、永続更新および実受入はblocked。別pathへの無許可保存で代用しない。
 - 未接続：正式なsource列挙adapter、案件ごとの保存providerと権限、実Agent発火・実providerへのcreate/update/readback、owner間の実成果物接続、製品CI受渡し。準備済みのfixture検証をこれらの証拠として使わない。
 - 局所の検証コマンド：python -m unittest tests.skills.runtime.test_feature_registry tests.skills.runtime.test_project_context_owner（module import環境によってはdiscoverで個別path指定）。CI：Code Quality / Validate Agent Skills / Validate Deterministic Output Evals / Validate Semantic Output Evals。結果は各workflowの実施結果を確認後に記載する。
+
+## 担当Bの追加実装・局所検証（2026-11-08）
+
+- Project Contextの`prepare-ids`：Section 12/13がこの案件のDEC/ASM正本である場合のみ、既存`project_context_ids.py materialize`に採番を委譲する。過去ID・16節・table前後の自由記述とSection 14/16を保持し、正本owner不一致・過去ID消失・expected revision不在を拒否する。これは保存前のdraft生成であり、providerによる原子的保存の証明ではない。
+- Project Contextの`prepare-update`：元artifact refとexpected revision、source ref/revision、変更理由を必須にした。既存stable key以外を無断更新せず、元の表・DEC/ASMを保持する。保存結果は`draft`と区別する。
+- `feature-analysis/scripts/git_source_inventory.py`：許可された単一のlocal Git checkoutとfull commit SHAを用い、全file snapshot・base→head差分・rename/moveをNUL区切りで列挙する。ファイル件数を機能件数としない。外部Issue／設計資料の列挙や保存は実providerに依存する。
+- `feature_registry.py`：未分類・source不完全・未知領域・分母0・旧HEAD・機能階層循環・機能ID意味再利用・履歴書換えを拒否またはincompleteにする。候補の対象外は機能ID対応率の分子へ含めない。繰返しのoperation IDでもschemaと履歴検証を省略しない。
+- 両Skillの`evals/deterministic/validator.py`、出力fixture、trigger、semantic caseを追加した。決定論的出力validatorはMarkdownの契約・ID・判定状態を調べる。独立した意味判断・外部sourceの真偽・provider承認の真正性を検証したことにはならない。
+
+### 確認済みCI結果と未解決の共有側の失敗
+
+[実装commit `5aceb2ae7f2da107768383182c588ef95a9c9739`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/5aceb2ae7f2da107768383182c588ef95a9c9739) のGitHub Actions結果：
+
+- [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982093)：SUCCESS。新規Python・Markdown・JSONのformatterとlintを確認した。
+- [Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982071)：SUCCESS。共有決定論的runtime 12件、repository決定論的評価292件、runtime／統合528件、意味評価runtimeの27件と13件がPASS。実Agentの意味判定を実行した証拠ではない。
+- [Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982055)：SUCCESS。dataset／参照の構造検証であり、実Agentの応答を評価したものではない。
+- [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982060)：FAIL。両新Skillの正式形式検証は通過したが、共有`README.md`に`project-context`と`feature-analysis`の記載がないためrepository一覧整合が失敗。共有READMEは担当A／PR #22の編集範囲。
+- [Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982070)：この記録時点では実行中。先行commitのLinux／Windowsでは、共有`tests/codex/test_development_skills.py:85`のSkill数`23`固定と新Skill25件との不一致によりFAILした。現HEADでも修正未統合のため残存する問題。
+
+共有README・Codexテスト・Section 16追加key・B ownerのruntime登録は[PR #22へ対応依頼](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/22#issuecomment-6722581724)済み。これらを担当Bで独自変更して競合させない。実案件のsource API接続、Project Context・機能一覧のprovider-native create/CAS、過去revisionの独立readback、実認証承認、実Agent／実製品CIの担当単独受入は未接続／blocked。局所fixtureとGitHub Actionsの成功を、保存・統合や製品全機能発見の完了として報告しない。
