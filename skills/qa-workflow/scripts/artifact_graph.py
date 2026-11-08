@@ -1124,6 +1124,49 @@ def _initialize_sqlite_workflow_table(connection: sqlite3.Connection) -> None:
         "workflow_ref TEXT PRIMARY KEY, envelope_json TEXT NOT NULL, "
         "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0))"
     )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS workflow_state_history ("
+        "workflow_ref TEXT NOT NULL REFERENCES workflow_state(workflow_ref), "
+        "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0), "
+        "envelope_json TEXT NOT NULL, "
+        "PRIMARY KEY(workflow_ref, provider_revision))"
+    )
+
+
+def _sqlite_history_is_complete(
+    connection: sqlite3.Connection, workflow_ref: str, revision: int
+) -> bool:
+    """Only a complete chain from revision 1 can substantiate full history."""
+    rows = connection.execute(
+        "SELECT provider_revision FROM workflow_state_history "
+        "WHERE workflow_ref=? ORDER BY provider_revision",
+        (workflow_ref,),
+    ).fetchall()
+    return len(rows) == revision and all(
+        row[0] == index for index, row in enumerate(rows, start=1)
+    )
+
+
+def _sqlite_assert_history_snapshot(
+    connection: sqlite3.Connection,
+    workflow_ref: str,
+    revision: int,
+    encoded: str,
+) -> None:
+    """Never overwrite a contradictory historical snapshot."""
+    row = connection.execute(
+        "SELECT envelope_json FROM workflow_state_history "
+        "WHERE workflow_ref=? AND provider_revision=?",
+        (workflow_ref, revision),
+    ).fetchone()
+    if row is None:
+        connection.execute(
+            "INSERT INTO workflow_state_history "
+            "(workflow_ref, provider_revision, envelope_json) VALUES (?,?,?)",
+            (workflow_ref, revision, encoded),
+        )
+    elif row[0] != encoded:
+        raise ValueError("workflow_state_history_conflict")
 
 
 def _provider_revision_token(revision: int) -> str:
@@ -1171,6 +1214,9 @@ def create_sqlite_workflow_state(
                 "INSERT INTO workflow_state(workflow_ref,envelope_json,provider_revision) VALUES(?,?,1)",
                 (envelope["workflow_ref"], encoded),
             )
+            _sqlite_assert_history_snapshot(
+                connection, envelope["workflow_ref"], 1, encoded
+            )
             connection.execute("COMMIT")
         result = read_sqlite_workflow_state(workflow_root, envelope["workflow_ref"])
         if result.get("status") != "current" or result.get("state") != state:
@@ -1189,7 +1235,7 @@ def read_sqlite_workflow_state(
     *,
     expected_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Read the current envelope from a new connection; the token is provider-owned."""
+    """Read the current envelope from a fresh SQLite connection."""
     ref = workflow_ref.lower() if isinstance(workflow_ref, str) else ""
     if not _UUID.fullmatch(ref):
         return {"status": "blocked", "reason": "workflow_state_identity_invalid"}
@@ -1199,38 +1245,60 @@ def read_sqlite_workflow_state(
             return {"status": "blocked", "reason": "workflow_state_not_found"}
         with closing(_sqlite_connection(path)) as connection:
             row = connection.execute(
-                "SELECT envelope_json,provider_revision FROM workflow_state WHERE workflow_ref=?",
+                "SELECT envelope_json,provider_revision FROM workflow_state "
+                "WHERE workflow_ref=?",
                 (ref,),
             ).fetchone()
-        if row is None:
-            return {"status": "blocked", "reason": "workflow_state_not_found"}
-        envelope = json.loads(row[0])
-        if (
-            not isinstance(envelope, dict)
-            or set(envelope) != {"workflow_ref", "schema_version", "state"}
-            or envelope.get("workflow_ref") != ref
-            or envelope.get("schema_version") != "1"
-            or not isinstance(envelope.get("state"), dict)
-            or not isinstance(row[1], int)
-            or row[1] < 1
-        ):
-            return {"status": "blocked", "reason": "workflow_state_corrupt"}
-        token = _provider_revision_token(row[1])
-        if expected_revision is not None and expected_revision != token:
+            if row is None:
+                return {"status": "blocked", "reason": "workflow_state_not_found"}
+            encoded, number = row
+            envelope = json.loads(encoded)
+            if (
+                not isinstance(envelope, dict)
+                or set(envelope) != {"workflow_ref", "schema_version", "state"}
+                or envelope.get("workflow_ref") != ref
+                or envelope.get("schema_version") != "1"
+                or not isinstance(envelope.get("state"), dict)
+                or not isinstance(number, int)
+                or number < 1
+            ):
+                return {"status": "blocked", "reason": "workflow_state_corrupt"}
+            token = _provider_revision_token(number)
+            if expected_revision is not None and expected_revision != token:
+                return {
+                    "status": "conflict",
+                    "reason": "state_revision_changed",
+                    "current_revision": token,
+                }
+            existing_table = connection.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='workflow_state_history'"
+            ).fetchone()
+            history_complete = False
+            if existing_table:
+                stored = connection.execute(
+                    "SELECT envelope_json FROM workflow_state_history "
+                    "WHERE workflow_ref=? AND provider_revision=?",
+                    (ref, number),
+                ).fetchone()
+                if stored is not None and stored[0] != encoded:
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_history_mismatch",
+                    }
+                history_complete = (
+                    stored is not None
+                    and _sqlite_history_is_complete(connection, ref, number)
+                )
             return {
-                "status": "conflict",
-                "reason": "state_revision_changed",
-                "current_revision": token,
+                "status": "current",
+                "state": envelope["state"],
+                "workflow_ref": ref,
+                "schema_version": "1",
+                "state_revision": token,
+                "revision_kind": "sqlite_atomic_provider_revision",
+                "historical_revision_available": history_complete,
             }
-        return {
-            "status": "current",
-            "state": envelope["state"],
-            "workflow_ref": ref,
-            "schema_version": "1",
-            "state_revision": token,
-            "revision_kind": "sqlite_atomic_provider_revision",
-            "historical_revision_available": False,
-        }
     except (
         OSError,
         sqlite3.Error,
@@ -1241,6 +1309,57 @@ def read_sqlite_workflow_state(
     ):
         return {"status": "blocked", "reason": "workflow_state_unreadable"}
 
+
+def read_sqlite_workflow_state_revision(
+    workflow_root: str | Path,
+    workflow_ref: str,
+    revision_token: str,
+) -> dict[str, Any]:
+    """Fetch the exact historical SQLite revision; never infer missing history."""
+    ref = workflow_ref.lower() if isinstance(workflow_ref, str) else ""
+    revision = _provider_revision_number(revision_token)
+    if not _UUID.fullmatch(ref) or revision is None:
+        return {"status": "blocked", "reason": "historical_state_identity_invalid"}
+    try:
+        path = _local_sqlite_path(workflow_root)
+        if not path.is_file():
+            return {"status": "blocked", "reason": "historical_state_unavailable"}
+        with closing(_sqlite_connection(path)) as connection:
+            row = connection.execute(
+                "SELECT envelope_json FROM workflow_state_history "
+                "WHERE workflow_ref=? AND provider_revision=?",
+                (ref, revision),
+            ).fetchone()
+            if row is None:
+                return {"status": "blocked", "reason": "historical_state_unavailable"}
+            encoded = row[0]
+            envelope = json.loads(encoded)
+            if (
+                not isinstance(envelope, dict)
+                or set(envelope) != {"workflow_ref", "schema_version", "state"}
+                or envelope.get("workflow_ref") != ref
+                or envelope.get("schema_version") != "1"
+                or not isinstance(envelope.get("state"), dict)
+                or encoded != _json_bytes(envelope).decode("utf-8")
+            ):
+                return {"status": "blocked", "reason": "historical_state_corrupt"}
+            return {
+                "status": "historical",
+                "workflow_ref": ref,
+                "schema_version": "1",
+                "state": envelope["state"],
+                "state_revision": _provider_revision_token(revision),
+                "revision_kind": "sqlite_atomic_provider_revision",
+            }
+    except (
+        OSError,
+        sqlite3.Error,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ):
+        return {"status": "blocked", "reason": "historical_state_unavailable"}
 
 def conditional_write_sqlite_workflow_state(
     workflow_root: str | Path,
@@ -1260,7 +1379,17 @@ def conditional_write_sqlite_workflow_state(
             }
         encoded = _json_bytes(envelope).decode("utf-8")
         with closing(_sqlite_connection(path)) as connection:
+            _initialize_sqlite_workflow_table(connection)
             connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                "SELECT envelope_json,provider_revision FROM workflow_state "
+                "WHERE workflow_ref=?",
+                (envelope["workflow_ref"],),
+            ).fetchone()
+            if current is not None and current[1] == revision:
+                _sqlite_assert_history_snapshot(
+                    connection, envelope["workflow_ref"], revision, current[0]
+                )
             cursor = connection.execute(
                 "UPDATE workflow_state SET envelope_json=?,provider_revision=provider_revision+1 "
                 "WHERE workflow_ref=? AND provider_revision=?",
@@ -1279,6 +1408,9 @@ def conditional_write_sqlite_workflow_state(
                     if current
                     else None,
                 }
+            _sqlite_assert_history_snapshot(
+                connection, envelope["workflow_ref"], revision + 1, encoded
+            )
             connection.execute("COMMIT")
         reread = read_sqlite_workflow_state(workflow_root, envelope["workflow_ref"])
         expected_new = _provider_revision_token(revision + 1)
