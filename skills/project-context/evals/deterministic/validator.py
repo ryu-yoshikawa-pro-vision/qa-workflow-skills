@@ -25,8 +25,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     state = bullets.get("判定状態")
     result.add(
         "PC-D001",
-        text.startswith("# Project Contextの確認・変更")
-        and state in STATES,
+        text.startswith("# Project Contextの確認・変更") and state in STATES,
         "判断状態と正規出力の見出しがあること",
     )
     for assertion, key in (
@@ -55,11 +54,21 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     else:
         result.add(
             "PC-D007",
-            state not in {"draft", "absent", "unconfirmed", "ambiguous", "blocked", "incomplete"}
+            state
+            not in {
+                "draft",
+                "absent",
+                "unconfirmed",
+                "ambiguous",
+                "blocked",
+                "incomplete",
+            }
             or not ref.startswith("保存済み"),
             "保存未確定の文書を保存済みと表記しないこと",
         )
-    storage = bullets.get("native create-if-absent／CAS、履歴再取得、独立readbackの結果", "")
+    storage = bullets.get(
+        "native create-if-absent／CAS、履歴再取得、独立readbackの結果", ""
+    )
     result.add(
         "PC-D008",
         bool(storage)
