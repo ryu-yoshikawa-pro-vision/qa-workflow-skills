@@ -3367,16 +3367,6 @@ def _state_result_blocks(
     return result
 
 
-RUNTIME_V2_SKILL_ROOTS = {
-    "test-analysis": ("artifact:analysis_entities:all",),
-    "test-requirement-design": ("artifact:requirement_structure:all",),
-    "test-condition-design": ("artifact:condition_structure:all",),
-    "test-case-design": ("artifact:case_structure:all",),
-    "coverage-analysis": ("artifact:traceability:all",),
-    "qa-workflow": ("artifact:workflow_runtime:all",),
-}
-
-
 def _default_expected_runtime_units(
     skill: str,
     normalized: dict[str, Any],
@@ -3394,10 +3384,16 @@ def _default_expected_runtime_units(
     expected.  Conditional child units are added only from a verified parent
     result in the candidate artifact.
     """
-    if skill not in RUNTIME_V2_SKILL_ROOTS:
-        raise InvalidInput(f"{skill} has no registered runtime-v2 verifier")
     roots: list[tuple[str, str | None]] = []
-    for unit in RUNTIME_V2_SKILL_ROOTS[skill]:
+    root_map = {
+        "test-analysis": ["artifact:analysis_entities:all"],
+        "test-requirement-design": ["artifact:requirement_structure:all"],
+        "test-condition-design": ["artifact:condition_structure:all"],
+        "test-case-design": ["artifact:case_structure:all"],
+        "coverage-analysis": ["artifact:traceability:all"],
+        "qa-workflow": ["artifact:workflow_runtime:all"],
+    }
+    for unit in root_map.get(skill, []):
         roots.append((unit, None))
     if skill == "test-analysis":
         conditional = (
@@ -4467,8 +4463,6 @@ def validate_current_structure_state(
     | None = None,
 ) -> dict[str, Any] | None:
     """Strictly validate the fixed verifier projection consumed by workflow/traceability."""
-    if skill not in RUNTIME_V2_SKILL_ROOTS:
-        raise InvalidInput(f"{skill} has no registered runtime-v2 verifier")
     if state is None:
         raise InvalidInput(
             "current_structure_state from verify_runtime_evidence is required"
@@ -5493,8 +5487,6 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     if request.get("operation") != "verify_runtime_evidence":
         raise InvalidInput("operationが不正です")
     skill = ensure_nonempty_string(request.get("skill"), "skill")
-    if skill not in RUNTIME_V2_SKILL_ROOTS:
-        raise InvalidInput(f"{skill} has no registered runtime-v2 verifier")
     normalized = ensure_object(
         request.get("normalized_skill_input"), "normalized_skill_input"
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import importlib.util
 import json
@@ -48,7 +49,7 @@ class CiHandoffTests(unittest.TestCase):
             "source_inventory": [{"ref": "repo-source", "revision": HEAD}],
             "changed_paths": ["src/a.ts", "docs/spec.md"],
             "allowed_classifications": ["implementation", "specification"],
-            "artifacts": [dict(artifact)],
+            "artifacts": [copy.deepcopy(artifact)],
             "required_approvals": [],
         }
         self.manifest = {
@@ -62,7 +63,7 @@ class CiHandoffTests(unittest.TestCase):
                 {"path": "src/a.ts", "classification": "implementation"},
                 {"path": "docs/spec.md", "classification": "specification"},
             ],
-            "artifacts": [dict(artifact, path="artifact.md")],
+            "artifacts": [dict(copy.deepcopy(artifact), path="artifact.md")],
         }
 
     def result(self) -> dict:

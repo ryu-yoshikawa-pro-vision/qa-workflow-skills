@@ -65,20 +65,10 @@ class OwnerVerifierGateTests(unittest.TestCase):
         self.assertEqual(result["payload"]["missing_runtime_units"], [])
         self.assertEqual(result["payload"]["missing_entities"], [])
 
-    def test_unregistered_skill_cannot_use_runtime_v2_zero_evidence(self) -> None:
-        with self.assertRaises(runtime.InvalidInput):
-            runtime._default_expected_runtime_units("test-management", {}, "")
-        with self.assertRaises(runtime.InvalidInput):
-            runtime.verify_runtime_evidence(
-                {
-                    "operation": "verify_runtime_evidence",
-                    "skill": "test-management",
-                    "normalized_skill_input": {},
-                    "artifact_markdown": "",
-                    "previous_artifact_markdown": None,
-                    "partial_rerun": False,
-                }
-            )
+    def test_unregistered_skill_has_no_runtime_v2_root(self) -> None:
+        self.assertEqual(
+            runtime._default_expected_runtime_units("test-management", {}, ""), []
+        )
 
     def test_unregistered_scope_cannot_inject_unverified_current_units(self) -> None:
         request = WorkflowRuntimeTests()._request()

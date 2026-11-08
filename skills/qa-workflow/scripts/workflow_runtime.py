@@ -12,7 +12,6 @@ from typing import Any
 import artifact_graph
 from runtime_contract import (
     FULL_DIGEST_RE,
-    RUNTIME_V2_SKILL_ROOTS,
     InvalidInput,
     _default_expected_runtime_units,
     _expected_entities,
@@ -37,6 +36,19 @@ SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
 GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
 SCRIPT_PATH = Path(__file__).resolve()
+# Only these Skills currently provide runtime-v2 root derivation and evidence.
+# A name appearing in workflow_scopes is not itself a verification contract.
+RUNTIME_V2_SKILL_ROOTS = frozenset(
+    {
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "qa-workflow",
+    }
+)
+
 _WCAG_STATE_OPERATIONS = {
     "register-wcag-evaluation-plan",
     "read-wcag-evaluation-state",
