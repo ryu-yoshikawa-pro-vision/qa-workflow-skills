@@ -184,28 +184,24 @@ SQLite履歴の追加テスト`test_sqlite_workflow_history.py`は、create／CA
 
 CodeRabbitは旧HEAD `620db5a` の差分に対して18件を指摘した。現行HEADに照らして対応し、旧形式claimの説明と読取互換の2件は以前の変更で対応済み。追加修正の対象と局所証拠は以下のとおり。
 
-| 対象 | 修正と回帰確認 | 検証ファイル |
-| --- | --- | --- |
-| workflow state履歴 | 旧snapshotを全件解析し、破損時はcurrent read／CASをblock。SQLite revision最大値を更新前に拒否。旧形式履歴・並行CASは維持 | `test_sqlite_workflow_history.py` |
-| mutable claim | 2 MiB超のclaimを保存前に拒否。ファイルシステムエラーを構造化block。旧JSONの有効な非正規バイト列と旧claim revisionの再読込を確認 | `test_qa_operation_claim.py` |
-| CI成果物受渡し | 深いJSON入力、FIFOの非ブロッキングopen、非POSIX等の危険なfallback拒否、比較用POSIX変更パスとartifact読取パスの区別、Unicode出力、旧source refの両側一致ケース | `test_ci_handoff.py` |
-| workflow runtime | 未登録Skillのnormalized modelを共通closure照合・materialize完了判定から除外。対象scopeは`unverified_scopes`に残し、対応済みscopeのcurrent結果を保持 | `test_owner_verifier_gate.py` |
-| 効率評価 | 中央値のoverflow防止、数値・JSON再帰エラー時のCLI block、異なる値の中央値による悪化判定、CLI成功の終了コード0、証拠付試行 | `test_workflow_efficiency.py` |
-| shared resource | 外部providerの取得済みフラグとrevision文字列だけで`reserved`を返さない。正式なproviderの実取得結果を用いるWCAG fixtureと共通helperのblockを別々に確認 | `test_shared_resource_contract.py`、`test_wcag_handoff_contract.py`、`test_qa_artifact_graph_skills.py` |
+- workflow state履歴（`test_sqlite_workflow_history.py`）：旧snapshotを全件解析し、破損時はcurrent read／CASをblock。SQLite revision最大値を更新前に拒否。旧形式履歴・並行CASは維持。
+- mutable claim（`test_qa_operation_claim.py`）：2 MiB超のclaimを保存前に拒否。ファイルシステムエラーを構造化block。旧JSONの有効な非正規バイト列と旧claim revisionの再読込を確認。
+- CI成果物受渡し（`test_ci_handoff.py`）：深いJSON入力、FIFOの非ブロッキングopen、危険なfallback拒否、比較用POSIX変更パスとartifact読取パスの区別、Unicode出力、旧source refの両側一致を確認。
+- workflow runtime（`test_owner_verifier_gate.py`）：未登録Skillのnormalized modelを共通closure照合・materialize完了判定から除外。対象scopeを未検証として残し、対応済みscopeのcurrent結果を保持。
+- 効率評価（`test_workflow_efficiency.py`）：中央値のoverflow防止、数値・JSON再帰エラー時のCLI block、中央値による悪化判定、CLI成功時の終了コード0を検証。
+- shared resource（`test_shared_resource_contract.py`、`test_wcag_handoff_contract.py`、`test_qa_artifact_graph_skills.py`）：外部providerの取得済みフラグとrevision文字列だけで`reserved`を返さない。正式なproviderの実取得結果と共通helperのblockを別々に確認。
 
 CodeRabbitのSQLite shared reservation再取得時revision上限の指摘は、そのprovider自体を今回の合意により撤回したため対象外。既存WCAG評価向けの単一host SQLite履歴は維持する。CodeRabbitのdocstring coverage警告はリポジトリのformatter／lintの失敗ではないが、公開helperには責務と信頼境界を記述する。
 
 ### 担当Aの実装／保留とPR #22への引継ぎ
 
-| 担当Aの作業 | 実装・局所検証 | PR #22へ残る条件 |
-| --- | --- | --- |
-| 1. 共通契約・owner責務の明示 | 本文の公開契約と正常／拒否fixtureに記録 | B〜Jが返す正式schema／validator／owner保存refの確定と共通契約の相互確認 |
-| 2. 新設Skill／routing | 未登録・空証拠の誤完了防止、既存6 Skill current／未検証scope混在 | 新設14 Skillの正式validator登録と、各ownerの真の成果物による結合 |
-| 3. native保存・履歴・claim | 既存WCAGの単一host SQLite CASと履歴、局所claim・失敗／再開blockのテスト | 案件で採用するowner保存providerのnative CAS／readback／release、claimの安全な実復旧 |
-| 4. 承認・権限 | 未接続なら副作用を許可しない共通条件を記述 | 対象scope・revision・主体・ロール・期限を認証する案件の正式なprovider |
-| 5. 製品CI受渡し | trusted expected／manifest／artifactの機械的照合、異常入力／安全読取の負例 | 製品CIでのtrusted expected生成・候補の実受渡し、実providerと認可の接続 |
-| 6. S1〜S17共通契約・局所受入 | 共通runtime／保存／CI／比較器の独立fixtureと既存consumerの回帰 | A〜Jの実成果物を接続した総合S1〜S17受入（PR #22） |
-| 7. 5条件の効率比較 | 5シナリオ・実測元／未測定・品質と数値計算・CLI正常／拒否テスト | 実Agentの比較元／変更後の記録取得・品質受入・効率化の実証（PR #22） |
+- **1. 共通契約・owner責務の明示**：本文の公開契約と正常／拒否fixtureに記録。B〜Jが返す正式schema／validator／owner保存refの確定と相互確認は未完了。
+- **2. 新設Skill／routing**：未登録・空証拠の誤完了防止、既存6 Skillのcurrent／未検証scope混在を局所検証。新設14 Skillの正式validator登録と実成果物による結合は未実施。
+- **3. native保存・履歴・claim**：既存WCAGの単一host SQLite CASと履歴、局所claim・失敗／再開blockを検証。案件で採用するowner保存providerのnative CAS／readback／release、claimの実復旧は未接続。
+- **4. 承認・権限**：未接続時に副作用を許可しない共通条件を記述。対象scope・revision・主体・ロール・期限を認証する正式providerは未決定。
+- **5. 製品CI受渡し**：trusted expected／manifest／artifactの機械的照合と異常入力／安全読取を検証。製品CIでのtrusted expected生成・実受渡し・認可は未接続。
+- **6. S1〜S17共通契約・局所受入**：共通runtime／保存／CI／比較器の独立fixtureと既存consumerを回帰。A〜Jの実成果物による総合S1〜S17受入はPR #22で行う。
+- **7. 5条件の効率比較**：5シナリオ・実測元／未測定・品質・数値計算・CLI正常／拒否をテスト。実Agentの変更前後の記録取得・品質受入・効率化実証はPR #22で行う。
 
 保存先・承認者・製品CIの入口を特定できないままSQLiteなどを既定providerにしない。未選定のshared resourceは安全に停止する。fixtureのsuccessは実ownerの保存／認証／CIを実証した結果ではない。
 
