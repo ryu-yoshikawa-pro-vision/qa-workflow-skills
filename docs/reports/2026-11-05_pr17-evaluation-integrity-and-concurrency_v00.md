@@ -202,3 +202,22 @@ Skill-local verifierの`valid`は提出されたruntime evidenceの契約適合�
 前節に記載したinventory累計76件へCOVの8 attemptと今回のTCN/TR各2 attemptを加え、この作業で追跡できる累計は88 attemptである。直近の4 attemptはいずれもhost-observed completed、成果物取得済み、採点済みで、PASS 2件（TR-OUT-004）、FAIL 2件（TCN-OUT-001）、生成前停止0件。既存の開発用改善実績は`test-requirement-design / TR-OUT-013`の1件で、新たなSkill修正candidateと新規改善実証は0件。TCNの失敗は既存Skill契約に対する異なる2種の逸脱であり、Skill欠陥へ帰属できる一貫した原因を示さない。TR positive評価はbaselineのみで改善の証拠ではない。
 
 今回の実測から、同一handoffで要求設定を指定した別サブエージェントを起動し、既存`prepare / host-request / capture / seal / grade`の経路で出力を保存・採点する開発用評価は実行可能と確認できた。これはCodexホスト上のサブエージェントによる開発用動作評価である。正式runner、Judge承認、実効model/build、tool trace、共有workspaceの物理read-denial、正式QTS評価は未達のままである。
+
+## 14. test-case-designの正方向baseline確認（2026-11-08）
+
+内容のある詳細ケース生成を確認するため、固定QTS source revision `84ce165493649550832731a60cf436f8ae29c56b`の`SCREEN-CHECKOUT-COMPLETE`契約を用いた合成上流Entityを追加した。最初の入力revisionは、仕様に明記されていないTEST-SUCCESS後の画面遷移を含み、期待JSONも単一の番号付き結果に限定していた。`test-case-design / TC-OUT-003`の2 attemptはともに`TC-D011`（18/19）FAIL、runtime evidenceはvalidだった。この組は遷移の根拠がないためSkill品質評価から除外せず、旧条件として保存し、後の条件と比較しない。
+
+入力を画面表示だけの検証へ改訂し、Payment成功・支払済みOrderを合成開始状態として指定した。遷移・DB/API/ログは検査せず、画面上のPayment成功、Order番号、注文履歴への導線だけを評価する。Authorityとexpectedは固定sourceのScreen contractに限定した。新しいdataset fingerprintは`sha256:f4d1feb00bc895a6d025517944de4b0df4c02df7265e044ca6f1a9c2d0a1e8d4`、input fingerprintは`sha256:04c913d1263fdd6f0f88848439a5bd45a3033378d28d49933841031fd7eff890`、Skill package fingerprintは`sha256:98aea2798671eeb721de1da5210b5e2b5d2c47bd5ea9cfa8f5460df10146d23e`。Evaluator / baseline Skill revisionは`96c95892393b5a99be01a68e10e56a416ba589ea`。要求設定は各attemptで`gpt-6-luna / max / fork_turns=none`、実効model/build・tool trace・物理read-denialは未検証。
+
+| Attempt                            | Grade / runtime            | 不適合                                                                                           |
+| ---------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `acfe50b21a554f2ca188ebc7d037b09c` | 18/19 FAIL / runtime valid | `TC-D012`: templateにある空のDisposition表を省略し、見出し下に「対象なし」の文章だけを出力した。 |
+| `990d2ebca98e492fa3a4d216e7c085a8` | 19/19 PASS / runtime valid | なし。                                                                                           |
+
+この1/2の出力差は実Agentのformat遵守の揺れであり、現行Skillは既定templateの使用をすでに指示している。再現するSkill指示欠落とは確認できないため、Skill patch、candidate比較、独立回帰は作成・実行していない。成功成果物は仕様に直接定義された3つの画面項目とsourceを対応させ、画面遷移を創作していない。これは正方向ケースのbaseline確認であり、Skill改善ではない。意味品質全体も独立Judgeまたは人間により承認されたものではない。
+
+この続きで実Agentを起動したattemptは合計4件（旧入力2件、新入力2件）。すべてhostがcompletedと記録し、成果物取得・seal・gradeまで完了。Gradeは旧入力2 FAIL、新入力1 PASS / 1 FAIL、runtime evidenceは4/4 valid、not_startedは0件。2回の`prepare`失敗は誤ったGit revision指定を`git rev-parse`が拒否したもので、attempt作成前のhost準備エラーとして別記し、合計attempt数へ含めていない。
+
+全run record、raw artifact、manifest、grade、request、要求設定およびhashはGit管理外の[旧条件証拠索引](../../.agent-eval-runs/pr17-positive-tcd-20261108-r1/evidence-index.md)と[改訂条件証拠索引](../../.agent-eval-runs/pr17-positive-tcd-20261108-r2/evidence-index.md)に保存した。r1 result SHA-256は`fca13c2755a94cda444ecb4c31a285f2a7ee90f390174bfd3a1f2f6ec2fff6a3`、r2 result SHA-256は`8447a7ad33ddccb00b8935dd858ba10d2761b301f6e1e430f24b7c4979ad9782`。r1 attemptの一方は初回generator request/resultがagent内部で破棄され最終artifactに含まれないと報告されたため、実行履歴自体は未検証としている。
+
+前節の追跡累計88 attemptへ今回の4件を加え、現行inventoryは92 attempt。今回新たにSkill修正candidateを作成した件数は0、改善実証数も0。PR #17全体では既存`TR-OUT-013`の開発用Skill改善1件を維持し、正式な独立評価とは区別する。正式runner、Judge、正式QTS評価、実効model/build、tool trace、共有workspaceの物理read-denialは引き続き未達または未検証。
