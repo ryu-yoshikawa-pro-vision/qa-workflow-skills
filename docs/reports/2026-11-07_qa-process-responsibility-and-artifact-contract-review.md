@@ -345,3 +345,14 @@ Q02とQ04は矛盾しない。**外部資料の変更を入力として扱うこ
 - コード、Skill、評価基盤、製品CIは今回変更していない。追加した修正契約・S17等が成立した実測証拠ではない。
 - QA Knowledgeの異常検索・Regression補助のみのActivity・並行testware編集・Agent効率の比較を実行再現したわけではない。既存コード・Planの処理経路を根拠とする。
 - QA遂行効率は、機能として成立したことと、同じ品質で処理負担を減らせたことを区別する。従来経路が機能を持たなかった範囲は機能追加として記録し、比較不能を「効率改善」と数えない。
+
+## 14. 人間の直接編集と既存UI package writerの照合（2026-11-08）
+
+PR #22 HEAD `f6f49da8f6fecb94e8662a9ac6032cea8314ac2c`の設計について、独立した3件のレビューは、確認範囲で重大な追加問題なしと判断した。別途、2026-11-08のQ06合意（人間もQA成果物を直接編集・レビューする）と既存`ui_target_package.py`の更新条件を照合し、直接編集の正式取り込み経路を実装契約へ補足した。
+
+- `_read_package()`は必須fileと`MANIFEST.md`のSHA-256一致を要求する。標準Markdownだけを直接変更したpackageをそのままcurrentとして更新すると`manifest_mismatch`になる。`_execute_operation()`の`materialize(update)`は有効なcurrentを前提とし、編集途中のpackageを自動取込する経路ではない。
+- Q06で合意した人間の直接編集は、既存の有効snapshotから分岐した作業用branch／copyで行い、各ownerがdiff・stable ID・Authority・承認・競合を確認した意味変更だけ既存`materialize`へ入力する。生成Manifest・CHANGELOG・Machine Entityとversionの正式な確定は既存writerが担当する。編集中の差分と元revisionの保全、誤ってcurrentを直接改変した場合の停止・再開は[詳細契約08](../plans/2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)を正本とする。
+- 新しい配置管理Skill・汎用の編集runtime・別の正本台帳は追加しない。案件の配置合意は`project-context`、workflowのroutingは`qa-workflow`、成果物の編集検証と正式保存は各ownerに維持する。
+
+本節は**既存コードの制約と実装Planへの反映記録**である。作業用差分の正式取り込み機能・テスト・実Agent受入は、この文書更新の時点では実装・実行していない。
+
