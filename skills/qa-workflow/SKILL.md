@@ -97,6 +97,7 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 ## リソース
 
 - オーケストレーション詳細: `references/guidance.md`
+- 製品CI向け成果物受渡しの決定論的検証と信頼境界: `references/ci-handoff.md`、`scripts/ci_handoff.py`。保存先・承認元未選定時の実CI接続はblocked。
 - artifact graph / workflow state / currentness / claim / reservation production helper: `scripts/artifact_graph.py`
 - Project ContextがDEC / ASM正本ownerの場合のID materialize / 履歴検証: `scripts/project_context_ids.py`
 - runtime-v2 migration / scope ownershipのnext action: `scripts/migration_preflight.py`
