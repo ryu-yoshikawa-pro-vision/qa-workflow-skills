@@ -158,14 +158,15 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             start = connection.execute(
                 "SELECT first_revision FROM workflow_state_history_origin "
-                "WHERE workflow_ref=?", (REF,)
+                "WHERE workflow_ref=?",
+                (REF,),
             ).fetchone()[0]
         self.assertEqual(start, 3)
         self.assertEqual(self.update("sqlite:4", "further-update")["status"], "written")
         self.assertFalse(
-            artifact_graph.read_sqlite_workflow_state(
-                self.root, REF
-            )["historical_revision_available"]
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)[
+                "historical_revision_available"
+            ]
         )
         self.assertEqual(self.read_history("sqlite:3")["state"], {"marker": "legacy"})
         self.assertEqual(
@@ -238,7 +239,8 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             connection.execute(
                 "DELETE FROM workflow_state_history "
-                "WHERE workflow_ref=? AND provider_revision=1", (REF,)
+                "WHERE workflow_ref=? AND provider_revision=1",
+                (REF,),
             )
         current = artifact_graph.read_sqlite_workflow_state(self.root, REF)
         self.assertEqual(current["status"], "blocked")
@@ -247,7 +249,8 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             rows = connection.execute(
                 "SELECT provider_revision FROM workflow_state_history "
-                "WHERE workflow_ref=? ORDER BY provider_revision", (REF,)
+                "WHERE workflow_ref=? ORDER BY provider_revision",
+                (REF,),
             ).fetchall()
             latest = connection.execute(
                 "SELECT provider_revision FROM workflow_state WHERE workflow_ref=?",
@@ -282,9 +285,9 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             )
         self.assertEqual(self.update("sqlite:2", "migrated")["status"], "written")
         self.assertTrue(
-            artifact_graph.read_sqlite_workflow_state(
-                self.root, REF
-            )["historical_revision_available"]
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)[
+                "historical_revision_available"
+            ]
         )
 
     def test_unmarked_partial_history_is_ambiguous_and_blocks_updates(self) -> None:
@@ -298,7 +301,8 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             )
             connection.execute(
                 "DELETE FROM workflow_state_history "
-                "WHERE workflow_ref=? AND provider_revision=1", (REF,)
+                "WHERE workflow_ref=? AND provider_revision=1",
+                (REF,),
             )
         self.assertEqual(self.update("sqlite:2")["status"], "blocked")
         with sqlite3.connect(database) as connection:
