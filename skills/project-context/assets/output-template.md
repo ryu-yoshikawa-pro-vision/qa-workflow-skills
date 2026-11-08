@@ -10,4 +10,6 @@
 - 変更内容と根拠source ref／revision：
 - native create-if-absent／CAS、履歴再取得、独立readbackの結果：
 - blockedの操作・理由・再開条件：
-- 判定状態（current／incomplete／existing／absent／unconfirmed／ambiguous／draft／blocked）：
+- 判定状態：
+
+判定状態はcurrent / incomplete / existing / absent / unconfirmed / ambiguous / draft / blockedのいずれかです。

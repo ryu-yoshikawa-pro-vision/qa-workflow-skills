@@ -22,4 +22,6 @@
 - 製品全機能の発見保証：未判定
 - providerのCAS・履歴・readback・承認の結果：
 - 下流への機能ID／source revision／artifact revisionと要再検証対象：
-- 判定状態（complete／incomplete／stale／idempotent／blocked）：
+- 判定状態：
+
+判定状態はcomplete / incomplete / stale / idempotent / blockedのいずれかです。
