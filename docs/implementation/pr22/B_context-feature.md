@@ -134,3 +134,10 @@
 - [Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42489982070)：この記録時点では実行中。先行commitのLinux／Windowsでは、共有`tests/codex/test_development_skills.py:85`のSkill数`23`固定と新Skill25件との不一致によりFAILした。現HEADでも修正未統合のため残存する問題。
 
 共有README・Codexテスト・Section 16追加key・B ownerのruntime登録は[PR #22へ対応依頼](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/22#issuecomment-6722581724)済み。これらを担当Bで独自変更して競合させない。実案件のsource API接続、Project Context・機能一覧のprovider-native create/CAS、過去revisionの独立readback、実認証承認、実Agent／実製品CIの担当単独受入は未接続／blocked。局所fixtureとGitHub Actionsの成功を、保存・統合や製品全機能発見の完了として報告しない。
+
+## 追加の安全性修正（2026-11-09）
+
+- `prepare-update`：path型の相対配置を検証し、絶対path・`..`・URIとscalar/pathへの改行・16節外の数値見出しの混入を拒否する。既存文書は自動書換えしない。
+- `feature_registry`：実際に変更されたartifactのrevision使回しを拒否し、split/mergedの履歴要件を確認する。handoffにcanonical snapshot SHA-256と取得source別状態・revision・未取得範囲を追加する。これらはproviderによる保存履歴・readbackの代替ではない。
+- `git_source_inventory`：Gitの大量出力を一時ファイルへ退避してから容量を判定し、巨大repoの出力によるプロセスメモリ消費を抑える。既存のGit差分と改名判定は維持する。
+- 上記の負例を担当unitへ追加。最新HEADのCI結果は実行後に確認し、未完了は未検証と記載する。

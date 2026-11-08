@@ -4,12 +4,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPT_DIR = (
     Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
 )
 sys.path.insert(0, str(SCRIPT_DIR))
+import git_source_inventory as inventory  # noqa: E402
 from git_source_inventory import handle  # noqa: E402
 
 
@@ -111,6 +113,12 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertEqual(handle(request)["status"], "blocked")
         request["head_sha"] = "f" * 40
         self.assertEqual(handle(request)["status"], "blocked")
+
+    def test_git_output_limit_blocks_instead_of_reporting_complete(self) -> None:
+        with mock.patch.object(inventory, "MAX_OUTPUT", 1):
+            result = handle(self.request(None, self.first))
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "git_output_too_large")
 
 
 if __name__ == "__main__":

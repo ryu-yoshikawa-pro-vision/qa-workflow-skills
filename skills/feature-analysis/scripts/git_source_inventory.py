@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -40,19 +41,24 @@ def _sha(value: Any, field: str) -> str:
 
 def _git(root: Path, *args: str) -> bytes:
     try:
-        process = subprocess.run(
-            ["git", "-C", str(root), *args],
-            capture_output=True,
-            timeout=TIMEOUT,
-            check=False,
-        )
+        # Spool Git output to disk so a large repository cannot exhaust RAM
+        # before the output-size guard runs.
+        with tempfile.TemporaryFile() as output:
+            process = subprocess.run(
+                ["git", "-C", str(root), *args],
+                stdout=output,
+                stderr=subprocess.DEVNULL,
+                timeout=TIMEOUT,
+                check=False,
+            )
+            if process.returncode:
+                raise Invalid(f"git_exit_{process.returncode}:{args[0]}")
+            if output.tell() > MAX_OUTPUT:
+                raise Invalid("git_output_too_large")
+            output.seek(0)
+            return output.read()
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise Invalid(f"git_execution_failed:{type(exc).__name__}") from exc
-    if process.returncode:
-        raise Invalid(f"git_exit_{process.returncode}:{args[0]}")
-    if len(process.stdout) > MAX_OUTPUT:
-        raise Invalid("git_output_too_large")
-    return process.stdout
 
 
 def _records(data: bytes, name: str) -> list[bytes]:

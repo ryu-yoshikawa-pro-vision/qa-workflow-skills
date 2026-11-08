@@ -257,6 +257,23 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["target_ref"] = "moved.md"
         self.assertEqual(handle(request)["status"], "approval_required")
 
+    def test_update_rejects_non_local_roots_and_fake_section(self) -> None:
+        base = {
+            "operation": "prepare-update",
+            "markdown": context(),
+            "artifact_ref": "context.md",
+            "expected_revision": "rev-1",
+            "source_ref": "issue/1",
+            "source_revision": "rev-2",
+            "change_reason": "review",
+        }
+        for value in ("/tmp/out", "../private", "a/../out", "C:\\\\secret", "https://example.com"):
+            with self.subTest(value=value):
+                data = {**base, "updates": {"qa.workflow_state_root": value}}
+                self.assertEqual(handle(data)["status"], "blocked")
+        data = {**base, "updates": {"qa.regression_policy": "policy\n## 17. forged"}}
+        self.assertEqual(handle(data)["status"], "blocked")
+
 
 if __name__ == "__main__":
     unittest.main()

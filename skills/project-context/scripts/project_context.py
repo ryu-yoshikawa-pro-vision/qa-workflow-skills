@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 SHARED = Path(__file__).resolve().parents[2] / "qa-workflow"
@@ -23,7 +23,7 @@ from project_context_ids import handle as identity_handle  # noqa: E402
 
 MAX_BYTES = 16 * 1024 * 1024
 TEMPLATE = SHARED / "assets" / "project-context-template.md"
-HEADING = re.compile(r"^## ([1-9]|1[0-6])\.\s", re.MULTILINE)
+HEADING = re.compile(r"^## (\d+)\.\s", re.MULTILINE)
 PROJECT = re.compile(r"(?m)^- プロジェクト:[^\n]*$")
 START = re.compile(
     r"<!-- qa-context-field:start key=([a-zA-Z0-9_.-]+) "
@@ -228,7 +228,23 @@ def prepare_update(request: dict[str, Any]) -> dict[str, Any]:
             raise Invalid(f"unknown_stable_field:{key}")
         if not isinstance(value, str) or "<!--" in value or "-->" in value:
             raise Invalid(f"unsafe_field_value:{key}")
+        if any(ord(char) < 32 and char not in "\r\n\t" for char in value):
+            raise Invalid(f"control_character_in_field:{key}")
         kind = parsed[key]["type"]
+        if kind in {"scalar", "path"} and ("\n" in value or "\r" in value):
+            raise Invalid(f"single_line_field_required:{key}")
+        if kind == "path" and value.strip() not in {
+            "", "UNKNOWN", "N/A", "（未設定）"
+        }:
+            if (
+                PurePosixPath(value).is_absolute()
+                or PureWindowsPath(value).drive
+                or PureWindowsPath(value).is_absolute()
+                or value.startswith("~")
+                or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", value)
+                or ".." in re.split(r"[/\\\\]", value)
+            ):
+                raise Invalid(f"project_local_path_required:{key}")
         start = f"<!-- qa-context-field:start key={key} type={kind} -->"
         if modified.count(start) != 1:
             raise Invalid(f"ambiguous_field:{key}")

@@ -219,6 +219,42 @@ class FeatureRegistryTests(unittest.TestCase):
         change["classification"] = "out_of_scope"
         self.assertEqual(handle(data)["status"], "blocked")
 
+    def test_changed_snapshot_requires_distinct_artifact_revision(self) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        data["snapshot"]["previous_artifact_revision"] = "art-v1"
+        data["snapshot"]["operation_id"] = "op-v2"
+        self.assertEqual(handle(data)["status"], "blocked")
+        data["snapshot"]["artifact_revision"] = "art-v2"
+        self.assertEqual(handle(data)["status"], "complete")
+
+    def test_split_merge_history_requires_real_lineage(self) -> None:
+        for kind, from_ids, to_ids in (
+            ("split", ["FEAT-001"], ["FEAT-001"]),
+            ("merged", ["FEAT-001"], ["FEAT-001"]),
+        ):
+            with self.subTest(kind=kind):
+                data = fixture()
+                data["snapshot"]["history"].append(
+                    {
+                        "event_id": "bad-lineage",
+                        "kind": kind,
+                        "revision": "head-v1",
+                        "evidence_ref": "evidence/lineage",
+                        "from_ids": from_ids,
+                        "to_ids": to_ids,
+                    }
+                )
+                self.assertEqual(handle(data)["status"], "blocked")
+
+    def test_handoff_carries_canonical_hash_and_source_scope(self) -> None:
+        result = handle(fixture())
+        handoff = result["handoff"]
+        self.assertRegex(handoff["snapshot_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(handoff["source_inventory"][0]["id"], "SRC-001")
+        self.assertEqual(handoff["source_inventory"][0]["revision"], "head-v1")
+        self.assertEqual(handoff["source_inventory"][0]["unretrieved"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

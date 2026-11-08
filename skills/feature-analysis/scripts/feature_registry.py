@@ -6,6 +6,7 @@ artifacts, and never claims that all product functions have been discovered.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -219,8 +220,10 @@ def _history(
         to_ids = _refs(event.get("to_ids"), "history_to_ids")
         if any(fid not in features for fid in from_ids + to_ids):
             raise ContractError("history_unknown_feature")
-        if event["kind"] in {"split", "merged"} and (not from_ids or not to_ids):
-            raise ContractError("history_lineage_missing")
+        if event["kind"] == "split" and (not from_ids or len(to_ids) < 2):
+            raise ContractError("split_requires_multiple_descendants")
+        if event["kind"] == "merged" and (len(from_ids) < 2 or not to_ids):
+            raise ContractError("merge_requires_multiple_ancestors")
     if previous is None:
         if snapshot.get("previous_artifact_revision") is not None:
             raise ContractError("unexpected_previous_artifact_revision")
@@ -245,6 +248,8 @@ def _history(
         "artifact_revision"
     ):
         raise ContractError("previous_artifact_revision_conflict")
+    if not idempotent and snapshot["artifact_revision"] == previous["artifact_revision"]:
+        raise ContractError("artifact_revision_reused")
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:
@@ -326,6 +331,11 @@ def analyze(request: Any) -> dict[str, Any]:
             "reasons": sorted(set(issues)),
             "metrics": None,
         }
+    snapshot_sha256 = hashlib.sha256(
+        json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
     return {
         "status": "complete" if not issues else "incomplete",
         "reasons": sorted(set(issues)),
@@ -350,6 +360,17 @@ def analyze(request: Any) -> dict[str, Any]:
             "all_product_features_discovered": None,
         },
         "handoff": {
+            "snapshot_sha256": snapshot_sha256,
+            "source_inventory": [
+                {
+                    "id": sid,
+                    "ref": row["ref"],
+                    "status": row["status"],
+                    "revision": row.get("revision"),
+                    "unretrieved": row["unretrieved"],
+                }
+                for sid, row in sorted(sources.items())
+            ],
             "artifact_ref": snapshot["artifact_ref"],
             "artifact_revision": snapshot["artifact_revision"],
             "source_revision": snapshot["source_revision"],

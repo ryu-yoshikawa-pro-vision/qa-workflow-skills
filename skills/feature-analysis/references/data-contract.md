@@ -23,3 +23,5 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 `scripts/git_source_inventory.py` はPython 3.11／Git CLIで `repository_root`、`authorized_root`、`base_sha`（初回null）、`head_sha` のJSONを受けます。2つのrootは正規化後に同一である必要があり、SHAはfull 40／64 hex commit IDです。read-onlyで `git ls-tree -r -z` によりHEAD全ファイル、baseがあれば `git diff --name-status -z --find-renames` で変更pathとrename元/先を列挙します。
 
 出力 `git-source-snapshot-v1` 相当の `files[]`（path、mode、kind、object_sha）、`changes[]`（status、before_path、after_path）、base/head SHA、complete_file_listing、complete_change_listing、unretrieved、feature_count=nullを、実際に取得できた範囲だけ返します。Gitの列挙結果は意味上の機能ID・全資料の発見を証明しません。Git以外のsourceと併せた正規化・対応付けはfeature_registry.pyの入力側で実施します。
+
+追加の機械検証：更新operationでは同一artifact_revisionの再利用を拒否します。分割は複数の派生ID、統合は複数の元IDが必要です。`handoff.snapshot_sha256`は候補snapshotのcanonical JSONのSHA-256、`handoff.source_inventory[]`はsource別のref・状態・revision・未取得の照合情報です。保存済みartifactの内容hash・認証済み承認の証明ではありません。

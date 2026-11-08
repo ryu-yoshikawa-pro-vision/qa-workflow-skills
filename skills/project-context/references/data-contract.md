@@ -21,3 +21,5 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 戻り値は `draft` と `allocated_ids`、履歴検査後の候補本文です。認証されたowner、元の保存revision、native create-if-absent／CAS、履歴と独立readbackは呼出し側の実providerで検証する必要があります。入力中の`dec_asm_owner`は呼出し側の宣言であり、それ自体は権限の証明にはなりません。
 
 既存stable keyの更新候補は変更理由を必須とし、返すdraftにはartifact ref、expected revision、source ref/revisionと変更理由を保持します。これらの文字列を保存時の認証や元文書の現在性の証明には使いません。
+
+更新値の安全条件：scalar/pathは単一行、pathは案件rootからの相対参照のみを受け付けます。絶対path、drive指定、`..`、URI・ホーム参照を拒否します。既存文書の読取互換性を維持するため、この制約は更新する値へ適用します。16節外の数値見出しを挿入した文書も拒否します。
