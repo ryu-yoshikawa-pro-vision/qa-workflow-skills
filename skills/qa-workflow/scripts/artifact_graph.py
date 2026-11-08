@@ -2948,13 +2948,17 @@ def claim_mutable_operation(
     *,
     operation_details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Persist an atomic pre-start claim, then independently read it back.
+    """Persist a mandatory detailed pre-start claim, then independently reread it.
 
-    A repeated claim never authorizes reexecution. Detailed claims preserve the
-    owner/scope/source/approval/resume boundary needed for a later session.
-    This local single-host claim does not authenticate approvals or prove that
-    a remote provider offers native conditional updates.
+    Existing detail-free claims are readable for migration but may never
+    authorize a new side effect. This is not approval authentication.
     """
+    if operation_details is None:
+        return {
+            "status": "blocked",
+            "may_start": False,
+            "reason": "operation_details_required",
+        }
     try:
         ref = _local_baseline_identity(workflow_ref)
         if (
@@ -3027,8 +3031,6 @@ def read_mutable_operation_claim(
     expected_claim_revision: str | None = None,
 ) -> dict[str, Any]:
     """Read a persisted claim in a fresh session without restarting its action."""
-    if operation_details is None:
-        return {"status": "blocked", "may_start": False, "reason": "operation_details_required"}
     try:
         ref = _local_baseline_identity(workflow_ref)
         if not isinstance(operation_ref, str) or not operation_ref.strip():
