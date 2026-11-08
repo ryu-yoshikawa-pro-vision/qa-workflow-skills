@@ -11,33 +11,33 @@
 
 ## 担当PR
 
-| 担当 | PR | 主な責務 | 作業定義 |
-| --- | --- | --- | --- |
-| A | [#23](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/23) | 共有runtime・保存／承認・評価・製品CI基盤の実装／局所検証（**横断統合は担当しない**） | [共通runtime・保存・CI基盤](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-a-runtime-integration/docs/implementation/pr22/A_runtime-integration.md) |
-| B | [#24](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/24) | 案件配置・機能ID・開発差分・情報源母集団 | [Project Context・機能分析](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-b-context-feature/docs/implementation/pr22/B_context-feature.md) |
-| C | [#25](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/25) | ui-target-v1と人間編集8受入 | [UI分析・人間編集](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-c-ui-human-editing/docs/implementation/pr22/C_ui-human-editing.md) |
-| D | [#26](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/26) | item／condition候補・stable IDと照合 | [テストアイテム・共通条件](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-d-item-condition/docs/implementation/pr22/D_item-condition.md) |
-| E | [#27](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/27) | Risk→TR→TCN/CI→TC・E2E選定 | [正式設計・E2E選定](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-e-formal-design-e2e-selection/docs/implementation/pr22/E_formal-design-e2e-selection.md) |
-| F | [#28](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/28) | QA要求・方式・計画／開始・終了基準 | [QA要求・アーキテクチャ・管理](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-f-qa-planning-architecture/docs/implementation/pr22/F_qa-planning-architecture.md) |
-| G | [#29](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/29) | API／バッチ／Vitest・静的テスト・runner／cleanup | [非E2E testware・実行](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-g-non-e2e-testware/docs/implementation/pr22/G_non-e2e-testware.md) |
-| H | [#30](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/30) | testware route・必須補助・Activity判定 | [Regression・Activity](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-h-regression-routing/docs/implementation/pr22/H_regression-routing.md) |
-| I | [#31](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/31) | identity／scope・read revision・探索直接開始 | [QA Knowledge・探索](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-i-knowledge-exploration/docs/implementation/pr22/I_knowledge-exploration.md) |
-| J | [#32](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32) | 外部Issue／元実測の集計完全性・改善の効果確認 | [欠陥・統合報告・活動評価](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-j-defects-reporting-evaluation/docs/implementation/pr22/J_defects-reporting-evaluation.md) |
+| 担当 | PR                                                                            | 主な責務                                                                              | 作業定義                                                                                                                                                                                            |
+| ---- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A    | [#23](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/23) | 共有runtime・保存／承認・評価・製品CI基盤の実装／局所検証（**横断統合は担当しない**） | [共通runtime・保存・CI基盤](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-a-runtime-integration/docs/implementation/pr22/A_runtime-integration.md)                  |
+| B    | [#24](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/24) | 案件配置・機能ID・開発差分・情報源母集団                                              | [Project Context・機能分析](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-b-context-feature/docs/implementation/pr22/B_context-feature.md)                          |
+| C    | [#25](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/25) | ui-target-v1と人間編集8受入                                                           | [UI分析・人間編集](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-c-ui-human-editing/docs/implementation/pr22/C_ui-human-editing.md)                                 |
+| D    | [#26](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/26) | item／condition候補・stable IDと照合                                                  | [テストアイテム・共通条件](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-d-item-condition/docs/implementation/pr22/D_item-condition.md)                             |
+| E    | [#27](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/27) | Risk→TR→TCN/CI→TC・E2E選定                                                            | [正式設計・E2E選定](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-e-formal-design-e2e-selection/docs/implementation/pr22/E_formal-design-e2e-selection.md)          |
+| F    | [#28](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/28) | QA要求・方式・計画／開始・終了基準                                                    | [QA要求・アーキテクチャ・管理](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-f-qa-planning-architecture/docs/implementation/pr22/F_qa-planning-architecture.md)     |
+| G    | [#29](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/29) | API／バッチ／Vitest・静的テスト・runner／cleanup                                      | [非E2E testware・実行](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-g-non-e2e-testware/docs/implementation/pr22/G_non-e2e-testware.md)                             |
+| H    | [#30](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/30) | testware route・必須補助・Activity判定                                                | [Regression・Activity](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-h-regression-routing/docs/implementation/pr22/H_regression-routing.md)                         |
+| I    | [#31](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/31) | identity／scope・read revision・探索直接開始                                          | [QA Knowledge・探索](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-i-knowledge-exploration/docs/implementation/pr22/I_knowledge-exploration.md)                     |
+| J    | [#32](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32) | 外部Issue／元実測の集計完全性・改善の効果確認                                         | [欠陥・統合報告・活動評価](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/feat/pr22-j-defects-reporting-evaluation/docs/implementation/pr22/J_defects-reporting-evaluation.md) |
 
 ## 作業範囲と受入の担当を分ける
 
 **担当PR #23〜#32では、分割可能な実装とその局所検証をすべて実施する。PR #22だけで、取り込み・横断統合と全体受入を行う。** Aは共通基盤の実装担当であって、PR #22の統合試験担当を兼ねない。
 
-| 作業 | 担当PR #23〜#32 | PR #22 |
-| --- | --- | --- |
-| Skill、helper、owner固有の保存・実行・CI接続コード | 実装・局所テスト・負例・回帰まで完了。担当内で必要な実runner・実provider接続も検証する | 他担当との組合せに必要な接続・設定のみ実施 |
-| 既存実装との接続 | その担当が所有するSkillと既存consumerの局所結合・互換・migrationを検証 | 複数担当の変更を取り込んだ状態で横断回帰 |
-| 他担当との入出力 | ID・revision・schema・fixture・拒否例を定義・局所検証して引渡し | 各担当の**実際の正本成果物**・run／approval／readbackで接続 |
-| 実Agent・実runner・実provider | 担当Skillの単独経路で必要な実証。外部未設定は未検証／blockedと記録 | 全Skill同時利用・複数owner接続・製品CIを含む総合受入 |
-| S1〜S17、人間編集8ケース | 対応する機能を実装。Cは人間編集8ケースを既存writerまで局所受入。他担当も受入に必要なfixture・評価を用意 | S1〜S17の横断試験と人間編集8ケースの全体経路再確認 |
-| 開発連動QA 15条件・QA全工程 10条件・詳細01〜08 | 担当する機能条件を局所検証し、結果と未統合条件を報告 | **すべての最終照合・完了判定** |
-| 詳細07の5シナリオ効率比較 | Aは測定・独立判定の仕組みを実装。各担当は必要な記録を用意 | 5シナリオの変更前後の実測・比較・改善／悪化の最終判定 |
-| 不具合修正 | 担当が所有する実装・契約・局所テストは担当branchへ戻して修正 | 統合固有の接続・設定・複数owner競合の確認だけを扱う |
+| 作業                                               | 担当PR #23〜#32                                                                                         | PR #22                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Skill、helper、owner固有の保存・実行・CI接続コード | 実装・局所テスト・負例・回帰まで完了。担当内で必要な実runner・実provider接続も検証する                  | 他担当との組合せに必要な接続・設定のみ実施                  |
+| 既存実装との接続                                   | その担当が所有するSkillと既存consumerの局所結合・互換・migrationを検証                                  | 複数担当の変更を取り込んだ状態で横断回帰                    |
+| 他担当との入出力                                   | ID・revision・schema・fixture・拒否例を定義・局所検証して引渡し                                         | 各担当の**実際の正本成果物**・run／approval／readbackで接続 |
+| 実Agent・実runner・実provider                      | 担当Skillの単独経路で必要な実証。外部未設定は未検証／blockedと記録                                      | 全Skill同時利用・複数owner接続・製品CIを含む総合受入        |
+| S1〜S17、人間編集8ケース                           | 対応する機能を実装。Cは人間編集8ケースを既存writerまで局所受入。他担当も受入に必要なfixture・評価を用意 | S1〜S17の横断試験と人間編集8ケースの全体経路再確認          |
+| 開発連動QA 15条件・QA全工程 10条件・詳細01〜08     | 担当する機能条件を局所検証し、結果と未統合条件を報告                                                    | **すべての最終照合・完了判定**                              |
+| 詳細07の5シナリオ効率比較                          | Aは測定・独立判定の仕組みを実装。各担当は必要な記録を用意                                               | 5シナリオの変更前後の実測・比較・改善／悪化の最終判定       |
+| 不具合修正                                         | 担当が所有する実装・契約・局所テストは担当branchへ戻して修正                                            | 統合固有の接続・設定・複数owner競合の確認だけを扱う         |
 
 **担当PRの完了とPR #22の最終完了は別判定**とする。別branchの未統合を理由に、独立に完成した担当PRを未完了としない。一方、fixtureだけの成功や担当PRの局所PASSをPR #22全体の完了の代わりにはしない。
 
@@ -57,14 +57,14 @@
 
 ## 共有ファイルの編集owner
 
-| 共有箇所 | 書込みowner |
-| --- | --- |
+| 共有箇所                                                                                                                  | 書込みowner   |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | `skills/qa-workflow/scripts/**`、Project Contextの共有template、共通評価runtime、`EVALS.md`、共通CI・共有READMEの実装変更 | A（実装のみ） |
-| `skills/spec-analysis/scripts/ui_target_package.py`およびUI関連既存経路 | C |
-| `test-analysis`、正式TR／TCN／CI／TC・coverage既存Skill | E |
-| `adversarial-review`、`test-execution`の対象拡張 | G |
-| `regression-testing/**` | H |
-| `qa-knowledge/**`・探索接続 | I |
+| `skills/spec-analysis/scripts/ui_target_package.py`およびUI関連既存経路                                                   | C             |
+| `test-analysis`、正式TR／TCN／CI／TC・coverage既存Skill                                                                   | E             |
+| `adversarial-review`、`test-execution`の対象拡張                                                                          | G             |
+| `regression-testing/**`                                                                                                   | H             |
+| `qa-knowledge/**`・探索接続                                                                                               | I             |
 
 B／D／F／Jは原則として新設Skillと担当固有のテストを変更する。共有ファイルの変更が必要なら上表のownerに要件・fixture・検証条件を引き渡し、同時編集しない。PR #17が共有runtimeや評価データを変更している場合は、統合時点の差分を再確認する。
 
