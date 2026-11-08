@@ -3131,28 +3131,7 @@ def reserve_shared_resource(
         return {"status": "blocked", "reason": "external_reservation_not_confirmed"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
-    target_ref = content_identity({"resource_ref": resource_ref})
-    target = Path(reservation_root) / f"{target_ref}.json"
-    reservation = {
-        "resource_ref": resource_ref,
-        "workflow_ref": workflow_ref,
-        "status": "reserved",
-    }
-    result = create_if_absent(target, _json_bytes(reservation))
-    if result["status"] == "created":
-        return {
-            **result,
-            "status": "reserved",
-            "reservation_ref": str(target),
-            "reservation_revision": "sha256:"
-            + hashlib.sha256(_json_bytes(reservation)).hexdigest(),
-            "revision_kind": "local_exact_content_token_not_a_cas_condition",
-        }
-    return {
-        **result,
-        "status": "blocked",
-        "reason": "reservation_conflict_or_atomic_create_unavailable",
-    }
+    return reserve_sqlite_shared_resource(reservation_root, resource_ref, workflow_ref)
 
 
 def release_shared_resource(
@@ -3165,6 +3144,8 @@ def release_shared_resource(
     owner_state_verified: bool = False,
     owner_execution_state: str | None = None,
     cleanup_confirmed: bool = False,
+    reservation_root: str | Path | None = None,
+    resource_ref: str | None = None,
 ) -> dict[str, Any]:
     if current_workflow_ref != expected_workflow_ref:
         return {"status": "blocked", "reason": "reservation_owner_mismatch"}
@@ -3181,6 +3162,18 @@ def release_shared_resource(
         return {"status": "conflict", "reason": "reservation_revision_mismatch"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
+    if reservation_root is not None or resource_ref is not None:
+        if reservation_root is None or resource_ref is None:
+            return {"status": "blocked", "reason": "reservation_target_missing"}
+        return release_sqlite_shared_resource(
+            reservation_root,
+            resource_ref,
+            expected_workflow_ref,
+            expected_reservation_revision,
+            owner_state_verified=owner_state_verified,
+            owner_execution_state=owner_execution_state,
+            cleanup_confirmed=cleanup_confirmed,
+        )
     return {
         "status": "conditional_release_required",
         "expected_revision": expected_reservation_revision,
@@ -3274,6 +3267,12 @@ def reserve_sqlite_shared_resource(
         identity = _reservation_identity(resource_ref)
         ref = _local_baseline_identity(workflow_ref)
         path = _reservation_sqlite_path(reservation_root)
+        legacy_path = path.parent / f"{identity}.json"
+        if legacy_path.exists() or legacy_path.is_symlink():
+            return {
+                "status": "blocked",
+                "reason": "legacy_reservation_requires_reconciliation",
+            }
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
             descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
