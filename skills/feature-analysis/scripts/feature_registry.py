@@ -241,9 +241,8 @@ def _history(
         raise ContractError("project_changed")
     if snapshot.get("artifact_ref") != previous.get("artifact_ref"):
         raise ContractError("artifact_changed")
-    if (
-        not idempotent
-        and snapshot.get("previous_artifact_revision") != previous.get("artifact_revision")
+    if not idempotent and snapshot.get("previous_artifact_revision") != previous.get(
+        "artifact_revision"
     ):
         raise ContractError("previous_artifact_revision_conflict")
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
