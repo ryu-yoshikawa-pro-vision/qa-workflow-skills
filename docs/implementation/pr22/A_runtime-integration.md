@@ -152,15 +152,12 @@
 
 検証対象の実装commitは[`19bc733932b6b5c0a72191cba30df9d6ad447756`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/19bc733932b6b5c0a72191cba30df9d6ad447756)。変更した共通helper、CI受渡し、評価処理と既存runtimeの回帰を、リポジトリのGitHub Actionsで検証した。fixtureの結果は他担当の実成果物や実providerの検証を意味しない。
 
-| 検証 | 実行方法・証拠 | 結果 |
-| --- | --- | --- |
-| 共有runtime単体テスト | `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`／[Actions](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873069) | 12件PASS |
-| repository決定論的評価 | `python -m unittest discover -s tests/skills/evals/deterministic -v`／同Actions | 290件PASS |
-| runtime／統合テスト | `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`／同Actions | 437件PASS |
-| 既存意味評価runtimeテスト | 同Actionsの`Validate semantic datasets and runtime` | 27件＋13件PASS |
-| Code Quality | [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873074) | SUCCESS |
-| Agent Skills仕様・構造 | [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456872941) | SUCCESS |
-| 意味評価データ・runtime | [Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873148) | SUCCESS |
+- 共有runtime単体テスト：`python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`、12件PASS。
+- repository決定論的評価：`python -m unittest discover -s tests/skills/evals/deterministic -v`、290件PASS。
+- runtime／統合テスト：`python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`、437件PASS。
+- 既存意味評価runtimeテスト：27件＋13件PASS。
+
+上記の元ログは[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873069)に保存している。[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873074)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456872941)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873148)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42456873033)も同じ実装commitでSUCCESSを確認した。
 
 特に`test_qa_operation_claim.py`は同一操作の並行claim、pre-start metadataの保存と別セッション読戻し、旧claim revision、改ざん、symlink、サイズ超過、既存3引数claim互換を検証した。`test_ci_handoff.py`は旧HEAD、未分類差分、source未対応、成果物hash／revision不一致、symlink経由読取り、承認provider未設定と不一致の同時発生を検証した。`test_workflow_efficiency.py`は5条件の比較、独立run重複、品質未PASS、条件不一致、未測定、悪化、JSON重複キー・サイズ制限を検証した。
 
