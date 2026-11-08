@@ -170,6 +170,56 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
             self.read_history("sqlite:1", OTHER)["state"], {"marker": "initial"}
         )
 
+    def test_cannot_refetch_future_revision_even_if_table_is_tampered(self) -> None:
+        self.create()
+        database = self.root / "workflow-state.sqlite3"
+        envelope = {
+            "workflow_ref": REF,
+            "schema_version": "1",
+            "state": {"marker": "not committed"},
+        }
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "INSERT INTO workflow_state_history VALUES (?,?,?)",
+                (REF, 2, json.dumps(envelope, sort_keys=True, separators=(",", ":"))),
+            )
+        self.assertEqual(self.read_history("sqlite:2")["status"], "blocked")
+        self.assertFalse(
+            artifact_graph.read_sqlite_workflow_state(self.root, REF)[
+                "historical_revision_available"
+            ]
+        )
+
+    def test_oversized_revision_token_blocks_cleanly(self) -> None:
+        self.create()
+        huge = "sqlite:" + "9" * 10000
+        self.assertEqual(self.read_history(huge)["status"], "blocked")
+        self.assertEqual(self.update(huge)["status"], "blocked")
+
+    def test_legacy_pretty_json_snapshot_can_be_refetched_after_update(self) -> None:
+        self.root.mkdir(parents=True)
+        database = self.root / "workflow-state.sqlite3"
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "CREATE TABLE workflow_state("
+                "workflow_ref TEXT PRIMARY KEY,envelope_json TEXT NOT NULL,"
+                "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0))"
+            )
+            envelope = {
+                "workflow_ref": REF,
+                "schema_version": "1",
+                "state": {"marker": "legacy-pretty"},
+            }
+            connection.execute(
+                "INSERT INTO workflow_state VALUES(?,?,3)",
+                (REF, json.dumps(envelope, indent=2, ensure_ascii=False)),
+            )
+        self.assertEqual(self.update("sqlite:3")["status"], "written")
+        self.assertEqual(
+            self.read_history("sqlite:3")["state"], {"marker": "legacy-pretty"}
+        )
+        self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
+
     def test_history_with_invalid_json_is_not_reused(self) -> None:
         self.create()
         database = self.root / "workflow-state.sqlite3"
