@@ -217,6 +217,7 @@ def prepare_update(request: dict[str, Any]) -> dict[str, Any]:
     _text(request.get("expected_revision"), "expected_revision")
     _text(request.get("source_ref"), "source_ref")
     _text(request.get("source_revision"), "source_revision")
+    change_reason = _text(request.get("change_reason"), "change_reason")
     updates = request.get("updates")
     if not isinstance(updates, dict) or not updates:
         raise Invalid("updates_required")
@@ -253,6 +254,8 @@ def prepare_update(request: dict[str, Any]) -> dict[str, Any]:
         "artifact_markdown": modified,
         "changed_keys": sorted(updates),
         "expected_revision": request["expected_revision"],
+        "artifact_ref": request["artifact_ref"],
+        "change_reason": change_reason,
         "source_ref": request["source_ref"],
         "source_revision": request["source_revision"],
         "reason": "provider_native_cas_history_and_readback_required",

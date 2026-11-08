@@ -94,6 +94,7 @@ class ProjectContextOwnerTests(unittest.TestCase):
                 "expected_revision": "rev-1",
                 "source_ref": "issue-1",
                 "source_revision": "rev-2",
+                "change_reason": "環境更新",
                 "updates": {"qa.workflow_state_root": "qa/state"},
             }
         )
@@ -112,6 +113,7 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "expected_revision": "rev-1",
             "source_ref": "issue-1",
             "source_revision": "rev-2",
+            "change_reason": "設定修正",
         }
         self.assertEqual(
             handle({**base, "updates": {"qa.feature_artifact_root": "out"}})["status"],
@@ -123,6 +125,20 @@ class ProjectContextOwnerTests(unittest.TestCase):
             ],
             "blocked",
         )
+
+    def test_update_requires_change_provenance(self) -> None:
+        result = handle(
+            {
+                "operation": "prepare-update",
+                "markdown": context(),
+                "artifact_ref": "context.md",
+                "expected_revision": "rev-1",
+                "source_ref": "issue/1",
+                "source_revision": "rev-2",
+                "updates": {"qa.workflow_state_root": "qa/state"},
+            }
+        )
+        self.assertEqual(result["status"], "blocked")
 
     def test_dec_asm_materialize_preserves_existing_prose(self) -> None:
         original = (
