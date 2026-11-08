@@ -379,7 +379,21 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
             )
 
             claim = graph.claim_mutable_operation(
-                Path(temporary) / "claims", workflow_ref, handoff["operation_ref"]
+                Path(temporary) / "claims",
+                workflow_ref,
+                handoff["operation_ref"],
+                operation_details={
+                    "owner_skill": "usability-inspection",
+                    "scope_ref": "wcag:scope",
+                    "operation_type": "browser_observation",
+                    "target_ref": "fixture-browser-session",
+                    "source_revisions": [{"ref": "wcag-evaluation", "revision": "rev-a"}],
+                    "artifact_revisions": [],
+                    "expected_revision": None,
+                    "approval_ref": None,
+                    "permission_scope": None,
+                    "resume_owner": "usability-inspection",
+                },
             )
             self.assertTrue(claim["may_start"])
             acquired = provider.acquire_reservation(
@@ -457,7 +471,9 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
                 owner_execution_state="complete",
                 cleanup_confirmed=True,
             )
-            self.assertEqual(release_decision["status"], "conditional_release_required")
+            self.assertEqual(release_decision["status"], "blocked")
+            # The fixture provider performs the actual native release; the
+            # common helper cannot authenticate this owner or release it.
             released = provider.release_reservation(
                 "fixture-browser-session", workflow_ref, acquired["revision"]
             )
