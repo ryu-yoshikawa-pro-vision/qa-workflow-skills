@@ -1131,6 +1131,11 @@ def _initialize_sqlite_workflow_table(connection: sqlite3.Connection) -> None:
         "envelope_json TEXT NOT NULL, "
         "PRIMARY KEY(workflow_ref, provider_revision))"
     )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS workflow_state_history_origin ("
+        "workflow_ref TEXT PRIMARY KEY REFERENCES workflow_state(workflow_ref), "
+        "first_revision INTEGER NOT NULL CHECK(first_revision > 0))"
+    )
 
 
 def _sqlite_history_is_complete(
@@ -1157,9 +1162,19 @@ def _sqlite_history_is_complete(
             or not isinstance(envelope.get("state"), dict)
         ):
             raise ValueError("workflow_state_history_corrupt")
-    return len(rows) == revision and all(
-        number == index for index, (number, _) in enumerate(rows, 1)
+    origin = connection.execute(
+        "SELECT first_revision FROM workflow_state_history_origin WHERE workflow_ref=?",
+        (workflow_ref,),
+    ).fetchone()
+    first = origin[0] if origin else 1
+    if not isinstance(first, int) or first < 1 or first > revision:
+        raise ValueError("workflow_state_history_origin_invalid")
+    complete = len(rows) == revision - first + 1 and all(
+        number == index for index, (number, _) in enumerate(rows, first)
     )
+    if origin and not complete:
+        raise ValueError("workflow_state_history_missing")
+    return complete and first == 1
 
 
 def _sqlite_assert_history_snapshot(
@@ -1234,6 +1249,11 @@ def create_sqlite_workflow_state(
             )
             _sqlite_assert_history_snapshot(
                 connection, envelope["workflow_ref"], 1, encoded
+            )
+            connection.execute(
+                "INSERT INTO workflow_state_history_origin(workflow_ref,first_revision) "
+                "VALUES(?,1)",
+                (envelope["workflow_ref"],),
             )
             connection.execute("COMMIT")
         result = read_sqlite_workflow_state(workflow_root, envelope["workflow_ref"])
@@ -1421,12 +1441,40 @@ def conditional_write_sqlite_workflow_state(
                         "status": "blocked",
                         "reason": "workflow_state_revision_exhausted",
                     }
-                _sqlite_assert_history_snapshot(
-                    connection, envelope["workflow_ref"], revision, current[0]
-                )
-                # Reject corrupt old snapshots even when the current row is sound.
+                origin = connection.execute(
+                    "SELECT first_revision FROM workflow_state_history_origin "
+                    "WHERE workflow_ref=?",
+                    (envelope["workflow_ref"],),
+                ).fetchone()
+                if origin is None:
+                    # Old databases lack provenance. A clean contiguous chain
+                    # can be adopted; an empty history is a legacy baseline.
+                    # Ambiguous partial history must not be assumed safe.
+                    previous = connection.execute(
+                        "SELECT COUNT(*) FROM workflow_state_history WHERE workflow_ref=?",
+                        (envelope["workflow_ref"],),
+                    ).fetchone()[0]
+                    if previous and not _sqlite_history_is_complete(
+                        connection, envelope["workflow_ref"], revision
+                    ):
+                        raise ValueError("workflow_state_history_provenance_unknown")
+                    first_revision = 1 if previous else revision
+                    connection.execute(
+                        "INSERT INTO workflow_state_history_origin "
+                        "(workflow_ref,first_revision) VALUES(?,?)",
+                        (envelope["workflow_ref"], first_revision),
+                    )
+                    if not previous:
+                        _sqlite_assert_history_snapshot(
+                            connection, envelope["workflow_ref"], revision, current[0]
+                        )
+                # A recorded chain must be present before the current snapshot
+                # is accepted; recreating a lost row would hide data loss.
                 _sqlite_history_is_complete(
                     connection, envelope["workflow_ref"], revision
+                )
+                _sqlite_assert_history_snapshot(
+                    connection, envelope["workflow_ref"], revision, current[0]
                 )
             cursor = connection.execute(
                 "UPDATE workflow_state SET envelope_json=?,provider_revision=provider_revision+1 "
