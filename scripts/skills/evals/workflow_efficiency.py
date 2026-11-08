@@ -7,6 +7,7 @@ import json
 import math
 import statistics
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -111,12 +112,82 @@ def _metric(value: Any, label: str) -> tuple[float | None, str]:
     return float(raw), unit
 
 
-def _trial(value: Any, label: str) -> dict[str, Any]:
+def _execution_evidence(value: Any, label: str) -> float:
+    """Validate recorded run boundaries and references, not the owner's assertions."""
     row = _obj(
         value,
         {
-            "trial_ref",
-            "run_ref",
+            "started_at",
+            "finished_at",
+            "skill_runs",
+            "owner_artifacts",
+            "attempt_refs",
+            "runner_refs",
+            "cleanup_refs",
+            "interruption_ref",
+        },
+        label,
+    )
+
+    def instant(raw: Any, name: str) -> datetime:
+        if not isinstance(raw, str):
+            raise ValueError(f"{name} must be a timezone-aware timestamp")
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValueError(f"{name} timestamp invalid") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError(f"{name} must include a timezone")
+        return parsed
+
+    started = instant(row["started_at"], f"{label}.started_at")
+    finished = instant(row["finished_at"], f"{label}.finished_at")
+    if finished < started:
+        raise ValueError(f"{label} ends before it starts")
+    skill_runs = row["skill_runs"]
+    if not isinstance(skill_runs, list) or not skill_runs:
+        raise ValueError(f"{label}.skill_runs missing")
+    skill_refs: set[str] = set()
+    for item in skill_runs:
+        skill = _obj(
+            item, {"skill", "run_ref", "started_at", "finished_at"}, "skill run"
+        )
+        _nonempty(skill["skill"], "skill name")
+        run_ref = _nonempty(skill["run_ref"], "skill run ref")
+        if run_ref in skill_refs:
+            raise ValueError("duplicate skill run ref")
+        skill_refs.add(run_ref)
+        skill_start = instant(skill["started_at"], "skill started_at")
+        skill_end = instant(skill["finished_at"], "skill finished_at")
+        if skill_start < started or skill_end > finished or skill_end < skill_start:
+            raise ValueError("skill run lies outside trial timestamps")
+    artifacts = row["owner_artifacts"]
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ValueError(f"{label}.owner_artifacts missing")
+    artifact_keys: set[tuple[str, str]] = set()
+    for item in artifacts:
+        artifact = _obj(
+            item, {"owner", "artifact_ref", "revision"}, "owner artifact"
+        )
+        key = (
+            _nonempty(artifact["owner"], "artifact owner"),
+            _nonempty(artifact["artifact_ref"], "artifact ref"),
+        )
+        _nonempty(artifact["revision"], "artifact revision")
+        if key in artifact_keys:
+            raise ValueError("duplicate owner artifact ref")
+        artifact_keys.add(key)
+    for name in ("attempt_refs", "runner_refs", "cleanup_refs"):
+        _refs(row[name], name)
+    if row["interruption_ref"] is not None:
+        _nonempty(row["interruption_ref"], "interruption_ref")
+    return (finished - started).total_seconds()
+
+
+def _trial(value: Any, label: str) -> dict[str, Any]:
+    fields = {
+        "trial_ref",
+        "run_ref",
             "product_commit",
             "source_revisions",
             "scope_refs",
@@ -127,9 +198,10 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
             "agent_config_ref",
             "quality",
             "metrics",
-        },
-        label,
-    )
+    }
+    if isinstance(value, dict) and "execution_evidence" in value:
+        fields.add("execution_evidence")
+    row = _obj(value, fields, label)
     for field in (
         "trial_ref",
         "run_ref",
@@ -166,6 +238,11 @@ def _trial(value: Any, label: str) -> dict[str, Any]:
     metrics = _obj(row["metrics"], set(METRICS), "trial metrics")
     for key, value in metrics.items():
         _metric(value, key)
+    if "execution_evidence" in row:
+        duration = _execution_evidence(row["execution_evidence"], label)
+        wall, unit = _metric(metrics["wall_seconds"], "wall_seconds")
+        if wall is not None and unit == "seconds" and abs(wall - duration) > max(1.0, duration * 0.01):
+            raise ValueError("recorded wall_seconds contradict trial timestamps")
     return row
 
 
@@ -218,6 +295,7 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("all five independent scenarios are required exactly once")
     seen_trials: set[str] = set()
     seen_runs: set[str] = set()
+    seen_skill_runs: set[str] = set()
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
         _obj(scenario, {"scenario", "baseline", "candidate"}, "scenario")
@@ -236,10 +314,24 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                 if run_ref in seen_runs:
                     raise ValueError("duplicate run_ref across independent trials")
                 seen_runs.add(run_ref)
+                evidence = trial.get("execution_evidence")
+                if evidence is not None:
+                    for skill_run in evidence["skill_runs"]:
+                        skill_ref = skill_run["run_ref"]
+                        if skill_ref in seen_skill_runs:
+                            raise ValueError("duplicate skill run across independent trials")
+                        seen_skill_runs.add(skill_ref)
         reasons: list[str] = []
         combined = groups["baseline"] + groups["candidate"]
         if len(groups["baseline"]) < 2 or len(groups["candidate"]) < 2:
             reasons.append("independent_repeated_trials_missing")
+        if any("execution_evidence" not in trial for trial in combined):
+            reasons.append("execution_evidence_missing")
+        if scenario["scenario"] == "interrupted_resume" and any(
+            trial.get("execution_evidence", {}).get("interruption_ref") is None
+            for trial in combined
+        ):
+            reasons.append("interruption_evidence_missing")
         if combined and len({_basis(trial) for trial in combined}) != 1:
             reasons.append("comparison_conditions_differ")
         if any(
