@@ -260,6 +260,114 @@ def prepare_update(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _id_table_lines(markdown: str, section: int) -> tuple[list[str], int, int]:
+    """Locate the single DEC/ASM ID table without discarding surrounding prose."""
+    lines = markdown.splitlines(keepends=True)
+    heading = re.compile(rf"^## {section}\.\s")
+    next_heading = re.compile(rf"^## {section + 1}\.\s")
+    starts = [i for i, line in enumerate(lines) if heading.match(line)]
+    if len(starts) != 1:
+        raise Invalid("id_table_section_ambiguous")
+    start = starts[0]
+    end = next(
+        (i for i in range(start + 1, len(lines)) if next_heading.match(lines[i])),
+        len(lines),
+    )
+    indices = [
+        i
+        for i in range(start + 1, end)
+        if lines[i].lstrip().startswith("| ID |")
+    ]
+    if len(indices) != 1:
+        raise Invalid("id_table_ambiguous")
+    first = indices[0]
+    last = first
+    while last < end and lines[last].lstrip().startswith("|"):
+        last += 1
+    if last <= first + 1:
+        raise Invalid("id_table_missing_separator")
+    return lines, first, last
+
+
+def _overlay_id_tables(original: str, materialized: str) -> str:
+    """Retain existing narratives and other sections, replacing only ID rows."""
+    merged = original
+    for section in (13, 12):
+        base_lines, first, last = _id_table_lines(merged, section)
+        new_lines, new_first, new_last = _id_table_lines(materialized, section)
+        merged = "".join(
+            base_lines[:first]
+            + new_lines[new_first:new_last]
+            + base_lines[last:]
+        )
+    return merged
+
+
+def prepare_ids(request: dict[str, Any]) -> dict[str, Any]:
+    """Delegate DEC/ASM allocation to the legacy owner helper; return a draft."""
+    markdown = _text(request.get("markdown"), "markdown")
+    _inspection(markdown, [])
+    if request.get("dec_asm_owner") != "project-context":
+        raise Invalid("dec_asm_owner_not_confirmed")
+    mode = request.get("artifact_mode")
+    if mode not in {"create", "update"}:
+        raise Invalid("artifact_mode_invalid")
+    artifact_ref = _text(request.get("artifact_ref"), "artifact_ref")
+    source_ref = _text(request.get("source_ref"), "source_ref")
+    source_revision = _text(request.get("source_revision"), "source_revision")
+    reason = _text(request.get("change_reason"), "change_reason")
+    expected = request.get("expected_revision")
+    if mode == "update":
+        _text(expected, "expected_revision")
+    elif expected is not None:
+        raise Invalid("create_must_not_have_expected_revision")
+    decisions = request.get("decisions")
+    assumptions = request.get("assumptions")
+    result = identity_handle(
+        {
+            "operation": "materialize",
+            "artifact_mode": mode,
+            "previous_artifact_markdown": (
+                _identity_compat(markdown) if mode == "update" else None
+            ),
+            "artifact_markdown": _identity_compat(markdown),
+            "decisions": decisions,
+            "assumptions": assumptions,
+        }
+    )
+    if not result["valid"]:
+        raise Invalid("dec_asm_materialize_invalid")
+    merged = _overlay_id_tables(
+        markdown, result["payload"]["artifact_markdown"]
+    )
+    _inspection(merged, [])
+    check = identity_handle(
+        {
+            "operation": "validate-history",
+            "previous_artifact_markdown": (
+                _identity_compat(markdown) if mode == "update" else None
+            ),
+            "artifact_markdown": _identity_compat(merged),
+        }
+    )
+    if not check["valid"]:
+        raise Invalid("dec_asm_history_invalid")
+    return {
+        "status": "draft",
+        "artifact_ref": artifact_ref,
+        "artifact_mode": mode,
+        "expected_revision": expected,
+        "artifact_markdown": merged,
+        "allocated_ids": result["payload"]["allocated_ids"],
+        "decision_ids": check["payload"]["decision_ids"],
+        "assumption_ids": check["payload"]["assumption_ids"],
+        "source_ref": source_ref,
+        "source_revision": source_revision,
+        "change_reason": reason,
+        "reason": "provider_atomic_write_history_and_readback_required",
+    }
+
+
 def placement(request: dict[str, Any]) -> dict[str, Any]:
     """Identify reuse vs approval; trust is established by a separate provider."""
     owner = _single_line(request.get("owner"), "owner")
@@ -297,6 +405,8 @@ def handle(request: Any) -> dict[str, Any]:
             return prepare_create(request)
         if op == "prepare-update":
             return prepare_update(request)
+        if op == "prepare-ids":
+            return prepare_ids(request)
         if op == "placement":
             return placement(request)
         raise Invalid("operation_invalid")

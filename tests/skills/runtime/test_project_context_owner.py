@@ -124,6 +124,101 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "blocked",
         )
 
+    def test_dec_asm_materialize_preserves_existing_prose(self) -> None:
+        original = context().replace(
+            "## 13. 仮定", "決定事項の根拠メモ。\n\n## 13. 仮定"
+        ).replace("## 14. 既存QA成果物", "仮定の注釈。\n\n## 14. 既存QA成果物")
+        cells = {
+            "確定内容": "承認済み配置",
+            "状態": "有効",
+            "決定根拠": "approval/1",
+            "影響範囲": "QA",
+            "関係": "独立",
+            "関連仕様根拠ID": "",
+            "置換先ID": "",
+            "備考": "",
+        }
+        request = {
+            "operation": "prepare-ids",
+            "markdown": original,
+            "artifact_mode": "create",
+            "artifact_ref": "project-context.md",
+            "expected_revision": None,
+            "source_ref": "issue/1",
+            "source_revision": "r1",
+            "change_reason": "初期配置",
+            "dec_asm_owner": "project-context",
+            "decisions": [
+                {
+                    "draft_key": "placement",
+                    "identity_action": "new",
+                    "reuse_id": None,
+                    "cells": cells,
+                }
+            ],
+            "assumptions": [],
+        }
+        result = handle(request)
+        self.assertEqual(result["status"], "draft", result)
+        self.assertEqual(result["allocated_ids"], [
+            {"draft_key": "placement", "stable_id": "DEC-001"}
+        ])
+        self.assertIn("決定事項の根拠メモ。", result["artifact_markdown"])
+        self.assertIn("仮定の注釈。", result["artifact_markdown"])
+        self.assertEqual(
+            original.split("## 14.")[1],
+            result["artifact_markdown"].split("## 14.")[1],
+        )
+        self.assertEqual(
+            handle(
+                {
+                    "operation": "inspect",
+                    "markdown": result["artifact_markdown"],
+                    "required_keys": [],
+                }
+            )["decision_ids"],
+            ["DEC-001"],
+        )
+        update = dict(request)
+        update.update(
+            markdown=result["artifact_markdown"],
+            artifact_mode="update",
+            expected_revision="revision-1",
+            decisions=[
+                {
+                    "draft_key": None,
+                    "identity_action": "reuse",
+                    "reuse_id": "DEC-001",
+                    "cells": cells,
+                }
+            ],
+        )
+        self.assertEqual(handle(update)["status"], "draft")
+
+    def test_dec_asm_wrong_owner_or_lost_id_is_blocked(self) -> None:
+        data = {
+            "operation": "prepare-ids",
+            "markdown": context(),
+            "artifact_mode": "create",
+            "artifact_ref": "context.md",
+            "expected_revision": None,
+            "source_ref": "issue/1",
+            "source_revision": "rev-1",
+            "change_reason": "初回",
+            "dec_asm_owner": "external",
+            "decisions": [],
+            "assumptions": [],
+        }
+        self.assertEqual(handle(data)["status"], "blocked")
+        data["dec_asm_owner"] = "project-context"
+        draft = handle(data)
+        self.assertEqual(draft["status"], "draft", draft)
+        data.update(
+            artifact_mode="update",
+            expected_revision=None,
+        )
+        self.assertEqual(handle(data)["status"], "blocked")
+
     def test_existing_placement_is_only_a_reuse_candidate(self) -> None:
         record = {
             "owner": "project-context",
