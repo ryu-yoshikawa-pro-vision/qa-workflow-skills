@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import statistics
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -273,10 +272,18 @@ def _summary(rows: list[dict[str, Any]], key: str) -> dict[str, Any]:
     if len(units) != 1 or any(value is None for value, _ in values):
         return {"status": "not_measured", "reason": "missing_or_inconsistent_unit"}
     measured = [value for value, _ in values if value is not None]
+    ordered = sorted(measured)
+    middle = len(ordered) // 2
+    median = (
+        ordered[middle]
+        if len(ordered) % 2
+        else ordered[middle - 1]
+        + (ordered[middle] - ordered[middle - 1]) / 2
+    )
     return {
         "status": "measured",
         "unit": next(iter(units)),
-        "median": statistics.median(measured),
+        "median": median,
         "minimum": min(measured),
         "maximum": max(measured),
         "trial_count": len(measured),
@@ -429,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
             parse_constant=_reject_constant,
         )
         report = evaluate(data)
-    except (OSError, UnicodeError, ValueError, TypeError) as exc:
+    except (OSError, UnicodeError, ValueError, TypeError, OverflowError, RecursionError) as exc:
         print(
             json.dumps(
                 {"status": "blocked", "reason": str(exc)},

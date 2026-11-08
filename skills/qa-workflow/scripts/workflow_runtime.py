@@ -661,7 +661,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         input_value["unsupported_item_closures"],
         current_runtime_rows,
         entities,
-        normalized=[scope["normalized_input"] for scope in scopes],
+        normalized=[
+            scope["normalized_input"]
+            for scope in scopes
+            if scope["skill"] in RUNTIME_V2_SKILL_ROOTS
+        ],
     )
 
     expected_units: list[dict[str, Any]] = []
@@ -828,6 +832,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities))
     for scope in scopes:
+        if scope["skill"] not in RUNTIME_V2_SKILL_ROOTS:
+            continue
         issues.extend(
             evaluate_materialize_completion(
                 scope["normalized_input"], current_runtime_rows, entities, closures

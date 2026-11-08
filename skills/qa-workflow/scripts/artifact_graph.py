@@ -1137,12 +1137,29 @@ def _sqlite_history_is_complete(
     connection: sqlite3.Connection, workflow_ref: str, revision: int
 ) -> bool:
     """Only a complete chain from revision 1 can substantiate full history."""
-    row = connection.execute(
-        "SELECT COUNT(*), MIN(provider_revision), MAX(provider_revision) "
-        "FROM workflow_state_history WHERE workflow_ref=?",
+    rows = connection.execute(
+        "SELECT provider_revision,envelope_json FROM workflow_state_history "
+        "WHERE workflow_ref=? ORDER BY provider_revision",
         (workflow_ref,),
-    ).fetchone()
-    return row == (revision, 1, revision)
+    ).fetchall()
+    for number, encoded in rows:
+        if not isinstance(number, int) or number < 1 or not isinstance(encoded, str):
+            raise ValueError("workflow_state_history_corrupt")
+        try:
+            envelope = json.loads(encoded)
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise ValueError("workflow_state_history_corrupt") from exc
+        if (
+            not isinstance(envelope, dict)
+            or set(envelope) != {"workflow_ref", "schema_version", "state"}
+            or envelope.get("workflow_ref") != workflow_ref
+            or envelope.get("schema_version") != "1"
+            or not isinstance(envelope.get("state"), dict)
+        ):
+            raise ValueError("workflow_state_history_corrupt")
+    return len(rows) == revision and all(
+        number == index for index, (number, _) in enumerate(rows, 1)
+    )
 
 
 def _sqlite_assert_history_snapshot(
@@ -1398,9 +1415,17 @@ def conditional_write_sqlite_workflow_state(
                 (envelope["workflow_ref"],),
             ).fetchone()
             if current is not None and current[1] == revision:
+                if revision >= 2**63 - 1:
+                    connection.execute("ROLLBACK")
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_revision_exhausted",
+                    }
                 _sqlite_assert_history_snapshot(
                     connection, envelope["workflow_ref"], revision, current[0]
                 )
+                # Reject corrupt old snapshots even when the current row is sound.
+                _sqlite_history_is_complete(connection, envelope["workflow_ref"], revision)
             cursor = connection.execute(
                 "UPDATE workflow_state SET envelope_json=?,provider_revision=provider_revision+1 "
                 "WHERE workflow_ref=? AND provider_revision=?",
@@ -2987,6 +3012,8 @@ def claim_mutable_operation(
         if details is not None:
             claim["operation_details"] = details
         raw = _json_bytes(claim)
+        if len(raw) > 2 * 1024 * 1024:
+            raise ValueError("claim_limit_exceeded")
         result = create_if_absent(target, raw)
         if result["status"] == "created":
             try:
@@ -3018,6 +3045,8 @@ def claim_mutable_operation(
                 "reason": "operation_already_claimed; inspect_owner_execution_and_cleanup",
             }
         return {**result, "may_start": False}
+    except OSError:
+        return {"status": "blocked", "may_start": False, "reason": "claim_storage_unavailable"}
     except (_LocalBaselineError, ValueError, TypeError) as exc:
         reason = exc.reason if isinstance(exc, _LocalBaselineError) else str(exc)
         return {"status": "blocked", "may_start": False, "reason": reason}
@@ -3127,11 +3156,14 @@ def reserve_shared_resource(
                 "status": "blocked",
                 "reason": "external_reservation_revision_missing",
             }
+        # An asserted acquisition and revision are not verified provider state.
+        # Return the references for independent owner readback, never permission.
         return {
-            "status": "reserved",
+            "status": "blocked",
+            "reason": "external_reservation_readback_required",
             "reservation_ref": external_reservation,
             "owner_workflow_ref": workflow_ref,
-            "provider": "existing_external_reservation",
+            "provider": "unverified_external_reservation",
             "reservation_revision": external_reservation_revision,
         }
     if external_reservation:

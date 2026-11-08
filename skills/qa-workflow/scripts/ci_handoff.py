@@ -41,13 +41,16 @@ def _read_json(path: Path) -> dict[str, Any]:
         raw = stream.read(MAX_JSON_BYTES + 1)
     if len(raw) > MAX_JSON_BYTES:
         raise ValueError("JSON input is too large")
-    value = json.loads(
-        raw.decode("utf-8"),
-        object_pairs_hook=_pairs,
-        parse_constant=lambda token: (_ for _ in ()).throw(
-            ValueError(f"unsupported JSON number: {token}")
-        ),
-    )
+    try:
+        value = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_pairs,
+            parse_constant=lambda token: (_ for _ in ()).throw(
+                ValueError(f"unsupported JSON number: {token}")
+            ),
+        )
+    except RecursionError as exc:
+        raise ValueError("JSON input nesting is too deep") from exc
     if not isinstance(value, dict):
         raise ValueError("JSON document must be an object")
     return value
@@ -78,6 +81,21 @@ def _path(value: Any) -> str:
         or "\x00" in raw
     ):
         raise ValueError("unsafe relative artifact path")
+    return raw
+
+
+def _change_path(value: Any) -> str:
+    """Validate a POSIX change identifier, not a local filesystem read path."""
+    raw = _string(value, "change path")
+    path = PurePosixPath(raw)
+    if (
+        path.is_absolute()
+        or not path.parts
+        or any(part in {".", ".."} for part in raw.split("/"))
+        or raw != path.as_posix()
+        or "\x00" in raw
+    ):
+        raise ValueError("invalid changed path")
     return raw
 
 
@@ -149,32 +167,25 @@ def _read_artifact(root: Path, relative: str) -> bytes:
     parts = PurePosixPath(_path(relative)).parts
     if not root.is_dir() or root.is_symlink():
         raise ValueError("artifact root missing or symlinked")
-    if os.name == "posix" and hasattr(os, "O_NOFOLLOW"):
-        directory_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
-        with ExitStack() as stack:
-            descriptor = os.open(root, directory_flags)
+    if os.name != "posix" or not all(
+        hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")
+    ):
+        raise ValueError("race-safe artifact reading unavailable on this platform")
+    directory_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
+    with ExitStack() as stack:
+        descriptor = os.open(root, directory_flags)
+        stack.callback(os.close, descriptor)
+        for part in parts[:-1]:
+            descriptor = os.open(part, directory_flags, dir_fd=descriptor)
             stack.callback(os.close, descriptor)
-            for part in parts[:-1]:
-                descriptor = os.open(part, directory_flags, dir_fd=descriptor)
-                stack.callback(os.close, descriptor)
-            file_descriptor = os.open(
-                parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=descriptor
-            )
-            with os.fdopen(file_descriptor, "rb") as stream:
-                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
-                    raise ValueError("artifact is not a regular file")
-                content = stream.read(MAX_ARTIFACT_BYTES + 1)
-    else:
-        current = root
-        for part in parts:
-            current = current / part
-            if current.is_symlink():
-                raise ValueError("symlink artifact path is not allowed")
-        if not current.is_file() or not current.resolve().is_relative_to(
-            root.resolve()
-        ):
-            raise ValueError("artifact missing or outside trusted root")
-        with current.open("rb") as stream:
+        file_descriptor = os.open(
+            parts[-1],
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=descriptor,
+        )
+        with os.fdopen(file_descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ValueError("artifact is not a regular file")
             content = stream.read(MAX_ARTIFACT_BYTES + 1)
     if len(content) > MAX_ARTIFACT_BYTES:
         raise ValueError("artifact exceeds size limit")
@@ -225,7 +236,7 @@ def verify(
     changed_paths = expected["changed_paths"]
     if not isinstance(changed_paths, list):
         raise ValueError("changed_paths must be a list")
-    paths = [_path(item) for item in changed_paths]
+    paths = [_change_path(item) for item in changed_paths]
     if len(paths) != len(set(paths)):
         raise ValueError("duplicate expected changed path")
     allowed = expected["allowed_classifications"]
@@ -242,7 +253,7 @@ def verify(
     actual_changes: dict[str, str] = {}
     for item in changes:
         record = _object(item, {"path", "classification"}, "change")
-        path = _path(record["path"])
+        path = _change_path(record["path"])
         classification = _string(record["classification"], "classification")
         if path in actual_changes:
             raise ValueError(f"duplicate change path: {path}")
@@ -347,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = 2
     else:
         exit_code = 0 if report["status"] == "pass" else 1
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    print(json.dumps(report, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
     return exit_code
 
 
