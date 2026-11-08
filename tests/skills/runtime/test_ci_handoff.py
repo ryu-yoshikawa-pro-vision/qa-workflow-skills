@@ -4,11 +4,13 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -100,6 +102,11 @@ class CiHandoffTests(unittest.TestCase):
         self.manifest["artifacts"][0]["source_refs"][0]["revision"] = BASE
         self.assert_rejects("artifact_revision_mismatch")
 
+    def test_both_expected_and_manifest_artifact_sources_stale(self) -> None:
+        self.expected["artifacts"][0]["source_refs"][0]["revision"] = BASE
+        self.manifest["artifacts"][0]["source_refs"][0]["revision"] = BASE
+        self.assert_rejects("stale_artifact_source")
+
     def test_artifact_hash_mismatch_is_rejected(self) -> None:
         (self.root / "artifact.md").write_bytes(b"tampered\n")
         self.assert_rejects("artifact_hash_mismatch")
@@ -128,6 +135,26 @@ class CiHandoffTests(unittest.TestCase):
             self.skipTest("symlinks are unavailable")
         self.manifest["artifacts"][0]["path"] = "alias.md"
         self.assert_rejects("artifact_readback_failed")
+
+    def test_backslash_in_posix_changed_filename_is_a_valid_comparison_key(self) -> None:
+        path = r"src/back\slash.ts"
+        self.expected["changed_paths"] = [path]
+        self.manifest["changes"] = [
+            {"path": path, "classification": "source"}
+        ]
+        self.assertEqual(self.result()["status"], "pass")
+
+    def test_fifo_is_never_opened_in_blocking_mode(self) -> None:
+        if os.name != "posix" or not hasattr(os, "mkfifo"):
+            self.skipTest("FIFO is POSIX-specific")
+        target = self.root / "artifact.md"
+        target.unlink()
+        os.mkfifo(target)
+        self.assert_rejects("artifact_readback_failed")
+
+    def test_no_unsafe_readback_fallback_when_secure_open_is_unavailable(self) -> None:
+        with patch.object(handoff, "os", SimpleNamespace(name="nt")):
+            self.assert_rejects("artifact_readback_failed")
 
     def test_duplicate_changes_are_rejected(self) -> None:
         self.manifest["changes"].append(dict(self.manifest["changes"][0]))
@@ -187,6 +214,29 @@ class CiHandoffTests(unittest.TestCase):
         with patch.object(handoff, "MAX_JSON_BYTES", 5):
             with self.assertRaises(ValueError):
                 handoff._read_json(candidate)
+
+    def test_json_nesting_failure_is_a_structured_input_error(self) -> None:
+        input_path = self.root / "deep.json"
+        input_path.write_bytes(b"[" * 1100 + b"0" + b"]" * 1100)
+        with self.assertRaisesRegex(ValueError, "nesting"):
+            handoff._read_json(input_path)
+
+    def test_cli_output_escapes_invalid_unicode_in_failure_report(self) -> None:
+        expected = self.root / "expected.json"
+        manifest = self.root / "manifest.json"
+        self.manifest["changes"][0]["path"] = "src/\ud800.py"
+        expected.write_text(json.dumps(self.expected), encoding="utf-8")
+        manifest.write_text(json.dumps(self.manifest), encoding="utf-8")
+        response = subprocess.run(
+            [
+                sys.executable, str(SCRIPT), "--expected", str(expected),
+                "--manifest", str(manifest), "--artifacts-root", str(self.root),
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(response.returncode, 1, response.stderr)
+        self.assertEqual(json.loads(response.stdout)["status"], "fail")
+        self.assertIn("\\ud800", response.stdout)
 
     def test_cli_output_and_fail_closed_exit_code(self) -> None:
         expected = self.root / "expected.json"

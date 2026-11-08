@@ -54,6 +54,30 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         self.assertFalse(result["may_start"])
         self.assertFalse(self.root.exists())
 
+    def test_large_multibyte_claim_is_rejected_before_creating_a_file(self) -> None:
+        details = operation_details()
+        emoji = "😀"
+        for field in ("source_revisions", "artifact_revisions"):
+            details[field] = [
+                {"ref": emoji * 508 + f"{index:04}", "revision": emoji * 512}
+                for index in range(256)
+            ]
+        result = self.claim(details)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "claim_limit_exceeded")
+        self.assertFalse(result["may_start"])
+        self.assertEqual(list((self.root / "claims").glob("*.json")), [])
+
+    def test_storage_permission_failure_returns_blocked_not_exception(self) -> None:
+        with patch.object(
+            artifact_graph, "_local_baseline_root",
+            side_effect=PermissionError("inaccessible"),
+        ):
+            result = self.claim()
+        self.assertEqual(result["status"], "blocked")
+        self.assertFalse(result["may_start"])
+        self.assertEqual(result["reason"], "claim_storage_unavailable")
+
     def test_claim_persists_scope_revision_and_resume_details(self) -> None:
         first = self.claim()
         self.assertEqual(first["status"], "claim_acquired", first)
@@ -188,7 +212,7 @@ class WorkflowOperationClaimTests(unittest.TestCase):
     def test_noncanonical_claim_is_not_recovered(self) -> None:
         first = self.claim()
         path = Path(first["path"])
-        path.write_bytes(path.read_bytes() + b"\\n")
+        path.write_bytes(path.read_bytes() + b"\n")
         loaded = artifact_graph.read_mutable_operation_claim(
             self.root, WORKFLOW_REF, "runner:attempt-001"
         )
@@ -225,6 +249,16 @@ class WorkflowOperationClaimTests(unittest.TestCase):
         self.assertEqual(saved["status"], "current")
         self.assertIsNone(saved["operation_details"])
         self.assertFalse(saved["may_start"])
+        reopened = artifact_graph.read_mutable_operation_claim(
+            self.root,
+            WORKFLOW_REF,
+            operation_ref,
+            expected_claim_revision=saved["claim_revision"],
+        )
+        self.assertEqual(reopened["status"], "current")
+        self.assertEqual(reopened["claim_revision"], saved["claim_revision"])
+        self.assertIsNone(reopened["operation_details"])
+        self.assertFalse(reopened["may_start"])
         second = artifact_graph.claim_mutable_operation(
             self.root, WORKFLOW_REF, operation_ref
         )

@@ -220,6 +220,53 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         )
         self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
 
+    def test_corrupt_old_snapshot_blocks_current_read_and_future_write(self) -> None:
+        self.create()
+        self.assertEqual(self.update()["status"], "written")
+        database = self.root / "workflow-state.sqlite3"
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "UPDATE workflow_state_history SET envelope_json=? "
+                "WHERE workflow_ref=? AND provider_revision=1",
+                ("{broken", REF),
+            )
+        current = artifact_graph.read_sqlite_workflow_state(self.root, REF)
+        self.assertEqual(current["status"], "blocked")
+        self.assertEqual(self.read_history("sqlite:1")["status"], "blocked")
+        self.assertEqual(self.update("sqlite:2", "should-not-write")["status"], "blocked")
+        with sqlite3.connect(database) as connection:
+            row = connection.execute(
+                "SELECT provider_revision,envelope_json FROM workflow_state "
+                "WHERE workflow_ref=?", (REF,)
+            ).fetchone()
+        self.assertEqual(row[0], 2)
+        self.assertEqual(json.loads(row[1])["state"], {"marker": "changed"})
+
+    def test_sqlite_revision_max_is_blocked_without_an_overflow_write(self) -> None:
+        self.create()
+        database = self.root / "workflow-state.sqlite3"
+        limit = 2**63 - 1
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "UPDATE workflow_state SET provider_revision=? WHERE workflow_ref=?",
+                (limit, REF),
+            )
+        result = self.update(f"sqlite:{limit}", "not-written")
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertEqual(result["reason"], "workflow_state_revision_exhausted")
+        with sqlite3.connect(database) as connection:
+            current = connection.execute(
+                "SELECT provider_revision,envelope_json FROM workflow_state "
+                "WHERE workflow_ref=?", (REF,)
+            ).fetchone()
+            additions = connection.execute(
+                "SELECT COUNT(*) FROM workflow_state_history WHERE workflow_ref=?",
+                (REF,),
+            ).fetchone()[0]
+        self.assertEqual(current[0], limit)
+        self.assertEqual(json.loads(current[1])["state"], {"marker": "initial"})
+        self.assertEqual(additions, 1)
+
     def test_history_with_invalid_json_is_not_reused(self) -> None:
         self.create()
         database = self.root / "workflow-state.sqlite3"
