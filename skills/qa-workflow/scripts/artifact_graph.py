@@ -3189,7 +3189,9 @@ def release_shared_resource(
 
 def _reservation_sqlite_path(reservation_root: str | Path) -> Path:
     """Reuse the local-only root checks without sharing workflow state data."""
-    path = _local_sqlite_path(reservation_root).with_name("resource-reservations.sqlite3")
+    path = _local_sqlite_path(reservation_root).with_name(
+        "resource-reservations.sqlite3"
+    )
     if path.is_symlink():
         raise ValueError("reservation_database_symlink_unsupported")
     return path
@@ -3379,9 +3381,13 @@ def release_sqlite_shared_resource(
             current.get("status") != "current"
             or current.get("owner_workflow_ref") != ref
             or current.get("reservation_status") != "released"
-            or current.get("reservation_revision") != _provider_revision_token(revision + 1)
+            or current.get("reservation_revision")
+            != _provider_revision_token(revision + 1)
         ):
-            return {"status": "blocked", "reason": "reservation_release_readback_failed"}
+            return {
+                "status": "blocked",
+                "reason": "reservation_release_readback_failed",
+            }
         return {**current, "status": "released"}
     except (_LocalBaselineError, OSError, sqlite3.Error, TypeError, ValueError):
         return {"status": "blocked", "reason": "reservation_provider_unavailable"}

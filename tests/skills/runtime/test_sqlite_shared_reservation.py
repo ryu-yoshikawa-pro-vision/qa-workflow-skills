@@ -23,9 +23,7 @@ class SqliteSharedReservationTests(unittest.TestCase):
         self.root = Path(temporary.name) / "reservations"
 
     def acquire(self, owner: str = OWNER_A, resource: str = RESOURCE) -> dict:
-        return artifact_graph.reserve_sqlite_shared_resource(
-            self.root, resource, owner
-        )
+        return artifact_graph.reserve_sqlite_shared_resource(self.root, resource, owner)
 
     def release(
         self,
@@ -75,7 +73,9 @@ class SqliteSharedReservationTests(unittest.TestCase):
             outcomes,
         )
         winner = next(row for row in outcomes if row["status"] == "reserved")
-        self.assertEqual(self.read()["owner_workflow_ref"], winner["owner_workflow_ref"])
+        self.assertEqual(
+            self.read()["owner_workflow_ref"], winner["owner_workflow_ref"]
+        )
 
     def test_unverified_owner_or_cleanup_never_releases(self) -> None:
         acquired = self.acquire()
@@ -108,8 +108,12 @@ class SqliteSharedReservationTests(unittest.TestCase):
 
     def test_repeated_release_never_operates_twice(self) -> None:
         acquired = self.acquire()
-        self.assertEqual(self.release(acquired["reservation_revision"])["status"], "released")
-        self.assertEqual(self.release(acquired["reservation_revision"])["status"], "conflict")
+        self.assertEqual(
+            self.release(acquired["reservation_revision"])["status"], "released"
+        )
+        self.assertEqual(
+            self.release(acquired["reservation_revision"])["status"], "conflict"
+        )
         self.assertEqual(self.read()["reservation_revision"], "sqlite:2")
 
     def test_independent_resources_do_not_share_owner_or_token(self) -> None:
