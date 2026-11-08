@@ -413,7 +413,9 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
                 external_reservation_revision=f"sqlite:{acquired['revision']}",
             )
             self.assertEqual(candidate["status"], "blocked")
-            self.assertEqual(candidate["reason"], "external_reservation_readback_required")
+            self.assertEqual(
+                candidate["reason"], "external_reservation_readback_required"
+            )
             # The actual fixture provider owns the atomic reservation; a
             # self-attested helper result cannot grant browser start permission.
             self.assertEqual(acquired["status"], "reserved")

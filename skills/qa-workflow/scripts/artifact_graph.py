@@ -1425,7 +1425,9 @@ def conditional_write_sqlite_workflow_state(
                     connection, envelope["workflow_ref"], revision, current[0]
                 )
                 # Reject corrupt old snapshots even when the current row is sound.
-                _sqlite_history_is_complete(connection, envelope["workflow_ref"], revision)
+                _sqlite_history_is_complete(
+                    connection, envelope["workflow_ref"], revision
+                )
             cursor = connection.execute(
                 "UPDATE workflow_state SET envelope_json=?,provider_revision=provider_revision+1 "
                 "WHERE workflow_ref=? AND provider_revision=?",
@@ -3046,7 +3048,11 @@ def claim_mutable_operation(
             }
         return {**result, "may_start": False}
     except OSError:
-        return {"status": "blocked", "may_start": False, "reason": "claim_storage_unavailable"}
+        return {
+            "status": "blocked",
+            "may_start": False,
+            "reason": "claim_storage_unavailable",
+        }
     except (_LocalBaselineError, ValueError, TypeError) as exc:
         reason = exc.reason if isinstance(exc, _LocalBaselineError) else str(exc)
         return {"status": "blocked", "may_start": False, "reason": reason}

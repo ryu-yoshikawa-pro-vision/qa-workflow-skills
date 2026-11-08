@@ -277,8 +277,7 @@ def _summary(rows: list[dict[str, Any]], key: str) -> dict[str, Any]:
     median = (
         ordered[middle]
         if len(ordered) % 2
-        else ordered[middle - 1]
-        + (ordered[middle] - ordered[middle - 1]) / 2
+        else ordered[middle - 1] + (ordered[middle] - ordered[middle - 1]) / 2
     )
     return {
         "status": "measured",
@@ -436,7 +435,14 @@ def main(argv: list[str] | None = None) -> int:
             parse_constant=_reject_constant,
         )
         report = evaluate(data)
-    except (OSError, UnicodeError, ValueError, TypeError, OverflowError, RecursionError) as exc:
+    except (
+        OSError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        OverflowError,
+        RecursionError,
+    ) as exc:
         print(
             json.dumps(
                 {"status": "blocked", "reason": str(exc)},
