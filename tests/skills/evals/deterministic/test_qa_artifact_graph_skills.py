@@ -1930,7 +1930,23 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 claims = list(
                     executor.map(
                         lambda _: workflow.claim_mutable_operation(
-                            workflow_state_root, workflow_ref, "browser:save-order"
+                            workflow_state_root,
+                            workflow_ref,
+                            "browser:save-order",
+                            operation_details={
+                                "owner_skill": "e2e-test-execution",
+                                "scope_ref": "scope:order",
+                                "operation_type": "browser_mutation",
+                                "target_ref": "order:save",
+                                "source_revisions": [
+                                    {"ref": "product", "revision": "v1"}
+                                ],
+                                "artifact_revisions": [],
+                                "expected_revision": None,
+                                "approval_ref": None,
+                                "permission_scope": None,
+                                "resume_owner": "e2e-test-execution",
+                            },
                         ),
                         range(8),
                     )
@@ -1972,7 +1988,7 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                     expected_claim_revision=winner["claim_revision"],
                     native_atomic_conditional_release=True,
                 )["status"],
-                "conditional_release_required",
+                "blocked",
             )
 
             reservation_root = Path(temp) / "reservations"
@@ -1989,40 +2005,27 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(
-                sum(item["status"] == "reserved" for item in reservations), 1
+                [r["status"] for r in reservations], ["blocked", "blocked"]
             )
-            reservation = next(
-                item for item in reservations if item["status"] == "reserved"
+            self.assertTrue(
+                all(
+                    r["reason"] == "reservation_provider_not_selected"
+                    for r in reservations
+                )
             )
-            reservation_data = json.loads(
-                Path(reservation["reservation_ref"]).read_text(encoding="utf-8")
-            )
-            owner_ref = reservation_data["workflow_ref"]
+            self.assertFalse(reservation_root.exists())
             self.assertEqual(
                 workflow.release_shared_resource(
-                    current_workflow_ref=owner_ref,
-                    expected_workflow_ref=owner_ref,
-                    expected_reservation_revision=reservation["reservation_revision"],
-                    current_reservation_revision=reservation["reservation_revision"],
-                    native_atomic_conditional_release=False,
-                    owner_state_verified=True,
-                    owner_execution_state="complete",
-                    cleanup_confirmed=True,
-                )["status"],
-                "blocked",
-            )
-            self.assertEqual(
-                workflow.release_shared_resource(
-                    current_workflow_ref="other",
-                    expected_workflow_ref=owner_ref,
-                    expected_reservation_revision=reservation["reservation_revision"],
-                    current_reservation_revision=reservation["reservation_revision"],
+                    current_workflow_ref=workflow_ref,
+                    expected_workflow_ref=workflow_ref,
+                    expected_reservation_revision="provider:r1",
+                    current_reservation_revision="provider:r1",
                     native_atomic_conditional_release=True,
                     owner_state_verified=True,
                     owner_execution_state="complete",
                     cleanup_confirmed=True,
                 )["reason"],
-                "reservation_owner_mismatch",
+                "reservation_release_provider_not_connected",
             )
             self.assertEqual(
                 workflow.reserve_shared_resource(
@@ -2043,8 +2046,11 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 external_reservation_acquired=True,
                 external_reservation_revision="provider:revision-1",
             )
-            self.assertEqual(external["status"], "reserved")
-            self.assertEqual(external["provider"], "existing_external_reservation")
+            self.assertEqual(external["status"], "blocked")
+            self.assertEqual(
+                external["reason"], "external_reservation_readback_required"
+            )
+            self.assertEqual(external["provider"], "unverified_external_reservation")
 
             unsafe_resource = "resource:local-without-release"
             unsafe_target = (
@@ -2068,7 +2074,8 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 workflow_ref,
                 native_atomic_conditional_release=True,
             )
-            self.assertEqual(safe_local["status"], "reserved")
+            self.assertEqual(safe_local["status"], "blocked")
+            self.assertEqual(safe_local["reason"], "reservation_provider_not_selected")
 
     def test_partial_update_requires_owner_scope_dependency_and_cas_proof(self):
         base = {
