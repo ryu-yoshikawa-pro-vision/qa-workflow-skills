@@ -9,3 +9,7 @@
 差分は根拠に基づいてimpact / no_impact / out_of_scope / unclassified / unresolvedを判定します。対象外とするなら承認refを持たせますが、その文字列の実認証は承認ownerの責務です。specificationの期待動作は実装の観測事実から推測して確定しません。
 
 実providerのnative create-if-absent／CAS・過去revision・readbackが未確認なら、更新案と分析結果だけを残します。同じoperation_idの再受付、旧HEAD、競合、停止再開は上流正本を再読込し、無条件再書込みを避けます。
+
+## Git情報源の取得
+
+`scripts/git_source_inventory.py`に許可されたcheckout rootをrepository_root・authorized_rootとして同一の正本pathで渡し、base_sha／head_shaは完全なcommit SHAで指定します。初回はbase_sha=nullです。Gitファイル一覧とrename/moveのbefore/after pathを証拠として受取り、各ファイルを自動的に別機能と数えません。Gitの出力が大きすぎる・権限不足・HEAD不一致ならcompleteとせず再取得します。Git以外のIssue／仕様・設計情報源は権限のある提供経路で列挙し、未接続ならpartial／unavailableを保持します。

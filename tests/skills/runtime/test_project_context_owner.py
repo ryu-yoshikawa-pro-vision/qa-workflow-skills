@@ -23,6 +23,16 @@ class ProjectContextOwnerTests(unittest.TestCase):
         self.assertEqual(output["status"], "current", output)
         self.assertIn("qa.workflow_state_root", output["fields"])
 
+    def test_blank_template_cannot_be_current(self) -> None:
+        result = handle(
+            {
+                "operation": "inspect",
+                "markdown": TEMPLATE.read_text(encoding="utf-8"),
+                "required_keys": [],
+            }
+        )
+        self.assertEqual(result["status"], "blocked")
+
     def test_required_field_is_operation_scoped(self) -> None:
         output = handle(
             {

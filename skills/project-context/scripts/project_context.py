@@ -86,6 +86,8 @@ def _identity_compat(markdown: str) -> str:
 
 def _inspection(markdown: str, required_keys: list[str]) -> dict[str, Any]:
     _structure(markdown)
+    if not _project_name(markdown):
+        raise Invalid("project_identity_missing")
     if not isinstance(required_keys, list) or any(
         not isinstance(v, str) or not v for v in required_keys
     ):
