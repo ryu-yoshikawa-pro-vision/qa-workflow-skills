@@ -141,6 +141,29 @@ def analyze(request: Any) -> dict[str, Any]:
             "reasons": ["git_revision_registry_mismatch"],
             "coverage": None,
         }
+    if event in {"merge", "release"}:
+        # Neither event provides a PR base. The saved source revision is
+        # the only verified baseline for its complete change inventory.
+        previous = registry_request.get("previous_snapshot") or {}
+        old_sources = previous.get("sources", [])
+        old = [
+            row
+            for row in old_sources
+            if isinstance(row, dict) and row.get("id") == source_id
+            and row.get("kind") == "code"
+        ]
+        if len(old) != 1:
+            return {
+                "status": "stale",
+                "reasons": ["event_previous_code_source_missing"],
+                "coverage": None,
+            }
+        if git["base_sha"] != old[0].get("revision"):
+            return {
+                "status": "stale",
+                "reasons": ["event_previous_git_revision_mismatch"],
+                "coverage": None,
+            }
     if source_basis is not None:
         old_sources = (registry_request.get("previous_snapshot") or {}).get(
             "sources", []
@@ -247,9 +270,11 @@ def analyze(request: Any) -> dict[str, Any]:
             continue
         if row["id"] in previous_ids and row["after_revision"] != head_sha:
             continue
-        # Historical reclassification at an older revision is not a new
-        # source diff for the current HEAD.
-        if row.get("supersedes_id") and row["after_revision"] != head_sha:
+        # A saved DIF correction is history, not a new source change.
+        # Only same-HEAD analysis updates may classify it as current.
+        if row.get("supersedes_id") and (
+            event != "analysis_update" or row["after_revision"] != head_sha
+        ):
             continue
         locator = row["locator"]
         registry_paths.add(locator)
