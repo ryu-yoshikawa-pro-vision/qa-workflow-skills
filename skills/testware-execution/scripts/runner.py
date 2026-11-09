@@ -306,12 +306,19 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 and clean["return_code"] == 0
                 else "failed_or_unknown"
             )
+        try:
+            run["workspace_state_after_cleanup"] = (
+                "clean" if _git_clean(repo) else "dirty"
+            )
+        except RunnerError:
+            run["workspace_state_after_cleanup"] = "unverified"
         records.append(run)
         # Retrying an ambiguous state can repeat a side effect; never do it.
         if (
             run["cleanup_state"] == "failed_or_unknown"
             or run["timeout"]
             or scope.get("side_effects")
+            or run["workspace_state_after_cleanup"] != "clean"
         ):
             break
         if (
@@ -331,7 +338,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             break
     outcome = "unknown"
     last = records[-1]
-    if last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
+    if last["workspace_state_after_cleanup"] != "clean":
+        outcome = "blocked_workspace_not_restored"
+    elif last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
         outcome = "blocked_cleanup_or_timeout"
     elif not last["started"] or last["result_collection"] in {
         "invalid",
