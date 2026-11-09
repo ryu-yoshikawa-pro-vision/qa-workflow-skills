@@ -152,6 +152,23 @@ class GitSourceInventoryTests(unittest.TestCase):
         request["head_sha"] = "f" * 40
         self.assertEqual(handle(request)["status"], "blocked")
 
+    def test_stale_existing_commit_is_not_current_git_evidence(self) -> None:
+        (self.root / "new.py").write_text("print(1)\n", encoding="utf-8")
+        git(self.root, "add", "new.py")
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "advance checkout",
+        )
+        result = handle(self.request(None, self.first))
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertEqual(result["reason"], "git_head_changed")
+
     def test_cli_requires_trusted_root_from_host(self) -> None:
         request = self.request(None, self.first)
         script = SCRIPT_DIR / "git_source_inventory.py"
