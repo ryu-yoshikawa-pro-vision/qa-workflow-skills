@@ -479,6 +479,114 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertFalse(artifact["collection_verified"])
         self.assertEqual(artifact["attempts"][0]["return_code"], 0)
 
+    def test_malformed_reporters_still_run_cleanup_and_write_manifest(self):
+        reports = [
+            (
+                "vitest",
+                None,
+                {
+                    "success": True,
+                    "testResults": [{
+                        "name": "tests/broken.test.ts",
+                        "status": "passed",
+                        "assertionResults": [{
+                            "ancestorTitles": ["suite"],
+                            "title": "one",
+                            "status": [],
+                        }],
+                    }],
+                },
+                [{"path": "tests/broken.test.ts", "title_path": ["suite", "one"]}],
+            ),
+            (
+                "playwright-api",
+                "playwright-json",
+                {
+                    "config": {"version": "fixture-version"},
+                    "errors": [],
+                    "stats": {
+                        "expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0
+                    },
+                    "suites": [{
+                        "title": "tests/api.spec.ts",
+                        "specs": [{
+                            "file": "tests/api.spec.ts",
+                            "title": "one",
+                            "tests": [{
+                                "status": [],
+                                "expectedStatus": "passed",
+                                "results": [{"status": "passed", "retry": 0}],
+                            }],
+                        }],
+                    }],
+                },
+                [{"path": "tests/api.spec.ts", "title_path": ["one"]}],
+            ),
+            (
+                "event",
+                "case-json",
+                {
+                    "schema": "non-e2e-cases/v1",
+                    "source_revision": self.sha,
+                    "testware_revision": "fixture-revision",
+                    "runner_version": "fixture-version",
+                    "complete": True,
+                    "results": [{
+                        "path": "tests/event.py",
+                        "title_path": ["one"],
+                        "status": [],
+                        "attempt_results": [{"status": "passed", "retry": 0}],
+                    }],
+                },
+                [{"path": "tests/event.py", "title_path": ["one"]}],
+            ),
+        ]
+        for kind, reporter_format, report, selected in reports:
+            with self.subTest(kind=kind):
+                output = repr(json.dumps(report))
+                if reporter_format == "playwright-json":
+                    script = (
+                        "import os,pathlib;"
+                        "pathlib.Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE'])."
+                        f"write_text({output},encoding='utf-8')"
+                    )
+                    argv = [sys.executable, "-c", script]
+                else:
+                    script = (
+                        "import pathlib,sys;"
+                        f"pathlib.Path(sys.argv[1]).write_text({output},encoding='utf-8')"
+                    )
+                    argv = [sys.executable, "-c", script, "{reporter_file}"]
+                plan = self.plan(argv, kind=kind)
+                plan.update({
+                    "testware_ref": "fixture:testware",
+                    "testware_revision": "fixture-revision",
+                    "runner_version": "fixture-version",
+                    "selected": selected,
+                    "selection_verified": True,
+                    "selection_evidence_ref": "fixture:selection",
+                    "planned_scope_ref": "fixture:scope",
+                })
+                if reporter_format is not None:
+                    plan["reporter_format"] = reporter_format
+                cleanup = [sys.executable, "-c", "print('cleanup marker')"]
+                plan["cleanup_argv"] = cleanup
+                plan["reviewed_cleanup_argv"] = cleanup
+                code, summary, artifact = self.call(plan)
+                self.assertEqual(code, 1)
+                self.assertEqual(summary["outcome"], "incomplete")
+                attempt = artifact["attempts"][0]
+                self.assertEqual(attempt["processing_error"], "TypeError")
+                self.assertEqual(attempt["return_code"], 0)
+                self.assertEqual(attempt["cleanup_state"], "success")
+                self.assertIn(
+                    "cleanup marker",
+                    (Path(artifact["artifact_directory"]) / "attempt-1" / "cleanup.stdout.log")
+                    .read_text(encoding="utf-8"),
+                )
+                self.assertTrue(Path(attempt["raw_report_ref"]).is_file())
+                self.assertFalse(artifact["collection_verified"])
+
     def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
         plan["direct_tc"] = True
