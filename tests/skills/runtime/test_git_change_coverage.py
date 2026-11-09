@@ -252,6 +252,70 @@ class GitChangeCoverageTests(unittest.TestCase):
             "git_change_revision_pairs_not_registered", missing_one["reasons"]
         )
 
+
+    def test_consecutive_pr_updates_keep_historical_dif_revision(self) -> None:
+        first_head = self.inventory["head_sha"]
+        historical = copy.deepcopy(self.feature["snapshot"])
+        (self.root / "gamma.py").write_text("print('gamma')\n", encoding="utf-8")
+        git(self.root, "add", "gamma.py")
+        self.commit("second PR update")
+        new_head = git(self.root, "rev-parse", "HEAD")
+        self.inventory = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": self.base,
+                "head_sha": new_head,
+            }
+        )
+        previous_diff = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": first_head,
+                "head_sha": new_head,
+            }
+        )
+        snapshot = self.feature["snapshot"]
+        self.feature["previous_snapshot"] = historical
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": self.base,
+            "head_sha": new_head,
+            "previous_head_sha": first_head,
+        }
+        snapshot["source_revision"] = new_head
+        snapshot["sources"][0]["revision"] = new_head
+        self.feature["observed_head_revision"] = new_head
+        snapshot["operation_id"] = "op-v2"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        pairs = [
+            (self.base, "alpha.py"),
+            (self.base, "beta.py"),
+            (self.base, "gamma.py"),
+            (first_head, "gamma.py"),
+        ]
+        for i, (before, path) in enumerate(pairs, start=2):
+            row = copy.deepcopy(snapshot["changes"][0])
+            row.update(
+                id=f"DIF-{i:03d}",
+                locator=path,
+                before_revision=before,
+                after_revision=new_head,
+            )
+            snapshot["changes"].append(row)
+        result = reconcile({**self.request(), "previous_head_git_inventory": previous_diff})
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(result["coverage"]["rate"], 1.0)
+        self.assertEqual(snapshot["changes"][0]["after_revision"], first_head)
+        snapshot["changes"].pop()
+        report = reconcile(
+            {**self.request(), "previous_head_git_inventory": previous_diff}
+        )
+        self.assertEqual(report["status"], "incomplete", report)
+        self.assertEqual(report["coverage"]["rate"], 0.75)
+
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"
         result = reconcile(self.request())

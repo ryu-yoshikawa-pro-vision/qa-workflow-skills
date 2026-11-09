@@ -153,6 +153,70 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(report["status"], "incomplete", report)
         self.assertIn("change_source_incomplete:DIF-001", report["reasons"])
 
+
+    def test_classification_history_is_immutable(self) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
+        snapshot = data["snapshot"]
+        snapshot["operation_id"] = "op-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["changes"][0].update(
+            classification="no_impact",
+            feature_ids=[],
+            reason="revised impact",
+            approval_ref="approval/verified",
+        )
+        result = handle(data)
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn("change_history_rewritten:DIF-001", result["reasons"])
+
+    def test_reclassification_requires_new_id_evidence_and_approval_revision(
+        self,
+    ) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
+        snapshot = data["snapshot"]
+        snapshot["operation_id"] = "op-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["artifact_revision"] = "art-v2"
+        replacement = {
+            **copy.deepcopy(snapshot["changes"][0]),
+            "id": "DIF-002",
+            "supersedes_id": "DIF-001",
+            "classification": "no_impact",
+            "feature_ids": [],
+            "reason": "Reviewed current classification",
+            "evidence_ref": "review/decision-v2",
+            "approval_ref": "approval/verified",
+            "approval_revision": "approval-revision-v2",
+        }
+        snapshot["changes"].append(replacement)
+        self.assertEqual(handle(data)["status"], "complete", handle(data))
+        replacement.pop("approval_revision")
+        self.assertIn("DIF-002_approval_revision_invalid", handle(data)["reasons"])
+        replacement["approval_revision"] = "approval-revision-v2"
+        replacement["evidence_ref"] = snapshot["changes"][0]["evidence_ref"]
+        self.assertEqual(handle(data)["status"], "blocked")
+        replacement["evidence_ref"] = "review/decision-v2"
+        replacement["before_revision"] = "forged-base"
+        self.assertEqual(handle(data)["status"], "blocked")
+
+    def test_two_code_repositories_may_have_independent_head_revision(self) -> None:
+        data = fixture()
+        source = {
+            **copy.deepcopy(data["snapshot"]["sources"][0]),
+            "id": "SRC-002",
+            "ref": "product/backend",
+            "revision": "f" * 40,
+        }
+        data["snapshot"]["sources"].append(source)
+        data["snapshot"]["expected_source_ids"].append("SRC-002")
+        data["snapshot"]["features"][0]["source_ids"].append("SRC-002")
+        self.assertEqual(handle(data)["status"], "complete", handle(data))
+
     def test_complete_local_inventory_has_no_full_product_guarantee(self) -> None:
         result = handle(fixture())
         self.assertEqual(result["status"], "complete", result)
