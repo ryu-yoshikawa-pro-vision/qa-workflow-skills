@@ -680,8 +680,7 @@ def _verify_git_evidence(
         raise ContractError("git_coverage_required")
     event = snapshot["event"]
     if event != "external_revision" and not any(
-        row["revision"] == snapshot["source_revision"]
-        for row in code_sources.values()
+        row["revision"] == snapshot["source_revision"] for row in code_sources.values()
     ):
         raise ContractError("event_primary_code_source_missing")
     if event in {"pr_update", "rebase"}:
@@ -689,8 +688,7 @@ def _verify_git_evidence(
         if not any(
             entry.get("head_sha") == snapshot["source_revision"]
             and entry.get("base_sha") == event_basis["base_sha"]
-            and entry.get("previous_head_base_sha")
-            == event_basis["previous_head_sha"]
+            and entry.get("previous_head_base_sha") == event_basis["previous_head_sha"]
             for entry in inputs
             if isinstance(entry, dict)
         ):
