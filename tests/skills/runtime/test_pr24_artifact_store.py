@@ -108,7 +108,10 @@ class ArtifactStoreTests(unittest.TestCase):
             self.store.read_current("project-context", "Sample", "artifact.md")
         )
         self.assertEqual(self.write()["status"], "stored")
-        self.assertEqual(self.approvals[-1]["sha256"], self.write()["sha256"])
+        self.assertEqual(
+            next(item["sha256"] for item in self.approvals if item["operation"] == "write"),
+            self.write()["sha256"],
+        )
 
 
     def test_read_denied_for_other_project_and_revoked_access(self) -> None:
@@ -357,6 +360,7 @@ class ArtifactStoreTests(unittest.TestCase):
             approval_revision="approval-v1",
         )
         self.assertEqual(rejected["status"], "blocked")
+        self.allowed = True
         self.assertEqual(
             self.store.read_current("project-context", "Sample", "context.md")[
                 "revision"
