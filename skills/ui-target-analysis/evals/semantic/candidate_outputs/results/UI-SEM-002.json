@@ -23,9 +23,9 @@
       "status": "pass",
       "reason": "UI操作・画面・親構造・scopeそれぞれの正確なstable ID、file、section、lineを示しています。",
       "evidence": [
-        "| UIOP-012 | 操作 | `02_behavior_and_business_rules.md` | UI操作一覧 | 44 | SCOPE-004、PAGE-008 |",
-        "| NAV-002 | 親構造 | `01_ui_structure_and_navigation.md` | UI構造一覧 | 8 | PAGE-008の親 |",
-        "| SCOPE-004 | scope | `00_scope_and_context.md` | 分析対象機能scope一覧 | 19 | 明示mapping |"
+        "| UIOP-012   | 操作   | `02_behavior_and_business_rules.md` | UI操作一覧            |   44 | SCOPE-004、PAGE-008   |",
+        "| NAV-002    | 親構造 | `01_ui_structure_and_navigation.md` | UI構造一覧            |    8 | PAGE-008の親          |",
+        "| SCOPE-004  | scope  | `00_scope_and_context.md`           | 分析対象機能scope一覧 |   19 | 明示mapping           |"
       ]
     },
     {

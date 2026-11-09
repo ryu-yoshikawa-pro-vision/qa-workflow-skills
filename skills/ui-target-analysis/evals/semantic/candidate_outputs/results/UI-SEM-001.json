@@ -24,7 +24,7 @@
       "reason": "UI captureとrequirementのref/revisionを別に保持しています。",
       "evidence": [
         "| 画面capture | `artifact://design/checkout` | `design-r7` |",
-        "| 要件 | `doc://checkout/requirement` | `req-12` |"
+        "| 要件        | `doc://checkout/requirement` | `req-12`    |"
       ]
     },
     {

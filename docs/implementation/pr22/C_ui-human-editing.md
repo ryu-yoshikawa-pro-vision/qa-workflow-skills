@@ -89,8 +89,8 @@ UI構造と期待仕様を分離し、既存ui-target-v1を破壊せず人間の
 - [ ] isolated copyではshared writer不在時に書込みhelperがblockedになることを検証した。trigger dataset契約とsemantic candidateはローカル検証したが、実trigger rateと独立Judge実行、既存TC/E2E consumerの実成果物接続は未検証。
 
 - [x] `SKILL.md`、入出力、停止条件、人間編集・互換性文書、isolated copy test、trigger dataset、semantic rubric/cases/candidate outputsを追加した。semantic結果は実装者と同一のsession LLMによる自己評価であり、独立Judge実行とは扱わない。
-- [ ] 担当Skillとpackage/migrationの局所回帰はPASS。全runtime・deterministic suiteはローカル環境要件によりFAIL（結果表参照）。remote head `0eae05d762678f20ca86b90a434c5ffa533e2a4f`ではsemantic、deterministic、Codex HarnessがPASS。root READMEと`qa-workflow`に旧route記述が残り、shared owner修正前のSkill validationは完了しない。
-- [ ] 専用unit／package／migration／semantic dataset・trigger datasetの各契約検証はPASS。Ruffと`skills-ref`はローカル環境にない。remote Code QualityはPython lint/format後のdprint Markdown整形でFAILし、対象5文書を整形して再実行待ち。公式Skill形式validation step自体はPASSしたが、同jobのrepository eval structure stepはREADMEのcatalog不足でFAIL。
+- [ ] 担当Skillとpackage/migrationの局所回帰はPASS。全runtime・deterministic suiteはローカル環境要件によりFAIL（結果表参照）。remote head `346c6edf1ba24fe73ff6bce782b679f4b9d8613e`ではruntime unit/integration・deterministic test stepがPASSしたが、semantic result evidence testがUI-SEM-001/002でFAIL。dprintによるcandidate table整形後のevidence文字列を更新し、再実行待ち。root READMEと`qa-workflow`に旧route記述が残り、shared owner修正前のSkill validationは完了しない。
+- [ ] 専用unit／package／migration／semantic dataset・trigger datasetの各契約検証はPASS。Ruffと`skills-ref`はローカル環境にない。remote Code Qualityは上記headでPASS。公式Skill形式validation step自体もPASSしたが、同jobのrepository eval structure stepはREADMEのcatalog不足でFAIL。
 - [ ] source／artifact／承認認証／native CAS／保存readbackとshared runtime owner検証をAへ接続できていない。以下のPR #22 handoff契約で継続する。
 - [x] 本branchの実装と可能な局所検証を完了し、未検証条件を分けて記録した。PR #22だけで行う横断検証、全Skill routing、15＋10条件とS1〜S17の最終判定は担当branchでPASS扱いしない。
 
@@ -126,7 +126,7 @@ triggerデータはCI形式と均衡を検査しただけで、全Skillを同時
 
 ### GitHub Actionsの記録
 
-remote head `0eae05d762678f20ca86b90a434c5ffa533e2a4f`の[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42554344304)、[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42554344325)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42554344328)はPASS。[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42554344305)は5文書のdprint整形差分でFAILし、本更新で整形した。[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42554344348)は公式Skill仕様validationがPASS、repository eval structureがREADMEの`ui-target-analysis` catalog不足でFAIL。Cの変更境界外のREADME・shared route更新はA/PR #22に引き継ぐ。
+remote head `346c6edf1ba24fe73ff6bce782b679f4b9d8613e`の[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555305166)と[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555305182)はPASS。[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555305173)はdeterministicとruntime unit/integrationまでPASSし、後続semantic result evidence testがUI-SEM-001/002でFAIL。[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555305252)も同じ2 assertionでFAILした。dprintが候補Markdownの表行を揃えた後も旧空白のまま残っていたevidence文字列を更新済みで、新headの再検証待ち。[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555305194)は公式Skill仕様validationがPASS、repository eval structureがREADMEの`ui-target-analysis` catalog不足でFAIL。Cの変更境界外のREADME・shared route更新はA/PR #22に引き継ぐ。
 
 ## PR #22への引継ぎとshared owner依頼
 
