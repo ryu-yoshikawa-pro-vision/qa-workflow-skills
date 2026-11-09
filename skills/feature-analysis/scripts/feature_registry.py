@@ -18,6 +18,7 @@ PROJECT_CONTEXT_SCRIPT = (
 )
 sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPT))
 from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
+from git_artifact_store import GitArtifactStore  # noqa: E402
 
 MAX_INPUT = 16 * 1024 * 1024
 ID = re.compile(r"^(SRC|CAND|FEAT|DIF)-[0-9]{3,}$")
@@ -569,7 +570,7 @@ def analyze(request: Any) -> dict[str, Any]:
 
 
 def persist_snapshot(
-    store: LocalArtifactStore,
+    store: LocalArtifactStore | GitArtifactStore,
     request: dict[str, Any],
     *,
     expected_revision: str | None,

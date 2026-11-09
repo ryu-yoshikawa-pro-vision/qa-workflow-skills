@@ -167,6 +167,26 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertEqual(path.read_text(encoding="utf-8"), before["content"])
         self.assertFalse((self.root / ".qa-context-feature").exists())
 
+
+    def test_retry_of_same_git_operation_is_idempotent(self) -> None:
+        first = self.write()
+        self.assertEqual(self.write()["status"], "idempotent")
+        updated = self.write(
+            content="second", expected=first["revision"], operation="op-2"
+        )
+        self.assertEqual(updated["status"], "stored")
+        self.assertEqual(
+            self.write(
+                content="second",
+                expected=first["revision"],
+                operation="op-2",
+            )["status"],
+            "idempotent",
+        )
+        with self.assertRaisesRegex(StoreError, "revision_conflict"):
+            self.write(content="changed", expected=first["revision"], operation="op-2")
+
+
     def test_native_ref_cas_detects_concurrent_edits(self) -> None:
         first = self.write()
         def update(index: int) -> str:

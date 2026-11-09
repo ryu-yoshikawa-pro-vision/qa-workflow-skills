@@ -24,3 +24,5 @@ description: QA案件のProject Contextを初回発見・新規初期化・必�
 - 入出力・保存条件: references/data-contract.md
 - 結果の確認形式: assets/output-template.md
 - helper: scripts/project_context.py
+
+既存のGit管理Markdownを正本として更新する場合は`scripts/git_artifact_store.py`の`GitArtifactStore`を利用します。Git refを条件付き更新（commit SHAでCAS）し、元のMarkdown pathと旧revisionをGit履歴に保持します。ローカルSQLite正本への移行は行いません。両保存先とも、信頼済みhostからの認可callbackを必須とし、読取にも権限確認を適用します。

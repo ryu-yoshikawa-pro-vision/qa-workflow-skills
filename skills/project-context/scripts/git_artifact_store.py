@@ -64,9 +64,9 @@ class GitArtifactStore:
         self.author_email = _name(author_email, "author_email")
         if "@" not in self.author_email:
             raise StoreError("author_email_invalid")
-        if self._git("rev-parse", "--show-toplevel").decode().strip() != str(
-            self.root
-        ):
+        top = self._git("rev-parse", "--show-toplevel")
+        assert top is not None
+        if Path(top.decode().strip()).resolve(strict=True) != self.root:
             raise StoreError("git_repository_root_mismatch")
         self._git("check-ref-format", "--branch", self.branch)
         self._head()
@@ -229,10 +229,56 @@ class GitArtifactStore:
             approval_ref=approval_ref, digest=digest,
         )
         current = self._read_at(kind, project_ref, path, head)
+        same_operation = False
+        if current is not None and current["content"] == content:
+            last_message = self._git("log", "-1", "--format=%B", head)
+            assert last_message is not None
+            trailers = last_message.decode("utf-8").splitlines()
+            same_operation = all(
+                f"{key}: {value}" in trailers
+                for key, value in (
+                    ("QA-Operation-Id", operation_id),
+                    ("QA-Project-Ref", project_ref),
+                    ("QA-Source-Ref", source_ref),
+                    ("QA-Source-Revision", source_revision),
+                    ("QA-Approval-Ref", approval_ref),
+                    ("QA-Approval-Revision", approval_revision),
+                    ("QA-Change-Reason", change_reason),
+                )
+            )
         if expected_revision is None:
             if current is not None:
+                parent = current["previous_revision"]
+                existed_before = (
+                    parent is not None
+                    and self._read_at(kind, project_ref, path, parent[4:]) is not None
+                )
+                if same_operation and not existed_before:
+                    return {
+                        "status": "idempotent",
+                        "artifact_ref": path,
+                        "revision": current["revision"],
+                        "previous_revision": parent,
+                        "sha256": digest,
+                        "source_revision": source_revision,
+                        "approval_ref": approval_ref,
+                    }
                 raise StoreError("create_if_absent_conflict")
         elif expected_revision != "git:" + head:
+            if (
+                same_operation
+                and current is not None
+                and current["previous_revision"] == expected_revision
+            ):
+                return {
+                    "status": "idempotent",
+                    "artifact_ref": path,
+                    "revision": current["revision"],
+                    "previous_revision": expected_revision,
+                    "sha256": digest,
+                    "source_revision": source_revision,
+                    "approval_ref": approval_ref,
+                }
             raise StoreError("revision_conflict")
         if current is not None and current["content"] == content:
             raise StoreError("unchanged_artifact_write")

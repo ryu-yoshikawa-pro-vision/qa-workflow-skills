@@ -20,6 +20,7 @@ from artifact_graph import (  # noqa: E402
     validate_required_context_fields,
 )
 from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
+from git_artifact_store import GitArtifactStore  # noqa: E402
 from project_context_ids import handle as identity_handle  # noqa: E402
 
 MAX_BYTES = 16 * 1024 * 1024
@@ -715,7 +716,7 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def persist_prepared(
-    store: LocalArtifactStore,
+    store: LocalArtifactStore | GitArtifactStore,
     preparation: dict[str, Any],
     *,
     project_ref: str,

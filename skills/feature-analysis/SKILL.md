@@ -26,3 +26,5 @@ description: 初回製品分析・PR更新・merge・release・資料改版のUI
 - 解析・履歴検証: scripts/feature_registry.py
 - Git全体snapshot・差分列挙: scripts/git_source_inventory.py
 - Git差分と機能差分台帳の照合: scripts/reconcile_git_coverage.py
+
+Git管理の機能台帳JSONを正本にする案件では、`project-context/scripts/git_artifact_store.py`を`persist_snapshot`へ明示的に渡すことができます。Git branchのcommit SHAによるnative CASと履歴読戻しを利用し、SQLite・Gitの二重正本を作りません。どちらも選定されていない案件では、保存をblockedとします。
