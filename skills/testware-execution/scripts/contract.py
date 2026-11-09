@@ -445,6 +445,7 @@ def reconcile_playwright(
     selected: list[dict[str, Any]],
     report: dict[str, Any],
     source_revision: str,
+    runner_version: str,
     raw_ref: str,
     selection_verified: bool = False,
     repo_root: str | None = None,
@@ -455,8 +456,10 @@ def reconcile_playwright(
         or not isinstance(report.get("suites"), list)
         or not isinstance(report.get("errors"), list)
         or not isinstance(report.get("stats"), dict)
+        or not isinstance(report.get("config"), dict)
     ):
         raise ContractError("invalid_playwright_report")
+    _required_str(runner_version, "runner_version")
     observed: list[dict[str, Any]] = []
 
     def visit(suite: dict[str, Any], parents: list[str], depth: int) -> None:
@@ -520,14 +523,18 @@ def reconcile_playwright(
         visit(top, [], 0)
     stats = report["stats"]
     totals = Counter(item["status"] for item in observed)
-    consistent = report["errors"] == [] and all(
-        type(stats.get(name)) is int and stats[name] == totals[status]
-        for name, status in [
-            ("expected", "expected"),
-            ("unexpected", "unexpected"),
-            ("flaky", "flaky"),
-            ("skipped", "skipped"),
-        ]
+    consistent = (
+        report["errors"] == []
+        and report["config"].get("version") == runner_version
+        and all(
+            type(stats.get(name)) is int and stats[name] == totals[status]
+            for name, status in [
+                ("expected", "expected"),
+                ("unexpected", "unexpected"),
+                ("flaky", "flaky"),
+                ("skipped", "skipped"),
+            ]
+        )
     )
     return _reconcile_individual_results(
         selected=selected,
