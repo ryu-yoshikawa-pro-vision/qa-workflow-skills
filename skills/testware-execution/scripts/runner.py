@@ -20,7 +20,15 @@ from typing import Any
 
 from contract import ContractError, preflight, reconcile_vitest
 
-KINDS = {"vitest", "playwright-api", "component", "batch", "event", "nonfunctional", "static"}
+KINDS = {
+    "vitest",
+    "playwright-api",
+    "component",
+    "batch",
+    "event",
+    "nonfunctional",
+    "static",
+}
 
 
 class RunnerError(ValueError):
@@ -28,8 +36,10 @@ class RunnerError(ValueError):
 
 
 def _argv(value: Any, name: str) -> list[str]:
-    if not isinstance(value, list) or not value or any(
-        not isinstance(arg, str) or not arg or "\x00" in arg for arg in value
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(arg, str) or not arg or "\x00" in arg for arg in value)
     ):
         raise RunnerError(f"invalid_{name}")
     if os.path.basename(value[0]) in {"sh", "bash", "cmd", "powershell", "pwsh"}:
@@ -98,14 +108,22 @@ def _run_command(
         except OSError as exc:
             # Do not serialize potentially sensitive environment values.
             return {
-                "started": started, "pid": pid, "return_code": return_code,
-                "timeout": timed_out, "launch_error": type(exc).__name__,
-                "started_at": started_at, "finished_at": time.time(),
+                "started": started,
+                "pid": pid,
+                "return_code": return_code,
+                "timeout": timed_out,
+                "launch_error": type(exc).__name__,
+                "started_at": started_at,
+                "finished_at": time.time(),
             }
     return {
-        "started": started, "pid": pid, "return_code": return_code,
-        "timeout": timed_out, "launch_error": None,
-        "started_at": started_at, "finished_at": time.time(),
+        "started": started,
+        "pid": pid,
+        "return_code": return_code,
+        "timeout": timed_out,
+        "launch_error": None,
+        "started_at": started_at,
+        "finished_at": time.time(),
     }
 
 
@@ -172,15 +190,19 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         attempt.mkdir(mode=0o700)
         reporter = attempt / "reporter.json"
         argv = [part.replace("{reporter_file}", str(reporter)) for part in command]
-        run = _run_command(argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit)
-        run.update({
-            "number": number,
-            "stdout_ref": str(attempt / "stdout.log"),
-            "stderr_ref": str(attempt / "stderr.log"),
-            "raw_report_ref": None,
-            "result_collection": "not_applicable",
-            "cleanup_state": "not_required" if cleanup is None else "not_started",
-        })
+        run = _run_command(
+            argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit
+        )
+        run.update(
+            {
+                "number": number,
+                "stdout_ref": str(attempt / "stdout.log"),
+                "stderr_ref": str(attempt / "stderr.log"),
+                "raw_report_ref": None,
+                "result_collection": "not_applicable",
+                "cleanup_state": "not_required" if cleanup is None else "not_started",
+            }
+        )
         if kind == "vitest":
             run["result_collection"] = "missing"
             if reporter.is_file() and run["started"]:
@@ -196,43 +218,64 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         repo_root=str(repo),
                     )
                     run["result_collection"] = (
-                        "complete" if run["reconciliation"]["collection_complete"]
+                        "complete"
+                        if run["reconciliation"]["collection_complete"]
                         else "incomplete"
                     )
                 except (ValueError, ContractError, UnicodeError):
                     run["result_collection"] = "invalid"
         if cleanup is not None and run["started"]:
             clean = _run_command(
-                cleanup, repo, attempt / "cleanup.stdout.log",
-                attempt / "cleanup.stderr.log", limit
+                cleanup,
+                repo,
+                attempt / "cleanup.stdout.log",
+                attempt / "cleanup.stderr.log",
+                limit,
             )
             run["cleanup"] = clean
             run["cleanup_state"] = (
-                "success" if clean["started"] and not clean["timeout"]
-                and clean["return_code"] == 0 else "failed_or_unknown"
+                "success"
+                if clean["started"]
+                and not clean["timeout"]
+                and clean["return_code"] == 0
+                else "failed_or_unknown"
             )
         records.append(run)
         # Retrying an ambiguous state can repeat a side effect; never do it.
-        if (run["cleanup_state"] == "failed_or_unknown" or run["timeout"]
-                or scope.get("side_effects")):
+        if (
+            run["cleanup_state"] == "failed_or_unknown"
+            or run["timeout"]
+            or scope.get("side_effects")
+        ):
             break
-        if run["return_code"] == 0 and run["result_collection"] in {"complete", "not_applicable"}:
+        if run["return_code"] == 0 and run["result_collection"] in {
+            "complete",
+            "not_applicable",
+        }:
             break
     outcome = "unknown"
     last = records[-1]
     if last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
         outcome = "blocked_cleanup_or_timeout"
-    elif not last["started"] or last["result_collection"] in {"invalid", "missing", "incomplete"}:
+    elif not last["started"] or last["result_collection"] in {
+        "invalid",
+        "missing",
+        "incomplete",
+    }:
         outcome = "incomplete"
     elif last["return_code"] == 0:
         outcome = "runner_pass"
     elif last["return_code"] is not None:
         outcome = "runner_fail"
     result = {
-        "runner_kind": kind, "source_revision": expected_sha,
-        "run_ref": scope["operation_ref"], "artifact_directory": str(folder),
-        "attempts": records, "outcome": outcome,
-        "tc_verdict": None, "evidence_is_fixture": bool(plan.get("fixture_only", False)),
+        "runner_kind": kind,
+        "source_revision": expected_sha,
+        "run_ref": scope["operation_ref"],
+        "artifact_directory": str(folder),
+        "attempts": records,
+        "outcome": outcome,
+        "tc_verdict": None,
+        "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
     }
     _write_json(folder / "manifest.json", result)
@@ -240,24 +283,38 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
 
 
 def main() -> int:
-    cli = argparse.ArgumentParser(description="Execute an inspected non-E2E runner command")
+    cli = argparse.ArgumentParser(
+        description="Execute an inspected non-E2E runner command"
+    )
     cli.add_argument("--plan", type=Path, required=True)
     cli.add_argument("--artifacts", type=Path, required=True)
     args = cli.parse_args()
     try:
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
         result = execute(plan, args.artifacts)
-        print(json.dumps({
-            "outcome": result["outcome"],
-            "run_ref": result["run_ref"],
-            "artifact_directory": result["artifact_directory"],
-        }, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "outcome": result["outcome"],
+                    "run_ref": result["run_ref"],
+                    "artifact_directory": result["artifact_directory"],
+                },
+                ensure_ascii=False,
+            )
+        )
         return 0 if result["outcome"] == "runner_pass" else 1
     except (RunnerError, ContractError, ValueError, OSError) as error:
-        print(json.dumps({
-            "outcome": "blocked",
-            "reason": str(error) if isinstance(error, (RunnerError, ContractError)) else type(error).__name__,
-        }, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "outcome": "blocked",
+                    "reason": str(error)
+                    if isinstance(error, (RunnerError, ContractError))
+                    else type(error).__name__,
+                },
+                ensure_ascii=False,
+            )
+        )
         return 2
 
 
