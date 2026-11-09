@@ -86,7 +86,13 @@ def _git_clean(repo: Path) -> bool:
 
 
 def _run_command(
-    argv: list[str], cwd: Path, stdout: Path, stderr: Path, timeout: int
+    argv: list[str],
+    cwd: Path,
+    stdout: Path,
+    stderr: Path,
+    timeout: int,
+    *,
+    env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     started_at = time.time()
     started = False
@@ -102,6 +108,7 @@ def _run_command(
                 stdout=out,
                 stderr=err,
                 shell=False,
+                env=env,
                 start_new_session=os.name == "posix",
             )
             started, pid = True, proc.pid
@@ -285,6 +292,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 raise RunnerError(field + "_required_for_reporter")
         if plan.get("selection_verified") is not True:
             raise RunnerError("selection_evidence_unverified")
+        if reporter_format != "playwright-json" and not any(
+            "{reporter_file}" in item for item in command
+        ):
+            raise RunnerError("reporter_output_file_not_configured")
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -319,8 +330,15 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         argv_digest = hashlib.sha256(
             json.dumps(argv, ensure_ascii=False).encode("utf-8")
         ).hexdigest()
+        env = None
+        if reporter_format == "playwright-json":
+            # Official Playwright JSON reporter output location; avoid a
+            # persistent repo-local report and stale output from a prior run.
+            env = os.environ.copy()
+            env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(reporter)
         run = _run_command(
-            argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit
+            argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit,
+            env=env,
         )
         run.update(
             {
