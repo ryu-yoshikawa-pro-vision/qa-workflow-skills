@@ -652,9 +652,7 @@ def analyze(request: Any) -> dict[str, Any]:
                 if row["classification"] in {"no_impact", "out_of_scope"}
             ),
             "unknown_areas": unknown,
-            "unclassified_change_ids": sorted(
-                set(effective_changes) - set(classified)
-            ),
+            "unclassified_change_ids": sorted(set(effective_changes) - set(classified)),
             "expected_source_ids": snapshot["expected_source_ids"],
         },
     }
@@ -680,6 +678,23 @@ def _verify_git_evidence(
         return
     if not isinstance(inputs, list) or len(inputs) != len(code_sources):
         raise ContractError("git_coverage_required")
+    event = snapshot["event"]
+    if event != "external_revision" and not any(
+        row["revision"] == snapshot["source_revision"]
+        for row in code_sources.values()
+    ):
+        raise ContractError("event_primary_code_source_missing")
+    if event in {"pr_update", "rebase"}:
+        event_basis = snapshot["event_basis"]
+        if not any(
+            entry.get("head_sha") == snapshot["source_revision"]
+            and entry.get("base_sha") == event_basis["base_sha"]
+            and entry.get("previous_head_base_sha")
+            == event_basis["previous_head_sha"]
+            for entry in inputs
+            if isinstance(entry, dict)
+        ):
+            raise ContractError("event_primary_git_evidence_missing")
     from git_source_inventory import handle as read_git  # noqa: PLC0415
     from reconcile_git_coverage import handle as reconcile  # noqa: PLC0415
 
@@ -726,10 +741,13 @@ def _verify_git_evidence(
             "source_id": sid,
         }
         if snapshot["event"] in {"pr_update", "rebase"}:
-            primary = entry["head_sha"] == snapshot["source_revision"]
+            primary = (
+                entry["head_sha"] == snapshot["source_revision"]
+                and entry["base_sha"] == snapshot["event_basis"]["base_sha"]
+                and entry.get("previous_head_base_sha")
+                == snapshot["event_basis"]["previous_head_sha"]
+            )
             if primary:
-                if entry["base_sha"] != snapshot["event_basis"]["base_sha"]:
-                    raise ContractError("event_git_base_mismatch")
                 previous_head = snapshot["event_basis"]["previous_head_sha"]
             else:
                 prior_source = next(

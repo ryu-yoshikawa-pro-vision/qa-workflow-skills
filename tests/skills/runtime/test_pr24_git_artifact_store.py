@@ -352,6 +352,22 @@ class GitArtifactStoreTests(unittest.TestCase):
         ]
         return request, evidence
 
+    def test_initial_code_snapshot_requires_event_bound_primary_head(self) -> None:
+        request, evidence = self._code_registry()
+        request["snapshot"]["source_revision"] = "a" * 40
+        request["observed_head_revision"] = "a" * 40
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="event primary not verified",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn("event_primary_code_source_missing", result["reasons"])
+
     def test_code_save_rechecks_actual_git_tree_and_rejects_unlisted_diff(
         self,
     ) -> None:
