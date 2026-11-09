@@ -537,6 +537,100 @@ class ArtifactStoreTests(unittest.TestCase):
             current["content"],
         )
 
+    def test_reclassification_requires_immutable_history_and_trusted_approval(
+        self,
+    ) -> None:
+        request = fixture()
+        snapshot = request["snapshot"]
+        snapshot["project_ref"] = "Sample"
+        snapshot["sources"][0].update(
+            kind="spec", ref="specification/checkout"
+        )
+        first = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="initial feature review",
+        )
+        self.assertEqual(first["status"], "stored", first)
+        previous = copy.deepcopy(snapshot)
+        request["previous_snapshot"] = previous
+        snapshot["event"] = "analysis_update"
+        snapshot["event_basis"] = {
+            "source_revision": snapshot["source_revision"],
+            "evidence_ref": "review/second",
+        }
+        snapshot["operation_id"] = "op-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["artifact_revision"] = "art-v2"
+        override = copy.deepcopy(snapshot["changes"][0])
+        override.update(
+            id="DIF-002",
+            supersedes_id="DIF-001",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Approved correction after source review",
+            evidence_ref="review/evidence-2",
+            approval_ref="approval/verified",
+            approval_revision="policy-v2",
+        )
+        snapshot["changes"].append(override)
+        normal_authorize = self.authorize
+
+        def strict_authorization(decision: dict) -> bool:
+            if decision["operation"] == "reclassify":
+                self.approvals.append(decision.copy())
+                return (
+                    self.allowed
+                    and decision["approval_ref"] == "approval/verified"
+                    and decision["approval_revision"] == "policy-approved-v2"
+                    and decision["change_id"] == "DIF-002"
+                    and decision["supersedes_id"] == "DIF-001"
+                    and decision["old_classification"] == "impact"
+                    and decision["classification"] == "no_impact"
+                )
+            return normal_authorize(decision)
+
+        self.store.authorize = strict_authorization
+        blocked = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="unapproved classification correction",
+        )
+        self.assertEqual(blocked["status"], "blocked", blocked)
+        self.assertIn(
+            "change_reclassification_approval_unverified:DIF-002",
+            blocked["reasons"],
+        )
+        self.assertEqual(
+            self.store.read_current(
+                "feature-inventory", "Sample", "feature-artifact"
+            )["revision"],
+            first["revision"],
+        )
+        override["approval_revision"] = "policy-approved-v2"
+        approved = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="approved classification correction",
+        )
+        self.assertEqual(approved["status"], "stored", approved)
+        historical = self.store.read_revision(
+            "feature-inventory", "Sample", "feature-artifact", first["revision"]
+        )["content"]
+        self.assertIn('"classification":"impact"', historical)
+        self.assertEqual(snapshot["changes"][0]["classification"], "impact")
+        self.assertEqual(snapshot["changes"][1]["classification"], "no_impact")
+        self.assertEqual(approved["revision"], "r2")
+
     def test_code_inventory_without_git_evidence_cannot_be_stored(self) -> None:
         request = fixture()
         request["snapshot"]["project_ref"] = "Sample"
