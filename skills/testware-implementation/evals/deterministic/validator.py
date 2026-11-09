@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    find_table,
+    parse_bullets,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 
@@ -55,4 +59,40 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ),
             "変更前・反映の必須列を空欄にしないこと",
         )
+    testware = find_table(
+        tables,
+        section_contains="testwareと検証",
+        required_headers=(
+            "testware ref／revision",
+            "assertion・fixtureの根拠",
+            "変更／再利用path",
+            "実行した軽量検証と実結果",
+            "未実施の理由",
+            "独立レビュー先",
+        ),
+    )
+    result.add("TW-IMPL-D005", testware is not None, "testwareと検証の表があること")
+    if testware is not None:
+        result.add(
+            "TW-IMPL-D006",
+            bool(testware.rows)
+            and all(
+                all(str(value).strip() for value in row.values())
+                for row in testware.rows
+            ),
+            "testwareと検証の必須欄を空欄にしないこと",
+        )
+    handoff = parse_bullets(text)
+    handoff_fields = (
+        "実runner実行owner",
+        "必要な認証・副作用・cleanup・未確定の条件",
+        "変更の復旧／再開条件",
+        "実run未実施の明示",
+    )
+    result.add(
+        "TW-IMPL-D007",
+        "## 引継ぎ" in text
+        and all(str(handoff.get(key, "")).strip() for key in handoff_fields),
+        "引継ぎのrunner owner・条件・再開・実run状況を明示すること",
+    )
     return result

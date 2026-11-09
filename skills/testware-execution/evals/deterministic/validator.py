@@ -55,4 +55,56 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ),
             "選択集合と収集の必須列を空欄にしないこと",
         )
+    start = find_table(
+        tables,
+        section_contains="開始・直接観測／静的解析",
+        required_headers=(
+            "活動・対象",
+            "開始状態",
+            "期待結果／適用rule",
+            "実観測・raw ref",
+            "FAIL／判定不能／未実行",
+            "備考",
+        ),
+    )
+    cleanup = find_table(
+        tables,
+        section_contains="Cleanupと診断",
+        required_headers=(
+            "scope",
+            "runner管理／run外",
+            "cleanup状態",
+            "残存副作用",
+            "再開条件・owner",
+        ),
+    )
+    diagnosis = find_table(
+        tables,
+        section_contains="Cleanupと診断",
+        required_headers=(
+            "元run ref", "原因候補・確度", "根拠・反証",
+            "不足証拠", "修正／再実行先",
+        ),
+    )
+    for identifier, table, description in (
+        ("TW-EXEC-D005", start, "開始・直接観測の表"),
+        ("TW-EXEC-D007", cleanup, "cleanupと残存副作用の表"),
+        ("TW-EXEC-D009", diagnosis, "元runの診断と再実行先の表"),
+    ):
+        result.add(identifier, table is not None, description + "があること")
+    for identifier, table, description in (
+        ("TW-EXEC-D006", start, "開始状態と根拠"),
+        ("TW-EXEC-D008", cleanup, "cleanupと再開条件"),
+        ("TW-EXEC-D010", diagnosis, "元run参照と診断根拠"),
+    ):
+        if table is not None:
+            result.add(
+                identifier,
+                bool(table.rows)
+                and all(
+                    all(str(value).strip() for value in row.values())
+                    for row in table.rows
+                ),
+                description + "の必須欄を空欄にしないこと",
+            )
     return result

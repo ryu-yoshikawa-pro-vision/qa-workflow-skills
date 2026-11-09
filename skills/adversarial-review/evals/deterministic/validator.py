@@ -52,6 +52,36 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=missing_tables or None,
     )
 
+    # New review modes must not silently pass without their provenance table.
+    # Legacy design/E2E reviews do not use this table, so gate by scope.
+    if "非E2E testware" in text or "静的レビュー" in text:
+        scope_table = find_table(
+            tables,
+            section_contains="非E2E testware／静的レビュー",
+            required_headers=(
+                "対象source／revision",
+                "TCまたは明示対象・仕様Authority",
+                "testware ref／assertion・fixture",
+                "適用基準／観測根拠",
+                "レビュー結果・誤検出候補",
+                "修正元owner",
+            ),
+        )
+        result.add(
+            "REV-D015", scope_table is not None,
+            "非E2E・静的レビューの対象revisionと根拠の表があること",
+        )
+        if scope_table is not None:
+            result.add(
+                "REV-D016",
+                bool(scope_table.rows)
+                and all(
+                    all(str(value).strip() for value in row.values())
+                    for row in scope_table.rows
+                ),
+                "非E2E・静的レビューの対象と根拠を空欄にしないこと",
+            )
+
     summary = nonempty_rows(summary_table)
     findings = nonempty_rows(findings_table)
     add_required_fields_assertion(
