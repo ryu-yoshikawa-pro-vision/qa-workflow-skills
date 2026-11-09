@@ -128,7 +128,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 1. `runner.py`で隔離checkout上の実subprocess起動とattempt／timeout／raw／cleanupを実装した。ただし案件の実Vitest・API-only Playwright・静的解析toolと、実副作用・認証が必要な環境の受入は未実施。独立Python subprocessと固定JSON reporterの結果から製品runの完了を主張しない。
 2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitをGit remoteに非強制fast-forward反映・readbackする経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
-3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23はclosed・merge済み。共有正本と新Skillとの接続について、PR #22統合ownerに引き継ぐ。PR #29のtrigger正負件数不均衡はGで修正したが、共有READMEに両Skill名がないことで`Validate Agent Skills`は継続してFAILする。
+3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23はclosed・merge済み。共有正本と新Skillとの接続について、PR #22統合ownerに引き継ぐ。PR #29のtrigger正負件数不均衡はGで修正済み。README未登録による`Validate Agent Skills` failureは旧HEADの履歴で、PR #22側の共有README同期後、commit `481eada`ではsuccessを確認した。
 4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
 5. 全対応方式の実runnerと保存先で必須受入を完了するまで、PR #29はDraftとし、**担当G完了**を宣言しない。PR #22の最終完了とは区別する。
 
@@ -183,7 +183,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 2. 現在のCLIは任意subprocessの権限・副作用回数・ignored file／外部状態の復元・共有予約を認証付きで検証できない。このため宣言された副作用やshared実行は開始前に拒否する。安全に実行可能なprovider／sandboxが必要なケースはblockedのままにする。
 3. 静的解析tool固有のraw収集・version照合・解析対象完全性の本接続、非機能採用閾値・測定条件の実証とtestware assertionの独立実製品レビューは未実施。独立fixtureのPASSで置換しない。
 4. `README.md`、共有runtimeへのrouting／保存・承認・native CAS／readback、H/Jの実保存成果物との結合、PR #22の全条件・S1〜S17／人間編集8ケースは担当ownerの統合受入を要する。PR #23はclosed・merge済み（merge commit `d38b775e43f7`）。残る統合はPR #22で実施する。
-5. 最新CI結果はPR #29のChecksとし、`Validate Agent Skills` FAIL等は原因と担当を分離して引き継ぐ。未検証がある限りPR #29の完了・mergeは宣言しない。
+5. 最新CI結果はPR #29のChecksを正本とする。README未登録による`Validate Agent Skills` FAILは旧HEADの履歴であり、現状と混同しない。未検証がある限りPR #29の完了・mergeは宣言しない。
 
 ## 実行安全性と非Vitest収集の追加修正（2026-11-09）
 
@@ -195,3 +195,12 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - PR #23はclosedだがmerge済みである。以前の「closed・未merge」という記載を訂正した。共有READMEとruntimeへの新Skill接続はPR #22の統合条件として引き継ぐ。
 
 最新CIの正本はPR #29のChecksとする。担当Gの全完了条件を満たしたという判定には、実runner受入・共有接続・下流証拠が別途必要。
+
+## 追加実装・検証（2026-11-09：Vitest・cleanup・TC Authority・Jest）
+
+- Vitest 4公式JSONで`ancestorTitles`先頭に含まれる空root名を構造上の区切りとして扱い、実テスト名に含む途中の空文字列は引き続き不正とする。固定形式の回帰テストを追加した。
+- Vitest／Playwright／batch-event各reporterの解釈で型不正などの例外が発生しても、元reporter・stdout・stderrを保存し、事前許可されたcleanup、実行後workspace確認、manifest保存へ進む。不正なreporter入力でcleanupが飛ぶ負例を追加した。
+- `direct_tc=true`では、`direct_tc_authority_file`に指定された**固定Git HEAD上の追跡済み通常ファイル**からTC ref・revision・仕様Authority ref・期待結果全件を読み取る。実行planの期待値が1件でも欠ける・異なる、指定fileが未追跡・版違いなら開始前に拒否する。rawから仕様を推測しない。取得したGit blobとsource revisionをmanifestへ残す。ただしGit snapshotの存在は承認主体の認証ではなく、実providerの検証・approved状態の主張ではない。
+- 固定`qa-training-store`のcomponent構成を再確認したところ、Web側はVitest、Native側はJestを利用するため、`component`にJestの公式`--json --outputFile`で出力するJest互換JSON形式を追加した。実runner本体ではなくJest形式JSONを生成する独立fixtureで局所検証する。
+- 固定`qa-training-store`での実Vitest・Playwright API-only・Native Jest・batch/event・静的解析・非機能計測の実run、必要なデータ／権限・安全なcleanup、外部Authority providerの承認／CAS／readback、H/J実artifactとの横断受入は未検証として残す。GitHub connector経由では対象repoのsource・package scriptを確認できるが、この実行環境からGitHubへ直接cloneできず、製品実runの証拠にはならない。
+- 上記の局所修正はPR #29の最新CIで判定する。PR #22の15＋10条件、S1〜S17、人間編集8件、詳細07の比較シナリオは削減しない。実runner・実provider受入が揃わないためG完了チェックボックスは未達のままとする。
