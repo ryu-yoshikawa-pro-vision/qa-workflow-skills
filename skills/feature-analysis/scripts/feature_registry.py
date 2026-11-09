@@ -215,7 +215,72 @@ def _changes(
                 _text(row.get("approval_ref"), f"{did}_approval_ref")
         elif did not in superseded:
             issues.append(f"change_unclassified:{did}")
+    seen: dict[tuple[str, str, str, str], str] = {}
+    for did, row in changes.items():
+        if did in superseded:
+            continue
+        identity = (
+            row["source_id"],
+            row["before_revision"],
+            row["after_revision"],
+            row["locator"],
+        )
+        if identity in seen:
+            raise ContractError(f"duplicate_active_change:{seen[identity]}:{did}")
+        seen[identity] = did
     return changes, issues
+
+
+def _primary_code_source_id(snapshot: dict[str, Any]) -> str | None:
+    """Identify the event's owning source, not just a shared Git SHA."""
+    if snapshot["event"] not in {"pr_update", "rebase", "merge", "release"}:
+        return None
+    matching = [
+        row for row in snapshot["sources"]
+        if row["kind"] == "code"
+        and row.get("revision") == snapshot["source_revision"]
+    ]
+    chosen = snapshot["event_basis"].get("primary_source_id")
+    if chosen is not None:
+        if not any(row.get("id") == chosen for row in matching):
+            raise ContractError("event_primary_source_invalid")
+        return chosen
+    if len(matching) != 1:
+        raise ContractError("event_primary_source_ambiguous")
+    return matching[0]["id"]
+
+
+def _current_changes(
+    snapshot: dict[str, Any],
+    previous: dict | None,
+    changes: dict[str, dict[str, Any]],
+    sources: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Scope current QA impact to this event, preserving append-only history."""
+    superseded = {
+        row["supersedes_id"]
+        for row in changes.values()
+        if row.get("supersedes_id") is not None
+    }
+    previous_ids = (
+        set(_rows(previous.get("changes"), "previous_changes", "DIF"))
+        if previous is not None
+        else set()
+    )
+    current: dict[str, dict[str, Any]] = {}
+    for did, row in changes.items():
+        if did in superseded:
+            continue
+        if previous is None or snapshot["event"] == "initial":
+            current[did] = row
+        elif did not in previous_ids:
+            current[did] = row
+        elif (
+            snapshot["event"] == "analysis_update"
+            and row["after_revision"] == sources[row["source_id"]].get("revision")
+        ):
+            current[did] = row
+    return current
 
 
 def _change_revisions(
@@ -235,6 +300,7 @@ def _change_revisions(
     )
     issues: list[str] = []
     basis = snapshot.get("event_basis") or {}
+    primary = _primary_code_source_id(snapshot)
     for did, row in changes.items():
         if did in prior or row.get("supersedes_id") is not None:
             continue
@@ -245,7 +311,7 @@ def _change_revisions(
         if row["after_revision"] != source["revision"]:
             raise ContractError(f"change_source_revision_mismatch:{did}")
         if snapshot["event"] in {"pr_update", "rebase"} and source["kind"] == "code":
-            if source["revision"] == snapshot["source_revision"]:
+            if row["source_id"] == primary:
                 permitted = {basis["base_sha"], basis["previous_head_sha"]}
                 if row["before_revision"] not in permitted:
                     raise ContractError(f"change_before_revision_mismatch:{did}")
@@ -452,7 +518,10 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             "evidence_ref",
         },
     }
-    if set(basis) != keys[event]:
+    allowed = keys[event].copy()
+    if event in {"pr_update", "rebase", "merge", "release"}:
+        allowed.add("primary_source_id")
+    if not keys[event] <= set(basis) or not set(basis) <= allowed:
         raise ContractError("event_basis_schema_invalid")
     for name, value in basis.items():
         _text(value, f"event_basis_{name}")
@@ -483,6 +552,7 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             row.get("revision") == head for row in code_sources
         ):
             raise ContractError("event_code_source_revision_mismatch")
+        _primary_code_source_id(snapshot)
         if event == "rebase" and basis["base_sha"] == basis["previous_base_sha"]:
             raise ContractError("rebase_base_unchanged")
     else:
@@ -554,21 +624,14 @@ def analyze(request: Any) -> dict[str, Any]:
     unknown = _refs(snapshot.get("unknown_areas"), "unknown_areas")
     if unknown:
         issues.append("unknown_areas_present")
-    superseded = {
-        row.get("supersedes_id")
-        for row in changes.values()
-        if row.get("supersedes_id") is not None
-    }
-    effective_changes = {
-        did: row for did, row in changes.items() if did not in superseded
-    }
+    current_changes = _current_changes(snapshot, previous, changes, sources)
     classified = sorted(
         did
-        for did, row in effective_changes.items()
+        for did, row in current_changes.items()
         if row["classification"] in {"impact", "no_impact", "out_of_scope"}
     )
     mapped = sorted(cid for cid, row in candidates.items() if row["status"] == "mapped")
-    if not changes:
+    if not current_changes:
         issues.append("change_denominator_zero")
     if not candidates:
         issues.append("candidate_denominator_zero")
@@ -589,10 +652,10 @@ def analyze(request: Any) -> dict[str, Any]:
         "metrics": {
             "change_classification": {
                 "numerator_ids": classified,
-                "denominator_ids": sorted(effective_changes),
+                "denominator_ids": sorted(current_changes),
                 "rate": (
-                    len(classified) / len(effective_changes)
-                    if effective_changes
+                    len(classified) / len(current_changes)
+                    if current_changes
                     else None
                 ),
             },
@@ -641,18 +704,18 @@ def analyze(request: Any) -> dict[str, Any]:
             "impacted_feature_ids": sorted(
                 {
                     fid
-                    for row in effective_changes.values()
+                    for row in current_changes.values()
                     if row["classification"] == "impact"
                     for fid in row["feature_ids"]
                 }
             ),
             "approval_required_change_ids": sorted(
                 did
-                for did, row in effective_changes.items()
+                for did, row in current_changes.items()
                 if row["classification"] in {"no_impact", "out_of_scope"}
             ),
             "unknown_areas": unknown,
-            "unclassified_change_ids": sorted(set(effective_changes) - set(classified)),
+            "unclassified_change_ids": sorted(set(current_changes) - set(classified)),
             "expected_source_ids": snapshot["expected_source_ids"],
         },
     }
@@ -679,6 +742,7 @@ def _verify_git_evidence(
     if not isinstance(inputs, list) or len(inputs) != len(code_sources):
         raise ContractError("git_coverage_required")
     event = snapshot["event"]
+    primary_id = _primary_code_source_id(snapshot)
     if event != "external_revision" and not any(
         row["revision"] == snapshot["source_revision"] for row in code_sources.values()
     ):
@@ -686,7 +750,8 @@ def _verify_git_evidence(
     if event in {"pr_update", "rebase"}:
         event_basis = snapshot["event_basis"]
         if not any(
-            entry.get("head_sha") == snapshot["source_revision"]
+            entry.get("source_id") == primary_id
+            and entry.get("head_sha") == snapshot["source_revision"]
             and entry.get("base_sha") == event_basis["base_sha"]
             and entry.get("previous_head_base_sha") == event_basis["previous_head_sha"]
             for entry in inputs
@@ -739,12 +804,7 @@ def _verify_git_evidence(
             "source_id": sid,
         }
         if snapshot["event"] in {"pr_update", "rebase"}:
-            primary = (
-                entry["head_sha"] == snapshot["source_revision"]
-                and entry["base_sha"] == snapshot["event_basis"]["base_sha"]
-                and entry.get("previous_head_base_sha")
-                == snapshot["event_basis"]["previous_head_sha"]
-            )
+            primary = sid == primary_id
             if primary:
                 previous_head = snapshot["event_basis"]["previous_head_sha"]
             else:
@@ -810,8 +870,21 @@ def _authorize_reclassifications(
             "supersedes_id": row["supersedes_id"],
             "old_classification": replaced["classification"],
             "classification": row["classification"],
-            "source_ref": row["source_id"],
+            "source_id": row["source_id"],
+            "source_ref": next(
+                source["ref"] for source in snapshot["sources"]
+                if source["id"] == row["source_id"]
+            ),
+            "source_scope": next(
+                source["scope"] for source in snapshot["sources"]
+                if source["id"] == row["source_id"]
+            ),
             "source_revision": row["after_revision"],
+            "before_revision": row["before_revision"],
+            "locator": row["locator"],
+            "old_feature_ids": list(replaced["feature_ids"]),
+            "feature_ids": list(row["feature_ids"]),
+            "old_evidence_ref": replaced["evidence_ref"],
             "evidence_ref": row["evidence_ref"],
             "approval_ref": row["approval_ref"],
             "approval_revision": row["approval_revision"],
