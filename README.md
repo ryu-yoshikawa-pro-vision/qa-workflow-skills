@@ -65,8 +65,8 @@ skills/
 | Skill                         | 責務                                                                                           |
 | ----------------------------- | ---------------------------------------------------------------------------------------------- |
 | `qa-workflow`                 | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了                                 |
-| `project-context`             | 案件Project Contextの既存正本の発見・差分更新候補、DEC/ASM ID・配置契約                |
-| `feature-analysis`            | 製品機能の安定IDと階層、情報源母集団・Git差分分類・履歴の正本                               |
+| `project-context`             | 案件Project Contextの既存正本の発見・差分更新候補、DEC/ASM ID・配置契約                    |
+| `feature-analysis`            | 製品機能の安定IDと階層、情報源母集団・Git差分分類・履歴の正本                                   |
 | `spec-analysis`               | 仕様分類 / 現在有効な仕様根拠                                                                  |
 | `question-analysis`           | 未解決事項分類 / 仮定 / 回答正規化                                                             |
 | `agent-answer-form`           | JSONからの回答用HTML生成・Markdown回答回収（分類・正規化はしない）                             |
