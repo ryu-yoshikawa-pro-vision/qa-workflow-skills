@@ -123,6 +123,58 @@ class VitestTests(unittest.TestCase):
         self.assertFalse(result["tc_verdicts_assessed"])
         self.assertIsNone(result["results"][0]["tc_verdict"])
 
+    def test_vitest_official_json_root_ancestor_is_ignored(self):
+        report = {
+            "success": True,
+            "numTotalTests": 1,
+            "numPassedTests": 1,
+            "numFailedTests": 0,
+            "numPendingTests": 0,
+            "numTodoTests": 0,
+            "testResults": [
+                {
+                    "name": "tests/official.test.ts",
+                    "status": "passed",
+                    "assertionResults": [
+                        {
+                            "ancestorTitles": ["", "first test file"],
+                            "title": "2 + 2 should equal 4",
+                            "status": "passed",
+                        }
+                    ],
+                }
+            ],
+        }
+        result = contract.reconcile_vitest(
+            selected=[
+                {
+                    "path": "tests/official.test.ts",
+                    "title_path": ["first test file", "2 + 2 should equal 4"],
+                }
+            ],
+            report=report,
+            source_revision="fixed",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertTrue(result["collection_complete"])
+        report["testResults"][0]["assertionResults"][0]["ancestorTitles"] = [
+            "first test file", "", "inner suite"
+        ]
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_vitest(
+                selected=[
+                    {
+                        "path": "tests/official.test.ts",
+                        "title_path": ["first test file", "2 + 2 should equal 4"],
+                    }
+                ],
+                report=report,
+                source_revision="fixed",
+                raw_ref="raw",
+                selection_verified=True,
+            )
+
     def test_duplicates_are_not_implicitly_matched(self):
         case = {"ancestorTitles": ["s"], "title": "a", "status": "passed"}
         report = {
