@@ -808,6 +808,8 @@ def _verify_git_evidence(
     }
     previous_snapshot = request.get("previous_snapshot") or {}
     verified: set[str] = set()
+    inventories: dict[str, dict[str, Any]] = {}
+    entries: dict[str, dict[str, Any]] = {}
     for entry in inputs:
         keys = {
             "source_id",
@@ -816,7 +818,7 @@ def _verify_git_evidence(
             "base_sha",
             "head_sha",
         }
-        optional = {"previous_head_base_sha"}
+        optional = {"previous_head_base_sha", "gitlink_sources"}
         if (
             not isinstance(entry, dict)
             or not keys <= set(entry)
@@ -836,11 +838,84 @@ def _verify_git_evidence(
             raise ContractError("git_evidence_source_revision_mismatch")
         tree_request = {key: entry[key] for key in keys if key != "source_id"}
         tree = read_git(tree_request)
-        if tree["status"] != "complete":
-            reason = tree.get("reason")
+        if tree["status"] == "blocked":
             raise ContractError(
-                "git_source_listing_incomplete" + (f":{reason}" if reason else "")
+                "git_source_listing_incomplete:" + tree.get("reason", "unknown")
             )
+        if tree["status"] not in {"complete", "incomplete"}:
+            raise ContractError("git_source_listing_incomplete")
+        inventories[sid] = tree
+        entries[sid] = entry
+
+    def resolved_git_tree(tree: dict[str, Any], sid: str) -> dict[str, Any]:
+        if tree["status"] == "complete":
+            return tree
+        markers = tree.get("unretrieved")
+        associations = entries[sid].get("gitlink_sources", {})
+        if not isinstance(markers, list) or not markers or not isinstance(associations, dict):
+            raise ContractError("gitlink_source_evidence_required")
+        for marker in markers:
+            if not isinstance(marker, str) or not marker.startswith("gitlink:") or "@" not in marker:
+                raise ContractError("git_source_listing_incomplete")
+            child_id = associations.get(marker)
+            if child_id == sid or child_id not in code_sources:
+                raise ContractError("gitlink_source_evidence_missing:" + marker)
+            child_revision = marker.rsplit("@", 1)[1]
+            current = inventories.get(child_id)
+            saved = previous_sources.get(child_id)
+            verified_current = (
+                current is not None
+                and current["status"] == "complete"
+                and entries[child_id]["head_sha"] == child_revision
+            )
+            verified_saved = (
+                saved is not None
+                and saved.get("kind") == "code"
+                and saved.get("revision") == child_revision
+                and saved.get("status") == "complete"
+                and saved.get("enumeration_complete") is True
+                and saved.get("unretrieved") == []
+            )
+            if not verified_current and not verified_saved:
+                raise ContractError("gitlink_source_revision_unverified:" + marker)
+        return {
+            **tree,
+            "status": "complete",
+            "complete_file_listing": True,
+            "unretrieved": [],
+            "resolved_gitlinks": sorted(markers),
+        }
+
+    # Resolve children first when another source points at a nested submodule.
+    unresolved = set(inventories)
+    for _ in inventories:
+        progress = False
+        for sid in sorted(unresolved):
+            try:
+                inventory = resolved_git_tree(inventories[sid], sid)
+            except ContractError as exc:
+                if str(exc).startswith("gitlink_source_revision_unverified:"):
+                    continue
+                raise
+            inventories[sid] = inventory
+            unresolved.remove(sid)
+            progress = True
+        if not unresolved or not progress:
+            break
+    if unresolved:
+        raise ContractError("gitlink_source_evidence_incomplete")
+
+    for entry in inputs:
+        sid = entry["source_id"]
+        tree = inventories[sid]
+        keys = {
+            "source_id",
+            "repository_root",
+            "authorized_root",
+            "base_sha",
+            "head_sha",
+        }
+        tree_request = {key: entry[key] for key in keys if key != "source_id"}
         if entry["base_sha"] is None:
             if any(row["source_id"] == sid for row in snapshot["changes"]):
                 raise ContractError("git_change_diff_not_enumerated")
@@ -905,12 +980,13 @@ def _verify_git_evidence(
             previous_request = dict(tree_request)
             previous_request["base_sha"] = previous_head
             previous_diff = read_git(previous_request)
-            if previous_diff["status"] != "complete":
-                reason = previous_diff.get("reason")
+            if previous_diff["status"] == "blocked":
                 raise ContractError(
-                    "previous_head_git_listing_incomplete"
-                    + (f":{reason}" if reason else "")
+                    "previous_head_git_listing_incomplete:"
+                    + previous_diff.get("reason", "unknown")
                 )
+            if previous_diff["status"] == "incomplete":
+                previous_diff = resolved_git_tree(previous_diff, sid)
             coverage_request["previous_head_git_inventory"] = previous_diff
         coverage = reconcile(coverage_request)
         extra = set(coverage.get("reasons", [])) - set(report.get("reasons", []))
@@ -994,8 +1070,6 @@ def persist_snapshot(
         report = handle(request)
         if report["status"] not in {"complete", "incomplete"}:
             return report
-        _verify_git_evidence(request, report, git_inventory_requests)
-        _authorize_reclassifications(store, request, expected_revision)
         snapshot = request["snapshot"]
         project_ref = snapshot["project_ref"]
         artifact_ref = snapshot["artifact_ref"]
@@ -1009,6 +1083,8 @@ def persist_snapshot(
                 raise ContractError("previous_snapshot_not_current")
         elif request["previous_snapshot"] is not None:
             raise ContractError("previous_snapshot_without_expected_revision")
+        _verify_git_evidence(request, report, git_inventory_requests)
+        _authorize_reclassifications(store, request, expected_revision)
         content = json.dumps(
             snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )
