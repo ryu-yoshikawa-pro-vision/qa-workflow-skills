@@ -149,6 +149,14 @@ def analyze(request: Any) -> dict[str, Any]:
     if Path(top).resolve() != root:
         raise Invalid("repository_root_mismatch")
     _git(root, "cat-file", "-e", head + "^{commit}")
+    # A valid historical commit is not evidence of the current checkout.
+    # The trusted host must refresh the inventory if HEAD has advanced.
+    checkout_head = _sha(
+        _decode(_git(root, "rev-parse", "--verify", "HEAD").strip(), "checkout_head"),
+        "checkout_head",
+    )
+    if checkout_head != head:
+        raise Invalid("git_head_changed")
     if base is not None:
         _git(root, "cat-file", "-e", base + "^{commit}")
     files = _tree(_git(root, "ls-tree", "-r", "--full-tree", "-z", head))
