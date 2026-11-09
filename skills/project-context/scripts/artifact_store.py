@@ -12,6 +12,7 @@ import json
 import os
 import sqlite3
 import stat
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Callable
 
@@ -44,7 +45,7 @@ def _check_root(root: Path, authorized_root: Path) -> Path:
     if not root.is_absolute() or not authorized_root.is_absolute():
         raise StoreError("absolute_authorized_root_required")
     # Do not silently resolve a symlink to an unrelated authorized location.
-    for candidate in (root, authorized_root):
+    for candidate in (root, *root.parents, authorized_root, *authorized_root.parents):
         if candidate.is_symlink():
             raise StoreError("root_symlink_rejected")
     resolved = root.resolve(strict=True)
@@ -94,7 +95,7 @@ class LocalArtifactStore:
             raise StoreError("store_file_invalid")
         if os.name == "posix" and stat.S_IMODE(self.path.stat().st_mode) & 0o077:
             raise StoreError("store_file_permissions_unsafe")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS artifact_revisions (
@@ -142,15 +143,23 @@ class LocalArtifactStore:
     def _key(kind: str, project_ref: str, artifact_ref: str) -> tuple[str, str, str]:
         if kind not in KINDS:
             raise StoreError("artifact_kind_invalid")
-        return kind, _name(project_ref, "project_ref"), _name(artifact_ref, "artifact_ref")
+        return (
+            kind,
+            _name(project_ref, "project_ref"),
+            _name(artifact_ref, "artifact_ref"),
+        )
 
     def read_revision(
         self, kind: str, project_ref: str, artifact_ref: str, revision: str
     ) -> dict[str, Any] | None:
         key = self._key(kind, project_ref, artifact_ref)
-        if not isinstance(revision, str) or not revision.startswith("r") or not revision[1:].isdigit():
+        if (
+            not isinstance(revision, str)
+            or not revision.startswith("r")
+            or not revision[1:].isdigit()
+        ):
             raise StoreError("revision_invalid")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 """SELECT content, digest, previous_version, source_ref, source_revision,
                           approval_ref, approval_revision, change_reason
@@ -160,7 +169,16 @@ class LocalArtifactStore:
             ).fetchone()
         if row is None:
             return None
-        content, digest, previous, source_ref, source_revision, approval_ref, approval_revision, reason = row
+        (
+            content,
+            digest,
+            previous,
+            source_ref,
+            source_revision,
+            approval_ref,
+            approval_revision,
+            reason,
+        ) = row
         if hashlib.sha256(content).hexdigest() != digest:
             raise StoreError("artifact_readback_hash_mismatch")
         try:
@@ -186,7 +204,7 @@ class LocalArtifactStore:
         self, kind: str, project_ref: str, artifact_ref: str
     ) -> dict[str, Any] | None:
         key = self._key(kind, project_ref, artifact_ref)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 """SELECT version FROM artifact_current
                    WHERE kind=? AND project_ref=? AND artifact_ref=?""",
@@ -231,9 +249,19 @@ class LocalArtifactStore:
         digest = hashlib.sha256(payload).hexdigest()
         fingerprint = hashlib.sha256(
             json.dumps(
-                [key, expected_revision, operation_id, digest, source_ref,
-                 source_revision, approval_ref, approval_revision, change_reason],
-                ensure_ascii=False, separators=(",", ":"),
+                [
+                    key,
+                    expected_revision,
+                    operation_id,
+                    digest,
+                    source_ref,
+                    source_revision,
+                    approval_ref,
+                    approval_revision,
+                    change_reason,
+                ],
+                ensure_ascii=False,
+                separators=(",", ":"),
             ).encode("utf-8")
         ).hexdigest()
         approval_request: dict[str, str | None] = {
@@ -248,7 +276,7 @@ class LocalArtifactStore:
             "approval_revision": approval_revision,
         }
         try:
-            with self._connect() as conn:
+            with closing(self._connect()) as conn, conn:
                 conn.execute("BEGIN IMMEDIATE")
                 receipt = conn.execute(
                     """SELECT fingerprint, version FROM artifact_receipts
@@ -285,8 +313,18 @@ class LocalArtifactStore:
                             previous_version, source_ref, source_revision, approval_ref,
                             approval_revision, change_reason)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (*key, version, payload, digest, old_version, source_ref,
-                         source_revision, approval_ref, approval_revision, change_reason),
+                        (
+                            *key,
+                            version,
+                            payload,
+                            digest,
+                            old_version,
+                            source_ref,
+                            source_revision,
+                            approval_ref,
+                            approval_revision,
+                            change_reason,
+                        ),
                     )
                     conn.execute(
                         """INSERT INTO artifact_current (kind, project_ref, artifact_ref, version)
@@ -316,7 +354,13 @@ class LocalArtifactStore:
         ):
             raise StoreError("independent_readback_mismatch")
         return {
-            "status": "idempotent" if idempotent else "stored",
+            "status": (
+                "superseded"
+                if idempotent and recorded["revision"] != f"r{version}"
+                else "idempotent"
+                if idempotent
+                else "stored"
+            ),
             "artifact_ref": artifact_ref,
             "revision": history["revision"],
             "previous_revision": history["previous_revision"],
