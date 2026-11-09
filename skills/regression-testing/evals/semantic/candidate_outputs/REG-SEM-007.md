@@ -185,7 +185,12 @@
   ],
   "counts": {
     "tc": { "selected": 1, "executed": 1, "pass": 1 },
-    "auxiliary": { "required": 1, "required_started": 0, "required_blocked": 1, "reference_only": 1 }
+    "auxiliary": {
+      "required": 1,
+      "required_started": 0,
+      "required_blocked": 1,
+      "reference_only": 1
+    }
   },
   "cleanup_status": "unconfirmed",
   "unresolved": [
