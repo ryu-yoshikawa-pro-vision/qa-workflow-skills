@@ -392,6 +392,7 @@ def reconcile_case_report(
     report: dict[str, Any],
     source_revision: str,
     testware_revision: str,
+    runner_version: str,
     raw_ref: str,
     selection_verified: bool = False,
 ) -> dict[str, Any]:
@@ -401,6 +402,7 @@ def reconcile_case_report(
         or report.get("schema") != "non-e2e-cases/v1"
         or report.get("source_revision") != source_revision
         or report.get("testware_revision") != testware_revision
+        or report.get("runner_version") != runner_version
         or not isinstance(report.get("results"), list)
     ):
         raise ContractError("invalid_case_report")
@@ -421,14 +423,15 @@ def reconcile_case_report(
             item["status"] not in {"skipped", "pending", "todo"} and not attempts
         ):
             raise ContractError("invalid_case_attempts")
-        for attempt in attempts:
-            if not isinstance(attempt, dict) or attempt.get("status") not in {
-                "passed",
-                "failed",
-                "timedOut",
-                "interrupted",
-                "skipped",
-            }:
+        for index, attempt in enumerate(attempts):
+            if (
+                not isinstance(attempt, dict)
+                or attempt.get("status") not in {
+                    "passed", "failed", "timedOut", "interrupted", "skipped"
+                }
+                or type(attempt.get("retry")) is not int
+                or attempt["retry"] != index
+            ):
                 raise ContractError("invalid_case_attempt_status")
         if (
             attempts
@@ -502,14 +505,15 @@ def reconcile_playwright(
                 ):
                     raise ContractError("missing_playwright_attempts")
                 attempt_rows = []
-                for entry in attempts:
-                    if not isinstance(entry, dict) or entry.get("status") not in {
-                        "passed",
-                        "failed",
-                        "timedOut",
-                        "interrupted",
-                        "skipped",
-                    }:
+                for index, entry in enumerate(attempts):
+                    if (
+                        not isinstance(entry, dict)
+                        or entry.get("status") not in {
+                            "passed", "failed", "timedOut", "interrupted", "skipped"
+                        }
+                        or type(entry.get("retry")) is not int
+                        or entry["retry"] != index
+                    ):
                         raise ContractError("invalid_playwright_attempt")
                     attempt_rows.append(
                         {"status": entry["status"], "retry": entry.get("retry")}
