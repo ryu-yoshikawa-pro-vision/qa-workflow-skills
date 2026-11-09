@@ -183,20 +183,7 @@ def validate_entry(
     ):
         issues.append("applicability_required")
     for field in ("provenance", "currentness_dependencies"):
-        refs = entry.get(field)
-        if not isinstance(refs, list) or not refs:
-            issues.append(f"{field}_must_be_list")
-            continue
-        for ref in refs:
-            if (
-                not isinstance(ref, dict)
-                or not isinstance(ref.get("ref"), str)
-                or not ref["ref"]
-                or not isinstance(ref.get("revision"), str)
-                or not ref["revision"]
-            ):
-                issues.append(f"{field}_requires_ref_and_revision")
-                break
+        issues.extend(_ref_record_issues(entry, field))
     currentness = (
         compare_currentness(
             entry.get("currentness_dependencies", []), current_dependencies
@@ -215,6 +202,27 @@ def validate_entry(
     if entry.get("state") != "置換済み" and entry.get("replacement_ref"):
         issues.append("replacement_ref_only_valid_for_superseded_entry")
     return {"valid": not issues, "issues": issues, "currentness": currentness}
+
+
+def _ref_record_issues(entry: dict[str, Any], field: str) -> list[str]:
+    """Check a ``[{ref, revision}]`` field: a non-empty list of string pairs.
+
+    Shared by validate_entry() and plan_revalidation() so both reject the same
+    stored dependency / provenance records.
+    """
+    records = entry.get(field)
+    if not isinstance(records, list) or not records:
+        return [f"{field}_must_be_list"]
+    for record in records:
+        if (
+            not isinstance(record, dict)
+            or not isinstance(record.get("ref"), str)
+            or not record["ref"]
+            or not isinstance(record.get("revision"), str)
+            or not record["revision"]
+        ):
+            return [f"{field}_requires_ref_and_revision"]
+    return []
 
 
 def compare_currentness(
@@ -941,7 +949,8 @@ def plan_revalidation(
     selection to entries depending on those refs. Each target carries the stored
     revision read from storage, which is the expected revision of the conditional
     update. An input that cannot be decided (not an object, broken identity,
-    unresolved dependencies field, or a target without a stored revision) is
+    invalid stored dependency records of an in-scope entry, or a target without a
+    stored revision) is
     reported in ``rejected`` and makes the plan ``incomplete``; it is never
     skipped or assumed current.
     """
@@ -965,19 +974,19 @@ def plan_revalidation(
         problems = identity_issues(entry)
         if not _ref_matches_identity(entry):
             problems.append("entry_ref_does_not_match_identity")
-        dependencies = entry.get("currentness_dependencies")
-        if not isinstance(dependencies, list):
-            problems.append("currentness_dependencies_must_be_list")
         if problems:
             rejected.append({"entry_ref": entry_ref, "issues": problems})
             continue
         if scope_refs is not None and not scope_refs & set(entry["scope_refs"]):
             continue
-        dependency_refs = {
-            item["ref"]
-            for item in dependencies
-            if isinstance(item, dict) and isinstance(item.get("ref"), str)
-        }
+        # An in-scope entry's stored dependencies are checked before anything
+        # (changed_refs filtering, the currentness comparison) can call it unaffected.
+        problems = _ref_record_issues(entry, "currentness_dependencies")
+        if problems:
+            rejected.append({"entry_ref": entry_ref, "issues": problems})
+            continue
+        dependencies = entry["currentness_dependencies"]
+        dependency_refs = {item["ref"] for item in dependencies}
         if changed_refs is not None and not dependency_refs & changed_refs:
             unaffected.append(entry_ref)
             continue

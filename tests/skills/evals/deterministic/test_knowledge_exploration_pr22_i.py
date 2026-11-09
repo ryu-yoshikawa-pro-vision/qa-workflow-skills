@@ -2780,5 +2780,307 @@ class KnowledgeCurrentDependencyRevisionTests(unittest.TestCase):
         self.assertEqual(stale["state"], "stale")
 
 
+class KnowledgeRevalidationDependencyRecordTests(unittest.TestCase):
+    """plan_revalidation() must reject what validate_entry() rejects in dependencies."""
+
+    BAD_RECORDS = {
+        "empty list": [],
+        "none record": [None],
+        "string record": ["config:a"],
+        "ref array": [{"ref": ["config:a"], "revision": "r1"}],
+        "ref empty": [{"ref": "", "revision": "r1"}],
+        "revision none": [{"ref": "config:a", "revision": None}],
+        "revision empty": [{"ref": "config:a", "revision": ""}],
+        "revision number": [{"ref": "config:a", "revision": 1}],
+        "mixed good and bad": [
+            {"ref": "config:a", "revision": "r1"},
+            {"ref": "config:b", "revision": None},
+        ],
+    }
+
+    def entry(self, dependencies, subject="x", scope="project:a"):
+        return with_revision(
+            make_entry(scope, subject, currentness_dependencies=dependencies)
+        )
+
+    def test_invalid_dependency_records_are_rejected_not_unaffected(self):
+        for name, dependencies in self.BAD_RECORDS.items():
+            entry = self.entry(dependencies)
+            # the same entry is invalid for validate_entry()
+            self.assertFalse(
+                knowledge.validate_entry(
+                    entry,
+                    current_dependencies=DEPENDENCIES,
+                    entry_revision="sha256:stored",
+                )["valid"],
+                name,
+            )
+            for kwargs in (
+                {},
+                {"changed_refs": {"config:unrelated"}},
+                {"changed_refs": {"config:a"}},
+                {"scope_refs": {"project:a"}},
+            ):
+                with self.subTest(case=name, kwargs=kwargs):
+                    plan = knowledge.plan_revalidation(
+                        [entry], current_dependencies=DEPENDENCIES, **kwargs
+                    )
+                    self.assertEqual(plan["status"], "incomplete")
+                    self.assertEqual(plan["targets"], [])
+                    self.assertEqual(plan["unaffected_refs"], [])
+                    (rejected,) = plan["rejected"]
+                    self.assertEqual(rejected["entry_ref"], entry["entry_ref"])
+                    self.assertTrue(
+                        any(
+                            issue.startswith("currentness_dependencies_")
+                            for issue in rejected["issues"]
+                        )
+                    )
+
+    def test_valid_dependencies_keep_the_partial_revalidation(self):
+        same = self.entry([{"ref": "config:a", "revision": "r1"}], "same")
+        changed = self.entry([{"ref": "config:b", "revision": "r0"}], "changed")
+        unknown = self.entry([{"ref": "config:c", "revision": "r1"}], "unknown")
+        plan = knowledge.plan_revalidation(
+            [same, changed, unknown],
+            current_dependencies={
+                "config:a": "r1",
+                "config:b": "r1",
+                "config:c": None,
+            },
+        )
+        self.assertEqual(plan["status"], "complete")
+        self.assertEqual(plan["rejected"], [])
+        self.assertEqual(plan["unaffected_refs"], [same["entry_ref"]])
+        reasons = {t["entry_ref"]: t["reason"] for t in plan["targets"]}
+        self.assertEqual(
+            reasons,
+            {
+                changed["entry_ref"]: "dependency_changed",
+                unknown["entry_ref"]: "dependency_unresolved",
+            },
+        )
+
+    def test_out_of_scope_entry_is_not_forced_through_dependency_validation(self):
+        other = self.entry([], "other", scope="project:b")
+        valid = self.entry([{"ref": "config:a", "revision": "r0"}], "valid")
+        plan = knowledge.plan_revalidation(
+            [other, valid],
+            current_dependencies=DEPENDENCIES,
+            scope_refs={"project:a"},
+        )
+        self.assertEqual(plan["status"], "complete")
+        self.assertEqual(plan["rejected"], [])
+        self.assertEqual(
+            [t["entry_ref"] for t in plan["targets"]], [valid["entry_ref"]]
+        )
+        self.assertNotIn(other["entry_ref"], plan["unaffected_refs"])
+        # without a scope limit the same entry is in scope and is rejected
+        unlimited = knowledge.plan_revalidation(
+            [other], current_dependencies=DEPENDENCIES
+        )
+        self.assertEqual(unlimited["status"], "incomplete")
+
+    def test_entries_read_from_a_root_are_checked_on_the_real_path(self):
+        good = make_entry("project:a", "good")
+        bad = make_entry("project:a", "bad", currentness_dependencies=[])
+        stale = make_entry("project:a", "stale", dependency="config:b")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "knowledge"
+            root.mkdir()
+            for entry in (good, bad, stale):
+                (root / f"{entry['entry_ref']}.md").write_bytes(
+                    knowledge.render_entry(entry)
+                )
+            snapshot = knowledge.read_root_entries(root)
+            self.assertTrue(snapshot["complete"])
+            self.assertEqual(len(snapshot["entries"]), 3)
+            plan = knowledge.plan_revalidation(
+                snapshot["entries"],
+                current_dependencies={"config:a": "r1", "config:b": "r2"},
+                changed_refs={"config:unrelated"},
+            )
+            self.assertEqual(plan["status"], "incomplete")
+            self.assertEqual(
+                [r["entry_ref"] for r in plan["rejected"]], [bad["entry_ref"]]
+            )
+            self.assertNotIn(bad["entry_ref"], plan["unaffected_refs"])
+            self.assertEqual(plan["targets"], [])
+            # without the broken entry the same root plans normally
+            (root / f"{bad['entry_ref']}.md").unlink()
+            plan = knowledge.plan_revalidation(
+                knowledge.read_root_entries(root)["entries"],
+                current_dependencies={"config:a": "r1", "config:b": "r2"},
+            )
+            self.assertEqual(plan["status"], "complete")
+            self.assertEqual(
+                [t["entry_ref"] for t in plan["targets"]], [stale["entry_ref"]]
+            )
+            self.assertEqual(plan["unaffected_refs"], [good["entry_ref"]])
+
+
+def _observation(**overrides):
+    value = dict(session()["observations"][0])
+    value.update(overrides)
+    return value
+
+
+class ExploratoryObservationEvidenceTests(unittest.TestCase):
+    """Observation evidence is a non-empty list of refs, in runtime and validator."""
+
+    INVALID_EVIDENCE = [
+        None,
+        "",
+        "evidence:E-1",
+        {},
+        {"ref": "evidence:E-1"},
+        [],
+        [None],
+        [123],
+        [{"ref": "evidence:E-1"}],
+    ]
+
+    def test_invalid_observation_evidence_is_rejected_by_runtime_and_validator(self):
+        for bad in self.INVALID_EVIDENCE:
+            with self.subTest(evidence_refs=bad):
+                data = session(observations=[_observation(evidence_refs=bad)])
+                result = exploratory.validate_session(data)
+                self.assertFalse(result["valid"])
+                self.assertIn(
+                    "observation_missing_action_fact_or_evidence", result["issues"]
+                )
+                self.assertEqual(_grade(data)["EXP-D004"], "fail")
+
+    def test_missing_evidence_key_is_rejected(self):
+        observation = _observation()
+        del observation["evidence_refs"]
+        data = session(observations=[observation])
+        self.assertFalse(exploratory.validate_session(data)["valid"])
+        self.assertEqual(_grade(data)["EXP-D004"], "fail")
+
+    def test_valid_evidence_is_accepted_by_both(self):
+        for good in (["evidence:E-1"], ["ev:1", "ev:2"]):
+            with self.subTest(evidence_refs=good):
+                data = session(observations=[_observation(evidence_refs=good)])
+                self.assertEqual(exploratory.validate_session(data)["issues"], [])
+                self.assertEqual(_grade(data)["EXP-D004"], "pass")
+
+    def test_fact_and_action_must_be_present_in_both(self):
+        for key in ("observed_fact", "action_or_observation"):
+            for bad in (None, "", "  ", [], ["fact"], {}, {"a": 1}, 5):
+                with self.subTest(field=key, value=bad):
+                    data = session(observations=[_observation(**{key: bad})])
+                    self.assertFalse(exploratory.validate_session(data)["valid"])
+                    self.assertEqual(_grade(data)["EXP-D004"], "fail")
+            missing = _observation()
+            del missing[key]
+            data = session(observations=[missing])
+            self.assertFalse(exploratory.validate_session(data)["valid"])
+            self.assertEqual(_grade(data)["EXP-D004"], "fail")
+
+    def test_non_object_observation_fails_without_raising(self):
+        for bad in (None, "OBS-1", ["OBS-1"], 5):
+            with self.subTest(observation=bad):
+                data = session(observations=[bad])
+                self.assertFalse(exploratory.validate_session(data)["valid"])
+                self.assertEqual(_grade(data)["EXP-D004"], "fail")
+
+    def test_observation_to_finding_links_and_no_promotion_are_unchanged(self):
+        data = session()
+        self.assertEqual(exploratory.validate_session(data)["issues"], [])
+        self.assertEqual(_grade(data)["EXP-D004"], "pass")
+        handoff = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-1"
+        )["handoff"]
+        self.assertEqual(handoff["promotion"], "not_promoted")
+        self.assertIs(handoff["formal_defect"], False)
+        self.assertNotIn("cancelled order shown", json.dumps(handoff))
+
+
+class ExploratoryEmptySourceRefsValidatorTests(unittest.TestCase):
+    """Starting an exploration and handing a Finding off are judged separately."""
+
+    def test_empty_source_refs_start_and_validate_in_runtime_and_validator(self):
+        data = session(charter=charter(source_refs=[]))
+        self.assertTrue(
+            exploratory.validate_charter("exploration", data["charter"])["valid"]
+        )
+        self.assertEqual(exploratory.validate_session(data)["issues"], [])
+        grades = _grade(data)
+        self.assertEqual(grades["EXP-D002"], "pass")
+        self.assertEqual(grades["EXP-D004"], "pass")
+        self.assertEqual(
+            exploratory.resolve_direct_start({"charter": data["charter"]})["status"],
+            "start",
+        )
+
+    def test_empty_source_refs_still_block_the_finding_hand_off(self):
+        data = session(charter=charter(source_refs=[]))
+        handoff = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-1"
+        )["handoff"]
+        self.assertEqual(handoff["state"], "blocked")
+        self.assertIn("source_refs_missing", handoff["unresolved"])
+        self.assertEqual(handoff["source_refs"], [])
+
+    def test_missing_null_and_blank_source_refs_are_still_rejected(self):
+        for name, value in (("none", None), ("blank", ""), ("absent", ...)):
+            with self.subTest(source_refs=name):
+                data = session()
+                if value is ...:
+                    del data["charter"]["source_refs"]
+                else:
+                    data["charter"]["source_refs"] = value
+                self.assertFalse(
+                    exploratory.validate_charter("exploration", data["charter"])[
+                        "valid"
+                    ]
+                )
+                self.assertEqual(_grade(data)["EXP-D002"], "fail")
+
+    def test_valid_sources_and_other_required_fields_are_unchanged(self):
+        self.assertEqual(_grade(session())["EXP-D002"], "pass")
+        for field in exploratory.CHARTER_FIELDS:
+            for name, value in (("absent", ...), ("none", None), ("blank", "")):
+                with self.subTest(field=field, value=name):
+                    data = session()
+                    if value is ...:
+                        del data["charter"][field]
+                    else:
+                        data["charter"][field] = value
+                    self.assertFalse(
+                        exploratory.validate_charter("exploration", data["charter"])[
+                            "valid"
+                        ]
+                    )
+                    self.assertEqual(_grade(data)["EXP-D002"], "fail")
+
+    def test_only_source_refs_and_side_effect_operations_may_be_empty_lists(self):
+        for field in ("source_refs", "side_effect_operations", "focus_refs"):
+            with self.subTest(field=field):
+                data = session(charter=charter(**{field: []}))
+                self.assertEqual(_grade(data)["EXP-D002"], "pass")
+        for field in ("allowed_origins", "allowed_operations"):
+            with self.subTest(field=field):
+                data = session(charter=charter(**{field: []}))
+                self.assertFalse(
+                    exploratory.validate_charter("exploration", data["charter"])[
+                        "valid"
+                    ]
+                )
+                self.assertEqual(_grade(data)["EXP-D002"], "fail")
+
+    def test_investigation_without_formal_tc_still_starts(self):
+        started = exploratory.resolve_direct_start(
+            {
+                "symptom_ref": "sym:1",
+                "owner_unknown": True,
+                "charter": charter(source_refs=[]),
+            }
+        )
+        self.assertEqual(started["status"], "start")
+        self.assertFalse(started["formal_tc_required"])
+
+
 if __name__ == "__main__":
     unittest.main()

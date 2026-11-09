@@ -19,7 +19,7 @@ current UI / accessible name / 既知範囲の事実収集は`test-target-inspec
 
 既存Sessionは、要求 / workflowから渡されたdirect refまたはProject Contextの「既存QA成果物」欄から解決します。現在のSkill contractに固定Session history rootはないため、未提示のrootを推測してscanしません。
 
-Observationは操作 / 観測、実際に起きたこと、evidence refを記録し、推測と分離します。Findingはsource observation / evidence、observed fact、follow-up理由、判定可能な分類、unresolved、recommended routeを記録します。両者の配列とrefを混在させません。
+Observationは操作 / 観測、実際に起きたこと、evidence refを記録し、推測と分離します。`action_or_observation`・`observed_fact`は空白でない文字列、`evidence_refs`は空でない文字列のlistが必須で、文字列単体・objectや空listは`validate_session()`のissue（`observation_missing_action_fact_or_evidence`）、決定論的評価の`EXP-D004`のFAILです。Charterの`source_refs`・`focus_refs`は探索開始時に空listでもよく（キーは必須）、sourceが必要なのはFindingの引継ぎ時です（`EXP-D002`もruntimeと同じ）。Findingはsource observation / evidence、observed fact、follow-up理由、判定可能な分類、unresolved、recommended routeを記録します。両者の配列とrefを混在させません。
 
 ## Safety and cleanup
 

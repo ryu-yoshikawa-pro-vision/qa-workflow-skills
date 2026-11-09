@@ -179,6 +179,10 @@ def _is_ref(value: Any) -> bool:
     return isinstance(value, str) and bool(value)
 
 
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _ref_list(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(_is_ref(v) for v in value)
 
@@ -226,11 +230,13 @@ def validate_session(session: dict[str, Any]) -> dict[str, Any]:
     ):
         issues.append("finding_refs_missing_or_duplicate")
     obs_set = {ref for ref in observation_refs if _is_ref(ref)}
+    # An Observation is a measured fact: text for the action and the fact, and a
+    # non-empty list of evidence refs (not a bare string or an object).
     observation_evidence = all(
         isinstance(item, dict)
-        and item.get("evidence_refs")
-        and item.get("observed_fact")
-        and item.get("action_or_observation")
+        and _ref_list(item.get("evidence_refs"))
+        and _text(item.get("observed_fact"))
+        and _text(item.get("action_or_observation"))
         for item in observations
     )
     for finding in findings:

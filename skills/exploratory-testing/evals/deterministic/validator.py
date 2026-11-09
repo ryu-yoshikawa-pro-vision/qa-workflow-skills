@@ -21,6 +21,11 @@ def _ref_list(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(_is_ref(v) for v in value)
 
 
+def _text(value: Any) -> bool:
+    """Same rule as exploratory_runtime._text: a non-blank string."""
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _usable_origin(value: Any) -> bool:
     """Same rule as exploratory_runtime.validate_charter: a non-blank string."""
     return isinstance(value, str) and bool(value.strip())
@@ -35,6 +40,10 @@ _ORIGIN_KEYS = (
     "symptom",
     "hypothesis",
 )
+# Starting an exploration needs the keys, not their contents: a Charter may have no
+# source yet (the Finding hand-off is what needs a source) and no focus; a read-only
+# exploration has no side effect operations. Same as exploratory_runtime.
+_MAY_BE_EMPTY_LIST = {"source_refs", "focus_refs", "side_effect_operations"}
 _MODES = {"exploration", "investigation"}
 _STATES = {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
 
@@ -79,6 +88,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         "in_scope",
         "out_of_scope",
         "source_refs",
+        "focus_refs",
         "timebox_or_exit_condition",
         "allowed_origins",
         "allowed_operations",
@@ -96,7 +106,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         if key not in charter
         or charter[key] is None
         or charter[key] == ""
-        or (key != "side_effect_operations" and charter[key] == [])
+        or (key not in _MAY_BE_EMPTY_LIST and charter[key] == [])
     )
     result.add(
         "EXP-D002",
@@ -132,6 +142,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         and len(finding_refs) == len(set(finding_refs))
     )
     obs_set = {ref for ref in obs_refs if _is_ref(ref)}
+    observation_evidence = all(
+        isinstance(item, dict)
+        and _ref_list(item.get("evidence_refs"))
+        and _text(item.get("observed_fact"))
+        and _text(item.get("action_or_observation"))
+        for item in observations
+    )
     finding_links = all(
         isinstance(item, dict)
         and _ref_list(item.get("source_observation_refs"))
@@ -143,7 +160,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     )
     result.add(
         "EXP-D004",
-        separated and refs_valid and finding_links,
+        separated and refs_valid and observation_evidence and finding_links,
         "Observation / Findingを分離し、unique ref・evidence・source / follow-upを閉じること",
     )
     cleanup = doc.get("cleanup", {})
