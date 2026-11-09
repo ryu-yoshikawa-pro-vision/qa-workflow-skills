@@ -128,7 +128,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 1. `runner.py`で隔離checkout上の実subprocess起動とattempt／timeout／raw／cleanupを実装した。ただし案件の実Vitest・API-only Playwright・静的解析toolと、実副作用・認証が必要な環境の受入は未実施。独立Python subprocessと固定JSON reporterの結果から製品runの完了を主張しない。
 2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitをGit remoteに非強制fast-forward反映・readbackする経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
-3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23がclosed・未mergeのため、PR #22統合ownerにも引継ぎ要。PR #29のtrigger正負件数不均衡はGで修正したが、共有READMEに両Skill名がないことで`Validate Agent Skills`は継続してFAILする。
+3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23はclosed・merge済み。共有正本と新Skillとの接続について、PR #22統合ownerに引き継ぐ。PR #29のtrigger正負件数不均衡はGで修正したが、共有READMEに両Skill名がないことで`Validate Agent Skills`は継続してFAILする。
 4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
 5. 全対応方式の実runnerと保存先で必須受入を完了するまで、PR #29はDraftとし、**担当G完了**を宣言しない。PR #22の最終完了とは区別する。
 
@@ -182,5 +182,16 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 1. 固定`qa-training-store`の実Vitest（実JSON reporter・部分選択・skip/todo・retry）、API-only Playwright、component、batch/event、非機能runnerでのraw・cleanup実証は未実施。対象commit・setup、許可と実データ、runner環境の確定が必要。
 2. 現在のCLIは任意subprocessの権限・副作用回数・ignored file／外部状態の復元・共有予約を認証付きで検証できない。このため宣言された副作用やshared実行は開始前に拒否する。安全に実行可能なprovider／sandboxが必要なケースはblockedのままにする。
 3. 静的解析tool固有のraw収集・version照合・解析対象完全性の本接続、非機能採用閾値・測定条件の実証とtestware assertionの独立実製品レビューは未実施。独立fixtureのPASSで置換しない。
-4. `README.md`、共有runtimeへのrouting／保存・承認・native CAS／readback、H/Jの実保存成果物との結合、PR #22の全条件・S1〜S17／人間編集8ケースは担当ownerの統合受入を要する。PR #23はclosedかつ未mergeであり、再開先をPR #22で明示する。
+4. `README.md`、共有runtimeへのrouting／保存・承認・native CAS／readback、H/Jの実保存成果物との結合、PR #22の全条件・S1〜S17／人間編集8ケースは担当ownerの統合受入を要する。PR #23はclosed・merge済み（merge commit `d38b775e43f7`）。残る統合はPR #22で実施する。
 5. 最新CI結果はPR #29のChecksとし、`Validate Agent Skills` FAIL等は原因と担当を分離して引き継ぐ。未検証がある限りPR #29の完了・mergeは宣言しない。
+
+## 実行安全性と非Vitest収集の追加修正（2026-11-09）
+
+- `runner.py`で`diagnosis_hypotheses`を実行前に検証し、不正な診断による実行後のmanifest未保存を防ぐ。要素がdictではない、根拠または担当が空などの負例と、正常診断を残す試験を追加した。
+- `artifacts_root`をcheckoutとの内外関係で判定してから`mkdir()`し、拒否対象のpathが作られない試験を追加した。
+- Vitestに加え、Playwrightの公式JSON reporterとbatch/eventの個別結果JSONに対応した。Playwrightは公式`PLAYWRIGHT_JSON_OUTPUT_FILE`でattemptごとのrawを記録する。componentは対応するVitestまたはPlaywright reporterを利用する。
+- reporterの選択集合、path／title／project、retry、global error、状態・母集団・exit codeとの矛盾を確認し、結果がない自動testwareではexit 0でも`runner_pass`としない。任意stdout期待値は正式なTC根拠がなければ個別結果の取得完了を代替しない。
+- 独立Python subprocess・模擬JSONの正常／負例を実装した。採用済み実runnerと本物の製品・認証・権限・副作用／cleanup、静的解析・非機能の実測、H/Jやproviderの実成果物照合は未実施。fixtureのPASSと実製品受入を混同しない。
+- PR #23はclosedだがmerge済みである。以前の「closed・未merge」という記載を訂正した。共有READMEとruntimeへの新Skill接続はPR #22の統合条件として引き継ぐ。
+
+最新CIの正本はPR #29のChecksとする。担当Gの全完了条件を満たしたという判定には、実runner受入・共有接続・下流証拠が別途必要。
