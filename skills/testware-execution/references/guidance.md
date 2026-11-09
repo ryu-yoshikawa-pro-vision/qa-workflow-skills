@@ -34,7 +34,6 @@
 
 H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/title、任意の元TC ref、実効選択条件、attempt、raw evidence、取得完全性、cleanup、診断とする。保存providerのreadback revisionや承認はAの正式公開契約に従い、未接続ならblockedとする。A〜J成果物の実参照をつないだ全体受入はPR #22で行う。
 
-
 ## 実行CLIと独立検証の範囲
 
 `python skills/testware-execution/scripts/runner.py --plan /path/to/run-plan.json --artifacts /outside/source/artifacts` で、事前に全コマンド連鎖とfixture・副作用を確認した単独対象を実行する。CLIは指定したcheckoutの固定HEADとclean状態を確認し、開始プロセス、終了コード、timeout、各attemptのstdout／stderr、任意のVitest JSON reporterとrun外cleanupを専用ディレクトリへ保存する。実runnerの成功と正式TCのPASSは別。実行前に止まった場合は証拠を捏造しない。
