@@ -895,19 +895,9 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             if key not in {"content_fingerprint", "previous_artifact_revision"}
         }
         old_projection.pop("previous_artifact_revision", None)
-        if fingerprint(old_projection) == fingerprint(new_projection):
-            return make_result(
-                "no_change",
-                valid=True,
-                issues=[],
-                candidate=previous,
-                write_precondition={
-                    "performed": False,
-                    "requires_provider_native_cas": True,
-                    "requires_independent_readback": True,
-                },
-                candidate_condition_ids=dict(sorted(assigned.items())),
-            )
+        no_change = fingerprint(old_projection) == fingerprint(new_projection)
+    else:
+        no_change = False
     stale = sorted(
         row["condition_id"]
         for row in candidate["conditions"]
@@ -918,13 +908,28 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         for row in candidate["conditions"]
         if row["currentness"] == "unknown"
     )
+    unconfirmed = sorted(
+        row["condition_id"]
+        for row in candidate["conditions"]
+        if row["candidate_state"] == "unconfirmed"
+    )
+    blocked = sorted(
+        row["condition_id"]
+        for row in candidate["conditions"]
+        if row["candidate_state"] == "blocked"
+    )
     status = (
         "candidate_ready_unpersisted"
         if not stale
         and not unknown
+        and not unconfirmed
+        and not blocked
         and inventory["source_boundary_complete"]
         and inventory["analysis_complete"]
         else "incomplete"
+    )
+    analysis_status = (
+        "complete" if status == "candidate_ready_unpersisted" else "incomplete"
     )
     issues = []
     if stale:
@@ -958,13 +963,54 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
+    if unconfirmed:
+        issues.append(
+            _issue(
+                "unconfirmed_conditions",
+                "unconfirmed conditions are not complete candidates",
+                blocking=False,
+            )
+        )
+    if blocked:
+        issues.append(
+            _issue(
+                "blocked_conditions",
+                "blocked conditions are not complete candidates",
+                blocking=False,
+            )
+        )
+    recheck_condition_ids = sorted(
+        set(stale) | set(unknown) | set(unconfirmed) | set(blocked)
+    )
+    if no_change:
+        return make_result(
+            "no_change",
+            valid=True,
+            issues=issues,
+            analysis_status=analysis_status,
+            candidate=previous,
+            candidate_condition_ids=dict(sorted(assigned.items())),
+            impacted_condition_ids=sorted(changed_ids),
+            stale_condition_ids=stale,
+            unknown_condition_ids=unknown,
+            unconfirmed_condition_ids=unconfirmed,
+            blocked_condition_ids=blocked,
+            recheck_condition_ids=recheck_condition_ids,
+            write_precondition={"performed": False, "provider_selected": False},
+        )
     return make_result(
         status,
         valid=True,
         issues=issues,
+        analysis_status=analysis_status,
         candidate=candidate,
         candidate_condition_ids=dict(sorted(assigned.items())),
         impacted_condition_ids=sorted(changed_ids),
+        stale_condition_ids=stale,
+        unknown_condition_ids=unknown,
+        unconfirmed_condition_ids=unconfirmed,
+        blocked_condition_ids=blocked,
+        recheck_condition_ids=recheck_condition_ids,
         write_precondition={
             "performed": False,
             "owner": OWNER,

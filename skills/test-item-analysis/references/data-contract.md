@@ -38,6 +38,12 @@ Older v1 artifacts without `feature_inventory_context` remain readable if their 
 
 An explicit merge records the new ID's links to its source IDs. Each merge source must also be explicitly retired in the same update with current evidence; otherwise the merge is rejected so the old and merged items cannot remain active together. Retired IDs remain in `id_history` and are never recycled.
 
+## Materialization result
+
+`valid` means that the request and candidate artifact satisfy D's structural contract. It does not mean the analysis is complete, the candidate is approved, or an artifact was saved. `status: no_change` means only that the candidate content is unchanged. The result separately returns `analysis_status` (`complete` or `incomplete`), current issues, stale/unknown/recheck item IDs, unrepresented feature IDs, and the item identification metric. A known active feature without an item candidate keeps `analysis_status: incomplete` and an `unrepresented_feature_candidates` issue, even when no candidate content changed.
+
+For `no_change`, `candidate` is the prior validated artifact unchanged: stable IDs, history, and fingerprint are preserved and no event is appended. `write_precondition.performed` and `provider_selected` are false; no provider write, CAS, or readback is requested by this result. Diagnostics and metrics are recomputed from the current input and candidate projection so a repeated request cannot hide an incomplete B analysis, source/currentness uncertainty, or candidate gap. Candidate identification metrics remain separate from formal coverage and execution.
+
 ## Storage handoff
 
 `write_precondition.performed` and `provider_selected` are false. `operation_claim_details` is formatted for A's published claim validator: `owner_skill`, `scope_ref`, `operation_type`, `target_ref`, `source_revisions`, `artifact_revisions`, `expected_revision`, `approval_ref`, `permission_scope`, and `resume_owner`. The current helper validates claim field bounds and carries at most 256 source revisions. It does not claim that permission or approval was authenticated.

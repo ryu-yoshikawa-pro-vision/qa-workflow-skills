@@ -6,6 +6,7 @@
 | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Project scope                           | project:shop                                                                                     |
 | Candidate artifact ref                  | item-candidates:shop                                                                             |
+| Candidate update / analysis status      | candidate_ready_unpersisted / complete                                                           |
 | Feature inventory ref / revision / hash | feature-analysis / feature-r1 / aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | Confirmed source boundary               | complete                                                                                         |
 | Candidate model fingerprint             | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                                 |

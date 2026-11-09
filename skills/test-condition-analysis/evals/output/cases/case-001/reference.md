@@ -6,6 +6,7 @@
 | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Project scope                           | project:shop                                                                                     |
 | Candidate artifact ref                  | condition-candidates:shop                                                                        |
+| Candidate update / analysis status      | candidate_ready_unpersisted / complete                                                           |
 | Feature inventory ref / revision / hash | feature-analysis / feature-r1 / aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | Authority refs / revisions              | AUTH-001 / spec-r1                                                                               |
 | Confirmed source boundary               | complete                                                                                         |

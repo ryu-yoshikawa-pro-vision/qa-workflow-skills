@@ -38,6 +38,12 @@ Older v1 item and condition artifacts without `feature_inventory_context` remain
 
 An explicit merge records the new condition ID's links to source IDs. Every merge source must also be explicitly retired in the same update with current evidence; otherwise the merge is rejected. Retired IDs remain in `id_history` and are never reused.
 
+## Materialization result
+
+`valid` means that the request and candidate artifact satisfy D's structural contract. It does not mean analysis completion, E approval, persistence, or readback. `status: no_change` means only that candidate content is unchanged. The result separately returns `analysis_status` (`complete` or `incomplete`), current issues, stale/unknown/unconfirmed/blocked condition IDs, and recheck condition IDs. Unconfirmed and blocked conditions remain incomplete when the same request is replayed.
+
+For `no_change`, `candidate` is the prior validated artifact unchanged: stable IDs, history, and fingerprint are preserved and no event is appended. `write_precondition.performed` and `provider_selected` are false; no provider write, CAS, or readback is requested by this result. Diagnostics are recomputed from the current input and candidate projection, retaining incomplete B analysis, source/currentness uncertainty, and condition blockers. Candidate condition and explicit pair information remains advisory; formal applicability and execution stay with their owners.
+
 ## Crosscheck and D-to-E boundary
 
 `item-condition-candidate-crosscheck-v1` validates the item artifact using the same byte-identical read-only contract helper embedded in the isolated item and condition packages. It checks semantic fields and references, not just the candidate fingerprint. Scope, B feature ref/population/context, and active source revisions must agree across both artifacts.

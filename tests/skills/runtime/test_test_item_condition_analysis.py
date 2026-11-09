@@ -287,6 +287,21 @@ def feature_inventory(*, features=None, status="complete", source_status="comple
     }
 
 
+def unresolved_feature_inventory(*, unknown_areas=None, unretrieved=None):
+    value = feature_inventory(
+        status="incomplete", source_status="denied" if unretrieved else "complete"
+    )
+    snapshot = value["snapshot"]
+    if unknown_areas:
+        snapshot["unknown_areas"] = list(unknown_areas)
+    if unretrieved:
+        snapshot["sources"][0]["unretrieved"] = list(unretrieved)
+    return {
+        "snapshot": snapshot,
+        "analysis": _feature_analysis(snapshot, "incomplete"),
+    }
+
+
 def feature_ref(revision=None, content_hash=None):
     if revision is None or content_hash is None:
         snapshot = feature_inventory()
@@ -553,6 +568,408 @@ class TestItemAnalysisContract(unittest.TestCase):
             self,
             "feature_inventory_not_current",
             lambda: run_items(item_request(feature_snapshot=blocked, candidates=[])),
+        )
+
+    def test_no_change_replay_preserves_unresolved_analysis_state(self):
+        incomplete = feature_inventory(status="incomplete")
+        item_first = _materialize_item(
+            item_request(
+                feature_snapshot=incomplete,
+                candidates=[
+                    item_candidate(
+                        "partial-item",
+                        evidence_refs=[_feature_ref_for(incomplete)],
+                    )
+                ],
+            )
+        )
+        self.assertEqual(item_first["analysis_status"], "incomplete")
+        self.assertEqual(item_first["status"], "incomplete")
+        self.assertTrue(item_first["issues"])
+        item_replay = run_items(
+            item_request(
+                feature_snapshot=incomplete,
+                candidates=[
+                    item_candidate(
+                        "partial-item",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        evidence_refs=[_feature_ref_for(incomplete)],
+                    )
+                ],
+                previous=item_first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(item_replay["status"], "no_change")
+        self.assertEqual(item_replay["analysis_status"], "incomplete")
+        self.assertEqual(item_replay["issues"], item_first["issues"])
+        self.assertEqual(
+            item_replay["item_candidate_coverage"],
+            item_first["item_candidate_coverage"],
+        )
+        self.assertEqual(
+            item_replay["unrepresented_feature_ids"],
+            item_first["unrepresented_feature_ids"],
+        )
+        self.assertEqual(item_replay["unrepresented_feature_ids"], ["FEAT-002"])
+        self.assertIn(
+            "unrepresented_feature_candidates",
+            {row["code"] for row in item_replay["issues"]},
+        )
+        self.assertEqual(
+            item_replay["item_candidate_coverage"]["status"],
+            "not_measurable_incomplete_population",
+        )
+        self.assertIsNone(item_replay["item_candidate_coverage"]["rate"])
+        self.assertEqual(
+            item_replay["write_precondition"],
+            {"performed": False, "provider_selected": False},
+        )
+        self.assertEqual(item_replay["candidate"], item_first["candidate"])
+
+        condition_first = _materialize_condition(
+            condition_request(
+                feature_snapshot=incomplete,
+                candidates=[
+                    condition_candidate(
+                        "partial-condition",
+                        evidence_refs=[_feature_ref_for(incomplete), spec_ref()],
+                        authorities=[
+                            {
+                                "source_ref": spec_ref(),
+                                "entity_ref": "AUTH-001",
+                            }
+                        ],
+                    )
+                ],
+            )
+        )
+        self.assertEqual(condition_first["analysis_status"], "incomplete")
+        self.assertEqual(condition_first["status"], "incomplete")
+        self.assertTrue(condition_first["issues"])
+        condition_replay = run_conditions(
+            condition_request(
+                feature_snapshot=incomplete,
+                candidates=[
+                    condition_candidate(
+                        "partial-condition",
+                        action="reuse",
+                        condition_id="COND-001",
+                        evidence_refs=[_feature_ref_for(incomplete), spec_ref()],
+                        authorities=[
+                            {
+                                "source_ref": spec_ref(),
+                                "entity_ref": "AUTH-001",
+                            }
+                        ],
+                    )
+                ],
+                previous=condition_first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(condition_replay["analysis_status"], "incomplete")
+        self.assertEqual(condition_replay["issues"], condition_first["issues"])
+        self.assertEqual(
+            condition_replay["write_precondition"],
+            {"performed": False, "provider_selected": False},
+        )
+        self.assertEqual(condition_replay["candidate"], condition_first["candidate"])
+
+        crosscheck_first = run_conditions(
+            {
+                "operation": "crosscheck",
+                "item_artifact": item_first["candidate"],
+                "condition_artifact": condition_first["candidate"],
+                "candidate_pairs": [],
+            }
+        )
+        crosscheck_replay = run_conditions(
+            {
+                "operation": "crosscheck",
+                "item_artifact": item_replay["candidate"],
+                "condition_artifact": condition_replay["candidate"],
+                "candidate_pairs": [],
+            }
+        )
+        self.assertEqual(crosscheck_replay, crosscheck_first)
+        self.assertEqual(crosscheck_replay["status"], "incomplete")
+        self.assertTrue(crosscheck_replay["issues"])
+
+    def test_no_change_replay_preserves_unknown_area_and_unretrieved_source(self):
+        cases = [
+            (
+                "unknown_area",
+                unresolved_feature_inventory(unknown_areas=["external auth flow"]),
+                "feature_population_incomplete",
+            ),
+            (
+                "unretrieved_source",
+                unresolved_feature_inventory(unretrieved=["src/auth/**"]),
+                "feature_population_incomplete",
+            ),
+        ]
+        for name, snapshot, issue_code in cases:
+            with self.subTest(state=name):
+                item_ref = _feature_ref_for(snapshot)
+                item_first = _materialize_item(
+                    item_request(
+                        feature_snapshot=snapshot,
+                        candidates=[
+                            item_candidate("partial", evidence_refs=[item_ref])
+                        ],
+                    )
+                )
+                item_replay = run_items(
+                    item_request(
+                        feature_snapshot=snapshot,
+                        candidates=[
+                            item_candidate(
+                                "partial",
+                                action="reuse",
+                                item_id="ITEM-001",
+                                evidence_refs=[item_ref],
+                            )
+                        ],
+                        previous=item_first["candidate"],
+                        expected="provider-r1",
+                        current="provider-r1",
+                    )
+                )
+                self.assertEqual(item_replay["status"], "no_change")
+                self.assertEqual(item_replay["analysis_status"], "incomplete")
+                self.assertIn(
+                    issue_code, {row["code"] for row in item_replay["issues"]}
+                )
+                self.assertEqual(item_replay["candidate"], item_first["candidate"])
+
+                condition_first = _materialize_condition(
+                    condition_request(
+                        feature_snapshot=snapshot,
+                        candidates=[
+                            condition_candidate(
+                                "partial",
+                                evidence_refs=[item_ref, spec_ref()],
+                            )
+                        ],
+                    )
+                )
+                condition_replay = run_conditions(
+                    condition_request(
+                        feature_snapshot=snapshot,
+                        candidates=[
+                            condition_candidate(
+                                "partial",
+                                action="reuse",
+                                condition_id="COND-001",
+                                evidence_refs=[item_ref, spec_ref()],
+                            )
+                        ],
+                        previous=condition_first["candidate"],
+                        expected="provider-r1",
+                        current="provider-r1",
+                    )
+                )
+                self.assertEqual(condition_replay["status"], "no_change")
+                self.assertEqual(condition_replay["analysis_status"], "incomplete")
+                self.assertIn(
+                    issue_code,
+                    {row["code"] for row in condition_replay["issues"]},
+                )
+                self.assertEqual(
+                    condition_replay["candidate"], condition_first["candidate"]
+                )
+
+    def test_complete_no_change_is_deterministic_and_requests_no_write(self):
+        item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate("stable", feature_refs=["FEAT-001", "FEAT-002"])
+                ]
+            )
+        )
+        item_request_again = item_request(
+            candidates=[
+                item_candidate(
+                    "stable",
+                    action="reuse",
+                    item_id="ITEM-001",
+                    feature_refs=["FEAT-001", "FEAT-002"],
+                )
+            ],
+            previous=item["candidate"],
+            expected="provider-r1",
+            current="provider-r1",
+        )
+        item_replay = run_items(item_request_again)
+        item_second_replay = run_items(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "stable",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                    )
+                ],
+                previous=item_replay["candidate"],
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        self.assertEqual(item_replay["status"], "no_change")
+        self.assertEqual(item_replay["analysis_status"], "complete")
+        self.assertTrue(item_replay["valid"])
+        self.assertEqual(item_replay["issues"], [])
+        self.assertEqual(item_replay["candidate_item_ids"], {"stable": "ITEM-001"})
+        self.assertEqual(
+            item_replay["candidate"]["content_fingerprint"],
+            item["candidate"]["content_fingerprint"],
+        )
+        self.assertEqual(
+            item_replay["candidate"]["history"], item["candidate"]["history"]
+        )
+        self.assertEqual(item_replay, item_second_replay)
+        self.assertEqual(
+            item_replay["write_precondition"],
+            {"performed": False, "provider_selected": False},
+        )
+
+        condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("stable")])
+        )
+        condition_replay = run_conditions(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "stable", action="reuse", condition_id="COND-001"
+                    )
+                ],
+                previous=condition["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(condition_replay["analysis_status"], "complete")
+        self.assertTrue(condition_replay["valid"])
+        self.assertEqual(condition_replay["issues"], [])
+        self.assertEqual(
+            condition_replay["candidate_condition_ids"], {"stable": "COND-001"}
+        )
+        self.assertEqual(
+            condition_replay["candidate"]["content_fingerprint"],
+            condition["candidate"]["content_fingerprint"],
+        )
+        self.assertEqual(
+            condition_replay["candidate"]["history"], condition["candidate"]["history"]
+        )
+        condition_second_replay = run_conditions(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "stable", action="reuse", condition_id="COND-001"
+                    )
+                ],
+                previous=condition_replay["candidate"],
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        self.assertEqual(condition_replay, condition_second_replay)
+        self.assertEqual(
+            condition_replay["write_precondition"],
+            {"performed": False, "provider_selected": False},
+        )
+
+    def test_no_change_keeps_unconfirmed_and_blocked_conditions_unresolved(self):
+        candidates = [
+            condition_candidate(
+                "blocked",
+                state="blocked",
+                authorities=[],
+                unknowns=["waiting for security evidence"],
+            ),
+            condition_candidate(
+                "unconfirmed",
+                state="unconfirmed",
+                authorities=[],
+                unknowns=["authority is not confirmed"],
+            ),
+        ]
+        first = _materialize_condition(condition_request(candidates=candidates))
+        ids = first["candidate_condition_ids"]
+        replay = run_conditions(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        row["candidate_key"],
+                        action="reuse",
+                        condition_id=ids[row["candidate_key"]],
+                        state=row["candidate_state"],
+                        authorities=[],
+                        unknowns=row["unknowns"],
+                    )
+                    for row in candidates
+                ],
+                previous=first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(first["status"], "incomplete")
+        self.assertEqual(replay["status"], "no_change")
+        self.assertEqual(replay["analysis_status"], "incomplete")
+        self.assertEqual(replay["unconfirmed_condition_ids"], [ids["unconfirmed"]])
+        self.assertEqual(replay["blocked_condition_ids"], [ids["blocked"]])
+        self.assertEqual(replay["recheck_condition_ids"], sorted(ids.values()))
+        self.assertEqual(
+            {row["code"] for row in replay["issues"]},
+            {"unconfirmed_conditions", "blocked_conditions"},
+        )
+        self.assertEqual(replay["candidate"], first["candidate"])
+
+    def test_invalid_previous_artifacts_are_rejected_before_no_change(self):
+        item = _materialize_item(
+            item_request(candidates=[item_candidate("valid-item")])
+        )["candidate"]
+        invalid_item = copy.deepcopy(item)
+        invalid_item["items"][0]["name"] = ""
+        _refresh_artifact_fingerprint(invalid_item)
+        _assert_contract_code(
+            self,
+            "invalid_field",
+            lambda: run_items(
+                item_request(
+                    candidates=[],
+                    previous=invalid_item,
+                    expected="provider-r1",
+                    current="provider-r1",
+                )
+            ),
+        )
+
+        condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("valid-condition")])
+        )["candidate"]
+        invalid_condition = copy.deepcopy(condition)
+        invalid_condition["conditions"][0]["name"] = ""
+        _refresh_artifact_fingerprint(invalid_condition)
+        _assert_contract_code(
+            self,
+            "invalid_field",
+            lambda: run_conditions(
+                condition_request(
+                    candidates=[],
+                    previous=invalid_condition,
+                    expected="provider-r1",
+                    current="provider-r1",
+                )
+            ),
         )
 
     def test_revision_conflict_blocks_without_allocating_ids(self):
@@ -1865,6 +2282,16 @@ class TestReviewRegressionFindings(unittest.TestCase):
         )
         self.assertEqual(item_replay["status"], "no_change")
         self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(item_replay["analysis_status"], "incomplete")
+        self.assertEqual(condition_replay["analysis_status"], "incomplete")
+        self.assertEqual(item_replay["stale_item_ids"], ["ITEM-001"])
+        self.assertEqual(condition_replay["stale_condition_ids"], ["COND-001"])
+        self.assertIn("source_stale", {row["code"] for row in item_replay["issues"]})
+        self.assertIn(
+            "source_stale", {row["code"] for row in condition_replay["issues"]}
+        )
+        self.assertEqual(item_replay["recheck_item_ids"], ["ITEM-001"])
+        self.assertEqual(condition_replay["recheck_condition_ids"], ["COND-001"])
         self.assertEqual(
             len(item_replay["candidate"]["history"]), len(item_previous["history"])
         )
@@ -1872,6 +2299,83 @@ class TestReviewRegressionFindings(unittest.TestCase):
             len(condition_replay["candidate"]["history"]),
             len(condition_previous["history"]),
         )
+
+    def test_no_change_replay_preserves_unknown_currentness(self):
+        snapshot = feature_inventory()
+        current_feature_ref = _feature_ref_for(snapshot)
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "unknown-after-source-omission",
+                        evidence_refs=[current_feature_ref, spec_ref()],
+                    )
+                ],
+                feature_snapshot=snapshot,
+            )
+        )["candidate"]
+        initial_condition = _materialize_condition(
+            condition_request(
+                candidates=[condition_candidate("unknown-after-source-omission")],
+                feature_snapshot=snapshot,
+            )
+        )["candidate"]
+        available_sources = [current_feature_ref]
+        item_unknown = _materialize_item(
+            item_request(
+                candidates=[],
+                feature_snapshot=snapshot,
+                sources=available_sources,
+                previous=initial_item,
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        condition_unknown = _materialize_condition(
+            condition_request(
+                candidates=[],
+                feature_snapshot=snapshot,
+                sources=available_sources,
+                previous=initial_condition,
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(item_unknown["unknown_item_ids"], ["ITEM-001"])
+        self.assertEqual(condition_unknown["unknown_condition_ids"], ["COND-001"])
+
+        item_replay = run_items(
+            item_request(
+                candidates=[],
+                feature_snapshot=snapshot,
+                sources=available_sources,
+                previous=item_unknown["candidate"],
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        condition_replay = run_conditions(
+            condition_request(
+                candidates=[],
+                feature_snapshot=snapshot,
+                sources=available_sources,
+                previous=condition_unknown["candidate"],
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        self.assertEqual(item_replay["status"], "no_change")
+        self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(item_replay["analysis_status"], "incomplete")
+        self.assertEqual(condition_replay["analysis_status"], "incomplete")
+        self.assertEqual(item_replay["issues"], item_unknown["issues"])
+        self.assertEqual(condition_replay["issues"], condition_unknown["issues"])
+        self.assertEqual(item_replay["unknown_item_ids"], ["ITEM-001"])
+        self.assertEqual(condition_replay["unknown_condition_ids"], ["COND-001"])
+        self.assertEqual(item_replay["recheck_item_ids"], ["ITEM-001"])
+        self.assertEqual(condition_replay["recheck_condition_ids"], ["COND-001"])
+        self.assertEqual(item_replay["candidate"], item_unknown["candidate"])
+        self.assertEqual(condition_replay["candidate"], condition_unknown["candidate"])
 
     def test_unfound_item_references_are_unconfirmed_and_can_resolve_later(self):
         empty_items = _materialize_item(item_request(candidates=[]))["candidate"]
@@ -1881,6 +2385,8 @@ class TestReviewRegressionFindings(unittest.TestCase):
             )
         )["candidate"]
         unresolved = self.crosscheck(empty_items, condition)
+        unresolved_replay = self.crosscheck(empty_items, condition)
+        self.assertEqual(unresolved_replay, unresolved)
         self.assertEqual(unresolved["status"], "incomplete")
         self.assertEqual(
             unresolved["unresolved_item_references"][0]["reason"], "item_not_found"

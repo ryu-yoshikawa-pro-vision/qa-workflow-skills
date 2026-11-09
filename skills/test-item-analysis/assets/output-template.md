@@ -6,6 +6,7 @@
 | --------------------------------------- | --------------- |
 | Project scope                           |                 |
 | Candidate artifact ref                  |                 |
+| Candidate update / analysis status      |                 |
 | Feature inventory ref / revision / hash |                 |
 | Confirmed source boundary               |                 |
 | Candidate model fingerprint             |                 |

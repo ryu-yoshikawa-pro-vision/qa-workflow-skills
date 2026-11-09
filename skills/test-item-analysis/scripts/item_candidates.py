@@ -540,26 +540,16 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     else:
         old_projection = None
         new_projection = None
-    if previous is not None and fingerprint(old_projection) == fingerprint(
+    no_change = previous is not None and fingerprint(old_projection) == fingerprint(
         new_projection
-    ):
-        return make_result(
-            "no_change",
-            valid=True,
-            issues=[],
-            candidate=previous,
-            write_precondition={
-                "performed": False,
-                "requires_native_cas": True,
-                "requires_readback": True,
-            },
-            candidate_item_ids={key: value for key, value in sorted(assigned.items())},
-        )
+    )
     stale = sorted(
         row["item_id"] for row in current_items if row["currentness"] == "stale"
     )
     unknown = sorted(
-        row["item_id"] for row in current_items if row["currentness"] == "unknown"
+        row["item_id"]
+        for row in current_items
+        if row["currentness"] == "unknown" or row["status"] == "unknown"
     )
     status = (
         "candidate_ready_unpersisted"
@@ -581,7 +571,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         issues.append(
             _issue(
                 "source_unknown",
-                "some item candidates do not have a current source ref",
+                "some item candidates have unknown status or currentness",
                 blocking=False,
             )
         )
@@ -601,6 +591,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
+    recheck_item_ids = sorted(set(stale) | set(unknown))
     active_features = {
         row["feature_id"] for row in feature_population if row["status"] != "retired"
     }
@@ -611,6 +602,19 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         for ref in row["feature_refs"]
     }
     gap_ids = sorted(active_features - represented)
+    if gap_ids:
+        issues.append(
+            _issue(
+                "unrepresented_feature_candidates",
+                "known active features have no current item candidate",
+                blocking=False,
+            )
+        )
+    analysis_status = (
+        "complete"
+        if status == "candidate_ready_unpersisted" and not gap_ids
+        else "incomplete"
+    )
     metric_status = "measured"
     metric_rate = None
     metric_denominator = None
@@ -623,21 +627,42 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         metric_denominator = len(active_features)
     else:
         metric_status = "not_measurable_zero_denominator"
+    item_candidate_coverage = {
+        "status": metric_status,
+        "basis": "confirmed active feature inventory only",
+        "numerator": len(active_features & represented),
+        "denominator": metric_denominator,
+        "rate": metric_rate,
+    }
+    if no_change:
+        return make_result(
+            "no_change",
+            valid=True,
+            issues=issues,
+            analysis_status=analysis_status,
+            candidate=previous,
+            candidate_item_ids={key: value for key, value in sorted(assigned.items())},
+            impacted_item_ids=sorted(changed_ids),
+            stale_item_ids=stale,
+            unknown_item_ids=unknown,
+            recheck_item_ids=recheck_item_ids,
+            unrepresented_feature_ids=gap_ids,
+            item_candidate_coverage=item_candidate_coverage,
+            write_precondition={"performed": False, "provider_selected": False},
+        )
     return make_result(
         status,
         valid=True,
         issues=issues,
+        analysis_status=analysis_status,
         candidate=candidate,
         candidate_item_ids={key: value for key, value in sorted(assigned.items())},
         impacted_item_ids=sorted(changed_ids),
+        stale_item_ids=stale,
+        unknown_item_ids=unknown,
+        recheck_item_ids=recheck_item_ids,
         unrepresented_feature_ids=gap_ids,
-        item_candidate_coverage={
-            "status": metric_status,
-            "basis": "confirmed active feature inventory only",
-            "numerator": len(active_features & represented),
-            "denominator": metric_denominator,
-            "rate": metric_rate,
-        },
+        item_candidate_coverage=item_candidate_coverage,
         write_precondition={
             "performed": False,
             "owner": OWNER,
