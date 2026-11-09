@@ -360,10 +360,13 @@ def diagnosis(*, run_ref: str, hypotheses: list[dict[str, Any]]) -> dict[str, An
         raise ContractError("invalid_hypotheses")
     for h in hypotheses:
         if (
-            h.get("cause") not in allowed
-            or not h.get("evidence_ref")
+            not isinstance(h, dict)
+            or h.get("cause") not in allowed
+            or not isinstance(h.get("evidence_ref"), str)
+            or not h["evidence_ref"].strip()
             or h.get("confidence") not in {"high", "medium", "low", "unknown"}
-            or not h.get("next_owner")
+            or not isinstance(h.get("next_owner"), str)
+            or not h["next_owner"].strip()
         ):
             raise ContractError("invalid_diagnosis")
     return {
