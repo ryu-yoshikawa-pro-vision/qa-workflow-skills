@@ -29,3 +29,9 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 `scripts/artifact_store.py` の `LocalArtifactStore` は、許可されたローカルroot内に所有者限定SQLiteを設け、`project-context`／`feature-inventory`のnative transactionによる新規作成・revision CAS・immutable履歴・独立読戻しを行います。遠隔providerの代替ではありません。Pythonの信頼済み呼出し元は`authorize(request)`を渡して認証済み承認のscope／revision／許可を保存直前に検証します。JSONの`approval_ref`単独では権限を証明できません。
 
 `persist_prepared(store,preparation,project_ref,operation_id,approval_ref,approval_revision)`は、同じhelperの準備操作から作った候補だけを保存します。既存更新では元の保存本文とexpected revisionを再取得して照合し、競合・未承認・readback不一致を拒否します。返す保存先revisionは候補のローカル論理revisionと別に保持します。初回作成時も根拠のsource ref/revisionと変更理由が必要です。
+
+### 初回配置・編集方針の記録
+
+`prepare-placement`は、既存Project Contextの`markdown`、`dec_asm_owner=project-context`、`artifact_ref`、`expected_revision`、`source_ref`／`source_revision`、`change_reason`、`policy`を受け取ります。`policy`の必須keyは`owner`、`scope`、`target_ref`、`revision`、`approval_ref`、`approval_revision`、`editable_scope`、`feature_index_ref`です。既存DEC/ASMがある場合は`existing_decisions`／`existing_assumptions`へ保存済み行を含め、既存helperの履歴検証に通します。
+
+初回または方針変更時は、既存Section 12のDECとSection 14の参照を同一draftに記録します。同一方針は`existing_policy`との一致で`reuse_candidate`を返し、不要なrevisionを作りません。この段階の`approval_ref`は自己申告値です。`persist_prepared`から実保存する際には、承認scope・revisionを外部認証した`authorize`callbackが必要です。

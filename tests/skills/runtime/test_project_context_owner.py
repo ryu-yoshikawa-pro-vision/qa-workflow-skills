@@ -312,6 +312,52 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["target_ref"] = "moved.md"
         self.assertEqual(handle(request)["status"], "approval_required")
 
+    def test_placement_policy_draft_records_decision_and_reference(self) -> None:
+        policy = {
+            "owner": "project-context",
+            "scope": "Sample",
+            "target_ref": "qa/artifacts",
+            "revision": "policy-v1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "approval-v1",
+            "editable_scope": "human-worktree",
+            "feature_index_ref": "qa/features/index.md",
+        }
+        request = {
+            "operation": "prepare-placement",
+            "markdown": context(),
+            "dec_asm_owner": "project-context",
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "issue/123",
+            "source_revision": "issue-r1",
+            "change_reason": "initial placement decision",
+            "policy": policy,
+            "existing_decisions": [],
+            "existing_assumptions": [],
+        }
+        result = handle(request)
+        self.assertEqual(result["status"], "draft", result)
+        self.assertEqual(result["decision_id"], "DEC-001")
+        self.assertIn("QA成果物配置・人間編集方針", result["artifact_markdown"])
+        self.assertIn("qa/features/index.md", result["artifact_markdown"])
+        self.assertIn("| QA成果物配置 | qa/artifacts |", result["artifact_markdown"])
+        self.assertEqual(
+            handle(
+                {
+                    "operation": "inspect",
+                    "markdown": result["artifact_markdown"],
+                    "required_keys": [],
+                }
+            )["status"],
+            "current",
+        )
+        request["existing_policy"] = policy
+        self.assertEqual(handle(request)["status"], "reuse_candidate")
+        request["existing_policy"] = None
+        request["policy"] = {**policy, "target_ref": "qa/|unauthorized"}
+        self.assertEqual(handle(request)["status"], "blocked")
+
     def test_update_rejects_non_local_roots_and_fake_section(self) -> None:
         base = {
             "operation": "prepare-update",

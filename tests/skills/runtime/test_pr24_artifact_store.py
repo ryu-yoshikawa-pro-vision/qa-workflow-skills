@@ -223,6 +223,84 @@ class ArtifactStoreTests(unittest.TestCase):
             "blocked",
         )
 
+    def test_placement_is_persisted_only_after_verified_approval(self) -> None:
+        initial = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": "context.md", "status": "absent"}],
+            "artifact_ref": "context.md",
+            "source_ref": "source/1",
+            "source_revision": "rev-1",
+            "change_reason": "init",
+        }
+        first = persist_prepared(
+            self.store,
+            initial,
+            project_ref="Sample",
+            operation_id="init",
+            approval_ref="approval/verified",
+            approval_revision="approval-v1",
+        )
+        self.assertEqual(first["status"], "stored", first)
+        markdown = self.store.read_current(
+            "project-context", "Sample", "context.md"
+        )["content"]
+        policy = {
+            "owner": "project-context",
+            "scope": "Sample",
+            "target_ref": "qa/artifacts",
+            "revision": "policy-v1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "approval-v1",
+            "editable_scope": "markdown/working",
+            "feature_index_ref": "qa/features/index.md",
+        }
+        change = {
+            "operation": "prepare-placement",
+            "markdown": markdown,
+            "dec_asm_owner": "project-context",
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "source/2",
+            "source_revision": "rev-2",
+            "change_reason": "approved layout",
+            "policy": policy,
+        }
+        self.allowed = False
+        rejected = persist_prepared(
+            self.store,
+            change,
+            project_ref="Sample",
+            operation_id="layout-1",
+            approval_ref="approval/verified",
+            approval_revision="approval-v1",
+        )
+        self.assertEqual(rejected["status"], "blocked")
+        self.assertEqual(
+            self.store.read_current("project-context", "Sample", "context.md")[
+                "revision"
+            ],
+            "r1",
+        )
+        self.allowed = True
+        stored = persist_prepared(
+            self.store,
+            change,
+            project_ref="Sample",
+            operation_id="layout-1",
+            approval_ref="approval/verified",
+            approval_revision="approval-v1",
+        )
+        self.assertEqual(stored["status"], "stored", stored)
+        self.assertEqual(stored["revision"], "r2")
+        self.assertIn(
+            "qa/features/index.md",
+            self.store.read_current("project-context", "Sample", "context.md")[
+                "content"
+            ],
+        )
+
     def test_feature_inventory_snapshot_requires_saved_predecessor(self) -> None:
         request = fixture()
         request["snapshot"]["project_ref"] = "Sample"
