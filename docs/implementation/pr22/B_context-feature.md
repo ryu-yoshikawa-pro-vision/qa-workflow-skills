@@ -276,3 +276,13 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 ## PR #34 再点検：checkoutのHEAD現在性
 
 `git_source_inventory.analyze`で`cat-file`による指定コミットの存在確認に加え、許可されたcheckoutの`git rev-parse HEAD`と`head_sha`が一致することを検証する。過去コミット自体が存在してもcheckoutが進んでいれば`git_head_changed`として保存を拒否する。`test_git_source_inventory.py`に古い実在SHAの列挙拒否、`test_pr24_git_artifact_store.py`に旧SHAを使った保存拒否と正本不変を追加した。現行SHAを信頼済み呼出し元で取り直すまで保存を再試行しない。GitHub Actionsの実行結果はPR #34の最新HEADに紐付くworkflowを正とする。
+## PR #34最終レビュー追加2件への対応（2026-11-09）
+
+担当Bの再点検で判明した次の2件を修正した。
+
+1. **merge／releaseのGit差分基準**：`reconcile_git_coverage`が各code sourceの保存済み`previous_snapshot.sources[].revision`と、今回Git列挙の`base_sha`を照合する。途中のcommit→今回HEADだけの差分では全変更を拾えないため`stale`にする。`persist_snapshot`もmerge／releaseに`base_sha`を必須とし、再列挙・照合で不一致なら書込みを拒否する。初回分析やPR更新の既存仕様は維持する。
+2. **過去DIF訂正と今回影響の分離**：`supersedes_id`で過去revisionのDIFを訂正しても、PR更新・rebase・merge・releaseなどのイベントの変更分類率・影響機能・承認対象へ計上しない。同一revisionの`analysis_update`では現行revisionの訂正のみ計上する。`reconcile_git_coverage`の差分照合でも同条件で過去訂正を除外する。訂正履歴・保存前承認の条件は維持する。
+
+回帰テストは`test_feature_registry.py`の旧DIF再分類2通り、`test_git_change_coverage.py`の実Git merge／releaseの途中commit base拒否、`test_pr24_git_artifact_store.py`の実Gitでの未列挙ファイルを含む途中commit base保存拒否・保存済み正本維持・正しい旧SHAからの正常保存を含む。検証はPR #34最新HEADのGitHub Actionsを正とする。
+
+実案件の外部provider・実承認サービス・実Agent・実製品CIおよびPR #22のA〜J統合受入は、従来の対象範囲どおり本PRの完了判定に含めない。外部レビューの依頼とPRのmergeは本対応では実施しない。
