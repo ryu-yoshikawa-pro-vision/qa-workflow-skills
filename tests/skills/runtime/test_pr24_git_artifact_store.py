@@ -645,6 +645,42 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         self.assertIsNotNone(stored)
         self.assertEqual(stored["revision"], operation)
+        # A same-HEAD analysis update must repeat both Git comparisons.
+        prior = copy.deepcopy(request["snapshot"])
+        request["previous_snapshot"] = prior
+        snapshot = request["snapshot"]
+        snapshot["event"] = "analysis_update"
+        snapshot["event_basis"] = {
+            "source_revision": snapshot["source_revision"],
+            "evidence_ref": "review/continued-analysis",
+        }
+        snapshot["operation_id"] = "op-analysis-review"
+        snapshot["previous_artifact_revision"] = prior["artifact_revision"]
+        snapshot["artifact_revision"] = "art-analysis-v3"
+        saved_previous_head = evidence[0].pop("previous_head_base_sha")
+        missing = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=operation,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="missing original PR comparison",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(missing["status"], "blocked", missing)
+        self.assertIn("analysis_git_baselines_mismatch", missing["reasons"])
+        evidence[0]["previous_head_base_sha"] = saved_previous_head
+        accepted = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=operation,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="full analysis comparison",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(accepted["status"], "stored", accepted)
+        self.assertEqual(accepted["analysis_status"], "complete")
 
     def test_shared_head_repositories_use_explicit_primary_source_and_own_base(
         self,
@@ -889,6 +925,164 @@ class GitArtifactStoreTests(unittest.TestCase):
                 "feature-inventory", "Sample", "qa/feature-inventory.json"
             )["revision"],
             result["revision"],
+        )
+
+    def test_new_secondary_repo_is_enumerated_in_pr_update(self) -> None:
+        request, evidence = self._code_registry()
+        first = persist_snapshot(
+            self.store, request, expected_revision=None,
+            approval_ref="approval/verified", approval_revision="policy-v1",
+            change_reason="initial primary source", git_inventory_requests=evidence,
+        )
+        self.assertEqual(first["status"], "stored", first)
+        previous = copy.deepcopy(request["snapshot"])
+        (self.root / "src" / "batch.py").write_text(
+            "def batch(): pass\n", encoding="utf-8"
+        )
+        git(self.root, "add", "src/batch.py")
+        git(self.root, "commit", "-qm", "new PR changes")
+        head = git(self.root, "rev-parse", "HEAD")
+        secondary_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(secondary_dir.cleanup)
+        other = Path(secondary_dir.name)
+        git(other, "init", "-q")
+        git(other, "config", "user.name", "QA")
+        git(other, "config", "user.email", "qa@example.invalid")
+        (other / "README.md").write_text("base\n", encoding="utf-8")
+        git(other, "add", ".")
+        git(other, "commit", "-qm", "new source baseline")
+        base = git(other, "rev-parse", "HEAD")
+        (other / "src").mkdir()
+        (other / "src" / "service.py").write_text(
+            "def service(): pass\n", encoding="utf-8"
+        )
+        git(other, "add", "src")
+        git(other, "commit", "-qm", "new secondary changes")
+        other_head = git(other, "rev-parse", "HEAD")
+        snap = request["snapshot"]
+        request["previous_snapshot"] = previous
+        request["observed_head_revision"] = head
+        snap["event"] = "pr_update"
+        snap["event_basis"] = {
+            "base_sha": evidence[0]["base_sha"],
+            "head_sha": head,
+            "previous_head_sha": evidence[0]["head_sha"],
+        }
+        snap["source_revision"] = head
+        snap["sources"][0]["revision"] = head
+        snap["sources"].append({
+            **copy.deepcopy(snap["sources"][0]), "id": "SRC-002",
+            "ref": "product/new-service", "revision": other_head,
+        })
+        snap["expected_source_ids"].append("SRC-002")
+        snap["features"][0]["source_ids"].append("SRC-002")
+        snap["history"].append({
+            "event_id": "event-2", "kind": "changed", "revision": head,
+            "evidence_ref": "evidence/new-source",
+            "from_ids": ["FEAT-001"], "to_ids": ["FEAT-001"],
+        })
+        snap["operation_id"] = "op-secondary"
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        for i, (sid, before, after, path) in enumerate((
+            ("SRC-001", evidence[0]["base_sha"], head, "src/auth.py"),
+            ("SRC-001", evidence[0]["base_sha"], head, "src/batch.py"),
+            ("SRC-001", evidence[0]["head_sha"], head, "src/batch.py"),
+            ("SRC-002", base, other_head, "src/service.py"),
+        ), start=2):
+            row = copy.deepcopy(snap["changes"][0])
+            row.update(
+                id=f"DIF-{i:03d}", source_id=sid,
+                before_revision=before, after_revision=after, locator=path,
+            )
+            snap["changes"].append(row)
+        evidence[0].update(
+            head_sha=head, previous_head_base_sha=previous["source_revision"],
+        )
+        evidence.append({
+            "source_id": "SRC-002", "repository_root": str(other),
+            "authorized_root": str(other), "base_sha": base, "head_sha": other_head,
+        })
+        result = persist_snapshot(
+            self.store, request, expected_revision=first["revision"],
+            approval_ref="approval/verified", approval_revision="policy-v1",
+            change_reason="register secondary checkout", git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "stored", result)
+
+    def test_verified_gitlink_source_can_complete_parent_git_inventory(self) -> None:
+        request, evidence = self._code_registry()
+        child = self.root / "vendor" / "module"
+        child.mkdir(parents=True)
+        git(child, "init", "-q")
+        git(child, "config", "user.name", "QA")
+        git(child, "config", "user.email", "qa@example.invalid")
+        (child / "service.py").write_text("def service(): pass\n", encoding="utf-8")
+        git(child, "add", ".")
+        git(child, "commit", "-qm", "verified child")
+        child_head = git(child, "rev-parse", "HEAD")
+        git(
+            self.root, "update-index", "--add", "--cacheinfo",
+            "160000", child_head, "vendor/module",
+        )
+        git(self.root, "commit", "-qm", "link verified child source")
+        parent_head = git(self.root, "rev-parse", "HEAD")
+        snap = request["snapshot"]
+        request["observed_head_revision"] = parent_head
+        snap["source_revision"] = parent_head
+        snap["sources"][0]["revision"] = parent_head
+        snap["sources"].append({
+            **copy.deepcopy(snap["sources"][0]), "id": "SRC-002",
+            "ref": "product/submodule", "revision": child_head,
+        })
+        snap["expected_source_ids"].append("SRC-002")
+        snap["features"][0]["source_ids"].append("SRC-002")
+        snap["changes"][0]["after_revision"] = parent_head
+        snap["changes"].append({
+            **copy.deepcopy(snap["changes"][0]), "id": "DIF-002",
+            "locator": "vendor/module",
+        })
+        snap["history"][0]["revision"] = parent_head
+        evidence[0].update(
+            head_sha=parent_head,
+            gitlink_sources={f"gitlink:vendor/module@{child_head}": "SRC-002"},
+        )
+        evidence.append({
+            "source_id": "SRC-002",
+            "repository_root": str(child),
+            "authorized_root": str(child),
+            "base_sha": None,
+            "head_sha": child_head,
+        })
+        stored = persist_snapshot(
+            self.store, request, expected_revision=None,
+            approval_ref="approval/verified", approval_revision="policy-v1",
+            change_reason="verified submodule", git_inventory_requests=evidence,
+        )
+        self.assertEqual(stored["status"], "stored", stored)
+
+    def test_source_ref_lock_conflict_prevents_artifact_write(self) -> None:
+        request, evidence = self._code_registry()
+        branch = git(self.root, "symbolic-ref", "HEAD")
+        ref_path = git(self.root, "rev-parse", "--git-path", branch)
+        target = Path(ref_path)
+        if not target.is_absolute():
+            target = self.root / target
+        lock = Path(str(target) + ".lock")
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_text("another writer", encoding="utf-8")
+        self.addCleanup(lock.unlink, missing_ok=True)
+        denied = persist_snapshot(
+            self.store, request, expected_revision=None,
+            approval_ref="approval/verified", approval_revision="policy-v1",
+            change_reason="concurrent source mutation", git_inventory_requests=evidence,
+        )
+        self.assertEqual(denied["status"], "blocked", denied)
+        self.assertIn("git_source_ref_lock_unavailable", denied["reasons"])
+        self.assertIsNone(
+            self.store.read_current(
+                "feature-inventory", "Sample", "qa/feature-inventory.json"
+            )
         )
 
     def test_feature_inventory_uses_same_git_cas_without_schema_copy(self) -> None:
