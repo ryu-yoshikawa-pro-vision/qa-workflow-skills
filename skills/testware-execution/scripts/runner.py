@@ -215,7 +215,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         if not isinstance(static_plan, dict):
             raise RunnerError("static_analysis_contract_required")
         for field in ("tool_ref", "tool_version", "rules_ref", "config_ref"):
-            if not isinstance(static_plan.get(field), str) or not static_plan[field].strip():
+            if (
+                not isinstance(static_plan.get(field), str)
+                or not static_plan[field].strip()
+            ):
                 raise RunnerError("static_" + field + "_required")
         targets = static_plan.get("expected_paths")
         if (
@@ -228,13 +231,15 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     elif static_plan is not None:
         raise RunnerError("static_contract_for_non_static_runner")
     if kind == "vitest" and plan.get("selection_verified") is True:
-        if not isinstance(plan.get("selection_evidence_ref"), str) or not plan[
-            "selection_evidence_ref"
-        ].strip():
+        if (
+            not isinstance(plan.get("selection_evidence_ref"), str)
+            or not plan["selection_evidence_ref"].strip()
+        ):
             raise RunnerError("selection_evidence_required")
-        if not isinstance(plan.get("planned_scope_ref"), str) or not plan[
-            "planned_scope_ref"
-        ].strip():
+        if (
+            not isinstance(plan.get("planned_scope_ref"), str)
+            or not plan["planned_scope_ref"].strip()
+        ):
             raise RunnerError("planned_scope_ref_required")
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
