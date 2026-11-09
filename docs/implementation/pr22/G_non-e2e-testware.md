@@ -228,3 +228,11 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 - `compare_direct()` の期待値比較では、辞書／配列の内側にあるJSON真偽値と数値が、Pythonの `True == 1`／`False == 0` により一致扱いになる可能性があった。ネストしたJSONにも型一致を適用し、終了コード0やHTTP 200と組み合わさっても誤PASSにならないようにした。
 - `tests/skills/runtime/test_non_e2e_contract.py` に、期待`{"ok": true}`へ実測`{"ok": 1}`を渡す負例を追加した。外部Authority未認証では正式TC判定は未確定という契約は維持する。
+
+## 最新CIの検証結果（2026-11-09）
+
+- 修正済みコードHEAD `5b0602ae0c7c2b59849146de8936a63d574146eb` のGitHub Actionsは、[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42584887894)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42584887972)、[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42584887817)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42584887926)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42584887799)が個別にsuccess。
+- 決定論的workflowのログで、repository deterministic eval 292件・runtime unit/integration 633件がPASS。追加したGの回帰・負例は全runtime suiteの一部であり、これを固定製品runnerの受入結果とは扱わない。
+- CodeRabbitの手動全体レビューは無料利用枠上限で実施されておらず、レビュー完了としない。
+- 固定製品の実runner（Vitest／Playwright API-only／Web・Native component／batch・event・静的解析・非機能）、実provider承認／共有予約／CAS／readback、H/J実成果物との横断接続は依然未受入。固定製品の既存CIでVitestジョブが成功したことはG adapterの受入の代わりにならない。
+- 本文書への追記後にHEADが進んだ場合は、最新の[PR #29 Checks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/29/checks)を最終検証の正本とする。未実行／blockedが残るためDraftを維持する。
