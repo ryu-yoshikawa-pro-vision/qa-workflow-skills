@@ -527,7 +527,7 @@ def reconcile_playwright(
                 outcome = test["status"]
                 if (
                     outcome == "expected"
-                    and statuses[-1] != expected
+                    and any(status != expected for status in statuses)
                     or outcome == "unexpected"
                     and statuses[-1] == expected
                     or outcome == "flaky"
