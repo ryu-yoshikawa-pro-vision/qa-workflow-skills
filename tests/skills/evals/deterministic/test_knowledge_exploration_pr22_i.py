@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -1737,15 +1738,17 @@ class ExploratorySourceRevisionHandoffTests(unittest.TestCase):
         self.assertEqual(len(sources), 4)
         self.assertTrue(all(item["revision"] is None for item in sources))
         self.assertEqual(result["handoff"]["state"], "blocked")
+        # A bare string is not a source list: it is an invalid source set, and its
+        # revision is never looked up (see ExploratorySourceSetHandoffTests).
         text_sources = session(
-            charter=charter(source_refs="change:CHG-1"), source_revisions={}
+            charter=charter(source_refs="change:CHG-1"),
+            source_revisions={"change:CHG-1": "rev-chg-1"},
         )
         handoff = exploratory.build_follow_up_handoff(
             text_sources, "FND-1", session_revision="rev-session"
         )["handoff"]
-        self.assertEqual(
-            handoff["source_refs"], [{"ref": "change:CHG-1", "revision": None}]
-        )
+        self.assertEqual(handoff["source_refs"], [])
+        self.assertEqual(handoff["unresolved"], ["source_refs_invalid"])
         self.assertEqual(handoff["state"], "blocked")
         for broken in ({"unresolved": "text"}, {"unresolved": {"a": 1}}):
             with self.subTest(broken=broken):
@@ -2193,6 +2196,588 @@ class ExploratoryMalformedInputTests(unittest.TestCase):
                 self.assertFalse(
                     exploratory.validate_charter("exploration", value)["valid"]
                 )
+
+
+class ExploratorySourceSetHandoffTests(unittest.TestCase):
+    """A hand-off needs a source set it can re-read; an empty one is never current."""
+
+    def handoff(self, source_refs, owner="question-analysis", **overrides):
+        data = session(charter=charter(source_refs=source_refs), **overrides)
+        data["findings"][0]["recommended_routing"] = owner
+        return exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )
+
+    def test_empty_source_set_is_blocked_with_its_own_resume_point(self):
+        result = self.handoff([])
+        self.assertEqual(result["status"], "ready")
+        handoff = result["handoff"]
+        self.assertNotEqual(handoff["state"], "current")
+        self.assertEqual(handoff["state"], "blocked")
+        self.assertEqual(handoff["source_refs"], [])
+        self.assertIn("source_refs_missing", handoff["unresolved"])
+        self.assertEqual(handoff["resume"]["action"], "record_source_refs")
+        # The Session revision is never used as a source revision.
+        self.assertEqual(handoff["session_revision"], "rev-session")
+        self.assertNotIn("rev-session", json.dumps(handoff["source_refs"]))
+
+    def test_null_or_blank_source_refs_stop_at_session_validation(self):
+        for value in (None, ""):
+            with self.subTest(source_refs=value):
+                result = self.handoff(value)
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], "session_invalid")
+                self.assertIn("missing_charter_field:source_refs", result["issues"])
+                self.assertNotIn("handoff", result)
+
+    def test_absent_source_refs_key_is_not_a_valid_source_set(self):
+        data = session()
+        del data["charter"]["source_refs"]
+        result = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )
+        self.assertEqual(result["status"], "blocked")
+
+    def test_invalid_source_set_is_distinguished_from_a_missing_one(self):
+        for value in ("change:CHG-1", {"ref": "change:CHG-1"}, 5, True):
+            with self.subTest(source_refs=value):
+                handoff = self.handoff(value)["handoff"]
+                self.assertEqual(handoff["state"], "blocked")
+                self.assertEqual(handoff["source_refs"], [])
+                self.assertIn("source_refs_invalid", handoff["unresolved"])
+                self.assertNotIn("source_refs_missing", handoff["unresolved"])
+                self.assertEqual(handoff["resume"]["action"], "record_source_refs")
+
+    def test_missing_set_differs_from_a_source_without_revision(self):
+        no_revision = self.handoff(["change:CHG-1"], source_revisions={})["handoff"]
+        self.assertEqual(no_revision["resume"]["action"], "record_source_revisions")
+        self.assertEqual(
+            no_revision["unresolved"], ["source_revision_unresolved:change:CHG-1"]
+        )
+        self.assertEqual(
+            no_revision["source_refs"], [{"ref": "change:CHG-1", "revision": None}]
+        )
+        none = self.handoff([])["handoff"]
+        self.assertEqual(none["unresolved"], ["source_refs_missing"])
+
+    def test_a_blocked_session_keeps_its_resume_point_but_reports_the_gap(self):
+        handoff = self.handoff([], state="ブロック中")["handoff"]
+        self.assertEqual(handoff["state"], "blocked")
+        self.assertEqual(handoff["resume"]["action"], "resume_session")
+        self.assertIn("source_refs_missing", handoff["unresolved"])
+
+    def test_defect_candidate_stops_without_a_source_set(self):
+        for value, reason in (
+            ([], "source_refs_missing"),
+            ("change:CHG-1", "source_refs_invalid"),
+            (5, "source_refs_invalid"),
+        ):
+            with self.subTest(source_refs=value):
+                result = self.handoff(value, owner="defect-management")
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], reason)
+                self.assertEqual(result["next"], "record_source_refs")
+                self.assertNotIn("handoff", result)
+
+    def test_valid_sources_and_revisions_keep_the_current_hand_off(self):
+        for owner in ("question-analysis", "qa-knowledge", "defect-management"):
+            with self.subTest(owner=owner):
+                handoff = self.handoff(["change:CHG-1"], owner=owner)["handoff"]
+                self.assertEqual(handoff["state"], "current")
+                self.assertIsNone(handoff["resume"])
+                self.assertEqual(handoff["unresolved"], [])
+                self.assertEqual(
+                    handoff["source_refs"],
+                    [{"ref": "change:CHG-1", "revision": "rev-chg-1"}],
+                )
+                self.assertEqual(handoff["follow_up_owner_skill"], owner)
+
+    def test_a_charter_without_sources_can_still_start_an_exploration(self):
+        started = exploratory.resolve_direct_start({"charter": charter(source_refs=[])})
+        self.assertEqual(started["status"], "start")
+        self.assertFalse(started["formal_tc_required"])
+        self.assertEqual(
+            exploratory.validate_session(session(charter=charter(source_refs=[])))[
+                "issues"
+            ],
+            [],
+        )
+
+
+class ExploratoryRoutingValidationTests(unittest.TestCase):
+    """recommended_routing must be a registered owner name; never an exception."""
+
+    BAD = [
+        ["question-analysis"],
+        {"owner": "question-analysis"},
+        None,
+        "",
+        123,
+        "unknown-owner",
+    ]
+
+    def with_routing(self, value):
+        data = session()
+        data["findings"][0]["recommended_routing"] = value
+        return data
+
+    def test_bad_routing_never_raises_and_is_rejected(self):
+        for value in self.BAD:
+            with self.subTest(routing=value):
+                data = self.with_routing(value)
+                result = exploratory.build_follow_up_handoff(
+                    data, "FND-1", session_revision="rev-1"
+                )
+                self.assertEqual(result["status"], "blocked")
+                self.assertNotIn("handoff", result)
+
+    def test_non_string_routing_is_a_session_validation_issue(self):
+        for value in self.BAD[:5]:
+            with self.subTest(routing=value):
+                result = exploratory.validate_session(self.with_routing(value))
+                self.assertFalse(result["valid"])
+                self.assertIn(
+                    "finding_missing_evidence_or_reason:FND-1", result["issues"]
+                )
+
+    def test_unregistered_owner_is_blocked_and_never_rerouted(self):
+        data = self.with_routing("unknown-owner")
+        result = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-1"
+        )
+        self.assertEqual(result["reason"], "unknown_follow_up_owner")
+        self.assertNotIn("follow_up_owner_skill", json.dumps(result))
+
+    def test_hand_off_rejects_bad_routing_even_when_session_validation_passes(self):
+        # build_follow_up_handoff() must not rely on validate_session() alone.
+        for value in self.BAD:
+            with self.subTest(routing=value):
+                data = self.with_routing(value)
+                with unittest.mock.patch.object(
+                    exploratory,
+                    "validate_session",
+                    return_value={"valid": True, "issues": []},
+                ):
+                    result = exploratory.build_follow_up_handoff(
+                        data, "FND-1", session_revision="rev-1"
+                    )
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], "unknown_follow_up_owner")
+
+    def test_registered_owners_keep_their_actions_and_approval_requirement(self):
+        expected = {
+            "question-analysis": (None, False),
+            "qa-knowledge": ("triage", False),
+            "defect-management": ("defect_candidate_review", True),
+        }
+        for owner, (action, approval) in expected.items():
+            with self.subTest(owner=owner):
+                result = exploratory.build_follow_up_handoff(
+                    self.with_routing(owner), "FND-1", session_revision="rev-1"
+                )
+                self.assertEqual(result["status"], "ready")
+                handoff = result["handoff"]
+                self.assertEqual(handoff["follow_up_owner_skill"], owner)
+                self.assertEqual(handoff["target_action"], action)
+                self.assertIs(handoff["required_approval"]["required"], approval)
+
+    def test_evidence_refs_must_be_a_list_of_refs(self):
+        for value in ("ev:1", {"a": "ev:1"}, [""], [["ev:1"]], [5], 5):
+            with self.subTest(evidence_refs=value):
+                data = session()
+                data["findings"][0]["evidence_refs"] = value
+                self.assertFalse(exploratory.validate_session(data)["valid"])
+                self.assertEqual(
+                    exploratory.build_follow_up_handoff(
+                        data, "FND-1", session_revision="rev-1"
+                    )["status"],
+                    "blocked",
+                )
+
+
+def _document(data):
+    return "```json\n" + json.dumps(data, ensure_ascii=False) + "\n```"
+
+
+def _grade(data):
+    graded = exploratory_validator.validate(_document(data), {}, "EXP-X")
+    return {item.id: item.status for item in graded.assertions}
+
+
+class ExploratoryValidatorRuntimeParityTests(unittest.TestCase):
+    """The deterministic validator must not accept what the runtime rejects."""
+
+    ORIGINS = ("symptom_ref", "hypothesis_ref", "unresolved_finding_ref")
+    BAD_ORIGINS = ("", "  ", ["x"], {"a": 1}, 5, True)
+
+    def investigation(self, **origin):
+        return session(mode="investigation", charter=charter(**origin))
+
+    def test_valid_origins_pass(self):
+        for key in (*self.ORIGINS, "symptom", "hypothesis"):
+            with self.subTest(origin=key):
+                self.assertEqual(
+                    _grade(self.investigation(**{key: "origin:1"}))["EXP-D003"],
+                    "pass",
+                )
+
+    def test_unusable_origins_fail_in_the_validator_as_in_the_runtime(self):
+        for key in (*self.ORIGINS, "symptom", "hypothesis"):
+            for bad in self.BAD_ORIGINS:
+                with self.subTest(origin=key, value=bad):
+                    data = self.investigation(**{key: bad})
+                    self.assertEqual(_grade(data)["EXP-D003"], "fail")
+                    self.assertIn(
+                        "investigation_requires_symptom_or_hypothesis",
+                        exploratory.validate_charter("investigation", data["charter"])[
+                            "issues"
+                        ],
+                    )
+
+    def test_exploration_needs_no_origin(self):
+        self.assertEqual(_grade(session())["EXP-D003"], "pass")
+
+    def test_malformed_refs_fail_without_raising(self):
+        bad_values = [[], {}, ["x"], {"a": 1}, 5, True, None, ""]
+        for bad in bad_values:
+            variants = {
+                "observation_ref": session(
+                    observations=[
+                        {**session()["observations"][0], "observation_ref": bad}
+                    ]
+                ),
+                "finding_ref": session(
+                    findings=[{**session()["findings"][0], "finding_ref": bad}]
+                ),
+                "source_observation_refs": session(
+                    findings=[
+                        {**session()["findings"][0], "source_observation_refs": bad}
+                    ]
+                ),
+                "source_observation_ref_item": session(
+                    findings=[
+                        {**session()["findings"][0], "source_observation_refs": [bad]}
+                    ]
+                ),
+                "finding_evidence_refs": session(
+                    findings=[{**session()["findings"][0], "evidence_refs": bad}]
+                ),
+                "recommended_routing": session(
+                    findings=[{**session()["findings"][0], "recommended_routing": bad}]
+                ),
+            }
+            if bad == ["x"]:  # a valid evidence ref list
+                del variants["finding_evidence_refs"]
+            for name, data in variants.items():
+                with self.subTest(field=name, value=bad):
+                    grades = _grade(data)
+                    self.assertEqual(grades["EXP-D004"], "fail")
+                    self.assertFalse(exploratory.validate_session(data)["valid"])
+
+    def test_malformed_top_level_values_fail_without_raising(self):
+        for bad in ([], {}, ["x"], {"a": 1}, 5, None):
+            variants = {
+                "mode": session(mode=bad),
+                "state": session(state=bad),
+                "charter": session(charter=bad),
+                "cleanup": session(cleanup=bad),
+                "observations": session(observations=bad),
+                "findings": session(findings=bad),
+            }
+            for name, data in variants.items():
+                with self.subTest(field=name, value=bad):
+                    grades = _grade(data)
+                    self.assertEqual(
+                        sorted(grades),
+                        [f"EXP-D00{n}" for n in range(1, 9)],
+                    )
+
+    def test_valid_observation_to_finding_links_still_pass(self):
+        grades = _grade(session())
+        self.assertEqual(grades["EXP-D004"], "pass")
+        self.assertEqual(grades["EXP-D001"], "pass")
+
+    def test_each_runtime_rejected_session_fails_the_matching_validator_check(self):
+        data = session()
+        data["findings"][0]["source_observation_refs"] = []
+        self.assertFalse(exploratory.validate_session(data)["valid"])
+        self.assertEqual(_grade(data)["EXP-D004"], "fail")
+        data = session()
+        data["findings"][0]["source_observation_refs"] = ["OBS-404"]
+        self.assertEqual(_grade(data)["EXP-D004"], "fail")
+        data = session()
+        data["findings"].append(dict(data["findings"][0]))
+        self.assertEqual(_grade(data)["EXP-D004"], "fail")
+
+
+class KnowledgeRootSymlinkTests(unittest.TestCase):
+    PARAMS = {
+        "scope_refs": {"project:a"},
+        "kind": None,
+        "environment": None,
+        "version": None,
+        "current_dependencies": DEPENDENCIES,
+    }
+
+    def make_root(self, temp):
+        root = Path(temp) / "knowledge"
+        entry = make_entry("project:a", "a")
+        created = knowledge.create_entry(
+            root,
+            entry,
+            complete_root_snapshot=True,
+            atomic_create_if_absent_available=True,
+            current_dependencies=DEPENDENCIES,
+        )
+        self.assertEqual(created["status"], "created")
+        return root, entry
+
+    def link(self, link, target):
+        try:
+            os.symlink(target, link)
+        except (OSError, NotImplementedError, AttributeError) as exc:
+            self.skipTest(f"symlink is unavailable in this environment: {exc}")
+
+    def test_regular_entries_are_a_complete_listing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            scan = knowledge.scan_knowledge_root(root)
+            self.assertTrue(scan["complete"])
+            self.assertEqual(scan["unresolved"], [])
+            self.assertEqual(len(scan["entry_paths"]), 1)
+            self.assertTrue(knowledge.read_root_entries(root)["complete"])
+            self.assertEqual(
+                knowledge.lookup_root(root, **self.PARAMS)["status"], "complete"
+            )
+
+    def test_a_symlinked_entry_candidate_is_an_incomplete_listing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            outside = Path(temp) / "outside.md"
+            outside.write_text("# outside", encoding="utf-8")
+            other = make_entry("project:b", "b")
+            name = f"{other['entry_ref']}.md"
+            self.link(root / name, outside)
+            scan = knowledge.scan_knowledge_root(root)
+            self.assertFalse(scan["complete"])
+            self.assertEqual(scan["unresolved"], [f"{name}:entry_is_symlink"])
+            # the link is never followed: it is not listed as an entry path
+            self.assertNotIn(name, [Path(p).name for p in scan["entry_paths"]])
+            self.assertEqual(outside.read_text(encoding="utf-8"), "# outside")
+
+    def test_dangling_symlink_and_in_root_target_are_both_incomplete(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            dangling = f"{make_entry('project:b', 'b')['entry_ref']}.md"
+            self.link(root / dangling, Path(temp) / "missing-target.md")
+            scan = knowledge.scan_knowledge_root(root)
+            self.assertFalse(scan["complete"])
+            self.assertEqual(scan["unresolved"], [f"{dangling}:entry_is_symlink"])
+            (root / dangling).unlink()
+            alias = f"{make_entry('project:c', 'c')['entry_ref']}.md"
+            self.link(root / alias, root / f"{entry['entry_ref']}.md")
+            scan = knowledge.scan_knowledge_root(root)
+            self.assertFalse(scan["complete"])
+            self.assertEqual(scan["unresolved"], [f"{alias}:entry_is_symlink"])
+
+    def test_mixed_regular_entry_and_symlink_makes_the_lookup_incomplete(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            outside = Path(temp) / "outside.md"
+            outside.write_text("# outside", encoding="utf-8")
+            name = f"{make_entry('project:b', 'b')['entry_ref']}.md"
+            self.link(root / name, outside)
+            snapshot = knowledge.read_root_entries(root)
+            self.assertFalse(snapshot["complete"])
+            self.assertEqual(snapshot["entries"], [])
+            self.assertIn(f"{name}:entry_is_symlink", snapshot["unresolved"])
+            found = knowledge.lookup_root(root, **self.PARAMS)
+            self.assertEqual(found["status"], "incomplete")
+            self.assertEqual(found["entries"], [])
+            self.assertIn(f"{name}:entry_is_symlink", found["unresolved"])
+
+    def test_non_entry_symlink_name_and_existing_negatives_are_unchanged(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            self.link(root / "latest", root / f"{entry['entry_ref']}.md")
+            self.assertTrue(knowledge.scan_knowledge_root(root)["complete"])
+            (root / "latest").unlink()
+            (root / "notes.md").write_text("# stray", encoding="utf-8")
+            self.assertEqual(
+                knowledge.lookup_root(root, **self.PARAMS)["status"], "incomplete"
+            )
+            (root / "notes.md").unlink()
+            self.assertTrue(knowledge.scan_knowledge_root(root)["complete"])
+            self.assertFalse(
+                knowledge.scan_knowledge_root(root, max_entries=0)["complete"]
+            )
+
+    def test_scan_does_not_write_through_or_outside_the_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, entry = self.make_root(temp)
+            outside = Path(temp) / "outside.md"
+            outside.write_text("# outside", encoding="utf-8")
+            before = sorted(p.name for p in Path(temp).iterdir())
+            name = f"{make_entry('project:b', 'b')['entry_ref']}.md"
+            self.link(root / name, outside)
+            knowledge.lookup_root(root, **self.PARAMS)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "# outside")
+            self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), before)
+
+
+class KnowledgeCurrentDependencyRevisionTests(unittest.TestCase):
+    STORED = [{"ref": "config:a", "revision": "r1"}]
+
+    def test_only_a_valid_different_revision_is_stale(self):
+        table = [
+            ("r1", "current"),
+            ("r2", "stale"),
+            (None, "unresolved"),
+            ("", "unresolved"),
+            ([], "unresolved"),
+            ({"revision": "r2"}, "unresolved"),
+            (5, "unresolved"),
+            (True, "unresolved"),
+        ]
+        for value, expected in table:
+            with self.subTest(current=value):
+                result = knowledge.compare_currentness(self.STORED, {"config:a": value})
+                self.assertEqual(result["status"], expected)
+                if expected == "unresolved":
+                    self.assertEqual(result["changed_refs"], [])
+                    self.assertEqual(result["unresolved"], ["config:a"])
+                if expected == "stale":
+                    self.assertEqual(result["changed_refs"], ["config:a"])
+                    self.assertEqual(result["unresolved"], [])
+
+    def test_a_ref_missing_from_the_snapshot_is_unresolved(self):
+        result = knowledge.compare_currentness(self.STORED, {"config:other": "r1"})
+        self.assertEqual(result["status"], "unresolved")
+        self.assertEqual(result["unresolved"], ["config:a"])
+
+    def test_one_unknown_dependency_keeps_the_unresolved_priority(self):
+        stored = [
+            {"ref": "config:a", "revision": "r1"},
+            {"ref": "config:b", "revision": "r1"},
+        ]
+        for unknown in (None, "", [], {"revision": "r1"}):
+            with self.subTest(unknown=unknown):
+                result = knowledge.compare_currentness(
+                    stored, {"config:a": "r2", "config:b": unknown}
+                )
+                self.assertEqual(result["status"], "unresolved")
+                self.assertEqual(result["unresolved"], ["config:b"])
+                self.assertEqual(result["changed_refs"], ["config:a"])
+
+    def test_validate_entry_does_not_report_unknown_revision_as_stale(self):
+        entry = with_revision(make_entry())
+        for value in (None, "", [], {"revision": "r2"}):
+            with self.subTest(current=value):
+                currentness = knowledge.validate_entry(
+                    entry,
+                    current_dependencies={"config:a": value},
+                    entry_revision="sha256:stored",
+                )["currentness"]
+                self.assertEqual(currentness["status"], "unresolved")
+        stale = knowledge.validate_entry(
+            entry,
+            current_dependencies={"config:a": "r2"},
+            entry_revision="sha256:stored",
+        )["currentness"]
+        self.assertEqual(stale["status"], "stale")
+
+    def test_lookup_never_returns_an_entry_with_an_unknown_revision(self):
+        entry = with_revision(make_entry())
+        ok = search([entry])
+        self.assertEqual(ok["status"], "complete")
+        self.assertEqual(
+            [item["entry_ref"] for item in ok["entries"]], [entry["entry_ref"]]
+        )
+        for value in (None, "", [], {"revision": "r2"}, 5):
+            with self.subTest(current=value):
+                result = search([entry], dependencies={"config:a": value})
+                self.assertEqual(result["status"], "incomplete")
+                self.assertEqual(result["entries"], [])
+                self.assertIn(
+                    f"{entry['entry_ref']}:currentness_unresolved",
+                    result["unresolved"],
+                )
+        changed = search([entry], dependencies={"config:a": "r2"})
+        self.assertEqual(changed["status"], "complete")
+        self.assertEqual(changed["entries"], [])
+        self.assertEqual(changed["historical_excluded_refs"], [entry["entry_ref"]])
+
+    def test_lookup_of_an_unrelated_entry_ignores_its_unknown_revision(self):
+        other = with_revision(make_entry("project:b", "b", dependency="config:b"))
+        result = search([other], dependencies={"config:b": None})
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(
+            result["out_of_scope_diagnostics"],
+            [f"{other['entry_ref']}:currentness_unresolved_not_applicable"],
+        )
+
+    def test_revalidation_separates_unknown_from_changed(self):
+        changed = with_revision(make_entry("project:a", "c", dependency="config:a"))
+        unknown = with_revision(make_entry("project:a", "u", dependency="config:b"))
+        same = with_revision(make_entry("project:a", "s", dependency="config:c"))
+        snapshot = {"config:a": "r2", "config:b": None, "config:c": "r1"}
+        plan = knowledge.plan_revalidation(
+            [changed, unknown, same], current_dependencies=snapshot
+        )
+        self.assertEqual(plan["status"], "complete")
+        reasons = {t["entry_ref"]: t for t in plan["targets"]}
+        self.assertEqual(reasons[changed["entry_ref"]]["reason"], "dependency_changed")
+        self.assertEqual(reasons[changed["entry_ref"]]["unresolved"], [])
+        self.assertEqual(
+            reasons[unknown["entry_ref"]]["reason"], "dependency_unresolved"
+        )
+        self.assertEqual(reasons[unknown["entry_ref"]]["changed_refs"], [])
+        self.assertEqual(reasons[unknown["entry_ref"]]["unresolved"], ["config:b"])
+        self.assertEqual(plan["unaffected_refs"], [same["entry_ref"]])
+
+    def test_lookup_and_revalidation_agree_on_a_partly_unknown_entry(self):
+        identity = {
+            "kind": "test_environment",
+            "scope_refs": ["project:a"],
+            "subject": "multi",
+        }
+        entry = with_revision(
+            make_entry(
+                "project:a",
+                "multi",
+                identity=identity,
+                entry_ref=knowledge.canonical_entry_ref(identity),
+                currentness_dependencies=[
+                    {"ref": "config:a", "revision": "r1"},
+                    {"ref": "config:b", "revision": "r1"},
+                ],
+            )
+        )
+        snapshot = {"config:a": "r2", "config:b": None}
+        lookup = search([entry], dependencies=snapshot)
+        self.assertEqual(lookup["status"], "incomplete")
+        plan = knowledge.plan_revalidation([entry], current_dependencies=snapshot)
+        (target,) = plan["targets"]
+        self.assertEqual(target["reason"], "dependency_unresolved")
+        self.assertEqual(target["unresolved"], ["config:b"])
+        self.assertEqual(target["changed_refs"], ["config:a"])
+
+    def test_hand_off_state_blocks_an_unknown_revision_instead_of_stale(self):
+        entry = with_revision(make_entry())
+        for value in (None, "", [], {"revision": "r2"}):
+            with self.subTest(current=value):
+                reference = knowledge.improvement_reference(
+                    entry, current_dependencies={"config:a": value}
+                )["reference"]
+                self.assertEqual(reference["state"], "blocked")
+                self.assertEqual(
+                    reference["resume"]["action"], "obtain_dependency_revisions"
+                )
+                self.assertEqual(reference["unresolved"], ["config:a"])
+        stale = knowledge.improvement_reference(
+            entry, current_dependencies={"config:a": "r2"}
+        )["reference"]
+        self.assertEqual(stale["state"], "stale")
 
 
 if __name__ == "__main__":

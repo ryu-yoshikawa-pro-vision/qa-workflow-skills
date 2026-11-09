@@ -90,12 +90,18 @@ def scan_knowledge_root(
 ) -> dict[str, Any]:
     path = Path(root)
     entries: list[Path] = []
+    links: list[str] = []
     try:
         with os.scandir(path) as listing:
             for item in listing:
-                if item.is_file(follow_symlinks=False) and item.name.lower().endswith(
-                    ".md"
-                ):
+                if not item.name.lower().endswith(".md"):
+                    continue
+                if item.is_symlink():
+                    # An entry candidate that is a link (dangling, inside or outside
+                    # the root) is never followed or tracked; the entry it would
+                    # stand for was not read, so the listing is incomplete.
+                    links.append(f"{item.name}:entry_is_symlink")
+                elif item.is_file(follow_symlinks=False):
                     entries.append(Path(item.path))
     except OSError as exc:
         return {
@@ -107,10 +113,13 @@ def scan_knowledge_root(
     truncated = max_entries is not None and len(entries) > max_entries
     if truncated:
         entries = entries[:max_entries]
+    unresolved = sorted(links)
+    if truncated:
+        unresolved.append("root_listing_truncated")
     return {
         "entry_paths": [str(item) for item in entries],
-        "complete": not truncated,
-        "unresolved": ["root_listing_truncated"] if truncated else [],
+        "complete": not unresolved,
+        "unresolved": unresolved,
     }
 
 
@@ -239,9 +248,12 @@ def compare_currentness(
             unresolved.append("invalid_dependency_record")
             continue
         ref = dependency["ref"]
-        if ref not in current_dependencies:
+        current = current_dependencies.get(ref)
+        if not isinstance(current, str) or not current:
+            # No valid current revision (missing, null, empty, array, object, ...):
+            # nothing shows the source changed, so it is unresolved, never stale.
             unresolved.append(ref)
-        elif current_dependencies[ref] != dependency["revision"]:
+        elif current != dependency["revision"]:
             changed.append(ref)
     if unresolved:
         status = "unresolved"

@@ -179,6 +179,10 @@ def _is_ref(value: Any) -> bool:
     return isinstance(value, str) and bool(value)
 
 
+def _ref_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(_is_ref(v) for v in value)
+
+
 def validate_session(session: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(session, dict):
         return {"valid": False, "issues": ["session_must_be_object"]}
@@ -243,10 +247,12 @@ def validate_session(session: dict[str, Any]) -> dict[str, Any]:
             issues.append(
                 f"finding_source_observation_unresolved:{finding.get('finding_ref')}"
             )
+        # evidence_refs must be a list of refs and recommended_routing a string, so a
+        # JSON array / object / number is an issue here instead of failing later.
         if (
-            not finding.get("evidence_refs")
+            not _ref_list(finding.get("evidence_refs"))
             or not finding.get("follow_up_reason")
-            or not finding.get("recommended_routing")
+            or not _is_ref(finding.get("recommended_routing"))
         ):
             issues.append(
                 f"finding_missing_evidence_or_reason:{finding.get('finding_ref')}"
@@ -438,13 +444,15 @@ def source_revision_refs(session: dict[str, Any]) -> list[dict[str, Any]]:
     A Charter source is a ref string or an object with "ref" and "revision".
     A string ref takes its revision from the Session's optional
     "source_revisions" map. A source without a revision keeps revision None; the
-    revision is never guessed or taken from the Session revision.
+    revision is never guessed or taken from the Session revision. A Charter whose
+    "source_refs" is not a list has no usable source set: it returns [] (see
+    source_set_problem()).
     """
     revisions = session.get("source_revisions")
     revisions = revisions if isinstance(revisions, dict) else {}
-    declared = session["charter"].get("source_refs", [])
+    declared = session["charter"].get("source_refs")
     if not isinstance(declared, list):
-        declared = [declared]
+        return []
     sources = []
     for item in declared:
         if isinstance(item, dict):
@@ -460,6 +468,22 @@ def source_revision_refs(session: dict[str, Any]) -> list[dict[str, Any]]:
             revision = None
         sources.append({"ref": ref, "revision": revision})
     return sources
+
+
+def source_set_problem(session: dict[str, Any]) -> str | None:
+    """Tell why the Charter has no source set to hand off, or None when it has one.
+
+    ``source_refs_missing``: absent, null, empty string or empty list (nothing to
+    re-read). ``source_refs_invalid``: present but not a list. Starting an
+    exploration does not need a source; a hand-off to another owner does, because
+    the owner must re-read what the Finding was derived from.
+    """
+    declared = session["charter"].get("source_refs")
+    if isinstance(declared, list):
+        return None if declared else "source_refs_missing"
+    if declared is None or declared == "":
+        return "source_refs_missing"
+    return "source_refs_invalid"
 
 
 def build_follow_up_handoff(
@@ -492,8 +516,11 @@ def build_follow_up_handoff(
     if finding is None:
         return {"status": "blocked", "reason": "finding_not_in_session"}
     owner = finding.get("recommended_routing")
-    if owner not in FOLLOW_UP_ACTIONS:
+    if not isinstance(owner, str) or owner not in FOLLOW_UP_ACTIONS:
         return {"status": "blocked", "reason": "unknown_follow_up_owner"}
+    evidence = finding.get("evidence_refs")
+    if not _ref_list(evidence) or not _ref_list(finding.get("source_observation_refs")):
+        return {"status": "blocked", "reason": "finding_refs_invalid"}
     session_unresolved = session.get("unresolved", [])
     finding_unresolved = finding.get("unresolved", [])
     if not isinstance(session_unresolved, list) or not isinstance(
@@ -502,12 +529,19 @@ def build_follow_up_handoff(
         return {"status": "blocked", "reason": "unresolved_must_be_list"}
     unresolved = [item for item in (*session_unresolved, *finding_unresolved) if item]
     sources = source_revision_refs(session)
+    source_problem = source_set_problem(session)
     unresolved_sources = [item["ref"] for item in sources if item["revision"] is None]
     if owner == "defect-management" and unresolved:
         return {
             "status": "blocked",
             "reason": "unresolved_finding_not_defect_candidate",
             "next": "owner_resolution_or_investigation",
+        }
+    if owner == "defect-management" and source_problem:
+        return {
+            "status": "blocked",
+            "reason": source_problem,
+            "next": "record_source_refs",
         }
     if owner == "defect-management" and unresolved_sources:
         return {
@@ -516,6 +550,8 @@ def build_follow_up_handoff(
             "unresolved": unresolved_sources,
             "next": "record_source_revisions",
         }
+    if source_problem:
+        unresolved.append(source_problem)
     unresolved.extend(f"source_revision_unresolved:{ref}" for ref in unresolved_sources)
     if session.get("state") in {"ブロック中", "部分完了（ブロック中あり）"}:
         state = "blocked"
@@ -523,6 +559,13 @@ def build_follow_up_handoff(
             "owner_skill": "exploratory-testing",
             "action": "resume_session",
             "condition": "same charter, scope, permitted range and environment",
+        }
+    elif source_problem:
+        state = "blocked"
+        resume = {
+            "owner_skill": "exploratory-testing",
+            "action": "record_source_refs",
+            "condition": "record the Charter source refs and their revisions",
         }
     elif unresolved_sources:
         state = "blocked"
@@ -567,7 +610,7 @@ def build_follow_up_handoff(
             "charter_snapshot_identity": session.get("charter_snapshot_identity"),
             "finding_ref": finding_ref,
             "source_observation_refs": list(finding["source_observation_refs"]),
-            "evidence_refs": list(finding["evidence_refs"]),
+            "evidence_refs": list(evidence),
             "source_refs": sources,
             "follow_up_reason": finding["follow_up_reason"],
             "unresolved": unresolved,
