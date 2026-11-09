@@ -54,6 +54,8 @@ class ActualRunnerTests(unittest.TestCase):
                 "permissions_verified": True,
                 "side_effects": [],
                 "isolated_environment": True,
+                "external_side_effects": False,
+                "shared_resource": False,
             },
         }
 
@@ -168,6 +170,8 @@ class ActualRunnerTests(unittest.TestCase):
             {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
         ]
         plan["selection_verified"] = True
+        plan["selection_evidence_ref"] = "fixture:selection"
+        plan["planned_scope_ref"] = "fixture:planned-scope"
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 0)
         reconciliation = artifact["attempts"][0]["reconciliation"]
@@ -198,6 +202,8 @@ class ActualRunnerTests(unittest.TestCase):
             {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
         ]
         plan["selection_verified"] = True
+        plan["selection_evidence_ref"] = "fixture:selection"
+        plan["planned_scope_ref"] = "fixture:planned-scope"
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "incomplete")
@@ -304,6 +310,67 @@ class ActualRunnerTests(unittest.TestCase):
             artifact["attempts"][0]["workspace_state_after_cleanup"], "dirty"
         )
         self.assertTrue((self.repo / "unexpected.tmp").exists())
+
+    def test_run_rejects_clean_workspace_with_changed_head(self):
+        script = (
+            "import pathlib,subprocess;"
+            "pathlib.Path('README.md').write_text('changed\\n');"
+            "subprocess.run(['git','add','README.md'],check=True);"
+            "subprocess.run(['git','commit','-qm','tamper'],check=True)"
+        )
+        plan = self.plan([sys.executable, "-c", script])
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "blocked_revision_changed")
+        self.assertEqual(
+            artifact["attempts"][0]["workspace_state_after_cleanup"], "clean"
+        )
+        self.assertNotEqual(
+            artifact["attempts"][0]["workspace_head_after_cleanup"], self.sha
+        )
+
+    def test_nonfunctional_without_threshold_rejected(self):
+        plan = self.plan([sys.executable, "-c", "print('ok')"], kind="nonfunctional")
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "missing_nonfunctional_criteria")
+        self.assertIsNone(artifact)
+
+    def test_static_requires_rule_and_tool_evidence(self):
+        plan = self.plan([sys.executable, "-c", "print('ok')"], kind="static")
+        code, summary, _ = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "static_analysis_contract_required")
+        plan["static_analysis"] = {
+            "tool_ref": "fixture",
+            "tool_version": "0.1",
+            "rules_ref": "fixture-rule",
+            "config_ref": "fixture-config",
+            "expected_paths": ["README.md"],
+        }
+        plan["argv"] = [
+            sys.executable,
+            "-c",
+            "print('{\\\"findings_count\\\":0,\\\"analyzed_paths\\\":[\\\"README.md\\\"],\\\"skipped_paths\\\":[]}')",
+        ]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertEqual(artifact["outcome"], "runner_pass")
+        self.assertTrue(artifact["attempts"][0]["static_analysis"]["complete"])
+        plan["argv"] = [sys.executable, "-c", "print('{}')"]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+
+    def test_preflight_flags_must_be_explicit(self):
+        plan = self.plan([sys.executable, "-c", "print('ok')"])
+        del plan["preflight"]["external_side_effects"]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "preflight_external_side_effects_unverified")
+        self.assertIsNone(artifact)
 
 
 if __name__ == "__main__":
