@@ -588,6 +588,14 @@ class ArtifactStoreTests(unittest.TestCase):
                     and decision["supersedes_id"] == "DIF-001"
                     and decision["old_classification"] == "impact"
                     and decision["classification"] == "no_impact"
+                    and decision["old_feature_ids"] == ["FEAT-001"]
+                    and decision["feature_ids"] == []
+                    and decision["source_id"] == "SRC-001"
+                    and decision["source_ref"] == "specification/checkout"
+                    and decision["source_scope"] == "src"
+                    and decision["before_revision"] == "head-old"
+                    and decision["source_revision"] == "head-v1"
+                    and decision["locator"] == "src/auth.py"
                 )
             return normal_authorize(decision)
 
@@ -612,6 +620,27 @@ class ArtifactStoreTests(unittest.TestCase):
             first["revision"],
         )
         override["approval_revision"] = "policy-approved-v2"
+        override["feature_ids"] = ["FEAT-001"]
+        wrong_scope = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="unapproved feature scope",
+        )
+        self.assertEqual(wrong_scope["status"], "blocked", wrong_scope)
+        self.assertIn(
+            "change_reclassification_approval_unverified:DIF-002",
+            wrong_scope["reasons"],
+        )
+        self.assertEqual(
+            self.store.read_current("feature-inventory", "Sample", "feature-artifact")[
+                "revision"
+            ],
+            first["revision"],
+        )
+        override["feature_ids"] = []
         approved = persist_snapshot(
             self.store,
             request,
