@@ -25,6 +25,7 @@ from contract import (
     compare_metrics,
     preflight,
     reconcile_vitest,
+    diagnosis,
 )
 
 KINDS = {
@@ -161,6 +162,16 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     # an authenticated effect-counting provider exists, refuse declared effects.
     if scope["side_effects"]:
         raise RunnerError("side_effect_limits_unenforceable")
+    # Invalid diagnostic metadata must never discard evidence from a launched
+    # process. Validate it before any side effect or artifact allocation.
+    diagnostic = (
+        diagnosis(
+            run_ref=scope["operation_ref"],
+            hypotheses=plan["diagnosis_hypotheses"],
+        )
+        if "diagnosis_hypotheses" in plan
+        else None
+    )
     repo_path = plan.get("repo_path")
     if not isinstance(repo_path, str) or not Path(repo_path).is_absolute():
         raise RunnerError("absolute_repo_path_required")
@@ -261,10 +272,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         raise RunnerError("invalid_attempt_count")
     if scope.get("side_effects") and attempts > 1:
         raise RunnerError("effect_retry_requires_state_readback")
+    # Reject a forbidden destination *before* creating anything. This check
+    # also resolves an existing symlink ancestor of a not-yet-created path.
     root = artifacts_root.resolve()
-    root.mkdir(parents=True, exist_ok=True)
     if repo == root or repo in root.parents or root in repo.parents:
         raise RunnerError("artifacts_must_be_outside_repo")
+    root.mkdir(parents=True, exist_ok=True)
+    if root.resolve() != root:
+        raise RunnerError("artifacts_root_changed")
     folder = Path(tempfile.mkdtemp(prefix="non-e2e-", dir=root))
     records: list[dict[str, Any]] = []
     workspace_changed_before_retry = False
@@ -508,13 +523,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
     }
-    if "diagnosis_hypotheses" in plan:
-        from contract import diagnosis
-
-        result["diagnosis"] = diagnosis(
-            run_ref=scope["operation_ref"],
-            hypotheses=plan["diagnosis_hypotheses"],
-        )
+    if diagnostic is not None:
+        result["diagnosis"] = diagnostic
     if result["direct_observation_verdict"] == "FAIL" and outcome == "runner_pass":
         result["outcome"] = "observed_FAIL"
     elif (
