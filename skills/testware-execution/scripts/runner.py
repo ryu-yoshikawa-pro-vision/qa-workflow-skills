@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from contract import ContractError, preflight, reconcile_vitest
+from contract import ContractError, compare_direct, preflight, reconcile_vitest
 
 KINDS = {
     "vitest",
@@ -171,6 +171,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             raise RunnerError("cleanup_not_reviewed")
     if scope.get("side_effects") and cleanup is None:
         raise RunnerError("effect_cleanup_required")
+    direct_expectations = plan.get("direct_expectations")
+    if direct_expectations is not None:
+        if kind == "vitest" or not isinstance(direct_expectations, list) or not direct_expectations:
+            raise RunnerError("invalid_direct_expectations")
+        # Validate the complete expectation contract before the first operation.
+        compare_direct(
+            started=False, expectations=direct_expectations, observations={}
+        )
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -224,6 +232,25 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     )
                 except (ValueError, ContractError, UnicodeError):
                     run["result_collection"] = "invalid"
+        if direct_expectations is not None:
+            observations: dict[str, Any] = {}
+            if run["started"] and run["return_code"] is not None:
+                observations["exit_code"] = run["return_code"]
+                # Parsing is bounded: malformed, non-UTF8 or excessive output
+                # remains unobserved, never an implicit PASS.
+                stdout = attempt / "stdout.log"
+                if stdout.stat().st_size <= 1_048_576:
+                    try:
+                        content = stdout.read_text(encoding="utf-8")
+                        observations["stdout_text"] = content
+                        observations["stdout_json"] = json.loads(content)
+                    except (UnicodeError, ValueError):
+                        pass
+            run["direct_comparison"] = compare_direct(
+                started=run["started"],
+                expectations=direct_expectations,
+                observations=observations,
+            )
         if cleanup is not None and run["started"]:
             clean = _run_command(
                 cleanup,
@@ -247,6 +274,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             or run["timeout"]
             or scope.get("side_effects")
         ):
+            break
+        if direct_expectations is not None and run["direct_comparison"]["result"] != "PASS":
             break
         if run["return_code"] == 0 and run["result_collection"] in {
             "complete",
@@ -274,10 +303,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "artifact_directory": str(folder),
         "attempts": records,
         "outcome": outcome,
-        "tc_verdict": None,
+        "tc_verdict": last.get("direct_comparison", {}).get("result"),
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
     }
+    if result["tc_verdict"] == "FAIL" and outcome == "runner_pass":
+        result["outcome"] = "observed_FAIL"
+    elif result["tc_verdict"] == "判定不能" and outcome == "runner_pass":
+        result["outcome"] = "observations_incomplete"
     _write_json(folder / "manifest.json", result)
     return result
 
