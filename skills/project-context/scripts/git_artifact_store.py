@@ -56,6 +56,8 @@ class GitArtifactStore:
         if not callable(authorize):
             raise StoreError("trusted_authorizer_required")
         self.authorize = authorize
+        # Git ref transactions must not invoke hooks from a source repository.
+        self._empty_hooks = tempfile.TemporaryDirectory(prefix="qa-git-no-hooks-")
         self.branch = _name(branch, "branch")
         if not BRANCH.fullmatch(self.branch):
             raise StoreError("branch_invalid")
@@ -92,7 +94,16 @@ class GitArtifactStore:
         env["GIT_COMMITTER_EMAIL"] = self.author_email
         try:
             completed = subprocess.run(
-                ["git", "-C", str(self.root), *args],
+                [
+                    "git",
+                    "-c",
+                    "core.hooksPath=" + self._empty_hooks.name,
+                    "-c",
+                    "core.fsmonitor=false",
+                    "-C",
+                    str(self.root),
+                    *args,
+                ],
                 input=content,
                 capture_output=True,
                 check=False,

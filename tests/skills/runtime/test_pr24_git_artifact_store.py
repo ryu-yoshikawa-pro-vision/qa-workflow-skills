@@ -217,6 +217,17 @@ class GitArtifactStoreTests(unittest.TestCase):
             "git:" + git(self.root, "rev-parse", "qa-artifacts"),
         )
 
+    def test_untrusted_reference_transaction_hook_is_not_executed(self) -> None:
+        hook = self.root / ".git" / "hooks" / "reference-transaction"
+        marker = self.root / "unsafe-hook-executed"
+        hook.write_text(
+            "#!/bin/sh\nprintf executed > " + str(marker) + "\n",
+            encoding="utf-8",
+        )
+        hook.chmod(0o700)
+        self.assertEqual(self.write()["status"], "stored")
+        self.assertFalse(marker.exists())
+
     def test_git_metadata_outside_authorized_root_is_rejected(self) -> None:
         worktree = self.root / "isolated-checkout"
         metadata = self.root / "external-gitdir"
