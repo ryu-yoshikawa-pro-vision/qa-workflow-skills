@@ -537,9 +537,28 @@ class ArtifactStoreTests(unittest.TestCase):
             current["content"],
         )
 
+    def test_code_inventory_without_git_evidence_cannot_be_stored(self) -> None:
+        request = fixture()
+        request["snapshot"]["project_ref"] = "Sample"
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="unverified code inventory",
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn("git_coverage_required", result["reasons"])
+        self.assertIsNone(
+            self.store.read_current("feature-inventory", "Sample", "feature-artifact")
+        )
+
     def test_feature_inventory_snapshot_requires_saved_predecessor(self) -> None:
         request = fixture()
         request["snapshot"]["project_ref"] = "Sample"
+        request["snapshot"]["sources"][0]["kind"] = "spec"
+        request["snapshot"]["sources"][0]["ref"] = "docs/specification"
         first = persist_snapshot(
             self.store,
             request,

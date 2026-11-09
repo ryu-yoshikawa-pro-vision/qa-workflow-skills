@@ -608,6 +608,90 @@ def analyze(request: Any) -> dict[str, Any]:
     }
 
 
+def _verify_git_evidence(
+    request: dict[str, Any],
+    report: dict[str, Any],
+    inputs: list[dict[str, Any]] | None,
+) -> None:
+    """Reread the authorized Git tree before accepting a code-backed write.
+
+    Paths in these requests must be chosen by the trusted caller, not the
+    feature inventory or an untrusted PR description.
+    """
+    snapshot = request["snapshot"]
+    code_sources = {
+        row["id"]: row
+        for row in snapshot["sources"]
+        if row.get("kind") == "code"
+    }
+    if not code_sources:
+        if inputs is not None:
+            raise ContractError("git_evidence_without_code_source")
+        return
+    if not isinstance(inputs, list) or len(inputs) != len(code_sources):
+        raise ContractError("git_coverage_required")
+    from git_source_inventory import handle as read_git  # noqa: PLC0415
+    from reconcile_git_coverage import handle as reconcile  # noqa: PLC0415
+
+    verified: set[str] = set()
+    for entry in inputs:
+        keys = {
+            "source_id",
+            "repository_root",
+            "authorized_root",
+            "base_sha",
+            "head_sha",
+        }
+        optional = {"previous_head_base_sha"}
+        if not isinstance(entry, dict) or not keys <= set(entry) or not set(
+            entry
+        ) <= keys | optional:
+            raise ContractError("git_evidence_schema_invalid")
+        sid = entry["source_id"]
+        if sid not in code_sources or sid in verified:
+            raise ContractError("git_source_evidence_duplicate_or_unknown")
+        verified.add(sid)
+        if sid not in snapshot["expected_source_ids"]:
+            raise ContractError("git_source_not_in_expected_inventory")
+        if (
+            code_sources[sid]["status"] != "complete"
+            or entry["head_sha"] != code_sources[sid]["revision"]
+            or entry["head_sha"] != snapshot["source_revision"]
+        ):
+            raise ContractError("git_evidence_source_revision_mismatch")
+        tree_request = {key: entry[key] for key in keys if key != "source_id"}
+        tree = read_git(tree_request)
+        if tree["status"] != "complete":
+            raise ContractError("git_source_listing_incomplete")
+        if entry["base_sha"] is None:
+            if any(row["source_id"] == sid for row in snapshot["changes"]):
+                raise ContractError("git_change_diff_not_enumerated")
+            if snapshot["event"] in {"pr_update", "rebase"}:
+                raise ContractError("pr_update_git_base_required")
+            continue
+        coverage_request: dict[str, Any] = {
+            "git_inventory": tree,
+            "registry_request": request,
+            "source_id": sid,
+        }
+        if snapshot["event"] in {"pr_update", "rebase"}:
+            previous_head = snapshot["event_basis"]["previous_head_sha"]
+            if entry.get("previous_head_base_sha") != previous_head:
+                raise ContractError("previous_head_git_base_required")
+            previous_request = dict(tree_request)
+            previous_request["base_sha"] = previous_head
+            previous_diff = read_git(previous_request)
+            if previous_diff["status"] != "complete":
+                raise ContractError("previous_head_git_listing_incomplete")
+            coverage_request["previous_head_git_inventory"] = previous_diff
+        elif "previous_head_base_sha" in entry:
+            raise ContractError("previous_head_git_base_unexpected")
+        coverage = reconcile(coverage_request)
+        extra = set(coverage.get("reasons", [])) - set(report.get("reasons", []))
+        if coverage["coverage"] is None or extra:
+            raise ContractError("git_coverage_not_verified:" + ",".join(sorted(extra)))
+
+
 def persist_snapshot(
     store: LocalArtifactStore | GitArtifactStore,
     request: dict[str, Any],
@@ -616,12 +700,14 @@ def persist_snapshot(
     approval_ref: str,
     approval_revision: str,
     change_reason: str,
+    git_inventory_requests: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Persist a validated inventory using the actual saved predecessor."""
+    """Persist a validated inventory using actual saved and Git source revisions."""
     try:
         report = handle(request)
         if report["status"] not in {"complete", "incomplete"}:
             return report
+        _verify_git_evidence(request, report, git_inventory_requests)
         snapshot = request["snapshot"]
         project_ref = snapshot["project_ref"]
         artifact_ref = snapshot["artifact_ref"]
