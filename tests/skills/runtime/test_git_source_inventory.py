@@ -123,6 +123,40 @@ class GitSourceInventoryTests(unittest.TestCase):
             "vendor/submodule", [row["after_path"] for row in report["changes"]]
         )
 
+    def test_deleted_and_replaced_gitlink_revision_is_unretrieved(self) -> None:
+        git(
+            self.root, "update-index", "--add", "--cacheinfo", "160000",
+            self.first, "vendor/submodule",
+        )
+        git(
+            self.root, "-c", "user.email=qa@example.invalid",
+            "-c", "user.name=QA", "commit", "-qm", "add submodule",
+        )
+        base = git(self.root, "rev-parse", "HEAD")
+        git(self.root, "rm", "-q", "--cached", "vendor/submodule")
+        git(
+            self.root, "-c", "user.email=qa@example.invalid",
+            "-c", "user.name=QA", "commit", "-qm", "remove submodule",
+        )
+        removed = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
+        self.assertEqual(removed["status"], "incomplete", removed)
+        self.assertEqual(
+            removed["unretrieved"], [f"gitlink:vendor/submodule@{self.first}"]
+        )
+        self.assertTrue(removed["complete_change_listing"])
+        # A normal file in place of the gitlink also needs the old revision.
+        git(self.root, "reset", "--hard", "-q", base)
+        (self.root / "vendor").mkdir(exist_ok=True)
+        (self.root / "vendor" / "submodule").write_text("ordinary file\n", encoding="utf-8")
+        git(self.root, "add", "vendor/submodule")
+        git(
+            self.root, "-c", "user.email=qa@example.invalid",
+            "-c", "user.name=QA", "commit", "-qm", "replace submodule",
+        )
+        replaced = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
+        self.assertEqual(replaced["status"], "incomplete", replaced)
+        self.assertIn(f"gitlink:vendor/submodule@{self.first}", replaced["unretrieved"])
+
     def test_path_with_newline_is_preserved_as_one_path(self) -> None:
         name = "line\nbreak.txt"
         (self.root / name).write_text("x", encoding="utf-8")
