@@ -348,3 +348,76 @@ def diagnosis(*, run_ref: str, hypotheses: list[dict[str, Any]]) -> dict[str, An
         "original_result_modified": False,
         "defect_confirmed": False,
     }
+
+
+def compare_metrics(
+    *,
+    started: bool,
+    criteria: list[dict[str, Any]],
+    measurements: dict[str, Any],
+    condition_ref: str,
+    authority_ref: str,
+) -> dict[str, Any]:
+    """Evaluate measured numeric quantities only against adopted thresholds."""
+    import math
+
+    _required_str(condition_ref, "measurement_condition")
+    _required_str(authority_ref, "threshold_authority")
+    if type(started) is not bool or not isinstance(criteria, list) or not criteria:
+        raise ContractError("invalid_metric_criteria")
+    if not isinstance(measurements, dict):
+        raise ContractError("invalid_measurements")
+    seen: set[str] = set()
+    results = []
+    for entry in criteria:
+        if not isinstance(entry, dict):
+            raise ContractError("invalid_metric_entry")
+        key = _required_str(entry.get("id"), "metric_id")
+        characteristic = _required_str(entry.get("characteristic"), "characteristic")
+        unit = _required_str(entry.get("unit"), "unit")
+        if key in seen or ("minimum" not in entry and "maximum" not in entry):
+            raise ContractError("invalid_metric_threshold")
+        seen.add(key)
+        for field in ("minimum", "maximum"):
+            if field in entry and (
+                type(entry[field]) not in {int, float}
+                or not math.isfinite(entry[field])
+            ):
+                raise ContractError("invalid_metric_bound")
+        if (
+            "minimum" in entry
+            and "maximum" in entry
+            and entry["minimum"] > entry["maximum"]
+        ):
+            raise ContractError("contradictory_metric_bounds")
+        actual = measurements.get(key) if started else None
+        observed = type(actual) in {int, float} and math.isfinite(actual)
+        matches = (
+            observed
+            and ("minimum" not in entry or actual >= entry["minimum"])
+            and ("maximum" not in entry or actual <= entry["maximum"])
+        )
+        results.append(
+            {
+                "metric_ref": key,
+                "characteristic": characteristic,
+                "unit": unit,
+                "observed": observed,
+                "value": actual if observed else None,
+                "matches": matches if observed else None,
+            }
+        )
+    if not started:
+        verdict = "未実行"
+    elif any(x["matches"] is False for x in results):
+        verdict = "FAIL"
+    elif any(x["matches"] is None for x in results):
+        verdict = "判定不能"
+    else:
+        verdict = "PASS"
+    return {
+        "verdict": verdict,
+        "condition_ref": condition_ref,
+        "authority_ref": authority_ref,
+        "results": results,
+    }
