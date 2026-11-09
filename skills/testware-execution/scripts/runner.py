@@ -337,7 +337,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             env = os.environ.copy()
             env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(reporter)
         run = _run_command(
-            argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit,
+            argv,
+            repo,
+            attempt / "stdout.log",
+            attempt / "stderr.log",
+            limit,
             env=env,
         )
         run.update(
