@@ -173,12 +173,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         raise RunnerError("effect_cleanup_required")
     direct_expectations = plan.get("direct_expectations")
     if direct_expectations is not None:
-        if kind == "vitest" or not isinstance(direct_expectations, list) or not direct_expectations:
+        if (
+            kind == "vitest"
+            or not isinstance(direct_expectations, list)
+            or not direct_expectations
+        ):
             raise RunnerError("invalid_direct_expectations")
         # Validate the complete expectation contract before the first operation.
-        compare_direct(
-            started=False, expectations=direct_expectations, observations={}
-        )
+        compare_direct(started=False, expectations=direct_expectations, observations={})
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -275,7 +277,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             or scope.get("side_effects")
         ):
             break
-        if direct_expectations is not None and run["direct_comparison"]["result"] != "PASS":
+        if (
+            direct_expectations is not None
+            and run["direct_comparison"]["result"] != "PASS"
+        ):
             break
         if run["return_code"] == 0 and run["result_collection"] in {
             "complete",
