@@ -250,12 +250,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         raise RunnerError("artifacts_must_be_outside_repo")
     folder = Path(tempfile.mkdtemp(prefix="non-e2e-", dir=root))
     records: list[dict[str, Any]] = []
+    workspace_changed_before_retry = False
     for number in range(1, attempts + 1):
         # Check again immediately before the launch. This is not a native
         # provider reservation; later changes are detected after cleanup.
         if _git_head(repo) != expected_sha or not _git_clean(repo):
             if not records:
                 raise RunnerError("repo_changed_before_start")
+            workspace_changed_before_retry = True
             break
         attempt = folder / f"attempt-{number}"
         attempt.mkdir(mode=0o700)
@@ -274,7 +276,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 "stdout_ref": str(attempt / "stdout.log"),
                 "stderr_ref": str(attempt / "stderr.log"),
                 "raw_report_ref": None,
-                "result_collection": "not_applicable",
+                "result_collection": "not_provided_by_adapter",
                 "cleanup_state": "not_required" if cleanup is None else "not_started",
             }
         )
@@ -353,10 +355,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             expected_set = set(static_plan["expected_paths"])
             paths_complete = (
                 isinstance(actual, list)
+                and all(isinstance(item, str) for item in actual)
                 and len(actual) == len(set(actual))
                 and set(actual) == expected_set
                 and omitted == []
-            ) if isinstance(actual, list) else False
+                and report_data.get("tool_version") == static_plan["tool_version"]
+                and report_data.get("rules_ref") == static_plan["rules_ref"]
+                and report_data.get("config_ref") == static_plan["config_ref"]
+            )
             finding_count = report_data.get("findings_count")
             if type(finding_count) is not int or finding_count < 0:
                 finding_count = None
@@ -426,12 +432,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             break
         if run["return_code"] == 0 and run["result_collection"] in {
             "complete",
-            "not_applicable",
+            "not_provided_by_adapter",
         }:
             break
     outcome = "unknown"
     last = records[-1]
-    if last["workspace_head_after_cleanup"] != expected_sha:
+    if workspace_changed_before_retry or last["workspace_head_after_cleanup"] != expected_sha:
         outcome = "blocked_revision_changed"
     elif last["workspace_state_after_cleanup"] != "clean":
         outcome = "blocked_workspace_not_restored"
@@ -463,7 +469,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "planned_scope_ref": plan.get("planned_scope_ref"),
         "selection_evidence_ref": plan.get("selection_evidence_ref"),
         "selection_filter": plan.get("selection_filter"),
-        "selection_verified_by_runner": False,
+        "selection_evidence_is_caller_declared": bool(plan.get("selection_verified")),
+        "declared_selection_matched_report": False,
         "declared_selected": plan.get("selected", []),
         "run_ref": scope["operation_ref"],
         "artifact_directory": str(folder),
@@ -486,7 +493,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     elif result["tc_verdict"] == "判定不能" and outcome == "runner_pass":
         result["outcome"] = "observations_incomplete"
     if kind == "vitest":
-        result["selection_verified_by_runner"] = bool(
+        result["declared_selection_matched_report"] = bool(
             last.get("reconciliation", {}).get("collection_complete")
         )
     if result["quality_verdict"] == "FAIL" and result["outcome"] == "runner_pass":
