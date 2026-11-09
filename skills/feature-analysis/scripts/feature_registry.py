@@ -381,9 +381,7 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
         if event in {"pr_update", "rebase", "merge"}:
             if previous.get("source_revision") != basis["previous_head_sha"]:
                 raise ContractError("event_previous_head_mismatch")
-        code_sources = [
-            row for row in snapshot["sources"] if row.get("kind") == "code"
-        ]
+        code_sources = [row for row in snapshot["sources"] if row.get("kind") == "code"]
         if not code_sources or not all(
             row.get("revision") == head for row in code_sources
         ):

@@ -317,23 +317,36 @@ class FeatureRegistryTests(unittest.TestCase):
         for event, basis in (
             (
                 "pr_update",
-                {"base_sha": "c" * 40, "head_sha": new_sha,
-                 "previous_head_sha": old_sha},
+                {
+                    "base_sha": "c" * 40,
+                    "head_sha": new_sha,
+                    "previous_head_sha": old_sha,
+                },
             ),
             (
                 "rebase",
-                {"base_sha": "c" * 40, "head_sha": new_sha,
-                 "previous_head_sha": old_sha, "previous_base_sha": "d" * 40},
+                {
+                    "base_sha": "c" * 40,
+                    "head_sha": new_sha,
+                    "previous_head_sha": old_sha,
+                    "previous_base_sha": "d" * 40,
+                },
             ),
             (
                 "merge",
-                {"merge_commit_sha": new_sha, "target_ref": "refs/heads/main",
-                 "previous_head_sha": old_sha},
+                {
+                    "merge_commit_sha": new_sha,
+                    "target_ref": "refs/heads/main",
+                    "previous_head_sha": old_sha,
+                },
             ),
             (
                 "release",
-                {"commit_sha": new_sha, "build_ref": "release/2",
-                 "target_ref": "refs/tags/v2"},
+                {
+                    "commit_sha": new_sha,
+                    "build_ref": "release/2",
+                    "target_ref": "refs/tags/v2",
+                },
             ),
         ):
             with self.subTest(event=event):
@@ -350,8 +363,9 @@ class FeatureRegistryTests(unittest.TestCase):
                 snap["artifact_revision"] = "art-v2"
                 snap["previous_artifact_revision"] = "art-v1"
                 snap["operation_id"] = "op-v2"
-                snap["changes"][0].update(id="DIF-002", before_revision=old_sha,
-                                           after_revision=new_sha)
+                snap["changes"][0].update(
+                    id="DIF-002", before_revision=old_sha, after_revision=new_sha
+                )
                 data["observed_head_revision"] = new_sha
                 self.assertEqual(handle(data)["status"], "complete", data)
                 del snap["event_basis"]
@@ -380,8 +394,9 @@ class FeatureRegistryTests(unittest.TestCase):
         snap["artifact_revision"] = "art-v2"
         snap["previous_artifact_revision"] = "art-v1"
         snap["operation_id"] = "op-v2"
-        snap["changes"][0].update(id="DIF-002", before_revision="doc-v1",
-                                   after_revision="doc-v2")
+        snap["changes"][0].update(
+            id="DIF-002", before_revision="doc-v1", after_revision="doc-v2"
+        )
         data["observed_head_revision"] = "event-v2"
         self.assertEqual(handle(data)["status"], "complete", data)
         snap["event_basis"]["after_revision"] = "doc-v3"
