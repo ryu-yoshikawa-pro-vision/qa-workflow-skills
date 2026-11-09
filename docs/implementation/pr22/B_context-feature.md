@@ -179,3 +179,17 @@
 
 - `project-context discover`でreadable候補の16節とstable keyだけでなく、DEC/ASMテーブルとID構造も確認する。破損候補を既存の有効正本として自動採用しない。
 - `feature_registry`でsource/candidate/changeの既存IDを別の対象へ再利用する変更を拒否する。新artifact revisionで同じIDの意味を変える操作は履歴の整合性を損なうためblockedとする。
+
+## 担当Bの実装完了記録（2026-11-09）
+
+利用者の指示により、対象は**コード実装と自動テストのみ**とし、実案件のprovider・承認サービス・実Agent・実製品CIへの接続検証は実施しない。前節までの実環境検証を担当Bの完了必須条件とする記述は、この指示で更新された。旧コミットに対するCIの失敗は当時の履歴として保持し、以下の最新結果を現在の判定とする。
+
+- 担当Bの最終コード変更：[コミット `1835fed2e4d19e338d335cdca1d96922c543f4a1`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/1835fed2e4d19e338d335cdca1d96922c543f4a1)。既存正本候補のDEC/ASM構造検証、source／候補／差分IDの意味上の再利用拒否、4つのfeature用stable keyの更新・再読込まで担当Bの回帰テストを追加した。
+- [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42540774400)：SUCCESS。
+- [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42540774457)：SUCCESS。
+- [Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42540774484)：SUCCESS。共有12件、決定論的292件、runtime／結合543件、意味評価runtime27件・13件のすべてがPASS。
+- [Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42540774490)：SUCCESS。意味評価datasetの構造検証であり実Agent判定ではない。
+- [Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42540774428)：SUCCESS。Linux／Windowsの両jobがPASS。
+- 上記のCIはPR #22のbaseを統合したGitHub ActionsのPR検証。共有README／Codexテスト／Project Context templateの対応は、担当Bの編集範囲に混ぜず、[PR #22側のコミット `7cc8ac8`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/7cc8ac8bcebdacd6ac35aede3bed8555c73f276c)に分離した。配置・認可・CAS等は案件ごとの契約が確定しなければ安全に拒否する。
+
+**判定**：担当Bで所有する実装・単体／結合テスト・CI検証は完了。実環境検証は依頼対象外であり未実施。A〜J横断のruntime／provider実装・PR #22統合、15＋10条件の全体判定は本PRで完了を宣言しない。PR #24のmerge、force push、base変更は実施しない。
