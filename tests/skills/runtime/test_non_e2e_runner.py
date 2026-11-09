@@ -100,6 +100,72 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertIn("runner observation", Path(attempt["stdout_ref"]).read_text())
         self.assertIsNone(artifact["tc_verdict"])
 
+    def test_invalid_diagnosis_preflight_never_launches_process(self):
+        plan = self.plan(
+            [sys.executable, "-c", "from pathlib import Path;Path('launched').touch()"]
+        )
+        plan["diagnosis_hypotheses"] = [
+            {"cause": "runner", "confidence": "low", "evidence_ref": "", "next_owner": ""}
+        ]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "invalid_diagnosis")
+        self.assertIsNone(artifact)
+        self.assertFalse((self.repo / "launched").exists())
+        self.assertFalse(self.logs.exists())
+
+    def test_malformed_diagnosis_entry_is_blocked_without_execution(self):
+        plan = self.plan(
+            [sys.executable, "-c", "from pathlib import Path;Path('launched').touch()"]
+        )
+        plan["diagnosis_hypotheses"] = [None]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "invalid_diagnosis")
+        self.assertIsNone(artifact)
+        self.assertFalse((self.repo / "launched").exists())
+
+    def test_valid_diagnosis_survives_in_manifest_without_regrading(self):
+        plan = self.plan([sys.executable, "-c", "print('run')"])
+        plan["diagnosis_hypotheses"] = [
+            {
+                "cause": "fixture",
+                "confidence": "low",
+                "evidence_ref": "fixture:observation",
+                "next_owner": "testware-implementation",
+            }
+        ]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertEqual(artifact["diagnosis"]["original_run_ref"], "test-fixture")
+        self.assertFalse(artifact["diagnosis"]["original_result_modified"])
+        self.assertIsNone(artifact["tc_verdict"])
+
+    def test_forbidden_artifact_root_has_no_write_side_effect(self):
+        plan = self.plan([sys.executable, "-c", "print('should not launch')"])
+        plan_file = Path(self.space.name) / "plan.json"
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        forbidden = self.repo / "forbidden" / "nested"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(forbidden),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(
+            json.loads(proc.stdout)["reason"], "artifacts_must_be_outside_repo"
+        )
+        self.assertFalse((self.repo / "forbidden").exists())
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
+
     def test_dirty_repo_and_unreviewed_command_refused(self):
         plan = self.plan([sys.executable, "-c", "print('safe')"])
         plan["reviewed_argv"] = [sys.executable, "-c", "print('different')"]
