@@ -1,0 +1,29 @@
+{
+  "skill": "test-item-analysis",
+  "criteria": [
+    {
+      "id": "ITEM-SEM-001",
+      "title": "独立したitem identity",
+      "description": "製品機能IDやファイルpathと区別したstable item IDを使い、テストレベル間で同じitem IDを再利用する。",
+      "critical": true
+    },
+    {
+      "id": "ITEM-SEM-002",
+      "title": "構造と状態",
+      "description": "UI/API/batch等のkind、親子、多対多feature ref、予定・未実装・実装済み・不明・廃止を根拠に沿って表す。",
+      "critical": true
+    },
+    {
+      "id": "ITEM-SEM-003",
+      "title": "履歴と変更影響",
+      "description": "reuse/split/merge/retireを明示判断として記録し、source revision変更と未確認範囲を過不足なく示す。",
+      "critical": true
+    },
+    {
+      "id": "ITEM-SEM-004",
+      "title": "owner境界と分母",
+      "description": "条件採否・正式TCN/CI・期待結果・実行を確定せず、partial/unknown/zero denominatorを製品全体の100%と表現しない。",
+      "critical": true
+    }
+  ]
+}

@@ -57,8 +57,8 @@
 
 ## 着手基準
 
-- [ ] 既存feature・SCOPE・TR／TCN／CI・Disposition・ID管理・当該ownerのsource revision契約を確認した。
-- [ ] B・Eと機能ref、item ID、condition ID、候補根拠、非採用判断の受渡しを固定した。
+- [x] 既存feature・SCOPE・TR／TCN／CI・Disposition・ID管理・当該ownerのsource revision契約を確認した。
+- [x] B・Eと機能ref、item ID、condition ID、候補根拠、非採用判断の受渡しを固定した。
 
 ## 作業内容
 
@@ -79,12 +79,12 @@
 ## 完了基準
 
 - [ ] 2 Skillが独立に発火し、根拠付きのstable ID・履歴・階層／多対多・再利用を扱う。
-- [ ] 相互不足検出と候補／適用判断／正式設計／実行の別指標が成立し、未確認・blocked・分母0を100%にしない。
-- [ ] 同名別ID、ID誤統合、循環、分割・廃止、source欠落、旧revision、CAS競合の負例がPASSする。
-- [ ] E向けに正規のitem・condition refと固定fixture・revision・拒否例を提供し、D側の契約を局所検証した。Eの実成果物との接続試験はPR #22に引き継いだ。
+- [x] 相互不足検出と候補／適用判断／正式設計／実行の別指標が成立し、未確認・blocked・分母0を100%にしない。
+- [x] 同名別ID、ID誤統合、循環、分割・廃止、source欠落、旧revision、CAS競合の負例がPASSする。
+- [x] E向けに正規のitem・condition refと固定fixture・revision・拒否例を提供し、D側の契約を局所検証した。Eの実成果物との接続試験はPR #22に引き継いだ。
 - [ ] 新Skillの構造・isolated/trigger・決定論的・意味・局所回帰を実行した。
 
-- [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
+- [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、isolated packaging・決定論的テスト・意味評価・trigger評価のデータを揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
 - [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
 - [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
@@ -96,3 +96,49 @@
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+## 実装・担当内検証結果（2026-11-09）
+
+### 実装
+
+- `skills/test-item-analysis/` と `skills/test-condition-analysis/` を新設し、独立した`ITEM-*`／`COND-*`、履歴・source fingerprint・revision影響・候補照合を実装した。
+- itemは階層・多対多feature ref・planned／unimplemented／implemented／unknown／retiredを扱う。conditionは意図・種別・Authority／evidence ref・候補状態・未確認理由を保持し、item確定前に独立識別できる。
+- IDはhistoryから単調採番し、reuseは既存IDだけに限定する。split／mergeは関連元を記録する。merge元は同じ更新で証拠付き明示retireしない限り拒否する。retired IDは再利用しない。
+- condition crosscheckは呼出元が明示した候補ペアだけを検証し、全組合せを生成しない。candidate／applicability／formal TCN・CI／executionの指標を分離し、Dの契約外件数は`null`のままにする。
+- Aの現在のsource／artifact／operation claim項目に対応する未実行のwrite preconditionを出力する。D helperは候補のmaterializeとhash照合までで、provider保存・認証・CAS・readback・承認を実行したとは報告しない。
+
+### 担当Dの独立検証
+
+| 検証                                                                                                                                                                                       | 結果                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `python -m unittest discover -s tests/skills/runtime -p 'test_test_item_condition_analysis.py' -v`                                                                                         | PASS、19 tests。stable ID、親子循環、reuse／split／merge／retire、source影響、partial／0分母、旧revision不一致、CAS競合、readbackの非認証性、明示pair、blocked条件のformal promotion拒否を検証。 |
+| `python -m unittest discover -s tests/skills/evals/deterministic -p 'test_d_item_condition_contracts.py' -v`                                                                               | PASS、4 tests。両出力fixture、0分母の誤った100%、正式Disposition拒否、isolated helper同一性を検証。負例mutationの列位置をfixtureの実際のMarkdown表に合わせて修正した。                           |
+| `python scripts/skills/evals/deterministic/run.py --skill test-item-analysis --eval-id ITEM-OUT-001 --output skills/test-item-analysis/evals/output/cases/case-001/reference.md`           | PASS、10/10 assertions。                                                                                                                                                                         |
+| `python scripts/skills/evals/deterministic/run.py --skill test-condition-analysis --eval-id COND-OUT-001 --output skills/test-condition-analysis/evals/output/cases/case-001/reference.md` | PASS、11/11 assertions。                                                                                                                                                                         |
+| `python -m unittest discover -s tests/skills/evals/trigger -p 'test_trigger_datasets.py' -v`                                                                                               | PASS。両Skillともtrain 12件（positive 6／negative 6）、validation 8件（positive 4／negative 4）、集合は重複なし。これはdataset検査であり、実Agent上の発火測定ではない。                          |
+| `python scripts/skills/evals/semantic/validate.py`                                                                                                                                         | PASS、25 Skills／167 semantic casesの構造検査。実LLM Judgeによる意味採点は未実施。                                                                                                               |
+| `python -m unittest discover -s tests/skills/evals/semantic -v`                                                                                                                            | PASS、13 tests。                                                                                                                                                                                 |
+| `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v`                                                                                                               | PASS、12 tests。                                                                                                                                                                                 |
+| `python -m unittest discover -s scripts/skills/evals/semantic/tests -v`                                                                                                                    | PASS、27 tests。                                                                                                                                                                                 |
+| `skills-ref validate`（CI固定commit `69ef37e9424c0a7ea9dd2293b559e43ec8176379`）                                                                                                           | PASS、全25 Skill。                                                                                                                                                                               |
+| `python scripts/format_tracked.py check`（Ruff 0.16.8／dprint 0.55.2）                                                                                                                     | PASS、tracked 226 files。固定toolchainを`/tmp`の隔離領域へ用意して実行。                                                                                                                         |
+| `python -m compileall -q`（担当D scripts、validators、tests）                                                                                                                              | PASS。                                                                                                                                                                                           |
+| `Validate Agent Skills`のrepository eval structure条件                                                                                                                                     | D frontmatter／trigger datasetの個別契約はPASS。workflow全体は共有`README.md`のSkill一覧に`test-item-analysis`と`test-condition-analysis`が未登録のためFAIL。A／PR #22へ登録を引き継ぐ。         |
+
+### 未完了・blocked・再開条件
+
+| 状態    | 項目・影響                                                                | 理由／再開条件                                                                                                                                                                                                                                                                                                                                                                            |
+| ------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 未完了  | Skillの実Agent発火・意味品質                                              | trigger datasetとsemantic rubric／fixtureの構造は用意したが、実Agent選択評価と実LLM Judgeを実行していない。対象Agent／Judge runnerが使えるCIまたは受入環境で実行し、結果を追加する。                                                                                                                                                                                                      |
+| blocked | Skillのrepository一覧登録（`Validate Agent Skills` workflow）             | 公式`skills-ref validate`は全25 SkillでPASSし、Dのfrontmatter／triggerも個別契約を通過した。一方、workflowのrepository eval structure条件は共有`README.md`のSkill一覧に新設2 SkillがないためFAIL。AがREADMEを更新した後、PR #22でworkflowを再実行する。Dでは共有ファイルを変更しない。                                                                                                    |
+| blocked | A runtime登録、実operation claim、provider保存／承認／CAS／履歴／readback | Aの`workflow_runtime.py`登録は現在6 Skillで、新設D Skillは未登録。保存provider・認証された承認主体も未選定。A／PR #22で登録とadapterを接続し、provider・権限・revision・readbackを実証後に再開する。Dのlocal `validate_readback`はtuple/hash検査に限る。                                                                                                                                  |
+| 未完了  | B／Eの実成果物との横断接続                                                | Bの`feature-inventory-v1`合意fixtureとE向け拒否fixtureで局所検証した。実B artifactとEの正式validator／正本との接続はPR #22で両ownerが統合した後に実施する。                                                                                                                                                                                                                               |
+| 未完了  | repository全体runtime回帰                                                 | `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`は515 tests中514 PASS／1 FAIL。残る`test_ci_handoff.test_json_nesting_failure_is_a_structured_input_error`はローカルPython 3.14.2で1100段配列の例外が`nesting`ではなく`JSON document must be an object`となる環境差で、D変更を通らない。CIはPython 3.11のため該当CI結果を確認する。Dの19 runtime testsは全件PASS。 |
+| 完了    | repository全体deterministic regression                                    | `python -m unittest discover -s tests/skills/evals/deterministic -v`は294 testsすべてPASS。以前sandbox制限で失敗したsocket／SQLite／WCAG保存テストを含め、現在の環境で再実行済み。                                                                                                                                                                                                        |
+| 未完了  | PR #26 branch反映と新headのActions                                        | 担当Dの明示ファイルはstage済み。commit／通常push後にPR headを確認し、関連Actionsの完了結果を追記する。                                                                                                                                                                                                                                                                                    |
+
+### 互換性・PR #22への引継ぎ
+
+- 既存のD artifact／legacy schemaはrepositoryに存在しない。DはB feature inventoryをread-onlyで参照し、既存Authority／TR／TCN／CI／TC artifactや既存consumerを更新していない。新D artifactはschema v1として追加し、source refとprovider CAS revisionを分離する。
+- PR #22で、実B source revision／hash、実D artifact owner／revision、E validator拒否fixtureとの接続、A runtime登録・認証されたsave claim・provider履歴readbackを再取得して検証する。未接続のfixture成功を実owner保存の証拠にしない。
+- PR #22で行う全owner横断統合、実Agent／実runner／provider、S1〜S17、人間編集8ケース、15＋10完了条件の最終受入はこの担当branchの完了扱いに含めない。

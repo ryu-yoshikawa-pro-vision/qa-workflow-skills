@@ -1,0 +1,32 @@
+[
+  {
+    "query": "製品機能一覧からテスト対象アイテムを独立IDで整理し、画面・API・バッチの親子関係と複数機能参照を持たせたい。",
+    "should_trigger": true
+  },
+  {
+    "query": "既存のテスト対象を予定・未実装・実装済み・不明に分けて、変更履歴を残してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "この画面、REST API、定期バッチ、イベント処理をテストアイテム候補にして stable ID を付けてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "ITEM-001 の名称だけ変わった候補を同じIDで再利用するか、分割・統合・廃止するか根拠付きで管理したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "機能IDとテストアイテムIDの対応、親子循環、未対応機能候補、source revisionの影響を確認してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "テストアイテム候補と条件候補を正式設計の前に整理し、未確認母集団と履歴を残してください。",
+    "should_trigger": true
+  },
+  { "query": "要求仕様書から有効なSPEC・DECISION・UNKNOWNを整理してください。", "should_trigger": false },
+  { "query": "画面遷移とボタン、表示状態を ui-target-v1 package に追加してください。", "should_trigger": false },
+  { "query": "新機能の親子関係と安定した FEAT ID を製品全体から抽出してください。", "should_trigger": false },
+  { "query": "Product Risk の影響度と発生可能性を評価し、テスト重点を提案してください。", "should_trigger": false },
+  { "query": "アイテムごとの正式TCNと適用Disposition、CIの基準を確定してください。", "should_trigger": false },
+  { "query": "既存のブラウザテストを実行してPASS/FAILを報告してください。", "should_trigger": false }
+]

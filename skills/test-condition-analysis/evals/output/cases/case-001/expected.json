@@ -1,0 +1,12 @@
+{
+  "known_features": ["FEAT-001"],
+  "required_condition_ids": ["COND-001"],
+  "required_authority_refs": ["AUTH-001"],
+  "required_candidate_state": "candidate",
+  "required_separate_metrics": [
+    "Formal applicability / adoption / disposition",
+    "Formal TCN / CI / expected-result design",
+    "Test execution"
+  ],
+  "required_crosscheck_label": "Advisory item-condition candidate pairs"
+}
