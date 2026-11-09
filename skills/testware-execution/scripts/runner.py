@@ -231,9 +231,25 @@ def _git_clean(repo: Path) -> bool:
     return not proc.stdout.strip()
 
 
+def _procfs_is_mounted(root: Path = Path("/proc")) -> bool:
+    """Require a real procfs superblock, not merely an empty /proc directory."""
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        status = ctypes.create_string_buffer(256)
+        if libc.statfs(os.fsencode(root), ctypes.byref(status)) != 0:
+            return False
+        # Linux PROC_SUPER_MAGIC; a plain directory does not meet this check.
+        return (
+            ctypes.c_long.from_buffer(status).value == 0x9FA0
+            and (root / "self" / "stat").is_file()
+        )
+    except (AttributeError, OSError, ValueError):
+        return False
+
+
 def _enable_descendant_supervision() -> bool:
     """Make escaped-session orphans observable in this dedicated Linux runner."""
-    if sys.platform != "linux" or not Path("/proc").is_dir():
+    if sys.platform != "linux" or not _procfs_is_mounted():
         return False
     try:
         libc = ctypes.CDLL(None, use_errno=True)
@@ -573,6 +589,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 if len(named) != 1 or None in named:
                     raise RunnerError("vitest_multi_project_requires_separate_runs")
                 project_name = next(iter(named))
+                # Even one Vitest project glob can select multiple projects.
+                if (
+                    any(char in project_name for char in "*?[]{}()|\\")
+                    or project_name.startswith("!")
+                ):
+                    raise RunnerError("vitest_project_filter_unverified")
                 declared_projects = []
                 for index, arg in enumerate(command):
                     if arg == "--project":

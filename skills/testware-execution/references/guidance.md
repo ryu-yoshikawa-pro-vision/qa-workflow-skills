@@ -70,7 +70,7 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 
 ## reporter異常とcleanup
 
-reporter JSONが型不正・未対応・不完全、または解釈中に例外を起こしたときは、元raw・終了コードを保持し、`result_collection=invalid`および必要に応じて例外の型名を記録する。解釈の成否に関係なく許可済みcleanupと実行後のHEAD／作業ツリー確認を試み、manifestを保存する。cleanupそのものが失敗した場合は`failed_or_unknown`として安全な完了・自動再実行を拒否する。Linuxでは専用runnerをchild subreaperとして設定し、元のprocess groupだけでなく別sessionに移動した子孫を採用・検出・終了／reapする。実行scopeの終了検査は必ずcleanupの前に行い、確認不能ならcleanupの安全実行を拒否する。cleanup実行自体も同じ子孫終了検証を通し、残存workerがいれば安全な完了を拒否する。Linuxのsubreaper／procfsが利用できない環境（Windowsやその他POSIXを含む）では、ローカルrunnerは`process_supervision_unavailable`で開始前に停止し、実環境受入はPR #22で行う。これはWindows実実行の受入済みを意味せず、PR #22側で隔離・後処理を確認する。独立fixtureでの実行成功を固定`qa-training-store`の実Vitest／Jest／Playwright受入とみなさない。
+reporter JSONが型不正・未対応・不完全、または解釈中に例外を起こしたときは、元raw・終了コードを保持し、`result_collection=invalid`および必要に応じて例外の型名を記録する。解釈の成否に関係なく許可済みcleanupと実行後のHEAD／作業ツリー確認を試み、manifestを保存する。cleanupそのものが失敗した場合は`failed_or_unknown`として安全な完了・自動再実行を拒否する。Linuxでは専用runnerをchild subreaperとして設定し、元のprocess groupだけでなく別sessionに移動した子孫を採用・検出・終了／reapする。実行scopeの終了検査は必ずcleanupの前に行い、確認不能ならcleanupの安全実行を拒否する。cleanup実行自体も同じ子孫終了検証を通し、残存workerがいれば安全な完了を拒否する。Linuxのsubreaper／実procfs mount（`statfs`のfilesystem type検査）が利用できない環境（Windowsやその他POSIX、空の`/proc`ディレクトリを含む）では、ローカルrunnerは`process_supervision_unavailable`で開始前に停止し、実環境受入はPR #22で行う。これはWindows実実行の受入済みを意味せず、PR #22側で隔離・後処理を確認する。独立fixtureでの実行成功を固定`qa-training-store`の実Vitest／Jest／Playwright受入とみなさない。
 
 ## 固定qa-training-store Vitest受入の再開手順
 

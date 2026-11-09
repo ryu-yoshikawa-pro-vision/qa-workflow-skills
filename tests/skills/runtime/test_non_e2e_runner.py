@@ -480,6 +480,34 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(attempt["cleanup_state"], "failed_or_unknown")
         self.assertEqual(artifact["outcome"], "blocked_cleanup_or_timeout")
 
+    @unittest.skipUnless(sys.platform == "linux", "Linux procfs required")
+    def test_unmounted_procfs_is_rejected_before_launch(self):
+        plan = self.plan([sys.executable, "-c", "print('should not run')"])
+        plan_file = Path(self.space.name) / "procfs.json"
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        code = (
+            "import pathlib,sys,tempfile\n"
+            "from unittest import mock\n"
+            f"sys.path.insert(0, {str(RUNNER.parent)!r})\n"
+            "import runner\n"
+            "with tempfile.TemporaryDirectory() as directory:\n"
+            "    assert not runner._procfs_is_mounted(pathlib.Path(directory))\n"
+            "with mock.patch.object(runner, '_procfs_is_mounted', return_value=False):\n"
+            "    raise SystemExit(runner.main())\n"
+        )
+        proc = subprocess.run(
+            [
+                sys.executable, "-c", code,
+                "--plan", str(plan_file), "--artifacts", str(self.logs),
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(
+            json.loads(proc.stdout)["reason"], "process_supervision_unavailable"
+        )
+        self.assertFalse(self.logs.exists())
+
     def test_bad_selected_identity_blocks_before_command(self):
         plan = self.plan([sys.executable, "-c", "print('should not run')"])
         plan.update(
@@ -578,6 +606,17 @@ class ActualRunnerTests(unittest.TestCase):
         ):
             case = dict(plan)
             case["argv"] = [*plan["argv"], *extra]
+            case["reviewed_argv"] = case["argv"]
+            code, summary, evidence = self.call(case)
+            self.assertEqual(code, 2)
+            self.assertEqual(summary["reason"], "vitest_project_filter_unverified")
+            self.assertIsNone(evidence)
+        for wildcard in ("*", "node*", "node?", "[nb]ode", "{node,browser}"):
+            case = dict(plan)
+            case["selected"] = [
+                {**plan["selected"][0], "project_name": wildcard}
+            ]
+            case["argv"] = [*plan["argv"][:-1], "--project=" + wildcard]
             case["reviewed_argv"] = case["argv"]
             code, summary, evidence = self.call(case)
             self.assertEqual(code, 2)
