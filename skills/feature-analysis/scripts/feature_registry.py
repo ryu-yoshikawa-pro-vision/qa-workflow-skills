@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import subprocess
 import sys
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -1055,6 +1058,88 @@ def _authorize_reclassifications(
                 )
 
 
+def _git_ref_output(root: Path, *args: str, optional: bool = False) -> str | None:
+    try:
+        command = subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ContractError("git_source_ref_unavailable") from exc
+    if command.returncode != 0:
+        if optional and command.returncode == 1:
+            return None
+        raise ContractError("git_source_ref_unavailable")
+    try:
+        return command.stdout.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ContractError("git_source_ref_invalid") from exc
+
+
+@contextmanager
+def _hold_git_source_refs(
+    inputs: list[dict[str, Any]] | None,
+):
+    """Hold Git's HEAD and checked-out branch ref locks across verification/write.
+
+    Normal Git checkout, commit and update-ref honor these lockfiles. A source
+    whose ref locks cannot be acquired fails closed, rather than racing CAS on
+    an unrelated artifact store.
+    """
+    roots: dict[str, str] = {}
+    for entry in inputs or []:
+        if not isinstance(entry, dict):
+            raise ContractError("git_evidence_schema_invalid")
+        try:
+            root = Path(entry["repository_root"]).resolve(strict=True)
+            allowed = Path(entry["authorized_root"]).resolve(strict=True)
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            raise ContractError("git_source_root_invalid") from exc
+        if root != allowed or not root.is_dir():
+            raise ContractError("git_source_root_invalid")
+        expected = entry.get("head_sha")
+        if not isinstance(expected, str) or not COMMIT.fullmatch(expected):
+            raise ContractError("git_evidence_source_revision_mismatch")
+        if str(root) in roots and roots[str(root)] != expected:
+            raise ContractError("git_source_root_revision_conflict")
+        roots[str(root)] = expected
+    with ExitStack() as stack:
+        for location, expected in sorted(roots.items()):
+            root = Path(location)
+            paths = [_git_ref_output(root, "rev-parse", "--git-path", "HEAD")]
+            branch = _git_ref_output(root, "symbolic-ref", "-q", "HEAD", optional=True)
+            if branch is not None:
+                paths.append(_git_ref_output(root, "rev-parse", "--git-path", branch))
+            for raw in sorted(set(paths)):
+                if not raw:
+                    raise ContractError("git_source_ref_unavailable")
+                target = Path(raw)
+                if not target.is_absolute():
+                    target = root / target
+                target = target.resolve(strict=False)
+                if not target.is_relative_to(root):
+                    raise ContractError("git_source_ref_outside_authorized_root")
+                lock = Path(str(target) + ".lock")
+                try:
+                    lock.parent.mkdir(parents=True, exist_ok=True)
+                    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                    if hasattr(os, "O_NOFOLLOW"):
+                        flags |= os.O_NOFOLLOW
+                    fd = os.open(lock, flags, 0o600)
+                    os.close(fd)
+                except OSError as exc:
+                    raise ContractError("git_source_ref_lock_unavailable") from exc
+                stack.callback(lock.unlink, missing_ok=True)
+            if _git_ref_output(root, "rev-parse", "--verify", "HEAD") != expected:
+                raise ContractError("git_head_changed")
+        yield
+        for location, expected in roots.items():
+            if _git_ref_output(Path(location), "rev-parse", "--verify", "HEAD") != expected:
+                raise ContractError("git_head_changed_during_persistence")
+
+
 def persist_snapshot(
     store: LocalArtifactStore | GitArtifactStore,
     request: dict[str, Any],
@@ -1083,24 +1168,25 @@ def persist_snapshot(
                 raise ContractError("previous_snapshot_not_current")
         elif request["previous_snapshot"] is not None:
             raise ContractError("previous_snapshot_without_expected_revision")
-        _verify_git_evidence(request, report, git_inventory_requests)
-        _authorize_reclassifications(store, request, expected_revision)
-        content = json.dumps(
-            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        )
-        written = store.write(
-            kind="feature-inventory",
-            project_ref=project_ref,
-            artifact_ref=artifact_ref,
-            content=content,
-            expected_revision=expected_revision,
-            operation_id=snapshot["operation_id"],
-            source_ref=project_ref,
-            source_revision=snapshot["source_revision"],
-            approval_ref=approval_ref,
-            approval_revision=approval_revision,
-            change_reason=change_reason,
-        )
+        with _hold_git_source_refs(git_inventory_requests):
+            _verify_git_evidence(request, report, git_inventory_requests)
+            _authorize_reclassifications(store, request, expected_revision)
+            content = json.dumps(
+                snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            written = store.write(
+                kind="feature-inventory",
+                project_ref=project_ref,
+                artifact_ref=artifact_ref,
+                content=content,
+                expected_revision=expected_revision,
+                operation_id=snapshot["operation_id"],
+                source_ref=project_ref,
+                source_revision=snapshot["source_revision"],
+                approval_ref=approval_ref,
+                approval_revision=approval_revision,
+                change_reason=change_reason,
+            )
         written["analysis_status"] = report["status"]
         written["snapshot_sha256"] = report["handoff"]["snapshot_sha256"]
         return written
