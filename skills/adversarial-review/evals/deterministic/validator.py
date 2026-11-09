@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import re
 
 from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
@@ -56,15 +57,32 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=missing_tables or None,
     )
 
-    # New review modes must not silently pass without their provenance table.
-    # Legacy design/E2E reviews do not use this table, so gate by scope.
-    mode = parse_bullets(text).get("レビュー種別", "")
-    target = parse_bullets(text).get("対象 / 実行範囲", "")
-    if (
-        "非E2E" in mode
+    # Fixture-provided intent is authoritative for evaluation applicability.
+    # The output cannot bypass checks by omitting its own review mode.
+    bullets = parse_bullets(text)
+    mode = clean(bullets.get("レビュー種別", ""))
+    target = clean(bullets.get("対象 / 実行範囲", ""))
+    expected_mode = expected.get("review_mode")
+    review_targets = {"非E2E testware", "要求・設計・コードの静的レビュー"}
+    check_non_e2e = (
+        expected_mode in {"non_e2e_testware", "static_review"}
+        or "非E2E" in mode
         or "静的レビュー" in mode
-        or target in {"非E2E testware", "要求・設計・コードの静的レビュー"}
-    ):
+        or target in review_targets
+    )
+    if check_non_e2e:
+        if expected_mode == "non_e2e_testware":
+            expected_output_mode = "非E2E testware"
+        elif expected_mode == "static_review":
+            expected_output_mode = "要求・設計・コードの静的レビュー"
+        else:
+            expected_output_mode = None
+        result.add(
+            "REV-D017",
+            mode in review_targets
+            and (expected_output_mode is None or mode == expected_output_mode),
+            "非E2E・静的レビューの種別が明示され、評価入力と一致すること",
+        )
         scope_table = find_table(
             tables,
             section_contains="非E2E testware／静的レビュー",
@@ -78,19 +96,34 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ),
         )
         result.add(
-            "REV-D015",
+            "REV-D018",
             scope_table is not None,
-            "非E2E・静的レビューの対象revisionと根拠の表があること",
+            "非E2E・静的レビューに根拠表が存在すること",
         )
         if scope_table is not None:
+            rows = scope_table.rows
             result.add(
-                "REV-D016",
-                bool(scope_table.rows)
+                "REV-D019",
+                bool(rows)
                 and all(
                     all(str(value).strip() for value in row.values())
-                    for row in scope_table.rows
+                    and re.fullmatch(
+                        r"[^\\s@]+@[^\\s@]+",
+                        clean(row.get("対象source／revision", "")),
+                    )
+                    is not None
+                    for row in rows
                 ),
-                "非E2E・静的レビューの対象と根拠を空欄にしないこと",
+                "source refとrevisionが分離可能な形式で記録されていること",
+            )
+            required_sources = expected.get("required_source_revisions", [])
+            actual_sources = {
+                clean(row.get("対象source／revision", "")) for row in rows
+            }
+            result.add(
+                "REV-D020",
+                all(item in actual_sources for item in required_sources),
+                "評価入力で指定されたsource／revisionが保持されていること",
             )
 
     summary = nonempty_rows(summary_table)

@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def validate(skill: str, text: str):
+def validate(skill: str, text: str, expected: dict | None = None):
     path = ROOT / "skills" / skill / "evals/deterministic/validator.py"
     spec = importlib.util.spec_from_file_location(
         "non_e2e_" + skill.replace("-", "_"), path
@@ -17,7 +17,7 @@ def validate(skill: str, text: str):
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.validate(text, {}, "local-regression")
+    return module.validate(text, expected or {}, "local-regression")
 
 
 def fill_template(path: str) -> str:
@@ -84,19 +84,39 @@ class NonE2EOutputValidationTests(unittest.TestCase):
             + "testware ref／assertion・fixture | 適用基準／観測根拠 | "
             + "レビュー結果・誤検出候補 | 修正元owner |\n"
             + "| --- | --- | --- | --- | --- | --- |\n"
-            + "| src:r1 | TC:1 | case:1 | authority:1 | 未確認 | testware-implementation |\n"
+            + "| src@r1 | TC:1 | case:1 | authority:1 | 未確認 | testware-implementation |\n"
         )
         checked = validate("adversarial-review", complete)
-        self.assertEqual(status(checked, "REV-D015"), "pass")
-        self.assertEqual(status(checked, "REV-D016"), "pass")
+        self.assertEqual(status(checked, "REV-D017"), "pass")
+        self.assertEqual(status(checked, "REV-D018"), "pass")
+        self.assertEqual(status(checked, "REV-D019"), "pass")
         absent = validate("adversarial-review", header)
-        self.assertEqual(status(absent, "REV-D015"), "fail")
-        empty_revision = validate(
-            "adversarial-review", complete.replace("| src:r1 |", "| |")
+        self.assertEqual(status(absent, "REV-D018"), "fail")
+        no_revision = validate(
+            "adversarial-review", complete.replace("| src@r1 |", "| src |")
         )
-        self.assertEqual(status(empty_revision, "REV-D016"), "fail")
+        self.assertEqual(status(no_revision, "REV-D019"), "fail")
+        expected = {
+            "review_mode": "non_e2e_testware",
+            "required_source_revisions": ["src@r1"],
+        }
+        missing_mode = validate(
+            "adversarial-review", complete.replace(header, ""), expected
+        )
+        self.assertEqual(status(missing_mode, "REV-D017"), "fail")
+        self.assertEqual(status(missing_mode, "REV-D020"), "pass")
+        missing_source = validate(
+            "adversarial-review", complete.replace("src@r1", "src@r2"), expected
+        )
+        self.assertEqual(status(missing_source, "REV-D020"), "fail")
         legacy = validate("adversarial-review", "- レビュー種別: テスト設計成果物\n")
-        self.assertIsNone(status(legacy, "REV-D015"))
+        self.assertIsNone(status(legacy, "REV-D018"))
+        legacy_e2e = validate(
+            "adversarial-review", "- レビュー種別: E2E実装\n",
+            {"expected_e2e_implementation_refs": ["tests/one.spec.ts > one"]},
+        )
+        self.assertEqual(status(legacy_e2e, "REV-D015"), "fail")
+        self.assertEqual(status(legacy_e2e, "REV-D016"), "fail")
 
 
 if __name__ == "__main__":
