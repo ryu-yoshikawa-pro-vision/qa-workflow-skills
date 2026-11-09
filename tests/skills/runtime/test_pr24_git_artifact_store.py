@@ -10,8 +10,8 @@ import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
 from pathlib import Path
+from threading import Event
 
 SKILL_ROOT = Path(__file__).resolve().parents[3] / "skills"
 sys.path.insert(0, str(SKILL_ROOT / "project-context" / "scripts"))
