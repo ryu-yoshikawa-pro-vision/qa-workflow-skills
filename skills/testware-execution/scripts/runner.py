@@ -93,7 +93,17 @@ def _verified_tc_expectations(
     ):
         raise RunnerError("invalid_direct_tc_authority_file")
     entry = subprocess.run(
-        ["git", "-C", str(repo), "ls-tree", "-r", "--full-tree", revision, "--", relative],
+        [
+            "git",
+            "-C",
+            str(repo),
+            "ls-tree",
+            "-r",
+            "--full-tree",
+            revision,
+            "--",
+            relative,
+        ],
         capture_output=True,
         text=True,
         check=False,
@@ -121,7 +131,11 @@ def _verified_tc_expectations(
         check=False,
         timeout=10,
     )
-    if size.returncode or not size.stdout.strip().isdigit() or int(size.stdout) > 1_048_576:
+    if (
+        size.returncode
+        or not size.stdout.strip().isdigit()
+        or int(size.stdout) > 1_048_576
+    ):
         raise RunnerError("direct_tc_authority_too_large_or_unavailable")
     blob = subprocess.run(
         ["git", "-C", str(repo), "cat-file", "blob", blob_sha],
@@ -464,7 +478,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             "selection_verified": True,
                         }
                         if reporter_format == "vitest-json":
-                            reconciliation = reconcile_vitest(**shared, repo_root=str(repo))
+                            reconciliation = reconcile_vitest(
+                                **shared, repo_root=str(repo)
+                            )
                             reporter_reports_failure = raw.get("success") is False
                         elif reporter_format == "playwright-json":
                             reconciliation = reconcile_playwright(
@@ -482,7 +498,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                                 runner_version=plan["runner_version"],
                             )
                             reporter_reports_failure = any(
-                                item.get("status") in {"failed", "timedOut", "interrupted"}
+                                item.get("status")
+                                in {"failed", "timedOut", "interrupted"}
                                 for item in raw["results"]
                             )
                         run["reconciliation"] = reconciliation
@@ -491,7 +508,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         run["result_collection"] = (
                             "complete"
                             if reconciliation["collection_complete"]
-                            and not (run["return_code"] == 0 and reporter_reports_failure)
+                            and not (
+                                run["return_code"] == 0 and reporter_reports_failure
+                            )
                             else "incomplete"
                         )
                     except (ValueError, ContractError, UnicodeError, OSError):
