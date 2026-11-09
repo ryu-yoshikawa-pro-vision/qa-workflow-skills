@@ -203,6 +203,9 @@ def reconcile_vitest(
     )
     if report.get("success") is True and statuses["failed"]:
         reporter_consistent = False
+    if report.get("success") is False and not statuses["failed"]:
+        # A failed run with no failing assertion may have a suite/global error.
+        reporter_consistent = False
     if "success" in report and type(report["success"]) is not bool:
         reporter_consistent = False
     results = []
