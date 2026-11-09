@@ -159,7 +159,9 @@ class VitestTests(unittest.TestCase):
         )
         self.assertTrue(result["collection_complete"])
         report["testResults"][0]["assertionResults"][0]["ancestorTitles"] = [
-            "first test file", "", "inner suite"
+            "first test file",
+            "",
+            "inner suite",
         ]
         with self.assertRaises(contract.ContractError):
             contract.reconcile_vitest(
