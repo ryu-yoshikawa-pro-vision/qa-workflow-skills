@@ -494,6 +494,103 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["policy"] = {**policy, "target_ref": "qa/|unauthorized"}
         self.assertEqual(handle(request)["status"], "blocked")
 
+    def test_placement_policy_preserves_query_urls_and_rejects_outer_space(self) -> None:
+        policy = {
+            "owner": "project-context",
+            "scope": "Sample",
+            "target_ref": "https://example.invalid/view?id=123",
+            "revision": "policy-v1",
+            "approval_ref": "https://approval.invalid/review?id=456",
+            "approval_revision": "approval-v1",
+            "editable_scope": "qa/team",
+            "feature_index_ref": "qa/features/index.md",
+        }
+        request = {
+            "operation": "prepare-placement",
+            "markdown": context(),
+            "dec_asm_owner": "project-context",
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "issue/123",
+            "source_revision": "issue-v1",
+            "change_reason": "approved placement",
+            "policy": policy,
+            "existing_decisions": [],
+            "existing_assumptions": [],
+        }
+        accepted = handle(request)
+        self.assertEqual(accepted["status"], "draft", accepted)
+        self.assertIn("view?id=123", accepted["artifact_markdown"])
+        request["policy"] = {**policy, "target_ref": "qa/artifacts "}
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["policy"] = {**policy, "approval_ref": " approval/verified"}
+        self.assertEqual(handle(request)["status"], "blocked")
+
+    def test_legacy_policy_without_approval_revision_can_be_replaced(self) -> None:
+        policy = {
+            "owner": "project-context",
+            "scope": "Sample",
+            "target_ref": "qa/old",
+            "revision": "policy-v1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "old-approval",
+            "editable_scope": "human-worktree",
+            "feature_index_ref": "qa/features/index.md",
+        }
+        request = {
+            "operation": "prepare-placement",
+            "markdown": context(),
+            "dec_asm_owner": "project-context",
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "issue/123",
+            "source_revision": "issue-v1",
+            "change_reason": "legacy layout",
+            "policy": policy,
+            "existing_decisions": [],
+            "existing_assumptions": [],
+        }
+        first = handle(request)
+        self.assertEqual(first["status"], "draft", first)
+        # Both old records omit approval_revision, as saved by the old schema.
+        saved_markdown = first["artifact_markdown"].replace(
+            "; approval_revision=old-approval", ""
+        )
+        old_decision = {
+            "draft_key": None,
+            "identity_action": "reuse",
+            "reuse_id": "DEC-001",
+            "cells": {
+                "確定内容": "QA成果物配置・人間編集方針",
+                "状態": "有効",
+                "決定根拠": "approval/verified",
+                "影響範囲": "Sample",
+                "関係": "独立",
+                "関連仕様根拠ID": "",
+                "置換先ID": "",
+                "備考": (
+                    "owner=project-context; target=qa/old; policy=policy-v1; "
+                    "editable=human-worktree; index=qa/features/index.md"
+                ),
+            },
+        }
+        request.update(
+            markdown=saved_markdown,
+            existing_decisions=[old_decision],
+            existing_policy={**policy, "decision_id": "DEC-001"},
+            policy={
+                **policy,
+                "target_ref": "qa/new",
+                "revision": "policy-v2",
+                "approval_revision": "approved-v2",
+            },
+            expected_revision="r2",
+        )
+        revised = handle(request)
+        self.assertEqual(revised["status"], "draft", revised)
+        self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", revised["artifact_markdown"])
+        self.assertIn("approval_revision=approved-v2", revised["artifact_markdown"])
+
     def test_update_rejects_non_local_roots_and_fake_section(self) -> None:
         base = {
             "operation": "prepare-update",
