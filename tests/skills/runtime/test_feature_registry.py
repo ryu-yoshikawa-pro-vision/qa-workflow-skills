@@ -104,6 +104,53 @@ def continue_analysis(data: dict) -> dict:
 
 
 class FeatureRegistryTests(unittest.TestCase):
+    def test_new_change_after_revision_must_match_source(self) -> None:
+        data = fixture()
+        data["snapshot"]["changes"][0]["after_revision"] = "unrelated-revision"
+        self.assertEqual(handle(data)["status"], "blocked")
+        self.assertIn(
+            "change_source_revision_mismatch:DIF-001", handle(data)["reasons"]
+        )
+
+    def test_historical_diff_keeps_old_revision_after_source_update(self) -> None:
+        data = fixture()
+        previous = copy.deepcopy(data["snapshot"])
+        data["previous_snapshot"] = previous
+        snap = data["snapshot"]
+        snap["event"] = "pr_update"
+        snap["event_basis"] = {
+            "base_sha": "c" * 40,
+            "head_sha": "a" * 40,
+            "previous_head_sha": "b" * 40,
+        }
+        previous["source_revision"] = "b" * 40
+        previous["sources"][0]["revision"] = "b" * 40
+        snap["source_revision"] = "a" * 40
+        snap["sources"][0]["revision"] = "a" * 40
+        data["observed_head_revision"] = "a" * 40
+        snap["operation_id"] = "op-v2"
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        snap["changes"][0]["after_revision"] = "head-v1"
+        snap["changes"].append({
+            **copy.deepcopy(snap["changes"][0]),
+            "id": "DIF-002",
+            "before_revision": "b" * 40,
+            "after_revision": "a" * 40,
+        })
+        self.assertEqual(handle(data)["status"], "complete", handle(data))
+        snap["changes"][-1]["before_revision"] = "d" * 40
+        self.assertEqual(handle(data)["status"], "blocked")
+
+    def test_incomplete_change_source_never_reports_complete(self) -> None:
+        data = fixture()
+        data["snapshot"]["sources"][0].update(
+            status="unavailable", reason="source unavailable"
+        )
+        report = handle(data)
+        self.assertEqual(report["status"], "incomplete", report)
+        self.assertIn("change_source_incomplete:DIF-001", report["reasons"])
+
     def test_complete_local_inventory_has_no_full_product_guarantee(self) -> None:
         result = handle(fixture())
         self.assertEqual(result["status"], "complete", result)

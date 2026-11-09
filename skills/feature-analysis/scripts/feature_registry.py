@@ -213,6 +213,44 @@ def _changes(
     return changes, issues
 
 
+def _change_revisions(
+    snapshot: dict[str, Any],
+    previous: dict | None,
+    sources: dict,
+    changes: dict,
+) -> list[str]:
+    """Check only newly observed differences against the current source revision.
+
+    Historical differences are append-only and retain their original revisions.
+    """
+    prior = (
+        _rows(previous.get("changes"), "previous_changes", "DIF")
+        if previous is not None
+        else {}
+    )
+    issues: list[str] = []
+    basis = snapshot.get("event_basis") or {}
+    for did, row in changes.items():
+        if did in prior:
+            continue
+        source = sources[row["source_id"]]
+        if source["status"] != "complete":
+            issues.append(f"change_source_incomplete:{did}")
+            continue
+        if row["after_revision"] != source["revision"]:
+            raise ContractError(f"change_source_revision_mismatch:{did}")
+        if snapshot["event"] in {"pr_update", "rebase"} and source["kind"] == "code":
+            permitted = {basis["base_sha"], basis["previous_head_sha"]}
+            if row["before_revision"] not in permitted:
+                raise ContractError(f"change_before_revision_mismatch:{did}")
+        elif snapshot["event"] == "external_revision" and source["ref"] == basis[
+            "document_ref"
+        ]:
+            if row["before_revision"] != basis["before_revision"]:
+                raise ContractError(f"document_change_before_revision_mismatch:{did}")
+    return issues
+
+
 def _history(
     snapshot: dict[str, Any],
     previous: dict | None,
@@ -473,6 +511,7 @@ def analyze(request: Any) -> dict[str, Any]:
     issues.extend(more)
     changes, more = _changes(snapshot, sources, features)
     issues.extend(more)
+    issues.extend(_change_revisions(snapshot, previous, sources, changes))
     _history(snapshot, previous, features, idempotent=idempotent)
     unknown = _refs(snapshot.get("unknown_areas"), "unknown_areas")
     if unknown:

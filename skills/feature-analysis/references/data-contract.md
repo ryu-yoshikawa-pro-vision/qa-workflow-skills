@@ -57,3 +57,5 @@ Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORI
 Gitのgitlink（submodule）は親repositoryの`ls-tree`で確認できるentryですが、内部ファイルは列挙できていません。`git_source_inventory`は`status=incomplete`、`complete_file_listing=false`、`unretrieved=[gitlink:path@commit]`を返し、submoduleを検証済みの別情報源へ登録するまで完全取得とみなしません。PR差分一覧の取得完了は`complete_change_listing`で別途表します。
 
 Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`、`source_ref`／`source_revision`、`operation_id`、`change_reason`、内容hashが渡されます。認証済み承認のscopeとrevisionの検証は信頼済みproviderの責務です。未確認の承認revisionでは書込みを拒否します。
+
+`feature_registry.handle`は新規DIFの`after_revision`を同じ`source_id`の現在revisionと照合し、PR更新／rebaseでは`before_revision`をbase SHAまたは前回head SHAへ限定します。前回snapshotから保存済みの旧DIFは当時のrevisionを保持でき、今回のsource SHAへ書き換えることはありません。source未取得時は`change_source_incomplete`を残し、completeを返しません。
