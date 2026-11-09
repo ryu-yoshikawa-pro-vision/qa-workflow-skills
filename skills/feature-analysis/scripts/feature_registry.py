@@ -271,6 +271,13 @@ def _current_changes(
     for did, row in changes.items():
         if did in superseded:
             continue
+        # A correction of a saved DIF is not a new Git change. Only a
+        # same-revision analysis update can include it in current QA impact.
+        if row.get("supersedes_id") is not None and (
+            snapshot["event"] != "analysis_update"
+            or row["after_revision"] != sources[row["source_id"]]["revision"]
+        ):
+            continue
         if previous is None or snapshot["event"] == "initial":
             current[did] = row
         elif did not in previous_ids:
@@ -792,8 +799,8 @@ def _verify_git_evidence(
         if entry["base_sha"] is None:
             if any(row["source_id"] == sid for row in snapshot["changes"]):
                 raise ContractError("git_change_diff_not_enumerated")
-            if snapshot["event"] in {"pr_update", "rebase"}:
-                raise ContractError("pr_update_git_base_required")
+            if snapshot["event"] in {"pr_update", "rebase", "merge", "release"}:
+                raise ContractError("event_git_base_required")
             continue
         coverage_request: dict[str, Any] = {
             "git_inventory": tree,
