@@ -664,6 +664,20 @@ def select_auxiliary_testware(
     policyがある場合だけ`completion_required=true`にする。`reference_only_refs`は
     参照候補として記録するだけで`false`。根拠が不明な値は推測せずunresolvedにする。
     """
+    all_inputs = [
+        *_list_of(requested_refs),
+        *_list_of(user_explicit_refs),
+        *_list_of(policy_refs),
+        *_list_of(available_refs),
+        *_list_of(reference_only_refs),
+    ]
+    invalid_refs = [str(ref) for ref in all_inputs if not _text(ref)]
+    if invalid_refs:
+        return {
+            "status": "unresolved",
+            "selected_refs": [],
+            "invalid_refs": invalid_refs,
+        }
     user_explicit = set(user_explicit_refs)
     authorized = user_explicit | set(policy_refs)
     available = set(available_refs)
@@ -678,7 +692,7 @@ def select_auxiliary_testware(
             detail = testware_details.get(ref)
             if (
                 not isinstance(detail, dict)
-                or detail.get("executor_owner") not in AUXILIARY_OWNERS
+                or not _in(detail.get("executor_owner"), AUXILIARY_OWNERS)
                 or not _text(detail.get("implementation_revision"))
             ):
                 missing_details.append(ref)
@@ -721,22 +735,37 @@ def select_auxiliary_testware(
     }
 
 
+def _in(value: Any, allowed: set[str]) -> bool:
+    """型不正の値（list・dict等）を集合照会へ渡さず不一致として扱う。"""
+    return isinstance(value, str) and value in allowed
+
+
+def _source_of(sources: Any, ref: Any) -> dict[str, Any]:
+    """不正なexecution_ref・sourceでも例外にせず、空sourceとして扱う。"""
+    value = sources.get(ref) if isinstance(sources, dict) and _text(ref) else None
+    return value if isinstance(value, dict) else {}
+
+
+def _list_of(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
+    if not isinstance(routes, list):
+        return {"routes": [], "valid": False, "issues": ["required_routes_not_list"]}
     issues: list[str] = []
     normalized: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for route in routes:
+    for index, route in enumerate(routes):
+        if not isinstance(route, dict):
+            issues.append(f"invalid_required_route:{index}")
+            continue
         tc_ref = route.get("tc_ref")
         kind = route.get("route_type")
         route_ref = route.get("route_ref")
-        if kind not in REQUIRED_ROUTE_TYPES:
+        if not _in(kind, REQUIRED_ROUTE_TYPES):
             issues.append(f"invalid_required_route_type:{tc_ref}")
-        if (
-            not isinstance(tc_ref, str)
-            or not tc_ref
-            or not isinstance(route_ref, str)
-            or not route_ref
-        ):
+        if not _text(tc_ref) or not _text(route_ref):
             issues.append("missing_tc_or_route_ref")
         if kind == "e2e" and not route.get("e2e_testware_ref"):
             issues.append(f"missing_e2e_testware_ref:{tc_ref}")
@@ -749,6 +778,9 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
                 issues.append(f"missing_implementation_revision:{tc_ref}")
             if not _text(route.get("selection_basis")):
                 issues.append(f"missing_selection_basis:{tc_ref}")
+        execution_ref = route.get("execution_ref")
+        if execution_ref is not None and not _text(execution_ref):
+            issues.append(f"invalid_execution_ref:{route_ref}")
         key = f"{tc_ref}|{route_ref}"
         if key in seen:
             issues.append(f"duplicate_required_route:{key}")
@@ -767,9 +799,9 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
                 "selection_basis",
             ):
                 item[field] = route.get(field)
-        if "execution_ref" in route:
+        if _text(execution_ref):
             # Activity投影がsourceを引けるよう、実行済みrouteのexecution_refを保持する。
-            item["execution_ref"] = route["execution_ref"]
+            item["execution_ref"] = execution_ref
         normalized.append(item)
     return {"routes": normalized, "valid": not issues, "issues": issues}
 
@@ -778,10 +810,16 @@ def validate_auxiliary_routes(
     routes: list[dict[str, Any]], *, tc_testware_refs: list[str] | None = None
 ) -> dict[str, Any]:
     """Validate Run `auxiliary_routes`; legacy entries are reported as unknown."""
+    if not isinstance(routes, list):
+        return {
+            "valid": False,
+            "issues": ["auxiliary_routes_not_list"],
+            "obligation_unknown_refs": [],
+        }
     issues: list[str] = []
     unknown: list[str] = []
     seen: set[str] = set()
-    tc_refs = set(tc_testware_refs or [])
+    tc_refs = {ref for ref in _list_of(tc_testware_refs) if _text(ref)}
     for index, entry in enumerate(routes):
         if not isinstance(entry, dict):
             issues.append(f"invalid_auxiliary_route:{index}")
@@ -797,6 +835,9 @@ def validate_auxiliary_routes(
             issues.append(f"auxiliary_route_has_tc_ref:{ref}")
         if ref in tc_refs:
             issues.append(f"auxiliary_ref_also_tc_route:{ref}")
+        execution_ref = entry.get("execution_ref")
+        if execution_ref is not None and not _text(execution_ref):
+            issues.append(f"invalid_execution_ref:{ref}")
         required = entry.get("completion_required")
         if required is None:
             unknown.append(ref)
@@ -804,12 +845,12 @@ def validate_auxiliary_routes(
         if type(required) is not bool:
             issues.append(f"invalid_completion_required:{ref}")
             continue
-        if entry.get("executor_owner") not in AUXILIARY_OWNERS:
+        if not _in(entry.get("executor_owner"), AUXILIARY_OWNERS):
             issues.append(f"invalid_auxiliary_executor_owner:{ref}")
         if not _text(entry.get("implementation_revision")):
             issues.append(f"missing_auxiliary_implementation_revision:{ref}")
         basis = entry.get("selection_basis")
-        if basis not in AUXILIARY_BASES or required is not (
+        if not _in(basis, AUXILIARY_BASES) or required is not (
             basis in AUXILIARY_REQUIRED_BASES
         ):
             issues.append(f"invalid_auxiliary_selection_basis:{ref}")
@@ -833,18 +874,20 @@ def resolve_auxiliary_obligations(
     入力のRunは変更しない。現在の利用者指示・policyで根拠を解決できない補助は
     `blocked`のまま残し、完了済みActivityを書き換えず新revisionで復旧する。
     """
-    user_explicit = set(user_explicit_refs)
-    policy = set(policy_refs)
-    reference_only = set(reference_only_refs or [])
-    details = testware_details or {}
+    user_explicit = {ref for ref in _list_of(user_explicit_refs) if _text(ref)}
+    policy = {ref for ref in _list_of(policy_refs) if _text(ref)}
+    reference_only = {ref for ref in _list_of(reference_only_refs) if _text(ref)}
+    details = testware_details if isinstance(testware_details, dict) else {}
     entries = [
         dict(entry)
-        for entry in run.get("auxiliary_routes", [])
+        for entry in _list_of(run.get("auxiliary_routes"))
         if isinstance(entry, dict)
     ]
-    known = {entry.get("testware_ref") for entry in entries}
-    for ref in run.get("auxiliary_testware_refs", []):
-        if ref not in known:
+    known = {e.get("testware_ref") for e in entries if _text(e.get("testware_ref"))}
+    for ref in _list_of(run.get("auxiliary_testware_refs")):
+        if not _text(ref):
+            entries.append({"testware_ref": None})
+        elif ref not in known:
             entries.append({"testware_ref": ref})
     resolved: list[dict[str, Any]] = []
     unresolved: list[str] = []
@@ -852,6 +895,9 @@ def resolve_auxiliary_obligations(
     is_v2 = run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
     for entry in entries:
         ref = entry.get("testware_ref")
+        if not _text(ref):
+            unresolved.append(str(ref))
+            continue
         # version無しの旧Runが持つ`completion_required`は根拠を確認できないため引き継がない。
         if is_v2 and type(entry.get("completion_required")) is bool:
             resolved.append(entry)
@@ -865,12 +911,13 @@ def resolve_auxiliary_obligations(
         else:
             unresolved.append(str(ref))
             continue
-        detail = details.get(ref, {})
+        detail = details.get(ref)
+        detail = detail if isinstance(detail, dict) else {}
         owner = entry.get("executor_owner") or detail.get("executor_owner")
         revision = entry.get("implementation_revision") or detail.get(
             "implementation_revision"
         )
-        if owner not in AUXILIARY_OWNERS or not _text(revision):
+        if not _in(owner, AUXILIARY_OWNERS) or not _text(revision):
             missing_details.append(str(ref))
             continue
         resolved.append(
@@ -925,6 +972,14 @@ def _revision_issue(ref: Any, declared: Any) -> str:
     return f"implementation_revision_{kind}:{ref}"
 
 
+def _route_done(item: dict[str, Any]) -> bool:
+    """TC routeのowner結果が確定・投影済みか。testware routeはattempt・raw取得も要する。"""
+    done = item["result_finalized"] and item["source_result_projectable"]
+    if item["route_type"] == "testware":
+        done = done and item["raw_capture_complete"] and _text(item["attempt_ref"])
+    return bool(done)
+
+
 def project_activity(
     run: dict[str, Any],
     source_executions: dict[str, dict[str, Any]],
@@ -932,28 +987,50 @@ def project_activity(
     cleanup_status: str = "対象なし",
     unresolved: list[Any] | None = None,
 ) -> dict[str, Any]:
-    routes = run.get("required_routes", [])
     derived_unresolved: list[str] = []
+    if not isinstance(run, dict):
+        derived_unresolved.append("run_not_object")
+        run = {}
+    sources: Any = source_executions
+    if not isinstance(sources, dict):
+        derived_unresolved.append("source_executions_not_object")
+        sources = {}
+    raw_routes = run.get("required_routes", [])
+    if not isinstance(raw_routes, list):
+        derived_unresolved.append("required_routes_not_list")
+        raw_routes = []
+    routes: list[dict[str, Any]] = []
+    for index, route in enumerate(raw_routes):
+        if isinstance(route, dict):
+            routes.append(route)
+        else:
+            derived_unresolved.append(f"invalid_required_route:{index}")
     projected: list[dict[str, Any]] = []
     by_tc: dict[str, list[dict[str, Any]]] = {}
+    seen_routes: set[str] = set()
     for route in routes:
+        route_ref = route.get("route_ref")
         execution_ref = route.get("execution_ref")
-        source = source_executions.get(execution_ref, {}) if execution_ref else {}
+        if execution_ref is not None and not _text(execution_ref):
+            derived_unresolved.append(f"invalid_execution_ref:{route_ref}")
+            execution_ref = None
+        route_key = f"{route.get('tc_ref')}|{route_ref}"
+        if route_key in seen_routes:
+            derived_unresolved.append(f"duplicate_required_route:{route_key}")
+        seen_routes.add(route_key)
+        source = _source_of(sources, execution_ref)
+        is_testware = route.get("route_type") == "testware"
         start_state = source.get("start_state", "未開始")
         started = (
             start_state == "開始済み" and source.get("actual_start_confirmed") is True
         )
         revision_ok = _revision_confirmed(
-            route.get("implementation_revision"),
-            source,
-            required=route.get("route_type") == "testware",
+            route.get("implementation_revision"), source, required=is_testware
         )
         actual_start = started and revision_ok
         if started and not revision_ok:
             derived_unresolved.append(
-                _revision_issue(
-                    route.get("route_ref"), route.get("implementation_revision")
-                )
+                _revision_issue(route_ref, route.get("implementation_revision"))
             )
         source_result = source.get("source_result")
         result_finalized = source.get("result_finalized") is True
@@ -962,7 +1039,7 @@ def project_activity(
         )
         item = {
             "tc_ref": route.get("tc_ref"),
-            "route_ref": route.get("route_ref"),
+            "route_ref": route_ref,
             "route_type": route.get("route_type"),
             "execution_ref": execution_ref,
             "implementation_revision": route.get("implementation_revision"),
@@ -970,33 +1047,62 @@ def project_activity(
             "source_result": source_result,
             "result_finalized": result_finalized,
             "source_result_projectable": source_result_projectable,
-            "cleanup_status": source.get("cleanup_status", "対象なし"),
-            "evidence_refs": list(source.get("evidence_refs", [])),
+            # testware routeのcleanupは明示された値だけを確認済みとし、欠落は未確認にする。
+            "cleanup_status": source.get(
+                "cleanup_status", "未確認" if is_testware else "対象なし"
+            ),
+            "evidence_refs": list(_list_of(source.get("evidence_refs"))),
             "executed": actual_start,
             "blocked": not actual_start
             and (source.get("blocked") is True or (started and not revision_ok)),
         }
+        if is_testware:
+            item["attempt_ref"] = source.get("attempt_ref")
+            item["raw_capture_complete"] = source.get("raw_capture_complete") is True
         projected.append(item)
         by_tc.setdefault(str(route.get("tc_ref")), []).append(item)
 
-    tc_execution_refs = {
-        route.get("execution_ref") for route in routes if route.get("execution_ref")
+    tc_execution_refs = {i["execution_ref"] for i in projected if i["execution_ref"]}
+    raw_auxiliary = run.get("auxiliary_routes", [])
+    if not isinstance(raw_auxiliary, list):
+        derived_unresolved.append("auxiliary_routes_not_list")
+        raw_auxiliary = []
+    auxiliary_entries: list[dict[str, Any]] = []
+    for index, entry in enumerate(raw_auxiliary):
+        if isinstance(entry, dict):
+            auxiliary_entries.append(entry)
+        else:
+            derived_unresolved.append(f"invalid_auxiliary_route:{index}")
+    covered = {
+        e.get("testware_ref") for e in auxiliary_entries if _text(e.get("testware_ref"))
     }
-    auxiliary_entries = [
-        entry for entry in run.get("auxiliary_routes", []) if isinstance(entry, dict)
-    ]
-    covered = {entry.get("testware_ref") for entry in auxiliary_entries}
     # 旧Runのrefだけの補助は義務不明のまま別枠に残し、完了へ数えない。
-    auxiliary_entries += [
-        {"testware_ref": ref}
-        for ref in run.get("auxiliary_testware_refs", [])
-        if ref not in covered
-    ]
+    raw_refs = run.get("auxiliary_testware_refs", [])
+    if not isinstance(raw_refs, list):
+        derived_unresolved.append("auxiliary_testware_refs_not_list")
+        raw_refs = []
+    for index, ref in enumerate(raw_refs):
+        if not _text(ref):
+            derived_unresolved.append(f"invalid_auxiliary_testware_ref:{index}")
+        elif ref not in covered:
+            auxiliary_entries.append({"testware_ref": ref})
+            covered.add(ref)
     auxiliary_projected: list[dict[str, Any]] = []
+    seen_auxiliary: set[str] = set()
     run_is_v2 = run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
-    for route in auxiliary_entries:
+    for index, route in enumerate(auxiliary_entries):
+        testware_ref = route.get("testware_ref")
+        if not _text(testware_ref):
+            derived_unresolved.append(f"invalid_auxiliary_testware_ref:{index}")
+        elif testware_ref in seen_auxiliary:
+            derived_unresolved.append(f"duplicate_auxiliary_route:{testware_ref}")
+        else:
+            seen_auxiliary.add(testware_ref)
         execution_ref = route.get("execution_ref")
-        source = source_executions.get(execution_ref, {}) if execution_ref else {}
+        if execution_ref is not None and not _text(execution_ref):
+            derived_unresolved.append(f"invalid_execution_ref:{testware_ref}")
+            execution_ref = None
+        source = _source_of(sources, execution_ref)
         started = (
             source.get("start_state") == "開始済み"
             and source.get("actual_start_confirmed") is True
@@ -1015,15 +1121,13 @@ def project_activity(
             )
         if started and not revision_ok:
             derived_unresolved.append(
-                _revision_issue(
-                    route.get("testware_ref"), route.get("implementation_revision")
-                )
+                _revision_issue(testware_ref, route.get("implementation_revision"))
             )
         actual_start = started and revision_ok and not shared
         source_result = source.get("source_result")
         auxiliary_projected.append(
             {
-                "testware_ref": route.get("testware_ref"),
+                "testware_ref": testware_ref,
                 "executor_owner": route.get("executor_owner"),
                 "implementation_revision": route.get("implementation_revision"),
                 "selection_basis": route.get("selection_basis"),
@@ -1038,7 +1142,7 @@ def project_activity(
                 "raw_capture_complete": source.get("raw_capture_complete") is True,
                 # 補助のcleanupは明示された値だけを確認済みとし、欠落は未確認にする。
                 "cleanup_status": source.get("cleanup_status", "未確認"),
-                "evidence_refs": list(source.get("evidence_refs", [])),
+                "evidence_refs": list(_list_of(source.get("evidence_refs"))),
                 "executed": actual_start,
                 "blocked": not actual_start
                 and (
@@ -1049,9 +1153,7 @@ def project_activity(
             }
         )
         if required is None:
-            derived_unresolved.append(
-                f"auxiliary_obligation_unknown:{route.get('testware_ref')}"
-            )
+            derived_unresolved.append(f"auxiliary_obligation_unknown:{testware_ref}")
 
     required_aux = [i for i in auxiliary_projected if i["completion_required"] is True]
     tc_states = {}
@@ -1082,7 +1184,7 @@ def project_activity(
             and item["source_result_projectable"]
             and item["raw_capture_complete"]
             and _text(item["attempt_ref"])
-            and item["cleanup_status"] in CLEANUP_CLOSED
+            and _in(item["cleanup_status"], CLEANUP_CLOSED)
         )
 
     unresolved_values = list(unresolved or [])
@@ -1099,9 +1201,9 @@ def project_activity(
     bad_cleanups = [
         value
         for value in [cleanup_status, *started_cleanups]
-        if value not in CLEANUP_CLOSED
+        if not _in(value, CLEANUP_CLOSED)
     ]
-    if bad_cleanups and cleanup_status in CLEANUP_CLOSED:
+    if bad_cleanups and _in(cleanup_status, CLEANUP_CLOSED):
         cleanup_status = bad_cleanups[0]
     if bad_cleanups or unresolved_values:
         state = "部分完了（ブロック中あり）" if started_units else "ブロック中"
@@ -1118,10 +1220,9 @@ def project_activity(
             state = "未開始"
         else:
             state = "部分完了（ブロック中あり）" if started_units else "ブロック中"
-    elif any(
-        not (item["result_finalized"] and item["source_result_projectable"])
-        for item in projected
-    ) or any(not aux_completed(i) for i in required_aux):
+    elif any(not _route_done(item) for item in projected) or any(
+        not aux_completed(i) for i in required_aux
+    ):
         state = "実行中"
     elif routes or required_aux:
         state = "完了"
@@ -1155,6 +1256,41 @@ def project_activity(
         "cleanup_status": cleanup_status,
         "unresolved": unresolved_values,
     }
+
+
+def verify_activity_against_run(
+    run: dict[str, Any], activity: dict[str, Any]
+) -> dict[str, Any]:
+    """保存済みRunを正本として、Activityのroute集合・実施義務・状態・件数を再計算し照合する。
+
+    Activity自身の申告（`route_results`・`completion_required`・件数）は、Runから
+    導出した値と一致しない限り検証済みにしない。RunとActivityのどちらかが
+    objectでない場合も例外にせず不一致として返す。
+    """
+    if not isinstance(run, dict) or not isinstance(activity, dict):
+        return {"valid": False, "mismatches": ["run_or_activity_not_object"]}
+    reported_unresolved = _list_of(activity.get("unresolved"))
+    recomputed = project_activity(
+        run,
+        activity.get("source_executions", {}),
+        cleanup_status=activity.get("cleanup_status", "対象なし"),
+        unresolved=reported_unresolved,
+    )
+    mismatches = [
+        field
+        for field in (
+            "route_contract_version",
+            "activity_state",
+            "route_results",
+            "auxiliary_route_results",
+            "tc_execution_state",
+            "counts",
+            "cleanup_status",
+            "unresolved",
+        )
+        if recomputed.get(field) != activity.get(field)
+    ]
+    return {"valid": not mismatches, "mismatches": mismatches}
 
 
 def update_activity(

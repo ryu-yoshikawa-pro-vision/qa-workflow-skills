@@ -20,7 +20,8 @@
       "source_result": "PASS",
       "implementation_revision": "rev-2026-11-09",
       "attempt_ref": "attempt-t2",
-      "raw_capture_complete": true
+      "raw_capture_complete": true,
+      "cleanup_status": "対象なし"
     },
     "EXEC-A-001": {
       "start_state": "開始済み",
@@ -71,7 +72,9 @@
       "cleanup_status": "対象なし",
       "evidence_refs": [],
       "executed": true,
-      "blocked": false
+      "blocked": false,
+      "attempt_ref": "attempt-t2",
+      "raw_capture_complete": true
     }
   ],
   "auxiliary_route_results": [

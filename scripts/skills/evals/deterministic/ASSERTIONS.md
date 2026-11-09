@@ -333,6 +333,7 @@
 - `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させず、補助結果の取得完全性（attempt・raw・cleanup・実装revision）をsourceと照合する
 - `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
+- `REG-D018` v2 Activityのrouteと実施義務を保存済みRun（`run`引数または`expected.json`の`run`）と照合する。Runが無い経路では完了の主張を拒否し、それ以外は警告にとどめる。旧形式のActivityは対象外
 
 ## exploratory-testing
 

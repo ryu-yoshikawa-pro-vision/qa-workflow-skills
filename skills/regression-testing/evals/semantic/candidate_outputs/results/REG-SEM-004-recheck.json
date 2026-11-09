@@ -9,14 +9,12 @@
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "manual\u3068E2E-55\u306e\u4e21\u65b9\u3092required route\u3068\u3057\u3066\u56fa\u5b9a\u3057\u3066\u3044\u308b\u3002manual\u306fscenario.when\u958b\u59cb\u6e08\u307f\u30fbfinalized=true\u30fbraw result FAIL\u3092\u518d\u89e3\u91c8\u305b\u305a\u305d\u306e\u307e\u307e\u8a18\u9332\u3057\u3066\u3044\u308b\u3002E2E-55\u306fartifact\u306e\u5b58\u5728\u3084preflight\u3060\u3051\u3067\u306f\u958b\u59cb\u6271\u3044\u306b\u305b\u305a\u3001actual_start_confirmed=false\u3001result_finalized=false\u3001route_status=blocked\u3068\u3057\u3066\u4fdd\u6301\u3057\u3066\u3044\u308b\u3002\u5168required route\u304c\u958b\u59cb\u3055\u308c\u3066\u3044\u306a\u3044\u305f\u3081logical TC-301\u306fexecuted=false\u3001executed_tc_count=0\u3068\u3057\u3001\u8ad6\u7406TC\u5358\u4f4d\u3067\u6271\u3063\u3066\u3044\u308b\u3002routes_total=2\u3001routes_actual_started=1\u3001routes_blocked=1\u306e\u96c6\u8a08\u3082\u6574\u5408\u3057\u3066\u3044\u308b\u3002FAIL\u306fDefect\u3078\u81ea\u52d5\u767b\u9332\u305b\u305a\u3001owner\u3078\u623b\u3057\u3066\u3044\u308b\u3002",
+      "reason": "manual route\u306f\u958b\u59cb\u6e08\u307f\u30fbfinalized=true\u30fbraw result FAIL\u306e\u307e\u307e\u518d\u89e3\u91c8\u305b\u305a\u4fdd\u6301\u3057\u3066\u3044\u308b\u3002E2E-55\u306fartifact\u5b58\u5728\u3084preflight\u304b\u3089\u958b\u59cb\u3092\u63a8\u5b9a\u305b\u305a\u3001\u672a\u958b\u59cb\u30fbblocked\u30fbfinalized=false\u3068\u3057\u3066\u4fdd\u6301\u3057\u3066\u3044\u308b\u3002\u8ad6\u7406TC-301\u306f\u5168required route\u958b\u59cb\u524d\u306e\u305f\u3081executed\u3068\u305b\u305a\u3001executed_tc_count=0\u3068\u3057\u3066\u3044\u308b\u3002required route\u30922\u4ef6\u306eroute\u5358\u4f4d\u3067\u6271\u3044\u3064\u3064TC\u5358\u4f4d\u3067\u3082\u96c6\u8a08\u3057\u3066\u304a\u308a\u3001Reference\u3068\u610f\u5473\u7684\u306b\u4e00\u81f4\u3059\u308b\u3002\u8ab2\u984c\u6587\u306b\u306a\u3044\u5024\u306fnull/\u672a\u78ba\u8a8d\u3068\u3057\u3066\u88dc\u5b8c\u3057\u3066\u3044\u306a\u3044\u3002",
       "evidence": [
-        "\"executed\": false, \"reason\": \"required route E2E-55 \u306eactual start\u304c\u672a\u78ba\u8a8d\u306e\u305f\u3081\u3001\u5168required route\u306estart\u6761\u4ef6\u3092\u6e80\u305f\u3055\u306a\u3044\"",
-        "\"executed_tc_count\": 0, \"routes_total\": 2, \"routes_actual_started\": 1, \"routes_blocked\": 1",
-        "manual: \"actual_start_confirmed\": true, \"result_finalized\": true, \"source_outcome\": \"FAIL\"",
-        "E2E-55: \"source_start_state\": \"preflight blocked; actual attempt not started\", \"actual_start_confirmed\": false, \"route_status\": \"blocked\"",
-        "artifact\u306e\u5b58\u5728\u3084preflight\u901a\u904e\u72b6\u6cc1\u3060\u3051\u3067\u306f\u958b\u59cb\u6271\u3044\u306b\u3057\u307e\u305b\u3093",
-        "Regression\u306f`FAIL`\u3092\u518d\u5224\u5b9a\u305b\u305a\u3001\u305d\u306e\u307e\u307e\u6295\u5f71\u3057\u307e\u3059"
+        "\"tc_execution_state\": {\"TC-301\": \"blocked\"} \u3068 \"executed_tc_count\": 0",
+        "manual:TC-301 \u306e source_result \u306f \"FAIL\"\u3001result_finalized: true\u3001actual_start_confirmed: true",
+        "e2e:E2E-55 \u306f start_state \"\u672a\u958b\u59cb\"\u3001actual_start_confirmed: false\u3001result_finalized: false\u3001unresolved \u306b e2e_preflight_blocked:E2E-55",
+        "\u300cartifact\u306e\u5b58\u5728\u3084preflight\u306e\u72b6\u614b\u304b\u3089\u958b\u59cb\u3092\u63a8\u5b9a\u3057\u307e\u305b\u3093\u300d\u300cowner\u306eraw result\u306e\u307e\u307e\u4fdd\u6301\u3057\u3001\u518d\u5224\u5b9a\u3001\u518d\u5206\u985e\u3001PASS / \u5224\u5b9a\u4e0d\u80fd\u3078\u306e\u8aad\u66ff\u3048\u306f\u3057\u307e\u305b\u3093\u300d"
       ]
     }
   ],

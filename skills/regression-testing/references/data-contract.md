@@ -57,6 +57,13 @@ TCに対応する非E2Eの自動／runner実行は、`required_routes`へ`route_
 
 同じTCに複数routeがある場合、全routeの実開始・結果確定・cleanupを照合します。別TCや補助testwareのPASSで未実行TCを完了にしません。
 
+`testware` routeのsource executionは、補助と同じ`testware-execution`の契約で`attempt_ref`・`raw_capture_complete`・`cleanup_status`・`implementation_revision`を返します。Activityの`route_results`（`testware` routeのみ）はこれらをそのまま投影し、次の場合は`完了`にしません。
+
+- `cleanup_status`が無い・`未確認` / `失敗` / `一部失敗` / `進行中`などの未終了状態: 未確認として扱い、`対象なし`へ読み替えません。完了に使えるのは`成功` / `対象なし` / `意図的に残した状態`だけです。
+- `attempt_ref`が空、または`raw_capture_complete`が`true`でない: `実行中`のままです。
+
+`manual` / `e2e` routeのcleanup既定値は旧形式の互換のため変更しません。`testware-execution`の正式な返却項目は担当G（PR #29）の成果物で確定し、PR #22でこの契約と照合します。
+
 ## TCなし補助testwareの実施義務
 
 Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-test-execution` / `testware-execution`）、`implementation_revision`、`selection_basis`、`completion_required`（真偽値）、`execution_ref`を持ちます。
@@ -69,6 +76,64 @@ Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-te
 補助routeのsource executionは、TC routeと同じ項目に加えて`attempt_ref`（実run / attempt）、`raw_capture_complete`（raw結果取得の完全性）、`cleanup_status`、`implementation_revision`を返します。Activityの`auxiliary_route_results`はこれらをそのまま投影します。補助の`cleanup_status`をsourceが返さない場合は`対象なし`へ読み替えず`未確認`として扱い、確認できるまでActivityを`完了`にしません（TC routeの旧形式の既定値は変更しません）。
 
 `select_auxiliary_testware()`は`testware_details`（owner・実装revision）が無い呼び出しでは選定結果だけを返し、`execution_ready: false`でrouteにownerとrevisionを含めません。実行可能なRunにするにはownerとrevisionを解決して`execution_ready: true`を得てから`auxiliary_routes`を保存します。
+
+## Activityのmachine artifact形（抜粋）
+
+`source_executions`は`execution_ref`をkeyとするobject、`tc_execution_state`は`tc_ref`をkeyとするobjectです（配列にしません）。`route_results[]`はTC routeごと、`auxiliary_route_results[]`は補助routeごとに1要素で、ownerのsourceから投影します。
+
+```json
+{
+  "artifact_type": "activity",
+  "route_contract_version": "2",
+  "activity_state": "部分完了（ブロック中あり）",
+  "source_executions": {
+    "EXEC-T-1": {
+      "start_state": "開始済み",
+      "actual_start_confirmed": true,
+      "result_finalized": true,
+      "source_result": "PASS",
+      "implementation_revision": "<Runの値>",
+      "attempt_ref": "<attempt ref>",
+      "raw_capture_complete": true,
+      "cleanup_status": "対象なし"
+    }
+  },
+  "tc_execution_state": { "TC-1": "executed" },
+  "route_results": [
+    {
+      "tc_ref": "TC-1",
+      "route_ref": "testware:TC-1",
+      "route_type": "testware",
+      "execution_ref": "EXEC-T-1",
+      "executed": true
+    }
+  ],
+  "auxiliary_route_results": [
+    {
+      "testware_ref": "<ref>",
+      "completion_required": true,
+      "execution_ref": "EXEC-A-1",
+      "executed": false
+    }
+  ]
+}
+```
+
+上は形を示す抜粋です。全項目を持つ完全な例は`evals/output/cases/reg-out-003`（Run）・`reg-out-004` / `reg-out-005`（Activity）です。
+
+## Runとの照合
+
+Activityの`route_results` / `auxiliary_route_results`・`completion_required`・件数は、Activity自身の申告であり、それだけでは検証済みになりません。保存済みRunを正本として、次を照合します。
+
+- Runの`required_routes`と`auxiliary_routes`（旧形式の`auxiliary_testware_refs`のrefを含む）の各entryが、Activityに欠落・追加・重複なく現れること。
+- 各補助の`completion_required`・`selection_basis`・`executor_owner`・`implementation_revision`・`execution_ref`がRunの値と一致すること。Activity側で必須補助を削除したり`completion_required`を変更したりした場合は不一致です。
+- Run由来のsourceから導出した状態・件数と一致すること。
+
+入口は`validator.py`の`validate_activity_against_run(activity, run)`と、決定論的評価の`REG-D018`（`validate(text, expected, eval_id, run=...)`の`run`引数、またはfixtureの`expected.json`の`run`）です。runtimeでは`regression_runtime.py::verify_activity_against_run(run, activity)`が、Runから`project_activity()`で再計算した投影とActivityを比較します。Runを渡せない経路では、`v2` Activityの`完了`の主張を`REG-D018`で失敗とし、それ以外の状態は警告にとどめます（Run照合済みとは扱いません）。旧形式のActivityは対象外です。保存・承認・条件付き更新による実際のRun取得は担当Aの共通契約に従い、PR #22で結合します。
+
+## 不正入力の扱い
+
+`execution_ref`・`testware_ref`・route配列・source等の型が不正（配列・object・空文字・非list）でも、検証は例外で中断しません。`validate_required_routes()` / `validate_auxiliary_routes()`は`valid: false`と`issues`を返し、`project_activity()`は`invalid_execution_ref:<ref>`・`invalid_required_route:<index>`・`source_executions_not_object`・`duplicate_required_route:<key>`等を`unresolved`へ追加して`完了`にしません。`select_auxiliary_testware()`は`invalid_refs`を持つ`unresolved`を返し、決定論的validatorは不正型を失敗として扱います。
 
 ## Activity完了判定
 

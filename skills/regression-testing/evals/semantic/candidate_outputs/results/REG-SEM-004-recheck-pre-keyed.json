@@ -1,0 +1,29 @@
+{
+  "skill": "regression-testing",
+  "eval_id": "REG-SEM-004",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "REG-SEM-004",
+      "title": "Required route\u3068actual execution",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "manual\u3068E2E-55\u306e\u4e21\u65b9\u3092required route\u3068\u3057\u3066\u56fa\u5b9a\u3057\u3066\u3044\u308b\u3002manual\u306fscenario.when\u958b\u59cb\u6e08\u307f\u30fbfinalized=true\u30fbraw result FAIL\u3092\u518d\u89e3\u91c8\u305b\u305a\u305d\u306e\u307e\u307e\u8a18\u9332\u3057\u3066\u3044\u308b\u3002E2E-55\u306fartifact\u306e\u5b58\u5728\u3084preflight\u3060\u3051\u3067\u306f\u958b\u59cb\u6271\u3044\u306b\u305b\u305a\u3001actual_start_confirmed=false\u3001result_finalized=false\u3001route_status=blocked\u3068\u3057\u3066\u4fdd\u6301\u3057\u3066\u3044\u308b\u3002\u5168required route\u304c\u958b\u59cb\u3055\u308c\u3066\u3044\u306a\u3044\u305f\u3081logical TC-301\u306fexecuted=false\u3001executed_tc_count=0\u3068\u3057\u3001\u8ad6\u7406TC\u5358\u4f4d\u3067\u6271\u3063\u3066\u3044\u308b\u3002routes_total=2\u3001routes_actual_started=1\u3001routes_blocked=1\u306e\u96c6\u8a08\u3082\u6574\u5408\u3057\u3066\u3044\u308b\u3002FAIL\u306fDefect\u3078\u81ea\u52d5\u767b\u9332\u305b\u305a\u3001owner\u3078\u623b\u3057\u3066\u3044\u308b\u3002",
+      "evidence": [
+        "\"executed\": false, \"reason\": \"required route E2E-55 \u306eactual start\u304c\u672a\u78ba\u8a8d\u306e\u305f\u3081\u3001\u5168required route\u306estart\u6761\u4ef6\u3092\u6e80\u305f\u3055\u306a\u3044\"",
+        "\"executed_tc_count\": 0, \"routes_total\": 2, \"routes_actual_started\": 1, \"routes_blocked\": 1",
+        "manual: \"actual_start_confirmed\": true, \"result_finalized\": true, \"source_outcome\": \"FAIL\"",
+        "E2E-55: \"source_start_state\": \"preflight blocked; actual attempt not started\", \"actual_start_confirmed\": false, \"route_status\": \"blocked\"",
+        "artifact\u306e\u5b58\u5728\u3084preflight\u901a\u904e\u72b6\u6cc1\u3060\u3051\u3067\u306f\u958b\u59cb\u6271\u3044\u306b\u3057\u307e\u305b\u3093",
+        "Regression\u306f`FAIL`\u3092\u518d\u5224\u5b9a\u305b\u305a\u3001\u305d\u306e\u307e\u307e\u6295\u5f71\u3057\u307e\u3059"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

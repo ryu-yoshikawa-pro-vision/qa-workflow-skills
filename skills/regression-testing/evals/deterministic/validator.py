@@ -123,7 +123,123 @@ def _auxiliary_run_issues(doc: dict[str, Any]) -> list[str]:
     return issues
 
 
-def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
+def _ref_set(value: Any) -> set[str] | None:
+    """TC refのlistをsetにする。listでない・空でない文字列以外を含む場合はNone。"""
+    if not isinstance(value, list) or not all(_text(item) for item in value):
+        return None
+    return set(value)
+
+
+def _in(value: Any, allowed: set[str]) -> bool:
+    """型不正の値（list・dict等）を集合照会へ渡さず不一致として扱う。"""
+    return isinstance(value, str) and value in allowed
+
+
+_ROUTE_IDENTITY = (
+    "tc_ref",
+    "route_ref",
+    "route_type",
+    "execution_ref",
+    "implementation_revision",
+)
+_AUXILIARY_IDENTITY = (
+    "testware_ref",
+    "executor_owner",
+    "implementation_revision",
+    "selection_basis",
+    "completion_required",
+    "execution_ref",
+)
+
+
+def _identity_counts(entries: list[dict[str, Any]], fields: tuple[str, ...]):
+    counts: dict[str, int] = {}
+    for entry in entries:
+        key = json.dumps(
+            [entry.get(field) for field in fields],
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def validate_activity_against_run(
+    activity: dict[str, Any], run: Any
+) -> list[dict[str, Any]]:
+    """保存済みRunを正本として、Activityのroute集合と実施義務を照合する。
+
+    Activity自身の`completion_required`や件数の申告は、Runのrequired route・
+    `auxiliary_routes`と一致しない限り検証済みにしない。欠落・追加・重複・
+    義務（`completion_required`・選定根拠・owner・revision）の変更を検出する。
+    """
+    if not isinstance(run, dict) or run.get("artifact_type") != "run":
+        return [{"issue": "run_artifact_required"}]
+    issues: list[dict[str, Any]] = []
+    if run.get("route_contract_version") != ROUTE_CONTRACT_VERSION:
+        issues.append({"issue": "run_not_contract_v2"})
+    if (
+        _text(activity.get("run_ref"))
+        and _text(run.get("run_ref"))
+        and activity["run_ref"] != run["run_ref"]
+    ):
+        issues.append({"issue": "run_ref_mismatch"})
+    shapes = {
+        "run_required_routes": run.get("required_routes", []),
+        "run_auxiliary_routes": run.get("auxiliary_routes", []),
+        "activity_route_results": activity.get("route_results", []),
+        "activity_auxiliary_route_results": activity.get("auxiliary_route_results", []),
+    }
+    for name, value in shapes.items():
+        if not isinstance(value, list) or not all(isinstance(v, dict) for v in value):
+            issues.append({"issue": f"{name}_not_list_of_objects"})
+    if issues and any(i["issue"].endswith("_not_list_of_objects") for i in issues):
+        return issues
+    run_refs = run.get("auxiliary_testware_refs", [])
+    covered = {e.get("testware_ref") for e in shapes["run_auxiliary_routes"]}
+    # 旧形式のref（義務不明）もRunの補助として扱い、Activityが落とせないようにする。
+    legacy_refs = [
+        {"testware_ref": ref}
+        for ref in (run_refs if isinstance(run_refs, list) else [])
+        if _text(ref) and ref not in covered
+    ]
+    pairs = (
+        (
+            "required_route",
+            shapes["run_required_routes"],
+            shapes["activity_route_results"],
+            _ROUTE_IDENTITY,
+        ),
+        (
+            "auxiliary_route",
+            [*shapes["run_auxiliary_routes"], *legacy_refs],
+            shapes["activity_auxiliary_route_results"],
+            _AUXILIARY_IDENTITY,
+        ),
+    )
+    for kind, from_run, from_activity, fields in pairs:
+        expected_counts = _identity_counts(from_run, fields)
+        actual_counts = _identity_counts(from_activity, fields)
+        for key, count in expected_counts.items():
+            if actual_counts.get(key, 0) < count:
+                issues.append(
+                    {"issue": f"{kind}_missing_from_activity", "identity": key}
+                )
+        for key, count in actual_counts.items():
+            if expected_counts.get(key, 0) < count:
+                issues.append({"issue": f"{kind}_not_in_run", "identity": key})
+        if any(c > 1 for c in [*expected_counts.values(), *actual_counts.values()]):
+            issues.append({"issue": f"{kind}_duplicate"})
+    return issues
+
+
+def validate(
+    text: str,
+    expected: dict[str, Any],
+    eval_id: str,
+    run: dict[str, Any] | None = None,
+) -> EvalResult:
     result = EvalResult("regression-testing", eval_id)
     doc, errors = _document(text)
     result.add(
@@ -370,6 +486,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     elif kind == "run":
         scope = doc.get("run_scope")
         baseline = doc.get("baseline", {})
+        if not isinstance(baseline, dict):
+            baseline = {}
         result.add(
             "REG-D006",
             scope != "full"
@@ -379,14 +497,20 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             ),
             "full Runはcompleteかつcurrentなbaselineだけから作ること",
         )
-        selected = set(doc.get("selected_tc_refs", []))
-        members = set(baseline.get("member_tc_refs", []))
+        selected = _ref_set(doc.get("selected_tc_refs", []))
+        members = _ref_set(baseline.get("member_tc_refs", []))
+        refs_valid = selected is not None and members is not None
+        selected = selected or set()
+        members = members or set()
         result.add(
             "REG-D007",
-            selected <= members
+            refs_valid
+            and selected <= members
             and (scope != "selected" or doc.get("suite_complete") is False),
             "selected RunはSuite memberのsubsetとして保持し、Suite完了と扱わないこと",
-            evidence=sorted(selected - members),
+            evidence=sorted(selected - members)
+            if refs_valid
+            else "invalid_tc_ref_list",
         )
         routes = doc.get("required_routes", [])
         if not isinstance(routes, list) or not all(
@@ -399,7 +523,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         invalid = [
             route
             for route in routes
-            if route.get("route_type") not in {"manual", "e2e", "testware"}
+            if not _in(route.get("route_type"), {"manual", "e2e", "testware"})
             or (route.get("route_type") == "e2e" and not route.get("e2e_testware_ref"))
             or (
                 route.get("route_type") == "testware"
@@ -457,10 +581,11 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             tc_ref = route.get("tc_ref")
             by_tc.setdefault(str(tc_ref), []).append(route)
             execution = _execution(source, route.get("execution_ref"))
+            is_testware = route.get("route_type") == "testware"
             actual_started = _source_started(
                 execution,
                 route.get("implementation_revision"),
-                require_revision=route.get("route_type") == "testware",
+                require_revision=is_testware,
             )
             if route.get("executed") is not actual_started:
                 source_mismatches.append(
@@ -479,7 +604,22 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                         "issue": "source_result_finalization_not_projected",
                     }
                 )
+            if v2 and is_testware:
+                # testware routeはattempt・raw取得・cleanupもownerのsourceから投影する。
+                for field, value in (
+                    ("attempt_ref", execution.get("attempt_ref")),
+                    (
+                        "raw_capture_complete",
+                        execution.get("raw_capture_complete") is True,
+                    ),
+                    ("cleanup_status", execution.get("cleanup_status", "未確認")),
+                ):
+                    if route.get(field) != value:
+                        source_mismatches.append(
+                            {"tc_ref": tc_ref, "issue": f"{field}_not_projected"}
+                        )
         state_errors = []
+        derived_states: dict[str, str] = {}
         for tc_ref, tc_routes in by_tc.items():
             started = all(route.get("executed") is True for route in tc_routes)
             expected_state = (
@@ -491,6 +631,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                     else "unexecuted"
                 )
             )
+            derived_states[tc_ref] = expected_state
             if tc_state.get(tc_ref) != expected_state:
                 state_errors.append({"tc_ref": tc_ref, "expected": expected_state})
         if v2:
@@ -518,13 +659,18 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             if _text(route.get("execution_ref"))
         }
 
+        def shared_with_tc(item: dict[str, Any]) -> bool:
+            ref = item.get("execution_ref")
+            return _text(ref) and ref in tc_execution_refs
+
         def route_complete(route: dict[str, Any]) -> bool:
             execution = _execution(source, route.get("execution_ref"))
+            is_testware = route.get("route_type") == "testware"
             return bool(
                 _source_started(
                     execution,
                     route.get("implementation_revision"),
-                    require_revision=route.get("route_type") == "testware",
+                    require_revision=is_testware,
                 )
                 and route.get("executed") is True
                 and route.get("result_finalized") is True
@@ -533,12 +679,21 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 and bool(route.get("source_result", "").strip())
                 and route.get("source_result") == execution.get("source_result")
                 and execution.get("result_finalized") is True
+                and (
+                    not is_testware
+                    or (
+                        execution.get("raw_capture_complete") is True
+                        and _text(execution.get("attempt_ref"))
+                        and route.get("raw_capture_complete") is True
+                        and route.get("attempt_ref") == execution.get("attempt_ref")
+                    )
+                )
             )
 
         def auxiliary_complete(item: dict[str, Any]) -> bool:
             execution = _execution(source, item.get("execution_ref"))
             return bool(
-                item.get("execution_ref") not in tc_execution_refs
+                not shared_with_tc(item)
                 and _source_started(
                     execution,
                     item.get("implementation_revision"),
@@ -550,7 +705,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 and execution.get("raw_capture_complete") is True
                 and _text(execution.get("attempt_ref"))
                 and item.get("attempt_ref") == execution.get("attempt_ref")
-                and execution.get("cleanup_status", "未確認") in CLEANUP_CLOSED
+                and _in(execution.get("cleanup_status", "未確認"), CLEANUP_CLOSED)
             )
 
         required_auxiliary = [
@@ -564,7 +719,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         if v2:
             started_cleanups = [
                 _execution(source, route.get("execution_ref")).get(
-                    "cleanup_status", "対象なし"
+                    "cleanup_status",
+                    "未確認" if route.get("route_type") == "testware" else "対象なし",
                 )
                 for route in routes
                 if route.get("executed") is True
@@ -580,8 +736,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 and all(route_complete(route) for route in routes)
                 and all(auxiliary_complete(item) for item in required_auxiliary)
                 and not obligation_unknown
-                and cleanup in CLEANUP_CLOSED
-                and all(value in CLEANUP_CLOSED for value in started_cleanups)
+                and _in(cleanup, CLEANUP_CLOSED)
+                and all(_in(value, CLEANUP_CLOSED) for value in started_cleanups)
                 and not doc.get("unresolved")
                 and not shape_issues
             )
@@ -608,7 +764,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                     is True
                     for route in routes
                 )
-                and cleanup in CLEANUP_CLOSED
+                and _in(cleanup, CLEANUP_CLOSED)
                 and not doc.get("unresolved")
             )
         result.add(
@@ -643,7 +799,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             for item in auxiliary:
                 execution = _execution(source, item.get("execution_ref"))
                 ref = item.get("testware_ref")
-                if item.get("execution_ref") in tc_execution_refs:
+                if shared_with_tc(item):
                     aux_issues.append(
                         {"testware_ref": ref, "issue": "execution_shared_with_tc"}
                     )
@@ -653,7 +809,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                         item.get("implementation_revision"),
                         require_revision=item.get("completion_required") is True,
                     )
-                    and item.get("execution_ref") not in tc_execution_refs,
+                    and not shared_with_tc(item),
                     "result_finalized": execution.get("result_finalized") is True,
                     "raw_capture_complete": execution.get("raw_capture_complete")
                     is True,
@@ -671,16 +827,31 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
                 value = route.get("source_result")
                 if route.get("executed") is True and _text(value):
                     tc_result_counts[value] = tc_result_counts.get(value, 0) + 1
+            auxiliary_result_counts: dict[str, int] = {}
+            for item in auxiliary:
+                value = item.get("source_result")
+                if item.get("executed") is True and _text(value):
+                    auxiliary_result_counts[value] = (
+                        auxiliary_result_counts.get(value, 0) + 1
+                    )
+            # 件数は元のrouteとsourceから独立に再計算し、公開された全件数と照合する。
             expected_counts = {
                 "tc_member_count": len(by_tc),
                 "executed_tc_count": sum(
                     all(route.get("executed") is True for route in tc_routes)
                     for tc_routes in by_tc.values()
                 ),
+                "unexecuted_tc_count": sum(
+                    state == "unexecuted" for state in derived_states.values()
+                ),
+                "blocked_tc_count": sum(
+                    state == "blocked" for state in derived_states.values()
+                ),
                 "source_result_counts": tc_result_counts,
                 "auxiliary_executed_count": sum(
                     item.get("executed") is True for item in auxiliary
                 ),
+                "auxiliary_source_result_counts": auxiliary_result_counts,
                 "auxiliary_required_count": len(required_auxiliary),
                 "auxiliary_required_completed_count": sum(
                     auxiliary_complete(item) for item in required_auxiliary
@@ -696,6 +867,32 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             "TCなし補助testwareを別枠に保ち、TC ref / countへ混在させず、補助結果の取得完全性をsourceと照合すること",
             evidence=aux_issues or None,
         )
+        # 保存済みRunを正本として、route集合・実施義務をActivityと照合する。
+        run_artifact = run if run is not None else expected.get("run")
+        if not v2:
+            result.add(
+                "REG-D018",
+                True,
+                "v2 Activityのrouteと実施義務を保存済みRunと照合すること（旧形式は対象外）",
+                evidence="legacy_activity",
+            )
+        elif run_artifact is None:
+            # Run無しではActivity自身の申告を検証済みとしない。完了の主張は拒否する。
+            result.add(
+                "REG-D018",
+                False,
+                "v2 Activityのrouteと実施義務を保存済みRunと照合すること",
+                severity="error" if expected_state == "完了" else "warning",
+                evidence=["run_not_supplied_activity_obligations_unverified"],
+            )
+        else:
+            run_issues = validate_activity_against_run(doc, run_artifact)
+            result.add(
+                "REG-D018",
+                not run_issues,
+                "v2 Activityのrouteと実施義務を保存済みRunと照合すること",
+                evidence=run_issues or None,
+            )
     expected_kind = expected.get("artifact_type")
     fixture_ok = not expected_kind or kind == expected_kind
     fixture_evidence: dict[str, Any] = {"expected": expected_kind, "actual": kind}
