@@ -381,6 +381,113 @@ class ArtifactStoreTests(unittest.TestCase):
             ],
         )
 
+
+    def test_placement_change_retires_earlier_decision(self) -> None:
+        initial = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": "context.md", "status": "absent"}],
+            "artifact_ref": "context.md",
+            "source_ref": "source/1",
+            "source_revision": "r1",
+            "change_reason": "init",
+        }
+        self.assertEqual(
+            persist_prepared(
+                self.store,
+                initial,
+                project_ref="Sample",
+                operation_id="create-for-policy",
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+            )["status"],
+            "stored",
+        )
+        initial_policy = {
+            "owner": "project-context",
+            "scope": "Sample",
+            "target_ref": "qa/old",
+            "revision": "policy-v1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v1",
+            "editable_scope": "markdown/worktree",
+            "feature_index_ref": "qa/feature-index.md",
+        }
+        first = {
+            "operation": "prepare-placement",
+            "markdown": self.store.read_current(
+                "project-context", "Sample", "context.md"
+            )["content"],
+            "dec_asm_owner": "project-context",
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "source/2",
+            "source_revision": "r2",
+            "change_reason": "initial policy",
+            "policy": initial_policy,
+        }
+        stored = persist_prepared(
+            self.store,
+            first,
+            project_ref="Sample",
+            operation_id="first-policy",
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+        )
+        self.assertEqual(stored["status"], "stored")
+        previous = self.store.read_current(
+            "project-context", "Sample", "context.md"
+        )["content"]
+        prior_decision = {
+            "draft_key": None,
+            "identity_action": "reuse",
+            "reuse_id": "DEC-001",
+            "cells": {
+                "確定内容": "QA成果物配置・人間編集方針",
+                "状態": "有効",
+                "決定根拠": "approval/verified",
+                "影響範囲": "Sample",
+                "関係": "独立",
+                "関連仕様根拠ID": "",
+                "置換先ID": "",
+                "備考": (
+                    "owner=project-context; target=qa/old; policy=policy-v1; "
+                    "editable=markdown/worktree; index=qa/feature-index.md"
+                ),
+            },
+        }
+        second = {
+            **first,
+            "markdown": previous,
+            "expected_revision": "r2",
+            "existing_policy": {**initial_policy, "decision_id": "DEC-001"},
+            "existing_decisions": [prior_decision],
+            "policy": {
+                **initial_policy,
+                "target_ref": "qa/new",
+                "revision": "policy-v2",
+                "approval_revision": "policy-v2",
+            },
+        }
+        changed = persist_prepared(
+            self.store,
+            second,
+            project_ref="Sample",
+            operation_id="second-policy",
+            approval_ref="approval/verified",
+            approval_revision="policy-v2",
+        )
+        self.assertEqual(changed["status"], "stored", changed)
+        self.assertEqual(changed["revision"], "r3")
+        current = self.store.read_current(
+            "project-context", "Sample", "context.md"
+        )["content"]
+        self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |", current)
+        self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", current)
+        self.assertIn("| QA成果物配置 | qa/new | Sample |", current)
+
+
     def test_section_update_requires_expected_revision_and_history(self) -> None:
         initial = {
             "operation": "prepare-create",

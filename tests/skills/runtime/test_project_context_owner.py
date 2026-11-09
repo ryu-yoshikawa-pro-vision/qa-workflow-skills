@@ -414,8 +414,58 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "current",
         )
         request["existing_policy"] = policy
+        self.assertEqual(handle(request)["status"], "blocked")
+        old_decision = {
+            "draft_key": None,
+            "identity_action": "reuse",
+            "reuse_id": "DEC-001",
+            "cells": {
+                "確定内容": "QA成果物配置・人間編集方針",
+                "状態": "有効",
+                "決定根拠": policy["approval_ref"],
+                "影響範囲": "Sample",
+                "関係": "独立",
+                "関連仕様根拠ID": "",
+                "置換先ID": "",
+                "備考": (
+                    "owner=project-context; target=qa/artifacts; "
+                    "policy=policy-v1; editable=human-worktree; "
+                    "index=qa/features/index.md"
+                ),
+            },
+        }
+        request["markdown"] = result["artifact_markdown"]
+        request["existing_policy"] = {**policy, "decision_id": "DEC-001"}
+        request["existing_decisions"] = [old_decision]
         self.assertEqual(handle(request)["status"], "reuse_candidate")
+        request["policy"] = {
+            **policy,
+            "target_ref": "qa/new-artifacts",
+            "revision": "policy-v2",
+            "approval_revision": "approval-v2",
+        }
+        updated = handle(request)
+        self.assertEqual(updated["status"], "draft", updated)
+        self.assertEqual(updated["decision_id"], "DEC-002")
+        self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |", updated["artifact_markdown"])
+        self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", updated["artifact_markdown"])
+        self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み | approval/verified | Sample | 独立 |  | DEC-002 |", updated["artifact_markdown"])
+        self.assertIn("| QA成果物配置 | qa/new-artifacts | Sample |", updated["artifact_markdown"])
+        self.assertEqual(
+            handle(
+                {
+                    "operation": "inspect",
+                    "markdown": updated["artifact_markdown"],
+                    "required_keys": [],
+                }
+            )["status"],
+            "current",
+        )
+        request["existing_decisions"] = []
+        self.assertEqual(handle(request)["status"], "blocked")
         request["existing_policy"] = None
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["markdown"] = context()
         request["policy"] = {**policy, "target_ref": "qa/|unauthorized"}
         self.assertEqual(handle(request)["status"], "blocked")
 

@@ -37,3 +37,9 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 初回または方針変更時は、既存Section 12のDECとSection 14の参照を同一draftに記録します。同一方針は`existing_policy`との一致で`reuse_candidate`を返し、不要なrevisionを作りません。この段階の`approval_ref`は自己申告値です。`persist_prepared`から実保存する際には、承認scope・revisionを外部認証した`authorize`callbackが必要です。
 
 `prepare-sections`は、根拠source・revision、変更理由、元文書ref／revisionを必須にし、既存文書の1〜11節と15節の本文だけを差分更新します。DEC/ASMの12/13節、成果物参照の14節、stable keyの16節はそれぞれ専用の更新操作へ委譲します。`prepare-create`にも任意の`section_updates`を指定でき、取得できた案件情報だけで既定templateを初期化します。いずれも保存済み正本への変更ではなく、実書込みには`persist_prepared`と認証済み承認を必要とします。
+
+配置方針の変更では、Section 12とSection 14に記録された現在有効なDECを照合し、旧DECの状態を`置換済み`、`置換先ID`を新DECに更新したうえで新方針を保存します。既存方針の`existing_policy.decision_id`と文書上のDECが不一致の場合はblockedとし、別の有効DECを並立させません。同一方針の再利用は、保存済みSection 12/14と方針のref・scope・revisionが一致する場合だけ可能です。
+
+正本が既存のGit管理Markdownである場合は、`scripts/git_artifact_store.py`の`GitArtifactStore`を明示選択できます。対象Git branchの`docs/PROJECT_CONTEXT.md`等を正本とし、Git commit SHAをexpected revisionに使う`update-ref`のnative CASで同一pathを更新します。履歴はGit commitから独立読戻しします。選択したbranchのGit objectが正本であり、未checkoutの作業ディレクトリを現行文書とは扱いません。ローカルSQLiteは別の案件でSQLiteを正本に選択した場合にのみ利用します。
+
+読み取りにも信頼済みhostから注入された`authorize`による案件scopeの権限確認を行います。operation再送時も権限を再評価します。両保存providerは認証済み呼出し元を仮定し、権限を自己申告するJSON CLIからは呼び出しません。
