@@ -25,7 +25,7 @@ def _relative(path: Any) -> str:
     value = _required_str(path, "path").replace("\\", "/")
     parsed = PurePosixPath(value)
     if (parsed.is_absolute() or ":" in value.split("/")[0]
-            or any(part in {".", ".."} for part in value.split("/")):
+            or any(part in {".", ".."} for part in value.split("/"))):
         raise ContractError("non_relative_test_path")
     return value
 
