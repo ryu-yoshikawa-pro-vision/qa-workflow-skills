@@ -63,8 +63,13 @@ class RoutingTests(unittest.TestCase):
         }
         self.assertTrue(contract.preflight(spec)["may_start"])
         self.assertEqual(
-            contract.preflight({key: value for key, value in spec.items()
-                                if key != "external_side_effects"})["reason"],
+            contract.preflight(
+                {
+                    key: value
+                    for key, value in spec.items()
+                    if key != "external_side_effects"
+                }
+            )["reason"],
             "external_side_effects_unverified",
         )
         self.assertFalse(
