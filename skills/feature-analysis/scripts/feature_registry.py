@@ -802,6 +802,11 @@ def _verify_git_evidence(
     from git_source_inventory import handle as read_git  # noqa: PLC0415
     from reconcile_git_coverage import handle as reconcile  # noqa: PLC0415
 
+    previous_sources = {
+        row["id"]: row
+        for row in (request.get("previous_snapshot") or {}).get("sources", [])
+    }
+    previous_snapshot = request.get("previous_snapshot") or {}
     verified: set[str] = set()
     for entry in inputs:
         keys = {
@@ -832,7 +837,10 @@ def _verify_git_evidence(
         tree_request = {key: entry[key] for key in keys if key != "source_id"}
         tree = read_git(tree_request)
         if tree["status"] != "complete":
-            raise ContractError("git_source_listing_incomplete")
+            reason = tree.get("reason")
+            raise ContractError(
+                "git_source_listing_incomplete" + (f":{reason}" if reason else "")
+            )
         if entry["base_sha"] is None:
             if any(row["source_id"] == sid for row in snapshot["changes"]):
                 raise ContractError("git_change_diff_not_enumerated")
@@ -844,39 +852,66 @@ def _verify_git_evidence(
             "registry_request": request,
             "source_id": sid,
         }
-        if snapshot["event"] in {"pr_update", "rebase"}:
-            primary = sid == primary_id
-            if primary:
+        previous_head: str | None = None
+        if event in {"pr_update", "rebase"}:
+            if sid == primary_id:
                 previous_head = snapshot["event_basis"]["previous_head_sha"]
-            else:
-                prior_source = next(
-                    (
-                        row
-                        for row in (request.get("previous_snapshot") or {}).get(
-                            "sources", []
-                        )
-                        if row.get("id") == sid
-                    ),
-                    None,
-                )
-                if prior_source is None:
-                    raise ContractError("secondary_git_source_previous_missing")
-                previous_head = prior_source["revision"]
+            elif sid in previous_sources:
+                previous_head = previous_sources[sid]["revision"]
+            if entry.get("previous_head_base_sha") != previous_head:
+                raise ContractError("previous_head_git_base_required")
+            if sid != primary_id:
                 coverage_request["source_event_basis"] = {
                     "base_sha": entry["base_sha"],
                     "head_sha": entry["head_sha"],
                     "previous_head_sha": previous_head,
                 }
-            if entry.get("previous_head_base_sha") != previous_head:
-                raise ContractError("previous_head_git_base_required")
+        elif event == "analysis_update":
+            # A same-HEAD correction must re-verify every Git diff baseline
+            # represented in the last saved current-revision DIFs.
+            prior_changes = previous_snapshot.get("changes", [])
+            replaced = {
+                parent for row in prior_changes for parent in _superseded_ids(row)
+            }
+            baselines = {
+                row["before_revision"]
+                for row in prior_changes
+                if row["source_id"] == sid
+                and row["after_revision"] == entry["head_sha"]
+                and row["id"] not in replaced
+            }
+            if previous_snapshot.get("event") in {"pr_update", "rebase"}:
+                if sid == _primary_code_source_id(previous_snapshot):
+                    old_basis = previous_snapshot["event_basis"]
+                    baselines.update(
+                        (old_basis["base_sha"], old_basis["previous_head_sha"])
+                    )
+            supplied = {
+                value for value in (entry["base_sha"], entry.get("previous_head_base_sha"))
+                if value is not None
+            }
+            if supplied != baselines or len(baselines) > 2:
+                raise ContractError("analysis_git_baselines_mismatch")
+            previous_head = entry.get("previous_head_base_sha")
+            if previous_head is not None:
+                coverage_request["source_event_basis"] = {
+                    "base_sha": entry["base_sha"],
+                    "head_sha": entry["head_sha"],
+                    "previous_head_sha": previous_head,
+                }
+        elif "previous_head_base_sha" in entry:
+            raise ContractError("previous_head_git_base_unexpected")
+        if previous_head is not None:
             previous_request = dict(tree_request)
             previous_request["base_sha"] = previous_head
             previous_diff = read_git(previous_request)
             if previous_diff["status"] != "complete":
-                raise ContractError("previous_head_git_listing_incomplete")
+                reason = previous_diff.get("reason")
+                raise ContractError(
+                    "previous_head_git_listing_incomplete"
+                    + (f":{reason}" if reason else "")
+                )
             coverage_request["previous_head_git_inventory"] = previous_diff
-        elif "previous_head_base_sha" in entry:
-            raise ContractError("previous_head_git_base_unexpected")
         coverage = reconcile(coverage_request)
         extra = set(coverage.get("reasons", [])) - set(report.get("reasons", []))
         if coverage["coverage"] is None or extra:
