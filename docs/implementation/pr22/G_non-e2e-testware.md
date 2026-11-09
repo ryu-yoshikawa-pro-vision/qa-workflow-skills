@@ -91,13 +91,13 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 ### Gで検証済みの実装・局所テスト
 
 - [x] 担当Gの非E2E所有境界、既存E2E・直接TC・静的レビューとのroutingを実装・独立テストで検証した。
-- [x] Git隔離編集、変更前hash／HEAD照合、非強制fast-forward確定・競合拒否とreadbackについてローカルGit fixtureで検証した。
+- [x] Git隔離編集、変更前hash／HEAD照合、期待HEADのlease付きfast-forward更新・競合拒否とreadbackをローカルGit fixtureで検証した。実共有remoteへの公開受入はPR #22で行う。
 - [x] 実subprocess・固定JSON reporter／直接観測・試行／タイムアウト・終了コード・cleanup・manifestの正常／負例を実装・局所検証した。実製品runnerを使用したとの主張はしない。
 - [x] 未承認Authorityから正式TC判定を出さないこと、選択集合・suite・retry・集計・不正JSON・直接観測型比較・静的解析tool照合のfail-closedを回帰テストで確認した。
 - [x] 非E2E testwareの反証レビューfixtureと、固定製品に対する限定的な静的レビューを記録し、未確認の仕様oracleを独立した品質合格へ昇格しなかった。
-- [x] 担当GのSkill・guidance・評価fixture・検証記録を整備し、GitHub Actionsの5 workflowを最新の検証済みHEAD `92fe70e751ae2bc56c7f9f73ecd862f26287bb0f` で確認した。runtime unit/integration 637件、repository deterministic eval 292件がPASS。
+- [x] 担当GのSkill・guidance・評価fixture・検証記録を整備し、HEAD `85cc433a8b19e512b6e7e5fc02a6f32405621999` でGitHub Actionsの5 workflowすべてが成功した。runtime unit/integration 656件、repository deterministic eval 292件がPASS。CodeRabbitの別チェックは`skipped`。
 - [x] PR #29本文とPR #22引継ぎコメントに、変更範囲、raw証拠の限界、受入の再開条件を残した。
-- [ ] CodeRabbitの`CHANGES_REQUESTED`を確認し、G実装に関係する妥当な指摘を修正・回帰検証する（受入試験とは分ける）。
+- [x] CodeRabbitの初回21threadと追指摘を確認し、G実装に関係する妥当な指摘を修正・回帰検証した。21threadすべて解決済み（未解決0件）。ただし`CHANGES_REQUESTED`の正式な撤回・承認は得ていない。
 
 ### PR #22に引き継ぐ受入（未実施）
 
@@ -106,7 +106,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - E/F/H/J各担当による契約の正式合意や他ownerの実成果物との接続。G側のschema・fixture・必要参照は記録済み。複数ownerの実データによる横断接続はPR #22で実施する。
 - 固定製品testwareの期待値についての正式な仕様Authority決定と、製品testware ownerによる変更・採否。Gの確認候補と反証根拠は記録済み。製品本体・既存製品テストは本PRの書込み対象ではない。
 
-**PR #29に残る実装上の対応**：CodeRabbitが最新の実装差分に対して`CHANGES_REQUESTED`を記録し、未解決のreview threadがある。runnerの中断・残存プロセス、Git更新時の競合、結果照合・評価の判定など、G所有コードの正しさに関する指摘はPR #22の受入へ移管しない。各指摘は既存実装・仕様・テストで確認し、妥当な修正をG branchで行う。レビュー指摘が残る時点でPR #29の実装レビューは完了していない。
+**PR #29のレビュー対応**：G所有コードに関するCodeRabbitの初回21threadと追指摘は修正・局所回帰テストまで実施し、21threadすべてが解決済み。既存のレビュー状態`CHANGES_REQUESTED`およびCodeRabbitチェック`skipped`は残るため、正式承認済みとは扱わない。実製品・実provider・他ownerを含む受入はPR #22に引き継いだ。
 
 上記受入の移管は未検証の隠蔽や仕様適合の証明を意味しない。PR #22で同一ID／revision／Authority／runner／raw／cleanupの実証を行い、結果を記録する。
 
@@ -160,7 +160,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitをGit remoteに非強制fast-forward反映・readbackする経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
 3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23はclosed・merge済み。共有正本と新Skillとの接続について、PR #22統合ownerに引き継ぐ。PR #29のtrigger正負件数不均衡はGで修正済み。README未登録による`Validate Agent Skills` failureは旧HEADの履歴で、PR #22側の共有README同期後、commit `481eada`ではsuccessを確認した。
 4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
-5. 全対応方式の実runnerと保存先で必須受入を完了するまで、PR #29はDraftとし、**担当G完了**を宣言しない。PR #22の最終完了とは区別する。
+5. 担当Gの実装・局所テストとレビュー指摘への修正は後続のHEAD `85cc433`で完了している。実runner・実provider・他ownerとの受入はPR #22の未完了条件とし、PR #29はDraftを維持する。正式なレビュー承認・merge完了とは区別する。
 
 ### Planとの既存差分
 
@@ -181,7 +181,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `skills/testware-execution/scripts/runner.py`：既存Git checkoutのHEAD・clean状態、実行許可、事前検査したargv、timeoutを検証して実subprocessを起動する。個別attemptのPID・開始／終了時刻・終了コード・stdout／stderr・Vitest JSON reporter、run外cleanup、実行後の作業ツリー残存変更を保存・照合する。shared／外部副作用はnative providerの認証済み確認ができないため拒否する。
 - 非ブラウザ直接TC：実行前に固定した期待値と、実バッチ等から得た終了コード・stdout JSONの観測値を比較する。終了コード0でも期待値不一致はFAIL、未観測は判定不能として元runner結果と分離した。非機能測定は品質特性、単位、閾値根拠、測定条件と実stdout数値を比較し、閾値違反と未測定を分ける。
 - Vitest：固定repo rootからのreporter絶対path正規化、選択集合と個別結果の重複・missing、optionalな集計件数、suite単位の起動失敗、global `success` 不整合を検出する。runner内の一時IDをTCの永続IDに変えない。retry個別testの証拠がJSONにない場合は不明のままとする。
-- `skills/testware-implementation/scripts/publish_git.py`：単一親candidateとexpected HEAD、全変更対象の変更前hash、許可path、通常ファイル性を確認後、Git remoteへの非強制fast-forward pushと、remote HEAD・fetch・blobのreadbackで変更確定を照合する。remoteが先に変更されたらpushしない。共有workspaceのnative reservationが必要な場合は別途取得し、Gitのref更新と混同しない。
+- `skills/testware-implementation/scripts/publish_git.py`：単一親candidateとexpected HEAD、全変更対象の変更前hash、許可path、通常ファイル性を確認後、期待HEADと一致する場合だけlease付きのfast-forward更新を行い、remote HEAD・fetch・blobのreadbackで確定を照合する。履歴の上書きを認めず、remoteが先に変更された場合は拒否する。共有workspaceのnative reservationとは区別する。
 - 評価器：新Skill両方の決定論的validatorが空欄の必須項目を通す問題を修正。反証レビューの修正先に新Skill二つを追加し、非E2Eのassertion漏れ／常真assertion／誤期待値およびTCなし静的レビューの独立意味評価ケースとtrigger正負例を追加。
 - 独立fixture：実Git bare remoteと複数cloneを使う先行更新の競合拒否・readback・独立path再計画、実Python subprocessでの実開始・retry・timeout・run外cleanup・残存状態、Vitest形式JSONの不整合、直接TCの終了コード0＋内容不一致、非機能の閾値超過・未測定をテストする。これらは製品実runnerの受入証拠とは区別する。
 
@@ -193,7 +193,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 4. H/J実成果物とのrun参照・診断・元結果、S1〜S17・人間編集8件・全15＋10条件の横断受入はPR #22へ引継ぎ。既存E2E implementationの共有編集競合保護もそのownerと照合する。
 5. 最新HEADのCI結果はPR #29のChecksを正本とする。旧版`Validate Agent Skills`の共有README未登録FAILはAに引継ぎ済み。その他のCI・局所fixtureが成功しても、本節の未検証を完了として扱わない。
 
-このPRは上記の未検証条件が残るためDraftのままとする。製品SUT・正式仕様・他ownerの共有正本は更新していない。
+PR #29の実装・局所検証は完了したが、実製品・実provider・横断受入はPR #22へ移管し、正式レビュー承認も未取得のためDraftを維持する。製品SUT・正式仕様・他ownerの共有正本は更新していない。
 
 ## 再レビュー修正と残る受入（2026-11-09）
 
@@ -213,7 +213,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 2. 現在のCLIは任意subprocessの権限・副作用回数・ignored file／外部状態の復元・共有予約を認証付きで検証できない。このため宣言された副作用やshared実行は開始前に拒否する。安全に実行可能なprovider／sandboxが必要なケースはblockedのままにする。
 3. 静的解析tool固有のraw収集・version照合・解析対象完全性の本接続、非機能採用閾値・測定条件の実証とtestware assertionの独立実製品レビューは未実施。独立fixtureのPASSで置換しない。
 4. `README.md`、共有runtimeへのrouting／保存・承認・native CAS／readback、H/Jの実保存成果物との結合、PR #22の全条件・S1〜S17／人間編集8ケースは担当ownerの統合受入を要する。PR #23はclosed・merge済み（merge commit `d38b775e43f7`）。残る統合はPR #22で実施する。
-5. 最新CI結果はPR #29のChecksを正本とする。README未登録による`Validate Agent Skills` FAILは旧HEADの履歴であり、現状と混同しない。未検証がある限りPR #29の完了・mergeは宣言しない。
+5. 最新CI結果はPR #29のChecksを正本とする。README未登録による`Validate Agent Skills` FAILは旧HEADの履歴であり、現状と混同しない。PR #29の実装・局所回帰テストとPR #22の実受入・最終完了は別に判定する。
 
 ## 実行安全性と非Vitest収集の追加修正（2026-11-09）
 
@@ -224,7 +224,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - 独立Python subprocess・模擬JSONの正常／負例を実装した。採用済み実runnerと本物の製品・認証・権限・副作用／cleanup、静的解析・非機能の実測、H/Jやproviderの実成果物照合は未実施。fixtureのPASSと実製品受入を混同しない。
 - PR #23はclosedだがmerge済みである。以前の「closed・未merge」という記載を訂正した。共有READMEとruntimeへの新Skill接続はPR #22の統合条件として引き継ぐ。
 
-最新CIの正本はPR #29のChecksとする。担当Gの全完了条件を満たしたという判定には、実runner受入・共有接続・下流証拠が別途必要。
+最新CIの正本はPR #29のChecksとする。担当Gの実装・局所検証は完了したが、実runner受入・共有接続・下流証拠を含む元Planの最終判定はPR #22で行う。
 
 ## 追加実装・検証（2026-11-09：Vitest・cleanup・TC Authority・Jest）
 
@@ -309,6 +309,6 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - process：Linuxの専用runnerはchild subreaper＋procfsで別sessionに移行した子孫も採用・検出し、実行scopeの停止・reap確認後にcleanupを開始する。cleanup自体の子孫も検査する。終了確認ができない場合はcleanup開始を拒否し、終了後に子孫が残った場合も安全成功としない。SIGINT時は元のprocess groupを停止してmanifestを残す。Linuxのsupervisionが使えない環境・Windows・その他POSIXは`process_supervision_unavailable`で開始前に拒否する。代替実行環境を含む受入はPR #22が担当する。
 - Git公開：差分pathはNUL区切りで取得し、日本語file名、許可された削除・rename後の不在readbackに対応。候補commitは`expected_head`を単一親とし、leaseで競合する更新・巻き戻しを拒否する。実共有remoteには未公開で、独立bare Git fixtureで検証する。
 - 評価と契約：実行結果の開始・cleanup・診断、testware実装の実testware／引継ぎを出力評価へ追加。反証レビューでは既存E2E用`REV-D015/D016`を維持し、非E2E・静的レビュー用`REV-D017〜D020`を追加。評価入力`review_mode`を基準に適用し、`source@revision`の両要素、fixture指定sourceとの一致を検証。`REV-OUT-003`の評価ケースと`ASSERTIONS.md`を更新した。製品文書への直接静的レビューを入力契約に明示した。
-- 追加回帰：独立reporter、変更path許可、Gitの競合・削除・日本語path、direct TC、失敗したstatic tool終了コード、SIGINT時のcleanup開始順序、別sessionの子孫、cleanup由来の子孫、Vitestの複数`--project`指定、legacyレビューとの互換性。HEAD`7d1b1da`でDeterministic Output Evalsの292件、runtime unit/integrationの655件がPASS。CI結果はPR #29の最新Checksを正本とする。
+- 追加回帰：独立reporter、変更path許可、Gitの競合・削除・日本語path、direct TC、失敗したstatic tool終了コード、SIGINT時のcleanup開始順序、別sessionの子孫、cleanup由来の子孫、Linux procfs未マウント、Vitestの複数`--project`指定・単独glob指定、legacyレビューとの互換性。HEAD `85cc433`でDeterministic Output Evalsの292件、runtime unit/integrationの656件がPASSし、5 workflowがすべて成功した。CI結果はPR #29の最新Checksを正本とする。
 - 共有ファイル`scripts/skills/evals/deterministic/common.py`の新Skill名許可はG branchでは変更せず、PR #22統合branch `e58e2a6`で修正し、`WF-D002`の回帰テストを追加。共有ownerの正本はPR #22とする。
-- 上記実装がレビュー指摘に対応するかは最新の実装コード・個別回帰テストとCodeRabbit指摘threadごとに判定する。PR #29の全レビュー完了は未宣言で、実受入条件は引き続きPR #22へ引き継ぐ。
+- CodeRabbitの21threadは修正後のやり取りで全件解決済み（未解決0件）。レビュー状態`CHANGES_REQUESTED`とCodeRabbitチェック`skipped`は正式な承認とは区別する。G実装・局所検証は完了、実受入は引き続きPR #22に引き継ぐ。
