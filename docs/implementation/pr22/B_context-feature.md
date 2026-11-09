@@ -276,4 +276,3 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 ## PR #34 再点検：checkoutのHEAD現在性
 
 `git_source_inventory.analyze`で`cat-file`による指定コミットの存在確認に加え、許可されたcheckoutの`git rev-parse HEAD`と`head_sha`が一致することを検証する。過去コミット自体が存在してもcheckoutが進んでいれば`git_head_changed`として保存を拒否する。`test_git_source_inventory.py`に古い実在SHAの列挙拒否、`test_pr24_git_artifact_store.py`に旧SHAを使った保存拒否と正本不変を追加した。現行SHAを信頼済み呼出し元で取り直すまで保存を再試行しない。GitHub Actionsの実行結果はPR #34の最新HEADに紐付くworkflowを正とする。
-
