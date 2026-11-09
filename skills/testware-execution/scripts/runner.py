@@ -585,19 +585,27 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     }
     if diagnostic is not None:
         result["diagnosis"] = diagnostic
-    if result["direct_observation_verdict"] == "FAIL" and outcome == "runner_pass":
+    if result["direct_observation_verdict"] == "FAIL" and outcome in {
+        "runner_pass", "incomplete"
+    } and last["return_code"] is not None:
         result["outcome"] = "observed_FAIL"
     elif (
-        result["direct_observation_verdict"] == "判定不能" and outcome == "runner_pass"
+        result["direct_observation_verdict"] == "判定不能"
+        and outcome in {"runner_pass", "incomplete"}
+        and last["return_code"] is not None
     ):
         result["outcome"] = "observations_incomplete"
     if reporter_format is not None:
         result["declared_selection_matched_report"] = bool(
             last.get("reconciliation", {}).get("collection_complete")
         )
-    if result["quality_verdict"] == "FAIL" and result["outcome"] == "runner_pass":
+    if result["quality_verdict"] == "FAIL" and result["outcome"] in {
+        "runner_pass", "incomplete"
+    } and last["return_code"] is not None:
         result["outcome"] = "measurement_FAIL"
-    elif result["quality_verdict"] == "判定不能" and result["outcome"] == "runner_pass":
+    elif result["quality_verdict"] == "判定不能" and result["outcome"] in {
+        "runner_pass", "incomplete"
+    } and last["return_code"] is not None:
         result["outcome"] = "measurements_incomplete"
     _write_json(folder / "manifest.json", result)
     return result
