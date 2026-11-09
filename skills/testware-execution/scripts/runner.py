@@ -25,6 +25,8 @@ from contract import (
     compare_metrics,
     preflight,
     reconcile_vitest,
+    reconcile_case_report,
+    reconcile_playwright,
     diagnosis,
 )
 
@@ -253,17 +255,36 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             raise RunnerError("invalid_static_expected_paths")
     elif static_plan is not None:
         raise RunnerError("static_contract_for_non_static_runner")
-    if kind == "vitest" and plan.get("selection_verified") is True:
-        if (
-            not isinstance(plan.get("selection_evidence_ref"), str)
-            or not plan["selection_evidence_ref"].strip()
+    reporter_format = plan.get("reporter_format")
+    if kind == "vitest" and reporter_format is None:
+        reporter_format = "vitest-json"
+    supported_formats = {
+        "vitest": {"vitest-json"},
+        "playwright-api": {"playwright-json"},
+        "component": {"vitest-json", "playwright-json"},
+        "batch": {"case-json"},
+        "event": {"case-json"},
+    }
+    if reporter_format is not None and reporter_format not in supported_formats.get(
+        kind, set()
+    ):
+        raise RunnerError("unsupported_reporter_format")
+    if reporter_format is not None:
+        if plan.get("direct_tc") is True:
+            raise RunnerError("reporter_not_supported_for_direct_tc")
+        if not isinstance(plan.get("selected"), list) or not plan["selected"]:
+            raise RunnerError("selected_test_population_required")
+        for field in (
+            "testware_ref",
+            "testware_revision",
+            "runner_version",
+            "selection_evidence_ref",
+            "planned_scope_ref",
         ):
-            raise RunnerError("selection_evidence_required")
-        if (
-            not isinstance(plan.get("planned_scope_ref"), str)
-            or not plan["planned_scope_ref"].strip()
-        ):
-            raise RunnerError("planned_scope_ref_required")
+            if not isinstance(plan.get(field), str) or not plan[field].strip():
+                raise RunnerError(field + "_required_for_reporter")
+        if plan.get("selection_verified") is not True:
+            raise RunnerError("selection_evidence_unverified")
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -312,27 +333,60 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 "cleanup_state": "not_required" if cleanup is None else "not_started",
             }
         )
-        if kind == "vitest":
+        if reporter_format is not None:
             run["result_collection"] = "missing"
-            if reporter.is_file() and run["started"]:
+            # Each attempt owns a newly created reporter file. Never read a
+            # symlink or a report produced outside this attempt's directory.
+            if (
+                run["started"]
+                and reporter.is_file()
+                and not reporter.is_symlink()
+            ):
                 run["raw_report_ref"] = str(reporter)
                 try:
+                    if reporter.stat().st_size > 16 * 1024 * 1024:
+                        raise RunnerError("reporter_too_large")
                     raw = json.loads(reporter.read_text(encoding="utf-8"))
-                    run["reconciliation"] = reconcile_vitest(
-                        selected=plan.get("selected", []),
-                        report=raw,
-                        source_revision=expected_sha,
-                        raw_ref=str(reporter),
-                        selection_verified=plan.get("selection_verified") is True,
-                        repo_root=str(repo),
-                    )
+                    shared = {
+                        "selected": plan["selected"],
+                        "report": raw,
+                        "source_revision": expected_sha,
+                        "raw_ref": str(reporter),
+                        "selection_verified": True,
+                    }
+                    if reporter_format == "vitest-json":
+                        reconciliation = reconcile_vitest(
+                            **shared, repo_root=str(repo)
+                        )
+                        reporter_reports_failure = raw.get("success") is False
+                    elif reporter_format == "playwright-json":
+                        reconciliation = reconcile_playwright(
+                            **shared, repo_root=str(repo)
+                        )
+                        reporter_reports_failure = (
+                            raw.get("stats", {}).get("unexpected", 0) > 0
+                        )
+                    else:
+                        reconciliation = reconcile_case_report(
+                            **shared, testware_revision=plan["testware_revision"]
+                        )
+                        reporter_reports_failure = any(
+                            item.get("status")
+                            in {"failed", "timedOut", "interrupted"}
+                            for item in raw["results"]
+                        )
+                    run["reconciliation"] = reconciliation
+                    # A test reporter claiming failures while the process exits 0
+                    # is contradictory, not a successful completed collection.
                     run["result_collection"] = (
                         "complete"
-                        if run["reconciliation"]["collection_complete"]
-                        and run["return_code"] == 0
+                        if reconciliation["collection_complete"]
+                        and not (
+                            run["return_code"] == 0 and reporter_reports_failure
+                        )
                         else "incomplete"
                     )
-                except (ValueError, ContractError, UnicodeError):
+                except (ValueError, ContractError, UnicodeError, OSError):
                     run["result_collection"] = "invalid"
         if direct_expectations is not None:
             observations: dict[str, Any] = {}
@@ -353,6 +407,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 expectations=direct_expectations,
                 observations=observations,
             )
+            run["result_collection"] = (
+                "complete"
+                if run["direct_comparison"]["result"] == "PASS"
+                else "incomplete"
+            )
         if metric_criteria is not None:
             metrics: dict[str, Any] = {}
             stdout_file = attempt / "stdout.log"
@@ -369,6 +428,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 measurements=metrics,
                 condition_ref=plan["measurement_condition_ref"],
                 authority_ref=plan["threshold_authority_ref"],
+            )
+            run["result_collection"] = (
+                "complete"
+                if run["metric_comparison"]["verdict"] in {"PASS", "FAIL"}
+                else "incomplete"
             )
         if kind == "static":
             from contract import interpret_static
@@ -463,10 +527,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             and run["metric_comparison"]["verdict"] != "PASS"
         ):
             break
-        if run["return_code"] == 0 and run["result_collection"] in {
-            "complete",
-            "not_provided_by_adapter",
-        }:
+        if run["return_code"] == 0 and run["result_collection"] == "complete":
             break
     outcome = "unknown"
     last = records[-1]
@@ -479,11 +540,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         outcome = "blocked_workspace_not_restored"
     elif last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
         outcome = "blocked_cleanup_or_timeout"
-    elif not last["started"] or last["result_collection"] in {
-        "invalid",
-        "missing",
-        "incomplete",
-    }:
+    elif not last["started"] or last["result_collection"] != "complete":
         outcome = "incomplete"
     elif last["return_code"] == 0:
         outcome = "runner_pass"
@@ -491,6 +548,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         outcome = "runner_fail"
     result = {
         "runner_kind": kind,
+        "reporter_format": reporter_format,
+        "result_collection": last["result_collection"],
+        "collection_verified": last["result_collection"] == "complete",
         "source_ref": scope["source_ref"],
         "source_revision": scope["source_revision"],
         "build_revision": scope["build_revision"],
@@ -531,7 +591,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         result["direct_observation_verdict"] == "判定不能" and outcome == "runner_pass"
     ):
         result["outcome"] = "observations_incomplete"
-    if kind == "vitest":
+    if reporter_format is not None:
         result["declared_selection_matched_report"] = bool(
             last.get("reconciliation", {}).get("collection_complete")
         )
