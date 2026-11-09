@@ -355,176 +355,187 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 "cleanup_state": "not_required" if cleanup is None else "not_started",
             }
         )
-        if reporter_format is not None:
-            run["result_collection"] = "missing"
-            # Each attempt owns a newly created reporter file. Never read a
-            # symlink or a report produced outside this attempt's directory.
-            if run["started"] and reporter.is_file() and not reporter.is_symlink():
-                run["raw_report_ref"] = str(reporter)
-                try:
-                    if reporter.stat().st_size > 16 * 1024 * 1024:
-                        raise RunnerError("reporter_too_large")
-                    raw = json.loads(reporter.read_text(encoding="utf-8"))
-                    shared = {
-                        "selected": plan["selected"],
-                        "report": raw,
-                        "source_revision": expected_sha,
-                        "raw_ref": str(reporter),
-                        "selection_verified": True,
-                    }
-                    if reporter_format == "vitest-json":
-                        reconciliation = reconcile_vitest(**shared, repo_root=str(repo))
-                        reporter_reports_failure = raw.get("success") is False
-                    elif reporter_format == "playwright-json":
-                        reconciliation = reconcile_playwright(
-                            **shared,
-                            runner_version=plan["runner_version"],
-                            repo_root=str(repo),
-                        )
-                        reporter_reports_failure = (
-                            raw.get("stats", {}).get("unexpected", 0) > 0
-                        )
-                    else:
-                        reconciliation = reconcile_case_report(
-                            **shared,
-                            testware_revision=plan["testware_revision"],
-                            runner_version=plan["runner_version"],
-                        )
-                        reporter_reports_failure = any(
-                            item.get("status") in {"failed", "timedOut", "interrupted"}
-                            for item in raw["results"]
-                        )
-                    run["reconciliation"] = reconciliation
-                    # A test reporter claiming failures while the process exits 0
-                    # is contradictory, not a successful completed collection.
-                    run["result_collection"] = (
-                        "complete"
-                        if reconciliation["collection_complete"]
-                        and not (run["return_code"] == 0 and reporter_reports_failure)
-                        else "incomplete"
-                    )
-                except (ValueError, ContractError, UnicodeError, OSError):
-                    run["result_collection"] = "invalid"
-        if direct_expectations is not None:
-            observations: dict[str, Any] = {}
-            if run["started"] and run["return_code"] is not None:
-                observations["exit_code"] = run["return_code"]
-                # Parsing is bounded: malformed, non-UTF8 or excessive output
-                # remains unobserved, never an implicit PASS.
-                stdout = attempt / "stdout.log"
-                if stdout.stat().st_size <= 1_048_576:
+        # Result interpretation is never permitted to skip cleanup or the
+        # attempt manifest. All errors here become evidence of incomplete
+        # collection; raw stdout/stderr/report files remain untouched.
+        try:
+            if reporter_format is not None:
+                run["result_collection"] = "missing"
+                # Each attempt owns a newly created reporter file. Never read a
+                # symlink or a report produced outside this attempt's directory.
+                if run["started"] and reporter.is_file() and not reporter.is_symlink():
+                    run["raw_report_ref"] = str(reporter)
                     try:
-                        content = stdout.read_text(encoding="utf-8")
-                        observations["stdout_text"] = content
-                        observations["stdout_json"] = json.loads(content)
-                    except (UnicodeError, ValueError):
+                        if reporter.stat().st_size > 16 * 1024 * 1024:
+                            raise RunnerError("reporter_too_large")
+                        raw = json.loads(reporter.read_text(encoding="utf-8"))
+                        shared = {
+                            "selected": plan["selected"],
+                            "report": raw,
+                            "source_revision": expected_sha,
+                            "raw_ref": str(reporter),
+                            "selection_verified": True,
+                        }
+                        if reporter_format == "vitest-json":
+                            reconciliation = reconcile_vitest(**shared, repo_root=str(repo))
+                            reporter_reports_failure = raw.get("success") is False
+                        elif reporter_format == "playwright-json":
+                            reconciliation = reconcile_playwright(
+                                **shared,
+                                runner_version=plan["runner_version"],
+                                repo_root=str(repo),
+                            )
+                            reporter_reports_failure = (
+                                raw.get("stats", {}).get("unexpected", 0) > 0
+                            )
+                        else:
+                            reconciliation = reconcile_case_report(
+                                **shared,
+                                testware_revision=plan["testware_revision"],
+                                runner_version=plan["runner_version"],
+                            )
+                            reporter_reports_failure = any(
+                                item.get("status") in {"failed", "timedOut", "interrupted"}
+                                for item in raw["results"]
+                            )
+                        run["reconciliation"] = reconciliation
+                        # A test reporter claiming failures while the process exits 0
+                        # is contradictory, not a successful completed collection.
+                        run["result_collection"] = (
+                            "complete"
+                            if reconciliation["collection_complete"]
+                            and not (run["return_code"] == 0 and reporter_reports_failure)
+                            else "incomplete"
+                        )
+                    except (ValueError, ContractError, UnicodeError, OSError):
+                        run["result_collection"] = "invalid"
+            if direct_expectations is not None:
+                observations: dict[str, Any] = {}
+                if run["started"] and run["return_code"] is not None:
+                    observations["exit_code"] = run["return_code"]
+                    # Parsing is bounded: malformed, non-UTF8 or excessive output
+                    # remains unobserved, never an implicit PASS.
+                    stdout = attempt / "stdout.log"
+                    if stdout.stat().st_size <= 1_048_576:
+                        try:
+                            content = stdout.read_text(encoding="utf-8")
+                            observations["stdout_text"] = content
+                            observations["stdout_json"] = json.loads(content)
+                        except (UnicodeError, ValueError):
+                            pass
+                run["direct_comparison"] = compare_direct(
+                    started=run["started"],
+                    expectations=direct_expectations,
+                    observations=observations,
+                )
+                # Arbitrary stdout expectations are useful observations, but
+                # only an authority-bound direct TC can replace a per-test reporter.
+                run["result_collection"] = (
+                    "complete"
+                    if plan.get("direct_tc") is True
+                    and run["direct_comparison"]["result"] == "PASS"
+                    else "incomplete"
+                )
+            if metric_criteria is not None:
+                metrics: dict[str, Any] = {}
+                stdout_file = attempt / "stdout.log"
+                if run["started"] and stdout_file.stat().st_size <= 1_048_576:
+                    try:
+                        parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                        if isinstance(parsed, dict):
+                            metrics = parsed
+                    except (ValueError, UnicodeError):
                         pass
-            run["direct_comparison"] = compare_direct(
-                started=run["started"],
-                expectations=direct_expectations,
-                observations=observations,
-            )
-            # Arbitrary stdout expectations are useful observations, but
-            # only an authority-bound direct TC can replace a per-test reporter.
-            run["result_collection"] = (
-                "complete"
-                if plan.get("direct_tc") is True
-                and run["direct_comparison"]["result"] == "PASS"
-                else "incomplete"
-            )
-        if metric_criteria is not None:
-            metrics: dict[str, Any] = {}
-            stdout_file = attempt / "stdout.log"
-            if run["started"] and stdout_file.stat().st_size <= 1_048_576:
-                try:
-                    parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
-                    if isinstance(parsed, dict):
-                        metrics = parsed
-                except (ValueError, UnicodeError):
-                    pass
-            run["metric_comparison"] = compare_metrics(
-                started=run["started"],
-                criteria=metric_criteria,
-                measurements=metrics,
-                condition_ref=plan["measurement_condition_ref"],
-                authority_ref=plan["threshold_authority_ref"],
-            )
-            run["result_collection"] = (
-                "complete"
-                if run["metric_comparison"]["verdict"] in {"PASS", "FAIL"}
-                else "incomplete"
-            )
-        if kind == "static":
-            from contract import interpret_static
+                run["metric_comparison"] = compare_metrics(
+                    started=run["started"],
+                    criteria=metric_criteria,
+                    measurements=metrics,
+                    condition_ref=plan["measurement_condition_ref"],
+                    authority_ref=plan["threshold_authority_ref"],
+                )
+                run["result_collection"] = (
+                    "complete"
+                    if run["metric_comparison"]["verdict"] in {"PASS", "FAIL"}
+                    else "incomplete"
+                )
+            if kind == "static":
+                from contract import interpret_static
 
-            report_data: dict[str, Any] = {}
-            stdout_file = attempt / "stdout.log"
-            if run["started"] and stdout_file.stat().st_size <= 1_048_576:
-                try:
-                    parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
-                    if isinstance(parsed, dict):
-                        report_data = parsed
-                except (ValueError, UnicodeError):
-                    pass
-            actual = report_data.get("analyzed_paths")
-            omitted = report_data.get("skipped_paths")
-            expected_set = set(static_plan["expected_paths"])
-            paths_complete = (
-                isinstance(actual, list)
-                and all(isinstance(item, str) for item in actual)
-                and len(actual) == len(set(actual))
-                and set(actual) == expected_set
-                and omitted == []
-                and report_data.get("tool_version") == static_plan["tool_version"]
-                and report_data.get("rules_ref") == static_plan["rules_ref"]
-                and report_data.get("config_ref") == static_plan["config_ref"]
-                and run["return_code"] in static_plan["accepted_exit_codes"]
-            )
-            finding_count = report_data.get("findings_count")
-            if type(finding_count) is not int or finding_count < 0:
-                finding_count = None
-            assessment = interpret_static(
-                started=run["started"],
-                exit_code=run["return_code"],
-                raw_ref=str(stdout_file) if run["started"] else None,
-                findings_count=finding_count if paths_complete else None,
-            )
-            run["static_analysis"] = {
-                **assessment,
-                "expected_paths": static_plan["expected_paths"],
-                "analyzed_paths": actual if isinstance(actual, list) else None,
-                "skipped_paths": omitted if isinstance(omitted, list) else None,
-                "selection_complete": paths_complete,
-                "tool_ref": static_plan["tool_ref"],
-                "tool_version": static_plan["tool_version"],
-                "rules_ref": static_plan["rules_ref"],
-                "config_ref": static_plan["config_ref"],
-            }
-            run["result_collection"] = (
-                "complete" if assessment["complete"] else "incomplete"
-            )
+                report_data: dict[str, Any] = {}
+                stdout_file = attempt / "stdout.log"
+                if run["started"] and stdout_file.stat().st_size <= 1_048_576:
+                    try:
+                        parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                        if isinstance(parsed, dict):
+                            report_data = parsed
+                    except (ValueError, UnicodeError):
+                        pass
+                actual = report_data.get("analyzed_paths")
+                omitted = report_data.get("skipped_paths")
+                expected_set = set(static_plan["expected_paths"])
+                paths_complete = (
+                    isinstance(actual, list)
+                    and all(isinstance(item, str) for item in actual)
+                    and len(actual) == len(set(actual))
+                    and set(actual) == expected_set
+                    and omitted == []
+                    and report_data.get("tool_version") == static_plan["tool_version"]
+                    and report_data.get("rules_ref") == static_plan["rules_ref"]
+                    and report_data.get("config_ref") == static_plan["config_ref"]
+                    and run["return_code"] in static_plan["accepted_exit_codes"]
+                )
+                finding_count = report_data.get("findings_count")
+                if type(finding_count) is not int or finding_count < 0:
+                    finding_count = None
+                assessment = interpret_static(
+                    started=run["started"],
+                    exit_code=run["return_code"],
+                    raw_ref=str(stdout_file) if run["started"] else None,
+                    findings_count=finding_count if paths_complete else None,
+                )
+                run["static_analysis"] = {
+                    **assessment,
+                    "expected_paths": static_plan["expected_paths"],
+                    "analyzed_paths": actual if isinstance(actual, list) else None,
+                    "skipped_paths": omitted if isinstance(omitted, list) else None,
+                    "selection_complete": paths_complete,
+                    "tool_ref": static_plan["tool_ref"],
+                    "tool_version": static_plan["tool_version"],
+                    "rules_ref": static_plan["rules_ref"],
+                    "config_ref": static_plan["config_ref"],
+                }
+                run["result_collection"] = (
+                    "complete" if assessment["complete"] else "incomplete"
+                )
+        except Exception as error:
+            run["result_collection"] = "invalid"
+            run["processing_error"] = type(error).__name__
         if cleanup is not None and run["started"]:
-            clean = _run_command(
-                cleanup,
-                repo,
-                attempt / "cleanup.stdout.log",
-                attempt / "cleanup.stderr.log",
-                limit,
-            )
-            run["cleanup"] = clean
-            run["cleanup_state"] = (
-                "success"
-                if clean["started"]
-                and not clean["timeout"]
-                and clean["return_code"] == 0
-                else "failed_or_unknown"
-            )
+            try:
+                clean = _run_command(
+                    cleanup,
+                    repo,
+                    attempt / "cleanup.stdout.log",
+                    attempt / "cleanup.stderr.log",
+                    limit,
+                )
+                run["cleanup"] = clean
+                run["cleanup_state"] = (
+                    "success"
+                    if clean["started"]
+                    and not clean["timeout"]
+                    and clean["return_code"] == 0
+                    else "failed_or_unknown"
+                )
+            except Exception as error:
+                run["cleanup_state"] = "failed_or_unknown"
+                run["cleanup_error"] = type(error).__name__
         try:
             run["workspace_head_after_cleanup"] = _git_head(repo)
             run["workspace_state_after_cleanup"] = (
                 "clean" if _git_clean(repo) else "dirty"
             )
-        except RunnerError:
+        except (RunnerError, OSError, subprocess.TimeoutExpired):
             run["workspace_head_after_cleanup"] = None
             run["workspace_state_after_cleanup"] = "unverified"
         records.append(run)
