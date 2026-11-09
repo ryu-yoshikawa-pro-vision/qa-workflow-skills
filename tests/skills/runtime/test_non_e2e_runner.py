@@ -300,7 +300,9 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "blocked_workspace_not_restored")
-        self.assertEqual(artifact["attempts"][0]["workspace_state_after_cleanup"], "dirty")
+        self.assertEqual(
+            artifact["attempts"][0]["workspace_state_after_cleanup"], "dirty"
+        )
         self.assertTrue((self.repo / "unexpected.tmp").exists())
 
 
