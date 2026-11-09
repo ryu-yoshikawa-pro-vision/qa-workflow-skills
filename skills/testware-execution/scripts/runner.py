@@ -442,7 +442,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             break
     outcome = "unknown"
     last = records[-1]
-    if workspace_changed_before_retry or last["workspace_head_after_cleanup"] != expected_sha:
+    if (
+        workspace_changed_before_retry
+        or last["workspace_head_after_cleanup"] != expected_sha
+    ):
         outcome = "blocked_revision_changed"
     elif last["workspace_state_after_cleanup"] != "clean":
         outcome = "blocked_workspace_not_restored"
