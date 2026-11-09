@@ -14,9 +14,7 @@ RUNNER = ROOT / "skills/testware-execution/scripts/runner.py"
 
 
 def git(repo: Path, *args: str) -> str:
-    return subprocess.check_output(
-        ["git", "-C", str(repo), *args], text=True
-    ).strip()
+    return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
 
 
 class ActualRunnerTests(unittest.TestCase):
@@ -95,9 +93,7 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertTrue(attempt["started"])
         self.assertIsInstance(attempt["pid"], int)
         self.assertEqual(attempt["return_code"], 0)
-        self.assertIn(
-            "runner observation", Path(attempt["stdout_ref"]).read_text()
-        )
+        self.assertIn("runner observation", Path(attempt["stdout_ref"]).read_text())
         self.assertIsNone(artifact["tc_verdict"])
 
     def test_dirty_repo_and_unreviewed_command_refused(self):
@@ -149,7 +145,11 @@ class ActualRunnerTests(unittest.TestCase):
                     "name": str(self.repo / "tests" / "sample.test.ts"),
                     "status": "passed",
                     "assertionResults": [
-                        {"ancestorTitles": ["suite"], "title": "one", "status": "passed"}
+                        {
+                            "ancestorTitles": ["suite"],
+                            "title": "one",
+                            "status": "passed",
+                        }
                     ],
                 }
             ],
@@ -193,9 +193,7 @@ class ActualRunnerTests(unittest.TestCase):
             + repr(json.dumps(report))
             + ",encoding='utf-8')"
         )
-        plan = self.plan(
-            [sys.executable, "-c", py, "{reporter_file}"], kind="vitest"
-        )
+        plan = self.plan([sys.executable, "-c", py, "{reporter_file}"], kind="vitest")
         plan["selected"] = [
             {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
         ]
