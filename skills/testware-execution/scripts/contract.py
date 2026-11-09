@@ -592,6 +592,22 @@ def reconcile_playwright(
     )
 
 
+def _json_equal_strict(expected: Any, actual: Any) -> bool:
+    """Match JSON values without Python's bool/int coercion, including nested data."""
+    if type(expected) is not type(actual):
+        return False
+    if isinstance(expected, dict):
+        return expected.keys() == actual.keys() and all(
+            _json_equal_strict(value, actual[key]) for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return len(expected) == len(actual) and all(
+            _json_equal_strict(left, right)
+            for left, right in zip(expected, actual)
+        )
+    return expected == actual
+
+
 def compare_direct(
     *, started: bool, expectations: list[dict[str, Any]], observations: dict[str, Any]
 ) -> dict[str, Any]:
@@ -614,11 +630,7 @@ def compare_direct(
     for item in expectations:
         ref = item["id"]
         observed = ref in observations if started else False
-        same = (
-            observed
-            and type(item["expected"]) is type(observations[ref])
-            and item["expected"] == observations[ref]
-        )
+        same = observed and _json_equal_strict(item["expected"], observations[ref])
         details.append(
             {
                 "expectation_ref": ref,

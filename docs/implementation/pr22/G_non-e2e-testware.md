@@ -223,3 +223,8 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 - `contract.reconcile_vitest()`は、公式Vitest 4／Jest JSONの全test集計（total／passed／failed／pending／todo）とroot `success`が欠落していても、選択した個別結果が一致すれば取得完全とする余地があった。全カウンターの型・値とglobal statusを必須とし、欠落したreporterは取得不完全に変更した。
 - `test_non_e2e_contract.py` の正常skip/todo fixtureに実reporterの集計・global statusを追加し、global status・total欠落の負例を追加した。skip/todo自体をTC PASSとみなさない従来の契約は維持する。
+
+### 直接観測のJSON型比較（2026-11-09）
+
+- `compare_direct()` の期待値比較では、辞書／配列の内側にあるJSON真偽値と数値が、Pythonの `True == 1`／`False == 0` により一致扱いになる可能性があった。ネストしたJSONにも型一致を適用し、終了コード0やHTTP 200と組み合わさっても誤PASSにならないようにした。
+- `tests/skills/runtime/test_non_e2e_contract.py` に、期待`{"ok": true}`へ実測`{"ok": 1}`を渡す負例を追加した。外部Authority未認証では正式TC判定は未確定という契約は維持する。

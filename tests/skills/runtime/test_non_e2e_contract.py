@@ -513,6 +513,14 @@ class DirectAndStaticTests(unittest.TestCase):
             observations={"code": 200, "body": {"ok": False}},
         )
         self.assertEqual(r["result"], "FAIL")
+        # In Python True == 1; an actual JSON number must not satisfy
+        # an expected JSON boolean nested in the response body.
+        nested_type_mismatch = contract.compare_direct(
+            started=True,
+            expectations=checks,
+            observations={"code": 200, "body": {"ok": 1}},
+        )
+        self.assertEqual(nested_type_mismatch["result"], "FAIL")
         self.assertEqual(
             contract.compare_direct(
                 started=True, expectations=checks, observations={"code": 200}
