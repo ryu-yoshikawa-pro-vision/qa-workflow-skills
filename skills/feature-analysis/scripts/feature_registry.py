@@ -253,6 +253,30 @@ def _history(
         and snapshot["artifact_revision"] == previous["artifact_revision"]
     ):
         raise ContractError("artifact_revision_reused")
+    old_sources = _rows(previous.get("sources"), "previous_sources", "SRC")
+    new_sources = _rows(snapshot.get("sources"), "sources", "SRC")
+    for sid in old_sources.keys() & new_sources.keys():
+        if any(
+            old_sources[sid].get(field) != new_sources[sid].get(field)
+            for field in ("kind", "ref", "scope")
+        ):
+            raise ContractError(f"source_identity_reused:{sid}")
+    old_candidates = _rows(previous.get("candidates"), "previous_candidates", "CAND")
+    new_candidates = _rows(snapshot.get("candidates"), "candidates", "CAND")
+    for cid in old_candidates.keys() & new_candidates.keys():
+        if any(
+            old_candidates[cid].get(field) != new_candidates[cid].get(field)
+            for field in ("source_ids", "evidence_ref")
+        ):
+            raise ContractError(f"candidate_identity_reused:{cid}")
+    old_changes = _rows(previous.get("changes"), "previous_changes", "DIF")
+    new_changes = _rows(snapshot.get("changes"), "changes", "DIF")
+    for did in old_changes.keys() & new_changes.keys():
+        if any(
+            old_changes[did].get(field) != new_changes[did].get(field)
+            for field in ("source_id", "before_revision", "after_revision", "locator")
+        ):
+            raise ContractError(f"change_identity_reused:{did}")
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:

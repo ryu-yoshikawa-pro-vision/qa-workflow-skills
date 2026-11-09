@@ -203,6 +203,22 @@ class FeatureRegistryTests(unittest.TestCase):
         data["snapshot"]["sources"][0]["unretrieved"] = ["src/unreadable.py"]
         self.assertEqual(handle(data)["status"], "blocked")
 
+    def test_source_candidate_and_change_ids_cannot_be_reused(self) -> None:
+        changes = (
+            ("sources", "ref", "different/repo"),
+            ("candidates", "evidence_ref", "unrelated-candidate"),
+            ("changes", "locator", "unrelated.py"),
+        )
+        for collection, key, replacement in changes:
+            with self.subTest(collection=collection):
+                data = fixture()
+                data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+                data["snapshot"]["previous_artifact_revision"] = "art-v1"
+                data["snapshot"]["artifact_revision"] = "art-v2"
+                data["snapshot"]["operation_id"] = "op-v2"
+                data["snapshot"][collection][0][key] = replacement
+                self.assertEqual(handle(data)["status"], "blocked")
+
     def test_duplicate_operation_does_not_rerun(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])

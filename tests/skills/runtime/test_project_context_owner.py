@@ -61,6 +61,27 @@ class ProjectContextOwnerTests(unittest.TestCase):
         req["candidates"].append({**row, "ref": "b"})
         self.assertEqual(handle(req)["status"], "ambiguous")
 
+    def test_corrupt_decision_table_is_not_a_valid_existing_context(self) -> None:
+        damaged = context().replace(
+            "| ID | 確定内容 |", "| BAD | 確定内容 |", 1
+        )
+        result = handle(
+            {
+                "operation": "discover",
+                "project_name": "Sample",
+                "enumeration_complete": True,
+                "candidates": [
+                    {
+                        "ref": "context.md",
+                        "status": "readable",
+                        "markdown": damaged,
+                        "revision": "v1",
+                    }
+                ],
+            }
+        )
+        self.assertEqual(result["status"], "blocked", result)
+
     def test_denied_cannot_prove_absence(self) -> None:
         req = {
             "operation": "discover",

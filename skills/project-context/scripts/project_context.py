@@ -158,7 +158,7 @@ def discover(request: dict[str, Any]) -> dict[str, Any]:
             continue
         markdown = _text(row.get("markdown"), "candidate_markdown")
         revision = _text(row.get("revision"), "candidate_revision")
-        _structure(markdown)
+        _inspection(markdown, [])
         if _project_name(markdown) != project:
             issues.append(f"project_identity_mismatch:{ref}")
             continue
