@@ -602,8 +602,7 @@ def _json_equal_strict(expected: Any, actual: Any) -> bool:
         )
     if isinstance(expected, list):
         return len(expected) == len(actual) and all(
-            _json_equal_strict(left, right)
-            for left, right in zip(expected, actual)
+            _json_equal_strict(left, right) for left, right in zip(expected, actual)
         )
     return expected == actual
 
