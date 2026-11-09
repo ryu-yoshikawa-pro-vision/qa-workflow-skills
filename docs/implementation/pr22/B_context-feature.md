@@ -287,3 +287,15 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 回帰テストは`test_feature_registry.py`の旧DIF再分類2通り、`test_git_change_coverage.py`の実Git merge／releaseの途中commit base拒否、`test_pr24_git_artifact_store.py`の実Gitでの未列挙ファイルを含む途中commit base保存拒否・保存済み正本維持・正しい旧SHAからの正常保存を含む。検証はPR #34最新HEADのGitHub Actionsを正とする。
 
 実案件の外部provider・実承認サービス・実Agent・実製品CIおよびPR #22のA〜J統合受入は、従来の対象範囲どおり本PRの完了判定に含めない。外部レビューの依頼とPRのmergeは本対応では実施しない。
+
+## PR #34 履歴互換・多source・submoduleの再点検（2026-11-09）
+
+担当Bの保存・差分管理・Project Contextについて、レビューで確認した問題を修正した。
+
+- 旧重複DIFは変更せず履歴として保持し、未統合ならincompleteとする。新規重複はblockedとし、supersedes_idsに旧ID群を明示した訂正では旧行それぞれの承認を確認する。同分類の根拠・機能ID訂正を許可する。
+- analysis_updateはすべてのsourceのrevisionを比較し、直前PRの二つのGit差分基準を照合する。主sourceの旧SHAをsource IDで確認し、新規副次sourceは初回基準で処理する。
+- 削除・置換前のgitlinkも未取得として記録し、検証済みの子sourceのSHAと対応付けてから親sourceを保存する。Git取得失敗の理由も保存結果へ伝える。
+- Git検証と成果物保存の間はHEADとbranch refのGitロックを保持する。通常のGit ref更新との競合では保存しない。
+- 配置方針の参照URL内の=を許容し、前後空白を拒否する。承認revisionのない旧DECは再利用せず、新たな承認による置換を許可する。承認revisionだけを変更する場合も新DECを作成する。
+
+回帰テストは担当Bのテストへ追加し、最新コミットでGitHub Actionsを確認する。実案件provider・実Agent・製品CIやPR #22の他担当統合は従来どおり対象外とし、レビュー依頼とmergeは行わない。
