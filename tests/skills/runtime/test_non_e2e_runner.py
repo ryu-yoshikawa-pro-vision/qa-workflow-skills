@@ -627,6 +627,15 @@ class ActualRunnerTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertEqual(summary["reason"], "vitest_project_filter_unverified")
             self.assertIsNone(evidence)
+        # Vitest also accepts the two-token --project value form.
+        separate = dict(plan)
+        separate["selected"] = [{**plan["selected"][0], "project_name": "node*"}]
+        separate["argv"] = [*plan["argv"][:-1], "--project", "node*"]
+        separate["reviewed_argv"] = separate["argv"]
+        code, summary, evidence = self.call(separate)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "vitest_project_filter_unverified")
+        self.assertIsNone(evidence)
         plan["selected"].append({**plan["selected"][0], "project_name": "browser"})
         code, summary, evidence = self.call(plan)
         self.assertEqual(code, 2)
