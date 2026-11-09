@@ -390,6 +390,7 @@ class ActualRunnerTests(unittest.TestCase):
                             "tests": [
                                 {
                                     "projectName": "api",
+                                    "expectedStatus": "passed",
                                     "status": "expected",
                                     "results": [{"status": "passed", "retry": 0}],
                                 }
