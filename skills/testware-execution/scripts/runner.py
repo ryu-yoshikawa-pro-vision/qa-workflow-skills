@@ -377,7 +377,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         reporter_reports_failure = raw.get("success") is False
                     elif reporter_format == "playwright-json":
                         reconciliation = reconcile_playwright(
-                            **shared, repo_root=str(repo)
+                            **shared,
+                            runner_version=plan["runner_version"],
+                            repo_root=str(repo),
                         )
                         reporter_reports_failure = (
                             raw.get("stats", {}).get("unexpected", 0) > 0
