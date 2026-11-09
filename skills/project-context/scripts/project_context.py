@@ -483,6 +483,46 @@ def placement(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _active_placement_decisions(markdown: str, scope: str) -> list[str]:
+    lines, first, last = _id_table_lines(markdown, 12)
+    active: list[str] = []
+    for raw in lines[first + 2 : last]:
+        cells = [cell.strip() for cell in raw.strip().strip("|").split("|")]
+        if (
+            len(cells) == 9
+            and cells[1] == "QA成果物配置・人間編集方針"
+            and cells[2] == "有効"
+            and cells[4] == scope
+        ):
+            active.append(cells[0])
+    if len(active) > 1:
+        raise Invalid("multiple_active_placement_decisions")
+    return active
+
+
+def _placement_reference(markdown: str, scope: str) -> str | None:
+    lines = markdown.splitlines()
+    start = next(
+        (i for i, line in enumerate(lines) if line.startswith("## 14. ")), None
+    )
+    end = next(
+        (i for i, line in enumerate(lines) if line.startswith("## 15. ")), None
+    )
+    if start is None or end is None:
+        raise Invalid("section_14_missing")
+    relevant = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in lines[start + 1 : end]
+        if line.startswith("| QA成果物配置 |")
+    ]
+    matching = [cells for cells in relevant if len(cells) == 5 and cells[2] == scope]
+    if len(matching) > 1:
+        raise Invalid("multiple_placement_references")
+    if not matching:
+        return None
+    return matching[0][1] + "|" + matching[0][4]
+
+
 def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
     """Draft one approved placement decision and its Section 14 reference."""
     markdown = _text(request.get("markdown"), "markdown")
@@ -512,7 +552,21 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         safe[key] = value
     if safe["scope"] != _project_name(markdown):
         raise Invalid("placement_project_scope_mismatch")
+    active = _active_placement_decisions(markdown, safe["scope"])
+    original_reference = _placement_reference(markdown, safe["scope"])
     existing = request.get("existing_policy")
+    active_id = active[0] if active else None
+    if bool(active_id) != bool(original_reference):
+        raise Invalid("placement_decision_reference_inconsistent")
+    if active_id is not None:
+        if not isinstance(existing, dict) or existing.get("decision_id") != active_id:
+            raise Invalid("existing_placement_policy_unconfirmed")
+        if not original_reference.endswith(";" + active_id):
+            # The Section 14 text contains the DEC ID before owner metadata.
+            if f"{active_id};" not in original_reference:
+                raise Invalid("existing_placement_reference_mismatch")
+    elif existing is not None:
+        raise Invalid("placement_reuse_not_backed_by_context")
     if existing is not None:
         reused = placement(
             {
@@ -525,6 +579,8 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         if reused["status"] == "reuse_candidate" and all(
             existing.get(key) == safe[key] for key in required
         ):
+            if not original_reference.startswith(safe["target_ref"] + "|"):
+                raise Invalid("placement_reference_mismatch")
             return reused
     mode = "update"
     revision = _text(request.get("expected_revision"), "expected_revision")
@@ -553,20 +609,19 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         previous_assumptions, list
     ):
         raise Invalid("existing_dec_asm_rows_invalid")
-    ids = prepare_ids(
-        {
-            "markdown": markdown,
-            "artifact_mode": mode,
-            "artifact_ref": request.get("artifact_ref"),
-            "expected_revision": revision,
-            "source_ref": request.get("source_ref"),
-            "source_revision": request.get("source_revision"),
-            "change_reason": request.get("change_reason"),
-            "dec_asm_owner": "project-context",
-            "decisions": [*previous_decisions, decision],
-            "assumptions": previous_assumptions,
-        }
-    )
+    prepare_request = {
+        "markdown": markdown,
+        "artifact_mode": mode,
+        "artifact_ref": request.get("artifact_ref"),
+        "expected_revision": revision,
+        "source_ref": request.get("source_ref"),
+        "source_revision": request.get("source_revision"),
+        "change_reason": request.get("change_reason"),
+        "dec_asm_owner": "project-context",
+        "decisions": [*previous_decisions, decision],
+        "assumptions": previous_assumptions,
+    }
+    ids = prepare_ids(prepare_request)
     if ids["status"] != "draft":
         return ids
     decision_id = next(
@@ -574,6 +629,38 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         for row in ids["allocated_ids"]
         if row["draft_key"] == "placement-policy"
     )
+    if active_id is not None:
+        old_decisions = [
+            row
+            for row in previous_decisions
+            if isinstance(row, dict)
+            and row.get("identity_action") == "reuse"
+            and row.get("reuse_id") == active_id
+        ]
+        if len(old_decisions) != 1:
+            raise Invalid("previous_placement_decision_missing")
+        old_decision = old_decisions[0]
+        cells = old_decision.get("cells")
+        if not isinstance(cells, dict) or cells.get("状態") != "有効":
+            raise Invalid("previous_placement_decision_not_active")
+        if cells.get("確定内容") != "QA成果物配置・人間編集方針":
+            raise Invalid("previous_placement_decision_type_mismatch")
+        retired = {
+            **old_decision,
+            "cells": {**cells, "状態": "置換済み", "置換先ID": decision_id},
+        }
+        prepare_request["decisions"] = [
+            retired if row is old_decision else row for row in previous_decisions
+        ] + [decision]
+        ids = prepare_ids(prepare_request)
+        if ids["status"] != "draft":
+            return ids
+        if not any(
+            row["draft_key"] == "placement-policy"
+            and row["stable_id"] == decision_id
+            for row in ids["allocated_ids"]
+        ):
+            raise Invalid("placement_decision_id_changed")
     result = ids["artifact_markdown"]
     lines = result.splitlines(keepends=True)
     section_start = next(
