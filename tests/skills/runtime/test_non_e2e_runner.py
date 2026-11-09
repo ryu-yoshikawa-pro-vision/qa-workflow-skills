@@ -289,6 +289,20 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(artifact["quality_verdict"], "判定不能")
         self.assertEqual(artifact["outcome"], "measurements_incomplete")
 
+    def test_runner_workspace_side_effect_blocks_completion_without_cleanup(self):
+        plan = self.plan(
+            [
+                sys.executable,
+                "-c",
+                "from pathlib import Path;Path('unexpected.tmp').write_text('unsafe')",
+            ]
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "blocked_workspace_not_restored")
+        self.assertEqual(artifact["attempts"][0]["workspace_state_after_cleanup"], "dirty")
+        self.assertTrue((self.repo / "unexpected.tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
