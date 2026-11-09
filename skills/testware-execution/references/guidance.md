@@ -33,3 +33,18 @@
 ## 下流の引継ぎ
 
 H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/title、任意の元TC ref、実効選択条件、attempt、raw evidence、取得完全性、cleanup、診断とする。保存providerのreadback revisionや承認はAの正式公開契約に従い、未接続ならblockedとする。A〜J成果物の実参照をつないだ全体受入はPR #22で行う。
+
+
+## 実行CLIと独立検証の範囲
+
+`python skills/testware-execution/scripts/runner.py --plan /path/to/run-plan.json --artifacts /outside/source/artifacts` で、事前に全コマンド連鎖とfixture・副作用を確認した単独対象を実行する。CLIは指定したcheckoutの固定HEADとclean状態を確認し、開始プロセス、終了コード、timeout、各attemptのstdout／stderr、任意のVitest JSON reporterとrun外cleanupを専用ディレクトリへ保存する。実runnerの成功と正式TCのPASSは別。実行前に止まった場合は証拠を捏造しない。
+
+入力JSONは `repo_path`（絶対path）、`repo_revision`（Git HEAD SHA）、`runner_kind`（vitest／playwright-api／component／batch／event／nonfunctional／static）、`argv`、同値の `reviewed_argv`、`preflight`、任意の `timeout_seconds`・`attempts`・`cleanup_argv`・`reviewed_cleanup_argv` からなる。コマンドはshellを介さず起動する。Vitestでは、実reporterの出力pathを `{reporter_file}` としてrunnerコマンドに明示し、固定された `selected`、実選択を証明できる場合のみ `selection_verified`、実checkout rootを使用して照合する。CLIが製品テストや依存関係を自動導入することはない。
+
+非ブラウザTCで出力の直接比較を行う場合、`direct_expectations` に `{"id":"exit_code","expected":0}`、`{"id":"stdout_json","expected":{"ok":true}}` 等を列挙する。これらの期待値は実行前の仕様Authority・TCに由来するものとし、stdoutのJSON／終了コードから取得した実測と比較する。異なる場合はraw終了コード0でも `observed_FAIL`、必須観測を取得できない場合は `observations_incomplete`。結果は元attempt・rawと区別する。外部サービス・DBの副作用を実際に観測できない場合、入力だけで観測済みとしない。
+
+非機能は `runner_kind=nonfunctional` に `metric_criteria`（id、characteristic、unit、minimum／maximum）、`threshold_authority_ref`、`measurement_condition_ref`、確認済みの `measurement_conditions_verified` を渡し、実runnerのstdout JSONで得た数値だけを比較する。測定値不足は `判定不能`、閾値違反は `FAIL`。採用基準・計測条件を実測から推測しない。実採用のツール／計測・fixtureや条件の妥当性自体は別途レビューする。
+
+`preflight` の確認済みbooleanは**承認や共有予約のprovider認証ではない**。本CLIはshared／外部副作用を常に拒否する。隔離checkoutはOSのサンドボックスではないため、未信頼コマンドの実行、未確認のpackage lifecycle、認証情報の利用、インターネット通信を安全化しない。全script chainの検査と実環境の許可・隔離・秘密情報保護は起動担当が行う。rawログには機密情報が含まれ得るため、自動commit・共有を禁止する。cleanupや試行状態が不明な場合は自動retryしない。
+
+独立fixtureでのPython subprocess、Vitest形式の固定JSON、Git fast-forward競合試験は、固定qa-training-storeの実Vitest／API-only Playwright／バッチ・イベント・非機能計測の受入とは区別する。これらの本物のrunnerと実providerの検証は対象commit・必要な許可が確認できたときに行う。
