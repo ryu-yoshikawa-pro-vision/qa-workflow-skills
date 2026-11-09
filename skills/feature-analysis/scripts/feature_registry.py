@@ -189,7 +189,7 @@ def _changes(
             _text(row.get("reason"), f"{did}_reason")
             if cls == "impact" and not ids:
                 raise ContractError(f"{did}_impact_feature_missing")
-            if cls == "out_of_scope":
+            if cls in {"out_of_scope", "no_impact"}:
                 _text(row.get("approval_ref"), f"{did}_approval_ref")
         else:
             issues.append(f"change_unclassified:{did}")
@@ -281,11 +281,40 @@ def _history(
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:
         raise ContractError("history_rewritten")
+    new_events = events[len(old_history) :]
     for fid, old in old_features.items():
         if fid not in features:
             raise ContractError(f"historical_feature_removed:{fid}")
         if old.get("identity") != features[fid]["identity"]:
             raise ContractError(f"historical_identity_reused:{fid}")
+        changed_fields = {
+            key
+            for key in (
+                "name",
+                "kind",
+                "status",
+                "parent_id",
+                "source_ids",
+                "implementation_refs",
+                "spec_refs",
+                "qa_refs",
+            )
+            if old.get(key) != features[fid].get(key)
+        }
+        if changed_fields and not (
+            changed_fields == {"status"} and features[fid]["status"] == "retired"
+        ):
+            acceptable_kinds = (
+                {"renamed", "changed"} if changed_fields == {"name"} else {"changed"}
+            )
+            if not any(
+                event["kind"] in acceptable_kinds
+                and fid in event["from_ids"]
+                and fid in event["to_ids"]
+                and event["revision"] == snapshot["source_revision"]
+                for event in new_events
+            ):
+                raise ContractError(f"feature_change_history_missing:{fid}")
         if old.get("status") == "retired" and features[fid]["status"] != "retired":
             raise ContractError(f"retired_identity_reactivated:{fid}")
         if old.get("status") != "retired" and features[fid]["status"] == "retired":

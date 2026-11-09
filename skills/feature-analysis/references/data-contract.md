@@ -33,3 +33,5 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 結果は`coverage.git_change_paths`、`registered_paths`、`missing_git_paths`、`unmatched_registry_change_ids`、`unclassified_git_paths`、`rate`、候補snapshot SHA-256を含みます。ファイルpathの網羅は機能・hunk・Issue・仕様の網羅ではありません。Git一覧そのものの真正性と実providerへの保存・承認は別途確認します。
 
 同一artifactの更新では、前回のsource IDのkind/ref/scope、候補IDのsource_ids/evidence_ref、差分IDのsource_id/before_revision/after_revision/locatorを同じIDのまま別の意味に変更できません。変更分類や未解決候補の判定状態の更新は認めます。正式なsource移設・diff改版時はIDを再利用せず新規登録と履歴の参照を保持します。
+
+既存機能のname変更には`renamed`または`changed`、実装参照・status・親・仕様／QA参照等の変更には`changed`の追記履歴（対象IDをfrom_ids/to_idsへ記録し、今回source_revisionを付ける）が必要です。廃止は従来どおりretired等の履歴を要求します。`no_impact`も`out_of_scope`と同様に理由と承認refが必要で、実認証・承認scopeの真正性は別途確認します。

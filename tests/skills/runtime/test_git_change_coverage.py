@@ -100,6 +100,7 @@ class GitChangeCoverageTests(unittest.TestCase):
             classification="no_impact",
             feature_ids=[],
             reason="Documentation of independent coverage",
+            approval_ref="approval/reviewed-no-impact",
         )
         snapshot["changes"].append(extra)
         result = reconcile(self.request())

@@ -163,7 +163,47 @@ class FeatureRegistryTests(unittest.TestCase):
         next_step["snapshot"]["features"][0]["implementation_refs"] = [
             "src/new-auth.py"
         ]
+        next_step["snapshot"]["history"].append(
+            {
+                "event_id": "changed-implementation",
+                "kind": "changed",
+                "revision": "head-v1",
+                "evidence_ref": "evidence/path-change",
+                "from_ids": ["FEAT-001"],
+                "to_ids": ["FEAT-001"],
+            }
+        )
         self.assertEqual(handle(next_step)["status"], "complete")
+
+    def test_feature_edit_requires_matching_history_event(self) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        data["snapshot"]["artifact_revision"] = "art-v2"
+        data["snapshot"]["previous_artifact_revision"] = "art-v1"
+        data["snapshot"]["operation_id"] = "op-v2"
+        data["snapshot"]["features"][0]["name"] = "Checkout access rules"
+        result = handle(data)
+        self.assertEqual(result["status"], "blocked", result)
+        data["snapshot"]["history"].append(
+            {
+                "event_id": "renamed-feature",
+                "kind": "renamed",
+                "revision": "head-v1",
+                "evidence_ref": "evidence/rename",
+                "from_ids": ["FEAT-001"],
+                "to_ids": ["FEAT-001"],
+            }
+        )
+        self.assertEqual(handle(data)["status"], "complete")
+
+    def test_no_impact_needs_approval_ref(self) -> None:
+        data = fixture()
+        data["snapshot"]["changes"][0].update(
+            classification="no_impact", feature_ids=[], reason="format-only"
+        )
+        self.assertEqual(handle(data)["status"], "blocked")
+        data["snapshot"]["changes"][0]["approval_ref"] = "approval/format"
+        self.assertEqual(handle(data)["status"], "complete")
 
     def test_reuse_of_id_with_new_semantics_is_blocked(self) -> None:
         data = fixture()
