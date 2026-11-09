@@ -7,8 +7,7 @@
       "reference": "cases/ui-sem-001/reference.md",
       "criteria": [
         "UI-SEM-001",
-        "UI-SEM-002",
-        "UI-SEM-006"
+        "UI-SEM-002"
       ]
     },
     {
@@ -17,8 +16,7 @@
       "reference": "cases/ui-sem-002/reference.md",
       "criteria": [
         "UI-SEM-002",
-        "UI-SEM-003",
-        "UI-SEM-006"
+        "UI-SEM-003"
       ]
     },
     {

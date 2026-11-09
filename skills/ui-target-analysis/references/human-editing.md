@@ -47,10 +47,10 @@
 
 ## 競合・失敗・再開
 
-- canonical packageがMANIFEST不一致、invalid、symlink、currentness不明ならwriteを止めます。編集copyと元snapshotの証拠は保持し、自動修復・破棄をしません。独立の有効baselineと権限を確認できない場合はblockedです。
+- canonical packageがMANIFEST不一致、invalid、symlink、currentness不明ならwriteを止めます。編集copyと元snapshotの証拠は保持し、自動修復・破棄をしません。復旧はowner/runtimeが権限と独立検証済みbaselineを確認して行います。復旧後はfresh `inspect` snapshotを取り、提案をそのsnapshotへ再準備してowner reviewを更新するまでmaterializeしません。独立の有効baselineと権限を確認できない場合はblockedです。
 - 同じstable ID、関連ref、Scope、proseの意味上の依存が別更新と重なる場合は競合として停止します。独立したIDで依存refも重ならない更新は、current snapshotに対する再レビューが記録された場合だけ再baseできます。
 - 同じbaseから同一差分が既に保存されている場合はcurrentをno-opで返し、IDを再採番しません。
-- 保存または応答結果が不明な場合は、同一snapshot・同一request fingerprint・writer receiptを照合します。commit後の応答消失は同じrequestの再送とreadbackで判定し、新しいdraft keyで再適用しません。
+- 保存または応答結果が不明な場合は、同一snapshot・同一request fingerprint・writer receiptを照合します。commit後の応答消失は既存writerの同一request再送と独立readbackで判定し、新しいdraft keyで再適用しません。保存先revisionが進んでいる、またはCAS conflictが返った場合は再送を止め、fresh snapshotに対するowner review後に再準備します。
 - writerのpackage-local lockは同一local packageのwriter競合だけを扱います。remote保存先・別workspace・複数hostのCASではありません。保存先native CAS、revision履歴、承認主体の認証、独立readbackを共有runtimeで検証できなければ外部正式保存をblockedにします。
 
 ## 機能別導出索引

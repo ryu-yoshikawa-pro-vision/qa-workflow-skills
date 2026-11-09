@@ -5,37 +5,42 @@
   "criteria": [
     {
       "id": "UI-SEM-004",
-      "title": "owner境界と承認",
+      "title": "owner\u5883\u754c\u3068\u627f\u8a8d",
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "commit状態が明確になるまで正本を復元・再適用せず、権限ある履歴でcurrentnessを確認します。",
+      "reason": "scope\u5185\u3067\u306e\u78ba\u8a8d\u3001UI owner\u306b\u3088\u308b\u610f\u5473\u78ba\u8a8d\u3068\u914d\u7f6e\u5408\u610f\u3001\u5909\u66f4\u3054\u3068\u306e\u6839\u62e0\u3001retire\u7406\u7531\u3068\u660e\u793a\u627f\u8a8d\u3092\u6c42\u3081\u3066\u3044\u307e\u3059\u3002approval ref\u3092\u8a8d\u8a3c\u6e08\u307f\u627f\u8a8d\u3068\u507d\u3089\u305a\u3001\u78ba\u8a8d\u3067\u304d\u306a\u3044\u5834\u5408\u306f\u4fdd\u5b58\u3092\u6b62\u3081\u308b\u65b9\u91dd\u3082\u660e\u78ba\u3067\u3059\u3002",
       "evidence": [
-        "提示情報だけでは、直前のrequestがcommit済みか判断できません。",
-        "状態を確認できない場合はblockedを継続し、baselineからの復元や再適用をしません。"
+        "\u300c\u5909\u66f4\u304c\u8a31\u53ef\u3055\u308c\u305fscope\u5185\u304b\u3092\u78ba\u8a8d\u300d",
+        "\u300cUI owner\u306e\u610f\u5473\u78ba\u8a8d\u3001Q06\u914d\u7f6e\u5408\u610f\u3001\u5909\u66f4\u3054\u3068\u306esource evidence\u3001retire\u7406\u7531\u30fb\u660e\u793a\u627f\u8a8d\u3092\u6539\u3081\u3066\u78ba\u8a8d\u3057\u307e\u3059\u300d",
+        "\u300capproval ref\u306f\u8a3c\u62e0\u5024\u3067\u3042\u308a\u3001\u8a8d\u8a3c\u6e08\u307f\u627f\u8a8d\u3068\u306f\u307f\u306a\u3057\u307e\u305b\u3093\u300d"
       ]
     },
     {
       "id": "UI-SEM-005",
-      "title": "writer・履歴・再開の安全性",
+      "title": "writer\u30fb\u5c65\u6b74\u30fb\u518d\u958b\u306e\u5b89\u5168\u6027",
       "critical": true,
-      "rating": 4,
+      "rating": 3,
       "status": "pass",
-      "reason": "状態確認後に同一snapshot/requestで照合し、external CASの保証をlocal lockに仮託していません。",
+      "reason": "canonical\u3078\u306e\u66f8\u304d\u8fbc\u307f\u3092\u6b62\u3081\u3001\u540c\u4e00request\u30fbsnapshot\u30fbfingerprint\u3067\u306e\u518d\u9001\u3068readback\u3001stale\u6642\u306efresh snapshot\u3068owner review\u3092\u793a\u3057\u3066\u3044\u307e\u3059\u3002package-local\u306elock\u3084readback\u306e\u9650\u754c\u306b\u3082\u89e6\u308c\u3066\u3044\u307e\u3059\u3002\u4e00\u65b9\u3001\u65e7request\u304c\u672acommit\u304b\u3064ID\u672a\u5272\u5f53\u3068\u78ba\u8a8d\u3067\u304d\u305f\u5834\u5408\u306b\u65b0\u3057\u3044draft ID\u3092\u4f7f\u3048\u308b\u3068\u3057\u3066\u304a\u308a\u3001Reference\u306e\u300c\u65b0\u3057\u3044draft key\u3092\u4f5c\u3089\u306a\u3044\u300d\u3068\u3044\u3046\u5236\u7d04\u3088\u308a\u5e83\u3044\u518d\u958b\u3092\u8a8d\u3081\u3066\u3044\u307e\u3059\u3002",
       "evidence": [
-        "同じsnapshot・同じrequest",
-        "package-local lockはremote CASや複数workspaceの履歴証明ではありません。"
+        "\u300c\u3053\u306e\u72b6\u614b\u3067\u306fwriter\u3092\u547c\u3070\u305a\u3001canonical write\u3092blocked\u306b\u3057\u307e\u3059\u300d",
+        "\u300c\u540c\u4e00request\u30fbsnapshot\u30fbfingerprint\u3092\u518d\u9001\u3057\u3066readback\u3057\u307e\u3059\u300d",
+        "\u300c`stale_snapshot`\u307e\u305f\u306fcurrent revision\u306e\u5909\u66f4\u306f\u540c\u4e00request\u306e\u518d\u9001\u7406\u7531\u306b\u305b\u305a\u3001fresh snapshot\u3068owner review\u306b\u623b\u3057\u307e\u3059\u300d",
+        "\u300c\u65b0\u3057\u3044draft ID\u306f\u65e7request\u304c\u672acommit\u3067ID\u672a\u5272\u5f53\u3068\u78ba\u8a8d\u3067\u304d\u305f\u5834\u5408\u3060\u3051\u4f7f\u3044\u300d",
+        "\u300cpackage-local lock\u306fremote CAS\u3084\u8907\u6570workspace\u306e\u5c65\u6b74\u8a3c\u660e\u3067\u306f\u306a\u304f\u300d"
       ]
     },
     {
       "id": "UI-SEM-006",
-      "title": "legacy互換と検証境界",
+      "title": "legacy\u4e92\u63db\u3068\u691c\u8a3c\u5883\u754c",
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "旧packageのstable IDs、条件付きfile applicability、manifestとchangelog lifecycleを維持する判断を示しています。",
+      "reason": "ui-target-v1\u3001v09 baseline\u3001\u6761\u4ef6\u4ed8\u304dfile\u306e\u9069\u7528\u6761\u4ef6\u3001\u65e2\u5b58\u306estable ID\u3001Manifest\u3001migration\u4e92\u63db\u6027\u3001retired ID\u306e\u5c65\u6b74\u3092\u7dad\u6301\u3059\u308b\u3068\u660e\u8a18\u3057\u3066\u3044\u307e\u3059\u3002\u72ec\u7acbfixture\u3092\u5b9fprovider\u3001A runtime\u3001\u4ed6owner\u6210\u679c\u7269\u306e\u7d71\u5408\u8a3c\u62e0\u3068\u3057\u3066\u6271\u308f\u306a\u3044\u9650\u754c\u3082\u793a\u3057\u3066\u3044\u307e\u3059\u3002",
       "evidence": [
-        "`PAGE-002`、`UIOP-004`、conditional file applicability、Manifest、retired `PAGE-001`のchangelog履歴は維持します。"
+        "\u300c\u65e7`ui-target-v1` package\u306e`PAGE-002`\u3001`UIOP-004`\u3001conditional file applicability\u3001Manifest\u3001stable ID lifecycle\u3001migration\u4e92\u63db\u6027\u3001retired `PAGE-001`\u306eCHANGELOG\u5c65\u6b74\u306f\u7dad\u6301\u3057\u307e\u3059\u300d",
+        "\u300c\u72ec\u7acbfixture\u3082A runtime\u30fb\u5b9fprovider\u30fb\u4ed6owner\u6210\u679c\u7269\u306e\u7d71\u5408\u8a3c\u62e0\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u300d"
       ]
     }
   ],

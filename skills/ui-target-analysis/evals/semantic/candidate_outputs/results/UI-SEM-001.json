@@ -5,42 +5,33 @@
   "criteria": [
     {
       "id": "UI-SEM-001",
-      "title": "UI構造と期待仕様の分離",
+      "title": "UI\u69cb\u9020\u3068\u671f\u5f85\u4ed5\u69d8\u306e\u5206\u96e2",
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "画面の観測を分離し、仕様で決まっていない挙動をUNKNOWNとしてownerへ戻しています。",
+      "reason": "\u753b\u9762\u4e0a\u306e\u69cb\u9020\u3068\u8868\u793a\u3092\u89b3\u6e2c\u3068\u3057\u3066\u8a18\u9332\u3057\u3001\u8981\u4ef6\u306e\u671f\u5f85\u3068\u5206\u96e2\u3057\u3066\u3044\u307e\u3059\u3002\u672a\u5b9a\u7fa9\u306e\u90f5\u4fbf\u756a\u53f7\u691c\u8a3c\u3001Continue\u306e\u6709\u52b9\u5316\u6761\u4ef6\u3001invalid input\u6642\u306e\u9001\u4fe1\u53ef\u5426\u3092UNKNOWN\u3068\u3057\u3066spec-analysis\u3078\u623b\u3057\u3066\u3044\u307e\u3059\u3002",
       "evidence": [
-        "郵便番号のvalidation規則と操作時の期待結果は指定されていないため、`spec-analysis`でUNKNOWNとして解決してください。",
-        "disabled表示やmessageを期待仕様の根拠にしません。"
+        "\u300c\u914d\u9001\u5148\u4f4f\u6240\u30d5\u30a9\u30fc\u30e0 | \u753b\u9762\u4e0a\u306b\u8868\u793a\u300d\u300cContinue\u30dc\u30bf\u30f3 | disabled\u8868\u793a\u300d\u300c\u90f5\u4fbf\u756a\u53f7\u6b04 | \u4e0d\u6b63\u5024\u5165\u529b\u5f8c\u306binline message\u304c\u8868\u793a\u300d",
+        "\u300c\u90f5\u4fbf\u756a\u53f7\u306evalidation\u898f\u5247\u3068\u64cd\u4f5c\u6642\u306e\u671f\u5f85\u7d50\u679c\u306f\u6307\u5b9a\u3055\u308c\u3066\u3044\u306a\u3044\u305f\u3081\u3001`spec-analysis`\u3067UNKNOWN\u3068\u3057\u3066\u89e3\u6c7a\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u300d",
+        "\u300ccapture\u4e0a\u306edisabled\u8868\u793a\u3084message\u3092\u671f\u5f85\u4ed5\u69d8\u306e\u6839\u62e0\u306b\u3057\u307e\u305b\u3093\u3002\u300d"
       ]
     },
     {
       "id": "UI-SEM-002",
-      "title": "根拠とcurrentness",
+      "title": "\u6839\u62e0\u3068currentness",
       "critical": true,
       "rating": 4,
       "status": "pass",
-      "reason": "UI captureとrequirementのref/revisionを別に保持しています。",
+      "reason": "\u753b\u9762capture\u3068\u8981\u4ef6\u3092\u305d\u308c\u305e\u308c\u306eref\u3068revision\u4ed8\u304d\u3067\u8a18\u9332\u3057\u3001\u9759\u6b62\u753b\u50cf\u304b\u3089\u78ba\u5b9a\u3067\u304d\u306a\u3044\u6319\u52d5\u3084\u5b9f\u969b\u306e\u9077\u79fb\u6210\u529f\u3092\u4e3b\u5f35\u3057\u3066\u3044\u307e\u305b\u3093\u3002",
       "evidence": [
-        "| 画面capture | `artifact://design/checkout` | `design-r7` |",
-        "| 要件        | `doc://checkout/requirement` | `req-12`    |"
-      ]
-    },
-    {
-      "id": "UI-SEM-006",
-      "title": "legacy互換と検証境界",
-      "critical": true,
-      "rating": 4,
-      "status": "pass",
-      "reason": "実行結果が見えない静止画像から遷移成功を主張していません。",
-      "evidence": [
-        "実際の遷移成功を確定できません。"
+        "\u300c\u753b\u9762capture | `artifact://design/checkout` | `design-r7`\u300d",
+        "\u300c\u8981\u4ef6 | `doc://checkout/requirement` | `req-12`\u300d",
+        "\u300c`design-r7`\u3060\u3051\u304b\u3089\u306f\u3001message\u306e\u767a\u706b\u6761\u4ef6\u3001Continue\u306eenable\u6761\u4ef6\u3001invalid input\u6642\u306esubmit\u53ef\u5426\u3001\u5b9f\u969b\u306e\u9077\u79fb\u6210\u529f\u3092\u78ba\u5b9a\u3067\u304d\u307e\u305b\u3093\u3002\u300d"
       ]
     }
   ],
   "summary": {
-    "pass": 3,
+    "pass": 2,
     "needs_review": 0,
     "fail": 0,
     "not_evaluable": 0

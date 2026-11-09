@@ -28,7 +28,7 @@
     {
       "id": "UI-SEM-005",
       "title": "writer・履歴・再開の安全性",
-      "description": "既存single writerを使い、生成物・control・無関係IDを維持し、競合・失敗・応答消失で同じrequestとsnapshotから再開し、推測による修復や重複採番を避けるか。",
+      "description": "既存single writerを使い、生成物・control・無関係IDを維持するか。応答消失・commit不明時は同じrequest／snapshot／fingerprintの再送とreadbackで判定し、stale CAS時は旧requestの再送を止めてfresh snapshotとowner reviewに戻るなど、失敗状態に応じて安全に再開し、推測による修復や重複採番を避けるか。",
       "critical": true
     },
     {

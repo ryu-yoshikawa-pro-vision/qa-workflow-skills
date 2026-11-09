@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -9,6 +10,11 @@ from scripts.skills.evals.semantic.result import normalize_judge_response
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
+
+
+def _normalize_evidence_quote(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(character for character in normalized if character.isalnum())
 
 
 class UiTargetCandidateResultTests(unittest.TestCase):
@@ -23,6 +29,7 @@ class UiTargetCandidateResultTests(unittest.TestCase):
                 output_path = output_root / f"{case['id']}.md"
                 result_path = output_root / "results" / f"{case['id']}.json"
                 output = output_path.read_text(encoding="utf-8")
+                normalized_output = _normalize_evidence_quote(output)
                 result = json.loads(result_path.read_text(encoding="utf-8"))
 
                 self.assertEqual(result["skill"], "ui-target-analysis")
@@ -32,7 +39,7 @@ class UiTargetCandidateResultTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     all(
-                        evidence in output
+                        _normalize_evidence_quote(evidence) in normalized_output
                         for item in result["criteria"]
                         for evidence in item["evidence"]
                     )

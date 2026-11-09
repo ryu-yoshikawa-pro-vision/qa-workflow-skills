@@ -5,6 +5,13 @@
 - explicit mapping: `FEATURE-021` → `SCOPE-004`
 - indexはcurrent `inspect` snapshotから導出しました。保存済みfeature indexは作成しません。
 
+## 正本位置
+
+- `UIOP-012`を`02_behavior_and_business_rules.md`の`UI操作一覧` line 44に記載します。
+- `UIOP-013`を`02_behavior_and_business_rules.md`の`UI操作一覧` line 51に記載します。
+- `PAGE-008`、`NAV-002`、`DIALOG-004`を`01_ui_structure_and_navigation.md`の`UI構造一覧`各lineに記載します。
+- `SCOPE-004`を`00_scope_and_context.md`の`分析対象機能scope一覧` line 19に記載します。
+
 | stable ID  | 種別   | 正本file                            | section               | line | 関係                  |
 | ---------- | ------ | ----------------------------------- | --------------------- | ---: | --------------------- |
 | SCOPE-004  | scope  | `00_scope_and_context.md`           | 分析対象機能scope一覧 |   19 | 明示mapping           |
