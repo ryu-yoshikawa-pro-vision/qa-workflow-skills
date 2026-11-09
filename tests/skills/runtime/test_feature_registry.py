@@ -511,9 +511,11 @@ class FeatureRegistryTests(unittest.TestCase):
                 snap["artifact_revision"] = "art-v2"
                 snap["previous_artifact_revision"] = "art-v1"
                 snap["operation_id"] = "op-v2"
-                snap["changes"][0].update(
+                change = copy.deepcopy(snap["changes"][0])
+                change.update(
                     id="DIF-002", before_revision=old_sha, after_revision=new_sha
                 )
+                snap["changes"].append(change)
                 data["observed_head_revision"] = new_sha
                 self.assertEqual(handle(data)["status"], "complete", data)
                 del snap["event_basis"]
@@ -542,9 +544,11 @@ class FeatureRegistryTests(unittest.TestCase):
         snap["artifact_revision"] = "art-v2"
         snap["previous_artifact_revision"] = "art-v1"
         snap["operation_id"] = "op-v2"
-        snap["changes"][0].update(
+        change = copy.deepcopy(snap["changes"][0])
+        change.update(
             id="DIF-002", before_revision="doc-v1", after_revision="doc-v2"
         )
+        snap["changes"].append(change)
         data["observed_head_revision"] = "event-v2"
         self.assertEqual(handle(data)["status"], "complete", data)
         snap["event_basis"]["after_revision"] = "doc-v3"

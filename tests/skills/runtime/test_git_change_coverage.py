@@ -150,8 +150,10 @@ class GitChangeCoverageTests(unittest.TestCase):
         snapshot["artifact_revision"] = "art-v2"
         snapshot["previous_artifact_revision"] = "art-v1"
         snapshot["operation_id"] = "op-v2"
-        snapshot["changes"][0]["id"] = "DIF-002"
-        second = copy.deepcopy(snapshot["changes"][0])
+        current = copy.deepcopy(snapshot["changes"][0])
+        current["id"] = "DIF-002"
+        snapshot["changes"].append(current)
+        second = copy.deepcopy(current)
         second.update(
             id="DIF-003",
             locator="beta.py",
@@ -226,10 +228,7 @@ class GitChangeCoverageTests(unittest.TestCase):
                 after_revision=previous_head,
                 classification="impact",
             )
-            if i == 0:
-                snapshot["changes"] = [row]
-            else:
-                snapshot["changes"].append(row)
+            snapshot["changes"].append(row)
         result = reconcile(
             {
                 **self.request(),
