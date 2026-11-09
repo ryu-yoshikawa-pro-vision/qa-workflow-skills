@@ -369,7 +369,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     supported_formats = {
         "vitest": {"vitest-json"},
         "playwright-api": {"playwright-json"},
-        "component": {"vitest-json", "playwright-json"},
+        "component": {"vitest-json", "jest-json", "playwright-json"},
         "batch": {"case-json"},
         "event": {"case-json"},
     }
@@ -477,7 +477,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             "raw_ref": str(reporter),
                             "selection_verified": True,
                         }
-                        if reporter_format == "vitest-json":
+                        if reporter_format in {"vitest-json", "jest-json"}:
                             reconciliation = reconcile_vitest(
                                 **shared, repo_root=str(repo)
                             )
