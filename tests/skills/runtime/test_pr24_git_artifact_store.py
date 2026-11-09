@@ -221,9 +221,7 @@ class GitArtifactStoreTests(unittest.TestCase):
         worktree = self.root / "isolated-checkout"
         metadata = self.root / "external-gitdir"
         git(self.root, "init", "-q", "--separate-git-dir", str(metadata), str(worktree))
-        with self.assertRaisesRegex(
-            StoreError, "git_metadata_outside_authorized_root"
-        ):
+        with self.assertRaisesRegex(StoreError, "git_metadata_outside_authorized_root"):
             GitArtifactStore(
                 worktree,
                 worktree,
