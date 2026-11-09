@@ -11,7 +11,11 @@ import json
 import sys
 from typing import Any
 
-from feature_registry import handle as validate_feature_registry
+from feature_registry import (  # noqa: E402
+    _primary_code_source_id,
+    _superseded_ids,
+    handle as validate_feature_registry,
+)
 
 MAX_INPUT = 32 * 1024 * 1024
 
@@ -81,13 +85,19 @@ def analyze(request: Any) -> dict[str, Any]:
     previous_inventory = request.get("previous_head_git_inventory")
     if source_basis is not None:
         if (
-            event not in {"pr_update", "rebase"}
+            event not in {"pr_update", "rebase", "analysis_update"}
             or not isinstance(source_basis, dict)
             or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}
         ):
             raise Invalid("source_event_basis_invalid")
+        if event in {"pr_update", "rebase"} and source_id == _primary_code_source_id(snapshot):
+            raise Invalid("primary_source_event_basis_override")
         basis = source_basis
-    if event in {"pr_update", "rebase"}:
+    checks_previous_diff = (
+        event in {"pr_update", "rebase"}
+        or (event == "analysis_update" and source_basis is not None)
+    )
+    if checks_previous_diff:
         if not isinstance(basis, dict):
             raise Invalid("event_basis_required")
         if git.get("base_sha") != basis["base_sha"] or head_sha != basis["head_sha"]:
@@ -96,25 +106,33 @@ def analyze(request: Any) -> dict[str, Any]:
                 "reasons": ["pr_base_head_inventory_mismatch"],
                 "coverage": None,
             }
-        if previous_inventory is None:
+        if basis.get("previous_head_sha") is None:
+            if source_basis is None or event not in {"pr_update", "rebase"}:
+                raise Invalid("previous_head_required")
+            if previous_inventory is not None:
+                raise Invalid("new_source_previous_diff_unexpected")
+        elif previous_inventory is None:
             return {
                 "status": "incomplete",
                 "reasons": ["previous_head_diff_not_enumerated"],
                 "coverage": None,
             }
-        if not isinstance(previous_inventory, dict):
+        if previous_inventory is not None and not isinstance(previous_inventory, dict):
             raise Invalid("previous_head_inventory_invalid")
         if (
-            previous_inventory.get("status") != "complete"
+            previous_inventory is not None
+            and (
+                previous_inventory.get("status") != "complete"
             or previous_inventory.get("complete_change_listing") is not True
-            or previous_inventory.get("unretrieved") != []
+                or previous_inventory.get("unretrieved") != []
+            )
         ):
             return {
                 "status": "incomplete",
                 "reasons": ["previous_head_diff_incomplete"],
                 "coverage": None,
             }
-        if (
+        if previous_inventory is not None and (
             previous_inventory.get("base_sha") != basis["previous_head_sha"]
             or previous_inventory.get("head_sha") != head_sha
         ):
@@ -165,12 +183,15 @@ def analyze(request: Any) -> dict[str, Any]:
                 "reasons": ["event_previous_git_revision_mismatch"],
                 "coverage": None,
             }
-    if source_basis is not None:
+    if source_basis is not None and event in {"pr_update", "rebase"}:
         old_sources = (registry_request.get("previous_snapshot") or {}).get(
             "sources", []
         )
         old = [row for row in old_sources if row.get("id") == source_id]
-        if len(old) != 1 or old[0].get("revision") != basis["previous_head_sha"]:
+        if basis["previous_head_sha"] is None:
+            if old:
+                raise Invalid("new_source_already_in_previous_snapshot")
+        elif len(old) != 1 or old[0].get("revision") != basis["previous_head_sha"]:
             raise Invalid("source_event_previous_head_mismatch")
     files = git.get("files")
     changes = git.get("changes")
@@ -252,9 +273,7 @@ def analyze(request: Any) -> dict[str, Any]:
         else set()
     )
     superseded = {
-        row.get("supersedes_id")
-        for row in snapshot["changes"]
-        if row.get("supersedes_id") is not None
+        parent for row in snapshot["changes"] for parent in _superseded_ids(row)
     }
     unmatched_ids: list[str] = []
     mismatched_revision_ids: list[str] = []
@@ -273,7 +292,7 @@ def analyze(request: Any) -> dict[str, Any]:
             continue
         # A saved DIF correction is history, not a new source change.
         # Only same-HEAD analysis updates may classify it as current.
-        if row.get("supersedes_id") and (
+        if _superseded_ids(row) and (
             event != "analysis_update" or row["after_revision"] != head_sha
         ):
             continue
