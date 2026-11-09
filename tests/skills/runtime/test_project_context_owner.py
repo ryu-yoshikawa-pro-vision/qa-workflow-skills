@@ -124,6 +124,42 @@ class ProjectContextOwnerTests(unittest.TestCase):
             result["artifact_markdown"].split("## 12.")[1].split("## 14.")[0],
         )
 
+    def test_feature_context_fields_are_registered_and_updateable(self) -> None:
+        updates = {
+            "qa.feature_source_refs": "source/repo@sha\nsource/spec@revision",
+            "qa.feature_artifact_root": "qa/features",
+            "qa.feature_base_ref": "refs/heads/main@sha",
+            "qa.feature_approval_policy_ref": "approval/policy-revision",
+        }
+        result = handle(
+            {
+                "operation": "prepare-update",
+                "markdown": context(),
+                "artifact_ref": "context.md",
+                "expected_revision": "rev-1",
+                "source_ref": "issue/1",
+                "source_revision": "rev-2",
+                "change_reason": "feature analysis initialization",
+                "updates": updates,
+            }
+        )
+        self.assertEqual(result["status"], "draft", result)
+        reviewed = handle(
+            {
+                "operation": "inspect",
+                "markdown": result["artifact_markdown"],
+                "required_keys": sorted(updates),
+            }
+        )
+        self.assertEqual(reviewed["status"], "current", reviewed)
+        self.assertEqual(
+            reviewed["fields"]["qa.feature_source_refs"]["value"],
+            ["source/repo@sha", "source/spec@revision"],
+        )
+        self.assertEqual(
+            reviewed["fields"]["qa.feature_artifact_root"]["value"], "qa/features"
+        )
+
     def test_unknown_key_and_injected_marker_rejected(self) -> None:
         base = {
             "operation": "prepare-update",
