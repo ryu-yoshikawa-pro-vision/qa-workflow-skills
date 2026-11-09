@@ -13,7 +13,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-PROJECT_CONTEXT_SCRIPT = Path(__file__).resolve().parents[2] / "project-context" / "scripts"
+PROJECT_CONTEXT_SCRIPT = (
+    Path(__file__).resolve().parents[2] / "project-context" / "scripts"
+)
 sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPT))
 from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 
@@ -460,7 +462,10 @@ def persist_snapshot(
         artifact_ref = snapshot["artifact_ref"]
         current = store.read_current("feature-inventory", project_ref, artifact_ref)
         if current is None:
-            if expected_revision is not None or request["previous_snapshot"] is not None:
+            if (
+                expected_revision is not None
+                or request["previous_snapshot"] is not None
+            ):
                 raise ContractError("previous_snapshot_missing")
         else:
             if current["revision"] != expected_revision:

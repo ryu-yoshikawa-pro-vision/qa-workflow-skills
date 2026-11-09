@@ -79,9 +79,7 @@ class ArtifactStoreTests(unittest.TestCase):
             "initial",
         )
         with self.assertRaisesRegex(StoreError, "revision_conflict"):
-            self.write(
-                content="stale", expected_revision="r1", operation_id="op-stale"
-            )
+            self.write(content="stale", expected_revision="r1", operation_id="op-stale")
         self.assertEqual(
             self.store.read_current("project-context", "Sample", "artifact.md")[
                 "content"
@@ -110,6 +108,7 @@ class ArtifactStoreTests(unittest.TestCase):
 
     def test_atomic_update_from_two_connections(self) -> None:
         self.write()
+
         def update(idx: int) -> str:
             store = LocalArtifactStore(self.root, self.root, self.authorize)
             try:
@@ -207,9 +206,9 @@ class ArtifactStoreTests(unittest.TestCase):
         self.assertEqual(result["revision"], "r2")
         self.assertIn(
             "qa/feature-list",
-            self.store.read_current(
-                "project-context", "Sample", "project-context.md"
-            )["content"],
+            self.store.read_current("project-context", "Sample", "project-context.md")[
+                "content"
+            ],
         )
         update["expected_revision"] = "r1"
         self.assertEqual(
