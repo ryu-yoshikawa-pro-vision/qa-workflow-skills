@@ -385,13 +385,14 @@ class ActualRunnerTests(unittest.TestCase):
             reconciliation["failed_suites_without_tests"], ["tests/sample.test.ts"]
         )
 
-    def test_retry_preserves_failed_attempt(self):
+    def test_missing_results_must_not_retry_even_with_clean_checkout(self):
         plan = self.plan([sys.executable, "-c", "raise SystemExit(1)"])
         plan["attempts"] = 2
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
-        self.assertEqual(len(artifact["attempts"]), 2)
-        self.assertTrue(all(a["return_code"] == 1 for a in artifact["attempts"]))
+        self.assertEqual(len(artifact["attempts"]), 1)
+        self.assertEqual(artifact["attempts"][0]["return_code"], 1)
+        self.assertEqual(artifact["attempts"][0]["result_collection"], "not_provided_by_adapter")
 
     def test_event_case_report_requires_complete_selected_population(self):
         report = {
