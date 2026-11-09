@@ -58,8 +58,15 @@ class RoutingTests(unittest.TestCase):
             "permissions_verified": True,
             "side_effects": [],
             "isolated_environment": True,
+            "external_side_effects": False,
+            "shared_resource": False,
         }
         self.assertTrue(contract.preflight(spec)["may_start"])
+        self.assertEqual(
+            contract.preflight({key: value for key, value in spec.items()
+                                if key != "external_side_effects"})["reason"],
+            "external_side_effects_unverified",
+        )
         self.assertFalse(
             contract.preflight({**spec, "script_chain_reviewed": False})["may_start"]
         )
@@ -133,6 +140,7 @@ class VitestTests(unittest.TestCase):
             "testResults": [
                 {
                     "name": "tests/new.test.ts",
+                    "status": "passed",
                     "assertionResults": [
                         {"ancestorTitles": [], "title": "skipped", "status": "pending"},
                         {"ancestorTitles": [], "title": "todo", "status": "todo"},
@@ -166,6 +174,35 @@ class VitestTests(unittest.TestCase):
                 source_revision="fixed-sha",
                 raw_ref="raw",
             )
+
+    def test_suite_failure_with_passing_assertions_is_not_complete(self):
+        report = {
+            "success": True,
+            "numTotalTests": 1,
+            "numPassedTests": 1,
+            "testResults": [
+                {
+                    "name": "tests/api.test.ts",
+                    "status": "failed",
+                    "assertionResults": [
+                        {
+                            "ancestorTitles": ["suite"],
+                            "title": "one",
+                            "status": "passed",
+                        }
+                    ],
+                }
+            ],
+        }
+        result = contract.reconcile_vitest(
+            selected=[{"path": "tests/api.test.ts", "title_path": ["suite", "one"]}],
+            report=report,
+            source_revision="sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(result["collection_complete"])
+        self.assertEqual(result["inconsistent_suites"], ["tests/api.test.ts"])
 
 
 class DirectAndStaticTests(unittest.TestCase):
