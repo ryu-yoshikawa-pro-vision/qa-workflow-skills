@@ -508,8 +508,8 @@ def _placement_reference(markdown: str, scope: str) -> str | None:
     lines = markdown.splitlines()
     start = next(
         (i for i, line in enumerate(lines) if line.startswith("## 14. ")), None
-
     )
+    end = next((i for i, line in enumerate(lines) if line.startswith("## 15. ")), None)
     if start is None or end is None:
         raise Invalid("section_14_missing")
     relevant = [
