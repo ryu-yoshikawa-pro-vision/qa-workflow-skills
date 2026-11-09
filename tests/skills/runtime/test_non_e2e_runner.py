@@ -238,7 +238,6 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(artifact["tc_verdict"], "判定不能")
         self.assertEqual(artifact["outcome"], "observations_incomplete")
 
-
     def test_nonfunctional_threshold_is_evaluated_from_real_measurement(self):
         plan = self.plan(
             [sys.executable, "-c", "print('{\"p95_ms\": 225}')"],
