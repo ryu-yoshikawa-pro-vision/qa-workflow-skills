@@ -116,9 +116,7 @@ class GitSourceInventoryTests(unittest.TestCase):
             report["unretrieved"], [f"gitlink:vendor/submodule@{self.first}"]
         )
         self.assertEqual(
-            next(x for x in report["files"] if x["path"] == "vendor/submodule")[
-                "kind"
-            ],
+            next(x for x in report["files"] if x["path"] == "vendor/submodule")["kind"],
             "commit",
         )
         self.assertIn(

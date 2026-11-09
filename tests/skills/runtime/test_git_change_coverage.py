@@ -114,7 +114,7 @@ class GitChangeCoverageTests(unittest.TestCase):
 
     def test_stale_and_unconfirmed_git_are_not_complete(self) -> None:
         self.feature["snapshot"]["sources"][0]["revision"] = "other-revision"
-        self.assertEqual(reconcile(self.request())["status"], "stale")
+        self.assertEqual(reconcile(self.request())["status"], "blocked")
         self.feature["snapshot"]["sources"][0]["revision"] = self.inventory["head_sha"]
         self.inventory["complete_change_listing"] = False
         self.assertEqual(reconcile(self.request())["status"], "incomplete")

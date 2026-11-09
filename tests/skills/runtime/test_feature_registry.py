@@ -132,12 +132,14 @@ class FeatureRegistryTests(unittest.TestCase):
         snap["artifact_revision"] = "art-v2"
         snap["previous_artifact_revision"] = "art-v1"
         snap["changes"][0]["after_revision"] = "head-v1"
-        snap["changes"].append({
-            **copy.deepcopy(snap["changes"][0]),
-            "id": "DIF-002",
-            "before_revision": "b" * 40,
-            "after_revision": "a" * 40,
-        })
+        snap["changes"].append(
+            {
+                **copy.deepcopy(snap["changes"][0]),
+                "id": "DIF-002",
+                "before_revision": "b" * 40,
+                "after_revision": "a" * 40,
+            }
+        )
         self.assertEqual(handle(data)["status"], "complete", handle(data))
         snap["changes"][-1]["before_revision"] = "d" * 40
         self.assertEqual(handle(data)["status"], "blocked")

@@ -341,13 +341,15 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         snap["history"][0]["revision"] = head
         request["observed_head_revision"] = head
-        evidence = [{
-            "source_id": "SRC-001",
-            "repository_root": str(self.root),
-            "authorized_root": str(self.root),
-            "base_sha": baseline,
-            "head_sha": head,
-        }]
+        evidence = [
+            {
+                "source_id": "SRC-001",
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": baseline,
+                "head_sha": head,
+            }
+        ]
         return request, evidence
 
     def test_code_save_rechecks_actual_git_tree_and_rejects_unlisted_diff(

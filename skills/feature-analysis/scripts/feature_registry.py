@@ -243,9 +243,10 @@ def _change_revisions(
             permitted = {basis["base_sha"], basis["previous_head_sha"]}
             if row["before_revision"] not in permitted:
                 raise ContractError(f"change_before_revision_mismatch:{did}")
-        elif snapshot["event"] == "external_revision" and source["ref"] == basis[
-            "document_ref"
-        ]:
+        elif (
+            snapshot["event"] == "external_revision"
+            and source["ref"] == basis["document_ref"]
+        ):
             if row["before_revision"] != basis["before_revision"]:
                 raise ContractError(f"document_change_before_revision_mismatch:{did}")
     return issues
@@ -620,9 +621,7 @@ def _verify_git_evidence(
     """
     snapshot = request["snapshot"]
     code_sources = {
-        row["id"]: row
-        for row in snapshot["sources"]
-        if row.get("kind") == "code"
+        row["id"]: row for row in snapshot["sources"] if row.get("kind") == "code"
     }
     if not code_sources:
         if inputs is not None:
@@ -643,9 +642,11 @@ def _verify_git_evidence(
             "head_sha",
         }
         optional = {"previous_head_base_sha"}
-        if not isinstance(entry, dict) or not keys <= set(entry) or not set(
-            entry
-        ) <= keys | optional:
+        if (
+            not isinstance(entry, dict)
+            or not keys <= set(entry)
+            or not set(entry) <= keys | optional
+        ):
             raise ContractError("git_evidence_schema_invalid")
         sid = entry["source_id"]
         if sid not in code_sources or sid in verified:
