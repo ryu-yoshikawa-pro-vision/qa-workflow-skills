@@ -181,6 +181,80 @@ def discover(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _apply_sections(markdown: str, updates: Any) -> str:
+    """Replace only named human-readable sections, preserving DEC/ASM and graph."""
+    if not isinstance(updates, dict) or not updates:
+        raise Invalid("section_updates_required")
+    numbers: dict[int, str] = {}
+    for raw_number, body in updates.items():
+        if not isinstance(raw_number, str) or not raw_number.isdigit():
+            raise Invalid("section_key_invalid")
+        number = int(raw_number)
+        if number not in {*range(1, 12), 15} or number in numbers:
+            raise Invalid("section_not_editable")
+        if not isinstance(body, str) or not body.strip():
+            raise Invalid("section_content_invalid")
+        if (
+            "<!--" in body
+            or "-->" in body
+            or "\x00" in body
+            or re.search(r"(?m)^## \d+\.\s", body)
+        ):
+            raise Invalid("section_content_unsafe")
+        numbers[number] = body.strip("\n")
+    original_project = _project_name(markdown)
+    lines = markdown.splitlines(keepends=True)
+    for number in sorted(numbers, reverse=True):
+        heading = re.compile(rf"^## {number}\.\s")
+        start = next((i for i, line in enumerate(lines) if heading.match(line)), None)
+        if start is None:
+            raise Invalid("section_missing")
+        following = next(
+            (i for i in range(start + 1, len(lines)) if HEADING.match(lines[i])),
+            len(lines),
+        )
+        body_lines = [value + "\n" for value in numbers[number].split("\n")]
+        lines[start + 1 : following] = ["\n", *body_lines, "\n"]
+    edited = "".join(lines)
+    _inspection(edited, [])
+    if _project_name(edited) != original_project:
+        raise Invalid("project_identity_changed")
+    return edited
+
+
+def prepare_sections(request: dict[str, Any]) -> dict[str, Any]:
+    """Prepare scoped human-readable field edits without rewriting unrelated data."""
+    markdown = _text(request.get("markdown"), "markdown")
+    _inspection(markdown, [])
+    artifact_ref = _single_line(request.get("artifact_ref"), "artifact_ref")
+    expected_revision = _single_line(
+        request.get("expected_revision"), "expected_revision"
+    )
+    source_ref = _single_line(request.get("source_ref"), "source_ref")
+    source_revision = _single_line(request.get("source_revision"), "source_revision")
+    change_reason = _single_line(request.get("change_reason"), "change_reason")
+    candidate = _apply_sections(markdown, request.get("section_updates"))
+    history = identity_handle(
+        {
+            "operation": "validate-history",
+            "previous_artifact_markdown": _identity_compat(markdown),
+            "artifact_markdown": _identity_compat(candidate),
+        }
+    )
+    if not history["valid"]:
+        raise Invalid("dec_asm_history_invalid")
+    return {
+        "status": "draft",
+        "artifact_ref": artifact_ref,
+        "expected_revision": expected_revision,
+        "artifact_markdown": candidate,
+        "source_ref": source_ref,
+        "source_revision": source_revision,
+        "change_reason": change_reason,
+        "reason": "provider_native_cas_and_approval_required",
+    }
+
+
 def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
     project = _single_line(request.get("project_name"), "project_name")
     discovery = discover(
@@ -203,6 +277,8 @@ def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
         PROJECT.sub(lambda _: "- プロジェクト: " + project, template)
     )
     _inspection(markdown, [])
+    if request.get("section_updates") is not None:
+        markdown = _apply_sections(markdown, request["section_updates"])
     return {
         "status": "draft",
         "artifact_markdown": markdown,
@@ -569,6 +645,7 @@ def persist_prepared(
             "prepare-update",
             "prepare-ids",
             "prepare-placement",
+            "prepare-sections",
         }:
             raise Invalid("unsupported_persistence_operation")
         draft = handle(preparation)
@@ -630,6 +707,8 @@ def handle(request: Any) -> dict[str, Any]:
             return placement(request)
         if op == "prepare-placement":
             return prepare_placement(request)
+        if op == "prepare-sections":
+            return prepare_sections(request)
         raise Invalid("operation_invalid")
     except (Invalid, KeyError, ValueError, TypeError, RecursionError) as exc:
         return {"status": "blocked", "reason": str(exc)}
