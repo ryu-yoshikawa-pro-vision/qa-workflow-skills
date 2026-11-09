@@ -7,7 +7,7 @@ projection. Callers must retain the raw reporter and proof of its provenance.
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
 
@@ -122,6 +122,29 @@ def _test_key(path: Any, title_path: Any) -> tuple[str, tuple[str, ...]]:
     return path, tuple(_required_str(x, "title") for x in title_path)
 
 
+def _report_path(value: Any, repo_root: str | None) -> str:
+    """Normalize reporter paths only within a verified absolute repo root."""
+    candidate = _required_str(value, "report_path").replace("\\", "/")
+    if candidate.startswith("/") or PureWindowsPath(candidate).is_absolute():
+        if not repo_root:
+            raise ContractError("reporter_root_required")
+        root = _required_str(repo_root, "repo_root").replace("\\", "/").rstrip("/")
+        if not (root.startswith("/") or PureWindowsPath(root).is_absolute()):
+            raise ContractError("invalid_reporter_root")
+        windows = bool(PureWindowsPath(root).drive)
+        actual_parts = candidate.split("/")
+        root_parts = root.split("/")
+        if windows:
+            compare_actual = [part.casefold() for part in actual_parts]
+            compare_root = [part.casefold() for part in root_parts]
+        else:
+            compare_actual, compare_root = actual_parts, root_parts
+        if len(actual_parts) <= len(root_parts) or compare_actual[:len(root_parts)] != compare_root:
+            raise ContractError("reporter_path_outside_root")
+        candidate = "/".join(actual_parts[len(root_parts):])
+    return _relative(candidate)
+
+
 def reconcile_vitest(
     *,
     selected: list[dict[str, Any]],
@@ -129,13 +152,11 @@ def reconcile_vitest(
     source_revision: str,
     raw_ref: str,
     selection_verified: bool = False,
+    repo_root: str | None = None,
 ) -> dict[str, Any]:
-    """Reconcile Vitest JSON reporter assertions without inventing TC verdicts.
+    """Compare an exact selected test population to Vitest JSON reporter output.
 
-    Expected report format is Vitest's Jest-style JSON reporter with
-    testResults[].name and assertionResults[].{ancestorTitles,title,status}.
-    Absolute reporter paths must be normalized against the verified repo root
-    *before* calling this function; arbitrary absolute paths are refused.
+    This does not attest to the actual run, retry history, or a TC PASS.
     """
     _required_str(source_revision, "source_revision")
     _required_str(raw_ref, "raw_ref")
@@ -145,16 +166,15 @@ def reconcile_vitest(
         raise ContractError("invalid_vitest_report")
     wanted = Counter(_test_key(t.get("path"), t.get("title_path")) for t in selected)
     raw: list[dict[str, Any]] = []
+    failed_suites_without_tests: list[str] = []
     for file in report["testResults"]:
-        if not isinstance(file, dict) or not isinstance(
-            file.get("assertionResults"), list
-        ):
+        if not isinstance(file, dict) or not isinstance(file.get("assertionResults"), list):
             raise ContractError("invalid_report_file")
-        path = _relative(file.get("name"))
+        path = _report_path(file.get("name"), repo_root)
+        if file.get("status") == "failed" and not file["assertionResults"]:
+            failed_suites_without_tests.append(path)
         for case in file["assertionResults"]:
-            if not isinstance(case, dict) or not isinstance(
-                case.get("ancestorTitles"), list
-            ):
+            if not isinstance(case, dict) or not isinstance(case.get("ancestorTitles"), list):
                 raise ContractError("invalid_report_assertion")
             key = _test_key(path, [*case["ancestorTitles"], case.get("title")])
             status = case.get("status")
@@ -162,6 +182,22 @@ def reconcile_vitest(
                 raise ContractError("unknown_vitest_status")
             raw.append({"key": key, "raw_status": status})
     seen = Counter(r["key"] for r in raw)
+    statuses = Counter(r["raw_status"] for r in raw)
+    counters = {
+        "numTotalTests": len(raw),
+        "numPassedTests": statuses["passed"],
+        "numFailedTests": statuses["failed"],
+        "numPendingTests": statuses["pending"] + statuses["disabled"],
+        "numTodoTests": statuses["todo"],
+    }
+    reporter_consistent = all(
+        key not in report or (type(report[key]) is int and report[key] == val)
+        for key, val in counters.items()
+    )
+    if report.get("success") is True and statuses["failed"]:
+        reporter_consistent = False
+    if "success" in report and type(report["success"]) is not bool:
+        reporter_consistent = False
     results = []
     for (path, titles), count in wanted.items():
         matches = [r for r in raw if r["key"] == (path, titles)]
@@ -171,28 +207,20 @@ def reconcile_vitest(
             status = "not_collected"
         else:
             status = matches[0]["raw_status"]
-        results.append(
-            {
-                "path": path,
-                "title_path": list(titles),
-                "expected_instances": count,
-                "collected_instances": len(matches),
-                "runner_status": status,
-                "tc_verdict": None,
-            }
-        )
+        results.append({
+            "path": path, "title_path": list(titles),
+            "expected_instances": count, "collected_instances": len(matches),
+            "runner_status": status, "tc_verdict": None,
+        })
     unplanned = [
         {"path": path, "title_path": list(titles), "count": count}
-        for (path, titles), count in seen.items()
-        if (path, titles) not in wanted
+        for (path, titles), count in seen.items() if (path, titles) not in wanted
     ]
     complete = (
-        selection_verified is True
-        and not unplanned
+        selection_verified is True and reporter_consistent
+        and not failed_suites_without_tests and not unplanned
         and wanted == seen
-        and all(
-            x["runner_status"] not in {"ambiguous", "not_collected"} for x in results
-        )
+        and all(x["runner_status"] not in {"ambiguous", "not_collected"} for x in results)
     )
     return {
         "source_revision": source_revision,
@@ -201,6 +229,9 @@ def reconcile_vitest(
         "selected_count": sum(wanted.values()),
         "results": results,
         "unexpected": unplanned,
+        "failed_suites_without_tests": failed_suites_without_tests,
+        "reporter_consistent": reporter_consistent,
+        "reporter_success": report.get("success"),
         "collection_complete": complete,
         "tc_verdicts_assessed": False,
         "attempt_completeness": "not_provided_by_reporter",
