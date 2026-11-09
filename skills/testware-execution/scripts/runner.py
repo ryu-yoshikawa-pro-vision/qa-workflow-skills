@@ -72,6 +72,90 @@ def _git_head(repo: Path) -> str:
     return proc.stdout.strip()
 
 
+def _verified_tc_expectations(
+    plan: dict[str, Any], repo: Path, revision: str
+) -> dict[str, str]:
+    """Verify the full TC expectation set against a pinned, tracked Git blob.
+
+    A pinned source controls what is being compared, not whether a separate
+    approval provider has authenticated the underlying specification.
+    """
+    relative = plan.get("direct_tc_authority_file")
+    if (
+        not isinstance(relative, str)
+        or not relative
+        or "\\\\" in relative
+        or "\\x00" in relative
+        or any(ord(ch) < 32 for ch in relative)
+        or relative.startswith("/")
+        or any(part in {"", ".", "..", ".git"} for part in relative.split("/"))
+        or ":" in relative
+    ):
+        raise RunnerError("invalid_direct_tc_authority_file")
+    entry = subprocess.run(
+        ["git", "-C", str(repo), "ls-tree", "-r", "--full-tree", revision, "--", relative],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    if entry.returncode or not entry.stdout.strip():
+        raise RunnerError("direct_tc_authority_not_tracked")
+    rows = entry.stdout.strip().splitlines()
+    if len(rows) != 1 or "\\t" not in rows[0]:
+        raise RunnerError("direct_tc_authority_not_regular")
+    header, name = rows[0].split("\\t", 1)
+    details = header.split()
+    if (
+        name != relative
+        or len(details) != 3
+        or details[0] not in {"100644", "100755"}
+        or details[1] != "blob"
+    ):
+        raise RunnerError("direct_tc_authority_not_regular")
+    blob_sha = details[2]
+    size = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "-s", blob_sha],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    if size.returncode or not size.stdout.strip().isdigit() or int(size.stdout) > 1_048_576:
+        raise RunnerError("direct_tc_authority_too_large_or_unavailable")
+    blob = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "blob", blob_sha],
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    if blob.returncode:
+        raise RunnerError("direct_tc_authority_unavailable")
+    try:
+        source = json.loads(blob.stdout.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        raise RunnerError("invalid_direct_tc_authority") from None
+    if (
+        not isinstance(source, dict)
+        or source.get("tc_ref") != plan["tc_ref"]
+        or source.get("tc_revision") != plan["tc_revision"]
+        or source.get("expected_authority_ref") != plan["expected_authority_ref"]
+        or not isinstance(source.get("direct_expectations"), list)
+    ):
+        raise RunnerError("direct_tc_authority_identity_mismatch")
+    compare_direct(
+        started=False, expectations=source["direct_expectations"], observations={}
+    )
+    if source["direct_expectations"] != plan["direct_expectations"]:
+        raise RunnerError("direct_tc_expectations_incomplete_or_mismatched")
+    return {
+        "authority_file": relative,
+        "authority_blob": blob_sha,
+        "authority_repo_revision": revision,
+        "authority_review_status": "not_authenticated_by_runner",
+    }
+
+
 def _git_clean(repo: Path) -> bool:
     proc = subprocess.run(
         ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=all"],
@@ -208,6 +292,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         for field in ("tc_ref", "tc_revision", "expected_authority_ref"):
             if not isinstance(plan.get(field), str) or not plan[field].strip():
                 raise RunnerError(field + "_required_for_direct_tc")
+    direct_authority = None
+    if plan.get("direct_tc") is True:
+        direct_authority = _verified_tc_expectations(plan, repo, expected_sha)
     direct_expectations = plan.get("direct_expectations")
     if direct_expectations is not None:
         if (
@@ -610,6 +697,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             else None
         ),
         "expected_authority_ref": plan.get("expected_authority_ref"),
+        "direct_tc_authority_evidence": direct_authority,
         "quality_verdict": last.get("metric_comparison", {}).get("verdict"),
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
