@@ -1031,10 +1031,15 @@ class GitArtifactStoreTests(unittest.TestCase):
                 "head_sha": other_head,
             }
         )
-        evidence.append({
-            "source_id": "SRC-002", "repository_root": str(other),
-            "authorized_root": str(other), "base_sha": base, "head_sha": other_head,
-        })
+        evidence.append(
+            {
+                "source_id": "SRC-002",
+                "repository_root": str(other),
+                "authorized_root": str(other),
+                "base_sha": base,
+                "head_sha": other_head,
+            }
+        )
         result = persist_snapshot(
             self.store,
             request,
