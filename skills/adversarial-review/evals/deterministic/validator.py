@@ -12,7 +12,11 @@ from scripts.skills.evals.deterministic.common import (
     ids_in,
     nonempty_rows,
 )
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    find_table,
+    parse_bullets,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 SEVERITIES = {"致命的", "重大", "軽微", "提案"}
@@ -54,7 +58,12 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     # New review modes must not silently pass without their provenance table.
     # Legacy design/E2E reviews do not use this table, so gate by scope.
-    if "非E2E testware" in text or "静的レビュー" in text:
+    mode = parse_bullets(text).get("レビュー種別", "")
+    target = parse_bullets(text).get("対象 / 実行範囲", "")
+    if (
+        "非E2E" in mode or "静的レビュー" in mode
+        or target in {"非E2E testware", "要求・設計・コードの静的レビュー"}
+    ):
         scope_table = find_table(
             tables,
             section_contains="非E2E testware／静的レビュー",
