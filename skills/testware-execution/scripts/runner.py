@@ -189,7 +189,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         compare_direct(started=False, expectations=direct_expectations, observations={})
     metric_criteria = plan.get("metric_criteria")
     if metric_criteria is not None:
-        if kind != "nonfunctional" or plan.get("measurement_conditions_verified") is not True:
+        if (
+            kind != "nonfunctional"
+            or plan.get("measurement_conditions_verified") is not True
+        ):
             raise RunnerError("metric_conditions_unverified")
         compare_metrics(
             started=False,
@@ -316,7 +319,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             and run["direct_comparison"]["result"] != "PASS"
         ):
             break
-        if metric_criteria is not None and run["metric_comparison"]["verdict"] != "PASS":
+        if (
+            metric_criteria is not None
+            and run["metric_comparison"]["verdict"] != "PASS"
+        ):
             break
         if run["return_code"] == 0 and run["result_collection"] in {
             "complete",
