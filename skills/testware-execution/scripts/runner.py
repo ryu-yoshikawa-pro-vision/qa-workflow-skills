@@ -182,8 +182,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             raise RunnerError("cleanup_not_reviewed")
     if scope.get("side_effects") and cleanup is None:
         raise RunnerError("effect_cleanup_required")
-    if plan.get("direct_tc") is True and not plan.get("direct_expectations"):
-        raise RunnerError("direct_tc_expectations_required")
+    if plan.get("direct_tc") is True:
+        if not plan.get("direct_expectations"):
+            raise RunnerError("direct_tc_expectations_required")
+        for field in ("tc_ref", "tc_revision", "expected_authority_ref"):
+            if not isinstance(plan.get(field), str) or not plan[field].strip():
+                raise RunnerError(field + "_required_for_direct_tc")
     direct_expectations = plan.get("direct_expectations")
     if direct_expectations is not None:
         if (
@@ -220,6 +224,14 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 or not static_plan[field].strip()
             ):
                 raise RunnerError("static_" + field + "_required")
+        accepted_exits = static_plan.get("accepted_exit_codes")
+        if (
+            not isinstance(accepted_exits, list)
+            or not accepted_exits
+            or any(type(code) is not int for code in accepted_exits)
+            or len(accepted_exits) != len(set(accepted_exits))
+        ):
+            raise RunnerError("static_accepted_exit_codes_required")
         targets = static_plan.get("expected_paths")
         if (
             not isinstance(targets, list)
@@ -367,6 +379,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 and report_data.get("tool_version") == static_plan["tool_version"]
                 and report_data.get("rules_ref") == static_plan["rules_ref"]
                 and report_data.get("config_ref") == static_plan["config_ref"]
+                and run["return_code"] in static_plan["accepted_exit_codes"]
             )
             finding_count = report_data.get("findings_count")
             if type(finding_count) is not int or finding_count < 0:
@@ -484,7 +497,13 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "artifact_directory": str(folder),
         "attempts": records,
         "outcome": outcome,
-        "tc_verdict": last.get("direct_comparison", {}).get("result"),
+        "direct_observation_verdict": last.get("direct_comparison", {}).get("result"),
+        "tc_verdict": (
+            last.get("direct_comparison", {}).get("result")
+            if plan.get("direct_tc") is True
+            else None
+        ),
+        "expected_authority_ref": plan.get("expected_authority_ref"),
         "quality_verdict": last.get("metric_comparison", {}).get("verdict"),
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
@@ -496,9 +515,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             run_ref=scope["operation_ref"],
             hypotheses=plan["diagnosis_hypotheses"],
         )
-    if result["tc_verdict"] == "FAIL" and outcome == "runner_pass":
+    if result["direct_observation_verdict"] == "FAIL" and outcome == "runner_pass":
         result["outcome"] = "observed_FAIL"
-    elif result["tc_verdict"] == "判定不能" and outcome == "runner_pass":
+    elif (
+        result["direct_observation_verdict"] == "判定不能"
+        and outcome == "runner_pass"
+    ):
         result["outcome"] = "observations_incomplete"
     if kind == "vitest":
         result["declared_selection_matched_report"] = bool(
