@@ -256,6 +256,146 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["change_classification"]["rate"], 1.0)
         self.assertIsNone(result["metrics"]["all_product_features_discovered"])
 
+    def test_pr_update_handoff_excludes_prior_revision_impact(self) -> None:
+        data = fixture()
+        previous = copy.deepcopy(data["snapshot"])
+        data["previous_snapshot"] = previous
+        before, head, base = "b" * 40, "a" * 40, "c" * 40
+        previous["source_revision"] = before
+        previous["sources"][0]["revision"] = before
+        snapshot = data["snapshot"]
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": base, "head_sha": head, "previous_head_sha": before
+        }
+        snapshot["source_revision"] = head
+        snapshot["sources"][0]["revision"] = head
+        snapshot["operation_id"] = "op-v2"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        data["observed_head_revision"] = head
+        second = copy.deepcopy(snapshot["features"][0])
+        second.update(
+            id="FEAT-002",
+            identity="batch settlement",
+            name="Batch settlement",
+            kind="batch",
+            implementation_refs=["src/batch.py"],
+        )
+        snapshot["features"].append(second)
+        snapshot["history"].append({
+            "event_id": "event-2",
+            "kind": "added",
+            "revision": head,
+            "evidence_ref": "evidence/batch",
+            "from_ids": [],
+            "to_ids": ["FEAT-002"],
+        })
+        latest = copy.deepcopy(snapshot["changes"][0])
+        latest.update(
+            id="DIF-002",
+            before_revision=before,
+            after_revision=head,
+            locator="src/batch.py",
+            feature_ids=["FEAT-002"],
+        )
+        snapshot["changes"].append(latest)
+        result = handle(data)
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(
+            result["metrics"]["change_classification"]["denominator_ids"],
+            ["DIF-002"],
+        )
+        self.assertEqual(result["handoff"]["impacted_feature_ids"], ["FEAT-002"])
+        self.assertEqual(result["handoff"]["approval_required_change_ids"], [])
+        latest.update(
+            classification="no_impact",
+            feature_ids=[],
+            approval_ref="approval/QA",
+        )
+        result = handle(data)
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(result["handoff"]["impacted_feature_ids"], [])
+        self.assertEqual(result["handoff"]["approval_required_change_ids"], ["DIF-002"])
+
+    def test_same_git_revision_pair_cannot_have_conflicting_active_difs(self) -> None:
+        data = fixture()
+        duplicate = copy.deepcopy(data["snapshot"]["changes"][0])
+        duplicate.update(
+            id="DIF-002",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Different verdict for exactly the same Git change",
+            approval_ref="approval/QA",
+        )
+        data["snapshot"]["changes"].append(duplicate)
+        result = handle(data)
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn(
+            "duplicate_active_change:DIF-001:DIF-002",
+            result["reasons"],
+        )
+        duplicate["locator"] = "src/another.py"
+        self.assertEqual(handle(data)["status"], "complete")
+
+    def test_shared_git_sha_needs_explicit_primary_source_id(self) -> None:
+        data = fixture()
+        previous = copy.deepcopy(data["snapshot"])
+        prior_code = copy.deepcopy(previous["sources"][0])
+        prior_code.update(id="SRC-002", ref="product/other")
+        previous["sources"].append(prior_code)
+        previous["expected_source_ids"].append("SRC-002")
+        data["previous_snapshot"] = previous
+        snapshot = data["snapshot"]
+        current_source = copy.deepcopy(snapshot["sources"][0])
+        current_source.update(id="SRC-002", ref="product/other")
+        snapshot["sources"].append(current_source)
+        snapshot["expected_source_ids"].append("SRC-002")
+        before, head, base, secondary_base = (
+            "b" * 40, "a" * 40, "c" * 40, "d" * 40
+        )
+        previous["source_revision"] = before
+        for row in previous["sources"]:
+            row["revision"] = before
+        snapshot["source_revision"] = head
+        for row in snapshot["sources"]:
+            row["revision"] = head
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": base,
+            "head_sha": head,
+            "previous_head_sha": before,
+        }
+        snapshot["operation_id"] = "op-v2"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        data["observed_head_revision"] = head
+        primary = copy.deepcopy(snapshot["changes"][0])
+        primary.update(
+            id="DIF-002",
+            before_revision=base,
+            after_revision=head,
+            locator="src/new.py",
+        )
+        secondary = copy.deepcopy(primary)
+        secondary.update(
+            id="DIF-003",
+            source_id="SRC-002",
+            before_revision=secondary_base,
+        )
+        snapshot["changes"].extend([primary, secondary])
+        self.assertIn(
+            "event_primary_source_ambiguous", handle(data)["reasons"]
+        )
+        snapshot["event_basis"]["primary_source_id"] = "SRC-001"
+        self.assertEqual(handle(data)["status"], "complete", handle(data))
+        snapshot["event_basis"]["primary_source_id"] = "SRC-002"
+        self.assertIn(
+            "change_before_revision_mismatch:DIF-003", handle(data)["reasons"]
+        )
+        snapshot["event_basis"]["primary_source_id"] = "SRC-003"
+        self.assertIn("event_primary_source_invalid", handle(data)["reasons"])
+
     def test_old_head_is_stale_without_mutation(self) -> None:
         data = fixture()
         data["observed_head_revision"] = "head-v2"
