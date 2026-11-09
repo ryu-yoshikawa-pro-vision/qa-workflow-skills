@@ -337,11 +337,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             run["result_collection"] = "missing"
             # Each attempt owns a newly created reporter file. Never read a
             # symlink or a report produced outside this attempt's directory.
-            if (
-                run["started"]
-                and reporter.is_file()
-                and not reporter.is_symlink()
-            ):
+            if run["started"] and reporter.is_file() and not reporter.is_symlink():
                 run["raw_report_ref"] = str(reporter)
                 try:
                     if reporter.stat().st_size > 16 * 1024 * 1024:
@@ -355,9 +351,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         "selection_verified": True,
                     }
                     if reporter_format == "vitest-json":
-                        reconciliation = reconcile_vitest(
-                            **shared, repo_root=str(repo)
-                        )
+                        reconciliation = reconcile_vitest(**shared, repo_root=str(repo))
                         reporter_reports_failure = raw.get("success") is False
                     elif reporter_format == "playwright-json":
                         reconciliation = reconcile_playwright(
@@ -371,8 +365,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             **shared, testware_revision=plan["testware_revision"]
                         )
                         reporter_reports_failure = any(
-                            item.get("status")
-                            in {"failed", "timedOut", "interrupted"}
+                            item.get("status") in {"failed", "timedOut", "interrupted"}
                             for item in raw["results"]
                         )
                     run["reconciliation"] = reconciliation
@@ -381,9 +374,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     run["result_collection"] = (
                         "complete"
                         if reconciliation["collection_complete"]
-                        and not (
-                            run["return_code"] == 0 and reporter_reports_failure
-                        )
+                        and not (run["return_code"] == 0 and reporter_reports_failure)
                         else "incomplete"
                     )
                 except (ValueError, ContractError, UnicodeError, OSError):
@@ -585,9 +576,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     }
     if diagnostic is not None:
         result["diagnosis"] = diagnostic
-    if result["direct_observation_verdict"] == "FAIL" and outcome in {
-        "runner_pass", "incomplete"
-    } and last["return_code"] is not None:
+    if (
+        result["direct_observation_verdict"] == "FAIL"
+        and outcome in {"runner_pass", "incomplete"}
+        and last["return_code"] is not None
+    ):
         result["outcome"] = "observed_FAIL"
     elif (
         result["direct_observation_verdict"] == "判定不能"
@@ -599,13 +592,17 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         result["declared_selection_matched_report"] = bool(
             last.get("reconciliation", {}).get("collection_complete")
         )
-    if result["quality_verdict"] == "FAIL" and result["outcome"] in {
-        "runner_pass", "incomplete"
-    } and last["return_code"] is not None:
+    if (
+        result["quality_verdict"] == "FAIL"
+        and result["outcome"] in {"runner_pass", "incomplete"}
+        and last["return_code"] is not None
+    ):
         result["outcome"] = "measurement_FAIL"
-    elif result["quality_verdict"] == "判定不能" and result["outcome"] in {
-        "runner_pass", "incomplete"
-    } and last["return_code"] is not None:
+    elif (
+        result["quality_verdict"] == "判定不能"
+        and result["outcome"] in {"runner_pass", "incomplete"}
+        and last["return_code"] is not None
+    ):
         result["outcome"] = "measurements_incomplete"
     _write_json(folder / "manifest.json", result)
     return result
