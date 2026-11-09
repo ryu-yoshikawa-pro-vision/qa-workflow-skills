@@ -426,9 +426,8 @@ def reconcile_case_report(
         for index, attempt in enumerate(attempts):
             if (
                 not isinstance(attempt, dict)
-                or attempt.get("status") not in {
-                    "passed", "failed", "timedOut", "interrupted", "skipped"
-                }
+                or attempt.get("status")
+                not in {"passed", "failed", "timedOut", "interrupted", "skipped"}
                 or type(attempt.get("retry")) is not int
                 or attempt["retry"] != index
             ):
@@ -508,8 +507,13 @@ def reconcile_playwright(
                 for index, entry in enumerate(attempts):
                     if (
                         not isinstance(entry, dict)
-                        or entry.get("status") not in {
-                            "passed", "failed", "timedOut", "interrupted", "skipped"
+                        or entry.get("status")
+                        not in {
+                            "passed",
+                            "failed",
+                            "timedOut",
+                            "interrupted",
+                            "skipped",
                         }
                         or type(entry.get("retry")) is not int
                         or entry["retry"] != index
