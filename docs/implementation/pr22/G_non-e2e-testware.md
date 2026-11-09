@@ -126,9 +126,9 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 ### 既知の未完了と再開条件
 
-1. `contract.py`はraw JSONが与えられたときの**照合helper**であり、Vitest・Playwright・静的ツールを実際に起動するrunner adapter、timeout・attempt全取得や実cleanupの保証ではない。実runnerが導入された対象で入口chain・reporter・attempt・artifact鮮度・cleanupを実測し、対応方式のfixtureとテストを補う必要がある。
-2. `snapshot_guard.py`は事前・反映直前の不一致を検出する補助で、local共有pathに対するatomic write/commitを実装しない。既存E2E実装にもPlan詳細05で要求された同じ競合保証が必要。対象ownerと協調し、shared編集のnative予約と実反映の条件付き確定の正当性を再検証する。
-3. repo共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #29からは勝手に変更せず、Aへ両新Skill名とvalidator／route契約を引き渡す。現行`validate-skills.yml`はREADMEに全current Skill名を要求するため、A側での同期が終わるまで該当CIは失敗し得る。
+1. `runner.py`で隔離checkout上の実subprocess起動とattempt／timeout／raw／cleanupを実装した。ただし案件の実Vitest・API-only Playwright・静的解析toolと、実副作用・認証が必要な環境の受入は未実施。独立Python subprocessと固定JSON reporterの結果から製品runの完了を主張しない。
+2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitをGit remoteに非強制fast-forward反映・readbackする経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
+3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23がclosed・未mergeのため、PR #22統合ownerにも引継ぎ要。PR #29のtrigger正負件数不均衡はGで修正したが、共有READMEに両Skill名がないことで`Validate Agent Skills`は継続してFAILする。
 4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
 5. 全対応方式の実runnerと保存先で必須受入を完了するまで、PR #29はDraftとし、**担当G完了**を宣言しない。PR #22の最終完了とは区別する。
 
@@ -164,3 +164,23 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 5. 最新HEADのCI結果はPR #29のChecksを正本とする。旧版`Validate Agent Skills`の共有README未登録FAILはAに引継ぎ済み。その他のCI・局所fixtureが成功しても、本節の未検証を完了として扱わない。
 
 このPRは上記の未検証条件が残るためDraftのままとする。製品SUT・正式仕様・他ownerの共有正本は更新していない。
+
+## 再レビュー修正と残る受入（2026-11-09）
+
+### 今回の修正
+
+- `adversarial-review`のtrigger学習／検証データを、それぞれ正例・負例同数へ修正した。共有READMEの2 Skill登録は別ownerが担当。
+- `runner.py`の各attempt実行前・cleanup後にHEADを確認し、dirtyではない新しいcommitも安全完了から除外する負例を追加した。
+- `preflight`は外部副作用・共有資源フラグの省略を拒否する。任意subprocessの副作用回数を検証できるproviderがないため、宣言された副作用を持つ実行を拒否する。フラグ自己申告を権限の実認証や副作用監視と同一視しない。
+- `reconcile_vitest()`はsuite statusとassertion statusの矛盾も取得不完全として扱う。正常・異常fixtureのテストを追加した。
+- 実run manifestへsource/build/testware/TC refとrevision、環境、選択条件・根拠、実argvのhashを追加した。選択根拠は呼出元宣言であり、provider認証済みと主張しない。
+- 非機能閾値未設定を開始前に拒否し、静的解析では対象path、tool/version、rule/config、Finding数、未解析対象をraw summaryと比較する。tool固有adapter・本物の測定条件と採用基準の受入は残る。
+- 独立Python runnerの既存試験に加え、ローカルHTTP実通信で200＋本文不一致をFAILとする負例を用意した。正式`qa-training-store`に対するネットワークや認証が必要なテストには代替できない。
+
+### 未完了・外部依存
+
+1. 固定`qa-training-store`の実Vitest（実JSON reporter・部分選択・skip/todo・retry）、API-only Playwright、component、batch/event、非機能runnerでのraw・cleanup実証は未実施。対象commit・setup、許可と実データ、runner環境の確定が必要。
+2. 現在のCLIは任意subprocessの権限・副作用回数・ignored file／外部状態の復元・共有予約を認証付きで検証できない。このため宣言された副作用やshared実行は開始前に拒否する。安全に実行可能なprovider／sandboxが必要なケースはblockedのままにする。
+3. 静的解析tool固有のraw収集・version照合・解析対象完全性の本接続、非機能採用閾値・測定条件の実証とtestware assertionの独立実製品レビューは未実施。独立fixtureのPASSで置換しない。
+4. `README.md`、共有runtimeへのrouting／保存・承認・native CAS／readback、H/Jの実保存成果物との結合、PR #22の全条件・S1〜S17／人間編集8ケースは担当ownerの統合受入を要する。PR #23はclosedかつ未mergeであり、再開先をPR #22で明示する。
+5. 最新CI結果はPR #29のChecksとし、`Validate Agent Skills` FAIL等は原因と担当を分離して引き継ぐ。未検証がある限りPR #29の完了・mergeは宣言しない。
