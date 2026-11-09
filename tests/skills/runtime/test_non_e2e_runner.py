@@ -367,12 +367,25 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertTrue(artifact["attempts"][0]["timeout"])
         self.assertEqual(artifact["outcome"], "blocked_cleanup_or_timeout")
 
-    @unittest.skipUnless(os.name == "posix", "process groups are POSIX-only")
+    @unittest.skipUnless(sys.platform == "linux", "Linux subreaper is required")
     def test_interrupted_command_kills_group_and_saves_cleanup_manifest(self):
-        script = "import time;print('started',flush=True);time.sleep(30)"
+        marker = Path(self.space.name) / "worker.pid"
+        script = (
+            "import subprocess,sys,time,pathlib;"
+            "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'],"
+            "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,"
+            "stderr=subprocess.DEVNULL);"
+            f"pathlib.Path({str(marker)!r}).write_text(str(p.pid));"
+            "print('started',flush=True);time.sleep(30)"
+        )
+        cleanup_script = (
+            "import pathlib,sys;"
+            f"pid=int(pathlib.Path({str(marker)!r}).read_text());"
+            "sys.exit(9 if pathlib.Path('/proc/'+str(pid)).exists() else 0)"
+        )
         plan = self.plan([sys.executable, "-c", script])
         plan["timeout_seconds"] = 15
-        plan["cleanup_argv"] = [sys.executable, "-c", "print('cleanup ran')"]
+        plan["cleanup_argv"] = [sys.executable, "-c", cleanup_script]
         plan["reviewed_cleanup_argv"] = plan["cleanup_argv"]
         plan_file = Path(self.space.name) / "interrupt.json"
         plan_file.write_text(json.dumps(plan), encoding="utf-8")
@@ -410,19 +423,25 @@ class ActualRunnerTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertTrue(manifest["attempts"][0]["interrupted"])
             self.assertEqual(manifest["attempts"][0]["cleanup_state"], "success")
+            self.assertEqual(
+                manifest["attempts"][0]["process_tree_state"], "terminated"
+            )
+            self.assertFalse(
+                Path("/proc", marker.read_text(encoding="utf-8")).exists()
+            )
             self.assertEqual(manifest["outcome"], "blocked_cleanup_or_timeout")
         finally:
             if proc.poll() is None:
                 proc.kill()
                 proc.wait()
 
-    @unittest.skipUnless(os.name == "posix", "process groups are POSIX-only")
+    @unittest.skipUnless(sys.platform == "linux", "Linux subreaper is required")
     def test_orphaned_fixture_process_prevents_runner_pass(self):
         script = (
             "import json,subprocess,sys;"
             "subprocess.Popen([sys.executable,'-c','import time;time.sleep(20)'],"
             "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,"
-            "stderr=subprocess.DEVNULL);"
+            "stderr=subprocess.DEVNULL,start_new_session=True);"
             "print(json.dumps({'ok':True}))"
         )
         plan = self.plan([sys.executable, "-c", script])
@@ -441,6 +460,27 @@ class ActualRunnerTests(unittest.TestCase):
         )
         self.assertTrue(manifest["collection_verified"])
         self.assertEqual(manifest["outcome"], "blocked_cleanup_or_timeout")
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux subreaper is required")
+    def test_cleanup_detached_child_blocks_success(self):
+        cleanup_script = (
+            "import subprocess,sys;"
+            "subprocess.Popen([sys.executable,'-c','import time;time.sleep(20)'],"
+            "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,"
+            "stderr=subprocess.DEVNULL,start_new_session=True)"
+        )
+        plan = self.plan([sys.executable, "-c", "print('done')"])
+        plan["cleanup_argv"] = [sys.executable, "-c", cleanup_script]
+        plan["reviewed_cleanup_argv"] = plan["cleanup_argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        attempt = artifact["attempts"][0]
+        self.assertEqual(attempt["process_tree_state"], "terminated")
+        self.assertEqual(
+            attempt["cleanup"]["process_tree_state"], "lingering_terminated"
+        )
+        self.assertEqual(attempt["cleanup_state"], "failed_or_unknown")
+        self.assertEqual(artifact["outcome"], "blocked_cleanup_or_timeout")
 
     def test_bad_selected_identity_blocks_before_command(self):
         plan = self.plan([sys.executable, "-c", "print('should not run')"])
