@@ -62,6 +62,8 @@ Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`
 
 ## 保存前のGit現在性確認
 
+`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は`git_head_changed`でblockし、信頼済み呼出し元が現在のSHAを取り直します。過去コミットのtreeを現在の情報源として保存しません。
+
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
 
 ## 継続PRのDIF履歴と複数repository
