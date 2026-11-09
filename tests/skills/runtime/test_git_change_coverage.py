@@ -211,12 +211,19 @@ class GitChangeCoverageTests(unittest.TestCase):
         snapshot["artifact_revision"] = "art-v2"
         snapshot["previous_artifact_revision"] = "art-v1"
         snapshot["operation_id"] = "op-v2"
-        for i, path in enumerate(("alpha.py", "beta.py", "temporary.py")):
+        pairs = [
+            (self.base, "alpha.py"),
+            (self.base, "beta.py"),
+            (middle_sha, "alpha.py"),
+            (middle_sha, "beta.py"),
+            (middle_sha, "temporary.py"),
+        ]
+        for i, (before, path) in enumerate(pairs):
             row = copy.deepcopy(snapshot["changes"][0])
             row.update(
                 id=f"DIF-{i + 2:03d}",
                 locator=path,
-                before_revision=self.base if path != "temporary.py" else middle_sha,
+                before_revision=before,
                 after_revision=previous_head,
                 classification="impact",
             )
@@ -233,6 +240,18 @@ class GitChangeCoverageTests(unittest.TestCase):
         self.assertEqual(result["status"], "complete", result)
         self.assertEqual(result["coverage"]["rate"], 1.0)
         self.assertIn("temporary.py", result["coverage"]["previous_head_change_paths"])
+        snapshot["changes"].pop(2)
+        missing_one = reconcile(
+            {
+                **self.request(),
+                "previous_head_git_inventory": earlier_diff,
+            }
+        )
+        self.assertEqual(missing_one["status"], "incomplete")
+        self.assertEqual(missing_one["coverage"]["rate"], 0.8)
+        self.assertIn(
+            "git_change_revision_pairs_not_registered", missing_one["reasons"]
+        )
 
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"

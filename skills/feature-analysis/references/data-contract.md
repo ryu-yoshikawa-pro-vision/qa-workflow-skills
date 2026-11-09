@@ -51,3 +51,5 @@ Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORI
 継続分析でsource revisionを変更しない内容修正は`event=analysis_update`と`event_basis={source_revision,evidence_ref}`を必須とします。これは初回処理とは別の更新イベントです。前回snapshotが存在するときは`event=initial`による新しいsnapshot作成を拒否します。ただし完全に同一のsnapshotとoperation_idの再送は従来どおり冪等に処理します。
 
 `reconcile_git_coverage`は各DIFのpathが今回base→HEAD／前回HEAD→今回HEADのどちらに出現したかに応じて旧revisionを照合します。片方の差分だけに出現したpathに別の基準SHAを強制しません。
+
+同一pathがPR base→headと前回head→現在headの両方に含まれ、旧SHAが異なる場合、`reconcile_git_coverage`は`(before_revision, path, after_revision)`の組ごとにDIFを要求します。いずれかの旧revisionが未分類なら`missing_git_revision_pairs`と`git_change_revision_pairs_not_registered`を返し、網羅率の分母からその組を除きません。同一の旧SHA・pathが両diffに現れる場合は重複計上しません。

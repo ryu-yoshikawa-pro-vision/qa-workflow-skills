@@ -200,6 +200,12 @@ def analyze(request: Any) -> dict[str, Any]:
                 raise Invalid("previous_head_paths_mismatch")
             previous_head_paths.add(after)
     git_paths |= previous_head_paths
+    required_pairs = {
+        (git["base_sha"], path) for path in base_change_paths
+    } | {
+        (basis["previous_head_sha"], path) for path in previous_head_paths
+    }
+    registered_pairs: set[tuple[str, str]] = set()
     registry_paths: set[str] = set()
     unmatched_ids: list[str] = []
     mismatched_revision_ids: list[str] = []
@@ -211,22 +217,20 @@ def analyze(request: Any) -> dict[str, Any]:
         registry_paths.add(locator)
         if locator not in git_paths:
             unmatched_ids.append(row["id"])
-        valid_bases: set[str] = set()
-        if locator in base_change_paths:
-            valid_bases.add(git["base_sha"])
-        if locator in previous_head_paths:
-            valid_bases.add(basis["previous_head_sha"])
-        if (
-            row["before_revision"] not in valid_bases
-            or row["after_revision"] != head_sha
-        ):
+        pair = (row["before_revision"], locator)
+        if pair not in required_pairs or row["after_revision"] != head_sha:
             mismatched_revision_ids.append(row["id"])
+        else:
+            registered_pairs.add(pair)
         if row["classification"] in {"unclassified", "unresolved"}:
             unclassified_paths.add(locator)
     missing = sorted(git_paths - registry_paths)
+    missing_pairs = required_pairs - registered_pairs
     reasons = list(registry.get("reasons", []))
     if missing:
         reasons.append("git_changes_not_registered")
+    if missing_pairs:
+        reasons.append("git_change_revision_pairs_not_registered")
     if unmatched_ids:
         reasons.append("registry_changes_not_in_git_diff")
     if mismatched_revision_ids:
@@ -244,11 +248,15 @@ def analyze(request: Any) -> dict[str, Any]:
             "previous_head_change_paths": sorted(previous_head_paths),
             "registered_paths": sorted(registry_paths & git_paths),
             "missing_git_paths": missing,
+            "missing_git_revision_pairs": [
+                {"before_revision": before, "path": path, "after_revision": head_sha}
+                for before, path in sorted(missing_pairs)
+            ],
             "unmatched_registry_change_ids": sorted(unmatched_ids),
             "mismatched_revision_change_ids": sorted(mismatched_revision_ids),
             "unclassified_git_paths": sorted(unclassified_paths),
             "rate": (
-                len(git_paths & registry_paths) / len(git_paths) if git_paths else None
+                len(registered_pairs) / len(required_pairs) if required_pairs else None
             ),
             "candidate_snapshot_sha256": registry["handoff"]["snapshot_sha256"],
         },
