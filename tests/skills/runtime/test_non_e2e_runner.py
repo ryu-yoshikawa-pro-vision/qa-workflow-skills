@@ -432,9 +432,7 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 0)
         self.assertEqual(artifact["reporter_format"], "playwright-json")
-        self.assertTrue(
-            Path(artifact["attempts"][0]["raw_report_ref"]).is_file()
-        )
+        self.assertTrue(Path(artifact["attempts"][0]["raw_report_ref"]).is_file())
         self.assertTrue(artifact["collection_verified"])
         self.assertIsNone(artifact["tc_verdict"])
 
