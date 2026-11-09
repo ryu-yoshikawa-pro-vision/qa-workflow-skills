@@ -22,3 +22,12 @@
 生成したassertionと各期待結果、データ・mock・fixture依存、分岐、観測方法の対応をadversarial-reviewで独立確認する。runner成功だけではassertion品質を満たさない。正式TCとのcoverageの正本はcoverage-analysisに残す。実runner実行結果はtestware-executionが保存する。
 
 既存E2E側の同時編集と変更反映の保証は詳細Plan 05に従うが、共有e2e-test-implementationの編集ownerとの照合を要するため、このSkillの安全検査だけで全体保証としない。
+
+
+## 隔離commitの変更確定
+
+`snapshot_guard.py` は共有先への反映前検査であり、書込みの原子性を保証しない。共有branchに対する変更確定には、既存Git remoteを使う `python skills/testware-implementation/scripts/publish_git.py --plan /path/to/publish-plan.json --publish` を使用できる。これ以外のproviderの保存をGit push成功で代用しない。
+
+publish planには、`repo_path`、設定済みの `remote` 名、`branch`、検査時に取得した `expected_head`、隔離workspaceで作成した単一親の `candidate` commit、`allowed_prefixes`、変更した全pathの変更前 `sha256:` hash（未存在ならnull）を明示する。差分・許可path・HEAD・対象ファイルの通常ファイル性を確認し、**forceを使わないfast-forward push**でremoteのnative ref更新に委ねる。先行commitによりremoteが進んでいた場合はrejectし、最新commitを取り込み、対象差分と期待内容を再検証してから新しいcandidateを作り直す。
+
+反映成功後はremote refとfetch後のHEAD・各blobをreadbackする。更新応答が失われた場合は成功・未実施を推測せず、保存先を再取得する。共有workspaceへ直接書くときはAが提供する認証済みreservationを別に要求し、隔離commitの成功をpath予約と混同しない。Git以外のproviderにはその保存先固有のnative CASが必要である。
