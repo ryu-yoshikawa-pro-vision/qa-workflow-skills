@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -163,6 +164,7 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertTrue(removed["complete_change_listing"])
         # A normal file in place of the gitlink also needs the old revision.
         git(self.root, "reset", "--hard", "-q", base)
+        shutil.rmtree(self.root / "vendor" / "submodule", ignore_errors=True)
         (self.root / "vendor").mkdir(exist_ok=True)
         (self.root / "vendor" / "submodule").write_text(
             "ordinary file\n", encoding="utf-8"
