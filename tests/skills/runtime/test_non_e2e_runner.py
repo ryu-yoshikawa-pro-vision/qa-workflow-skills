@@ -177,6 +177,31 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["reason"], "duplicate_json_key")
         self.assertFalse(self.logs.exists())
 
+        # Python's JSON parser otherwise accepts NaN/Infinity, which are not
+        # valid JSON values and must not enter authorization metadata.
+        source = json.dumps(plan)
+        self.assertEqual(source.count('"attempts": 1'), 1)
+        plan_file.write_text(
+            source.replace('"attempts": 1', '"attempts": NaN'),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(self.logs),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)["reason"], "nonfinite_json_number")
+        self.assertFalse(self.logs.exists())
+
     def test_real_subprocess_preserves_stdout_and_identity(self):
         plan = self.plan([sys.executable, "-c", "print('runner observation')"])
         plan["direct_expectations"] = [
