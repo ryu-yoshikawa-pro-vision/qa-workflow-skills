@@ -231,7 +231,7 @@ def _change_revisions(
     issues: list[str] = []
     basis = snapshot.get("event_basis") or {}
     for did, row in changes.items():
-        if did in prior:
+        if did in prior or row.get("supersedes_id") is not None:
             continue
         source = sources[row["source_id"]]
         if source["status"] != "complete":
@@ -327,12 +327,31 @@ def _history(
             raise ContractError(f"candidate_identity_reused:{cid}")
     old_changes = _rows(previous.get("changes"), "previous_changes", "DIF")
     new_changes = _rows(snapshot.get("changes"), "changes", "DIF")
+    if set(old_changes) - set(new_changes):
+        raise ContractError("historical_changes_removed")
     for did in old_changes.keys() & new_changes.keys():
-        if any(
-            old_changes[did].get(field) != new_changes[did].get(field)
-            for field in ("source_id", "before_revision", "after_revision", "locator")
-        ):
-            raise ContractError(f"change_identity_reused:{did}")
+        if old_changes[did] != new_changes[did]:
+            raise ContractError(f"change_history_rewritten:{did}")
+    replaced: set[str] = set()
+    for did in new_changes.keys() - old_changes.keys():
+        row = new_changes[did]
+        parent = row.get("supersedes_id")
+        if parent is None:
+            continue
+        if parent not in old_changes or parent in replaced:
+            raise ContractError(f"change_supersession_invalid:{did}")
+        prior = old_changes[parent]
+        fields = ("source_id", "before_revision", "after_revision", "locator")
+        if any(row.get(key) != prior.get(key) for key in fields):
+            raise ContractError(f"change_supersession_target_mismatch:{did}")
+        if row.get("classification") == prior.get("classification"):
+            raise ContractError(f"change_supersession_classification_unchanged:{did}")
+        if row.get("evidence_ref") == prior.get("evidence_ref"):
+            raise ContractError(f"change_supersession_evidence_not_new:{did}")
+        _text(row.get("approval_ref"), f"{did}_approval_ref")
+        _text(row.get("approval_revision"), f"{did}_approval_revision")
+        _text(row.get("reason"), f"{did}_change_reason")
+        replaced.add(parent)
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:
@@ -442,7 +461,7 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             if previous.get("source_revision") != basis["previous_head_sha"]:
                 raise ContractError("event_previous_head_mismatch")
         code_sources = [row for row in snapshot["sources"] if row.get("kind") == "code"]
-        if not code_sources or not all(
+        if not code_sources or not any(
             row.get("revision") == head for row in code_sources
         ):
             raise ContractError("event_code_source_revision_mismatch")
@@ -657,7 +676,6 @@ def _verify_git_evidence(
         if (
             code_sources[sid]["status"] != "complete"
             or entry["head_sha"] != code_sources[sid]["revision"]
-            or entry["head_sha"] != snapshot["source_revision"]
         ):
             raise ContractError("git_evidence_source_revision_mismatch")
         tree_request = {key: entry[key] for key in keys if key != "source_id"}
@@ -676,7 +694,28 @@ def _verify_git_evidence(
             "source_id": sid,
         }
         if snapshot["event"] in {"pr_update", "rebase"}:
-            previous_head = snapshot["event_basis"]["previous_head_sha"]
+            primary = entry["head_sha"] == snapshot["source_revision"]
+            if primary:
+                if entry["base_sha"] != snapshot["event_basis"]["base_sha"]:
+                    raise ContractError("event_git_base_mismatch")
+                previous_head = snapshot["event_basis"]["previous_head_sha"]
+            else:
+                prior_source = next(
+                    (
+                        row
+                        for row in (request.get("previous_snapshot") or {}).get("sources", [])
+                        if row.get("id") == sid
+                    ),
+                    None,
+                )
+                if prior_source is None:
+                    raise ContractError("secondary_git_source_previous_missing")
+                previous_head = prior_source["revision"]
+                coverage_request["source_event_basis"] = {
+                    "base_sha": entry["base_sha"],
+                    "head_sha": entry["head_sha"],
+                    "previous_head_sha": previous_head,
+                }
             if entry.get("previous_head_base_sha") != previous_head:
                 raise ContractError("previous_head_git_base_required")
             previous_request = dict(tree_request)
@@ -691,6 +730,49 @@ def _verify_git_evidence(
         extra = set(coverage.get("reasons", [])) - set(report.get("reasons", []))
         if coverage["coverage"] is None or extra:
             raise ContractError("git_coverage_not_verified:" + ",".join(sorted(extra)))
+
+
+def _authorize_reclassifications(
+    store: LocalArtifactStore | GitArtifactStore,
+    request: dict[str, Any],
+    expected_revision: str | None,
+) -> None:
+    """Check each new classification override with the trusted approval owner."""
+    prior = request.get("previous_snapshot")
+    if prior is None:
+        if any(row.get("supersedes_id") for row in request["snapshot"]["changes"]):
+            raise ContractError("change_supersession_without_predecessor")
+        return
+    old = _rows(prior.get("changes"), "previous_changes", "DIF")
+    snapshot = request["snapshot"]
+    for row in snapshot["changes"]:
+        if row["id"] in old or not row.get("supersedes_id"):
+            continue
+        replaced = old[row["supersedes_id"]]
+        decision = {
+            "operation": "reclassify",
+            "kind": "feature-inventory",
+            "project_ref": snapshot["project_ref"],
+            "artifact_ref": snapshot["artifact_ref"],
+            "expected_revision": expected_revision,
+            "operation_id": snapshot["operation_id"],
+            "change_id": row["id"],
+            "supersedes_id": row["supersedes_id"],
+            "old_classification": replaced["classification"],
+            "classification": row["classification"],
+            "source_ref": row["source_id"],
+            "source_revision": row["after_revision"],
+            "evidence_ref": row["evidence_ref"],
+            "approval_ref": row["approval_ref"],
+            "approval_revision": row["approval_revision"],
+            "reason": row["reason"],
+        }
+        try:
+            verified = store.authorize(decision)
+        except Exception as exc:
+            raise ContractError("change_approval_provider_unavailable") from exc
+        if verified is not True:
+            raise ContractError(f"change_reclassification_approval_unverified:{row['id']}")
 
 
 def persist_snapshot(
@@ -709,6 +791,7 @@ def persist_snapshot(
         if report["status"] not in {"complete", "incomplete"}:
             return report
         _verify_git_evidence(request, report, git_inventory_requests)
+        _authorize_reclassifications(store, request, expected_revision)
         snapshot = request["snapshot"]
         project_ref = snapshot["project_ref"]
         artifact_ref = snapshot["artifact_ref"]

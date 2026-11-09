@@ -37,7 +37,7 @@ def _text(value: Any, name: str) -> str:
 
 def analyze(request: Any) -> dict[str, Any]:
     required = {"git_inventory", "registry_request", "source_id"}
-    allowed = required | {"previous_head_git_inventory"}
+    allowed = required | {"previous_head_git_inventory", "source_event_basis"}
     if (
         not isinstance(request, dict)
         or not required <= set(request)
@@ -77,7 +77,14 @@ def analyze(request: Any) -> dict[str, Any]:
     head_sha = _text(git.get("head_sha"), "git_head_sha")
     event = snapshot.get("event")
     basis = snapshot.get("event_basis")
+    source_basis = request.get("source_event_basis")
     previous_inventory = request.get("previous_head_git_inventory")
+    if source_basis is not None:
+        if event not in {"pr_update", "rebase"} or not isinstance(
+            source_basis, dict
+        ) or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}:
+            raise Invalid("source_event_basis_invalid")
+        basis = source_basis
     if event in {"pr_update", "rebase"}:
         if not isinstance(basis, dict):
             raise Invalid("event_basis_required")
@@ -126,12 +133,22 @@ def analyze(request: Any) -> dict[str, Any]:
     source = source_rows[0]
     if source["kind"] != "code" or source["status"] != "complete":
         raise Invalid("git_source_not_complete_code")
-    if source["revision"] != head_sha or snapshot["source_revision"] != head_sha:
+    if source["revision"] != head_sha:
         return {
             "status": "stale",
             "reasons": ["git_revision_registry_mismatch"],
             "coverage": None,
         }
+    if source_basis is not None:
+        old_sources = (registry_request.get("previous_snapshot") or {}).get(
+            "sources", []
+        )
+        old = [
+            row for row in old_sources
+            if row.get("id") == source_id
+        ]
+        if len(old) != 1 or old[0].get("revision") != basis["previous_head_sha"]:
+            raise Invalid("source_event_previous_head_mismatch")
     files = git.get("files")
     changes = git.get("changes")
     if not isinstance(files, list) or not isinstance(changes, list):
@@ -205,11 +222,36 @@ def analyze(request: Any) -> dict[str, Any]:
     }
     registered_pairs: set[tuple[str, str]] = set()
     registry_paths: set[str] = set()
+    previous = registry_request.get("previous_snapshot")
+    previous_ids = (
+        set(_source_rows["id"] for _source_rows in previous["changes"])
+        if previous is not None
+        else set()
+    )
+    superseded = {
+        row.get("supersedes_id")
+        for row in snapshot["changes"]
+        if row.get("supersedes_id") is not None
+    }
     unmatched_ids: list[str] = []
     mismatched_revision_ids: list[str] = []
     unclassified_paths: set[str] = set()
     for row in snapshot["changes"]:
-        if row["source_id"] != source_id:
+        if row["source_id"] != source_id or row["id"] in superseded:
+            continue
+        if (
+            row["id"] in previous_ids
+            and event in {"pr_update", "rebase", "merge", "release"}
+        ):
+            continue
+        if (
+            row["id"] in previous_ids
+            and row["after_revision"] != head_sha
+        ):
+            continue
+        # Historical reclassification at an older revision is not a new
+        # source diff for the current HEAD.
+        if row.get("supersedes_id") and row["after_revision"] != head_sha:
             continue
         locator = row["locator"]
         registry_paths.add(locator)
