@@ -137,7 +137,10 @@ def analyze(request: Any) -> dict[str, Any]:
         registry_paths.add(locator)
         if locator not in git_paths:
             unmatched_ids.append(row["id"])
-        if row["before_revision"] != git["base_sha"] or row["after_revision"] != head_sha:
+        if (
+            row["before_revision"] != git["base_sha"]
+            or row["after_revision"] != head_sha
+        ):
             mismatched_revision_ids.append(row["id"])
         if row["classification"] in {"unclassified", "unresolved"}:
             unclassified_paths.add(locator)
