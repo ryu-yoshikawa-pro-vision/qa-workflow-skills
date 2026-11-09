@@ -186,9 +186,9 @@ Aが`regression-testing`をworkflowのverifierへ登録するための入力（A
 - `REG-SEM-007`はPR #30のレビュー指摘（入力に無い補助testwareの`implementation_revision`を候補が補完していた）を受けて、rubricの基準（入力に無い補助revision・cleanup結果を推測せず未解決として扱う）と`reference.md`を追加し、候補を別のAgentで再生成して別Judgeで再評価した。再評価の結果は**pass、rating 3**で、補助revisionは空・`implementation_revision_missing`として未解決に、cleanupは`未確認`として扱われた。Judgeの軽微な指摘は、未解決値を`null`でなく空文字で表した点と、入力に無い補助のexecutor ownerを注記付きで`testware-execution`にした点。`REG-SEM-006`の候補はこのレビュー対応より前に生成した結果で、再生成していない（`REG-SEM-007`・`REG-SEM-004-recheck`は後続の「追加修正」で正規形に合わせて再生成した）。`REG-SEM-006`は補助testwareの境界（TCへ混ぜない）を評価する通常caseで、今回のcleanup既定値・revision必須化・Run照合・testware owner契約は評価基準の範囲外のため、再生成していない。
 - `skills-ref validate`（CI `validate-skills.yml`と同じ固定commit）：`skills/*`の23 Skill全てPASS（Windowsでは`PYTHONUTF8=1`が必要）。
 
-### GitHub Actions（HEAD `f25fb16`）
+### GitHub Actions（HEAD `52de5b9`）
 
-追加レビュー4件の修正commit `f25fb16`で、`Code Quality`・`Codex Harness`（codex-contract・windows-launcher）・`Validate Deterministic Output Evals`・`Validate Semantic Output Evals`・`Validate Agent Skills`の5本を個別に確認し、全てPASS（CodeRabbitはDraftのためスキップ）。この記録を追加するcommitは文書のみの変更で、そのHEADの結果はPR #30のChecksで確認する。履歴：`aea50bf`・`15bfae7`でも同じ5本がPASS。
+残存不具合3件の修正commit `52de5b9`で、`Code Quality`・`Codex Harness`（codex-contract・windows-launcher）・`Validate Deterministic Output Evals`・`Validate Semantic Output Evals`・`Validate Agent Skills`の5本を個別に確認し、全てPASS（CodeRabbitはDraftのためスキップ）。この記録を追加するcommitは文書のみの変更で、そのHEADの結果はPR #30のChecksで確認する。履歴：`f25fb16`・`c13f82f`・`aea50bf`・`15bfae7`でも同じ5本がPASS。
 
 #### 履歴（HEAD `e134412`、`aea50bf`で同じ5本がPASS）
 
