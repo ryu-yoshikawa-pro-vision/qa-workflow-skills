@@ -21,6 +21,7 @@ from typing import Any
 
 from contract import (
     ContractError,
+    _json_equal_strict,
     compare_direct,
     compare_metrics,
     diagnosis,
@@ -160,7 +161,11 @@ def _verified_tc_expectations(
     compare_direct(
         started=False, expectations=source["direct_expectations"], observations={}
     )
-    if source["direct_expectations"] != plan["direct_expectations"]:
+    # Python's == treats True as 1, including inside a nested JSON object.
+    # A caller must not replace a committed boolean expectation with a number.
+    if not _json_equal_strict(
+        source["direct_expectations"], plan["direct_expectations"]
+    ):
         raise RunnerError("direct_tc_expectations_incomplete_or_mismatched")
     return {
         "authority_file": relative,

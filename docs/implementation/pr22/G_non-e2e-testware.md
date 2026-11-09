@@ -236,3 +236,9 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - CodeRabbitの手動全体レビューは無料利用枠上限で実施されておらず、レビュー完了としない。
 - 固定製品の実runner（Vitest／Playwright API-only／Web・Native component／batch・event・静的解析・非機能）、実provider承認／共有予約／CAS／readback、H/J実成果物との横断接続は依然未受入。固定製品の既存CIでVitestジョブが成功したことはG adapterの受入の代わりにならない。
 - 本文書への追記後にHEADが進んだ場合は、最新の[PR #29 Checks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/29/checks)を最終検証の正本とする。未実行／blockedが残るためDraftを維持する。
+
+## 直接TC期待値snapshotの型照合（2026-11-09）
+
+- `runner._verified_tc_expectations()`は、Gitの追跡済み期待値と実行planの比較にPythonの`==`を使用しており、JSONの入れ子にある`true`と`1`を同一視できた。実行前の仕様期待値改変を拒否できないため、既存`contract._json_equal_strict()`を再利用して型まで照合する。
+- 独立fixtureの固定Git blobに`{"ok":true}`を保存し、実行planだけを`{"ok":1}`へ変えた場合、起動前に`direct_tc_expectations_incomplete_or_mismatched`で拒否されることを回帰テストに追加した。
+- この照合はGit snapshotの改変防止であり、仕様Authorityのprovider認証・承認ではない。正式`tc_verdict`は引き続き未判定とする。固定製品の実runner受入・実provider受入は未実施のまま。

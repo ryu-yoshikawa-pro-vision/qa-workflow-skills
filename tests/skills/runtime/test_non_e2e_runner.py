@@ -943,6 +943,19 @@ class ActualRunnerTests(unittest.TestCase):
         )
         self.assertIsNone(artifact)
 
+        # A nested boolean in the committed expected result is not the
+        # JSON number 1, despite Python's True == 1 behavior.
+        plan["direct_expectations"] = [
+            {"id": "exit_code", "expected": 0},
+            {"id": "stdout_json", "expected": {"ok": 1}},
+        ]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(
+            summary["reason"], "direct_tc_expectations_incomplete_or_mismatched"
+        )
+        self.assertIsNone(artifact)
+
     def test_direct_tc_rejects_untracked_authority_and_mismatched_revision(self):
         plan = self.plan([sys.executable, "-c", "pass"])
         plan["direct_tc"] = True
