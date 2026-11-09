@@ -124,7 +124,15 @@ def _test_key(path: Any, title_path: Any) -> tuple[str, tuple[str, ...]]:
     path = _relative(path)
     if not isinstance(title_path, list) or not title_path:
         raise ContractError("invalid_title_path")
-    return path, tuple(_required_str(x, "title") for x in title_path)
+    # Vitest JSON includes an empty root name in ancestorTitles. It is
+    # structural, not a user-defined suite title. Do not accept empty names
+    # elsewhere: those would make distinct test identities ambiguous.
+    titles = list(title_path)
+    while titles and titles[0] == "":
+        titles.pop(0)
+    if not titles:
+        raise ContractError("invalid_title_path")
+    return path, tuple(_required_str(x, "title") for x in titles)
 
 
 def _report_path(value: Any, repo_root: str | None) -> str:
