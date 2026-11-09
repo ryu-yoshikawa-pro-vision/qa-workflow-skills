@@ -160,9 +160,7 @@ def analyze(request: Any) -> dict[str, Any]:
     if event == "analysis_update":
         previous = registry_request.get("previous_snapshot") or {}
         older = previous.get("changes", [])
-        superseded_ids = {
-            ref for row in older for ref in _superseded_ids(row)
-        }
+        superseded_ids = {ref for row in older for ref in _superseded_ids(row)}
         current_bases = {
             row["before_revision"]
             for row in older
