@@ -577,7 +577,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 stdout_file = attempt / "stdout.log"
                 if run["started"] and stdout_file.stat().st_size <= 1_048_576:
                     try:
-                        parsed = _strict_json_loads(stdout_file.read_text(encoding="utf-8"))
+                        parsed = _strict_json_loads(
+                            stdout_file.read_text(encoding="utf-8")
+                        )
                         if isinstance(parsed, dict):
                             metrics = parsed
                     except (ValueError, UnicodeError):
@@ -601,7 +603,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 stdout_file = attempt / "stdout.log"
                 if run["started"] and stdout_file.stat().st_size <= 1_048_576:
                     try:
-                        parsed = _strict_json_loads(stdout_file.read_text(encoding="utf-8"))
+                        parsed = _strict_json_loads(
+                            stdout_file.read_text(encoding="utf-8")
+                        )
                         if isinstance(parsed, dict):
                             report_data = parsed
                     except (ValueError, UnicodeError):
