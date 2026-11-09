@@ -281,6 +281,8 @@ def _history(
         if event["kind"] == "merged" and (len(from_ids) < 2 or not to_ids):
             raise ContractError("merge_requires_multiple_ancestors")
     if previous is None:
+        if any(row.get("supersedes_id") for row in snapshot["changes"]):
+            raise ContractError("change_supersession_without_predecessor")
         if snapshot.get("previous_artifact_revision") is not None:
             raise ContractError("unexpected_previous_artifact_revision")
         new_features = set(features)
@@ -332,7 +334,11 @@ def _history(
     for did in old_changes.keys() & new_changes.keys():
         if old_changes[did] != new_changes[did]:
             raise ContractError(f"change_history_rewritten:{did}")
-    replaced: set[str] = set()
+    replaced: set[str] = {
+        row["supersedes_id"]
+        for row in old_changes.values()
+        if row.get("supersedes_id") is not None
+    }
     for did in new_changes.keys() - old_changes.keys():
         row = new_changes[did]
         parent = row.get("supersedes_id")
@@ -344,8 +350,11 @@ def _history(
         fields = ("source_id", "before_revision", "after_revision", "locator")
         if any(row.get(key) != prior.get(key) for key in fields):
             raise ContractError(f"change_supersession_target_mismatch:{did}")
-        if row.get("classification") == prior.get("classification"):
-            raise ContractError(f"change_supersession_classification_unchanged:{did}")
+        if (
+            row.get("classification") == prior.get("classification")
+            or row.get("classification") not in {"impact", "no_impact", "out_of_scope"}
+        ):
+            raise ContractError(f"change_supersession_classification_invalid:{did}")
         if row.get("evidence_ref") == prior.get("evidence_ref"):
             raise ContractError(f"change_supersession_evidence_not_new:{did}")
         _text(row.get("approval_ref"), f"{did}_approval_ref")
