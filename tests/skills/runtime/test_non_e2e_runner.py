@@ -379,10 +379,10 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_playwright_native_json_report_reconciles_api_only_tests(self):
         report = {
+            "config": {"version": "playwright-json-fixture"},
             "suites": [
                 {
                     "title": "tests/contracts/api.spec.ts",
-                    "suites": [],
                     "specs": [
                         {
                             "file": "tests/contracts/api.spec.ts",
