@@ -89,6 +89,19 @@ class ProjectContextOwnerTests(unittest.TestCase):
         }
         self.assertEqual(handle(req)["status"], "unconfirmed")
 
+
+    def test_create_ref_requires_confirmed_absence_at_same_ref(self) -> None:
+        request = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": "a.md", "status": "absent"}],
+            "artifact_ref": "b.md",
+        }
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["artifact_ref"] = "a.md"
+        self.assertEqual(handle(request)["status"], "draft")
+
     def test_new_project_includes_only_supplied_sections(self) -> None:
         result = handle(
             {

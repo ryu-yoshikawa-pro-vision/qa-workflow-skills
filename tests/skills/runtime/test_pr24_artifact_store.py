@@ -30,6 +30,8 @@ class ArtifactStoreTests(unittest.TestCase):
 
         def authorize(request: dict) -> bool:
             self.approvals.append(request.copy())
+            if request["operation"] == "read":
+                return self.allowed and request["project_ref"] == "Sample"
             return self.allowed and request["approval_ref"] == "approval/verified"
 
         self.authorize = authorize
@@ -97,14 +99,42 @@ class ArtifactStoreTests(unittest.TestCase):
 
     def test_authorization_is_a_trusted_callback_not_json_flag(self) -> None:
         self.allowed = False
-        with self.assertRaisesRegex(StoreError, "approval_not_verified"):
+        with self.assertRaisesRegex(StoreError, "access_denied"):
             self.write()
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Sample", "artifact.md")
+        self.allowed = True
         self.assertIsNone(
             self.store.read_current("project-context", "Sample", "artifact.md")
         )
-        self.allowed = True
         self.assertEqual(self.write()["status"], "stored")
         self.assertEqual(self.approvals[-1]["sha256"], self.write()["sha256"])
+
+
+    def test_read_denied_for_other_project_and_revoked_access(self) -> None:
+        self.write()
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", "artifact.md")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_revision(
+                "project-context", "Other", "artifact.md", "r1"
+            )
+        self.allowed = False
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_revision(
+                "project-context", "Sample", "artifact.md", "r1"
+            )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.write()
+        self.allowed = True
+
+    def test_replayed_write_cannot_bypass_revoked_permission(self) -> None:
+        self.write()
+        self.allowed = False
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.write()
+        self.allowed = True
+        self.assertEqual(self.write()["status"], "idempotent")
 
     def test_authorization_service_error_does_not_write(self) -> None:
         def unavailable(_: dict) -> bool:
@@ -125,8 +155,10 @@ class ArtifactStoreTests(unittest.TestCase):
                 approval_revision="policy-v1",
                 change_reason="attempt",
             )
-        self.assertIsNone(
+        with self.assertRaisesRegex(StoreError, "approval_provider_unavailable"):
             store.read_current("project-context", "Sample", "unapproved.md")
+        self.assertIsNone(
+            self.store.read_current("project-context", "Sample", "unapproved.md")
         )
 
     def test_atomic_update_from_two_connections(self) -> None:
@@ -183,6 +215,31 @@ class ArtifactStoreTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(StoreError, "readback_hash_mismatch"):
             self.store.read_current("project-context", "Sample", "artifact.md")
+
+
+    def test_create_cannot_redirect_absence_to_unchecked_path(self) -> None:
+        request = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": "approved.md", "status": "absent"}],
+            "artifact_ref": "other.md",
+            "source_ref": "issue/1",
+            "source_revision": "r1",
+            "change_reason": "initial",
+        }
+        result = persist_prepared(
+            self.store,
+            request,
+            project_ref="Sample",
+            operation_id="redirect",
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIsNone(
+            self.store.read_current("project-context", "Sample", "other.md")
+        )
 
     def test_project_context_create_and_update_are_stored(self) -> None:
         initial = {

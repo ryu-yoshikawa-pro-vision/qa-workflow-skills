@@ -270,6 +270,9 @@ def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
             "reason": "existing_or_unconfirmed_context",
             "discovery": discovery,
         }
+    artifact_ref = request.get("artifact_ref")
+    if artifact_ref is not None and artifact_ref not in discovery["authorized_candidate_refs"]:
+        raise Invalid("artifact_ref_absence_not_confirmed")
     template = TEMPLATE.read_text(encoding="utf-8")
     if len(PROJECT.findall(template)) != 1:
         raise Invalid("shared_template_identity_invalid")
@@ -649,6 +652,16 @@ def persist_prepared(
         }:
             raise Invalid("unsupported_persistence_operation")
         draft = handle(preparation)
+        if operation == "prepare-create":
+            target = _single_line(preparation.get("artifact_ref"), "artifact_ref")
+            candidates = preparation.get("candidates")
+            if not isinstance(candidates, list) or not any(
+                isinstance(row, dict)
+                and row.get("ref") == target
+                and row.get("status") == "absent"
+                for row in candidates
+            ):
+                raise Invalid("artifact_ref_absence_not_confirmed")
         if operation == "prepare-placement" and draft["status"] == "draft":
             if (
                 draft["approval_ref"] != approval_ref

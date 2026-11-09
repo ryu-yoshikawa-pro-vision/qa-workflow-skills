@@ -149,10 +149,28 @@ class LocalArtifactStore:
             _name(artifact_ref, "artifact_ref"),
         )
 
+    def _authorized(self, request: dict[str, str | None]) -> None:
+        try:
+            permitted = self.authorize(request)
+        except Exception as exc:
+            raise StoreError("approval_provider_unavailable") from exc
+        if permitted is not True:
+            raise StoreError("access_denied")
+
     def read_revision(
         self, kind: str, project_ref: str, artifact_ref: str, revision: str
     ) -> dict[str, Any] | None:
         key = self._key(kind, project_ref, artifact_ref)
+        self._authorized(
+            {
+                "operation": "read",
+                "kind": kind,
+                "project_ref": project_ref,
+                "artifact_ref": artifact_ref,
+                "expected_revision": revision,
+                "approval_ref": None,
+            }
+        )
         if (
             not isinstance(revision, str)
             or not revision.startswith("r")
@@ -204,6 +222,16 @@ class LocalArtifactStore:
         self, kind: str, project_ref: str, artifact_ref: str
     ) -> dict[str, Any] | None:
         key = self._key(kind, project_ref, artifact_ref)
+        self._authorized(
+            {
+                "operation": "read",
+                "kind": kind,
+                "project_ref": project_ref,
+                "artifact_ref": artifact_ref,
+                "expected_revision": None,
+                "approval_ref": None,
+            }
+        )
         with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 """SELECT version FROM artifact_current
@@ -265,6 +293,7 @@ class LocalArtifactStore:
             ).encode("utf-8")
         ).hexdigest()
         approval_request: dict[str, str | None] = {
+            "operation": "write",
             "kind": kind,
             "project_ref": project_ref,
             "artifact_ref": artifact_ref,
@@ -278,6 +307,7 @@ class LocalArtifactStore:
         try:
             with closing(self._connect()) as conn, conn:
                 conn.execute("BEGIN IMMEDIATE")
+                self._authorized(approval_request)
                 receipt = conn.execute(
                     """SELECT fingerprint, version FROM artifact_receipts
                        WHERE kind=? AND project_ref=? AND artifact_ref=?
@@ -290,12 +320,6 @@ class LocalArtifactStore:
                     version = int(receipt[1])
                     idempotent = True
                 else:
-                    try:
-                        granted = self.authorize(approval_request)
-                    except Exception as exc:
-                        raise StoreError("approval_provider_unavailable") from exc
-                    if granted is not True:
-                        raise StoreError("approval_not_verified")
                     current = conn.execute(
                         """SELECT version FROM artifact_current
                            WHERE kind=? AND project_ref=? AND artifact_ref=?""",
