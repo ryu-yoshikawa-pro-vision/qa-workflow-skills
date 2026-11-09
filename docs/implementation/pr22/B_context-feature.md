@@ -232,3 +232,14 @@
 6. **保存先の読取権限**：SQLiteの`read_current`／`read_revision`にも信頼済みhostの`authorize`callbackを必須とし、案件・成果物refと操作種別を渡す。writeのoperation ID再送時もアクセス権を再評価する。Git保存先も読取／書込で同じ認可境界を適用する。
 
 検証はB専用の独立テスト・一時Git repository・GitHub Actionsで実施する。新規fixtureには正本pathの維持、競合、旧revision保全、認可取消、複数revision基準、DEC置換・二重有効防止と未承認refの負例を含めた。**実案件の認証元、遠隔provider、実Agent／製品CIへの接続は今回の依頼から除外**し、隔離テスト成功を実環境受入済みとは扱わない。PR #22側の共通runtime／他owner統合とmergeも対象外。
+
+## PR #24 merge後の追加レビュー4件（2026-11-09、修正PR #34）
+
+PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除された。以後の追加修正はPR #22のbranchへ直接commitせず、担当Bだけの[PR #34](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/34)で行う。
+
+1. `prepare-placement`は保存済みSection 12の有効DECとSection 14の参照から、決定ID、owner、scope、保存先、方針revision、決定根拠、承認revision、編集可能範囲、機能別参照を復元・相互照合する。入力`existing_policy`を承認済みとみなさず、両入力の承認revisionだけを変えても再利用不可。旧記録に承認revisionがなければ推測しない。
+2. Gitの`GitArtifactStore.write`では`authorize`へ承認revision・source ref/revision・operation ID・理由・hashを渡し、信頼済み承認元が不一致を拒否できるようにした。承認refだけの検証では通さない。
+3. `git_source_inventory.py`はgitlink／submoduleの内部を未取得の場合に`incomplete`、`complete_file_listing=false`、`unretrieved=[gitlink:path@revision]`とする。親treeの列挙成功をsubmodule内部の取得成功として扱わず、別sourceとして検証する必要がある。
+4. `feature_registry.py`は今回新規のDIFの`after_revision`をsourceの現在revisionへ照合し、PR更新／rebaseの`before_revision`を正当な旧SHAへ制限する。過去に登録したDIFは旧revisionのまま保持する。`persist_snapshot`ではcode sourceごとに信頼済み呼出し元が指定したGit root・base/head refを`git_inventory_requests`で受け、保存前に実際のGit tree／diffを再列挙し、`reconcile_git_coverage`を再実行する。未登録差分・submodule未取得・HEAD不一致・必要な差分未列挙ならblocked。code sourceを含まない台帳は既存の保存経路を保持する。
+
+自動テストには保存済み方針と呼出し元の承認revision不一致、Git承認revision不一致、gitlinkの未取得、偽ったDIF revision、未登録Git差分、保存前のGit再列挙と旧DIF履歴維持を追加した。実案件の遠隔保存provider・承認認証元・実Agent・製品CIの実環境検証は利用者指示どおり実施しない。全工程・他owner横断の統合はPR #22で別に判定する。
