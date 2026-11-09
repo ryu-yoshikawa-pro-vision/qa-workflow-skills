@@ -219,3 +219,16 @@
 - **実案件での保存先選択・認証サービス接続・実Agent・製品CIは対象外**。ローカルproviderの成功を、未選定のGitHub／Drive等のproviderのnative CAS・承認・readback成功へ一般化しない。
 - PR #22側の共通runtime owner登録・他ownerとの成果物受渡しはPR #24の編集範囲外。担当Bは必要な入出力契約とhandoff projectionを用意したが、PR #22の統合完了は宣言しない。
 - 最終実装コードの先頭commitは[dd5b7f5](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/dd5b7f5c2327b295a0b139c50fc82189d286e6b4)。CI最終判定は最新PR headに紐付くActionsで確認する。
+
+## PR #24 追加レビュー6件の修正（2026-11-09）
+
+レビュー時点のHEAD `0ddbf4a` で指摘された6件を、担当Bの保存・ID・差分契約と回帰テストに反映した。
+
+1. **不存在確認済みrefの限定**：`prepare-create`の保存先refが列挙済みの`absent`候補と一致することを確認する。別refへのredirectは`prepare_create`と`persist_prepared`で拒否する。
+2. **既存Markdown正本の保存**：Git管理文書の正本は`git_artifact_store.py`で対象branchの元pathを更新する。Git commit SHAをexpected revisionにした`git update-ref`によるnative CAS、Git履歴からの旧版読戻し、独立内容照合、同一operationの再送を実装した。未選択の遠隔providerに保存できるとは主張しない。SQLiteを正本とする案件だけ従来の`LocalArtifactStore`を使用する。
+3. **配置変更時の既存DEC失効**：現在有効なDECとSection 14の正本参照、`existing_policy.decision_id`を照合する。変更時は旧DECの状態を`置換済み`、`置換先ID`を新DECに設定し、新DECのみ有効にする。同時に既存DEC／ASMのセルが以前の保存文書と一致することを検証し、別の決定内容の無断編集を拒否する。文書に裏付けがない方針の再利用はblockedにする。
+4. **変更イベントの初回扱い**：前回snapshotが存在する更新で`event=initial`を指定すると拒否する（同一snapshotの冪等再送のみ許容）。source revisionに変化がない手動の内容修正は`analysis_update`と明示的なsource revision・根拠refを要求する。PR更新・merge等のイベント根拠を初回処理へ偽装できないようにした。
+5. **2基準差分の旧revision**：PR base→HEADと前回HEAD→現在HEADを、それぞれ旧SHA・path・今回HEADの組として照合する。両基準に同じpathがあって旧SHAが異なる場合も二つの差分を保持する。一方だけの分類を両方の100%として報告せず、`missing_git_revision_pairs`に未確認を残す。
+6. **保存先の読取権限**：SQLiteの`read_current`／`read_revision`にも信頼済みhostの`authorize`callbackを必須とし、案件・成果物refと操作種別を渡す。writeのoperation ID再送時もアクセス権を再評価する。Git保存先も読取／書込で同じ認可境界を適用する。
+
+検証はB専用の独立テスト・一時Git repository・GitHub Actionsで実施する。新規fixtureには正本pathの維持、競合、旧revision保全、認可取消、複数revision基準、DEC置換・二重有効防止と未承認refの負例を含めた。**実案件の認証元、遠隔provider、実Agent／製品CIへの接続は今回の依頼から除外**し、隔離テスト成功を実環境受入済みとは扱わない。PR #22側の共通runtime／他owner統合とmergeも対象外。
