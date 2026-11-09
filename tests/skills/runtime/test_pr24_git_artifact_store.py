@@ -391,6 +391,30 @@ class GitArtifactStoreTests(unittest.TestCase):
             )
         )
 
+    def test_code_save_rejects_stale_head_even_if_commit_exists(self) -> None:
+        request, evidence = self._code_registry()
+        (self.root / "src" / "later.py").write_text(
+            "def changed(): return True\n", encoding="utf-8"
+        )
+        git(self.root, "add", "src/later.py")
+        git(self.root, "commit", "-qm", "advance source after inventory")
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="stale current git source",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn("git_source_listing_incomplete", result["reasons"])
+        self.assertIsNone(
+            self.store.read_current(
+                "feature-inventory", "Sample", "qa/feature-inventory.json"
+            )
+        )
+
     def test_code_save_rejects_wrong_git_diff_revision(self) -> None:
         request, evidence = self._code_registry()
         request["snapshot"]["changes"][0]["after_revision"] = "forged-head"
