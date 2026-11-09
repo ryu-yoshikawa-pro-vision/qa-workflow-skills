@@ -141,6 +141,17 @@ class GitSourceInventoryTests(unittest.TestCase):
             check=True,
         )
         self.assertEqual(json.loads(accepted.stdout)["status"], "complete")
+        malformed = dict(request)
+        del malformed["authorized_root"]
+        rejected = subprocess.run(
+            command,
+            input=json.dumps(malformed),
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertEqual(json.loads(rejected.stdout)["status"], "blocked")
 
     def test_git_output_limit_blocks_instead_of_reporting_complete(self) -> None:
         with mock.patch.object(inventory, "MAX_OUTPUT", 1):

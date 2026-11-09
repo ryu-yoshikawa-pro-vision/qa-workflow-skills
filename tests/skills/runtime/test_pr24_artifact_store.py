@@ -106,6 +106,29 @@ class ArtifactStoreTests(unittest.TestCase):
         self.assertEqual(self.write()["status"], "stored")
         self.assertEqual(self.approvals[-1]["sha256"], self.write()["sha256"])
 
+    def test_authorization_service_error_does_not_write(self) -> None:
+        def unavailable(_: dict) -> bool:
+            raise RuntimeError("service unavailable")
+
+        store = LocalArtifactStore(self.root, self.root, unavailable)
+        with self.assertRaisesRegex(StoreError, "approval_provider_unavailable"):
+            store.write(
+                kind="project-context",
+                project_ref="Sample",
+                artifact_ref="unapproved.md",
+                content="draft",
+                expected_revision=None,
+                operation_id="operation-denied",
+                source_ref="issue/1",
+                source_revision="r1",
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+                change_reason="attempt",
+            )
+        self.assertIsNone(
+            store.read_current("project-context", "Sample", "unapproved.md")
+        )
+
     def test_atomic_update_from_two_connections(self) -> None:
         self.write()
 

@@ -290,7 +290,11 @@ class LocalArtifactStore:
                     version = int(receipt[1])
                     idempotent = True
                 else:
-                    if self.authorize(approval_request) is not True:
+                    try:
+                        granted = self.authorize(approval_request)
+                    except Exception as exc:
+                        raise StoreError("approval_provider_unavailable") from exc
+                    if granted is not True:
                         raise StoreError("approval_not_verified")
                     current = conn.execute(
                         """SELECT version FROM artifact_current

@@ -199,9 +199,16 @@ def main() -> int:
         trusted = os.environ.get("QA_FEATURE_AUTHORIZED_ROOT")
         if not trusted:
             raise Invalid("trusted_authorized_root_missing")
-        if not isinstance(request, dict) or Path(trusted).resolve(strict=True) != Path(
-            request["authorized_root"]
-        ).resolve(strict=True):
+        if not isinstance(request, dict) or not isinstance(
+            request.get("authorized_root"), str
+        ):
+            raise Invalid("trusted_authorized_root_mismatch")
+        try:
+            authorized_root = Path(request["authorized_root"]).resolve(strict=True)
+            trusted_root = Path(trusted).resolve(strict=True)
+        except (OSError, ValueError) as exc:
+            raise Invalid("trusted_authorized_root_unavailable") from exc
+        if trusted_root != authorized_root:
             raise Invalid("trusted_authorized_root_mismatch")
         result = handle(request)
     except (Invalid, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
