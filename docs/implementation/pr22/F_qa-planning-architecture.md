@@ -219,11 +219,13 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 
 この節は2026-11-09の検証記録を更新する。対象branchは`feat/pr22-f-qa-planning-architecture`、作業開始時HEADはレビュー基準`f86e4bc4f56b95c831997d8ca9088ee7846d8400`で、開始時のworktreeはcleanだった。現在の差分はF担当Skill・F担当文書・F回帰テストだけである。レビュー修正の記録時点ではGitHubへのpush、PR本文更新、commitを行っていない。
 
-### Commit／push前チェック（2026-11-10）
+### Commit／push確認（2026-11-10）
 
 今回の公開作業開始時は対象branch `feat/pr22-f-qa-planning-architecture`、HEAD `f86e4bc4f56b95c831997d8ca9088ee7846d8400`。worktreeにはこの修正作業で作成した22件のtracked変更があり、未追跡ファイルはなかった。変更pathは3 Skill配下、`tests/skills/evals/deterministic/test_f_planning_contracts.py`、この担当文書に限定され、A所有のREADME・共通runtime・routingや生成物は含まない。
 
-`git fetch origin`は成功し、`git rev-list --left-right --count HEAD...origin/feat/pr22-f-qa-planning-architecture`は`0 0`。remote-only／local-only commitはなく、履歴同期は不要。秘密情報を含む高信頼形式、意図しないpath、テスト失敗を隠す差分は今回のpush前確認で検出されていない。追記した担当文書はdprint 0.55.2の`dprint fmt`と`dprint check`をPASSした。上記のローカル検証結果は修正完了時点の記録で、この公開作業ではテストを再実行していない。push後の新HEADに対するGitHub Actionsは未確認であり、push後に確認する。今回許可された対象branchへの通常pushを行い、PR本文とDraft状態は変更しない。
+`git fetch origin`は成功し、commit前の`git rev-list --left-right --count HEAD...origin/feat/pr22-f-qa-planning-architecture`は`0 0`。remote-only／local-only commitはなく、履歴同期は不要。秘密情報を含む高信頼形式、意図しないpath、テスト失敗を隠す差分はpush前確認で検出されていない。追記した担当文書はdprint 0.55.2の`dprint fmt`と`dprint check`をPASSした。上記のローカル検証結果は修正完了時点の記録で、この公開作業ではテストを再実行していない。
+
+修正commit `be63df06b05970811e966d2f81b589400cc73e34`（`fix(pr28): address planning validator review findings`）は作成済み。`git push origin HEAD:feat/pr22-f-qa-planning-architecture`は`fatal: could not read Username for 'https://github.com': No such device or address`で失敗した。これは利用可能なGitHub認証がない認証エラーであり、network、権限拒否、履歴競合を示すエラーではない。`git ls-remote --heads origin feat/pr22-f-qa-planning-architecture`とGitHub PR取得はremote headが引き続き`f86e4bc4f56b95c831997d8ca9088ee7846d8400`であることを確認し、修正commitはGitHubへ反映されていない。GitHubはPR #28をDraftのまま報告し、修正commitに対するActions runは0件。既存remote headの5 workflowはValidate Agent Skills／Validate Deterministic Output EvalsがFAIL、Validate Semantic Output Evals／Code Quality／Codex HarnessがPASSだが、すべて`f86e4bc4...`上の結果で修正後CIではない。通常push可能な認証経路が利用できた後、remote SHA一致と5 workflowを再確認する。PR本文とDraft状態は変更していない。
 
 ### 指摘別の修正結果
 
