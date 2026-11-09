@@ -135,6 +135,50 @@ class GitChangeCoverageTests(unittest.TestCase):
             result["coverage"]["mismatched_revision_change_ids"], ["DIF-001"]
         )
 
+    def test_pr_update_checks_new_base_and_previous_head_diffs(self) -> None:
+        snapshot = self.feature["snapshot"]
+        prior = copy.deepcopy(snapshot)
+        prior["source_revision"] = self.base
+        prior["sources"][0]["revision"] = self.base
+        self.feature["previous_snapshot"] = prior
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": self.base,
+            "head_sha": self.inventory["head_sha"],
+            "previous_head_sha": self.base,
+        }
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["operation_id"] = "op-v2"
+        snapshot["changes"][0]["id"] = "DIF-002"
+        second = copy.deepcopy(snapshot["changes"][0])
+        second.update(
+            id="DIF-003",
+            locator="beta.py",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Reviewed independent change",
+            approval_ref="approval/qa",
+        )
+        snapshot["changes"].append(second)
+        req = self.request()
+        result = reconcile(req)
+        self.assertEqual(result["status"], "incomplete", result)
+        self.assertIn("previous_head_diff_not_enumerated", result["reasons"])
+        req["previous_head_git_inventory"] = copy.deepcopy(self.inventory)
+        result = reconcile(req)
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(len(result["coverage"]["previous_head_change_paths"]), 2)
+        req["previous_head_git_inventory"]["changes"].append(
+            {"status": "D", "before_path": "transient.py",
+             "after_path": "transient.py"}
+        )
+        result = reconcile(req)
+        self.assertEqual(result["status"], "incomplete", result)
+        self.assertIn("transient.py", result["coverage"]["missing_git_paths"])
+        req["previous_head_git_inventory"]["base_sha"] = "f" * 40
+        self.assertEqual(reconcile(req)["status"], "stale")
+
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"
         result = reconcile(self.request())

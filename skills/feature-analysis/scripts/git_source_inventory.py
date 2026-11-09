@@ -7,6 +7,7 @@ required. Paths and rename events are evidence, not semantic feature identities.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -195,6 +196,15 @@ def main() -> int:
         if len(raw) > MAX_INPUT:
             raise Invalid("input_too_large")
         request = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs)
+        trusted = os.environ.get("QA_FEATURE_AUTHORIZED_ROOT")
+        if not trusted:
+            raise Invalid("trusted_authorized_root_missing")
+        if (
+            not isinstance(request, dict)
+            or Path(trusted).resolve(strict=True)
+            != Path(request["authorized_root"]).resolve(strict=True)
+        ):
+            raise Invalid("trusted_authorized_root_mismatch")
         result = handle(request)
     except (Invalid, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         result = {"status": "blocked", "reason": str(exc)}

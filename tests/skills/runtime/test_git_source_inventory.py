@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -113,6 +115,24 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertEqual(handle(request)["status"], "blocked")
         request["head_sha"] = "f" * 40
         self.assertEqual(handle(request)["status"], "blocked")
+
+    def test_cli_requires_trusted_root_from_host(self) -> None:
+        request = self.request(None, self.first)
+        script = SCRIPT_DIR / "git_source_inventory.py"
+        env = dict(os.environ)
+        env.pop("QA_FEATURE_AUTHORIZED_ROOT", None)
+        command = [sys.executable, str(script)]
+        denied = subprocess.run(
+            command, input=json.dumps(request), env=env,
+            text=True, capture_output=True, check=True
+        )
+        self.assertEqual(json.loads(denied.stdout)["status"], "blocked")
+        env["QA_FEATURE_AUTHORIZED_ROOT"] = str(self.root)
+        accepted = subprocess.run(
+            command, input=json.dumps(request), env=env,
+            text=True, capture_output=True, check=True
+        )
+        self.assertEqual(json.loads(accepted.stdout)["status"], "complete")
 
     def test_git_output_limit_blocks_instead_of_reporting_complete(self) -> None:
         with mock.patch.object(inventory, "MAX_OUTPUT", 1):
