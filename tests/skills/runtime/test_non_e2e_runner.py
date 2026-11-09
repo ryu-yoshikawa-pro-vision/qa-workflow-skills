@@ -369,7 +369,9 @@ class ActualRunnerTests(unittest.TestCase):
         del plan["preflight"]["external_side_effects"]
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 2)
-        self.assertEqual(summary["reason"], "preflight_external_side_effects_unverified")
+        self.assertEqual(
+            summary["reason"], "preflight_external_side_effects_unverified"
+        )
         self.assertIsNone(artifact)
 
 
