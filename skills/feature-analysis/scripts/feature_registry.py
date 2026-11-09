@@ -343,6 +343,15 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
         return
     if not isinstance(basis, dict):
         raise ContractError("event_basis_required")
+    if not isinstance(snapshot.get("sources"), list) or any(
+        not isinstance(row, dict) for row in snapshot["sources"]
+    ):
+        raise ContractError("event_sources_invalid")
+    if previous is not None and (
+        not isinstance(previous.get("sources"), list)
+        or any(not isinstance(row, dict) for row in previous["sources"])
+    ):
+        raise ContractError("event_previous_sources_invalid")
     keys: dict[str, set[str]] = {
         "pr_update": {"base_sha", "head_sha", "previous_head_sha"},
         "rebase": {"base_sha", "head_sha", "previous_head_sha", "previous_base_sha"},

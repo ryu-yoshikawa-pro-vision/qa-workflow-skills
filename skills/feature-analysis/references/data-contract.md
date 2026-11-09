@@ -37,3 +37,7 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 既存機能のname変更には`renamed`または`changed`、実装参照・status・親・仕様／QA参照等の変更には`changed`の追記履歴（対象IDをfrom_ids/to_idsへ記録し、今回source_revisionを付ける）が必要です。廃止は従来どおりretired等の履歴を要求します。`no_impact`も`out_of_scope`と同様に理由と承認refが必要で、実認証・承認scopeの真正性は別途確認します。
 
 同じローカル保存先を明示選択した案件では`feature_registry.persist_snapshot(store,request,expected_revision,approval_ref,approval_revision,change_reason)`が既存保存済みsnapshotの独立再取得後にnative CASで保存します。元snapshotの意味上の一致・provider revision・snapshot hashを別に検証し、未解決項目があれば`analysis_status=incomplete`を維持します。外部保存providerの選択・認証は信頼済み呼出し元の責務です。
+
+## 変更イベントの入力検証
+
+`event=initial`以外のsnapshotには`event_basis`が必須です。`pr_update`にはbase_sha／head_sha／previous_head_sha、`rebase`にはさらにprevious_base_sha、`merge`にはmerge_commit_sha／target_ref／previous_head_sha、`release`にはcommit_sha／build_ref／target_ref、`external_revision`にはdocument_ref／before_revision／after_revision／evidence_refを指定します。Git commitは省略SHAやbranch名ではなくfull SHAを使用し、source_revision・コードsource revision・前回snapshotのrevisionと一致させます。外部資料のみの改版は資料refと旧／新revisionを直接比較し、コードPRがないことを変更なしと扱いません。

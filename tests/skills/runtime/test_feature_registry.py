@@ -311,6 +311,82 @@ class FeatureRegistryTests(unittest.TestCase):
                 )
                 self.assertEqual(handle(data)["status"], "blocked")
 
+    def test_code_events_require_full_revisions_and_previous_head(self) -> None:
+        old_sha = "b" * 40
+        new_sha = "a" * 40
+        for event, basis in (
+            (
+                "pr_update",
+                {"base_sha": "c" * 40, "head_sha": new_sha,
+                 "previous_head_sha": old_sha},
+            ),
+            (
+                "rebase",
+                {"base_sha": "c" * 40, "head_sha": new_sha,
+                 "previous_head_sha": old_sha, "previous_base_sha": "d" * 40},
+            ),
+            (
+                "merge",
+                {"merge_commit_sha": new_sha, "target_ref": "refs/heads/main",
+                 "previous_head_sha": old_sha},
+            ),
+            (
+                "release",
+                {"commit_sha": new_sha, "build_ref": "release/2",
+                 "target_ref": "refs/tags/v2"},
+            ),
+        ):
+            with self.subTest(event=event):
+                data = fixture()
+                before = copy.deepcopy(data["snapshot"])
+                before["source_revision"] = old_sha
+                before["sources"][0]["revision"] = old_sha
+                data["previous_snapshot"] = before
+                snap = data["snapshot"]
+                snap["event"] = event
+                snap["event_basis"] = basis
+                snap["source_revision"] = new_sha
+                snap["sources"][0]["revision"] = new_sha
+                snap["artifact_revision"] = "art-v2"
+                snap["previous_artifact_revision"] = "art-v1"
+                snap["operation_id"] = "op-v2"
+                snap["changes"][0].update(id="DIF-002", before_revision=old_sha,
+                                           after_revision=new_sha)
+                data["observed_head_revision"] = new_sha
+                self.assertEqual(handle(data)["status"], "complete", data)
+                del snap["event_basis"]
+                self.assertEqual(handle(data)["status"], "blocked")
+
+    def test_document_only_revision_has_independent_source_basis(self) -> None:
+        data = fixture()
+        before = copy.deepcopy(data["snapshot"])
+        before["source_revision"] = "event-v1"
+        before["sources"][0].update(
+            kind="spec", ref="requirements/doc", revision="doc-v1"
+        )
+        data["previous_snapshot"] = before
+        snap = data["snapshot"]
+        snap["source_revision"] = "event-v2"
+        snap["sources"][0].update(
+            kind="spec", ref="requirements/doc", revision="doc-v2"
+        )
+        snap["event"] = "external_revision"
+        snap["event_basis"] = {
+            "document_ref": "requirements/doc",
+            "before_revision": "doc-v1",
+            "after_revision": "doc-v2",
+            "evidence_ref": "source/change-1",
+        }
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        snap["operation_id"] = "op-v2"
+        snap["changes"][0].update(id="DIF-002", before_revision="doc-v1",
+                                   after_revision="doc-v2")
+        data["observed_head_revision"] = "event-v2"
+        self.assertEqual(handle(data)["status"], "complete", data)
+        snap["event_basis"]["after_revision"] = "doc-v3"
+        self.assertEqual(handle(data)["status"], "blocked")
+
     def test_handoff_carries_canonical_hash_and_source_scope(self) -> None:
         result = handle(fixture())
         handoff = result["handoff"]
