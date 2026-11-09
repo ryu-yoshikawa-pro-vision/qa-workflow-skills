@@ -45,6 +45,22 @@ def dec(action: str, *, reuse_id: str | None = None, draft: str | None = None) -
 
 
 class ProjectContextIdsTests(unittest.TestCase):
+    def test_repository_template_uses_parser_compatible_id_tables(self) -> None:
+        template = (
+            SCRIPT_DIR.parent / "assets" / "project-context-template.md"
+        ).read_text(encoding="utf-8")
+        response = handle(
+            {
+                "operation": "materialize",
+                "artifact_mode": "create",
+                "previous_artifact_markdown": None,
+                "artifact_markdown": template,
+                "decisions": [],
+                "assumptions": [],
+            }
+        )
+        self.assertTrue(response["valid"], response)
+
     def test_create_allocates_canonical_dec_id_and_preserves_other_sections(
         self,
     ) -> None:

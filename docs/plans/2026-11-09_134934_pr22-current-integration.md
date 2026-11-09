@@ -23,6 +23,10 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 証拠は各担当PRのhead・Checks・作業定義を正本とする。Draftのコードやfixtureを、担当完了・実環境受入として扱わない。
 
+## 統合時に確認した文書・コード差異
+
+PR #24の担当記録ではProject ContextテンプレートSection 12/13の区切り行が2本とされ、parserの3本以上という条件との差が報告されている。PR #22の現行treeではテンプレートが既に3本以上へ修正され、`project_context_ids.py`によるcreate入力検証で`valid=true`を確認した。2本の行は古いC作業treeで再現した状態で、今回PR #22の現行テンプレートに変更は不要。再発を防ぐため、`tests/skills/runtime/test_project_context_ids.py`にrepository既定テンプレートを実parserへ渡す回帰テストを追加する。
+
 ## 既存契約
 
 - 最終統合先はPR #22の`feat/development-qa-traceability`。担当の独立実装は各owner PR、親PRは取り込み・接続・横断検証・最終判定を行う。
