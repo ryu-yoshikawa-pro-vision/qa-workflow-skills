@@ -239,5 +239,57 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(artifact["outcome"], "observations_incomplete")
 
 
+    def test_nonfunctional_threshold_is_evaluated_from_real_measurement(self):
+        plan = self.plan(
+            [sys.executable, "-c", "print('{\"p95_ms\": 225}')"],
+            kind="nonfunctional",
+        )
+        plan.update(
+            {
+                "metric_criteria": [
+                    {
+                        "id": "p95_ms",
+                        "characteristic": "performance",
+                        "unit": "ms",
+                        "maximum": 200,
+                    }
+                ],
+                "measurement_condition_ref": "fixture-condition-v1",
+                "measurement_conditions_verified": True,
+                "threshold_authority_ref": "fixture-approved-threshold",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["quality_verdict"], "FAIL")
+        self.assertEqual(artifact["outcome"], "measurement_FAIL")
+        self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+
+    def test_nonfunctional_missing_measurement_is_not_zero(self):
+        plan = self.plan(
+            [sys.executable, "-c", "print('{\"unrelated\": 0}')"],
+            kind="nonfunctional",
+        )
+        plan.update(
+            {
+                "metric_criteria": [
+                    {
+                        "id": "p95_ms",
+                        "characteristic": "performance",
+                        "unit": "ms",
+                        "maximum": 200,
+                    }
+                ],
+                "measurement_condition_ref": "fixture-condition-v1",
+                "measurement_conditions_verified": True,
+                "threshold_authority_ref": "fixture-approved-threshold",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["quality_verdict"], "判定不能")
+        self.assertEqual(artifact["outcome"], "measurements_incomplete")
+
+
 if __name__ == "__main__":
     unittest.main()
