@@ -66,6 +66,8 @@ Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`
 
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
 
+merge／release時はPR baseが存在しないため、`git_inventory_requests[].base_sha`を**各code source IDの保存済み`previous_snapshot.sources[].revision`**と一致させます。主source／副sourceのどちらにも適用し、未取得・不一致・nullのbase SHAで差分を省略した場合は保存しません。`reconcile_git_coverage`の単独照合でも同じ基準を検証し、旧revision→merge commit／release commitの変更pathを母集団として使用します。途中のコミット→今回HEADだけの差分では全変更を確認したとみなしません。
+
 ## 継続PRのDIF履歴と複数repository
 
 `feature-inventory-v1`の`changes[]`は履歴を含む追記型です。前回snapshotに存在するDIF IDの全フィールドは改変・削除しません。再分類する場合は別のDIF IDに`supersedes_id`（前回DIF ID）、新しい`evidence_ref`、`reason`、`approval_ref`、`approval_revision`を指定します。対象のsource ID・前後revision・locatorは一致する必要があります。旧行は履歴として残し、現在の分類率・未分類ID・下流影響は置換された行を除外します。
@@ -78,7 +80,7 @@ PR更新・rebaseでGit差分を照合する際、前回snapshotにあるDIFは�
 
 ## 現在の差分と過去の履歴の分離（PR #34追補）
 
-過去のDIFは削除せず、PR更新・rebase・merge・release・外部資料改版では今回新規の有効DIFだけを`metrics.change_classification`と`handoff.impacted_feature_ids`／`approval_required_change_ids`／`unclassified_change_ids`へ渡します。初回分析は全有効DIF、同じsource revisionの`analysis_update`は現在source revisionに対応する有効DIFと今回追加された分類訂正DIFを対象とします。過去の未分類履歴は別途`reasons`で未解決のまま維持され、無根拠に成功へ格上げしません。
+過去のDIFは削除せず、PR更新・rebase・merge・release・外部資料改版では今回新規の有効DIFだけを`metrics.change_classification`と`handoff.impacted_feature_ids`／`approval_required_change_ids`／`unclassified_change_ids`へ渡します。新規IDでも`supersedes_id`で過去DIFを訂正した行は新しいGit差分ではないため、これらの変更イベントの今回集計に含めません。初回分析は全有効DIF、同じsource revisionの`analysis_update`は現在source revisionに対応する有効DIFと今回追加された分類訂正DIFを対象とします。過去の未分類履歴は別途`reasons`で未解決のまま維持され、無根拠に成功へ格上げしません。
 
 同じ`source_id`、旧revision、新revision、`locator`に対して、複数の**有効な**DIFを記録できません。訂正は既存DIFを`supersedes_id`で置換し、両行を履歴に残します。Git path単位の差分照合で別hunkを独立に分類したい場合は、区別できるlocator／根拠が必要です。同じ識別子のまま異なる判定を併存させません。
 
