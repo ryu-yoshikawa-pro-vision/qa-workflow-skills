@@ -106,7 +106,6 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - E/F/H/J各担当による契約の正式合意や他ownerの実成果物との接続。G側のschema・fixture・必要参照は記録済み。複数ownerの実データによる横断接続はPR #22で実施する。
 - 固定製品testwareの期待値についての正式な仕様Authority決定と、製品testware ownerによる変更・採否。Gの確認候補と反証根拠は記録済み。製品本体・既存製品テストは本PRの書込み対象ではない。
 
-
 **PR #29に残る実装上の対応**：CodeRabbitが最新の実装差分に対して`CHANGES_REQUESTED`を記録し、未解決のreview threadがある。runnerの中断・残存プロセス、Git更新時の競合、結果照合・評価の判定など、G所有コードの正しさに関する指摘はPR #22の受入へ移管しない。各指摘は既存実装・仕様・テストで確認し、妥当な修正をG branchで行う。レビュー指摘が残る時点でPR #29の実装レビューは完了していない。
 
 上記受入の移管は未検証の隠蔽や仕様適合の証明を意味しない。PR #22で同一ID／revision／Authority／runner／raw／cleanupの実証を行い、結果を記録する。
@@ -114,7 +113,6 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 ## PR #22で判定する受入基準（元Planから保持）
 
 以下のチェックリストはPR #29の実装済み範囲を含めた**受入の最終照合**としてPR #22へ引き継ぐ。Gの局所CI成功をもって完了にしない。
-
 
 - [ ] 対象方式のtestware実装／更新と実runnerでの実行・raw証拠・cleanupが結びつき、独立fixtureと固定qa-training-storeの対象を区別した。
 - [ ] preflight不備・共有データ競合・応答消失・cleanup失敗・隔離worktreeの競合を安全に拒否／再開できる。
