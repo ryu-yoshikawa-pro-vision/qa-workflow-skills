@@ -88,7 +88,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 - [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
 - [x] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
+- [x] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
 - [x] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した（Aの公開契約の項目に合わせた参照payloadとreadback済みrevisionまで。Aのvalidator正式登録、validation result refの保存、承認providerは未接続でPR #22／A側。下記）。
 - [x] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
@@ -146,9 +146,13 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 - semantic評価（LLM判定）は未実施。データ契約とcase追加までで、PR #22の実Agent評価で実施する。triggerは下記の擬似確認までで、実ハーネスでの全current Skill同時のroutingはPR #22。
 - 実保存先のnative atomic create／conditional write（CAS）：`update_entry()`は注入されたproviderの結果を使う。テストのproviderは固定fixture（排他lockとos.replace）で、実providerのCASを実証したものではない。実provider／実runnerでの検証はPR #22。
-- このbranchの変更はcommit／pushしていないため、GitHub Actionsは未確認（PR #31の現在のChecksは変更前HEADの結果）。push後に各workflowを個別に確認する。PR本文も、push後に最新状態へ更新する。
+- GitHub Actions（PR #31のChecks）：コミット`8e4425e`（ベース取り込み後）で`code-quality`・`codex-contract`・`windows-launcher`・`deterministic-output-evals`・`semantic-output-evals`・`validate`が各々pass（CodeRabbitはskipping）。`47e97d7`にrunが無かったのは、当時PRがベースとコンフリクトしていてpull_request用workflowが起動しなかったため。以降のHEADで変わった場合は、そのHEADのChecksを個別に確認する。
 - A・J・Fの実成果物との接続、validation result refの保存、承認provider、全Skill同時のrouting、S1〜S17、人間編集8ケースはPR #22で実施する。
 - 本環境の既存の失敗（上表）は、変更前HEADでも再現することを確認済み。Python 3.11のLinux CIでの再確認はPR #22。
+
+### ベース取り込み（2026-11-09）
+
+- ベース`feat/development-qa-traceability`（B統合を含む14コミット）の取り込みで`EVALS.md`の意味評価対応表のみ衝突した。ベース側の表を採用し、担当Iの2セル（`EXP-SEM-005`・`KN-SEM-007`）だけを再適用した。取り込み後のローカル検証：format／lint、semantic dataset（25 Skill／171 case）、trigger、deterministic（Windows／Linuxとも341件）がPASS。Linuxのruntimeテストは581件中1件（`test_ci_handoff`、変更前HEADでも失敗する既存の失敗）。
 
 ### 互換・移行・rollback
 
