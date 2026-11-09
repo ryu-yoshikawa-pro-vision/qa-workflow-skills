@@ -251,7 +251,6 @@ class GitChangeCoverageTests(unittest.TestCase):
             "git_change_revision_pairs_not_registered", missing_one["reasons"]
         )
 
-
     def test_consecutive_pr_updates_keep_historical_dif_revision(self) -> None:
         first_head = self.inventory["head_sha"]
         historical = copy.deepcopy(self.feature["snapshot"])
@@ -304,7 +303,9 @@ class GitChangeCoverageTests(unittest.TestCase):
                 after_revision=new_head,
             )
             snapshot["changes"].append(row)
-        result = reconcile({**self.request(), "previous_head_git_inventory": previous_diff})
+        result = reconcile(
+            {**self.request(), "previous_head_git_inventory": previous_diff}
+        )
         self.assertEqual(result["status"], "complete", result)
         self.assertEqual(result["coverage"]["rate"], 1.0)
         self.assertEqual(snapshot["changes"][0]["after_revision"], first_head)

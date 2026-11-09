@@ -153,7 +153,6 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(report["status"], "incomplete", report)
         self.assertIn("change_source_incomplete:DIF-001", report["reasons"])
 
-
     def test_classification_history_is_immutable(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
@@ -545,9 +544,7 @@ class FeatureRegistryTests(unittest.TestCase):
         snap["previous_artifact_revision"] = "art-v1"
         snap["operation_id"] = "op-v2"
         change = copy.deepcopy(snap["changes"][0])
-        change.update(
-            id="DIF-002", before_revision="doc-v1", after_revision="doc-v2"
-        )
+        change.update(id="DIF-002", before_revision="doc-v1", after_revision="doc-v2")
         snap["changes"].append(change)
         data["observed_head_revision"] = "event-v2"
         self.assertEqual(handle(data)["status"], "complete", data)

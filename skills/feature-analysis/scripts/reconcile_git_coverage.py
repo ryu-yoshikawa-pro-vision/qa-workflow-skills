@@ -80,9 +80,11 @@ def analyze(request: Any) -> dict[str, Any]:
     source_basis = request.get("source_event_basis")
     previous_inventory = request.get("previous_head_git_inventory")
     if source_basis is not None:
-        if event not in {"pr_update", "rebase"} or not isinstance(
-            source_basis, dict
-        ) or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}:
+        if (
+            event not in {"pr_update", "rebase"}
+            or not isinstance(source_basis, dict)
+            or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}
+        ):
             raise Invalid("source_event_basis_invalid")
         basis = source_basis
     if event in {"pr_update", "rebase"}:
@@ -143,10 +145,7 @@ def analyze(request: Any) -> dict[str, Any]:
         old_sources = (registry_request.get("previous_snapshot") or {}).get(
             "sources", []
         )
-        old = [
-            row for row in old_sources
-            if row.get("id") == source_id
-        ]
+        old = [row for row in old_sources if row.get("id") == source_id]
         if len(old) != 1 or old[0].get("revision") != basis["previous_head_sha"]:
             raise Invalid("source_event_previous_head_mismatch")
     files = git.get("files")
@@ -239,15 +238,14 @@ def analyze(request: Any) -> dict[str, Any]:
     for row in snapshot["changes"]:
         if row["source_id"] != source_id or row["id"] in superseded:
             continue
-        if (
-            row["id"] in previous_ids
-            and event in {"pr_update", "rebase", "merge", "release"}
-        ):
+        if row["id"] in previous_ids and event in {
+            "pr_update",
+            "rebase",
+            "merge",
+            "release",
+        }:
             continue
-        if (
-            row["id"] in previous_ids
-            and row["after_revision"] != head_sha
-        ):
+        if row["id"] in previous_ids and row["after_revision"] != head_sha:
             continue
         # Historical reclassification at an older revision is not a new
         # source diff for the current HEAD.

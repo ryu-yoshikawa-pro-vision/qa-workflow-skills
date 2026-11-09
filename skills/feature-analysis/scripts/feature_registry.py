@@ -240,9 +240,14 @@ def _change_revisions(
         if row["after_revision"] != source["revision"]:
             raise ContractError(f"change_source_revision_mismatch:{did}")
         if snapshot["event"] in {"pr_update", "rebase"} and source["kind"] == "code":
-            permitted = {basis["base_sha"], basis["previous_head_sha"]}
-            if row["before_revision"] not in permitted:
-                raise ContractError(f"change_before_revision_mismatch:{did}")
+            if source["revision"] == snapshot["source_revision"]:
+                permitted = {basis["base_sha"], basis["previous_head_sha"]}
+                if row["before_revision"] not in permitted:
+                    raise ContractError(f"change_before_revision_mismatch:{did}")
+            elif not COMMIT.fullmatch(row["before_revision"]):
+                # For a second repository the actual base/previous HEAD are
+                # validated against its own Git diff at persistence time.
+                raise ContractError(f"change_before_revision_not_sha:{did}")
         elif (
             snapshot["event"] == "external_revision"
             and source["ref"] == basis["document_ref"]
@@ -350,10 +355,9 @@ def _history(
         fields = ("source_id", "before_revision", "after_revision", "locator")
         if any(row.get(key) != prior.get(key) for key in fields):
             raise ContractError(f"change_supersession_target_mismatch:{did}")
-        if (
-            row.get("classification") == prior.get("classification")
-            or row.get("classification") not in {"impact", "no_impact", "out_of_scope"}
-        ):
+        if row.get("classification") == prior.get("classification") or row.get(
+            "classification"
+        ) not in {"impact", "no_impact", "out_of_scope"}:
             raise ContractError(f"change_supersession_classification_invalid:{did}")
         if row.get("evidence_ref") == prior.get("evidence_ref"):
             raise ContractError(f"change_supersession_evidence_not_new:{did}")
@@ -712,7 +716,9 @@ def _verify_git_evidence(
                 prior_source = next(
                     (
                         row
-                        for row in (request.get("previous_snapshot") or {}).get("sources", [])
+                        for row in (request.get("previous_snapshot") or {}).get(
+                            "sources", []
+                        )
                         if row.get("id") == sid
                     ),
                     None,
@@ -781,7 +787,9 @@ def _authorize_reclassifications(
         except Exception as exc:
             raise ContractError("change_approval_provider_unavailable") from exc
         if verified is not True:
-            raise ContractError(f"change_reclassification_approval_unverified:{row['id']}")
+            raise ContractError(
+                f"change_reclassification_approval_unverified:{row['id']}"
+            )
 
 
 def persist_snapshot(

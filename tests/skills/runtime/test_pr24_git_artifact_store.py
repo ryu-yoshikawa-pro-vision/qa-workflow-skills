@@ -488,9 +488,10 @@ class GitArtifactStoreTests(unittest.TestCase):
             )
             self.assertEqual(result["status"], "stored", result)
             self.assertEqual(result["analysis_status"], "complete")
-            self.assertEqual(snapshot["changes"][0]["after_revision"], prior[
-                "changes"
-            ][0]["after_revision"])
+            self.assertEqual(
+                snapshot["changes"][0]["after_revision"],
+                prior["changes"][0]["after_revision"],
+            )
             operation = result["revision"]
             previous_head = head
         stored = self.store.read_current(
@@ -603,12 +604,8 @@ class GitArtifactStoreTests(unittest.TestCase):
                 locator=locator,
             )
             snapshot["changes"].append(row)
-        evidence[0].update(
-            head_sha=new_first_head, previous_head_base_sha=first_head
-        )
-        evidence[1].update(
-            head_sha=new_other_head, previous_head_base_sha=other_head
-        )
+        evidence[0].update(head_sha=new_first_head, previous_head_base_sha=first_head)
+        evidence[1].update(head_sha=new_other_head, previous_head_base_sha=other_head)
         result = persist_snapshot(
             self.store,
             request,

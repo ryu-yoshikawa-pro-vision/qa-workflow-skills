@@ -543,9 +543,7 @@ class ArtifactStoreTests(unittest.TestCase):
         request = fixture()
         snapshot = request["snapshot"]
         snapshot["project_ref"] = "Sample"
-        snapshot["sources"][0].update(
-            kind="spec", ref="specification/checkout"
-        )
+        snapshot["sources"][0].update(kind="spec", ref="specification/checkout")
         first = persist_snapshot(
             self.store,
             request,
@@ -608,9 +606,9 @@ class ArtifactStoreTests(unittest.TestCase):
             blocked["reasons"],
         )
         self.assertEqual(
-            self.store.read_current(
-                "feature-inventory", "Sample", "feature-artifact"
-            )["revision"],
+            self.store.read_current("feature-inventory", "Sample", "feature-artifact")[
+                "revision"
+            ],
             first["revision"],
         )
         override["approval_revision"] = "policy-approved-v2"
