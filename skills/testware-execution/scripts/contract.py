@@ -120,15 +120,16 @@ def preflight(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _test_key(path: Any, title_path: Any) -> tuple[str, tuple[str, ...]]:
+def _test_key(
+    path: Any, title_path: Any, *, vitest_root: bool = False
+) -> tuple[str, tuple[str, ...]]:
     path = _relative(path)
     if not isinstance(title_path, list) or not title_path:
         raise ContractError("invalid_title_path")
-    # Vitest JSON includes an empty root name in ancestorTitles. It is
-    # structural, not a user-defined suite title. Do not accept empty names
-    # elsewhere: those would make distinct test identities ambiguous.
+    # Only the Vitest/Jest reporter may contain one structural empty root.
+    # Selected identities, Playwright and case-json may never drop empty titles.
     titles = list(title_path)
-    if titles and titles[0] == "":
+    if vitest_root and titles and titles[0] == "":
         titles.pop(0)
     if not titles:
         raise ContractError("invalid_title_path")
@@ -169,6 +170,8 @@ def reconcile_vitest(
     raw_ref: str,
     selection_verified: bool = False,
     repo_root: str | None = None,
+    project_name: str | None = None,
+    project_verified: bool = False,
 ) -> dict[str, Any]:
     """Compare an exact selected test population to Vitest JSON reporter output.
 
@@ -180,6 +183,21 @@ def reconcile_vitest(
         raise ContractError("empty_selected_test_set")
     if not isinstance(report, dict) or not isinstance(report.get("testResults"), list):
         raise ContractError("invalid_vitest_report")
+    if any(not isinstance(t, dict) for t in selected):
+        raise ContractError("invalid_selected_test")
+    named_projects = {t.get("project_name") for t in selected}
+    if any(name is not None for name in named_projects):
+        if (
+            len(named_projects) != 1
+            or project_name not in named_projects
+            or project_verified is not True
+        ):
+            # Vitest 4 JSON has no per-case project identifier. It is safe
+            # only for an independently verified single-project invocation.
+            raise ContractError("vitest_project_identity_unverified")
+        _required_str(project_name, "project_name")
+    elif project_name is not None:
+        raise ContractError("unexpected_vitest_project")
     wanted = Counter(_test_key(t.get("path"), t.get("title_path")) for t in selected)
     raw: list[dict[str, Any]] = []
     failed_suites_without_tests: list[str] = []
@@ -214,7 +232,9 @@ def reconcile_vitest(
                 case.get("ancestorTitles"), list
             ):
                 raise ContractError("invalid_report_assertion")
-            key = _test_key(path, [*case["ancestorTitles"], case.get("title")])
+            key = _test_key(
+                path, [*case["ancestorTitles"], case.get("title")], vitest_root=True
+            )
             status = case.get("status")
             if status not in {"passed", "failed", "pending", "todo", "disabled"}:
                 raise ContractError("unknown_vitest_status")
@@ -483,6 +503,18 @@ def reconcile_playwright(
     ):
         raise ContractError("invalid_playwright_report")
     _required_str(runner_version, "runner_version")
+    root_dir = report["config"].get("rootDir")
+    if repo_root is not None:
+        if not isinstance(root_dir, str) or not root_dir:
+            raise ContractError("playwright_root_dir_required")
+        normalized_root = _required_str(root_dir, "playwright_root_dir").replace(
+            "\\", "/"
+        ).rstrip("/")
+        # Check the root itself before combining with any untrusted spec.file.
+        if not (normalized_root.startswith("/") or PureWindowsPath(normalized_root).is_absolute()):
+            raise ContractError("invalid_playwright_root_dir")
+        if normalized_root != _required_str(repo_root, "repo_root").replace("\\", "/").rstrip("/"):
+            _report_path(normalized_root + "/__root_check__", repo_root)
     observed: list[dict[str, Any]] = []
 
     def visit(suite: dict[str, Any], parents: list[str], depth: int) -> None:
@@ -499,7 +531,13 @@ def reconcile_playwright(
         for spec in specs:
             if not isinstance(spec, dict) or not isinstance(spec.get("tests"), list):
                 raise ContractError("invalid_playwright_spec")
-            path = _report_path(spec.get("file"), repo_root)
+            file_path = _required_str(spec.get("file"), "playwright_file")
+            if repo_root is not None:
+                path = _report_path(
+                    normalized_root + "/" + _relative(file_path), repo_root
+                )
+            else:
+                path = _report_path(file_path, None)
             title_path = [*titles, _required_str(spec.get("title"), "spec_title")]
             for test in spec["tests"]:
                 if not isinstance(test, dict) or test.get("status") not in {

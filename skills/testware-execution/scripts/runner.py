@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import signal
@@ -22,6 +23,7 @@ from typing import Any
 from contract import (
     ContractError,
     _json_equal_strict,
+    _test_key,
     compare_direct,
     compare_metrics,
     diagnosis,
@@ -60,15 +62,23 @@ def _no_nonfinite_json_numbers(value: str) -> None:
     raise RunnerError("nonfinite_json_number")
 
 
+def _finite_json_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise RunnerError("nonfinite_json_number")
+    return number
+
+
 def _strict_json_loads(value: str | bytes) -> Any:
     return json.loads(
         value,
         object_pairs_hook=_no_duplicate_json_keys,
         parse_constant=_no_nonfinite_json_numbers,
+        parse_float=_finite_json_float,
     )
 
 
-def _argv(value: Any, name: str) -> list[str]:
+def _argv(value: Any, name: str, cwd: Path) -> list[str]:
     if (
         not isinstance(value, list)
         or not value
@@ -77,7 +87,16 @@ def _argv(value: Any, name: str) -> list[str]:
         raise RunnerError(f"invalid_{name}")
     if os.path.basename(value[0]) in {"sh", "bash", "cmd", "powershell", "pwsh"}:
         raise RunnerError("shell_interpreter_not_supported")
-    if shutil.which(value[0]) is None and not Path(value[0]).is_file():
+    executable = value[0]
+    if os.path.isabs(executable):
+        available = Path(executable).is_file()
+    elif "/" in executable or "\\" in executable:
+        # The subprocess runs with cwd=repo, not the caller's cwd.
+        candidate = (cwd / executable).resolve()
+        available = candidate.is_relative_to(cwd) and candidate.is_file()
+    else:
+        available = shutil.which(executable) is not None
+    if not available:
         raise RunnerError(f"runner_missing_{name}")
     return value
 
@@ -317,12 +336,17 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         raise RunnerError("repo_revision_changed")
     if not _git_clean(repo):
         raise RunnerError("repo_not_clean")
-    command = _argv(plan.get("argv"), "argv")
+    source_revision = scope["source_revision"]
+    if source_revision != expected_sha:
+        # This adapter executes a pinned checkout. External-source mappings
+        # require an authenticated identity bridge, which is not available.
+        raise RunnerError("source_revision_not_execution_revision")
+    command = _argv(plan.get("argv"), "argv", repo)
     if command != plan.get("reviewed_argv"):
         raise RunnerError("argv_not_reviewed")
     cleanup = plan.get("cleanup_argv")
     if cleanup is not None:
-        cleanup = _argv(cleanup, "cleanup")
+        cleanup = _argv(cleanup, "cleanup", repo)
         if cleanup != plan.get("reviewed_cleanup_argv"):
             raise RunnerError("cleanup_not_reviewed")
     if scope.get("side_effects") and cleanup is None:
@@ -407,8 +431,38 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     if reporter_format is not None:
         if plan.get("direct_tc") is True:
             raise RunnerError("reporter_not_supported_for_direct_tc")
-        if not isinstance(plan.get("selected"), list) or not plan["selected"]:
+        selected = plan.get("selected")
+        if not isinstance(selected, list) or not selected:
             raise RunnerError("selected_test_population_required")
+        identities = []
+        for item in selected:
+            if not isinstance(item, dict):
+                raise RunnerError("invalid_selected_test")
+            try:
+                identity = _test_key(item.get("path"), item.get("title_path"))
+            except ContractError as exc:
+                raise RunnerError("invalid_selected_test") from exc
+            project = item.get("project_name")
+            if project is not None and (
+                not isinstance(project, str) or not project.strip()
+            ):
+                raise RunnerError("invalid_selected_project")
+            identities.append((*identity, project or "default"))
+        if len(identities) != len(set(identities)):
+            raise RunnerError("duplicate_selected_test")
+        if reporter_format in {"vitest-json", "jest-json"}:
+            named = {item.get("project_name") for item in selected}
+            if any(name is not None for name in named):
+                if len(named) != 1 or None in named:
+                    raise RunnerError("vitest_multi_project_requires_separate_runs")
+                project_name = next(iter(named))
+                if not any(
+                    (arg == "--project" and index + 1 < len(command)
+                     and command[index + 1] == project_name)
+                    or arg == "--project=" + project_name
+                    for index, arg in enumerate(command)
+                ):
+                    raise RunnerError("vitest_project_filter_unverified")
         for field in (
             "testware_ref",
             "testware_revision",
@@ -505,8 +559,18 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             "selection_verified": True,
                         }
                         if reporter_format in {"vitest-json", "jest-json"}:
+                            named_projects = {
+                                item.get("project_name") for item in plan["selected"]
+                            }
+                            selected_project = (
+                                next(iter(named_projects))
+                                if None not in named_projects else None
+                            )
                             reconciliation = reconcile_vitest(
-                                **shared, repo_root=str(repo)
+                                **shared,
+                                repo_root=str(repo),
+                                project_name=selected_project,
+                                project_verified=selected_project is not None,
                             )
                             # A successful process with a missing global JSON
                             # status cannot attest an official Vitest/Jest result.
@@ -569,7 +633,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     run["result_collection"] = (
                         "complete"
                         if plan.get("direct_tc") is True
-                        and run["direct_comparison"]["result"] == "PASS"
+                        and all(
+                            item["observed"]
+                            for item in run["direct_comparison"]["details"]
+                        )
                         else "incomplete"
                     )
             if metric_criteria is not None:
@@ -759,7 +826,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         result["diagnosis"] = diagnostic
     if (
         result["direct_observation_verdict"] == "FAIL"
-        and outcome in {"runner_pass", "incomplete"}
+        and outcome in {"runner_pass", "runner_fail", "incomplete"}
         and last["return_code"] is not None
     ):
         result["outcome"] = "observed_FAIL"
