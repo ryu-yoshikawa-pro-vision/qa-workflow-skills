@@ -392,7 +392,9 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(len(artifact["attempts"]), 1)
         self.assertEqual(artifact["attempts"][0]["return_code"], 1)
-        self.assertEqual(artifact["attempts"][0]["result_collection"], "not_provided_by_adapter")
+        self.assertEqual(
+            artifact["attempts"][0]["result_collection"], "not_provided_by_adapter"
+        )
 
     def test_event_case_report_requires_complete_selected_population(self):
         report = {
