@@ -1345,6 +1345,10 @@ def verify_activity_against_run(
         return {"valid": False, "mismatches": ["run_or_activity_not_object"]}
     # 不正なRunを再投影して一致しただけでは、検証済みの実施義務として扱わない。
     run_issues = _run_contract_issues(run)
+    # 保存済みRunの代わりに、Activity・Baseline等のRun以外のartifactを受け入れない。
+    # `project_activity()`の簡略入力は対象外（この検証入口だけの条件）。
+    if run.get("artifact_type") != "run":
+        run_issues.append("run_artifact_required")
     if run.get("route_contract_version") != ROUTE_CONTRACT_VERSION:
         run_issues.append("run_not_contract_v2")
     if run_issues:

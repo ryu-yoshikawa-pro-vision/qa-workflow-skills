@@ -112,7 +112,7 @@
 | `references/data-contract.md`・`guidance.md`・`SKILL.md`・`assets/output-template.md`                       | route・義務・完了判定・旧形式互換の契約                                                                                                                      |
 | `scripts/skills/evals/deterministic/ASSERTIONS.md`                                                          | REG-D008／D009／D011／D015の説明                                                                                                                             |
 | `evals/output/cases/reg-out-003`〜`005`、`evals.json`                                                       | Run（manual＋testware＋補助）、Activity完了、必須補助未開始の負例                                                                                            |
-| `tests/skills/evals/deterministic/test_regression_routing.py`、`tests/skills/fixtures/regression-testware/` | 担当固有の局所テスト101件と、固定`qa-training-store`のVitest JSON形式fixture                                                                                 |
+| `tests/skills/evals/deterministic/test_regression_routing.py`、`tests/skills/fixtures/regression-testware/` | 担当固有の局所テスト111件と、固定`qa-training-store`のVitest JSON形式fixture                                                                                 |
 | `tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`                                         | 出力評価manifestのcase一覧にREG-OUT-003〜005を追加（既存テストの変更はこの1箇所のみ）                                                                        |
 
 公開契約の要点（詳細は`data-contract.md`）：
@@ -130,8 +130,8 @@
 
 | 検証                                                                                                                                                                         | 結果                                                                                                                                                                                       |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `unittest discover tests/skills/evals/deterministic`（391件）                                                                                                                | PASS（短縮形のTEMPで1件が環境要因で失敗するため、TEMPを長いパスにして実行）                                                                                                                |
-| `test_regression_routing.py`（101件）、`test_qa_artifact_graph_skills.py`（40件、Regression 18件を含む）                                                                     | PASS                                                                                                                                                                                       |
+| `unittest discover tests/skills/evals/deterministic`（401件）                                                                                                                | PASS（短縮形のTEMPで1件が環境要因で失敗するため、TEMPを長いパスにして実行）                                                                                                                |
+| `test_regression_routing.py`（111件）、`test_qa_artifact_graph_skills.py`（40件、Regression 18件を含む）                                                                     | PASS                                                                                                                                                                                       |
 | `scripts/skills/evals/deterministic/tests`（12件）、`tests/skills/evals/semantic`（13件、1 skip）、`tests/skills/evals/trigger`、`scripts/skills/evals/semantic/validate.py` | PASS                                                                                                                                                                                       |
 | `ruff format --check`／`ruff check`（変更したPython）、`dprint check`（変更したmd／json）、`git diff --check`                                                                | PASS                                                                                                                                                                                       |
 | `unittest discover tests/skills/runtime`（496件）                                                                                                                            | `test_ci_handoff`（6 FAIL）と`test_sqlite_workflow_history`（14 ERROR）が失敗。変更前HEAD（`git archive`）でも同数が失敗するためH差分と無関係（Windows環境起因）。Regression関連の失敗なし |
@@ -188,7 +188,7 @@ Aが`regression-testing`をworkflowのverifierへ登録するための入力（A
 
 ### GitHub Actions（HEAD `52de5b9`）
 
-残存不具合3件の修正commit `52de5b9`で、`Code Quality`・`Codex Harness`（codex-contract・windows-launcher）・`Validate Deterministic Output Evals`・`Validate Semantic Output Evals`・`Validate Agent Skills`の5本を個別に確認し、全てPASS（CodeRabbitはDraftのためスキップ）。この記録を追加するcommitは文書のみの変更で、そのHEADの結果はPR #30のChecksで確認する。履歴：`f25fb16`・`c13f82f`・`aea50bf`・`15bfae7`でも同じ5本がPASS。
+直前の修正commit `52de5b9`と`c0e170b`で、`Code Quality`・`Codex Harness`（codex-contract・windows-launcher）・`Validate Deterministic Output Evals`・`Validate Semantic Output Evals`・`Validate Agent Skills`の5本を個別に確認し、全てPASS（CodeRabbitはDraftのためスキップ）。今回のRun検証2件の修正commitの結果は、push後に確認してこの節へ追記する。履歴：`f25fb16`・`c13f82f`・`aea50bf`・`15bfae7`でも同じ5本がPASS。
 
 #### 履歴（HEAD `e134412`、`aea50bf`で同じ5本がPASS）
 
@@ -265,6 +265,23 @@ runtimeとvalidatorの判定の一致は、14種のscenario（完了・実行中
 修正後の結果：新規17件を含む`test_regression_routing.py`101件、`tests/skills/evals/deterministic`全体391件がPASS。既存テストは弱体化していない（v2 Runの件数が必須になったため、既存テスト内のv2 Runに`auxiliary_testware_count`を追記したのみ）。`reg-out-003`〜`005`のfixtureは件数・e2e参照ともに影響を受けず再生成は不要（e2e routeを含むv2 fixtureは無い。e2e routeの投影はテストで検証）。runtimeとvalidatorの判定一致は、ランダム6000件の比較とActivity・Runへ不正型を注入する8000件の変異ファジング（`validate`・`verify_activity_against_run`・`project_activity`で例外ゼロ）で再確認した（いずれもコミットしない確認）。
 
 互換性：旧形式（`route_contract_version`なし）のRun・Activityの読取・検証、保存済みの`完了`、manual・testwareのroute形式は変更していない。`route_results`のe2e routeに`e2e_testware_ref`が増えた。v2は未mergeで、保存済みの運用データは無い。この項目を持たないv2 Activityは、e2e routeがある場合にRun照合で不一致となる。PR #22への引継ぎ事項に変更はない。
+
+### Run検証の不整合2件（前回確認HEAD `c0e170b`）への対応
+
+最新HEAD（`c0e170b`、前回から変更なし）で2件とも再現してから修正した。新規テスト（`AuxiliaryRefsPresenceTests`・`RunArtifactTypeVerificationTests`、10件）は修正前のコードで失敗する（refs省略の正常系とartifact_type拒否の計13件のsubTest）ことを確認した。
+
+| # | 指摘                                                         | 修正前の再現                                                                                                                                                           | 原因と修正（関数）                                                                                                                                                                                                                                                                                                                                                            |
+| - | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 | `auxiliary_testware_refs`省略時にREG-D009と他経路が不一致    | 補助route 1件・count 1・refs省略のv2 Runで、`REG-D009`は`fail`、`REG-D018`は`pass`、`verify_activity_against_run()`は`valid: true`、`project_activity()`は`完了`だった | `_auxiliary_run_issues()`と`_auxiliary_count_issues()`がrefs省略を空配列として扱い集合・件数を比較していた。`validator.py`の2関数で、v2 Runはフィールドが存在する場合だけrefs一覧との集合・件数比較を行うよう変更し、`_run_contract_issues()`の個別処理（refs未宣言時の差し替えと`REG-D009`の問題の選別）を削除して規則を1か所に集約した。runtime側は既に同じ規則で、変更なし |
+| 2 | `verify_activity_against_run()`が`artifact_type`を検査しない | 正常なRunの`artifact_type`だけを`activity`・`baseline`・空文字・`None`・list・dict・未指定へ変えても`valid: true`だった（`REG-D018`は拒否）                            | runtimeのRun検証が`artifact_type`を見ていなかった。`regression_runtime.py::verify_activity_against_run()`に`run_artifact_required`を追加し、`valid: false`・`run_contract_invalid`を返す。`project_activity()`と`_run_contract_issues()`は変更せず、`artifact_type`を省略した簡略Runの投影は従来どおり                                                                        |
+
+refsの契約確認：`references/data-contract.md`とtemplateはrefs一覧を「必須」と明記しておらず、fixtureと`resolve_auxiliary_obligations()`は常にrefsを出力する。runtimeと`REG-D018`の実装・担当文書の既存規則（宣言しない場合は集合比較を行わない）が省略を許容しているため、仕様は変更せず`REG-D009`をこれに揃えた（`data-contract.md`へ明記）。省略と空配列は区別し、`[]`・`["B"]`・重複・`null`・文字列は失敗、省略時のcount `0`・`True`は失敗、補助route 0件・count 0は成功。この仕様は`REG-D009`・`REG-D018`・`verify_activity_against_run()`・`project_activity()`の4経路で同じ結果になる。旧形式（版なし）のRunは従来どおりrefsだけが根拠で、省略は空一覧として扱う。
+
+互換性：v2 Runでrefsを省略した入力は`REG-D009`でも通るようになる（緩和）。`artifact_type`が`run`でないRunを`verify_activity_against_run()`へ渡す呼び出しは拒否される（厳格化。保存済みRunは`artifact_type: "run"`を持つ。fixtureの`expected.json`のrunも該当）。旧形式のRun・Activity、`project_activity()`の簡略入力、完了済みActivityの不変性、fixtureの出力は変更していない。
+
+### CodeRabbit 16スレッドの再確認（HEAD `c0e170b`）
+
+16件すべてを、最新HEADのコードに対する挙動の再実行（コミットしない確認スクリプト）で確認し、いずれも成立しないことを確認した（16項目すべてOK）。上の対応表のコード根拠・テストと対応する。16スレッドはGitHub上ですべて未解決（`isResolved: false`）で、うち9件はoutdated。outdatedであることは解消の根拠にしていない。レビュー状態は`CHANGES_REQUESTED`のままで、これは現行コードの不具合の有無とは別の状態である。
 
 ### E／F／Gとの合意の状況
 

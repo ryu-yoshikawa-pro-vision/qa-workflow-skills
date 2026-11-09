@@ -118,7 +118,13 @@ def _auxiliary_run_issues(doc: dict[str, Any]) -> list[str]:
         ):
             issues.append(f"invalid_auxiliary_obligation:{ref}")
     ref_set = {ref for ref in refs if _text(ref)}
-    if v2 and (ref_set != seen or len(ref_set) != len(refs)):
+    # refs一覧は省略できる。フィールドが存在する場合だけ、補助routeとの集合一致と重複を検査する
+    # （省略と空配列は区別する）。
+    if (
+        v2
+        and "auxiliary_testware_refs" in doc
+        and (ref_set != seen or len(ref_set) != len(refs))
+    ):
         issues.append("auxiliary_refs_routes_mismatch")
     return issues
 
@@ -134,7 +140,9 @@ def _auxiliary_count_issues(doc: dict[str, Any], *, v2: bool) -> list[str]:
         return ["invalid_auxiliary_testware_count"]
     actual: list[int] = []
     refs = doc.get("auxiliary_testware_refs", [])
-    if isinstance(refs, list):
+    # v2 Runのrefs一覧は省略でき、省略時は`auxiliary_routes`の件数とだけ照合する。
+    # 旧形式はrefs一覧だけが補助の根拠であり、省略は空一覧として従来どおり扱う。
+    if isinstance(refs, list) and (not v2 or "auxiliary_testware_refs" in doc):
         actual.append(len(refs))
     entries = doc.get("auxiliary_routes", [])
     if v2 and isinstance(entries, list):
@@ -234,13 +242,7 @@ def _required_route_issues(routes: Any) -> list[str]:
 def _run_contract_issues(run: dict[str, Any]) -> list[str]:
     """保存済みRun自体の妥当性。不正なRunを正当な実施義務として受け入れない。"""
     issues = _required_route_issues(run.get("required_routes", []))
-    for issue in _auxiliary_run_issues(run):
-        # refs一覧を宣言していないRunでは、一覧と補助routeの一致は検査しない。
-        if issue == "auxiliary_refs_routes_mismatch" and (
-            "auxiliary_testware_refs" not in run
-        ):
-            continue
-        issues.append(issue)
+    issues += _auxiliary_run_issues(run)
     refs = run.get("auxiliary_testware_refs", [])
     if isinstance(refs, list):
         issues += [
@@ -249,11 +251,7 @@ def _run_contract_issues(run: dict[str, Any]) -> list[str]:
             if not _text(ref)
         ]
     if run.get("route_contract_version") == ROUTE_CONTRACT_VERSION:
-        # refs一覧を宣言していないv2 Runでは、auxiliary_routesの件数とだけ照合する。
-        declared = "auxiliary_testware_refs" in run
-        issues += _auxiliary_count_issues(
-            run if declared else {**run, "auxiliary_testware_refs": None}, v2=True
-        )
+        issues += _auxiliary_count_issues(run, v2=True)
     return issues
 
 

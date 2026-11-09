@@ -2361,6 +2361,180 @@ class AuxiliaryCountTests(unittest.TestCase):
         )
 
 
+class AuxiliaryRefsPresenceTests(unittest.TestCase):
+    """v2 Runの`auxiliary_testware_refs`は省略でき、省略と空配列は区別する。
+
+    REG-D009・REG-D018・runtimeのRun検証・project_activity()の判定は同じになる。
+    """
+
+    SOURCE = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+
+    def setUp(self):
+        self.run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        self.doc = activity_doc(self.run, self.SOURCE)
+        self.assertEqual(self.doc["activity_state"], "完了")
+
+    def variant(self, **changes):
+        run = copy.deepcopy(self.run)
+        for key, value in changes.items():
+            if value is ...:
+                run.pop(key, None)
+            else:
+                run[key] = value
+        return run
+
+    def paths(self, run, doc=None):
+        doc = doc or self.doc
+        return {
+            "d009": check_with_run(run, "REG-D009"),
+            "d018": check_with_run(doc, "REG-D018", run),
+            "verify": regression.verify_activity_against_run(run, doc)["valid"],
+            "complete": regression.project_activity(run, self.SOURCE)["activity_state"]
+            == "完了",
+        }
+
+    OK = {"d009": "pass", "d018": "pass", "verify": True, "complete": True}
+    NG = {"d009": "fail", "d018": "fail", "verify": False, "complete": False}
+
+    def test_omitted_refs_are_accepted_by_every_path(self):
+        self.assertEqual(self.paths(self.variant(auxiliary_testware_refs=...)), self.OK)
+        self.assertEqual(
+            self.paths(self.variant(auxiliary_testware_refs=["A"])), self.OK
+        )
+
+    def test_declared_refs_must_match_the_routes_exactly(self):
+        for name, refs in (
+            ("empty", []),
+            ("other", ["B"]),
+            ("duplicate", ["A", "A"]),
+            ("extra", ["A", "B"]),
+            ("null", None),
+            ("string", "A"),
+            ("dict", {"A": 1}),
+            ("nested", [["A"]]),
+        ):
+            with self.subTest(refs=name):
+                self.assertEqual(
+                    self.paths(self.variant(auxiliary_testware_refs=refs)), self.NG
+                )
+
+    def test_omitted_refs_still_require_a_strict_count(self):
+        for count in (0, 2, -1, True, "1", 1.0, None):
+            with self.subTest(count=count):
+                run = self.variant(
+                    auxiliary_testware_refs=..., auxiliary_testware_count=count
+                )
+                self.assertEqual(self.paths(run), self.NG)
+        self.assertEqual(
+            self.paths(
+                self.variant(auxiliary_testware_refs=..., auxiliary_testware_count=1)
+            ),
+            self.OK,
+        )
+
+    def test_omitted_refs_do_not_skip_route_validation(self):
+        bad = copy.deepcopy(self.run)
+        del bad["auxiliary_testware_refs"]
+        bad["auxiliary_routes"][0]["executor_owner"] = ["x"]
+        self.assertEqual(self.paths(bad), self.NG)
+
+    def test_zero_auxiliary_routes_with_zero_count(self):
+        run = mk_run([tc_route("TC-1", "M-1", "manual")])
+        doc = activity_doc(run, {"M-1": started("PASS")})
+        for refs in (..., []):
+            with self.subTest(refs=refs):
+                candidate = {
+                    k: v for k, v in run.items() if k != "auxiliary_testware_refs"
+                }
+                if refs is not ...:
+                    candidate["auxiliary_testware_refs"] = refs
+                self.assertEqual(self.paths(candidate, doc)["d009"], "pass")
+                self.assertEqual(check_with_run(doc, "REG-D018", candidate), "pass")
+                self.assertTrue(
+                    regression.verify_activity_against_run(candidate, doc)["valid"]
+                )
+
+    def test_legacy_run_keeps_the_previous_refs_rule(self):
+        # 旧形式（版なし）はrefs一覧だけが補助の根拠で、省略は空一覧として扱う。
+        legacy = {
+            "artifact_type": "run",
+            "run_scope": "selected",
+            "suite_complete": False,
+            "baseline": {"member_tc_refs": ["TC-1"]},
+            "selected_tc_refs": ["TC-1"],
+            "required_routes": [],
+            "auxiliary_testware_count": 1,
+        }
+        self.assertEqual(check_with_run(legacy, "REG-D009"), "fail")
+        legacy["auxiliary_testware_refs"] = ["OLD"]
+        self.assertEqual(check_with_run(legacy, "REG-D009"), "pass")
+
+
+class RunArtifactTypeVerificationTests(unittest.TestCase):
+    """保存済みRunの代わりに、Run以外のartifactを受け入れない。"""
+
+    def setUp(self):
+        self.run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        self.source = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+        self.doc = activity_doc(self.run, self.source)
+
+    def test_only_run_artifact_type_is_accepted(self):
+        for value in ("activity", "baseline", "", None, [], {}, 5, True, "Run", ...):
+            with self.subTest(artifact_type=value):
+                run = copy.deepcopy(self.run)
+                if value is ...:
+                    del run["artifact_type"]
+                else:
+                    run["artifact_type"] = value
+                result = regression.verify_activity_against_run(run, self.doc)
+                self.assertFalse(result["valid"])
+                self.assertEqual(result["mismatches"], ["run_contract_invalid"])
+                self.assertIn("run_artifact_required", result["run_issues"])
+                self.assertEqual(check_with_run(self.doc, "REG-D018", run), "fail")
+        valid = regression.verify_activity_against_run(self.run, self.doc)
+        self.assertEqual(valid, {"valid": True, "mismatches": []})
+        self.assertEqual(check_with_run(self.doc, "REG-D018", self.run), "pass")
+
+    def test_non_object_runs_fail_without_raising(self):
+        for bad in (None, [], "run", 5, [self.run]):
+            with self.subTest(run=bad):
+                self.assertFalse(
+                    regression.verify_activity_against_run(bad, self.doc)["valid"]
+                )
+                self.assertEqual(check_with_run(self.doc, "REG-D018", bad), "fail")
+
+    def test_project_activity_keeps_accepting_simplified_runs(self):
+        # 投影helperは保存済みRunの検証入口ではなく、artifact_type省略の簡略Runも従来どおり。
+        simple = {"required_routes": [tc_route("TC-1", "M-1", "manual")]}
+        self.assertEqual(
+            regression.project_activity(simple, {"M-1": started("PASS")})[
+                "activity_state"
+            ],
+            "完了",
+        )
+        no_type = {k: v for k, v in self.run.items() if k != "artifact_type"}
+        self.assertEqual(
+            regression.project_activity(no_type, self.source)["activity_state"], "完了"
+        )
+        # 同じRunをArtifactとして照合する入口では拒否する。
+        self.assertFalse(
+            regression.verify_activity_against_run(no_type, self.doc)["valid"]
+        )
+
+    def test_valid_run_results_are_unchanged(self):
+        # route集合・状態・件数の照合は従来どおり働く。
+        forged = {**self.doc, "activity_state": "実行中"}
+        self.assertFalse(
+            regression.verify_activity_against_run(self.run, forged)["valid"]
+        )
+        legacy = {
+            "artifact_type": "activity",
+            "activity_state": "完了",
+            "route_results": [],
+        }
+        self.assertEqual(check_with_run(legacy, "REG-D018"), "pass")
+
+
 class SemanticCandidateShapeTests(unittest.TestCase):
     """意味評価の候補が保存するActivityは、正規のkey付きobject形を使う。
 
