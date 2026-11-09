@@ -348,11 +348,15 @@ class ActualRunnerTests(unittest.TestCase):
             "config_ref": "fixture-config",
             "expected_paths": ["README.md"],
         }
-        plan["argv"] = [
-            sys.executable,
-            "-c",
-            "print('{\\\"findings_count\\\":0,\\\"analyzed_paths\\\":[\\\"README.md\\\"],\\\"skipped_paths\\\":[],\\\"tool_version\\\":\\\"0.1\\\",\\\"rules_ref\\\":\\\"fixture-rule\\\",\\\"config_ref\\\":\\\"fixture-config\\\"}')",
-        ]
+        raw = {
+            "findings_count": 0,
+            "analyzed_paths": ["README.md"],
+            "skipped_paths": [],
+            "tool_version": "0.1",
+            "rules_ref": "fixture-rule",
+            "config_ref": "fixture-config",
+        }
+        plan["argv"] = [sys.executable, "-c", "print(" + repr(json.dumps(raw)) + ")"]
         plan["reviewed_argv"] = plan["argv"]
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 0)
