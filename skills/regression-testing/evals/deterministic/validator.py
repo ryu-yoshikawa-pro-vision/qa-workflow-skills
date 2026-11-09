@@ -135,12 +135,17 @@ def _in(value: Any, allowed: set[str]) -> bool:
     return isinstance(value, str) and value in allowed
 
 
+# TC付きtestware routeの選定情報（testware_ref・executor_owner・selection_basis）も
+# 識別子に含める。manual・e2e routeはこれらを持たず、双方Noneとして比較される。
 _ROUTE_IDENTITY = (
     "tc_ref",
     "route_ref",
     "route_type",
     "execution_ref",
     "implementation_revision",
+    "testware_ref",
+    "executor_owner",
+    "selection_basis",
 )
 _AUXILIARY_IDENTITY = (
     "testware_ref",
@@ -152,17 +157,210 @@ _AUXILIARY_IDENTITY = (
 )
 
 
+def _identity_key(entry: dict[str, Any], fields: tuple[str, ...]) -> str:
+    values = [entry.get(field) for field in fields]
+    try:
+        return json.dumps(values, ensure_ascii=False, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        # 比較不能な値は例外にせず、文字列表現で別の識別子として扱う。
+        return repr(values)
+
+
 def _identity_counts(entries: list[dict[str, Any]], fields: tuple[str, ...]):
     counts: dict[str, int] = {}
     for entry in entries:
-        key = json.dumps(
-            [entry.get(field) for field in fields],
-            ensure_ascii=False,
-            sort_keys=True,
-            default=str,
-        )
+        key = _identity_key(entry, fields)
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def _required_route_issues(routes: Any) -> list[str]:
+    """Runのrequired routeの妥当性。D008とD018が同じ規則を使う。"""
+    if not isinstance(routes, list) or not all(isinstance(r, dict) for r in routes):
+        return ["required_routes_not_list_of_objects"]
+    issues: list[str] = []
+    seen: set[str] = set()
+    for route in routes:
+        kind = route.get("route_type")
+        tc_ref = route.get("tc_ref")
+        route_ref = route.get("route_ref")
+        if not _in(kind, {"manual", "e2e", "testware"}):
+            issues.append(f"invalid_required_route_type:{tc_ref}")
+        if not _text(tc_ref) or not _text(route_ref):
+            issues.append("missing_tc_or_route_ref")
+        if kind == "e2e" and not route.get("e2e_testware_ref"):
+            issues.append(f"missing_e2e_testware_ref:{tc_ref}")
+        if kind == "testware" and (
+            not _text(route.get("testware_ref"))
+            or route.get("executor_owner") != "testware-execution"
+            or not _text(route.get("implementation_revision"))
+            or not _text(route.get("selection_basis"))
+        ):
+            issues.append(f"invalid_testware_route:{tc_ref}")
+        execution_ref = route.get("execution_ref")
+        if execution_ref is not None and not _text(execution_ref):
+            issues.append(f"invalid_execution_ref:{route_ref}")
+        key = f"{tc_ref}|{route_ref}"
+        if key in seen:
+            issues.append(f"duplicate_required_route:{key}")
+        seen.add(key)
+    return issues
+
+
+def _run_contract_issues(run: dict[str, Any]) -> list[str]:
+    """保存済みRun自体の妥当性。不正なRunを正当な実施義務として受け入れない。"""
+    issues = _required_route_issues(run.get("required_routes", []))
+    for issue in _auxiliary_run_issues(run):
+        # refs一覧を宣言していないRunでは、一覧と補助routeの一致は検査しない。
+        if issue == "auxiliary_refs_routes_mismatch" and (
+            "auxiliary_testware_refs" not in run
+        ):
+            continue
+        issues.append(issue)
+    refs = run.get("auxiliary_testware_refs", [])
+    if isinstance(refs, list):
+        issues += [
+            f"invalid_auxiliary_testware_ref:{index}"
+            for index, ref in enumerate(refs)
+            if not _text(ref)
+        ]
+    return issues
+
+
+def _start_flags(
+    execution: dict[str, Any], declared: Any, *, require_revision: bool
+) -> tuple[bool, bool]:
+    """(sourceが開始済みと申告, 宣言revisionの確認を含めた実開始)を返す。"""
+    raw = (
+        execution.get("start_state") == "開始済み"
+        and execution.get("actual_start_confirmed") is True
+    )
+    return raw, _source_started(execution, declared, require_revision=require_revision)
+
+
+def _derive_activity_state(
+    routes: list[dict[str, Any]],
+    auxiliary: list[dict[str, Any]],
+    source: dict[str, Any],
+    cleanup: Any,
+    *,
+    unresolved: bool,
+) -> str:
+    """route・補助route・owner sourceからActivity状態を独立に再計算する。
+
+    Activityが申告した`executed`・`blocked`・件数・状態は使わず、識別子（route種別・
+    execution_ref・revision・実施義務）とownerのsourceだけから導く。`unresolved`は、
+    Activityが申告した未解決項目の有無か、呼び出し側が確認したRun自体の不正の有無。
+    """
+    tc_exec_refs = {
+        r.get("execution_ref") for r in routes if _text(r.get("execution_ref"))
+    }
+    seen: set[str] = set()
+    # TCごとに(実開始, blocked, 結果確定・投影済み)のrouteを集める。
+    by_tc: dict[str, list[tuple[bool, bool, bool]]] = {}
+    started_cleanups: list[Any] = []
+    route_executed = 0
+    for route in routes:
+        key = f"{route.get('tc_ref')}|{route.get('route_ref')}"
+        if (
+            key in seen
+            or not _in(route.get("route_type"), {"manual", "e2e", "testware"})
+            or not _text(route.get("tc_ref"))
+            or not _text(route.get("route_ref"))
+        ):
+            unresolved = True
+        seen.add(key)
+        execution = _execution(source, route.get("execution_ref"))
+        testware = route.get("route_type") == "testware"
+        raw_started, executed = _start_flags(
+            execution, route.get("implementation_revision"), require_revision=testware
+        )
+        if raw_started and not executed:
+            unresolved = True
+        blocked = not executed and (execution.get("blocked") is True or raw_started)
+        done = bool(
+            execution.get("result_finalized") is True
+            and _text(execution.get("source_result"))
+            and (
+                not testware
+                or (
+                    execution.get("raw_capture_complete") is True
+                    and _text(execution.get("attempt_ref"))
+                )
+            )
+        )
+        by_tc.setdefault(str(route.get("tc_ref")), []).append((executed, blocked, done))
+        if executed:
+            route_executed += 1
+            started_cleanups.append(
+                execution.get("cleanup_status", "未確認" if testware else "対象なし")
+            )
+    tc_states = [
+        "executed"
+        if all(executed for executed, _, _ in items)
+        else ("blocked" if any(blocked for _, blocked, _ in items) else "unexecuted")
+        for items in by_tc.values()
+    ]
+    # 実施義務のある補助だけを状態判定へ使う: (実開始, blocked, 完了)。
+    required_aux: list[tuple[bool, bool, bool]] = []
+    seen_aux: set[str] = set()
+    for item in auxiliary:
+        ref = item.get("testware_ref")
+        if (
+            not _text(ref)
+            or ref in seen_aux
+            or type(item.get("completion_required")) is not bool
+        ):
+            unresolved = True
+        seen_aux.add(str(ref))
+        execution = _execution(source, item.get("execution_ref"))
+        required = item.get("completion_required") is True
+        raw_started, executed = _start_flags(
+            execution, item.get("implementation_revision"), require_revision=required
+        )
+        shared = _text(item.get("execution_ref")) and (
+            item["execution_ref"] in tc_exec_refs
+        )
+        if shared or (raw_started and not executed):
+            unresolved = True
+        executed = executed and not shared
+        if executed:
+            started_cleanups.append(execution.get("cleanup_status", "未確認"))
+        if required:
+            blocked = not executed and (
+                execution.get("blocked") is True or shared or raw_started
+            )
+            completed = bool(
+                executed
+                and execution.get("result_finalized") is True
+                and _text(execution.get("source_result"))
+                and execution.get("raw_capture_complete") is True
+                and _text(execution.get("attempt_ref"))
+                and _in(execution.get("cleanup_status", "未確認"), CLEANUP_CLOSED)
+            )
+            required_aux.append((executed, blocked, completed))
+    started_units = route_executed + sum(executed for executed, _, _ in required_aux)
+    bad_cleanup = any(
+        not _in(value, CLEANUP_CLOSED) for value in [cleanup, *started_cleanups]
+    )
+    blocked_state = "部分完了（ブロック中あり）" if started_units else "ブロック中"
+    if bad_cleanup or unresolved:
+        return blocked_state
+    if any(state != "executed" for state in tc_states) or any(
+        not executed for executed, _, _ in required_aux
+    ):
+        if (
+            not routes
+            and not started_units
+            and not any(blocked for _, blocked, _ in required_aux)
+        ):
+            return "未開始"
+        return blocked_state
+    if any(not done for items in by_tc.values() for _, _, done in items) or any(
+        not completed for _, _, completed in required_aux
+    ):
+        return "実行中"
+    return "完了" if routes or required_aux else "未開始"
 
 
 def validate_activity_against_run(
@@ -196,8 +394,18 @@ def validate_activity_against_run(
             issues.append({"issue": f"{name}_not_list_of_objects"})
     if issues and any(i["issue"].endswith("_not_list_of_objects") for i in issues):
         return issues
+    # 保存済みRun自体が不正（未知のroute種別・識別子欠落・不正なowner等）なら、
+    # 再投影が一致しても正当な実施義務としては受け入れない。
+    run_issues = _run_contract_issues(run)
+    if run_issues:
+        issues.append({"issue": "run_contract_invalid", "detail": run_issues})
     run_refs = run.get("auxiliary_testware_refs", [])
-    covered = {e.get("testware_ref") for e in shapes["run_auxiliary_routes"]}
+    # 不正な補助ref（list・dict等）は集合へ入れず、上のRun不正として報告済みとする。
+    covered = {
+        e["testware_ref"]
+        for e in shapes["run_auxiliary_routes"]
+        if _text(e.get("testware_ref"))
+    }
     # 旧形式のref（義務不明）もRunの補助として扱い、Activityが落とせないようにする。
     legacy_refs = [
         {"testware_ref": ref}
@@ -231,6 +439,24 @@ def validate_activity_against_run(
                 issues.append({"issue": f"{kind}_not_in_run", "identity": key})
         if any(c > 1 for c in [*expected_counts.values(), *actual_counts.values()]):
             issues.append({"issue": f"{kind}_duplicate"})
+    # Activity状態は、Runのrouteと実施義務・activityのowner sourceだけから再計算する。
+    source = activity.get("source_executions", {})
+    source = source if isinstance(source, dict) else {}
+    expected_state = _derive_activity_state(
+        shapes["run_required_routes"],
+        [*shapes["run_auxiliary_routes"], *legacy_refs],
+        source,
+        activity.get("cleanup_status"),
+        unresolved=bool(run_issues) or bool(activity.get("unresolved")),
+    )
+    if activity.get("activity_state") != expected_state:
+        issues.append(
+            {
+                "issue": "activity_state_mismatch",
+                "expected": expected_state,
+                "actual": activity.get("activity_state"),
+            }
+        )
     return issues
 
 
@@ -512,35 +738,12 @@ def validate(
             if refs_valid
             else "invalid_tc_ref_list",
         )
-        routes = doc.get("required_routes", [])
-        if not isinstance(routes, list) or not all(
-            isinstance(route, dict) for route in routes
-        ):
-            routes = []
-            invalid_shape = True
-        else:
-            invalid_shape = False
-        invalid = [
-            route
-            for route in routes
-            if not _in(route.get("route_type"), {"manual", "e2e", "testware"})
-            or (route.get("route_type") == "e2e" and not route.get("e2e_testware_ref"))
-            or (
-                route.get("route_type") == "testware"
-                and (
-                    not _text(route.get("testware_ref"))
-                    or route.get("executor_owner") != "testware-execution"
-                    or not _text(route.get("implementation_revision"))
-                    or not _text(route.get("selection_basis"))
-                )
-            )
-        ]
+        route_issues = _required_route_issues(doc.get("required_routes", []))
         result.add(
             "REG-D008",
-            not invalid and not invalid_shape,
+            not route_issues,
             "required routeをmanual・concrete E2E testware ref・実行owner / 実装revision付きtestwareで表すこと",
-            evidence=invalid
-            or (["required_routes_not_list_of_objects"] if invalid_shape else None),
+            evidence=route_issues or None,
         )
         auxiliary_issues = _auxiliary_run_issues(doc)
         result.add(
@@ -591,6 +794,19 @@ def validate(
                 source_mismatches.append(
                     {"tc_ref": tc_ref, "route_ref": route.get("route_ref")}
                 )
+            if v2:
+                raw_started, _ = _start_flags(
+                    execution,
+                    route.get("implementation_revision"),
+                    require_revision=is_testware,
+                )
+                expected_blocked = not actual_started and (
+                    execution.get("blocked") is True or raw_started
+                )
+                if route.get("blocked") is not expected_blocked:
+                    source_mismatches.append(
+                        {"tc_ref": tc_ref, "issue": "blocked_not_projected"}
+                    )
             if route.get("source_result") != execution.get("source_result"):
                 source_mismatches.append(
                     {"tc_ref": tc_ref, "issue": "source_result_reinterpreted"}
@@ -605,6 +821,15 @@ def validate(
                     }
                 )
             if v2 and is_testware:
+                # testware routeはRunの選定情報（testware・owner・選定根拠）を保持する。
+                if (
+                    not _text(route.get("testware_ref"))
+                    or route.get("executor_owner") != "testware-execution"
+                    or not _text(route.get("selection_basis"))
+                ):
+                    source_mismatches.append(
+                        {"tc_ref": tc_ref, "issue": "testware_selection_missing"}
+                    )
                 # testware routeはattempt・raw取得・cleanupもownerのsourceから投影する。
                 for field, value in (
                     ("attempt_ref", execution.get("attempt_ref")),
@@ -767,10 +992,24 @@ def validate(
                 and _in(cleanup, CLEANUP_CLOSED)
                 and not doc.get("unresolved")
             )
+        state_evidence: dict[str, Any] | None = None
+        if v2:
+            # 申告された状態は、sourceから独立に再計算した状態と一致しなければならない。
+            # 完了以外の状態でも、実際は完了済みのActivityを実行中等へ改ざんできない。
+            derived_state = _derive_activity_state(
+                routes,
+                auxiliary,
+                source,
+                cleanup,
+                unresolved=bool(doc.get("unresolved")) or bool(shape_issues),
+            )
+            state_evidence = {"expected": derived_state, "actual": expected_state}
+            completion_valid = completion_valid and derived_state == expected_state
         result.add(
             "REG-D011",
             completion_valid,
-            "required TC routeと実施義務のある補助routeの実開始・owner result確定・raw結果投影・cleanup・義務不明なしをsourceから確認できない限りActivityを完了にしないこと",
+            "required TC routeと実施義務のある補助routeの実開始・owner result確定・raw結果投影・cleanup・義務不明なしをsourceから確認できない限りActivityを完了にせず、申告された状態がsourceから再計算した状態と一致すること",
+            evidence=state_evidence,
         )
         result.add(
             "REG-D012",
@@ -803,13 +1042,20 @@ def validate(
                     aux_issues.append(
                         {"testware_ref": ref, "issue": "execution_shared_with_tc"}
                     )
+                raw_started, base_executed = _start_flags(
+                    execution,
+                    item.get("implementation_revision"),
+                    require_revision=item.get("completion_required") is True,
+                )
+                aux_executed = base_executed and not shared_with_tc(item)
                 expected_projection = {
-                    "executed": _source_started(
-                        execution,
-                        item.get("implementation_revision"),
-                        require_revision=item.get("completion_required") is True,
-                    )
-                    and not shared_with_tc(item),
+                    "executed": aux_executed,
+                    "blocked": not aux_executed
+                    and (
+                        execution.get("blocked") is True
+                        or shared_with_tc(item)
+                        or raw_started
+                    ),
                     "result_finalized": execution.get("result_finalized") is True,
                     "raw_capture_complete": execution.get("raw_capture_complete")
                     is True,

@@ -73,6 +73,9 @@
       "evidence_refs": [],
       "executed": true,
       "blocked": false,
+      "testware_ref": "vitest:tests/unit/password-hasher.test.ts",
+      "executor_owner": "testware-execution",
+      "selection_basis": "tests/unit/password-hasher.test.ts",
       "attempt_ref": "attempt-t2",
       "raw_capture_complete": true
     }

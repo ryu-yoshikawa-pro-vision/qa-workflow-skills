@@ -57,7 +57,7 @@ TCに対応する非E2Eの自動／runner実行は、`required_routes`へ`route_
 
 同じTCに複数routeがある場合、全routeの実開始・結果確定・cleanupを照合します。別TCや補助testwareのPASSで未実行TCを完了にしません。
 
-`testware` routeのsource executionは、補助と同じ`testware-execution`の契約で`attempt_ref`・`raw_capture_complete`・`cleanup_status`・`implementation_revision`を返します。Activityの`route_results`（`testware` routeのみ）はこれらをそのまま投影し、次の場合は`完了`にしません。
+`testware` routeのsource executionは、補助と同じ`testware-execution`の契約で`attempt_ref`・`raw_capture_complete`・`cleanup_status`・`implementation_revision`を返します。Activityの`route_results`（`testware` routeのみ）はこれらに加え、Runの選定情報`testware_ref`・`executor_owner`・`selection_basis`もそのまま投影し（`manual` / `e2e`のrouteには追加しません）、次の場合は`完了`にしません。
 
 - `cleanup_status`が無い・`未確認` / `失敗` / `一部失敗` / `進行中`などの未終了状態: 未確認として扱い、`対象なし`へ読み替えません。完了に使えるのは`成功` / `対象なし` / `意図的に残した状態`だけです。
 - `attempt_ref`が空、または`raw_capture_complete`が`true`でない: `実行中`のままです。
@@ -105,6 +105,9 @@ Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-te
       "route_ref": "testware:TC-1",
       "route_type": "testware",
       "execution_ref": "EXEC-T-1",
+      "testware_ref": "<Runの値>",
+      "executor_owner": "testware-execution",
+      "selection_basis": "<Runの値>",
       "executed": true
     }
   ],
@@ -125,15 +128,16 @@ Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-te
 
 Activityの`route_results` / `auxiliary_route_results`・`completion_required`・件数は、Activity自身の申告であり、それだけでは検証済みになりません。保存済みRunを正本として、次を照合します。
 
-- Runの`required_routes`と`auxiliary_routes`（旧形式の`auxiliary_testware_refs`のrefを含む）の各entryが、Activityに欠落・追加・重複なく現れること。
+- **Run自体が有効であること**。未知の`route_type`、`tc_ref` / `route_ref`の欠落、`e2e`の具体的testware ref欠落、`testware` routeの`testware_ref` / `executor_owner`（`testware-execution`）/ `implementation_revision` / `selection_basis`の欠落・不正、不正な`execution_ref`、重複route、不正な補助entryや補助refを含むRunは、再投影がActivityと一致しても正当な実施義務として受け入れません（`REG-D008`と同じ規則を`REG-D018`が再利用します）。`route_contract_version`が無い旧Runでは、この検査のうち版に関する項目だけを免除します。
+- Runの`required_routes`と`auxiliary_routes`（旧形式の`auxiliary_testware_refs`のrefを含む）の各entryが、Activityに欠落・追加・重複なく現れること。TC付き`testware` routeでは`testware_ref`・`executor_owner`・`selection_basis`も識別子として比較し、`route_ref`・`execution_ref`・revisionを維持したまま選定情報だけを変更した場合も不一致です。
 - 各補助の`completion_required`・`selection_basis`・`executor_owner`・`implementation_revision`・`execution_ref`がRunの値と一致すること。Activity側で必須補助を削除したり`completion_required`を変更したりした場合は不一致です。
-- Run由来のsourceから導出した状態・件数と一致すること。
+- `activity_state`が、Runのrouteと実施義務・Activityのowner `source_executions`だけから独立に再計算した状態と一致すること。Activityの`executed` / `blocked` / 件数 / 申告状態は再計算に使いません。実際は完了済みのActivityを`実行中`等へ変更した場合も、未開始・blocked・結果未確定のActivityを別状態へ変更した場合も不一致です（`REG-D011`はRun無しでもActivity内のrouteとsourceから同じ再計算を行い、`REG-D018`はRunから行います）。旧形式のActivityは状態を再計算しません。
 
 入口は`validator.py`の`validate_activity_against_run(activity, run)`と、決定論的評価の`REG-D018`（`validate(text, expected, eval_id, run=...)`の`run`引数、またはfixtureの`expected.json`の`run`）です。runtimeでは`regression_runtime.py::verify_activity_against_run(run, activity)`が、Runから`project_activity()`で再計算した投影とActivityを比較します。Runを渡せない経路では、`v2` Activityの`完了`の主張を`REG-D018`で失敗とし、それ以外の状態は警告にとどめます（Run照合済みとは扱いません）。旧形式のActivityは対象外です。保存・承認・条件付き更新による実際のRun取得は担当Aの共通契約に従い、PR #22で結合します。
 
 ## 不正入力の扱い
 
-`execution_ref`・`testware_ref`・route配列・source等の型が不正（配列・object・空文字・非list）でも、検証は例外で中断しません。`validate_required_routes()` / `validate_auxiliary_routes()`は`valid: false`と`issues`を返し、`project_activity()`は`invalid_execution_ref:<ref>`・`invalid_required_route:<index>`・`source_executions_not_object`・`duplicate_required_route:<key>`等を`unresolved`へ追加して`完了`にしません。`select_auxiliary_testware()`は`invalid_refs`を持つ`unresolved`を返し、決定論的validatorは不正型を失敗として扱います。
+`execution_ref`・`testware_ref`・route配列・source等の型が不正（配列・object・空文字・非list）でも、検証は例外で中断しません。`validate_required_routes()` / `validate_auxiliary_routes()`は`valid: false`と`issues`を返し、`project_activity()`は`invalid_execution_ref:<ref>`・`invalid_required_route:<index>`・`invalid_required_route_type:<tc_ref>`・`unsupported_route_contract_version`・`source_executions_not_object`・`duplicate_required_route:<key>`等を`unresolved`へ追加して`完了`にします。`project_activity()`は、同じ検証（`validate_required_routes()` / `validate_auxiliary_routes()`）でRun自体の不正を確認してから状態を導くため、未知のroute種別を含むRunは`完了`になりません。`verify_activity_against_run()`は不正なRunを`run_contract_invalid`として`valid: false`にします。`REG-D018`は不正なRun・補助refを集合へ入れる前に型を確認して失敗とし（黙って除去しません）、例外で中断しません。`select_auxiliary_testware()`は`invalid_refs`を持つ`unresolved`を返し、決定論的validatorは不正型を失敗として扱います。
 
 ## Activity完了判定
 

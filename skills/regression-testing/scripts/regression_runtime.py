@@ -972,6 +972,60 @@ def _revision_issue(ref: Any, declared: Any) -> str:
     return f"implementation_revision_{kind}:{ref}"
 
 
+def _run_contract_issues(run: Any) -> list[str]:
+    """Runそのものの妥当性を、既存のroute検証を再利用して確認する。
+
+    不正なroute種別・必須識別子の欠落・不正なowner／revision／選定根拠・補助refの
+    型不正を含むRunは、Activity投影の入力として正当な実施義務とは扱わない。
+    `route_contract_version`が無い旧Runは読取互換のため版の検査だけを免除する。
+    """
+    if not isinstance(run, dict):
+        return ["run_not_object"]
+    issues: list[str] = []
+    if (
+        "route_contract_version" in run
+        and run.get("route_contract_version") != ROUTE_CONTRACT_VERSION
+    ):
+        issues.append("unsupported_route_contract_version")
+    routes = run.get("required_routes", [])
+    issues += validate_required_routes(routes)["issues"]
+    tc_testware = [
+        route.get("testware_ref")
+        for route in _list_of(routes)
+        if isinstance(route, dict) and route.get("route_type") == "testware"
+    ]
+    entries = run.get("auxiliary_routes", [])
+    issues += validate_auxiliary_routes(entries, tc_testware_refs=tc_testware)["issues"]
+    refs = run.get("auxiliary_testware_refs", [])
+    if not isinstance(refs, list):
+        issues.append("auxiliary_testware_refs_not_list")
+    else:
+        issues += [
+            f"invalid_auxiliary_testware_ref:{index}"
+            for index, ref in enumerate(refs)
+            if not _text(ref)
+        ]
+        # refsを宣言したv2 Runは、補助routeの集合と一致しなければならない（宣言が無い場合は検査しない）。
+        if (
+            run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
+            and "auxiliary_testware_refs" in run
+            and isinstance(entries, list)
+        ):
+            listed = {
+                e.get("testware_ref")
+                for e in entries
+                if isinstance(e, dict) and _text(e.get("testware_ref"))
+            }
+            text_refs = [ref for ref in refs if _text(ref)]
+            if (
+                len(text_refs) != len(refs)
+                or len(set(text_refs)) != len(text_refs)
+                or set(text_refs) != listed
+            ):
+                issues.append("auxiliary_refs_routes_mismatch")
+    return issues
+
+
 def _route_done(item: dict[str, Any]) -> bool:
     """TC routeのowner結果が確定・投影済みか。testware routeはattempt・raw取得も要する。"""
     done = item["result_finalized"] and item["source_result_projectable"]
@@ -987,9 +1041,9 @@ def project_activity(
     cleanup_status: str = "対象なし",
     unresolved: list[Any] | None = None,
 ) -> dict[str, Any]:
-    derived_unresolved: list[str] = []
+    # Run自体が不正な場合（未知のroute種別等）は、Activityを完了へ進めない。
+    derived_unresolved: list[str] = list(_run_contract_issues(run))
     if not isinstance(run, dict):
-        derived_unresolved.append("run_not_object")
         run = {}
     sources: Any = source_executions
     if not isinstance(sources, dict):
@@ -1057,6 +1111,9 @@ def project_activity(
             and (source.get("blocked") is True or (started and not revision_ok)),
         }
         if is_testware:
+            # Runの選定情報（testware・owner・選定根拠）もRun照合できるよう投影する。
+            for field in ("testware_ref", "executor_owner", "selection_basis"):
+                item[field] = route.get(field)
             item["attempt_ref"] = source.get("attempt_ref")
             item["raw_capture_complete"] = source.get("raw_capture_complete") is True
         projected.append(item)
@@ -1188,7 +1245,9 @@ def project_activity(
         )
 
     unresolved_values = list(unresolved or [])
-    unresolved_values += [v for v in derived_unresolved if v not in unresolved_values]
+    for value in derived_unresolved:
+        if value not in unresolved_values:
+            unresolved_values.append(value)
     # 状態判定は論理TCではなくrouteの開始単位で数える（一部routeだけ開始済みも含む）。
     started_units = sum(i["executed"] for i in projected) + sum(
         i["executed"] for i in required_aux
@@ -1269,6 +1328,16 @@ def verify_activity_against_run(
     """
     if not isinstance(run, dict) or not isinstance(activity, dict):
         return {"valid": False, "mismatches": ["run_or_activity_not_object"]}
+    # 不正なRunを再投影して一致しただけでは、検証済みの実施義務として扱わない。
+    run_issues = _run_contract_issues(run)
+    if run.get("route_contract_version") != ROUTE_CONTRACT_VERSION:
+        run_issues.append("run_not_contract_v2")
+    if run_issues:
+        return {
+            "valid": False,
+            "mismatches": ["run_contract_invalid"],
+            "run_issues": run_issues,
+        }
     reported_unresolved = _list_of(activity.get("unresolved"))
     recomputed = project_activity(
         run,

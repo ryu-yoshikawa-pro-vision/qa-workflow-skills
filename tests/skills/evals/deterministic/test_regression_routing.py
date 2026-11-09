@@ -1518,6 +1518,498 @@ class RunBranchRobustnessTests(unittest.TestCase):
         self.assertEqual(check(ok, "REG-D007"), "pass")
 
 
+def mk_run(routes, auxes=(), **extra):
+    """検証用のv2 Run。補助routeのrefsと件数をrouteから揃える。"""
+    return {
+        **V2,
+        "artifact_type": "run",
+        "required_routes": list(routes),
+        "auxiliary_routes": list(auxes),
+        "auxiliary_testware_refs": [a["testware_ref"] for a in auxes],
+        "auxiliary_testware_count": len(list(auxes)),
+        **extra,
+    }
+
+
+def verify_all(run, doc):
+    """D011（Run無し）・D018（Run有り）・runtimeの照合結果をまとめて返す。"""
+    return {
+        "d011": check_with_run(doc, "REG-D011"),
+        "d018": check_with_run(doc, "REG-D018", run),
+        "runtime": regression.verify_activity_against_run(run, doc)["valid"],
+    }
+
+
+class InvalidRunTests(unittest.TestCase):
+    """不正なRunは、再投影が一致してもActivityを完了にも検証済みにもしない。"""
+
+    def routes(self, **changes):
+        return [tc_route("TC-1", "M-1", "manual"), tc_route("TC-1", "X-1", **changes)]
+
+    def source(self):
+        return {"M-1": started("PASS"), "X-1": tw_started("PASS")}
+
+    def test_valid_mixed_run_is_the_baseline(self):
+        run = mk_run(self.routes(), [aux("A", "E-A")])
+        doc = activity_doc(run, {**self.source(), "E-A": aux_started("PASS")})
+        self.assertEqual(doc["activity_state"], "完了")
+        self.assertEqual(
+            verify_all(run, doc), {"d011": "pass", "d018": "pass", "runtime": True}
+        )
+
+    def test_unknown_route_type_never_completes(self):
+        for kind in ("unknown", "", None, ["manual"], {"a": 1}, 3):
+            with self.subTest(route_type=kind):
+                run = mk_run(
+                    [{**tc_route("TC-1", "M-1", "manual"), "route_type": kind}]
+                )
+                doc = activity_doc(run, {"M-1": started("PASS")})
+                self.assertNotEqual(doc["activity_state"], "完了")
+                self.assertTrue(
+                    any(
+                        u.startswith("invalid_required_route_type")
+                        for u in doc["unresolved"]
+                    )
+                )
+                # 状態の主張を偽って完了にしても、sourceから確認できず拒否する。
+                forged = {**doc, "activity_state": "完了", "unresolved": []}
+                self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, forged)["valid"]
+                )
+                # 真のActivityでも、不正なRunは正当な義務として受け入れない。
+                self.assertEqual(check_with_run(doc, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, doc)["valid"]
+                )
+                self.assertEqual(check_with_run(run, "REG-D008"), "fail")
+
+    def test_missing_identifiers_and_invalid_testware_fields_are_rejected(self):
+        broken = {
+            "missing_route_ref": {"route_ref": None},
+            "missing_tc_ref": {"tc_ref": ""},
+            "no_testware_ref": {"testware_ref": None},
+            "wrong_owner": {"executor_owner": "someone-else"},
+            "no_revision": {"implementation_revision": None},
+            "no_selection": {"selection_basis": ""},
+            "bad_execution_ref": {"execution_ref": ["X-1"]},
+        }
+        for name, change in broken.items():
+            with self.subTest(case=name):
+                run = mk_run(self.routes(**change))
+                self.assertFalse(
+                    regression.validate_required_routes(run["required_routes"])["valid"]
+                )
+                doc = activity_doc(run, self.source())
+                self.assertNotEqual(doc["activity_state"], "完了")
+                forged = {**doc, "activity_state": "完了", "unresolved": []}
+                self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, forged)["valid"]
+                )
+                self.assertEqual(check_with_run(run, "REG-D008"), "fail")
+
+    def test_e2e_route_without_concrete_testware_is_rejected(self):
+        route = tc_route("TC-1", "E-1", "e2e")
+        run = mk_run([route])
+        doc = activity_doc(run, {"E-1": started("PASS")})
+        self.assertNotEqual(doc["activity_state"], "完了")
+        self.assertEqual(check_with_run(doc, "REG-D018", run), "fail")
+        valid = mk_run([{**route, "e2e_testware_ref": "e2e/login.spec.ts"}])
+        good = activity_doc(valid, {"E-1": started("PASS")})
+        self.assertEqual(good["activity_state"], "完了")
+        self.assertEqual(check_with_run(good, "REG-D018", valid), "pass")
+
+    def test_unsupported_run_version_is_rejected_but_legacy_is_readable(self):
+        for version in ("3", 2, None, ""):
+            with self.subTest(version=version):
+                run = {
+                    **mk_run([tc_route("TC-1", "M-1", "manual")]),
+                    "route_contract_version": version,
+                }
+                doc = activity_doc(run, {"M-1": started("PASS")})
+                self.assertNotEqual(doc["activity_state"], "完了")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, doc)["valid"]
+                )
+        legacy = {"required_routes": [tc_route("TC-1", "M-1", "manual")]}
+        self.assertEqual(
+            regression.project_activity(legacy, {"M-1": started("PASS")})[
+                "activity_state"
+            ],
+            "完了",
+        )
+
+    def test_invalid_auxiliary_entries_in_run_are_rejected(self):
+        manual = [tc_route("TC-1", "M-1", "manual")]
+        bad_aux = {
+            "wrong_owner": {**aux("A", "E-A"), "executor_owner": "x"},
+            "no_revision": {**aux("A", "E-A"), "implementation_revision": None},
+            "bad_basis": {**aux("A", "E-A"), "selection_basis": "guess"},
+            "required_mismatch": {**aux("A", "E-A"), "completion_required": False},
+        }
+        for name, entry in bad_aux.items():
+            with self.subTest(case=name):
+                run = mk_run(manual, [entry])
+                doc = activity_doc(
+                    run, {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+                )
+                self.assertNotEqual(doc["activity_state"], "完了", name)
+                self.assertEqual(check_with_run(doc, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, doc)["valid"]
+                )
+
+
+class TestwareSelectionIdentityTests(unittest.TestCase):
+    """TC付きtestwareの選定情報（testware_ref・owner・選定根拠）もRunと照合する。"""
+
+    def setUp(self):
+        self.run = mk_run(
+            [tc_route("TC-1", "M-1", "manual"), tc_route("TC-1", "X-1")],
+            [aux("A", "E-A")],
+        )
+        self.source = {
+            "M-1": started("PASS"),
+            "X-1": tw_started("PASS"),
+            "E-A": aux_started("PASS"),
+        }
+        self.doc = activity_doc(self.run, self.source)
+
+    def tw_item(self, doc):
+        return next(r for r in doc["route_results"] if r["route_type"] == "testware")
+
+    def test_selection_is_projected_only_for_testware_routes(self):
+        item = self.tw_item(self.doc)
+        self.assertEqual(item["testware_ref"], "vitest:TC-1")
+        self.assertEqual(item["executor_owner"], "testware-execution")
+        self.assertEqual(item["selection_basis"], "tests/unit/password-hasher.test.ts")
+        manual = next(
+            r for r in self.doc["route_results"] if r["route_type"] == "manual"
+        )
+        for field in ("testware_ref", "executor_owner", "selection_basis"):
+            self.assertNotIn(field, manual)
+        self.assertEqual(check_with_run(self.doc, "REG-D018", self.run), "pass")
+
+    def test_changed_selection_in_activity_is_detected(self):
+        for field, value in (
+            ("testware_ref", "vitest:OTHER"),
+            ("executor_owner", "e2e-test-execution"),
+            ("selection_basis", "tests/unit/other.test.ts"),
+        ):
+            with self.subTest(field=field):
+                forged = copy.deepcopy(self.doc)
+                self.tw_item(forged)[field] = value
+                # route_ref・execution_ref・revisionは維持したまま、選定情報だけを変える。
+                self.assertEqual(check_with_run(forged, "REG-D018", self.run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(self.run, forged)["valid"]
+                )
+
+    def test_changed_selection_in_run_is_detected_against_stored_activity(self):
+        for field, value in (
+            ("testware_ref", "vitest:OTHER"),
+            ("selection_basis", "tests/unit/other.test.ts"),
+        ):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(self.run)
+                next(
+                    r
+                    for r in changed["required_routes"]
+                    if r["route_type"] == "testware"
+                )[field] = value
+                self.assertEqual(check_with_run(self.doc, "REG-D018", changed), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(changed, self.doc)["valid"]
+                )
+
+    def test_dropped_selection_fields_are_rejected_without_a_run_too(self):
+        for field in ("testware_ref", "executor_owner", "selection_basis"):
+            with self.subTest(field=field):
+                forged = copy.deepcopy(self.doc)
+                del self.tw_item(forged)[field]
+                self.assertEqual(check_with_run(forged, "REG-D010"), "fail")
+                self.assertEqual(check_with_run(forged, "REG-D018", self.run), "fail")
+
+    def test_old_v2_activity_without_selection_fields_is_not_silently_accepted(self):
+        old = copy.deepcopy(self.doc)
+        for field in ("testware_ref", "executor_owner", "selection_basis"):
+            self.tw_item(old).pop(field)
+        self.assertFalse(regression.verify_activity_against_run(self.run, old)["valid"])
+
+
+class ActivityStateVerificationTests(unittest.TestCase):
+    """Activity状態はsourceから独立に再計算し、runtimeとvalidatorの判定を一致させる。"""
+
+    def scenarios(self):
+        manual = tc_route("TC-1", "M-1", "manual")
+        tw = tc_route("TC-1", "X-1")
+        other = tc_route("TC-2", "M-2", "manual")
+        a = aux("A", "E-A")
+        opt = aux("OPT", "E-O", required=False)
+        done = {"M-1": started("PASS"), "X-1": tw_started("PASS")}
+        return {
+            "complete": (
+                mk_run([manual, tw], [a, opt]),
+                {**done, "E-A": aux_started("PASS"), "E-O": NOT_STARTED},
+                {},
+            ),
+            "running_unfinalized": (
+                mk_run([manual, tw]),
+                {"M-1": started("PASS", finalized=False), "X-1": tw_started("PASS")},
+                {},
+            ),
+            "running_raw_incomplete": (
+                mk_run([manual, tw]),
+                {
+                    "M-1": started("PASS"),
+                    "X-1": tw_started("PASS", raw_capture_complete=False),
+                },
+                {},
+            ),
+            "running_aux_unfinalized": (
+                mk_run([manual], [a]),
+                {"M-1": started("PASS"), "E-A": aux_started("PASS", finalized=False)},
+                {},
+            ),
+            "partial": (
+                mk_run([manual, other]),
+                {"M-1": started("PASS"), "M-2": NOT_STARTED},
+                {},
+            ),
+            "partial_one_route_of_tc": (
+                mk_run([manual, tw]),
+                {"M-1": started("PASS"), "X-1": NOT_STARTED},
+                {},
+            ),
+            "unstarted_routes": (
+                mk_run([manual, other]),
+                {"M-1": NOT_STARTED, "M-2": NOT_STARTED},
+                {},
+            ),
+            "blocked_route": (
+                mk_run([manual]),
+                {"M-1": {**NOT_STARTED, "blocked": True}},
+                {},
+            ),
+            "aux_only_unstarted": (
+                mk_run([], [a]),
+                {"E-A": NOT_STARTED},
+                {},
+            ),
+            "aux_only_blocked": (
+                mk_run([], [a]),
+                {"E-A": {**NOT_STARTED, "blocked": True}},
+                {},
+            ),
+            "revision_mismatch": (
+                mk_run([manual, tw]),
+                {"M-1": started("PASS"), "X-1": tw_started("PASS", revision="rev-B")},
+                {},
+            ),
+            "cleanup_failed": (
+                mk_run([manual, tw]),
+                {
+                    "M-1": started("PASS"),
+                    "X-1": tw_started("PASS", cleanup_status="失敗"),
+                },
+                {},
+            ),
+            "activity_cleanup_failed": (
+                mk_run([manual]),
+                {"M-1": started("PASS")},
+                {"cleanup_status": "失敗"},
+            ),
+            "shared_execution": (
+                mk_run([manual], [aux("A", "M-1")]),
+                {"M-1": started("PASS", implementation_revision=REV)},
+                {},
+            ),
+        }
+
+    def test_runtime_and_validator_agree_on_every_state(self):
+        states = set()
+        for name, (run, source, kwargs) in self.scenarios().items():
+            with self.subTest(case=name):
+                doc = activity_doc(run, source, **kwargs)
+                states.add(doc["activity_state"])
+                # validatorは申告されたunresolved・executed等を使わず、同じ状態を導く。
+                derived = validator._derive_activity_state(
+                    run["required_routes"],
+                    run["auxiliary_routes"],
+                    source,
+                    doc["cleanup_status"],
+                    unresolved=False,
+                )
+                self.assertEqual(derived, doc["activity_state"])
+                self.assertEqual(
+                    verify_all(run, doc),
+                    {"d011": "pass", "d018": "pass", "runtime": True},
+                )
+        # 5種類すべての状態を実際に通している。
+        self.assertEqual(
+            states,
+            {"完了", "実行中", "未開始", "ブロック中", "部分完了（ブロック中あり）"},
+        )
+
+    def test_any_changed_state_is_rejected_by_both(self):
+        all_states = {
+            "完了",
+            "実行中",
+            "未開始",
+            "ブロック中",
+            "部分完了（ブロック中あり）",
+        }
+        for name, (run, source, kwargs) in self.scenarios().items():
+            doc = activity_doc(run, source, **kwargs)
+            for forged_state in all_states - {doc["activity_state"]}:
+                with self.subTest(case=name, forged=forged_state):
+                    forged = {**doc, "activity_state": forged_state}
+                    self.assertEqual(check_with_run(forged, "REG-D011"), "fail")
+                    self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+                    self.assertFalse(
+                        regression.verify_activity_against_run(run, forged)["valid"]
+                    )
+
+    def test_completed_work_cannot_be_downgraded_to_running(self):
+        run, source, kwargs = self.scenarios()["complete"]
+        doc = activity_doc(run, source, **kwargs)
+        self.assertEqual(doc["activity_state"], "完了")
+        forged = {**doc, "activity_state": "実行中"}
+        self.assertEqual(check_with_run(forged, "REG-D011"), "fail")
+        self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+
+    def test_forged_unstarted_blocked_and_unfinalized_routes_are_detected(self):
+        run, source, _ = self.scenarios()["blocked_route"]
+        doc = activity_doc(run, source)
+        unblocked = copy.deepcopy(doc)
+        unblocked["route_results"][0]["blocked"] = False
+        unblocked["tc_execution_state"] = {"TC-1": "unexecuted"}
+        unblocked["counts"].update(blocked_tc_count=0, unexecuted_tc_count=1)
+        self.assertEqual(check_with_run(unblocked, "REG-D010"), "fail")
+        self.assertFalse(
+            regression.verify_activity_against_run(run, unblocked)["valid"]
+        )
+        # 未開始のsourceを開始済みに偽装する。
+        started_forged = copy.deepcopy(doc)
+        started_forged["route_results"][0]["executed"] = True
+        started_forged["tc_execution_state"] = {"TC-1": "executed"}
+        self.assertEqual(check_with_run(started_forged, "REG-D010"), "fail")
+        # 結果未確定のsourceを確定済みに偽装して完了にする。
+        run2, source2, _ = self.scenarios()["running_unfinalized"]
+        doc2 = activity_doc(run2, source2)
+        forged = copy.deepcopy(doc2)
+        forged["route_results"][0]["result_finalized"] = True
+        forged["activity_state"] = "完了"
+        self.assertEqual(check_with_run(forged, "REG-D010"), "fail")
+        self.assertEqual(check_with_run(forged, "REG-D011"), "fail")
+        self.assertFalse(regression.verify_activity_against_run(run2, forged)["valid"])
+
+    def test_executed_count_that_contradicts_state_is_rejected(self):
+        run, source, kwargs = self.scenarios()["partial"]
+        doc = activity_doc(run, source, **kwargs)
+        forged = copy.deepcopy(doc)
+        forged["counts"]["executed_tc_count"] = 2
+        forged["counts"]["unexecuted_tc_count"] = 0
+        forged["activity_state"] = "完了"
+        self.assertEqual(check_with_run(forged, "REG-D015"), "fail")
+        self.assertEqual(check_with_run(forged, "REG-D011"), "fail")
+        self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+
+    def test_removing_derived_unresolved_cannot_restore_a_better_state(self):
+        run, source, kwargs = self.scenarios()["revision_mismatch"]
+        doc = activity_doc(run, source, **kwargs)
+        self.assertTrue(doc["unresolved"])
+        forged = {**doc, "unresolved": [], "activity_state": "完了"}
+        self.assertEqual(check_with_run(forged, "REG-D011"), "fail")
+        self.assertEqual(check_with_run(forged, "REG-D018", run), "fail")
+        self.assertFalse(regression.verify_activity_against_run(run, forged)["valid"])
+
+    def test_legacy_activity_state_is_not_recomputed(self):
+        legacy = {
+            "artifact_type": "activity",
+            "activity_ref": "A",
+            "snapshot_ref": "S",
+            "scope_identity": "scope",
+            "activity_state": "実行中",
+            "cleanup_status": "対象なし",
+            "route_results": [],
+        }
+        self.assertEqual(check_with_run(legacy, "REG-D011"), "pass")
+        self.assertEqual(check_with_run(legacy, "REG-D018"), "pass")
+
+
+class RunAuxiliaryRefInputTests(unittest.TestCase):
+    """REG-D018は不正な補助refを集合へ入れず、例外ではなく失敗として扱う。"""
+
+    def setUp(self):
+        self.run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        self.doc = activity_doc(
+            self.run, {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+        )
+
+    def test_unhashable_or_invalid_testware_ref_in_run_fails_without_raising(self):
+        for bad in (["A"], {"a": 1}, 5, None, "", True):
+            with self.subTest(testware_ref=bad):
+                run = {**self.run, "auxiliary_routes": [aux(bad, "E-A")]}
+                self.assertEqual(check_with_run(self.doc, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, self.doc)["valid"]
+                )
+                self.assertEqual(
+                    check_with_run(
+                        {**self.doc, "auxiliary_route_results": [aux(bad, "E-A")]},
+                        "REG-D018",
+                        self.run,
+                    ),
+                    "fail",
+                )
+
+    def test_invalid_auxiliary_refs_list_is_not_silently_dropped(self):
+        for bad in ([["A"]], [{"a": 1}], [None, "A"], ["A", "A"], "A", 3, {"A": 1}):
+            with self.subTest(refs=bad):
+                run = {**self.run, "auxiliary_testware_refs": bad}
+                self.assertEqual(check_with_run(self.doc, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, self.doc)["valid"]
+                )
+
+    def test_invalid_run_shapes_fail_without_raising(self):
+        for key, bad in (
+            ("auxiliary_routes", "A"),
+            ("auxiliary_routes", [["A"]]),
+            ("required_routes", {"a": 1}),
+            ("required_routes", [["x"]]),
+            ("required_routes", None),
+        ):
+            with self.subTest(key=key, value=bad):
+                run = {**self.run, key: bad}
+                self.assertEqual(check_with_run(self.doc, "REG-D018", run), "fail")
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, self.doc)["valid"]
+                )
+
+    def test_identity_comparison_tolerates_incomparable_values(self):
+        entry = {"testware_ref": "A", "execution_ref": {1: "a", "b": 2}}
+        key = validator._identity_key(entry, ("testware_ref", "execution_ref"))
+        self.assertIsInstance(key, str)
+        counts = validator._identity_counts([entry, entry], ("testware_ref",))
+        self.assertEqual(sum(counts.values()), 2)
+
+    def test_valid_run_with_legacy_refs_is_still_read(self):
+        legacy = {
+            **self.run,
+            "auxiliary_routes": [],
+            "auxiliary_testware_refs": ["OLD"],
+            "auxiliary_testware_count": 1,
+        }
+        del legacy["route_contract_version"]
+        self.assertEqual(check_with_run(self.doc, "REG-D018", legacy), "fail")
+        legacy_doc = activity_doc(legacy, {"M-1": started("PASS")})
+        self.assertEqual(legacy_doc["counts"]["auxiliary_obligation_unknown_count"], 1)
+        self.assertNotEqual(legacy_doc["activity_state"], "完了")
+
+
 class SemanticCandidateShapeTests(unittest.TestCase):
     """意味評価の候補が保存するActivityは、正規のkey付きobject形を使う。
 
