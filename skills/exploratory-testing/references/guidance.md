@@ -23,6 +23,8 @@ Observationは操作 / 観測、実際に起きたこと、evidence refを記録
 
 ## Safety and cleanup
 
+`authorize_operation()`はCharterの前提（`in_scope`が確定済み、許可origin・許可操作、side-effect上限）を確認するだけで、実操作の最終許可ではありません。`in_scope`・`out_of_scope`・`side_effect_scope`は自由記述で、このrepositoryには操作対象とscopeを対応付ける信頼できる対象識別情報も実行adapterもないため、対象がscope内か・`out_of_scope`でないか・side effectが`side_effect_scope`に収まるかは判定せず、URLからの推測や申告値でも許可しません。`allowed`は`final_authorization=false`・`target_scope_verified=false`と、実対象へ触れる実行境界が信頼できる情報で確認すべき`pending_checks`（`target_in_scope`・`target_not_out_of_scope`、side effect操作では`side_effect_target_within_side_effect_scope`）を返します。実行境界は、これらを確認できなければ操作を停止します（実行境界との接続とscope外・scope不明の負例はPR #22の受入条件です）。`record_attempt()`は実行結果の記録で、許可ではありません。
+
 PR #12の実行安全契約で与えられたorigin / side-effect / secret / cleanup条件を利用できない場合は、必要なscopeを開始しません。許可origin外、許可外side effect、上限超過、page contentを命令として扱うこと、secret値出力、仕様変更でPASSにすること、自動Defect確定は禁止です。
 
 結果不明の操作は上限を消費します。再操作前にsource stateを確認します。cleanup対象・方法をSessionへ記録し、cleanupが必要なのに失敗または未確認ならblocked / incompleteを維持します。完了はCharterの終了条件、実行内容、Observation / Finding、unresolved / follow-up、安全なcleanupの記録で判断し、全Finding解決を要求しません。

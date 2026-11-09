@@ -9,7 +9,7 @@ description: 固定Charterの範囲で未知の問題を探索する。既存own
 
 ## 実行契約
 
-1. 操作前に`references/guidance.md`を読み、Charter、allowed origin、side-effect上限、cleanup、安全条件を固定します。
+1. 操作前に`references/guidance.md`を読み、Charter、allowed origin、side-effect上限、cleanup、安全条件を固定します。`authorize_operation()`の`allowed`は最終許可ではなく、対象が`in_scope`内・`out_of_scope`外か（side effectでは`side_effect_scope`内か）は実行境界が信頼できる情報で確認し、確認できなければ停止します。
 2. ExplorationはChange / Risk / Question / Feature / user goalから未知領域を探索します。Investigationは既存ownerで扱えないsymptom / hypothesis / unresolved Findingだけを検証します。
 3. current UI / known behaviorの収集は`test-target-inspection`、既知TCの忠実実行は`test-execution` / `e2e-test-execution`、E2E原因分析は`e2e-test-result-analysis`へroutingします。「調査」という語だけでInvestigationにしません。
 4. Observationは実測事実、Findingはfollow-upを要する検出事項として分離します。実測を仕様、原因、Defectへ自動昇格しません。

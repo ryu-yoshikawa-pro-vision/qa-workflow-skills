@@ -108,7 +108,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 - `skills/qa-knowledge/evals/deterministic/validator.py`／`scripts/skills/evals/deterministic/ASSERTIONS.md`：`KN-D012`（identityと直下のkind／scope_refsの一致）。
 - 両Skillの`SKILL.md`・`references/`、trigger（各train／validationに正負1件ずつ。exploratory-testingのtrain負例1件は、下記の実Agent確認の結果に基づき差し替え）、両Skillの`description`、semantic（`KN-SEM-007`・`EXP-SEM-005`）、`EVALS.md`の対象ID範囲。
 - 既存テスト`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`：`plan_update()`／`plan_replacement()`が現・新entryを必須にした契約変更に合わせて呼出しを更新（検証内容は維持）。
-- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（133件。うちレビュー指摘への回帰は後述）。
+- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（142件。うちレビュー指摘への回帰は後述）。
 
 ### 公開入出力契約（PR #22／Aへ引渡し）
 
@@ -123,9 +123,9 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 | 検証                                                                                                                                                | 環境                    | 結果                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `unittest test_knowledge_exploration_pr22_i`（133件）                                                                                               | Windows                 | PASS（最終レビュー対応後。symlink 5件は権限不足でSKIP、Linuxで実行）                                                                                                                      |
-| `unittest discover -s tests/skills/evals/deterministic`（425件）                                                                                    | Windows                 | TEMPを長いパスにして425件PASS（5件SKIPはsymlink。既定TEMPは短縮パス`RYU-YO~1`のため、1件が環境依存でFAILする。変更前から）                                                                |
-| 同上（425件、symlinkを含む）                                                                                                                        | Linux(WSL, Python 3.12) | PASS（`git init`したコピーで実行。修正前のコードに最終レビュー分の新規テストを当てると15件失敗）                                                                                          |
+| `unittest test_knowledge_exploration_pr22_i`（142件）／`test_qa_artifact_graph_skills`（40件）                                                      | Windows                 | PASS（操作対象scope対応後。symlink 5件は権限不足でSKIP、Linuxで実行）                                                                                                                     |
+| `unittest discover -s tests/skills/evals/deterministic`（434件）                                                                                    | Windows                 | TEMPを長いパスにして434件PASS（5件SKIPはsymlink。既定TEMPは短縮パス`RYU-YO~1`のため、1件が環境依存でFAILする。変更前から）                                                                |
+| 同上（434件、symlinkを含む）                                                                                                                        | Linux(WSL, Python 3.12) | PASS（`git init`したコピーで実行。修正前のコードに操作対象scope分の新規テストを当てると5件失敗）                                                                                          |
 | `unittest discover -s tests/skills/runtime`（581件）                                                                                                | Windows                 | 6 failures／16 errors（`test_sqlite_workflow_history`・`test_ci_handoff`）。修正前HEADのexportで取得した失敗22件の名前と完全に一致（Windowsのファイルロック等）。追加レビュー対応でも同じ |
 | 同上（581件）                                                                                                                                       | Linux(WSL, Python 3.12) | 581件中1件FAIL（`test_ci_handoff`の`test_json_nesting_failure_...`。変更前HEADのexportでも同じ失敗。CIはPython 3.11）。本変更と無関係                                                     |
 | `unittest discover -s scripts/skills/evals/deterministic/tests`、`.../trigger`、`.../semantic`、`scripts/skills/evals/semantic/{validate.py,tests}` | Windows／Linux          | PASS（semantic datasetは25 Skill／171 case。`validate.py`で再計測）                                                                                                                       |
@@ -167,7 +167,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 | 探索・症状調査の直接開始                     | 満たす（修正後）      | unresolved Finding起点を含む3起点が、開始・Session検証・再開まで一貫（`ExploratoryInvestigationOriginTests`）。routingは既存のまま                 |
 | Findingの引継ぎと未確定状態の保持            | 満たす（修正後）      | sourceごとのrevision、未取得revisionのunresolved／blocked／再開先（`ExploratorySourceRevisionHandoffTests`）。Aの実成果物との接続はPR #22          |
 | 既存Skillとのrouting境界                     | 部分的（擬似確認）    | haikuのdescription判定は48／48だが、同一dataset・haikuのみ・実ハーネスではない。全current Skill同時のrouting・保留dataはPR #22                     |
-| 履歴・旧entry・既存呼び出し元の互換性        | 満たす                | 既存`test_qa_artifact_graph_skills`等を含むdeterministic 425件。runtimeの失敗集合は変更前と一致。公開形状の変更は「互換・移行・rollback」を参照    |
+| 履歴・旧entry・既存呼び出し元の互換性        | 満たす                | 既存`test_qa_artifact_graph_skills`等を含むdeterministic 434件。runtimeの失敗集合は変更前と一致。公開形状の変更は「互換・移行・rollback」を参照    |
 | standalone packaging・評価データ・関連CI     | 満たす（局所）        | isolated packagingテスト、trigger／semantic dataset検証、deterministic。semantic評価のLLM判定は未実施（PR #22）。最終HEADのActionsは下の記録を参照 |
 
 ### 追加レビュー指摘への対応（2026-11-09、レビュー対象`6f5f403`）
@@ -219,6 +219,39 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 **修正前の再現**：新規の`ExploratoryCharterListContractTests`（6件）を修正前のコードに当てると15件失敗した（`out_of_scope=[]`・`block_conditions=[]`で`EXP-D002`がFAIL、`in_scope=[]`・空白要素・list以外をruntimeが有効とし`authorize_operation()`が許可、雛形Charterの`authorize_operation()`が`blocked`にならない）。修正後は、全Charter項目のabsent／null／blank、list項目の空listをruntimeとvalidatorで突き合わせて一致を確認する。
 
 **互換性**：`in_scope`が空list・list以外・空白要素のSession／Charterは、従来runtimeで有効だったが無効になる（既存のoutput evalと既存テストのCharterは空でない文字列のlist）。`authorize_operation()`は`in_scope`が未確定のCharterを`in_scope_not_fixed`でblockする（従来は許可）。`out_of_scope=[]`・`block_conditions=[]`のSessionは`EXP-D002`でPASSになる。entry ID・保存形式・履歴は不変。rollbackはcommit単位。
+
+### 操作対象scopeの安全確認（2026-11-10、レビュー対象`b218718`）
+
+指摘：`authorize_operation()`は`in_scope`が空でないこと・許可origin・許可操作・side-effect上限を確認するが、操作対象が`in_scope`内か・`out_of_scope`外かは確認しない。
+
+**確認した事実（実コード・仕様）**
+
+- `authorize_operation()`・`record_attempt()`の呼出し元は、このrepositoryにはテストしかない（`skills/**`・`scripts/**`・workflow・adapterに本番の呼出しはない）。探索の実操作は、エージェントがSKILL.md・`guidance.md`に従い外部のブラウザ操作で行い、helperは任意の検証部品。実行adapterも、操作対象とscopeを対応付ける実行境界も、このrepositoryにはない（`guidance.md`が参照する「PR #12の実行安全契約」の実装も見当たらない）。
+- `in_scope`・`out_of_scope`・`side_effect_scope`は自由記述（例：「注文履歴の閲覧」「read-only」「test account only」）で、URL・要素・機能IDなど、操作対象を識別できる機械可読な対応は定義されていない。同一origin内の`/checkout`と`/admin`をscope名から判定する根拠がない。
+- `status=allowed`は、既存の使われ方（テスト）でも「Charterの前提を満たした」以上の意味を持たない。
+
+**判断**：実対象のscopeを判定する情報と境界はPR #22の実行側にしかなく、PR #31には存在しない。そのため、方針どおり新しい対象識別基盤・scope schema・認可frameworkは実装しない。禁止されているURL部分文字列の推測、申告値（`scope_confirmed=True`等）での許可、scope不明時の許可は、いずれも行わない。代わりに、`authorize_operation()`の保証範囲を契約として明示した。
+
+**変更**：`authorize_operation()`の`allowed`に`final_authorization=false`・`target_scope_verified=false`・`pending_checks`（`target_in_scope`・`target_not_out_of_scope`、side effect操作は`side_effect_target_within_side_effect_scope`を追加）を付けた（`status`・既存キーは不変。blockedの結果にはこれらを付けない）。docstring・`guidance.md`・`SKILL.md`に、`allowed`は最終許可でなく、対象scopeの確認は実行境界の責務で、確認できなければ停止することを明記した。引数は変えていない（scopeの申告引数は存在しない）。`record_attempt()`は記録で許可ではないことを明記した。
+
+**修正前後の挙動**
+
+| 条件                                          | 修正前                                            | 修正後                                                                                     |
+| --------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 許可origin・許可操作・上限内（読取専用）      | `allowed`（最終許可と読めた）                     | `allowed`＋`final_authorization=false`・`target_scope_verified=false`・`pending_checks`2件 |
+| 同上（side effect操作）                       | `allowed`                                         | 同上＋`side_effect_target_within_side_effect_scope`                                        |
+| 同一originの`/checkout`・`/admin`・`/unknown` | いずれも`allowed`（区別せず、未確認とも示さない） | いずれも`allowed`だが全件scope未確認と明示（区別しない）                                   |
+| `in_scope`が空                                | `in_scope_not_fixed`でblock                       | 不変                                                                                       |
+| origin未許可・操作未許可・side effect上限超過 | block                                             | 不変                                                                                       |
+
+**PR #31で確認した安全条件（`ExploratoryOperationAuthorizationBoundaryTests`、9件。修正前のコードに当てると5件失敗、残りは既存条件を固定）**：`allowed`が最終許可でなく未確認のscopeと残りの確認を示すこと、side effect操作の追加確認、blockedに許可を示すキーがないこと、origin・操作・上限・`in_scope`確定の既存条件、URLからscopeを推測しないこと（同一origin内で結果が同じ）、scope申告の引数がないこと、読取専用探索と直接開始の不変、`record_attempt()`が許可でないこと、文書への明記。**PR #31で確認していないこと**：操作対象がscope内・`out_of_scope`外・side effectの対象範囲内かの判定、scope不明の拒否（判定する境界がないため）。実対象の操作を模擬した成功は作っていない。
+
+**PR #22へ引き継ぐ実行境界の確認事項**
+
+- 担当：実対象へ操作を行う実行境界（PR #22で接続するadapter・runner。`guidance.md`のPR #12実行安全契約の実装）。
+- 必要な入力：操作対象を識別する信頼できる情報（実行側が取得する対象ID・要素・機能など。呼出し元の申告やURLの部分一致は不可）と、Charterの`in_scope`・`out_of_scope`・`side_effect_scope`の名前をその対象IDへ対応付ける、Charter側が与える機械可読な定義。
+- 確認条件：`authorize_operation()`が`allowed`で、かつ`pending_checks`をすべて満たす（対象が`in_scope`内、`out_of_scope`外、side effectでは`side_effect_scope`内）場合だけ実操作する。対象を識別できない・対応を照合できない場合は操作を停止する。
+- 受入の負例：`in_scope=["checkout"]`・`out_of_scope=["admin"]`で、確認済みの対象がscope内なら許可、`out_of_scope`内は拒否、対象scope不明は拒否、許可origin内でscope外は拒否、scope内でorigin・操作が未許可なら拒否、side effectの対象範囲が未許可は拒否、side effect上限超過は拒否、`in_scope`が空は拒否、正常な読取専用探索は動作する。
 
 ### 未検証／blocked／SKIP と再開条件
 

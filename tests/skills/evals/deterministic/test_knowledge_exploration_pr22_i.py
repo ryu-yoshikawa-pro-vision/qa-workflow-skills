@@ -3255,5 +3255,150 @@ class ExploratoryCharterListContractTests(unittest.TestCase):
         self.assertEqual(_grade(template)["EXP-D002"], "fail")
 
 
+class ExploratoryOperationAuthorizationBoundaryTests(unittest.TestCase):
+    """authorize_operation() checks the Charter preconditions; it is not the final
+    authorization of an operation on a real target.
+
+    The Charter's in_scope / out_of_scope / side_effect_scope are free text, and
+    this repository has no trusted target identity or execution adapter that maps
+    a target to them. The helper therefore does not judge target scope (no URL
+    substring guess, no self-declared flag); it states that scope is unverified and
+    leaves the check to the execution boundary that touches the real target
+    (PR #22). Target-scope rejection cases are PR #22 acceptance conditions.
+    """
+
+    BASE = "https://staging.example.test"
+
+    def authorize(self, c=None, url=None, operation="navigate", prior=0, **kw):
+        return exploratory.authorize_operation(
+            c or charter(),
+            target_url=url or f"{self.BASE}/checkout",
+            operation=operation,
+            prior_side_effect_attempts=prior,
+            **kw,
+        )
+
+    def test_allowed_is_not_a_final_authorization_and_names_the_open_checks(self):
+        result = self.authorize()
+        self.assertEqual(result["status"], "allowed")
+        self.assertIs(result["final_authorization"], False)
+        self.assertIs(result["target_scope_verified"], False)
+        self.assertEqual(
+            result["pending_checks"], ["target_in_scope", "target_not_out_of_scope"]
+        )
+
+    def test_a_side_effect_operation_also_needs_the_side_effect_scope_check(self):
+        result = self.authorize(operation="submit_form")
+        self.assertEqual(result["status"], "allowed")
+        self.assertIs(result["final_authorization"], False)
+        self.assertEqual(
+            result["pending_checks"],
+            [
+                "target_in_scope",
+                "target_not_out_of_scope",
+                "side_effect_target_within_side_effect_scope",
+            ],
+        )
+        self.assertEqual(result["side_effect_attempt_number"], 1)
+
+    def test_blocked_results_claim_no_authorization(self):
+        cases = {
+            "in_scope_not_fixed": self.authorize(charter(in_scope=[])),
+            "origin_not_allowed": self.authorize(url="https://other.example.test/"),
+            "operation_not_allowed": self.authorize(operation="delete_all"),
+            "side_effect_limit_reached": self.authorize(
+                operation="submit_form", prior=2
+            ),
+        }
+        for reason, result in cases.items():
+            with self.subTest(reason=reason):
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], reason)
+                for key in ("final_authorization", "target_scope_verified"):
+                    self.assertNotIn(key, result)
+
+    def test_existing_origin_operation_and_limit_conditions_are_kept(self):
+        self.assertEqual(self.authorize()["status"], "allowed")
+        self.assertEqual(
+            self.authorize(operation="submit_form", prior=1)["status"], "allowed"
+        )
+        self.assertEqual(
+            self.authorize(
+                operation="submit_form", prior=1, uncertain_previous_attempt=True
+            )["reason"],
+            "side_effect_limit_reached",
+        )
+        self.assertEqual(
+            self.authorize(url="http://staging.example.test/")["reason"],
+            "origin_not_allowed",
+        )
+
+    def test_the_helper_does_not_guess_the_target_scope_from_the_url(self):
+        # Same origin, different logical targets: the helper cannot tell them apart,
+        # so every answer says scope is unverified instead of allowing or denying.
+        c = charter(in_scope=["checkout"], out_of_scope=["admin"])
+        results = [
+            self.authorize(c, url=f"{self.BASE}{path}")
+            for path in ("/checkout", "/admin", "/unknown", "/admin/checkout", "/")
+        ]
+        for result in results:
+            self.assertEqual(result["status"], "allowed")
+            self.assertIs(result["target_scope_verified"], False)
+            self.assertIs(result["final_authorization"], False)
+        self.assertEqual(len({json.dumps(r["pending_checks"]) for r in results}), 1)
+
+    def test_no_self_declared_scope_parameter_exists(self):
+        import inspect
+
+        self.assertEqual(
+            list(inspect.signature(exploratory.authorize_operation).parameters),
+            [
+                "charter",
+                "target_url",
+                "operation",
+                "prior_side_effect_attempts",
+                "uncertain_previous_attempt",
+            ],
+        )
+
+    def test_read_only_exploration_and_direct_start_are_unchanged(self):
+        read_only = charter(side_effect_operations=[], side_effect_maximum=0)
+        result = self.authorize(read_only, operation="navigate")
+        self.assertEqual(result["status"], "allowed")
+        self.assertIsNone(result["side_effect_attempt_number"])
+        self.assertEqual(
+            result["pending_checks"], ["target_in_scope", "target_not_out_of_scope"]
+        )
+        self.assertEqual(
+            exploratory.resolve_direct_start({"charter": read_only})["status"],
+            "start",
+        )
+
+    def test_record_attempt_records_and_never_authorizes(self):
+        recorded = exploratory.record_attempt(
+            charter(),
+            [],
+            {
+                "attempt_ref": "ATT-1",
+                "operation": "submit_form",
+                "side_effect": True,
+                "outcome": "completed",
+            },
+        )
+        self.assertEqual(recorded["status"], "recorded")
+        self.assertNotIn("final_authorization", recorded)
+
+    def test_the_contract_is_stated_in_the_skill_documents(self):
+        guidance = (
+            REPO_ROOT / "skills/exploratory-testing/references/guidance.md"
+        ).read_text(encoding="utf-8")
+        for needle in (
+            "final_authorization",
+            "pending_checks",
+            "target_scope_verified",
+        ):
+            self.assertIn(needle, guidance)
+
+
 if __name__ == "__main__":
     unittest.main()

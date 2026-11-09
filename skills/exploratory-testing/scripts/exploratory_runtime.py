@@ -157,6 +157,17 @@ def authorize_operation(
     prior_side_effect_attempts: int,
     uncertain_previous_attempt: bool = False,
 ) -> dict[str, Any]:
+    """Check the Charter preconditions of one operation; not a final authorization.
+
+    It checks that the in-scope target is fixed, the origin and the operation are
+    allowed, and the side-effect limit is not exceeded. It does not judge whether
+    the target belongs to ``in_scope`` / ``out_of_scope`` / ``side_effect_scope``:
+    those are free text, and this helper has no trusted target identity (it does not
+    guess from the URL and takes no self-declared scope flag). ``allowed`` therefore
+    carries ``final_authorization=False``, ``target_scope_verified=False`` and the
+    ``pending_checks`` the execution boundary that touches the real target must
+    complete from trusted target information, stopping when it cannot.
+    """
     if not _text_list(charter.get("in_scope")):
         return {"status": "blocked", "reason": "in_scope_not_fixed"}
     target_origin = _origin(target_url)
@@ -179,13 +190,18 @@ def authorize_operation(
             "reason": "side_effect_limit_reached",
             "consumed_attempts": consumed,
         }
+    side_effect = operation in charter.get("side_effect_operations", [])
+    pending = ["target_in_scope", "target_not_out_of_scope"]
+    if side_effect:
+        pending.append("side_effect_target_within_side_effect_scope")
     return {
         "status": "allowed",
         "origin": target_origin,
         "operation": operation,
-        "side_effect_attempt_number": next_attempt
-        if operation in charter.get("side_effect_operations", [])
-        else None,
+        "side_effect_attempt_number": next_attempt if side_effect else None,
+        "final_authorization": False,
+        "target_scope_verified": False,
+        "pending_checks": pending,
     }
 
 
