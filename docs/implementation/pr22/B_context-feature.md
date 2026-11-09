@@ -147,3 +147,20 @@
 - `reconcile_git_coverage.py`を追加。実際に列挙したGit差分の各変更pathと、feature inventoryに登録された差分locatorを照合し、漏れたpath／根拠のない差分IDを`incomplete`にする。旧HEAD／取得不完全は成功へ変換しない。
 - `test_git_change_coverage.py`は一時GitリポジトリでbaseとHEADの変更2件を作り、台帳に1件しか登録していない場合の漏れ、2件分類したときの整合、未分類・旧revision・存在しないpathの負例を検証する。
 - この照合はコードの変更path単位であり、意味上の全製品機能・全差分hunk・外部資料の列挙を保証しない。製品CI接続はA・PR #22に引き継ぐ。
+
+## 最新HEADの担当B局所検証（2026-11-09）
+
+対象：[コミット `4f1177c6000441cbd3e76a11c467b68a7576288d`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/4f1177c6000441cbd3e76a11c467b68a7576288d)。
+
+- [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42538056128)：SUCCESS。追加・変更したPython／Markdown等の書式・lint確認。
+- [Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42538056146)：SUCCESS。追加したProject Context／feature registry／実Git差分照合のunit／結合とrepository既存回帰を含む。fixture・実行中に作る一時Git repositoryの受入であり、実製品CIの受入ではない。
+- [Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42538056160)：SUCCESS。dataset構造・参照の検証で、実Agentによる意味判断を示さない。
+- [Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42538056138)：FAIL。2 Skillの形式チェックは通るが共有`README.md`に`feature-analysis`・`project-context`がない。PR #22の共有ownerに依頼済み。
+- [Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42538056127)：FAIL。`tests/codex/test_development_skills.py:85`の`len(qa_skills) == 23`が新規2 Skill追加後の25件と一致しない。共有ownerに依頼済み。
+- PRのbaseは`feat/development-qa-traceability`、担当branchの差分は担当BのSkill、専用unit／eval、担当記録のみ。mergeや共有ファイル修正は実施しない。
+
+### PR #22への未完了の受入引継ぎ
+
+- 共有`README.md`、Codex固定件数、共有Project Context templateのSection 12/13 separator・Section 16追加stable key、共通runtimeへのB owner登録を統合branchの担当者が修正して再検証する。
+- 実案件の認証・情報源／保存root・正本を決め、対象providerのnative create-if-absent／CAS・history・独立readback、実認証承認、同時更新と再試行の受入を行う。現helperは準備済みdraft／検証結果であって永続書込み済みの正本ではない。
+- 実AgentでのSkill発火・意味評価、実製品情報源からの全対象列挙、製品CIへの差分／分類／hash受渡し、他ownerの実成果物との現在性と承認・再開を検証する。これらの経路は未接続のため未実施であり、PR #24の局所fixture成功を完了証拠としない。
