@@ -13,12 +13,16 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 WRITER_DIR = ROOT / "skills" / "spec-analysis" / "scripts"
 WRITER_SCRIPT = WRITER_DIR / "ui_target_package.py"
-HUMAN_EDIT_SCRIPT = ROOT / "skills" / "ui-target-analysis" / "scripts" / "human_editing.py"
+HUMAN_EDIT_SCRIPT = (
+    ROOT / "skills" / "ui-target-analysis" / "scripts" / "human_editing.py"
+)
 sys.path.insert(0, str(WRITER_DIR))
 import ui_target_package as package  # noqa: E402
 
 FIXTURE_TEST_PATH = ROOT / "tests" / "skills" / "runtime" / "test_ui_target_package.py"
-FIXTURE_SPEC = importlib.util.spec_from_file_location("ui_target_package_fixtures", FIXTURE_TEST_PATH)
+FIXTURE_SPEC = importlib.util.spec_from_file_location(
+    "ui_target_package_fixtures", FIXTURE_TEST_PATH
+)
 assert FIXTURE_SPEC is not None and FIXTURE_SPEC.loader is not None
 fixture_module = importlib.util.module_from_spec(FIXTURE_SPEC)
 FIXTURE_SPEC.loader.exec_module(fixture_module)
@@ -53,21 +57,27 @@ def raw_cli(script: Path, payload: str) -> tuple[int, dict[str, Any]]:
 
 
 def inspect(root: Path) -> dict[str, Any]:
-    code, response = cli(WRITER_SCRIPT, {"operation": "inspect", "package_root": str(root)})
+    code, response = cli(
+        WRITER_SCRIPT, {"operation": "inspect", "package_root": str(root)}
+    )
     if code != 0 or response.get("valid") is not True:
         raise AssertionError(f"inspect failed: {response}")
     return response["payload"]
 
 
-def create_workspace() -> tuple[tempfile.TemporaryDirectory[str], Path, Path, Path, dict[str, Any]]:
+def create_workspace() -> tuple[
+    tempfile.TemporaryDirectory[str], Path, Path, Path, dict[str, Any]
+]:
     temp = tempfile.TemporaryDirectory()
     root = Path(temp.name)
     canonical = root / "canonical"
     canonical.mkdir()
     request = fixture_module.child_identity_unknown_request(canonical, "uc")
     structure_change = next(
-        item for item in request["table_changes"]
-        if item["file"] == "01_ui_structure_and_navigation.md" and item["section"] == "UI構造一覧"
+        item
+        for item in request["table_changes"]
+        if item["file"] == "01_ui_structure_and_navigation.md"
+        and item["section"] == "UI構造一覧"
     )
     structure_change["rows"].append(
         {
@@ -102,9 +112,13 @@ def create_workspace() -> tuple[tempfile.TemporaryDirectory[str], Path, Path, Pa
 def edit_table(root: Path, file: str, section: str, update) -> None:
     path = root / file
     text = path.read_text(encoding="utf-8")
-    rows = package.parse_table(text, section, package.TABLE_BY_KEY[(file, section)].headers)
+    rows = package.parse_table(
+        text, section, package.TABLE_BY_KEY[(file, section)].headers
+    )
     rows = update(rows)
-    updated = package.replace_table(text, section, package.TABLE_BY_KEY[(file, section)].headers, rows)
+    updated = package.replace_table(
+        text, section, package.TABLE_BY_KEY[(file, section)].headers, rows
+    )
     path.write_bytes(package.canonical_bytes(updated))
 
 
@@ -123,7 +137,11 @@ def review(
         "placement_agreement_ref": "fixture://project-context/q06/001",
         "change_summary": "UI owner reviewed human edit fixture",
         "approved_change_keys": change_keys,
-        "evidence_refs": evidence_refs or {key: [f"fixture://source/{index}"] for index, key in enumerate(change_keys, 1)},
+        "evidence_refs": evidence_refs
+        or {
+            key: [f"fixture://source/{index}"]
+            for index, key in enumerate(change_keys, 1)
+        },
         "approved_retirements": retirement_rows,
         "retirement_evidence_refs": {
             row["id"]: [f"fixture://retirement/{row['id']}"] for row in retirement_rows
@@ -134,7 +152,13 @@ def review(
     return result
 
 
-def prepare(canonical: Path, base: Path, edit: Path, snapshot: dict[str, Any], decision: dict[str, Any]):
+def prepare(
+    canonical: Path,
+    base: Path,
+    edit: Path,
+    snapshot: dict[str, Any],
+    decision: dict[str, Any],
+):
     return cli(
         HUMAN_EDIT_SCRIPT,
         {
@@ -179,7 +203,9 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
             lambda rows: [
-                copy_page_row(row, 名称="Updated sign-in page") if row["構造ID"] == "PAGE-001" else row
+                copy_page_row(row, 名称="Updated sign-in page")
+                if row["構造ID"] == "PAGE-001"
+                else row
                 for row in rows
             ],
         )
@@ -192,7 +218,10 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
                 )
             )
         )
-        keys = ["PAGE-001", "prose:01_ui_structure_and_navigation.md:Navigation / Entry / Exit"]
+        keys = [
+            "PAGE-001",
+            "prose:01_ui_structure_and_navigation.md:Navigation / Entry / Exit",
+        ]
         code, prepared = prepare(canonical, base, edit, snapshot, review(keys))
         self.assertEqual(code, 0, prepared)
         self.assertEqual(prepared["status"], "ready")
@@ -207,11 +236,20 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         before_ids = set(original.by_id)
         self.assertEqual(set(final.by_id), before_ids)
         self.assertEqual(final.by_id["PAGE-001"][1]["名称"], "Updated sign-in page")
-        self.assertEqual(final.by_id["PAGE-002"][1]["名称"], original.by_id["PAGE-002"][1]["名称"])
-        self.assertIn("Sign-in route is /sign-in.", final.files["01_ui_structure_and_navigation.md"])
+        self.assertEqual(
+            final.by_id["PAGE-002"][1]["名称"], original.by_id["PAGE-002"][1]["名称"]
+        )
+        self.assertIn(
+            "Sign-in route is /sign-in.",
+            final.files["01_ui_structure_and_navigation.md"],
+        )
         valid_code, validated = cli(
             WRITER_SCRIPT,
-            {"operation": "validate", "package_root": str(canonical), "previous_snapshot": readback["update_snapshot"]},
+            {
+                "operation": "validate",
+                "package_root": str(canonical),
+                "previous_snapshot": readback["update_snapshot"],
+            },
         )
         self.assertEqual(valid_code, 0, validated)
         self.assertTrue(validated["valid"])
@@ -222,25 +260,31 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: [row for row in rows if row["構造ID"] != "PAGE-002"]
-            + [
-                {
-                    "構造ID": "@draft:settings-page",
-                    "種別": "PAGE",
-                    "名称": "Settings page",
-                    "状態軸": "",
-                    "Path / 識別子": "/settings",
-                    "親構造ID": "",
-                    "関連仕様項目ID": "",
-                    "関連構造ID": "",
-                    "備考": "New human-proposed UI structure.",
-                }
-            ],
+            lambda rows: (
+                [row for row in rows if row["構造ID"] != "PAGE-002"]
+                + [
+                    {
+                        "構造ID": "@draft:settings-page",
+                        "種別": "PAGE",
+                        "名称": "Settings page",
+                        "状態軸": "",
+                        "Path / 識別子": "/settings",
+                        "親構造ID": "",
+                        "関連仕様項目ID": "",
+                        "関連構造ID": "",
+                        "備考": "New human-proposed UI structure.",
+                    }
+                ]
+            ),
         )
         decisions = review(
             ["@draft:settings-page", "PAGE-002"],
             retirements=[
-                {"id": "PAGE-002", "reason": "The UI page was formally removed.", "approval_ref": "fixture://approval/retire-page-002"}
+                {
+                    "id": "PAGE-002",
+                    "reason": "The UI page was formally removed.",
+                    "approval_ref": "fixture://approval/retire-page-002",
+                }
             ],
         )
         missing_retirement_approval = review(["@draft:settings-page", "PAGE-002"])
@@ -255,17 +299,26 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         self.assertEqual(code, 0, prepared)
         request = prepared["materialize_request"]
         self.assertEqual(request["retire_ids"], ["PAGE-002"])
-        self.assertEqual(request["table_changes"][0]["rows"][0]["identity_action"], "new")
-        self.assertTrue(request["table_changes"][0]["rows"][0]["draft_key"] == "settings-page")
+        self.assertEqual(
+            request["table_changes"][0]["rows"][0]["identity_action"], "new"
+        )
+        self.assertTrue(
+            request["table_changes"][0]["rows"][0]["draft_key"] == "settings-page"
+        )
         applied = apply(request)
-        self.assertEqual(applied["allocated_ids"], [{"draft_key": "settings-page", "stable_id": "PAGE-003"}])
+        self.assertEqual(
+            applied["allocated_ids"],
+            [{"draft_key": "settings-page", "stable_id": "PAGE-003"}],
+        )
         self.assertEqual(applied["retired_ids"], ["PAGE-002"])
         final = package._read_package(canonical)
         self.assertNotIn("PAGE-002", final.by_id)
         self.assertIn("PAGE-003", final.by_id)
         self.assertIn("| PAGE-002 | retired |", final.files["CHANGELOG.md"])
 
-    def test_03_generated_and_control_file_edits_are_rejected_and_preserved(self) -> None:
+    def test_03_generated_and_control_file_edits_are_rejected_and_preserved(
+        self,
+    ) -> None:
         canonical, base, edit, snapshot = self.make_fixture()
         original_canonical = (canonical / "MANIFEST.md").read_bytes()
         manifest = edit / "MANIFEST.md"
@@ -273,15 +326,24 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         code, response = prepare(canonical, base, edit, snapshot, review(["PAGE-001"]))
         self.assertNotEqual(code, 0)
         self.assertEqual(response["status"], "blocked")
-        self.assertIn(response["issues"][0]["code"], {"owner_boundary", "noncanonical_text"})
+        self.assertIn(
+            response["issues"][0]["code"], {"owner_boundary", "noncanonical_text"}
+        )
         self.assertEqual((canonical / "MANIFEST.md").read_bytes(), original_canonical)
         self.assertIn(b"Human rewrite", manifest.read_bytes())
 
-    def test_04_authority_changes_and_missing_approval_or_evidence_are_blocked(self) -> None:
+    def test_04_authority_changes_and_missing_approval_or_evidence_are_blocked(
+        self,
+    ) -> None:
         canonical, base, edit, snapshot = self.make_fixture()
         canonical_before_block = package_bytes(canonical)
         authority = edit / "09_authority_and_traceability.md"
-        authority.write_bytes(authority.read_bytes().replace(b"Valid sign-in reaches the account page.", b"Changed expected behavior."))
+        authority.write_bytes(
+            authority.read_bytes().replace(
+                b"Valid sign-in reaches the account page.",
+                b"Changed expected behavior.",
+            )
+        )
         code, response = prepare(canonical, base, edit, snapshot, review(["PAGE-001"]))
         self.assertNotEqual(code, 0)
         self.assertEqual(response["issues"][0]["code"], "owner_boundary")
@@ -293,9 +355,16 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: [copy_page_row(row, 名称="Unapproved name") if row["構造ID"] == "PAGE-001" else row for row in rows],
+            lambda rows: [
+                copy_page_row(row, 名称="Unapproved name")
+                if row["構造ID"] == "PAGE-001"
+                else row
+                for row in rows
+            ],
         )
-        code, response = prepare(canonical, base, edit, snapshot, review(["PAGE-001"], decision="pending"))
+        code, response = prepare(
+            canonical, base, edit, snapshot, review(["PAGE-001"], decision="pending")
+        )
         self.assertNotEqual(code, 0)
         self.assertEqual(response["issues"][0]["code"], "review_required")
         self.assertEqual(package_bytes(canonical), canonical_before_block)
@@ -305,17 +374,32 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         self.assertEqual(response["issues"][0]["code"], "evidence_required")
         self.assertEqual(package_bytes(canonical), canonical_before_block)
 
-    def test_05_same_id_conflict_blocks_and_independent_change_rebases_after_review(self) -> None:
+    def test_05_same_id_conflict_blocks_and_independent_change_rebases_after_review(
+        self,
+    ) -> None:
         canonical, base, edit, snapshot = self.make_fixture()
         edit_table(
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: [copy_page_row(row, 名称="Human concurrent name") if row["構造ID"] == "PAGE-001" else row for row in rows],
+            lambda rows: [
+                copy_page_row(row, 名称="Human concurrent name")
+                if row["構造ID"] == "PAGE-001"
+                else row
+                for row in rows
+            ],
         )
         self._update_page(canonical, "PAGE-001", "Agent concurrent name")
         canonical_before_conflict = package_bytes(canonical)
-        code, conflict = prepare(canonical, base, edit, snapshot, review(["PAGE-001"], current_snapshot=inspect(canonical)["update_snapshot"]))
+        code, conflict = prepare(
+            canonical,
+            base,
+            edit,
+            snapshot,
+            review(
+                ["PAGE-001"], current_snapshot=inspect(canonical)["update_snapshot"]
+            ),
+        )
         self.assertNotEqual(code, 0)
         self.assertEqual(conflict["issues"][0]["code"], "concurrent_edit_blocked")
         self.assertEqual(package_bytes(canonical), canonical_before_conflict)
@@ -325,19 +409,22 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: rows + [
-                {
-                    "構造ID": "@draft:new-independent-page",
-                    "種別": "PAGE",
-                    "名称": "Independent page",
-                    "状態軸": "",
-                    "Path / 識別子": "/independent",
-                    "親構造ID": "",
-                    "関連仕様項目ID": "",
-                    "関連構造ID": "",
-                    "備考": "No shared structure or authority references.",
-                }
-            ],
+            lambda rows: (
+                rows
+                + [
+                    {
+                        "構造ID": "@draft:new-independent-page",
+                        "種別": "PAGE",
+                        "名称": "Independent page",
+                        "状態軸": "",
+                        "Path / 識別子": "/independent",
+                        "親構造ID": "",
+                        "関連仕様項目ID": "",
+                        "関連構造ID": "",
+                        "備考": "No shared structure or authority references.",
+                    }
+                ]
+            ),
         )
         self._update_page(canonical, "PAGE-002", "Agent changed unrelated page")
         current_snapshot = inspect(canonical)["update_snapshot"]
@@ -350,10 +437,14 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(code, 0, prepared)
         self.assertTrue(prepared["rebased"])
-        self.assertEqual(prepared["materialize_request"]["previous_snapshot"], current_snapshot)
+        self.assertEqual(
+            prepared["materialize_request"]["previous_snapshot"], current_snapshot
+        )
         apply(prepared["materialize_request"])
         final = package._read_package(canonical)
-        self.assertEqual(final.by_id["PAGE-002"][1]["名称"], "Agent changed unrelated page")
+        self.assertEqual(
+            final.by_id["PAGE-002"][1]["名称"], "Agent changed unrelated page"
+        )
         self.assertIn("PAGE-003", final.by_id)
 
         canonical, base, edit, snapshot = self.make_fixture()
@@ -361,20 +452,22 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: rows
-            + [
-                {
-                    "構造ID": "@draft:cas-page",
-                    "種別": "PAGE",
-                    "名称": "CAS page",
-                    "状態軸": "",
-                    "Path / 識別子": "/cas",
-                    "親構造ID": "",
-                    "関連仕様項目ID": "",
-                    "関連構造ID": "",
-                    "備考": "The package changes after prepare.",
-                }
-            ],
+            lambda rows: (
+                rows
+                + [
+                    {
+                        "構造ID": "@draft:cas-page",
+                        "種別": "PAGE",
+                        "名称": "CAS page",
+                        "状態軸": "",
+                        "Path / 識別子": "/cas",
+                        "親構造ID": "",
+                        "関連仕様項目ID": "",
+                        "関連構造ID": "",
+                        "備考": "The package changes after prepare.",
+                    }
+                ]
+            ),
         )
         code, prepared = prepare(
             canonical, base, edit, snapshot, review(["@draft:cas-page"])
@@ -390,51 +483,75 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         self.assertEqual(final.by_id["PAGE-002"][1]["名称"], "Changed after prepare")
         self.assertNotIn("PAGE-003", final.by_id)
 
-    def test_06_direct_canonical_edit_blocks_then_validated_baseline_allows_safe_resume(self) -> None:
+    def test_06_direct_canonical_edit_blocks_then_validated_baseline_allows_safe_resume(
+        self,
+    ) -> None:
         canonical, base, edit, snapshot = self.make_fixture()
         edit_table(
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: [copy_page_row(row, 名称="Preserved human edit") if row["構造ID"] == "PAGE-001" else row for row in rows],
+            lambda rows: [
+                copy_page_row(row, 名称="Preserved human edit")
+                if row["構造ID"] == "PAGE-001"
+                else row
+                for row in rows
+            ],
         )
         current_file = canonical / "01_ui_structure_and_navigation.md"
-        current_file.write_bytes(current_file.read_bytes().replace(b"Sign-in page", b"Direct canonical mutation"))
+        current_file.write_bytes(
+            current_file.read_bytes().replace(
+                b"Sign-in page", b"Direct canonical mutation"
+            )
+        )
         direct_bytes = current_file.read_bytes()
         code, blocked = prepare(canonical, base, edit, snapshot, review(["PAGE-001"]))
         self.assertNotEqual(code, 0)
         self.assertEqual(blocked["issues"][0]["code"], "package_not_current")
         self.assertEqual(current_file.read_bytes(), direct_bytes)
-        self.assertIn(b"Preserved human edit", (edit / "01_ui_structure_and_navigation.md").read_bytes())
+        self.assertIn(
+            b"Preserved human edit",
+            (edit / "01_ui_structure_and_navigation.md").read_bytes(),
+        )
 
         shutil.rmtree(canonical)
         shutil.copytree(base, canonical)
         code, prepared = prepare(canonical, base, edit, snapshot, review(["PAGE-001"]))
         self.assertEqual(code, 0, prepared)
         apply(prepared["materialize_request"])
-        self.assertEqual(package._read_package(canonical).by_id["PAGE-001"][1]["名称"], "Preserved human edit")
+        self.assertEqual(
+            package._read_package(canonical).by_id["PAGE-001"][1]["名称"],
+            "Preserved human edit",
+        )
 
-    def test_07_lost_commit_response_replays_same_request_without_duplicate_ids(self) -> None:
+    def test_07_lost_commit_response_replays_same_request_without_duplicate_ids(
+        self,
+    ) -> None:
         canonical, base, edit, snapshot = self.make_fixture()
         edit_table(
             edit,
             "01_ui_structure_and_navigation.md",
             "UI構造一覧",
-            lambda rows: rows + [
-                {
-                    "構造ID": "@draft:response-loss-page",
-                    "種別": "PAGE",
-                    "名称": "Response loss page",
-                    "状態軸": "",
-                    "Path / 識別子": "/response-loss",
-                    "親構造ID": "",
-                    "関連仕様項目ID": "",
-                    "関連構造ID": "",
-                    "備考": "Retry uses the same writer request.",
-                }
-            ],
+            lambda rows: (
+                rows
+                + [
+                    {
+                        "構造ID": "@draft:response-loss-page",
+                        "種別": "PAGE",
+                        "名称": "Response loss page",
+                        "状態軸": "",
+                        "Path / 識別子": "/response-loss",
+                        "親構造ID": "",
+                        "関連仕様項目ID": "",
+                        "関連構造ID": "",
+                        "備考": "Retry uses the same writer request.",
+                    }
+                ]
+            ),
         )
-        code, prepared = prepare(canonical, base, edit, snapshot, review(["@draft:response-loss-page"]))
+        code, prepared = prepare(
+            canonical, base, edit, snapshot, review(["@draft:response-loss-page"])
+        )
         self.assertEqual(code, 0, prepared)
         request = prepared["materialize_request"]
         first = apply(request)  # Treat this committed response as lost.
@@ -453,8 +570,12 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         self.assertEqual(retry_code, 0, retry)
         self.assertEqual(retry["status"], "unchanged")
         final = package._read_package(canonical)
-        self.assertEqual(sum(1 for stable_id in final.by_id if stable_id == "PAGE-003"), 1)
-        self.assertEqual(inspect(canonical)["package_version"], replay["package_version"])
+        self.assertEqual(
+            sum(1 for stable_id in final.by_id if stable_id == "PAGE-003"), 1
+        )
+        self.assertEqual(
+            inspect(canonical)["package_version"], replay["package_version"]
+        )
 
     def test_08_feature_index_reaches_current_ui_file_line_and_stable_id(self) -> None:
         canonical, _base, _edit, _snapshot = self.make_fixture()
@@ -466,7 +587,9 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
                 "package_root": str(canonical),
                 "feature_artifact_ref": "fixture://feature-analysis/features-v1",
                 "feature_artifact_revision": "fixture-revision-01",
-                "feature_scope_refs": [{"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}],
+                "feature_scope_refs": [
+                    {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
+                ],
                 "changed_ids": ["PAGE-001"],
             },
         )
@@ -479,9 +602,16 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         self.assertIn("UIOP-001", by_id)
         self.assertIn("SCOPE-001", by_id)
         self.assertIn("PAGE-001", {row["id"] for row in entry["changed_ui_rows"]})
-        self.assertEqual(package._read_package(canonical).by_id["PAGE-001"][1]["名称"], "Changed for feature index")
+        self.assertEqual(
+            package._read_package(canonical).by_id["PAGE-001"][1]["名称"],
+            "Changed for feature index",
+        )
         for location in entry["ui_rows"]:
-            line = (canonical / location["file"]).read_text(encoding="utf-8").splitlines()[location["line"] - 1]
+            line = (
+                (canonical / location["file"])
+                .read_text(encoding="utf-8")
+                .splitlines()[location["line"] - 1]
+            )
             self.assertIn(location["id"], line)
         missing_code, missing = cli(
             HUMAN_EDIT_SCRIPT,
@@ -525,7 +655,9 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             self.assertNotEqual(code, 0)
             self.assertEqual(response["status"], "blocked")
             self.assertEqual(response["issues"][0]["code"], "writer_unavailable")
-            self.assertFalse((Path(temp_dir) / "skills" / "spec-analysis" / "scripts").exists())
+            self.assertFalse(
+                (Path(temp_dir) / "skills" / "spec-analysis" / "scripts").exists()
+            )
 
     def test_10_symlink_root_and_duplicate_json_keys_are_rejected(self) -> None:
         canonical, base, edit, snapshot = self.make_fixture()

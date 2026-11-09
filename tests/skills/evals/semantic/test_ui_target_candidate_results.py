@@ -12,7 +12,9 @@ SKILLS_ROOT = REPO_ROOT / "skills"
 
 
 class UiTargetCandidateResultTests(unittest.TestCase):
-    def test_candidate_judgements_match_cases_and_quote_candidate_evidence(self) -> None:
+    def test_candidate_judgements_match_cases_and_quote_candidate_evidence(
+        self,
+    ) -> None:
         dataset = load_semantic_skill("ui-target-analysis", SKILLS_ROOT)
         output_root = dataset["semantic_root"] / "candidate_outputs"
 
