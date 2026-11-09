@@ -322,6 +322,75 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(result["handoff"]["impacted_feature_ids"], [])
         self.assertEqual(result["handoff"]["approval_required_change_ids"], ["DIF-002"])
 
+    def test_pr_update_ignores_reclassification_of_past_revision(self) -> None:
+        for old_class, current_class, reviewed_class, impacted, approvals in (
+            ("no_impact", "no_impact", "impact", [], ["DIF-002"]),
+            ("impact", "impact", "no_impact", ["FEAT-001"], []),
+        ):
+            with self.subTest(reviewed_classification=reviewed_class):
+                data = fixture()
+                previous = copy.deepcopy(data["snapshot"])
+                old_head, new_head = "b" * 40, "a" * 40
+                previous["source_revision"] = old_head
+                previous["sources"][0]["revision"] = old_head
+                prior_change = previous["changes"][0]
+                prior_change["after_revision"] = old_head
+                prior_change["classification"] = old_class
+                prior_change["feature_ids"] = (
+                    ["FEAT-001"] if old_class == "impact" else []
+                )
+                if old_class == "no_impact":
+                    prior_change["approval_ref"] = "approval/old"
+                snapshot = copy.deepcopy(previous)
+                data["previous_snapshot"] = previous
+                data["snapshot"] = snapshot
+                data["observed_head_revision"] = new_head
+                snapshot["event"] = "pr_update"
+                snapshot["event_basis"] = {
+                    "base_sha": "c" * 40,
+                    "head_sha": new_head,
+                    "previous_head_sha": old_head,
+                }
+                snapshot["source_revision"] = new_head
+                snapshot["sources"][0]["revision"] = new_head
+                snapshot["operation_id"] = "op-v2"
+                snapshot["artifact_revision"] = "art-v2"
+                snapshot["previous_artifact_revision"] = "art-v1"
+                new_change = copy.deepcopy(prior_change)
+                new_change.update(
+                    id="DIF-002",
+                    before_revision=old_head,
+                    after_revision=new_head,
+                    locator="src/current.py",
+                    classification=current_class,
+                    feature_ids=["FEAT-001"] if current_class == "impact" else [],
+                    reason="Current PR source change reviewed",
+                )
+                if current_class == "no_impact":
+                    new_change["approval_ref"] = "approval/current"
+                correction = copy.deepcopy(prior_change)
+                correction.update(
+                    id="DIF-003",
+                    supersedes_id="DIF-001",
+                    classification=reviewed_class,
+                    feature_ids=["FEAT-001"] if reviewed_class == "impact" else [],
+                    evidence_ref="review/old-diff-correction",
+                    approval_ref="approval/reclassification",
+                    approval_revision="approval-v2",
+                    reason="Historical source revision reviewed",
+                )
+                snapshot["changes"].extend([new_change, correction])
+                report = handle(data)
+                self.assertEqual(report["status"], "complete", report)
+                self.assertEqual(
+                    report["metrics"]["change_classification"]["denominator_ids"],
+                    ["DIF-002"],
+                )
+                self.assertEqual(report["handoff"]["impacted_feature_ids"], impacted)
+                self.assertEqual(
+                    report["handoff"]["approval_required_change_ids"], approvals
+                )
+
     def test_same_git_revision_pair_cannot_have_conflicting_active_difs(self) -> None:
         data = fixture()
         duplicate = copy.deepcopy(data["snapshot"]["changes"][0])
