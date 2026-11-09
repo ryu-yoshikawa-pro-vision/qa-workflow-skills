@@ -35,3 +35,5 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 同一artifactの更新では、前回のsource IDのkind/ref/scope、候補IDのsource_ids/evidence_ref、差分IDのsource_id/before_revision/after_revision/locatorを同じIDのまま別の意味に変更できません。変更分類や未解決候補の判定状態の更新は認めます。正式なsource移設・diff改版時はIDを再利用せず新規登録と履歴の参照を保持します。
 
 既存機能のname変更には`renamed`または`changed`、実装参照・status・親・仕様／QA参照等の変更には`changed`の追記履歴（対象IDをfrom_ids/to_idsへ記録し、今回source_revisionを付ける）が必要です。廃止は従来どおりretired等の履歴を要求します。`no_impact`も`out_of_scope`と同様に理由と承認refが必要で、実認証・承認scopeの真正性は別途確認します。
+
+同じローカル保存先を明示選択した案件では`feature_registry.persist_snapshot(store,request,expected_revision,approval_ref,approval_revision,change_reason)`が既存保存済みsnapshotの独立再取得後にnative CASで保存します。元snapshotの意味上の一致・provider revision・snapshot hashを別に検証し、未解決項目があれば`analysis_status=incomplete`を維持します。外部保存providerの選択・認証は信頼済み呼出し元の責務です。

@@ -23,3 +23,9 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 既存stable keyの更新候補は変更理由を必須とし、返すdraftにはartifact ref、expected revision、source ref/revisionと変更理由を保持します。これらの文字列を保存時の認証や元文書の現在性の証明には使いません。
 
 更新値の安全条件：scalar/pathは単一行、pathは案件rootからの相対参照のみを受け付けます。絶対path、drive指定、`..`、URI・ホーム参照を拒否します。既存文書の読取互換性を維持するため、この制約は更新する値へ適用します。16節外の数値見出しを挿入した文書も拒否します。
+
+## 明示選択されたローカル保存先での永続化
+
+`scripts/artifact_store.py` の `LocalArtifactStore` は、許可されたローカルroot内に所有者限定SQLiteを設け、`project-context`／`feature-inventory`のnative transactionによる新規作成・revision CAS・immutable履歴・独立読戻しを行います。遠隔providerの代替ではありません。Pythonの信頼済み呼出し元は`authorize(request)`を渡して認証済み承認のscope／revision／許可を保存直前に検証します。JSONの`approval_ref`単独では権限を証明できません。
+
+`persist_prepared(store,preparation,project_ref,operation_id,approval_ref,approval_revision)`は、同じhelperの準備操作から作った候補だけを保存します。既存更新では元の保存本文とexpected revisionを再取得して照合し、競合・未承認・readback不一致を拒否します。返す保存先revisionは候補のローカル論理revisionと別に保持します。初回作成時も根拠のsource ref/revisionと変更理由が必要です。

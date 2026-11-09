@@ -14,8 +14,9 @@ description: 初回製品分析・PR更新・merge・release・資料改版のUI
 5. Gitの全ファイルとbase→headの差分は許可されたlocal checkoutのfull commit SHAに対しscripts/git_source_inventory.pyで列挙します。renameをold/new pathで記録し、列挙失敗・未対応データをcompleteにしません。Issueや外部設計の取得には許可済みの提供手段を使用します。
 6. scripts/feature_registry.pyでsource inventory、feature hierarchy、candidate、変更分類、履歴、旧HEAD、分母0を検証します。結果のcompleteは宣言された情報源境界での機械検証であり、製品全機能の発見保証ではありません。
    Git差分がある場合、scripts/reconcile_git_coverage.pyでGit列挙した全変更pathと機能差分台帳を突き合わせます。未登録変更を分類済みと報告せず、製品CIへはこの照合結果も渡します。
-7. 案件の保存先がnative CASと履歴・独立readbackを保証できない場合は保存をblockします。認証済みの承認を得る前に対象外へ変更しません。
-8. 下流へ機能ID・source refs/revisions・未分類・未知領域・成果物ref/revisionを渡します。仕様Authorityはspec-analysis、Product Riskはtest-analysis、正式TCNはtest-condition-designが正本です。
+7. 明示選択されたローカル保存先ではproject-context/scripts/artifact_store.pyとpersist_snapshotでCAS・履歴・独立readbackを検証します。未選定の遠隔保存providerの代用にはしません。
+8. 案件の保存先がnative CASと履歴・独立readbackを保証できない場合は保存をblockします。認証済みの承認を得る前に対象外へ変更しません。
+9. 下流へ機能ID・source refs/revisions・未分類・未知領域・成果物ref/revisionを渡します。仕様Authorityはspec-analysis、Product Riskはtest-analysis、正式TCNはtest-condition-designが正本です。
 
 ## リソース
 

@@ -20,6 +20,7 @@ from artifact_graph import (  # noqa: E402
     validate_required_context_fields,
 )
 from project_context_ids import handle as identity_handle  # noqa: E402
+from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 
 MAX_BYTES = 16 * 1024 * 1024
 TEMPLATE = SHARED / "assets" / "project-context-template.md"
@@ -401,6 +402,60 @@ def placement(request: dict[str, Any]) -> dict[str, Any]:
         "approval_ref": existing["approval_ref"],
         "reason": "trusted_approval_and_current_scope_must_be_verified",
     }
+
+
+def persist_prepared(
+    store: LocalArtifactStore,
+    preparation: dict[str, Any],
+    *,
+    project_ref: str,
+    operation_id: str,
+    approval_ref: str,
+    approval_revision: str,
+) -> dict[str, Any]:
+    """Persist only a freshly prepared candidate through an authorized store.
+
+    The caller must be a trusted application; the public JSON CLI cannot
+    grant itself approval by attaching an arbitrary approval_ref.
+    """
+    try:
+        operation = preparation.get("operation")
+        if operation not in {"prepare-create", "prepare-update", "prepare-ids"}:
+            raise Invalid("unsupported_persistence_operation")
+        draft = handle(preparation)
+        if draft["status"] != "draft":
+            return draft
+        markdown = draft["artifact_markdown"]
+        project_ref = _single_line(project_ref, "project_ref")
+        if _project_name(markdown) != project_ref:
+            raise Invalid("project_scope_mismatch")
+        artifact_ref = _single_line(preparation.get("artifact_ref"), "artifact_ref")
+        expected = draft.get("expected_revision")
+        current = store.read_current("project-context", project_ref, artifact_ref)
+        if expected is not None:
+            if current is None or current["revision"] != expected:
+                raise Invalid("revision_conflict")
+            if current["content"] != preparation.get("markdown"):
+                raise Invalid("previous_document_mismatch")
+        elif current is not None:
+            raise Invalid("create_if_absent_conflict")
+        result = store.write(
+            kind="project-context",
+            project_ref=project_ref,
+            artifact_ref=artifact_ref,
+            content=markdown,
+            expected_revision=expected,
+            operation_id=operation_id,
+            source_ref=preparation.get("source_ref"),
+            source_revision=preparation.get("source_revision"),
+            approval_ref=approval_ref,
+            approval_revision=approval_revision,
+            change_reason=preparation.get("change_reason"),
+        )
+        result["project_ref"] = project_ref
+        return result
+    except (Invalid, StoreError, KeyError, TypeError, ValueError) as exc:
+        return {"status": "blocked", "reason": str(exc)}
 
 
 def handle(request: Any) -> dict[str, Any]:

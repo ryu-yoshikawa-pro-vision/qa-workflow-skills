@@ -11,6 +11,11 @@ import json
 import re
 import sys
 from typing import Any
+from pathlib import Path
+
+PROJECT_CONTEXT_SCRIPT = Path(__file__).resolve().parents[2] / "project-context" / "scripts"
+sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPT))
+from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 
 MAX_INPUT = 16 * 1024 * 1024
 ID = re.compile(r"^(SRC|CAND|FEAT|DIF)-[0-9]{3,}$")
@@ -434,6 +439,56 @@ def analyze(request: Any) -> dict[str, Any]:
             "expected_source_ids": snapshot["expected_source_ids"],
         },
     }
+
+
+def persist_snapshot(
+    store: LocalArtifactStore,
+    request: dict[str, Any],
+    *,
+    expected_revision: str | None,
+    approval_ref: str,
+    approval_revision: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    """Persist a validated inventory using the actual saved predecessor."""
+    try:
+        report = handle(request)
+        if report["status"] not in {"complete", "incomplete"}:
+            return report
+        snapshot = request["snapshot"]
+        project_ref = snapshot["project_ref"]
+        artifact_ref = snapshot["artifact_ref"]
+        current = store.read_current("feature-inventory", project_ref, artifact_ref)
+        if current is None:
+            if expected_revision is not None or request["previous_snapshot"] is not None:
+                raise ContractError("previous_snapshot_missing")
+        else:
+            if current["revision"] != expected_revision:
+                raise ContractError("revision_conflict")
+            old = json.loads(current["content"])
+            if old != request["previous_snapshot"]:
+                raise ContractError("previous_snapshot_not_current")
+        content = json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        written = store.write(
+            kind="feature-inventory",
+            project_ref=project_ref,
+            artifact_ref=artifact_ref,
+            content=content,
+            expected_revision=expected_revision,
+            operation_id=snapshot["operation_id"],
+            source_ref=project_ref,
+            source_revision=snapshot["source_revision"],
+            approval_ref=approval_ref,
+            approval_revision=approval_revision,
+            change_reason=change_reason,
+        )
+        written["analysis_status"] = report["status"]
+        written["snapshot_sha256"] = report["handoff"]["snapshot_sha256"]
+        return written
+    except (ContractError, StoreError, KeyError, TypeError, ValueError) as exc:
+        return {"status": "blocked", "reasons": [str(exc)], "metrics": None}
 
 
 def handle(request: Any) -> dict[str, Any]:

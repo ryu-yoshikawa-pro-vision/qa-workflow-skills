@@ -13,7 +13,7 @@ description: QA案件のProject Contextを初回発見・新規初期化・必�
 4. Section 12/13のDEC/ASM正本は既存project_context_ids.pyを利用し、独立したID正本を新設しません。Section 16のstable key解析とcurrentnessは既存artifact_graph.pyを使用します。 正本ownerがこの文書の案件だけ、prepare-idsで既存ID helperによる採番・履歴を使用します。
 5. 初回配置と人間編集方針は、既存正本と編集可能範囲を調べたうえで利用者に合意を求めます。合意済み方針のscope・revision・失効条件を確認し、条件が変わらなければ再承認を繰返しません。Section 14の正本参照を第二の正本にしません。
 6. 決定論的な発見・候補作成・field更新の判定はscripts/project_context.pyを使用します。このhelperのdraftやreuse_candidateは保存成功・認証済み承認ではありません。
-7. 書込みは案件の許可されたproviderによるnative create-if-absent／CAS、履歴取得、独立readback、実認証済み承認の条件が揃ってから実行します。不足時はその操作をblockし、読取専用分析を止めません。
+7. 明示されたローカル保存providerではscripts/artifact_store.pyのLocalArtifactStoreとpersist_preparedを使用します。認証済み権限・承認の照合は信頼済み呼出し元のauthorize callbackで行い、CLI入力だけで許可しません。書込みは案件の許可されたproviderによるnative create-if-absent／CAS、履歴取得、独立readback、実認証済み承認の条件が揃ってから実行します。不足時はその操作をblockし、読取専用分析を止めません。
 
 ## リソース
 
