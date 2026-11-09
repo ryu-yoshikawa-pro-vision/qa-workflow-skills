@@ -227,7 +227,10 @@ class OtherRunnerReportTests(unittest.TestCase):
                     "path": "tests/batch.py",
                     "title_path": ["batch", "one"],
                     "status": "passed",
-                    "attempt_results": [{"status": "failed", "retry": 0}, {"status": "passed", "retry": 1}],
+                    "attempt_results": [
+                        {"status": "failed", "retry": 0},
+                        {"status": "passed", "retry": 1},
+                    ],
                 },
                 {
                     "path": "tests/batch.py",
