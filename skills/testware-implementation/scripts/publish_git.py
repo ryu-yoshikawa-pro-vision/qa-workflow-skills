@@ -86,7 +86,13 @@ def publish(
         ):
             raise PublishError("path_out_of_scope")
         mode = _git(repo, "ls-tree", candidate, "--", path).split("\t")
-        if mode and mode[0] and not mode[0].startswith("100644 blob ") and not mode[0].startswith("100755 blob "):
+        if (
+            len(mode) != 2
+            or not (
+                mode[0].startswith("100644 blob ")
+                or mode[0].startswith("100755 blob ")
+            )
+        ):
             raise PublishError("non_regular_file_in_diff")
         process = subprocess.run(
             ["git", "-C", str(repo), "show", expected_head + ":" + path],
