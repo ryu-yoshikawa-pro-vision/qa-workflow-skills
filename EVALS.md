@@ -30,7 +30,7 @@
 
 正規の発火評価は**repositoryの全Skillを同一のAgentクライアント上で同時に利用可能**にし、クエリごとに独立したコンテキストで実行します。対象Skillの発火、想定外発火、ルーティングの正しさを確認します。
 
-対象Skillはcurrent repositoryの`skills/*/SKILL.md`から導出します。現在は`qa-workflow`、設計 / 実行Skill、`regression-testing`、`exploratory-testing`、`qa-knowledge`に加え、`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`を含みます。
+対象Skillはcurrent repositoryの`skills/*/SKILL.md`から導出します。Cの`ui-target-analysis`、Dの`test-item-analysis` / `test-condition-analysis`、Gの`testware-implementation` / `testware-execution`を含む全Skillを同一Agentで利用可能にし、Skill追加時はREADME catalogと各Skillのtrigger / semantic manifestも同期します。
 
 対象Skill単独または限定Skillだけを利用可能にする実行は診断モードです。正規の発火スコアには使いません。
 
@@ -283,35 +283,40 @@ skills/<skill>/evals/semantic/
         └── reference.md
 ```
 
-Skillごとのsemantic case数と合計は各`evals.json`から導出します。`evals.json`の各caseは、そのfixtureで評価可能な評価基準だけを`criteria`へ列挙します。`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`には、それぞれ別責務のsemantic casesとcritical criteriaを設けています。
+Skillごとのsemantic case数と合計は各`evals.json`から導出します。`evals.json`の各caseは、そのfixtureで評価可能な評価基準だけを`criteria`へ列挙します。case IDはSkillとそのSkillのmanifestの範囲で解決し、異なるSkill間の同一ID prefixを混同しません。`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`には、それぞれ別責務のsemantic casesとcritical criteriaを設けています。
 
 現在の意味評価で扱う拡張責務とcase対応は次のとおりです。
 
-| Skill                         | 責務                                                                                      | Case ID                                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `test-analysis`               | Domain Testing採用                                                                        | `RISK-SEM-003`                                                                           |
-| `test-analysis`               | CRUD Testing採用                                                                          | `RISK-SEM-004`                                                                           |
-| `test-analysis`               | Random Testing採用                                                                        | `RISK-SEM-005`                                                                           |
-| `test-analysis`               | Metamorphic Testing採用                                                                   | `RISK-SEM-006`                                                                           |
-| `test-analysis`               | Syntax-Based Testing採用                                                                  | `RISK-SEM-007`                                                                           |
-| `test-condition-design`       | Domain / CRUD / Random / Metamorphic / Syntax                                             | `TCN-SEM-003`, `TCN-SEM-004`, `TCN-SEM-005`, `TCN-SEM-006`                               |
-| `test-condition-design`       | Decision / Cause-Effect、classification / combination                                     | `TCN-SEM-007`, `TCN-SEM-008`                                                             |
-| `test-condition-design`       | state / flow / schema / UI                                                                | `TCN-SEM-009`, `TCN-SEM-010`, `TCN-SEM-011`                                              |
-| `test-condition-design`       | test data / merge / disposition                                                           | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014`                                              |
-| `test-case-design`            | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle         | `TC-SEM-001`                                                                             |
-| `adversarial-review`          | 新技法の6誤用                                                                             | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008` |
-| `test-target-inspection`      | 実対象currentness、条件・鮮度、snapshot、視覚・副作用・secret境界                         | `TTI-SEM-001`, `TTI-SEM-002`                                                             |
-| `test-execution`              | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup                           | `TEX-SEM-001`, `TEX-SEM-002`                                                             |
-| `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                                   | `WF-SEM-003`                                                                             |
-| `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                           | `REG-SEM-001` ～ `REG-SEM-006`                                                           |
-| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                         | `EXP-SEM-001` ～ `EXP-SEM-005`                                                           |
-| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                 | `KN-SEM-001` ～ `KN-SEM-007`                                                             |
-| `usability-evaluation`        | reference/evidenceに基づくUI/UX意味評価と追加観測境界                                     | `UE-SEM-001` ～ `UE-SEM-012`                                                             |
-| `usability-inspection`        | live observation、scope、fixed probe、measurement、安全境界                               | `UI-SEM-001` ～ `UI-SEM-033`                                                             |
-| `wcag-conformance-evaluation` | WCAG-EM procedure、sample、handoff、formal report、EARL                                   | `WCAG-SEM-001` ～ `WCAG-SEM-038`                                                         |
-| `spec-analysis`               | UI対象・US / UC / Behavior / AC分解、UNKNOWN lifecycle、Repository / owner / file trigger | `SPEC-SEM-003`, `SPEC-SEM-004`, `SPEC-SEM-005`, `SPEC-SEM-006`, `SPEC-SEM-007`           |
-| `question-analysis`           | 暫定回答、same-UNKNOWN reopen、Q / UNKNOWN identity lifecycle                             | `QUESTION-SEM-003`, `QUESTION-SEM-004`                                                   |
-| `test-requirement-design`     | UI target artifact modeのAC→検証責務、Authority独立closure                                | `TR-SEM-003`                                                                             |
+| Skill                         | 責務                                                                                        | Case ID                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `test-analysis`               | Domain Testing採用                                                                          | `RISK-SEM-003`                                                                                                         |
+| `test-analysis`               | CRUD Testing採用                                                                            | `RISK-SEM-004`                                                                                                         |
+| `test-analysis`               | Random Testing採用                                                                          | `RISK-SEM-005`                                                                                                         |
+| `test-analysis`               | Metamorphic Testing採用                                                                     | `RISK-SEM-006`                                                                                                         |
+| `test-analysis`               | Syntax-Based Testing採用                                                                    | `RISK-SEM-007`                                                                                                         |
+| `test-condition-design`       | Domain / CRUD / Random / Metamorphic / Syntax                                               | `TCN-SEM-003`, `TCN-SEM-004`, `TCN-SEM-005`, `TCN-SEM-006`                                                             |
+| `test-condition-design`       | Decision / Cause-Effect、classification / combination                                       | `TCN-SEM-007`, `TCN-SEM-008`                                                                                           |
+| `test-condition-design`       | state / flow / schema / UI                                                                  | `TCN-SEM-009`, `TCN-SEM-010`, `TCN-SEM-011`                                                                            |
+| `test-condition-design`       | test data / merge / disposition                                                             | `TCN-SEM-012`, `TCN-SEM-013`, `TCN-SEM-014`                                                                            |
+| `test-case-design`            | canonical CI Machine Entityからの具体TC展開、環境・test data、Authority限定Oracle           | `TC-SEM-001`                                                                                                           |
+| `test-item-analysis`          | テストアイテム候補とscope分割                                                               | `ITEM-SEM-001`                                                                                                         |
+| `test-condition-analysis`     | 既存の正式設計を先取りしない条件候補                                                        | `COND-SEM-001`                                                                                                         |
+| `adversarial-review`          | 新技法とE2E / 非E2E testwareの独立レビュー                                                  | `REV-SEM-003`, `REV-SEM-004`, `REV-SEM-005`, `REV-SEM-006`, `REV-SEM-007`, `REV-SEM-008`, `REV-SEM-009`, `REV-SEM-010` |
+| `test-target-inspection`      | 実対象currentness、条件・鮮度、snapshot、視覚・副作用・secret境界                           | `TTI-SEM-001`, `TTI-SEM-002`                                                                                           |
+| `test-execution`              | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup                             | `TEX-SEM-001`, `TEX-SEM-002`                                                                                           |
+| `testware-implementation`     | 非E2E testwareの実装、検証、期待仕様とUI観測の分離                                          | `TW-IMPL-SEM-001`                                                                                                      |
+| `testware-execution`          | runner safety、開始前確認、実行結果、cleanup                                                | `TW-EXEC-SEM-001`                                                                                                      |
+| `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                                     | `WF-SEM-003`                                                                                                           |
+| `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                             | `REG-SEM-001` ～ `REG-SEM-006`                                                                                         |
+| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                           | `EXP-SEM-001` ～ `EXP-SEM-005`                                                                                         |
+| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                   | `KN-SEM-001` ～ `KN-SEM-007`                                                                                           |
+| `usability-evaluation`        | reference/evidenceに基づくUI/UX意味評価と追加観測境界                                       | `UE-SEM-001` ～ `UE-SEM-012`                                                                                           |
+| `usability-inspection`        | live observation、scope、fixed probe、measurement、安全境界                                 | `UI-SEM-001` ～ `UI-SEM-033`                                                                                           |
+| `wcag-conformance-evaluation` | WCAG-EM procedure、sample、handoff、formal report、EARL                                     | `WCAG-SEM-001` ～ `WCAG-SEM-038`                                                                                       |
+| `ui-target-analysis`          | UI構造・操作・状態・遷移、human editing、ui-target-v1 history / migration                   | `UI-SEM-001` ～ `UI-SEM-006`                                                                                           |
+| `spec-analysis`               | 期待仕様のAuthority、US / UC / Behavior / AC、UNKNOWN lifecycle、Repository / owner trigger | `SPEC-SEM-003`, `SPEC-SEM-004`, `SPEC-SEM-005`, `SPEC-SEM-006`, `SPEC-SEM-007`                                         |
+| `question-analysis`           | 暫定回答、same-UNKNOWN reopen、Q / UNKNOWN identity lifecycle                               | `QUESTION-SEM-003`, `QUESTION-SEM-004`                                                                                 |
+| `test-requirement-design`     | ui-target-analysis packageのAC→検証責務、Authority独立closure                               | `TR-SEM-003`                                                                                                           |
 
 `rubric.json`の評価基準は`id`, `title`, `description`, `critical`を持ちます。重み付きスコアは持ちません。
 
