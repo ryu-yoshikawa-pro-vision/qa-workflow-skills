@@ -149,7 +149,8 @@ def analyze(request: Any) -> dict[str, Any]:
         old = [
             row
             for row in old_sources
-            if isinstance(row, dict) and row.get("id") == source_id
+            if isinstance(row, dict)
+            and row.get("id") == source_id
             and row.get("kind") == "code"
         ]
         if len(old) != 1:
