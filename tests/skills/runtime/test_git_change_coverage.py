@@ -170,8 +170,7 @@ class GitChangeCoverageTests(unittest.TestCase):
         self.assertEqual(result["status"], "complete", result)
         self.assertEqual(len(result["coverage"]["previous_head_change_paths"]), 2)
         req["previous_head_git_inventory"]["changes"].append(
-            {"status": "D", "before_path": "transient.py",
-             "after_path": "transient.py"}
+            {"status": "D", "before_path": "transient.py", "after_path": "transient.py"}
         )
         result = reconcile(req)
         self.assertEqual(result["status"], "incomplete", result)

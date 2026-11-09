@@ -123,14 +123,22 @@ class GitSourceInventoryTests(unittest.TestCase):
         env.pop("QA_FEATURE_AUTHORIZED_ROOT", None)
         command = [sys.executable, str(script)]
         denied = subprocess.run(
-            command, input=json.dumps(request), env=env,
-            text=True, capture_output=True, check=True
+            command,
+            input=json.dumps(request),
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
         )
         self.assertEqual(json.loads(denied.stdout)["status"], "blocked")
         env["QA_FEATURE_AUTHORIZED_ROOT"] = str(self.root)
         accepted = subprocess.run(
-            command, input=json.dumps(request), env=env,
-            text=True, capture_output=True, check=True
+            command,
+            input=json.dumps(request),
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
         )
         self.assertEqual(json.loads(accepted.stdout)["status"], "complete")
 

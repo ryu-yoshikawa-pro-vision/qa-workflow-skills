@@ -38,9 +38,11 @@ def _text(value: Any, name: str) -> str:
 def analyze(request: Any) -> dict[str, Any]:
     required = {"git_inventory", "registry_request", "source_id"}
     allowed = required | {"previous_head_git_inventory"}
-    if not isinstance(request, dict) or not required <= set(request) or not set(
-        request
-    ) <= allowed:
+    if (
+        not isinstance(request, dict)
+        or not required <= set(request)
+        or not set(request) <= allowed
+    ):
         raise Invalid("request_schema_invalid")
     source_id = _text(request["source_id"], "source_id")
     git = request["git_inventory"]
@@ -79,10 +81,7 @@ def analyze(request: Any) -> dict[str, Any]:
     if event in {"pr_update", "rebase"}:
         if not isinstance(basis, dict):
             raise Invalid("event_basis_required")
-        if (
-            git.get("base_sha") != basis["base_sha"]
-            or head_sha != basis["head_sha"]
-        ):
+        if git.get("base_sha") != basis["base_sha"] or head_sha != basis["head_sha"]:
             return {
                 "status": "stale",
                 "reasons": ["pr_base_head_inventory_mismatch"],
