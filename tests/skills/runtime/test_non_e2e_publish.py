@@ -135,10 +135,10 @@ class GitPublishTests(unittest.TestCase):
         git(self.b, "fetch", "-q", "origin", "fixture")
         self.assertFalse(
             subprocess.run(
-                ["git", "-C", str(self.b), "cat-file", "-e",
-                 "FETCH_HEAD:" + path],
+                ["git", "-C", str(self.b), "cat-file", "-e", "FETCH_HEAD:" + path],
                 capture_output=True,
-            ).returncode == 0
+            ).returncode
+            == 0
         )
 
     def test_remote_rewind_between_read_and_push_is_rejected(self):

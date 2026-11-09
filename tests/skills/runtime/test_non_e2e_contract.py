@@ -198,34 +198,52 @@ class VitestTests(unittest.TestCase):
 
     def test_vitest_project_requires_verifiable_single_project(self):
         report = {
-            "success": True, "numTotalTests": 1, "numPassedTests": 1,
-            "numFailedTests": 0, "numPendingTests": 0, "numTodoTests": 0,
-            "testResults": [{
-                "name": "tests/one.test.ts", "status": "passed",
-                "assertionResults": [{
-                    "ancestorTitles": [""], "title": "case", "status": "passed",
-                }],
-            }],
+            "success": True,
+            "numTotalTests": 1,
+            "numPassedTests": 1,
+            "numFailedTests": 0,
+            "numPendingTests": 0,
+            "numTodoTests": 0,
+            "testResults": [
+                {
+                    "name": "tests/one.test.ts",
+                    "status": "passed",
+                    "assertionResults": [
+                        {
+                            "ancestorTitles": [""],
+                            "title": "case",
+                            "status": "passed",
+                        }
+                    ],
+                }
+            ],
         }
         item = {
-            "path": "tests/one.test.ts", "title_path": ["case"],
+            "path": "tests/one.test.ts",
+            "title_path": ["case"],
             "project_name": "node",
         }
         kwargs = dict(
-            report=report, source_revision="sha", raw_ref="raw",
+            report=report,
+            source_revision="sha",
+            raw_ref="raw",
             selection_verified=True,
         )
         with self.assertRaisesRegex(contract.ContractError, "project_identity"):
             contract.reconcile_vitest(selected=[item], **kwargs)
         good = contract.reconcile_vitest(
-            selected=[item], project_name="node", project_verified=True,
+            selected=[item],
+            project_name="node",
+            project_verified=True,
             **kwargs,
         )
         self.assertTrue(good["collection_complete"])
         with self.assertRaisesRegex(contract.ContractError, "project_identity"):
             contract.reconcile_vitest(
                 selected=[item, {**item, "project_name": "browser"}],
-                project_name="node", project_verified=True, **kwargs,
+                project_name="node",
+                project_verified=True,
+                **kwargs,
             )
 
     def test_duplicates_are_not_implicitly_matched(self):
@@ -448,17 +466,23 @@ class OtherRunnerReportTests(unittest.TestCase):
             "testware_revision": "b",
             "runner_version": "c",
             "complete": True,
-            "results": [{
-                "path": "tests/event.py",
-                "title_path": ["", "one"],
-                "status": "passed",
-                "attempt_results": [{"status": "passed", "retry": 0}],
-            }],
+            "results": [
+                {
+                    "path": "tests/event.py",
+                    "title_path": ["", "one"],
+                    "status": "passed",
+                    "attempt_results": [{"status": "passed", "retry": 0}],
+                }
+            ],
         }
         with self.assertRaisesRegex(contract.ContractError, "invalid_title"):
             contract.reconcile_case_report(
-                selected=selected, report=report, source_revision="a",
-                testware_revision="b", runner_version="c", raw_ref="raw",
+                selected=selected,
+                report=report,
+                source_revision="a",
+                testware_revision="b",
+                runner_version="c",
+                raw_ref="raw",
                 selection_verified=True,
             )
 
@@ -592,28 +616,42 @@ class OtherRunnerReportTests(unittest.TestCase):
     def test_playwright_root_dir_normalization_and_escape(self):
         report = {
             "config": {"version": "fixture", "rootDir": "/work/project/tests"},
-            "suites": [{
-                "title": "api.spec.ts",
-                "specs": [{
-                    "file": "api.spec.ts", "title": "request",
-                    "tests": [{
-                        "projectName": "api", "expectedStatus": "passed",
-                        "status": "expected",
-                        "results": [{"status": "passed", "retry": 0}],
-                    }],
-                }],
-            }],
+            "suites": [
+                {
+                    "title": "api.spec.ts",
+                    "specs": [
+                        {
+                            "file": "api.spec.ts",
+                            "title": "request",
+                            "tests": [
+                                {
+                                    "projectName": "api",
+                                    "expectedStatus": "passed",
+                                    "status": "expected",
+                                    "results": [{"status": "passed", "retry": 0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
             "errors": [],
             "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
         }
         params = dict(
-            selected=[{
-                "path": "tests/api.spec.ts", "title_path": ["request"],
-                "project_name": "api",
-            }],
-            report=report, repo_root="/work/project",
-            source_revision="sha", runner_version="fixture",
-            raw_ref="raw", selection_verified=True,
+            selected=[
+                {
+                    "path": "tests/api.spec.ts",
+                    "title_path": ["request"],
+                    "project_name": "api",
+                }
+            ],
+            report=report,
+            repo_root="/work/project",
+            source_revision="sha",
+            runner_version="fixture",
+            raw_ref="raw",
+            selection_verified=True,
         )
         self.assertTrue(contract.reconcile_playwright(**params)["collection_complete"])
         report["config"]["rootDir"] = "/outside/tests"

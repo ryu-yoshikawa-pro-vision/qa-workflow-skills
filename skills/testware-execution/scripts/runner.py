@@ -490,8 +490,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     raise RunnerError("vitest_multi_project_requires_separate_runs")
                 project_name = next(iter(named))
                 if not any(
-                    (arg == "--project" and index + 1 < len(command)
-                     and command[index + 1] == project_name)
+                    (
+                        arg == "--project"
+                        and index + 1 < len(command)
+                        and command[index + 1] == project_name
+                    )
                     or arg == "--project=" + project_name
                     for index, arg in enumerate(command)
                 ):
@@ -597,7 +600,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             }
                             selected_project = (
                                 next(iter(named_projects))
-                                if None not in named_projects else None
+                                if None not in named_projects
+                                else None
                             )
                             reconciliation = reconcile_vitest(
                                 **shared,

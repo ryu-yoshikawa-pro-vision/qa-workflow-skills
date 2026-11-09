@@ -61,7 +61,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     mode = parse_bullets(text).get("レビュー種別", "")
     target = parse_bullets(text).get("対象 / 実行範囲", "")
     if (
-        "非E2E" in mode or "静的レビュー" in mode
+        "非E2E" in mode
+        or "静的レビュー" in mode
         or target in {"非E2E testware", "要求・設計・コードの静的レビュー"}
     ):
         scope_table = find_table(
@@ -77,7 +78,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             ),
         )
         result.add(
-            "REV-D015", scope_table is not None,
+            "REV-D015",
+            scope_table is not None,
             "非E2E・静的レビューの対象revisionと根拠の表があること",
         )
         if scope_table is not None:

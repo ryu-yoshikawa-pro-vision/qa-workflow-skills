@@ -43,9 +43,7 @@ def _git(repo: Path, *args: str) -> str:
 
 def _changed_paths(repo: Path, base: str, candidate: str) -> list[str]:
     # --name-only without -z C-quotes non-ASCII, tabs and newlines.
-    raw = _git_bytes(
-        repo, "diff", "-z", "--name-only", "--no-renames", base, candidate
-    )
+    raw = _git_bytes(repo, "diff", "-z", "--name-only", "--no-renames", base, candidate)
     if not raw or not raw.endswith(b"\x00"):
         raise PublishError("invalid_diff_paths")
     return [item.decode("utf-8", "strict") for item in raw[:-1].split(b"\x00")]
@@ -103,13 +101,11 @@ def publish(
         new_entry = _git(repo, "ls-tree", candidate, "--", path)
         old_entry = _git(repo, "ls-tree", expected_head, "--", path)
         if new_entry and not (
-            new_entry.startswith("100644 blob ")
-            or new_entry.startswith("100755 blob ")
+            new_entry.startswith("100644 blob ") or new_entry.startswith("100755 blob ")
         ):
             raise PublishError("non_regular_file_in_diff")
         if old_entry and not (
-            old_entry.startswith("100644 blob ")
-            or old_entry.startswith("100755 blob ")
+            old_entry.startswith("100644 blob ") or old_entry.startswith("100755 blob ")
         ):
             raise PublishError("non_regular_file_in_base")
         if not old_entry and not new_entry:
@@ -137,9 +133,13 @@ def publish(
     target_ref = "refs/heads/" + branch
     process = subprocess.run(
         [
-            "git", "-C", str(repo), "push",
+            "git",
+            "-C",
+            str(repo),
+            "push",
             "--force-with-lease=" + target_ref + ":" + expected_head,
-            remote, candidate + ":" + target_ref,
+            remote,
+            candidate + ":" + target_ref,
         ],
         capture_output=True,
         check=False,

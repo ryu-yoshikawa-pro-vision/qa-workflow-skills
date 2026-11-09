@@ -82,8 +82,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         tables,
         section_contains="Cleanupと診断",
         required_headers=(
-            "元run ref", "原因候補・確度", "根拠・反証",
-            "不足証拠", "修正／再実行先",
+            "元run ref",
+            "原因候補・確度",
+            "根拠・反証",
+            "不足証拠",
+            "修正／再実行先",
         ),
     )
     for identifier, table, description in (

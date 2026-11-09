@@ -57,7 +57,9 @@ class NonE2EOutputValidationTests(unittest.TestCase):
         self.assertEqual(validate("testware-execution", empty_cleanup).status, "fail")
 
     def test_implementation_requires_testware_and_handoff(self):
-        report = fill_template("skills/testware-implementation/assets/output-template.md")
+        report = fill_template(
+            "skills/testware-implementation/assets/output-template.md"
+        )
         self.assertEqual(validate("testware-implementation", report).status, "pass")
         incomplete = report.split("## testwareと検証")[0]
         checked = validate("testware-implementation", incomplete)
@@ -93,9 +95,7 @@ class NonE2EOutputValidationTests(unittest.TestCase):
             "adversarial-review", complete.replace("| src:r1 |", "| |")
         )
         self.assertEqual(status(empty_revision, "REV-D016"), "fail")
-        legacy = validate(
-            "adversarial-review", "- レビュー種別: テスト設計成果物\n"
-        )
+        legacy = validate("adversarial-review", "- レビュー種別: テスト設計成果物\n")
         self.assertIsNone(status(legacy, "REV-D015"))
 
 

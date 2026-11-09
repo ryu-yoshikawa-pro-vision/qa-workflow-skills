@@ -312,7 +312,9 @@ class ActualRunnerTests(unittest.TestCase):
         tool_dir.mkdir()
         for name in ("run", "cleanup"):
             script = tool_dir / name
-            script.write_text("#!/usr/bin/env python3\nprint('fixture')\n", encoding="utf-8")
+            script.write_text(
+                "#!/usr/bin/env python3\nprint('fixture')\n", encoding="utf-8"
+            )
             script.chmod(0o755)
         git(self.repo, "add", "tools")
         git(self.repo, "commit", "-qm", "fixture executables")
@@ -364,20 +366,28 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_bad_selected_identity_blocks_before_command(self):
         plan = self.plan([sys.executable, "-c", "print('should not run')"])
-        plan.update({
-            "reporter_format": "case-json", "testware_ref": "fixture",
-            "testware_revision": self.sha, "runner_version": "v1",
-            "selected": [None], "selection_verified": True,
-            "selection_evidence_ref": "fixture:selection",
-            "planned_scope_ref": "fixture:scope",
-        })
+        plan.update(
+            {
+                "reporter_format": "case-json",
+                "testware_ref": "fixture",
+                "testware_revision": self.sha,
+                "runner_version": "v1",
+                "selected": [None],
+                "selection_verified": True,
+                "selection_evidence_ref": "fixture:selection",
+                "planned_scope_ref": "fixture:scope",
+            }
+        )
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 2)
         self.assertEqual(summary["reason"], "invalid_selected_test")
         self.assertIsNone(artifact)
-        plan["selected"] = [{
-            "path": "tests/a.py", "title_path": [],
-        }]
+        plan["selected"] = [
+            {
+                "path": "tests/a.py",
+                "title_path": [],
+            }
+        ]
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 2)
         self.assertEqual(summary["reason"], "invalid_selected_test")
@@ -854,9 +864,17 @@ class ActualRunnerTests(unittest.TestCase):
         plan_file = Path(self.space.name) / "overflow.json"
         plan_file.write_text(raw, encoding="utf-8")
         proc = subprocess.run(
-            [sys.executable, str(RUNNER), "--plan", str(plan_file),
-             "--artifacts", str(self.logs)],
-            capture_output=True, text=True, timeout=15,
+            [
+                sys.executable,
+                str(RUNNER),
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(self.logs),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         self.assertEqual(proc.returncode, 2)
         self.assertEqual(json.loads(proc.stdout)["reason"], "nonfinite_json_number")
