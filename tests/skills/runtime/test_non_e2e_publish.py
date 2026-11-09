@@ -146,10 +146,12 @@ class GitPublishTests(unittest.TestCase):
         self._publish(self.a, self.base, first, "tests/case.txt", digest)
         second, digest = self._candidate(self.a, "tests/other.txt", "second\n")
         original_remote_head = MODULE._remote_head
+
         def rewind_after_read(repo, remote, branch):
             current = original_remote_head(repo, remote, branch)
             git(self.remote, "update-ref", "refs/heads/fixture", self.base)
             return current
+
         with mock.patch.object(MODULE, "_remote_head", side_effect=rewind_after_read):
             with self.assertRaisesRegex(
                 MODULE.PublishError, "push_rejected_or_response_unknown"
