@@ -518,8 +518,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     if result["direct_observation_verdict"] == "FAIL" and outcome == "runner_pass":
         result["outcome"] = "observed_FAIL"
     elif (
-        result["direct_observation_verdict"] == "判定不能"
-        and outcome == "runner_pass"
+        result["direct_observation_verdict"] == "判定不能" and outcome == "runner_pass"
     ):
         result["outcome"] = "observations_incomplete"
     if kind == "vitest":
