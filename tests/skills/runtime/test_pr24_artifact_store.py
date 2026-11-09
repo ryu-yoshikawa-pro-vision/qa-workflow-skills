@@ -454,7 +454,8 @@ class ArtifactStoreTests(unittest.TestCase):
                 "置換先ID": "",
                 "備考": (
                     "owner=project-context; target=qa/old; policy=policy-v1; "
-                    "editable=markdown/worktree; index=qa/feature-index.md"
+                    "editable=markdown/worktree; index=qa/feature-index.md; "
+                    "approval_revision=policy-v1"
                 ),
             },
         }

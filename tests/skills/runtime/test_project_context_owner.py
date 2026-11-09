@@ -429,7 +429,7 @@ class ProjectContextOwnerTests(unittest.TestCase):
                 "備考": (
                     "owner=project-context; target=qa/artifacts; "
                     "policy=policy-v1; editable=human-worktree; "
-                    "index=qa/features/index.md"
+                    "index=qa/features/index.md; approval_revision=approval-v1"
                 ),
             },
         }
