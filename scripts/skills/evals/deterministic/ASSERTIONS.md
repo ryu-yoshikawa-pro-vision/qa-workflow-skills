@@ -329,7 +329,7 @@
 - `REG-D011` TC routeと実施義務のある補助routeについて、source由来の実開始・result確定・raw結果投影・cleanup・義務不明なしを独立再計算し、満たさない場合にActivityを完了としない（旧Activityは従来規則）
 - `REG-D012` completed Activityのimmutable性
 - `REG-D013` Activityからidentityと固定snapshotを追跡
-- `REG-D014` fixture指定のartifact kindとの一致
+- `REG-D014` fixture指定のartifact kind、および指定がある場合のActivity状態・実施義務のある補助refとの一致
 - `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させず、補助結果の取得完全性（attempt・raw・cleanup・実装revision）をsourceと照合する
 - `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす

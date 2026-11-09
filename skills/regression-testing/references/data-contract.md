@@ -66,24 +66,29 @@ Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-te
 - 選定根拠が不明なまま値を推測しません。`completion_required`を持たない旧entryと、`auxiliary_routes`に無い旧`auxiliary_testware_refs`のrefは**義務不明**です。
 - TCなし補助は`tc_ref`を持たず、TC routeと`execution_ref`を共有しません。補助の件数・結果はTCのexecution / coverage分子へ加算しません。
 
-補助routeのsource executionは、TC routeと同じ項目に加えて`attempt_ref`（実run / attempt）、`raw_capture_complete`（raw結果取得の完全性）、`cleanup_status`、`implementation_revision`を返します。Activityの`auxiliary_route_results`はこれらをそのまま投影します。
+補助routeのsource executionは、TC routeと同じ項目に加えて`attempt_ref`（実run / attempt）、`raw_capture_complete`（raw結果取得の完全性）、`cleanup_status`、`implementation_revision`を返します。Activityの`auxiliary_route_results`はこれらをそのまま投影します。補助の`cleanup_status`をsourceが返さない場合は`対象なし`へ読み替えず`未確認`として扱い、確認できるまでActivityを`完了`にしません（TC routeの旧形式の既定値は変更しません）。
+
+`select_auxiliary_testware()`は`testware_details`（owner・実装revision）が無い呼び出しでは選定結果だけを返し、`execution_ready: false`でrouteにownerとrevisionを含めません。実行可能なRunにするにはownerとrevisionを解決して`execution_ready: true`を得てから`auxiliary_routes`を保存します。
 
 ## Activity完了判定
 
 `完了`は、今回Runの**全required TC route**と`completion_required=true`の**全補助route**について、実開始・owner側result確定・source result projection・（補助は）`raw_capture_complete`と`attempt_ref`・cleanup終了を確認でき、未解決と義務不明が無い場合だけです。両集合が空なら`完了`にしません。`completion_required=false`の候補は完了を妨げません。
 
-| 状況                                                                | `activity_state`                                                     |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 必須補助またはTC routeが未開始・blocked、cleanup未確認、未解決あり  | 開始済みの義務あり: `部分完了（ブロック中あり）`、なし: `ブロック中` |
-| 義務不明の補助がある（旧Run）                                       | 上と同じ（`auxiliary_obligation_unknown:<ref>`を`unresolved`へ追加） |
-| 実開始済みだが結果未確定・raw未取得・`attempt_ref`なし（timeout等） | `実行中`                                                             |
-| 補助のみのRunで必須補助が全て未開始かつblockedなし                  | `未開始`                                                             |
-| 上記以外で全義務を確認                                              | `完了`                                                               |
+| 状況                                                                | `activity_state`                                                                          |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 必須補助またはTC routeが未開始・blocked、cleanup未確認、未解決あり  | いずれかのrouteまたは必須補助が開始済み: `部分完了（ブロック中あり）`、なし: `ブロック中` |
+| 義務不明の補助がある（旧Run）                                       | 上と同じ（`auxiliary_obligation_unknown:<ref>`を`unresolved`へ追加）                      |
+| 実開始済みだが結果未確定・raw未取得・`attempt_ref`なし（timeout等） | `実行中`                                                                                  |
+| 補助のみのRunで必須補助が全て未開始かつblockedなし                  | `未開始`                                                                                  |
+| 上記以外で全義務を確認                                              | `完了`                                                                                    |
 
-実開始前のblockを実行済みにせず、skip・未実行・runnerエラー・試行途中timeoutを`executed` / `完了`へ変換しません。retryはsourceが返す最新attemptの確定結果だけを投影します。TC route / 補助routeとも、ownerが返した`implementation_revision`がRunの値と一致しない結果は実行済みに数えず、`implementation_revision_mismatch:<ref>`を未解決へ追加します。
+状態の判定は論理TC単位ではなくrouteの開始単位で行います（同じTCの一部のrouteだけ開始済みで残りがblockedなら`部分完了（ブロック中あり）`）。TC件数（`executed_tc_count`等）は全routeが開始済みのTCだけを数えます。`auxiliary_required_completed_count`は実開始・結果確定・raw取得・`attempt_ref`に加えてcleanup終了（`成功` / `対象なし` / `意図的に残した状態`）まで確認できた必須補助だけを数えます。
+
+実開始前のblockを実行済みにせず、skip・未実行・runnerエラー・試行途中timeoutを`executed` / `完了`へ変換しません。retryはsourceが返す最新attemptの確定結果だけを投影します。TC route / 補助routeとも、ownerが返した`implementation_revision`がRunの値と一致しない結果は実行済みに数えず、`implementation_revision_mismatch:<ref>`を未解決へ追加します。`testware` route・`completion_required=true`の補助routeでRunの`implementation_revision`が空・欠落している場合は照合できないため実行済みに数えず、`implementation_revision_missing:<ref>`を未解決へ追加します。
 
 ## 旧Run / Activityの互換
 
 - `route_contract_version`が無いRun / Activityは旧形式です。読取互換で保持し、保存済みの`完了`を遡って変更しません。旧Activityは従来規則（TC routeだけ）で検証します。
-- 旧形式のentryに`completion_required`を付けるには`route_contract_version: "2"`が必要です（versionなしで義務だけ主張できません）。
+- 旧形式のentryに`completion_required`を付けるには`route_contract_version: "2"`が必要です（versionなしで義務だけ主張できません）。`project_activity()`と`resolve_auxiliary_obligations()`も、versionなしのRunが持つ`completion_required`を信用せず義務不明として扱い、現在の利用者指示・policyで根拠を再確認します。
+- `route_contract_version`が存在するのに`"2"`以外（数値`2`・`"3"`等）の場合は、旧形式として扱わずvalidatorが拒否します。旧形式として扱えるのはfield自体が無い場合だけです。
 - 旧Runを新しい実行へ再開するときは`resolve_auxiliary_obligations()`で現在の利用者指示・policy・旧選定証拠から義務を解決します。解決できない補助が残る場合は`blocked`のままです。解決後のRunは新revisionとして保存し、完了済みActivityは書き換えず新Activityを使います。

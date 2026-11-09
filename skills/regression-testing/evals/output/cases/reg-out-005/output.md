@@ -27,13 +27,15 @@
       "actual_start_confirmed": false,
       "result_finalized": false,
       "source_result": "未実行",
-      "blocked": true
+      "blocked": true,
+      "cleanup_status": "対象なし"
     },
     "EXEC-A-002": {
       "start_state": "未開始",
       "actual_start_confirmed": false,
       "result_finalized": false,
-      "source_result": "未実行"
+      "source_result": "未実行",
+      "cleanup_status": "対象なし"
     }
   },
   "route_contract_version": "2",

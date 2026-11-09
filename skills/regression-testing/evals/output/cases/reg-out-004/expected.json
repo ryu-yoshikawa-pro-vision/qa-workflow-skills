@@ -1,3 +1,7 @@
 {
-  "artifact_type": "activity"
+  "artifact_type": "activity",
+  "activity_state": "完了",
+  "required_auxiliary_refs": [
+    "vitest:tests/unit/app-config.test.ts"
+  ]
 }

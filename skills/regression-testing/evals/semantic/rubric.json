@@ -40,7 +40,7 @@
     {
       "id": "REG-SEM-007",
       "title": "Testware routeと補助testwareの実施義務",
-      "description": "TCに紐付く非E2Eをtestware required routeとして固定し、今回実行する補助testwareを実施義務ありとして別集合で扱い、義務のある補助が未開始・blockedならActivityを完了にせず、参照のみの補助は妨げず、補助結果をTC件数やcoverageへ加算していないか。",
+      "description": "TCに紐付く非E2Eをtestware required routeとして固定し、今回実行する補助testwareを実施義務ありとして別集合で扱い、義務のある補助が未開始・blockedならActivityを完了にせず、参照のみの補助は妨げず、補助結果をTC件数やcoverageへ加算していないか。入力に無い補助testwareのimplementation_revisionやcleanup結果をTCや他routeの値から推測して補完せず、未解決（null / unresolved）として扱っているか。",
       "critical": true
     }
   ]

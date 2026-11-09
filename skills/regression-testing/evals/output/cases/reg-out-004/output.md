@@ -29,13 +29,15 @@
       "source_result": "PASS",
       "implementation_revision": "rev-2026-11-09",
       "attempt_ref": "attempt-a1",
-      "raw_capture_complete": true
+      "raw_capture_complete": true,
+      "cleanup_status": "対象なし"
     },
     "EXEC-A-002": {
       "start_state": "未開始",
       "actual_start_confirmed": false,
       "result_finalized": false,
-      "source_result": "未実行"
+      "source_result": "未実行",
+      "cleanup_status": "対象なし"
     }
   },
   "route_contract_version": "2",

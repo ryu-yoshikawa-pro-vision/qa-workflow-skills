@@ -696,21 +696,24 @@ def select_auxiliary_testware(
     for ref in sorted(requested | reference_only):
         detail = details.get(ref, {})
         is_required = ref in requested
-        routes.append(
-            {
-                "testware_ref": ref,
-                "executor_owner": detail.get("executor_owner"),
-                "implementation_revision": detail.get("implementation_revision"),
-                "selection_basis": (
-                    ("user_explicit" if ref in user_explicit else "policy")
-                    if is_required
-                    else "reference_only"
-                ),
-                "completion_required": is_required,
-            }
-        )
+        route: dict[str, Any] = {
+            "testware_ref": ref,
+            "selection_basis": (
+                ("user_explicit" if ref in user_explicit else "policy")
+                if is_required
+                else "reference_only"
+            ),
+            "completion_required": is_required,
+        }
+        if testware_details is not None:
+            route["executor_owner"] = detail.get("executor_owner")
+            route["implementation_revision"] = detail.get("implementation_revision")
+        routes.append(route)
+    # `testware_details`が無い呼び出しは選定結果だけを返す。ownerとrevisionが
+    # 無いrouteは`validate_auxiliary_routes()`に拒否されるため、実行可能とは言わない。
     return {
         "status": "ready",
+        "execution_ready": testware_details is not None,
         "selected_refs": sorted(requested),
         "auxiliary_routes": routes,
         "tc_member_count": 0,
@@ -764,6 +767,9 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
                 "selection_basis",
             ):
                 item[field] = route.get(field)
+        if "execution_ref" in route:
+            # Activity投影がsourceを引けるよう、実行済みrouteのexecution_refを保持する。
+            item["execution_ref"] = route["execution_ref"]
         normalized.append(item)
     return {"routes": normalized, "valid": not issues, "issues": issues}
 
@@ -843,9 +849,11 @@ def resolve_auxiliary_obligations(
     resolved: list[dict[str, Any]] = []
     unresolved: list[str] = []
     missing_details: list[str] = []
+    is_v2 = run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
     for entry in entries:
         ref = entry.get("testware_ref")
-        if type(entry.get("completion_required")) is bool:
+        # version無しの旧Runが持つ`completion_required`は根拠を確認できないため引き継がない。
+        if is_v2 and type(entry.get("completion_required")) is bool:
             resolved.append(entry)
             continue
         if ref in user_explicit:
@@ -899,9 +907,22 @@ def resolve_auxiliary_obligations(
     }
 
 
-def _revision_confirmed(declared: Any, source: dict[str, Any]) -> bool:
-    """旧build・別revisionの結果を今回の実行として数えない。"""
-    return not _text(declared) or source.get("implementation_revision") == declared
+def _revision_confirmed(
+    declared: Any, source: dict[str, Any], *, required: bool = False
+) -> bool:
+    """旧build・別revisionの結果を今回の実行として数えない。
+
+    `required`のroute（testware route・実施義務のある補助）は、宣言revisionが
+    欠落していれば照合できないため確認済みにしない。旧manual／e2e routeは従来どおり。
+    """
+    if not _text(declared):
+        return not required
+    return source.get("implementation_revision") == declared
+
+
+def _revision_issue(ref: Any, declared: Any) -> str:
+    kind = "missing" if not _text(declared) else "mismatch"
+    return f"implementation_revision_{kind}:{ref}"
 
 
 def project_activity(
@@ -922,11 +943,17 @@ def project_activity(
         started = (
             start_state == "開始済み" and source.get("actual_start_confirmed") is True
         )
-        revision_ok = _revision_confirmed(route.get("implementation_revision"), source)
+        revision_ok = _revision_confirmed(
+            route.get("implementation_revision"),
+            source,
+            required=route.get("route_type") == "testware",
+        )
         actual_start = started and revision_ok
         if started and not revision_ok:
             derived_unresolved.append(
-                f"implementation_revision_mismatch:{route.get('route_ref')}"
+                _revision_issue(
+                    route.get("route_ref"), route.get("implementation_revision")
+                )
             )
         source_result = source.get("source_result")
         result_finalized = source.get("result_finalized") is True
@@ -966,6 +993,7 @@ def project_activity(
         if ref not in covered
     ]
     auxiliary_projected: list[dict[str, Any]] = []
+    run_is_v2 = run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
     for route in auxiliary_entries:
         execution_ref = route.get("execution_ref")
         source = source_executions.get(execution_ref, {}) if execution_ref else {}
@@ -973,7 +1001,13 @@ def project_activity(
             source.get("start_state") == "開始済み"
             and source.get("actual_start_confirmed") is True
         )
-        revision_ok = _revision_confirmed(route.get("implementation_revision"), source)
+        required = route.get("completion_required")
+        # version無しの旧Runの値は根拠不明として扱い、義務を確定しない。
+        if not run_is_v2 or type(required) is not bool:
+            required = None
+        revision_ok = _revision_confirmed(
+            route.get("implementation_revision"), source, required=required is True
+        )
         shared = bool(execution_ref) and execution_ref in tc_execution_refs
         if shared:
             derived_unresolved.append(
@@ -981,12 +1015,11 @@ def project_activity(
             )
         if started and not revision_ok:
             derived_unresolved.append(
-                f"implementation_revision_mismatch:{route.get('testware_ref')}"
+                _revision_issue(
+                    route.get("testware_ref"), route.get("implementation_revision")
+                )
             )
         actual_start = started and revision_ok and not shared
-        required = route.get("completion_required")
-        if type(required) is not bool:
-            required = None
         source_result = source.get("source_result")
         auxiliary_projected.append(
             {
@@ -1003,7 +1036,8 @@ def project_activity(
                 "source_result_projectable": isinstance(source_result, str)
                 and bool(source_result.strip()),
                 "raw_capture_complete": source.get("raw_capture_complete") is True,
-                "cleanup_status": source.get("cleanup_status", "対象なし"),
+                # 補助のcleanupは明示された値だけを確認済みとし、欠落は未確認にする。
+                "cleanup_status": source.get("cleanup_status", "未確認"),
                 "evidence_refs": list(source.get("evidence_refs", [])),
                 "executed": actual_start,
                 "blocked": not actual_start
@@ -1048,11 +1082,15 @@ def project_activity(
             and item["source_result_projectable"]
             and item["raw_capture_complete"]
             and _text(item["attempt_ref"])
+            and item["cleanup_status"] in CLEANUP_CLOSED
         )
 
     unresolved_values = list(unresolved or [])
     unresolved_values += [v for v in derived_unresolved if v not in unresolved_values]
-    started_units = started_count + sum(i["executed"] for i in required_aux)
+    # 状態判定は論理TCではなくrouteの開始単位で数える（一部routeだけ開始済みも含む）。
+    started_units = sum(i["executed"] for i in projected) + sum(
+        i["executed"] for i in required_aux
+    )
     started_cleanups = [
         item["cleanup_status"]
         for item in [*projected, *auxiliary_projected]
