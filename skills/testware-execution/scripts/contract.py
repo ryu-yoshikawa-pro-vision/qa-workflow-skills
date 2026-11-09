@@ -350,12 +350,19 @@ def _reconcile_individual_results(
                 "expected_instances": count,
                 "collected_instances": len(matches),
                 "runner_status": status,
-                "attempt_results": matches[0]["attempt_results"] if len(matches) == 1 else [],
+                "attempt_results": matches[0]["attempt_results"]
+                if len(matches) == 1
+                else [],
                 "tc_verdict": None,
             }
         )
     unexpected = [
-        {"path": path, "title_path": list(titles), "project_name": project, "count": count}
+        {
+            "path": path,
+            "title_path": list(titles),
+            "project_name": project,
+            "count": count,
+        }
         for (path, titles, project), count in seen.items()
         if (path, titles, project) not in wanted
     ]
@@ -401,7 +408,13 @@ def reconcile_case_report(
     raw = report["results"]
     for item in raw:
         if not isinstance(item, dict) or item.get("status") not in {
-            "passed", "failed", "pending", "todo", "skipped", "timedOut", "interrupted"
+            "passed",
+            "failed",
+            "pending",
+            "todo",
+            "skipped",
+            "timedOut",
+            "interrupted",
         }:
             raise ContractError("invalid_case_status")
         attempts = item.get("attempt_results")
@@ -411,7 +424,11 @@ def reconcile_case_report(
             raise ContractError("invalid_case_attempts")
         for attempt in attempts:
             if not isinstance(attempt, dict) or attempt.get("status") not in {
-                "passed", "failed", "timedOut", "interrupted", "skipped"
+                "passed",
+                "failed",
+                "timedOut",
+                "interrupted",
+                "skipped",
             }:
                 raise ContractError("invalid_case_attempt_status")
     return _reconcile_individual_results(
@@ -461,7 +478,10 @@ def reconcile_playwright(
             title_path = [*titles, _required_str(spec.get("title"), "spec_title")]
             for test in spec["tests"]:
                 if not isinstance(test, dict) or test.get("status") not in {
-                    "expected", "unexpected", "flaky", "skipped"
+                    "expected",
+                    "unexpected",
+                    "flaky",
+                    "skipped",
                 }:
                     raise ContractError("invalid_playwright_test")
                 attempts = test.get("results")
@@ -472,7 +492,11 @@ def reconcile_playwright(
                 attempt_rows = []
                 for entry in attempts:
                     if not isinstance(entry, dict) or entry.get("status") not in {
-                        "passed", "failed", "timedOut", "interrupted", "skipped"
+                        "passed",
+                        "failed",
+                        "timedOut",
+                        "interrupted",
+                        "skipped",
                     }:
                         raise ContractError("invalid_playwright_attempt")
                     attempt_rows.append(
