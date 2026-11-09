@@ -220,13 +220,14 @@ class OtherRunnerReportTests(unittest.TestCase):
             "schema": "non-e2e-cases/v1",
             "source_revision": "commit-1",
             "testware_revision": "revision-1",
+            "runner_version": "fixture-runner",
             "complete": True,
             "results": [
                 {
                     "path": "tests/batch.py",
                     "title_path": ["batch", "one"],
                     "status": "passed",
-                    "attempt_results": [{"status": "failed"}, {"status": "passed"}],
+                    "attempt_results": [{"status": "failed", "retry": 0}, {"status": "passed", "retry": 1}],
                 },
                 {
                     "path": "tests/batch.py",
@@ -241,6 +242,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             report=report,
             source_revision="commit-1",
             testware_revision="revision-1",
+            runner_version="fixture-runner",
             raw_ref="run:raw",
             selection_verified=True,
         )
@@ -253,6 +255,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             report=report,
             source_revision="commit-1",
             testware_revision="revision-1",
+            runner_version="fixture-runner",
             raw_ref="run:raw",
             selection_verified=True,
         )
@@ -265,12 +268,13 @@ class OtherRunnerReportTests(unittest.TestCase):
             "path": "tests/event.py",
             "title_path": ["event"],
             "status": "passed",
-            "attempt_results": [{"status": "passed"}],
+            "attempt_results": [{"status": "passed", "retry": 0}],
         }
         report = {
             "schema": "non-e2e-cases/v1",
             "source_revision": "base",
             "testware_revision": "v1",
+            "runner_version": "fixture-runner",
             "complete": True,
             "results": [row, row],
         }
@@ -279,6 +283,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             report=report,
             source_revision="base",
             testware_revision="v1",
+            runner_version="fixture-runner",
             raw_ref="raw",
             selection_verified=True,
         )
@@ -290,6 +295,7 @@ class OtherRunnerReportTests(unittest.TestCase):
                 report=report,
                 source_revision="new-base",
                 testware_revision="v1",
+                runner_version="fixture-runner",
                 raw_ref="raw",
                 selection_verified=True,
             )
