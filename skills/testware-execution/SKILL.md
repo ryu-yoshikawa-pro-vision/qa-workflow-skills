@@ -25,3 +25,5 @@ assets/output-template.mdを使い、runの固定条件、実開始・未開始�
 - 非E2E実行手順・安全判断: references/guidance.md
 - 決定論的な結果照合: scripts/contract.py
 - 正規出力: assets/output-template.md
+
+- 実runnerの単独実行: `scripts/runner.py`（承認済みの隔離checkoutのみ。コマンド・fixture・副作用を確認する前に実行しない）
