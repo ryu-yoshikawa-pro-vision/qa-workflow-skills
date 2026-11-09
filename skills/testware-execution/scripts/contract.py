@@ -279,7 +279,6 @@ def reconcile_vitest(
     }
 
 
-
 def _reconcile_individual_results(
     *,
     selected: list[dict[str, Any]],
