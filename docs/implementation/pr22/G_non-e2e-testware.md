@@ -136,3 +136,10 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 - 詳細Plan 05は、共有workspaceでのreservationと変更反映時のnative競合検出を同時に要求する。現行`artifact_graph.reserve_shared_resource()`は実provider不在時にblockedを返すため、provider未選定環境で共有編集の開始はできない。今回のlocal fixture成功を例外扱いしない。
 - 既存`test-execution`はUI手動相当のbrowser経路だけを担当する。非ブラウザ直接TCは新Skillへ分離したが、既存結果の移行・再採点は行わない。
+
+### qa-training-storeの固定参照と実runner再開条件
+
+- 調査時の対象リポジトリ：`ryu-yoshikawa-pro-vision/qa-training-store`、`main` commit `2a8bcf57ff091e84a8b3bf7b123568e967000d88`（2026-11-09にGitHubから確認）。製品リポジトリには変更を加えていない。
+- `package.json`で確認した実行入口は`pnpm run test:unit`（`vitest run tests/unit`）、`pnpm run test:integration`（`vitest run tests/integration --no-file-parallelism --maxWorkers=1`）、`pnpm run test:component:web`（`vitest run tests/component --exclude tests/component/native`）。`pnpm@10.34.5`、`vitest@4.1.11`、`vitest.config.ts`の`jsdom`／`tests/setup.ts`を確認した。
+- これらは**既存package scriptの確認結果のみ**であり、実行許可ではない。実施前に当該固定commit、script chain・setup/fixtureの全副作用、データ・認証権限、隔離／予約・cleanup、記録するreporterの絶対pathとtest選択集合を調査する。安全な対象と許容副作用を固定してから実runner・retry・rawを取得し、H/Jへ渡す。
+- ローカルcontainerではGitHubへの直接cloneが名前解決エラーとなり、当該製品repoの依存インストール／実runnerは実施できなかった。GitHub connectorによるソース閲覧は可能だったが、実行成功の証拠ではない。
