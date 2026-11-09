@@ -1,6 +1,6 @@
 ---
 name: qa-knowledge
-description: QA Finding等のcandidateを既存正本へ戻すか、project-localで継続利用するknowledgeとして有効化・再検証・更新・置換・検索する。specification、Risk、TC、current UIの正本化には使用しない。
+description: 探索のFinding / Observationを含むQA candidateを、既存正本へ戻すか、project-localで継続利用するknowledgeとして有効化・再検証・更新・置換・検索する。specification、Risk、TC、current UIの正本化には使用しない。既存knowledgeを他の分析・設計の入力として読むだけの場合は使用しない。
 ---
 
 # QA Knowledge
@@ -17,6 +17,7 @@ QA活動のcandidateが既存QA正本へ属するか、継続利用するknowled
 6. 同一identityのcreateはcanonical targetへのatomic create-if-absent、same-entry updateはentry自身のexpected revisionを渡すnative atomic conditional writeを必須にします。CASが使えない場合は`blocked`とし、別ref作成、semantic auto-merge、LLM fallbackをしません。
 7. 同一identityの再検証・更新は同じentry refを新revisionにします。replacementはsemantic identity変更等に限り、old/newを安全にatomic反映できなければblockします。
 8. secret実値、未検証Finding / Observationを保存しません。
+9. `identity.kind` / `identity.scope_refs`は直下の`kind` / `scope_refs`と一致が必要で、不一致entryはcreate / read / update / lookupのすべてで拒否します。lookupは適用範囲が確実に異なるentryの依存不明では停止せず、適用範囲を判断できないentryとroot列挙不完全だけを`incomplete`にします。`read_entry()`の`entry_revision`はentry本体と別に引き継ぎます。create / updateは保存後のreadbackで確認したrevisionだけを返し、updateは保存先nativeのconditional write（provider）がなければblockします。他ownerへの引継ぎは`improvement_reference()`のstate（current / stale / blocked）・validation・resume・承認欄つきの参照だけです。
 
 ## 正規対象
 

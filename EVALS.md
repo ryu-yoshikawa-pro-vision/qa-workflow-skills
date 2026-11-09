@@ -304,8 +304,8 @@ Skillごとのsemantic case数と合計は各`evals.json`から導出します�
 | `test-execution`              | snapshot追跡、実行前YAML、Playwright順序、結果・secret・cleanup                           | `TEX-SEM-001`, `TEX-SEM-002`                                                             |
 | `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                                   | `WF-SEM-003`                                                                             |
 | `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                           | `REG-SEM-001` ～ `REG-SEM-006`                                                           |
-| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                         | `EXP-SEM-001` ～ `EXP-SEM-004`                                                           |
-| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                 | `KN-SEM-001` ～ `KN-SEM-006`                                                             |
+| `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                         | `EXP-SEM-001` ～ `EXP-SEM-005`                                                           |
+| `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                 | `KN-SEM-001` ～ `KN-SEM-007`                                                             |
 | `usability-evaluation`        | reference/evidenceに基づくUI/UX意味評価と追加観測境界                                     | `UE-SEM-001` ～ `UE-SEM-012`                                                             |
 | `usability-inspection`        | live observation、scope、fixed probe、measurement、安全境界                               | `UI-SEM-001` ～ `UI-SEM-033`                                                             |
 | `wcag-conformance-evaluation` | WCAG-EM procedure、sample、handoff、formal report、EARL                                   | `WCAG-SEM-001` ～ `WCAG-SEM-038`                                                         |

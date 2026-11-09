@@ -315,3 +315,178 @@ def record_attempt(
         "side_effect_count": next_count,
         "retry_without_state_check": attempt.get("outcome") == "unknown",
     }
+
+
+def resolve_direct_start(request: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a direct entry request to a mode or to the owner that must handle it.
+
+    No formal TC, TR or E2E testware is required to start. Only a Charter
+    (exploration) or an owner-unknown symptom / hypothesis / unresolved Finding
+    (investigation) is needed. The word "investigate" alone never selects
+    investigation: work that an existing owner can handle is routed to that owner.
+    """
+    if request.get("current_ui_collection") is True:
+        return _route("test-target-inspection", "current_ui_fact_collection")
+    if request.get("e2e_failure_ref"):
+        return _route("e2e-test-result-analysis", "known_e2e_failure_has_owner")
+    if request.get("known_tc_ref") and not (
+        request.get("symptom_ref")
+        or request.get("hypothesis_ref")
+        or request.get("unresolved_finding_ref")
+    ):
+        return _route("test-execution", "known_tc_faithful_execution")
+    charter = request.get("charter")
+    start_refs = [
+        key
+        for key in ("symptom_ref", "hypothesis_ref", "unresolved_finding_ref")
+        if request.get(key)
+    ]
+    if start_refs:
+        known_owner = request.get("known_owner")
+        if known_owner:
+            return _route(str(known_owner), "symptom_owner_already_known")
+        if request.get("owner_unknown") is not True:
+            return {"status": "blocked", "reason": "owner_resolution_unconfirmed"}
+        mode = "investigation"
+        start_ref = {key: request[key] for key in start_refs}
+    elif isinstance(charter, dict) and charter:
+        mode = "exploration"
+        start_ref = {}
+    else:
+        return {"status": "blocked", "reason": "charter_or_unowned_symptom_required"}
+    if not isinstance(charter, dict) or not charter:
+        return {
+            "status": "blocked",
+            "reason": "charter_required",
+            "mode": mode,
+            "start_ref": start_ref,
+        }
+    # Start refs are the investigation origin; reflect them in the Charter check.
+    checked = {**charter, **start_ref}
+    validation = validate_charter(mode, checked)
+    if not validation["valid"]:
+        return {
+            "status": "blocked",
+            "reason": "charter_invalid",
+            "mode": mode,
+            "missing_fields": validation["missing_fields"],
+            "issues": validation["issues"],
+        }
+    return {
+        "status": "start",
+        "mode": mode,
+        "start_ref": start_ref,
+        "required_prerequisite_skills": [],
+        "formal_tc_required": False,
+    }
+
+
+def _route(owner: str, reason: str) -> dict[str, Any]:
+    return {"status": "route", "owner_skill": owner, "reason": reason}
+
+
+FOLLOW_UP_ACTIONS = {
+    "question-analysis": None,
+    "test-analysis": None,
+    "test-case-design": None,
+    "test-target-inspection": None,
+    "e2e-test-result-analysis": None,
+    "qa-knowledge": "triage",
+    "defect-management": "defect_candidate_review",
+}
+
+
+def build_follow_up_handoff(
+    session: dict[str, Any], finding_ref: str, *, session_revision: str | None
+) -> dict[str, Any]:
+    """Build a reference-only hand-off of one Finding to its follow-up owner.
+
+    The hand-off carries IDs and the revision needed to re-read the Session, not
+    the Observation text, spec or run results. It never promotes the Finding to a
+    formal defect or a knowledge entry; the receiving owner decides.
+    """
+    if not session_revision:
+        return {"status": "blocked", "reason": "session_revision_required"}
+    validation = validate_session(session)
+    if not validation["valid"]:
+        return {
+            "status": "blocked",
+            "reason": "session_invalid",
+            "issues": validation["issues"],
+        }
+    finding = next(
+        (
+            item
+            for item in session.get("findings", [])
+            if isinstance(item, dict) and item.get("finding_ref") == finding_ref
+        ),
+        None,
+    )
+    if finding is None:
+        return {"status": "blocked", "reason": "finding_not_in_session"}
+    owner = finding.get("recommended_routing")
+    if owner not in FOLLOW_UP_ACTIONS:
+        return {"status": "blocked", "reason": "unknown_follow_up_owner"}
+    unresolved = [
+        item
+        for item in (*session.get("unresolved", []), *finding.get("unresolved", []))
+        if item
+    ]
+    if owner == "defect-management" and unresolved:
+        return {
+            "status": "blocked",
+            "reason": "unresolved_finding_not_defect_candidate",
+            "next": "owner_resolution_or_investigation",
+        }
+    if session.get("state") in {"ブロック中", "部分完了（ブロック中あり）"}:
+        state = "blocked"
+        resume: dict[str, Any] | None = {
+            "owner_skill": "exploratory-testing",
+            "action": "resume_session",
+            "condition": "same charter, scope, permitted range and environment",
+        }
+    elif unresolved:
+        state = "current"
+        resume = {
+            "owner_skill": "exploratory-testing",
+            "action": "owner_resolution_or_investigation",
+        }
+    else:
+        state = "current"
+        resume = None
+    return {
+        "status": "ready",
+        "handoff": {
+            "kind": "exploratory_finding_reference",
+            "owner_skill": "exploratory-testing",
+            "artifact_ref": session.get("session_ref"),
+            "content_hash": session_revision,
+            "state": state,
+            "validation": {
+                "runtime": "exploratory-testing/scripts/exploratory_runtime.py:validate_session",
+                "valid": True,
+                "issues": [],
+                "result_ref": None,
+            },
+            "resume": resume,
+            "required_approval": {
+                "required": owner == "defect-management",
+                "approval_ref": None,
+                "decided_by": "receiving_owner",
+            },
+            "follow_up_owner_skill": owner,
+            "target_action": FOLLOW_UP_ACTIONS[owner],
+            "session_ref": session.get("session_ref"),
+            "session_revision": session_revision,
+            "charter_snapshot_identity": session.get("charter_snapshot_identity"),
+            "finding_ref": finding_ref,
+            "source_observation_refs": list(finding["source_observation_refs"]),
+            "evidence_refs": list(finding["evidence_refs"]),
+            "source_refs": list(session["charter"].get("source_refs", [])),
+            "follow_up_reason": finding["follow_up_reason"],
+            "unresolved": unresolved,
+            "promotion": "not_promoted",
+            "formal_defect": False,
+            "knowledge_entry_created": False,
+        },
+    }

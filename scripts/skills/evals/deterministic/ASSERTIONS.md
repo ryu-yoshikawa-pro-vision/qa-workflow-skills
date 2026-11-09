@@ -358,6 +358,7 @@
 - `KN-D009` 既存QA正本候補をownerへ戻す
 - `KN-D010` CAS / completeness不足時の保存fail-closed
 - `KN-D011` entry / outputへのsecret実値の混入禁止
+- `KN-D012` identityのkind / scope_refsとentry直下の適用対象の一致
 
 ## 共通runtime / Machine Entity
 

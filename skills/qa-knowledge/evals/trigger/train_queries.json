@@ -46,5 +46,13 @@
   {
     "query": "current QA knowledgeを使って今回のテスト分析をして。",
     "should_trigger": false
+  },
+  {
+    "query": "checkoutのstaging環境に適用できる現在有効なentryだけを直接lookupして。",
+    "should_trigger": true
+  },
+  {
+    "query": "このTestCaseをcurrent QA knowledgeからのlookupなしで設計して。",
+    "should_trigger": false
   }
 ]

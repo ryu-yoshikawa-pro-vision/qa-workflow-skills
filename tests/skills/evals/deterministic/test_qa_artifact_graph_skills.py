@@ -1574,15 +1574,22 @@ class KnowledgeRuntimeTests(unittest.TestCase):
             knowledge.canonical_entry_ref(identity),
             knowledge.canonical_entry_ref({**identity, "subject": "other"}),
         )
+        entry = self.entry()
         self.assertEqual(
             knowledge.plan_update(
-                expected_entry_revision="r1", native_atomic_conditional_write=False
+                expected_entry_revision="r1",
+                native_atomic_conditional_write=False,
+                current_entry=entry,
+                updated_entry=entry,
             )["status"],
             "blocked",
         )
         self.assertEqual(
             knowledge.plan_update(
-                expected_entry_revision="r1", native_atomic_conditional_write=True
+                expected_entry_revision="r1",
+                native_atomic_conditional_write=True,
+                current_entry=entry,
+                updated_entry=entry,
             )["status"],
             "conditional_write_required",
         )
@@ -1591,22 +1598,35 @@ class KnowledgeRuntimeTests(unittest.TestCase):
                 target_entry_revision_changed=True, different_entry_only_changed=False
             )["auto_merge"]
         )
+        old_entry = self.entry()
+        new_entry = self.entry(
+            {
+                "kind": "test_environment",
+                "scope_refs": ["project:checkout"],
+                "subject": "other",
+            }
+        )
         self.assertEqual(
             knowledge.plan_replacement(
-                old_entry_ref="KN-1",
-                new_entry_ref="KN-2",
+                old_entry_ref=old_entry["entry_ref"],
+                new_entry_ref=new_entry["entry_ref"],
                 native_atomic_multi_entry_update=False,
-            )["status"],
-            "blocked",
+                old_entry=old_entry,
+                new_entry=new_entry,
+            )["reason"],
+            "replacement_requires_atomic_old_new_update",
         )
 
     def test_same_entry_concurrent_updates_fail_closed_without_provider_cas(self):
+        entry = self.entry()
         with ThreadPoolExecutor(max_workers=2) as executor:
             decisions = list(
                 executor.map(
                     lambda _: knowledge.plan_update(
                         expected_entry_revision="r1",
                         native_atomic_conditional_write=False,
+                        current_entry=entry,
+                        updated_entry=entry,
                     ),
                     range(2),
                 )
