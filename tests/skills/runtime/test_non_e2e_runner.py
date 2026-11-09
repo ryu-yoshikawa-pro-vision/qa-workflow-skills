@@ -402,13 +402,13 @@ class ActualRunnerTests(unittest.TestCase):
             "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
         }
         command = (
-            "import pathlib,sys;"
-            "pathlib.Path(sys.argv[1]).write_text("
+            "import os,pathlib;"
+            "pathlib.Path(os.environ['PLAYWRIGHT_JSON_OUTPUT_FILE']).write_text("
             + repr(json.dumps(report))
             + ",encoding='utf-8')"
         )
         plan = self.plan(
-            [sys.executable, "-c", command, "{reporter_file}"],
+            [sys.executable, "-c", command],
             kind="playwright-api",
         )
         plan.update(
@@ -432,6 +432,9 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 0)
         self.assertEqual(artifact["reporter_format"], "playwright-json")
+        self.assertTrue(
+            Path(artifact["attempts"][0]["raw_report_ref"]).is_file()
+        )
         self.assertTrue(artifact["collection_verified"])
         self.assertIsNone(artifact["tc_verdict"])
 
