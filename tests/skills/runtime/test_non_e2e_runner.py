@@ -345,9 +345,7 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(artifact["reporter_format"], "jest-json")
         self.assertTrue(artifact["collection_verified"])
-        self.assertEqual(
-            artifact["attempts"][0]["reconciliation"]["selected_count"], 1
-        )
+        self.assertEqual(artifact["attempts"][0]["reconciliation"]["selected_count"], 1)
         self.assertIsNone(artifact["tc_verdict"])
 
     def test_vitest_incorrect_totals_or_setup_failure_incomplete(self):
