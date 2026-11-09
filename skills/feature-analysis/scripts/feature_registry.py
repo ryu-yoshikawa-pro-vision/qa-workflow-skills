@@ -21,7 +21,15 @@ from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 
 MAX_INPUT = 16 * 1024 * 1024
 ID = re.compile(r"^(SRC|CAND|FEAT|DIF)-[0-9]{3,}$")
-EVENTS = {"initial", "pr_update", "rebase", "merge", "release", "external_revision"}
+EVENTS = {
+    "initial",
+    "analysis_update",
+    "pr_update",
+    "rebase",
+    "merge",
+    "release",
+    "external_revision",
+}
 SOURCE_STATES = {"complete", "partial", "denied", "unavailable"}
 FEATURE_KINDS = {"ui", "api", "batch", "integration", "authorization", "data", "other"}
 FEATURE_STATES = {"planned", "implemented", "retired", "unknown"}
@@ -338,6 +346,8 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
     event = snapshot["event"]
     basis = snapshot.get("event_basis")
     if event == "initial":
+        if previous is not None and snapshot != previous:
+            raise ContractError("initial_event_with_previous_snapshot")
         if basis not in (None, {}):
             raise ContractError("initial_event_basis_unexpected")
         return
@@ -353,6 +363,7 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
     ):
         raise ContractError("event_previous_sources_invalid")
     keys: dict[str, set[str]] = {
+        "analysis_update": {"source_revision", "evidence_ref"},
         "pr_update": {"base_sha", "head_sha", "previous_head_sha"},
         "rebase": {"base_sha", "head_sha", "previous_head_sha", "previous_base_sha"},
         "merge": {"merge_commit_sha", "target_ref", "previous_head_sha"},
@@ -370,6 +381,15 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
         _text(value, f"event_basis_{name}")
         if name.endswith("_sha") and not COMMIT.fullmatch(value):
             raise ContractError(f"event_basis_{name}_not_full_sha")
+    if event == "analysis_update":
+        if previous is None:
+            raise ContractError("analysis_update_requires_previous_snapshot")
+        if (
+            basis["source_revision"] != snapshot["source_revision"]
+            or previous.get("source_revision") != snapshot["source_revision"]
+        ):
+            raise ContractError("analysis_update_source_revision_changed")
+        return
     if event in {"pr_update", "rebase", "merge", "release"}:
         if previous is None:
             raise ContractError("event_previous_snapshot_required")

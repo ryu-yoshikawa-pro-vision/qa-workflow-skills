@@ -178,6 +178,62 @@ class GitChangeCoverageTests(unittest.TestCase):
         req["previous_head_git_inventory"]["base_sha"] = "f" * 40
         self.assertEqual(reconcile(req)["status"], "stale")
 
+
+    def test_previous_head_only_change_uses_its_actual_before_sha(self) -> None:
+        previous_head = self.inventory["head_sha"]
+        git(self.root, "checkout", "-q", "-b", "intermediate", self.base)
+        (self.root / "temporary.py").write_text("temporary\n", encoding="utf-8")
+        git(self.root, "add", "temporary.py")
+        self.commit("previous PR head")
+        middle_sha = git(self.root, "rev-parse", "HEAD")
+        git(self.root, "checkout", "-q", "--detach", previous_head)
+        earlier_diff = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": middle_sha,
+                "head_sha": previous_head,
+            }
+        )
+        self.assertEqual(earlier_diff["status"], "complete", earlier_diff)
+        data = self.feature
+        old = copy.deepcopy(data["snapshot"])
+        old["source_revision"] = middle_sha
+        old["sources"][0]["revision"] = middle_sha
+        data["previous_snapshot"] = old
+        snapshot = data["snapshot"]
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": self.base,
+            "head_sha": previous_head,
+            "previous_head_sha": middle_sha,
+        }
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["operation_id"] = "op-v2"
+        for i, path in enumerate(("alpha.py", "beta.py", "temporary.py")):
+            row = copy.deepcopy(snapshot["changes"][0])
+            row.update(
+                id=f"DIF-{i + 2:03d}",
+                locator=path,
+                before_revision=self.base if path != "temporary.py" else middle_sha,
+                after_revision=previous_head,
+                classification="impact",
+            )
+            if i == 0:
+                snapshot["changes"] = [row]
+            else:
+                snapshot["changes"].append(row)
+        result = reconcile(
+            {
+                **self.request(),
+                "previous_head_git_inventory": earlier_diff,
+            }
+        )
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(result["coverage"]["rate"], 1.0)
+        self.assertIn("temporary.py", result["coverage"]["previous_head_change_paths"])
+
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"
         result = reconcile(self.request())

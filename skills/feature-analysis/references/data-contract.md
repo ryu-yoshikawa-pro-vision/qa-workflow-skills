@@ -47,3 +47,7 @@ PR更新・rebase時のGit差分照合には`previous_head_git_inventory`を別�
 Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORIZED_ROOT`へ許可済みcheckout rootを渡します。入力JSONだけに記載された`authorized_root`ではread権限を主張できません。Pythonから直接`handle`を使う場合は呼出し側が認証済みの対象rootを固定する責任を負います。
 
 下流のC・D・E担当へ渡す`handoff.feature_refs[]`は、機能ID／kind／status／parent ID、source／implementation／spec／QA refsを含む読取専用のprojectionです。`impacted_feature_ids`は差分がimpactと分類された機能ID、`approval_required_change_ids`は影響なし／対象外に分類された差分IDで、後続の認証済み承認確認を省略できません。`unknown_areas`を下流でも保持し、unknownを影響なしへ推測変換しません。
+
+継続分析でsource revisionを変更しない内容修正は`event=analysis_update`と`event_basis={source_revision,evidence_ref}`を必須とします。これは初回処理とは別の更新イベントです。前回snapshotが存在するときは`event=initial`による新しいsnapshot作成を拒否します。ただし完全に同一のsnapshotとoperation_idの再送は従来どおり冪等に処理します。
+
+`reconcile_git_coverage`は各DIFのpathが今回base→HEAD／前回HEAD→今回HEADのどちらに出現したかに応じて旧revisionを照合します。片方の差分だけに出現したpathに別の基準SHAを強制しません。

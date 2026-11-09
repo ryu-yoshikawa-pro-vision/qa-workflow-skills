@@ -211,8 +211,13 @@ def analyze(request: Any) -> dict[str, Any]:
         registry_paths.add(locator)
         if locator not in git_paths:
             unmatched_ids.append(row["id"])
+        valid_bases: set[str] = set()
+        if locator in base_change_paths:
+            valid_bases.add(git["base_sha"])
+        if locator in previous_head_paths:
+            valid_bases.add(basis["previous_head_sha"])
         if (
-            row["before_revision"] != git["base_sha"]
+            row["before_revision"] not in valid_bases
             or row["after_revision"] != head_sha
         ):
             mismatched_revision_ids.append(row["id"])

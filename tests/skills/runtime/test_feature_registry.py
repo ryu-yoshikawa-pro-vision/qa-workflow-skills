@@ -93,6 +93,17 @@ def fixture() -> dict:
     }
 
 
+
+def continue_analysis(data: dict) -> dict:
+    """Represent a manual correction at an unchanged source revision."""
+    data["snapshot"]["event"] = "analysis_update"
+    data["snapshot"]["event_basis"] = {
+        "source_revision": data["snapshot"]["source_revision"],
+        "evidence_ref": "review/confirmed",
+    }
+    return data
+
+
 class FeatureRegistryTests(unittest.TestCase):
     def test_complete_local_inventory_has_no_full_product_guarantee(self) -> None:
         result = handle(fixture())
@@ -157,6 +168,7 @@ class FeatureRegistryTests(unittest.TestCase):
         first = fixture()
         next_step = copy.deepcopy(first)
         next_step["previous_snapshot"] = copy.deepcopy(first["snapshot"])
+        continue_analysis(next_step)
         next_step["snapshot"]["previous_artifact_revision"] = "art-v1"
         next_step["snapshot"]["artifact_revision"] = "art-v2"
         next_step["snapshot"]["operation_id"] = "op-v2"
@@ -178,6 +190,7 @@ class FeatureRegistryTests(unittest.TestCase):
     def test_feature_edit_requires_matching_history_event(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
         data["snapshot"]["artifact_revision"] = "art-v2"
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         data["snapshot"]["operation_id"] = "op-v2"
@@ -208,6 +221,7 @@ class FeatureRegistryTests(unittest.TestCase):
     def test_reuse_of_id_with_new_semantics_is_blocked(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         data["snapshot"]["operation_id"] = "op-v2"
         data["snapshot"]["features"][0]["identity"] = "unrelated feature"
@@ -216,6 +230,7 @@ class FeatureRegistryTests(unittest.TestCase):
     def test_split_requires_retirement_history(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         data["snapshot"]["operation_id"] = "op-v2"
         data["snapshot"]["artifact_revision"] = "art-v2"
@@ -253,6 +268,7 @@ class FeatureRegistryTests(unittest.TestCase):
             with self.subTest(collection=collection):
                 data = fixture()
                 data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+                continue_analysis(data)
                 data["snapshot"]["previous_artifact_revision"] = "art-v1"
                 data["snapshot"]["artifact_revision"] = "art-v2"
                 data["snapshot"]["operation_id"] = "op-v2"
@@ -286,6 +302,7 @@ class FeatureRegistryTests(unittest.TestCase):
     def test_changed_snapshot_requires_distinct_artifact_revision(self) -> None:
         data = fixture()
         data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         data["snapshot"]["operation_id"] = "op-v2"
         self.assertEqual(handle(data)["status"], "blocked")
@@ -310,6 +327,28 @@ class FeatureRegistryTests(unittest.TestCase):
                     }
                 )
                 self.assertEqual(handle(data)["status"], "blocked")
+
+
+    def test_initial_event_with_previous_changed_snapshot_is_rejected(self) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        data["snapshot"]["operation_id"] = "new-operation"
+        data["snapshot"]["artifact_revision"] = "art-v2"
+        data["snapshot"]["previous_artifact_revision"] = "art-v1"
+        self.assertEqual(handle(data)["status"], "blocked")
+        self.assertIn(
+            "initial_event_with_previous_snapshot", handle(data)["reasons"]
+        )
+        continue_analysis(data)
+        self.assertEqual(handle(data)["status"], "complete")
+
+    def test_analysis_update_cannot_hide_changed_source(self) -> None:
+        data = fixture()
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
+        data["snapshot"]["source_revision"] = "new-head"
+        data["observed_head_revision"] = "new-head"
+        self.assertEqual(handle(data)["status"], "blocked")
 
     def test_code_events_require_full_revisions_and_previous_head(self) -> None:
         old_sha = "b" * 40

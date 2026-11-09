@@ -444,6 +444,11 @@ class ArtifactStoreTests(unittest.TestCase):
         self.assertEqual(first["analysis_status"], "complete")
         prior = copy.deepcopy(request["snapshot"])
         request["previous_snapshot"] = prior
+        request["snapshot"]["event"] = "analysis_update"
+        request["snapshot"]["event_basis"] = {
+            "source_revision": request["snapshot"]["source_revision"],
+            "evidence_ref": "review/confirmed",
+        }
         request["snapshot"]["artifact_revision"] = "art-v2"
         request["snapshot"]["previous_artifact_revision"] = "art-v1"
         request["snapshot"]["operation_id"] = "op-2"
