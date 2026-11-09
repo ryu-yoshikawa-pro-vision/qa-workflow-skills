@@ -90,12 +90,13 @@ def analyze(request: Any) -> dict[str, Any]:
             or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}
         ):
             raise Invalid("source_event_basis_invalid")
-        if event in {"pr_update", "rebase"} and source_id == _primary_code_source_id(snapshot):
+        if event in {"pr_update", "rebase"} and source_id == _primary_code_source_id(
+            snapshot
+        ):
             raise Invalid("primary_source_event_basis_override")
         basis = source_basis
-    checks_previous_diff = (
-        event in {"pr_update", "rebase"}
-        or (event == "analysis_update" and source_basis is not None)
+    checks_previous_diff = event in {"pr_update", "rebase"} or (
+        event == "analysis_update" and source_basis is not None
     )
     if checks_previous_diff:
         if not isinstance(basis, dict):
@@ -119,13 +120,10 @@ def analyze(request: Any) -> dict[str, Any]:
             }
         if previous_inventory is not None and not isinstance(previous_inventory, dict):
             raise Invalid("previous_head_inventory_invalid")
-        if (
-            previous_inventory is not None
-            and (
-                previous_inventory.get("status") != "complete"
-                or previous_inventory.get("complete_change_listing") is not True
-                or previous_inventory.get("unretrieved") != []
-            )
+        if previous_inventory is not None and (
+            previous_inventory.get("status") != "complete"
+            or previous_inventory.get("complete_change_listing") is not True
+            or previous_inventory.get("unretrieved") != []
         ):
             return {
                 "status": "incomplete",
