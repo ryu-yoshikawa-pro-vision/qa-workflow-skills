@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import Counter
 import re
+from collections import Counter
 
 from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
@@ -108,7 +108,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 and all(
                     all(str(value).strip() for value in row.values())
                     and re.fullmatch(
-                        r"[^\\s@]+@[^\\s@]+",
+                        r"[^\s@]+@[^\s@]+",
                         clean(row.get("対象source／revision", "")),
                     )
                     is not None
