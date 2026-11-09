@@ -89,6 +89,9 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_real_subprocess_preserves_stdout_and_identity(self):
         plan = self.plan([sys.executable, "-c", "print('runner observation')"])
+        plan["direct_expectations"] = [
+            {"id": "stdout_text", "expected": "runner observation\n"}
+        ]
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 0)
         self.assertEqual(summary["outcome"], "runner_pass")
@@ -127,6 +130,7 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_valid_diagnosis_survives_in_manifest_without_regrading(self):
         plan = self.plan([sys.executable, "-c", "print('run')"])
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
         plan["diagnosis_hypotheses"] = [
             {
                 "cause": "fixture",
@@ -183,6 +187,16 @@ class ActualRunnerTests(unittest.TestCase):
             self.call(plan)[1]["reason"], "native_provider_authorization_required"
         )
 
+    def test_runner_exit_zero_without_case_evidence_is_not_test_complete(self):
+        plan = self.plan([sys.executable, "-c", "print('not a test report')"])
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["outcome"], "incomplete")
+        self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+        self.assertFalse(artifact["collection_verified"])
+        self.assertEqual(artifact["result_collection"], "not_provided_by_adapter")
+        self.assertIsNone(artifact["tc_verdict"])
+
     def test_failed_cleanup_disallows_runner_success(self):
         plan = self.plan([sys.executable, "-c", "print('done')"])
         cleanup = [sys.executable, "-c", "raise SystemExit(1)"]
@@ -237,6 +251,9 @@ class ActualRunnerTests(unittest.TestCase):
         plan["selected"] = [
             {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
         ]
+        plan["testware_ref"] = "fixture:sample-suite"
+        plan["testware_revision"] = self.sha
+        plan["runner_version"] = "vitest-fixture"
         plan["selection_verified"] = True
         plan["selection_evidence_ref"] = "fixture:selection"
         plan["planned_scope_ref"] = "fixture:planned-scope"
@@ -269,6 +286,9 @@ class ActualRunnerTests(unittest.TestCase):
         plan["selected"] = [
             {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
         ]
+        plan["testware_ref"] = "fixture:sample-suite"
+        plan["testware_revision"] = self.sha
+        plan["runner_version"] = "vitest-fixture"
         plan["selection_verified"] = True
         plan["selection_evidence_ref"] = "fixture:selection"
         plan["planned_scope_ref"] = "fixture:planned-scope"
