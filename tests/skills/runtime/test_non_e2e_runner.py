@@ -108,7 +108,12 @@ class ActualRunnerTests(unittest.TestCase):
             [sys.executable, "-c", "from pathlib import Path;Path('launched').touch()"]
         )
         plan["diagnosis_hypotheses"] = [
-            {"cause": "runner", "confidence": "low", "evidence_ref": "", "next_owner": ""}
+            {
+                "cause": "runner",
+                "confidence": "low",
+                "evidence_ref": "",
+                "next_owner": "",
+            }
         ]
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 2)
@@ -458,9 +463,7 @@ class ActualRunnerTests(unittest.TestCase):
                 "testware_ref": "fixture:batch",
                 "testware_revision": "v1",
                 "runner_version": "adapter-fixture",
-                "selected": [
-                    {"path": "tests/batch.py", "title_path": ["batch"]}
-                ],
+                "selected": [{"path": "tests/batch.py", "title_path": ["batch"]}],
                 "selection_verified": True,
                 "selection_evidence_ref": "fixture:selection",
                 "planned_scope_ref": "fixture:scope",
