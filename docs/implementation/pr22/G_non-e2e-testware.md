@@ -218,3 +218,8 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - commit `320c196` のDeterministic Output Evalsで、既存の直接TCテスト3件が旧`tc_verdict`値を期待してFAILした。新契約で未認証の正式`tc_verdict`はnull、観測比較は`direct_observation_verdict`へ分離するため、3件のassertionを修正した。元runの`observed_FAIL`／`observations_incomplete`は維持する。
 - 公式Vitest／Jest JSONのroot `success`が欠落しても、終了コード0と個別resultだけで成功にしてしまう経路を修正。欠落rootの負例を追加した。
 - 修正後の検証結果は更新後HEADのChecksを正本とする。旧commitのFAILと新HEADの結果を混同しない。
+
+### Vitest／Jest JSON取得完全性の補強（2026-11-09）
+
+- `contract.reconcile_vitest()`は、公式Vitest 4／Jest JSONの全test集計（total／passed／failed／pending／todo）とroot `success`が欠落していても、選択した個別結果が一致すれば取得完全とする余地があった。全カウンターの型・値とglobal statusを必須とし、欠落したreporterは取得不完全に変更した。
+- `test_non_e2e_contract.py` の正常skip/todo fixtureに実reporterの集計・global statusを追加し、global status・total欠落の負例を追加した。skip/todo自体をTC PASSとみなさない従来の契約は維持する。

@@ -196,6 +196,12 @@ class VitestTests(unittest.TestCase):
 
     def test_skip_todo_and_file_revision(self):
         report = {
+            "success": True,
+            "numTotalTests": 2,
+            "numPassedTests": 0,
+            "numFailedTests": 0,
+            "numPendingTests": 1,
+            "numTodoTests": 1,
             "testResults": [
                 {
                     "name": "tests/new.test.ts",
@@ -222,6 +228,24 @@ class VitestTests(unittest.TestCase):
         self.assertEqual(
             [x["runner_status"] for x in r["results"]], ["pending", "todo"]
         )
+        missing_total = {k: v for k, v in report.items() if k != "numTotalTests"}
+        partial = contract.reconcile_vitest(
+            selected=selected,
+            report=missing_total,
+            source_revision="fixed-sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(partial["collection_complete"])
+        missing_success = {k: v for k, v in report.items() if k != "success"}
+        partial = contract.reconcile_vitest(
+            selected=selected,
+            report=missing_success,
+            source_revision="fixed-sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(partial["collection_complete"])
         with self.assertRaises(contract.ContractError):
             contract.reconcile_vitest(
                 selected=selected,

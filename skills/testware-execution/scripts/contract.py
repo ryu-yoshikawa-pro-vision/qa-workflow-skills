@@ -223,16 +223,20 @@ def reconcile_vitest(
         "numPendingTests": statuses["pending"] + statuses["disabled"],
         "numTodoTests": statuses["todo"],
     }
-    reporter_consistent = all(
-        key not in report or (type(report[key]) is int and report[key] == val)
-        for key, val in counters.items()
+    # Official Vitest 4 / Jest JSON contains global success and every test
+    # counter. A partial or truncated JSON report cannot prove completeness
+    # even when the selected individual assertions happen to match.
+    reporter_consistent = (
+        type(report.get("success")) is bool
+        and all(
+            type(report.get(key)) is int and report[key] == val
+            for key, val in counters.items()
+        )
     )
     if report.get("success") is True and statuses["failed"]:
         reporter_consistent = False
     if report.get("success") is False and not statuses["failed"]:
         # A failed run with no failing assertion may have a suite/global error.
-        reporter_consistent = False
-    if "success" in report and type(report["success"]) is not bool:
         reporter_consistent = False
     if inconsistent_suites:
         reporter_consistent = False
