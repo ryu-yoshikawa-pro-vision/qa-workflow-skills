@@ -1,0 +1,45 @@
+{
+  "skill": "ui-target-analysis",
+  "cases": [
+    {
+      "id": "UI-SEM-001",
+      "input": "cases/ui-sem-001/input.md",
+      "reference": "cases/ui-sem-001/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-002",
+        "UI-SEM-006"
+      ]
+    },
+    {
+      "id": "UI-SEM-002",
+      "input": "cases/ui-sem-002/input.md",
+      "reference": "cases/ui-sem-002/reference.md",
+      "criteria": [
+        "UI-SEM-002",
+        "UI-SEM-003",
+        "UI-SEM-006"
+      ]
+    },
+    {
+      "id": "UI-SEM-003",
+      "input": "cases/ui-sem-003/input.md",
+      "reference": "cases/ui-sem-003/reference.md",
+      "criteria": [
+        "UI-SEM-001",
+        "UI-SEM-004",
+        "UI-SEM-005"
+      ]
+    },
+    {
+      "id": "UI-SEM-004",
+      "input": "cases/ui-sem-004/input.md",
+      "reference": "cases/ui-sem-004/reference.md",
+      "criteria": [
+        "UI-SEM-004",
+        "UI-SEM-005",
+        "UI-SEM-006"
+      ]
+    }
+  ]
+}

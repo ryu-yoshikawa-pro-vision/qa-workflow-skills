@@ -1,0 +1,3 @@
+# 意味評価candidate
+
+各candidateは新設Skillを使った想定出力として、本branchの実装者が作成しました。`results/`は本sessionのLLMが同じrubricでcaseごとに判定した記録です。生成者とjudgeが独立していないため、独立judge実行の証拠にはなりません。共有judge commandが利用できるPR #22で再実行してください。

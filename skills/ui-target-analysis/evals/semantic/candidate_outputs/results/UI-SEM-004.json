@@ -1,0 +1,48 @@
+{
+  "skill": "ui-target-analysis",
+  "eval_id": "UI-SEM-004",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "UI-SEM-004",
+      "title": "owner境界と承認",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "commit状態が明確になるまで正本を復元・再適用せず、権限ある履歴でcurrentnessを確認します。",
+      "evidence": [
+        "提示情報だけでは、直前のrequestがcommit済みか判断できません。",
+        "状態を確認できない場合はblockedを継続し、baselineからの復元や再適用をしません。"
+      ]
+    },
+    {
+      "id": "UI-SEM-005",
+      "title": "writer・履歴・再開の安全性",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "状態確認後に同一snapshot/requestで照合し、external CASの保証をlocal lockに仮託していません。",
+      "evidence": [
+        "同じsnapshot・同じrequest",
+        "package-local lockはremote CASや複数workspaceの履歴証明ではありません。"
+      ]
+    },
+    {
+      "id": "UI-SEM-006",
+      "title": "legacy互換と検証境界",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "旧packageのstable IDs、条件付きfile applicability、manifestとchangelog lifecycleを維持する判断を示しています。",
+      "evidence": [
+        "`PAGE-002`、`UIOP-004`、conditional file applicability、Manifest、retired `PAGE-001`のchangelog履歴は維持します。"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

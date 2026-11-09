@@ -1,0 +1,48 @@
+{
+  "skill": "ui-target-analysis",
+  "eval_id": "UI-SEM-001",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "UI-SEM-001",
+      "title": "UI構造と期待仕様の分離",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "画面の観測を分離し、仕様で決まっていない挙動をUNKNOWNとしてownerへ戻しています。",
+      "evidence": [
+        "郵便番号のvalidation規則と操作時の期待結果は指定されていないため、`spec-analysis`でUNKNOWNとして解決してください。",
+        "disabled表示やmessageを期待仕様の根拠にしません。"
+      ]
+    },
+    {
+      "id": "UI-SEM-002",
+      "title": "根拠とcurrentness",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "UI captureとrequirementのref/revisionを別に保持しています。",
+      "evidence": [
+        "| 画面capture | `artifact://design/checkout` | `design-r7` |",
+        "| 要件 | `doc://checkout/requirement` | `req-12` |"
+      ]
+    },
+    {
+      "id": "UI-SEM-006",
+      "title": "legacy互換と検証境界",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "実行結果が見えない静止画像から遷移成功を主張していません。",
+      "evidence": [
+        "実際の遷移成功を確定できません。"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

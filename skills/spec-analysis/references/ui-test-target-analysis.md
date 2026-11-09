@@ -1,6 +1,15 @@
 # UIテスト対象分析モード
 
-このreferenceは、テスト設計前に継続利用する対象理解packageを作成・更新する場合のspec-analysis契約です。通常の単発仕様分析は既存の`assets/output-template.md`と通常ガイダンスを使います。単にMarkdownを要求されたことだけではmodeを選びません。
+このreferenceは、テスト設計前に継続利用する`ui-target-v1` packageの互換読取と、spec-analysis owner領域の作成・更新契約です。通常の単発仕様分析は既存の`assets/output-template.md`と通常ガイダンスを使います。単にMarkdownを要求されたことだけではpackage modeを選びません。
+
+## UI ownerとの境界
+
+`ui-target-analysis`がUI構造、UI操作、画面状態、Navigationを論理的に所有し、本Skillは期待仕様・Authority・業務状態・権限・AC・UNKNOWNを所有します。既存packageの00〜09とwriterは互換のため単一packageのままです。package全体を再materializeする場合も、各ownerは自分の意味領域だけを更新し、他ownerの行をcarry-forwardします。
+
+- `00_scope_and_context.md`の`分析対象機能scope一覧`にあるUI操作判定、`01_ui_structure_and_navigation.md`の`UI構造一覧`と`Navigation / Entry / Exit`、`02_behavior_and_business_rules.md`の`UI操作一覧`は`ui-target-analysis`が更新します。
+- US、UC、Behavior、AC、業務ルール、Authority、UNKNOWN、その他の期待挙動・業務意味は本Skillが更新します。UI構造を仕様Authorityとみなさず、UI package内のAuthority projectionは本Skillのowner領域として維持します。
+- 新Skillが利用可能なworkflowでは、本SkillはUI tableを再判断・再採番せず、UI変更を`ui-target-analysis`へhandoffします。既存package・旧呼び出し元からの読取と、Authorityの既存compat projectionは継続します。
+- `ui-target-v1`にはUI行ごとの独立source-ref列もfeature ID列もありません。既存列や拡張fileへsource／featureを複製せず、承認されたartifact ref・revisionと明示feature-to-Scope参照から読取専用索引を導出します。正式な保存先が未接続の場合はruntime owner検証をblockedにします。
 
 ## 起動条件と目的
 
@@ -11,7 +20,7 @@
 - UI構造、状態、業務ルール、入力制約、通知・外部連携、UNKNOWN、実装状況を相互参照できるpackageが必要
 - 通常spec-analysisの単一成果物を、同じ意味IDを保って継続packageへ移行する
 
-このmodeはspec-analysisの条件付き出力です。新Skill、別Authority、テスト要求、テスト条件、テストケースを作りません。packageの実データは案件側のartifactとして保存し、このrepositoryへ書き込みません。
+このmodeはspec-analysisの条件付き互換出力です。新Skill、別Authority、テスト要求、テスト条件、テストケースを作りません。packageの実データは案件側のartifactとして保存し、このrepositoryへ書き込みません。UI owner分離はlogical ownerの切替であり、package schemaやrootを追加しません。
 
 ## 責務と情報源
 

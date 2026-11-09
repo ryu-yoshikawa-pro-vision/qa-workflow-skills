@@ -1,0 +1,50 @@
+{
+  "skill": "ui-target-analysis",
+  "eval_id": "UI-SEM-002",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "UI-SEM-002",
+      "title": "根拠とcurrentness",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "保存済みfeature artifactのref/revisionとexplicit mappingを使い、current package snapshotから索引を導出しています。",
+      "evidence": [
+        "explicit mapping: `FEATURE-021` → `SCOPE-004`",
+        "indexはcurrent `inspect` snapshotから導出しました。"
+      ]
+    },
+    {
+      "id": "UI-SEM-003",
+      "title": "正本位置とstable identity",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "UI操作・画面・親構造・scopeそれぞれの正確なstable ID、file、section、lineを示しています。",
+      "evidence": [
+        "| UIOP-012 | 操作 | `02_behavior_and_business_rules.md` | UI操作一覧 | 44 | SCOPE-004、PAGE-008 |",
+        "| NAV-002 | 親構造 | `01_ui_structure_and_navigation.md` | UI構造一覧 | 8 | PAGE-008の親 |",
+        "| SCOPE-004 | scope | `00_scope_and_context.md` | 分析対象機能scope一覧 | 19 | 明示mapping |"
+      ]
+    },
+    {
+      "id": "UI-SEM-006",
+      "title": "legacy互換と検証境界",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "feature mappingをpackageへ保存せず、変更のないcurrent packageにchanged rowを捏造していません。",
+      "evidence": [
+        "保存済みfeature indexは作成しません。",
+        "このrevisionではchanged UI rowはありません。"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

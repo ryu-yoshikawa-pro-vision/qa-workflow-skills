@@ -1,0 +1,48 @@
+{
+  "skill": "ui-target-analysis",
+  "eval_id": "UI-SEM-003",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "UI-SEM-001",
+      "title": "UI構造と期待仕様の分離",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "UI packageのUI-owned changeだけを扱っています。",
+      "evidence": [
+        "label変更と`@draft:preferences`の新規PAGEをUI table差分として準備します。"
+      ]
+    },
+    {
+      "id": "UI-SEM-004",
+      "title": "owner境界と承認",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "owner review、Q06合意、変更別証拠と明示retire根拠を要求し、証拠文字列を認証と混同しません。",
+      "evidence": [
+        "UI owner review",
+        "実provider、authenticated approver、共有runtime、native CASがないので、正式保存・承認認証・共有readbackは未検証です。"
+      ]
+    },
+    {
+      "id": "UI-SEM-005",
+      "title": "writer・履歴・再開の安全性",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "既存writerへのrequestに限定し、fixtureで通る局所検証と未接続の実保存を区別しています。",
+      "evidence": [
+        "`ui_target_package.py materialize`用requestを返すだけです。",
+        "その範囲だけをlocal acceptanceとして報告します。"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

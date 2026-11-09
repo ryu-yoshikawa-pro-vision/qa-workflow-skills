@@ -59,8 +59,8 @@ UI構造と期待仕様を分離し、既存ui-target-v1を破壊せず人間の
 
 ## 着手基準
 
-- [ ] `ui_target_package.py`、既存UI modeの利用側・migration・legacy・関連テストを読み、A/B/Eの変更境界を確認した。
-- [ ] Q06の合意の位置・保存先・編集権限・元snapshot／revision参照の契約を確認した。
+- [x] `ui_target_package.py`、既存UI modeの利用側・migration・legacy・関連テストを読み、A/B/Eの変更境界を確認した。PR #23の共有runtime契約とPR #24の独立検証状態も照合した。
+- [ ] Q06の実合意・保存先・編集権限はBの実artifactで未確認。helper fixtureのrefは契約例であり、実接続証拠ではない。
 
 ## 作業内容
 
@@ -81,18 +81,58 @@ UI構造と期待仕様を分離し、既存ui-target-v1を破壊せず人間の
 
 ## 完了基準
 
-- [ ] 独立`ui-target-analysis`と既存`spec-analysis`が責務・形式・履歴・migrationを維持し、既存UI packageと正式設計の読取が壊れない。
-- [ ] 詳細08の8ケース（通常編集、新規／廃止、禁止領域、無承認変更、同時編集、直接改変、失敗再開、正本探索）を実際の編集差分・正式writer・readbackまで検証した。
-- [ ] 必要な源Authority・関連ID・承認・scopeを意味検証し、採用分だけwriterで版を更新し無関係IDは維持した。
-- [ ] Manifest不一致や元revision不明を誤修復・誤成功にせず、編集案を失わずblocked／安全な再開ができた。
-- [ ] 機能別導出索引から正本と変更差分を確認でき、依存した下流だけstaleになる。
-- [ ] UI Skillのisolated/trigger/semantic、UI package回帰・migration・既存TC/E2E利用経路を検証した。
+- [x] 独立`ui-target-analysis`を追加し、`spec-analysis`のUI modeをAuthority／期待仕様のownerとして維持しながら、既存`ui-target-v1`、stable ID、Manifest、CHANGELOG、conditional file、writer、migrationを壊さない局所検証を通した。
+- [x] 詳細08の8ケースを独立package fixtureで実施した。通常編集と新規／廃止は既存writer・独立readbackまで実行し、禁止領域・無承認・競合・不正currentは正本不変を確認してblocked、失敗再開は同一fingerprint receiptで再送、正本探索はcurrent file／section／line／stable IDまで照合した。prepareとmaterializeの間にcurrentが変わるCAS競合もwriterのstructured `stale_snapshot`拒否で確認した。
+- [ ] 承認ref・Authority参照・scopeをfixture内で検査したが、Q06実合意、認証された承認者、Bの実feature artifact／mappingは未接続。実artifactの意味currentnessはPR #22で再検証する。
+- [x] Manifest不一致・canonical直接編集・不足承認・symlink・重複JSON keyをblockedにし、編集案とcanonical bytesを保全した。別copyからの再開、commit応答消失、同じrequestの再送も独立fixtureで検証した。
+- [ ] feature indexは独立fixtureでcurrent package versionとfile／section／line／stable ID／changed rowを導出した。下流artifactのstale伝播・必要scopeのみの再検証はA runtimeとEの実成果物がなく未検証。
+- [ ] isolated copyではshared writer不在時に書込みhelperがblockedになることを検証した。trigger dataset契約とsemantic candidateはローカル検証したが、実trigger rateと独立Judge実行、既存TC/E2E consumerの実成果物接続は未検証。
 
-- [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
-- [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
-- [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
-- [ ] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
+- [x] `SKILL.md`、入出力、停止条件、人間編集・互換性文書、isolated copy test、trigger dataset、semantic rubric/cases/candidate outputsを追加した。semantic結果は実装者と同一のsession LLMによる自己評価であり、独立Judge実行とは扱わない。
+- [ ] 担当Skillとpackage/migrationの局所回帰はPASS。全runtime・deterministic suiteは既存runtime環境要件によりFAILし、remote CIの結果待ち。root READMEと`qa-workflow`に旧route記述が残り、shared owner修正前のSkill validationは完了しない。
+- [ ] 専用unit／package／migration／semantic dataset・runtime／trigger検証は個別PASS。Ruff未導入でformatter/lintは実行不能、`skills-ref`未導入で公式Skill validatorは未実行。GitHub Actionsはpush後に結果確認する。
+- [ ] source／artifact／承認認証／native CAS／保存readbackとshared runtime owner検証をAへ接続できていない。以下のPR #22 handoff契約で継続する。
+- [x] 本branchの実装と可能な局所検証を完了し、未検証条件を分けて記録した。PR #22だけで行う横断検証、全Skill routing、15＋10条件とS1〜S17の最終判定は担当branchでPASS扱いしない。
+
+## 実装と受入契約
+
+- `skills/ui-target-analysis/`はUI構造、操作、表示状態、navigationの論理owner。UI package形式とsingle writerは既存`spec-analysis`側の`ui-target-v1`契約を再利用する。
+- `scripts/human_editing.py prepare`は検証済みbase/current/edit copyを照合し、UI-owned tableとNavigation proseだけをexisting `materialize` requestへ変換する。正本へ直接書かず、外部承認refは認証済みidentityとみなさない。
+- `feature-index`は明示的なfeature artifact ref/revision・feature-to-Scope mappingをcurrent package snapshotへ結合し、file／section／physical line／stable ID／changed rowを都度導出する。二次索引やfeature ID列を`ui-target-v1`へ追加しない。
+- test 01〜08は`tests/skills/runtime/test_ui_human_editing.py`に対応する。test 09〜10はisolated packaging、symlink root、重複JSON key、invalid mappingの追加安全性回帰。
+
+## 局所検証記録
+
+環境はPython 3.14.2。本repositoryのGitHub ActionsはPython 3.11を使う。
+
+| 検証 | コマンド | 結果 |
+| --- | --- | --- |
+| 人間編集8受入＋追加安全性 | `python -m unittest discover -s tests/skills/runtime -p 'test_ui_human_editing.py'` | PASS 10 tests。01 normal edit/readback、02 draft/retire/history、03 generated/control拒否、04 Authority/approval/evidence拒否、05 same-ID conflict・independent rebase・stale CAS拒否、06 direct edit保全/reopen、07 lost response/fingerprint replay、08 feature index、09 isolated copy、10 symlink/duplicate JSON |
+| 既存package regression | `python -m unittest discover -s tests/skills/runtime -p 'test_ui_target_package.py'` | PASS 19 tests |
+| migration preflight | `python -m unittest discover -s tests/skills/runtime -p 'test_migration_preflight.py'` | PASS 9 tests |
+| trigger dataset contract | `python -m unittest discover -s tests/skills/evals/trigger` | PASS 1 test。train 12件・validation 8件、各positive/negative均衡、重複なし |
+| semantic dataset | `python scripts/skills/evals/semantic/validate.py` | PASS。24 Skills / 169 cases |
+| semantic repository tests | `python -m unittest discover -s tests/skills/evals/semantic` | PASS 13 tests |
+| semantic shared runtime tests | `python -m unittest discover -s scripts/skills/evals/semantic/tests` | PASS 27 tests |
+| semantic candidate evidence/結果形式 | `python -m unittest discover -s tests/skills/evals/semantic -p 'test_ui_target_candidate_results.py'` | PASS 1 test。4 cases / 12 criteria。candidate generatorと同じsession LLMによる自己評価。独立Judgeではない |
+| helper compile | `python -m compileall -q skills/ui-target-analysis/scripts` | PASS |
+| shared Skill catalog precondition | `python`でcurrent `skills/*/SKILL.md`とREADMEのbacktick名を照合 | FAIL: `ui-target-analysis`。README所有者が共通catalogを更新するまで`validate-skills.yml`全体はPASSしない |
+| 全runtime suite | `python -m unittest discover -s tests/skills/runtime -p 'test_*.py'` | FAIL 506 tests: 10 failures / 9 errors。担当testは修正後に個別10件PASS。残る失敗はCI handoffのPython 3.14 nesting差、Project Context workflow-state provider不足、SQLite履歴DBが作成されない環境エラー |
+| deterministic eval全suite | `python -m unittest discover -s tests/skills/evals/deterministic` | FAIL 290 tests中4 failures / 1 error。loopback socketのsandbox拒否、未提供Project Context state-root/providerでWCAG workflow testsがblocked。UI-target既存contract testsに今回由来の失敗なし |
+| formatter/lint | `python scripts/format_tracked.py check` | BLOCKED exit 2。environmentに`ruff` executableがないためCIと同じformat/lint一式を開始できない |
+| 公式Skill形式validator | `skills-ref validate skills/ui-target-analysis` | 未実行。`skills-ref`未導入。GitHub Actionsのinstall済みrunnerで確認する |
+
+triggerデータはCI形式と均衡を検査しただけで、全Skillを同時に利用可能にしたtrigger rateは未測定。semantic candidateは本branch内の参考判定で、独立Judge commandによる再採点が必要。上記のFAIL / BLOCKEDはPASSへ読み替えない。
+
+## PR #22への引継ぎとshared owner依頼
+
+1. **A / PR #22**：shared runtimeに`ui-target-analysis`を登録し、`review_ref`等を認証するowner verifier、Project Context Q06、保存先native CAS、revision history、独立readback、blocked/reopenを接続する。local helper requestの証拠文字列だけでは認証やexternal writeを許可しない。
+2. **B / PR #22**：実Project Context Q06 agreementと保存先権限、実feature artifact ref/revisionと明示feature-to-Scope mappingを渡す。fixture結果と実artifact横断結果を分けて記録する。
+3. **A / qa-workflow shared owner**：`README.md`は現在も`spec-analysis`のUI modeがpackageを作ると説明し、`skills/qa-workflow/SKILL.md`・`references/guidance.md`もUI package要求を`spec-analysis`へrouteしている。新Skill名のREADME登録もCIで必須。UI構造要求を`ui-target-analysis`へrouteし、仕様Authorityだけを`spec-analysis`に残すshared説明・trigger/isolated validationを更新する。Cでは共有範囲のため変更していない。
+4. **E / PR #22**：実UI package、Authority artifact、既存test-analysis／TC／E2E consumerを接続し、UI observationとcurrent Authority refの分離、changed scopeだけの下流staleness、legacy package読取を横断確認する。
+5. **PR #22**：全Skill同時のtrigger/routing、独立Judge評価、実provider経路、人間編集8ケースの統合経路、全CI、開発連動QA 15条件・QA全工程10条件・S1〜S17を統合branch上で判定する。PR #25のfixtureをowner実成果物の証拠に置換しない。
+
+このbranchのcandidate semantic結果と独立fixture証拠は再利用可能だが、共有owner修正・実artifact接続・実trigger/remote CAS/owner authenticationの完了まではPR #25全体を統合完了として扱わない。
 
 ## PR #22へ取り込む前の確認
 

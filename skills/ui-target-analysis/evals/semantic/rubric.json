@@ -1,0 +1,41 @@
+{
+  "skill": "ui-target-analysis",
+  "criteria": [
+    {
+      "id": "UI-SEM-001",
+      "title": "UI構造と期待仕様の分離",
+      "description": "画面・要素・操作・遷移の観測を整理し、期待結果、業務状態、認可、Authority、AC、UNKNOWNの意味決定をspec-analysisへ戻しているか。",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-002",
+      "title": "根拠とcurrentness",
+      "description": "UI source・feature artifact・packageそれぞれのref/revision/versionを保持し、sourceにない観測やfeature-to-scope対応を推測していないか。",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-003",
+      "title": "正本位置とstable identity",
+      "description": "機能別導出結果がcurrent packageの正確なfile・section・line・stable IDに到達し、別artifactや類似名の参照を混同しないか。",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-004",
+      "title": "owner境界と承認",
+      "description": "人間編集案をscope内で検証し、UI ownerの意味確認・配置合意・変更別根拠・明示retire承認を要求し、認証済み承認と偽らないか。",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-005",
+      "title": "writer・履歴・再開の安全性",
+      "description": "既存single writerを使い、生成物・control・無関係IDを維持し、競合・失敗・応答消失で同じrequestとsnapshotから再開し、推測による修復や重複採番を避けるか。",
+      "critical": true
+    },
+    {
+      "id": "UI-SEM-006",
+      "title": "legacy互換と検証境界",
+      "description": "ui-target-v1の形式・条件付きfile・stable ID・migration・履歴を維持し、独立fixtureを実provider・A runtime・他owner成果物の統合証拠に読み替えないか。",
+      "critical": true
+    }
+  ]
+}
