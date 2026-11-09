@@ -56,3 +56,13 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 - `direct_tc: true` は `direct_expectations` に加えて `tc_ref`、`tc_revision`、`expected_authority_ref` を必須とする。これらのない任意出力比較は `direct_observation_verdict` としてのみ記録し、正式 `tc_verdict` には昇格しない。通常のbatch等の終了コード0は、期待結果の比較がない場合、実runnerの正常終了だけを表す。非機能は `metric_criteria` と採用根拠・測定条件を必須とし、未指定なら開始前に拒否する。
 - 静的解析の実行は `runner_kind: static` と `static_analysis`（`tool_ref`、`tool_version`、`rules_ref`、`config_ref`、`expected_paths`、許可された `accepted_exit_codes`）を必須とする。実ツール／既存の許可済みadapterがstdoutへJSON objectとして `findings_count`、`analyzed_paths`、空の `skipped_paths`、同じtool/version/rules/configを出力した場合だけ取得完全とする。未実行・欠損・toolのrawだけではFinding 0件としない。各種tool固有の出力をこのJSONへ適合させるadapterは別途対象toolに沿った検証を要する。
 - `diagnosis_hypotheses` を指定した場合はrunの元観測と独立して原因候補・確度・証拠・次の担当を保持する。これは確定した製品欠陥でも元runの再採点でもない。
+
+## 個別reporterの照合と実行結果
+
+- 自動testwareでは終了コードだけで取得完全を宣言しない。`reporter_format`は`vitest-json`（Vitest／対応component）、`playwright-json`（Playwright API-only／対応component）、`case-json`（batch／eventの採用済みadapter）から選ぶ。未対応・欠落時はexit 0でも`outcome=incomplete`、`collection_verified=false`とする。
+- reporterを使うrunには`testware_ref`・`testware_revision`・`runner_version`・`selected[]`・`selection_verified=true`・`selection_evidence_ref`・`planned_scope_ref`を必須とする。`selected`はrepo相対`path`・`title_path`と必要な`project_name`を持つ。選択の根拠は起動担当の宣言であり、このCLIによる認証済みprovider readbackではない。
+- `vitest-json`は実起動引数に`{reporter_file}`を含める。Vitest 4のCLIは`vitest run --reporter=json --outputFile={reporter_file}`でJSONを書ける。suite・個別status・集計・選択集合の一致を照合する。
+- `playwright-json`は公式`PLAYWRIGHT_JSON_OUTPUT_FILE`を子プロセスに設定する。CLIの`--reporter=json`、Playwright TestのAPI-only実行であること（ブラウザ利用のないテストコードとscript chain）を実行前に確認する。suite/spec/test/project・個別retry・global error・statsを照合する。
+- `case-json`は採用済みbatch/event adapterが`{reporter_file}`へ固定schema `non-e2e-cases/v1`のJSONを出す。必須rootは`schema`、`source_revision`、`testware_revision`、`complete`、`results[]`。個別resultは`path`、`title_path`、`status`（passed/failed/pending/todo/skipped/timedOut/interrupted）、`attempt_results`（statusを保持する配列）。変換前の実ツールrawとadapterのrevisionも別に残す。
+- source/testware revision、選択集合、個別statusの重複・欠落、未取得attempt、raw失敗と終了コード0の矛盾は完全としない。任意の`direct_expectations`だけを自動testwareの個別取得の代わりに使わない。正式直接TCは`direct_tc=true`とTC ref・revision・仕様Authority refを必要とする。
+- 実装済みの個別reporterテストはPython subprocessで固定JSONを模擬生成した独立fixture。固定`qa-training-store`の実Vitest／Playwright／採用済みbatch・event実runを証明しない。
