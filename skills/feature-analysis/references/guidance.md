@@ -21,3 +21,7 @@ Git code sourceを取得した場合は、`git_source_inventory.py`のbase→hea
 Gitのgitlink／submoduleは親repositoryのtreeに現れていても、その内部内容は未確認として`unretrieved`へ記録し、別情報源として取得・確認するまでcompleteにしません。新しいDIFは根拠sourceの現revisionとafter_revisionを一致させます。過去のDIFは元revisionの履歴を維持します。
 
 code sourceを含む機能台帳を正式保存するときは、信頼済み呼出し元が各source IDのGit rootとbase/head SHAを`git_inventory_requests`に指定し、`persist_snapshot`が実Gitの全tree／変更一覧を再取得・照合した後にCAS保存します。PR更新・rebase時は前回headを別の差分基準として明示します。前回取得したJSONだけを再使用した場合や、未確認のGit pathが残る場合には保存をblockします。provider／権限の選定は呼出し元の責務です。
+
+継続PRで機能DIFを追記するときは前回のDIF行を残し、新しいbase→headと前回head→headの差分に対応するDIF IDを追加します。過去のDIFのrevision・分類・根拠を直接書き換えません。分類見直し時は新しいID、`supersedes_id`、別の根拠、承認ref／revisionで履歴をつなぎ、保存前に認可callbackで検証します。
+
+複数Git repositoryはsource ID別に各HEAD・前回HEAD・baseを確認します。主イベントの`snapshot.source_revision`が全code sourceのHEADであるという前提は使用しません。保存前のGit列挙・差分照合を省略した旧入力だけではcurrentを確定しません。

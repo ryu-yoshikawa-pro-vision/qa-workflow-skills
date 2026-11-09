@@ -203,6 +203,40 @@ class FeatureRegistryTests(unittest.TestCase):
         replacement["before_revision"] = "forged-base"
         self.assertEqual(handle(data)["status"], "blocked")
 
+    def test_superseded_unclassified_change_does_not_remain_in_current_denominator(
+        self,
+    ) -> None:
+        data = fixture()
+        original = data["snapshot"]["changes"][0]
+        original["classification"] = "unclassified"
+        data["previous_snapshot"] = copy.deepcopy(data["snapshot"])
+        continue_analysis(data)
+        snap = data["snapshot"]
+        snap["operation_id"] = "op-v2"
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        revised = copy.deepcopy(original)
+        revised.update(
+            id="DIF-002",
+            supersedes_id="DIF-001",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Reviewed and approved the current classification",
+            evidence_ref="review/current-v2",
+            approval_ref="approval/verified",
+            approval_revision="review-v2",
+        )
+        snap["changes"].append(revised)
+        result = handle(data)
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(
+            result["metrics"]["change_classification"]["denominator_ids"],
+            ["DIF-002"],
+        )
+        self.assertEqual(result["metrics"]["change_classification"]["rate"], 1.0)
+        self.assertEqual(result["handoff"]["unclassified_change_ids"], [])
+        self.assertEqual(snap["changes"][0]["classification"], "unclassified")
+
     def test_two_code_repositories_may_have_independent_head_revision(self) -> None:
         data = fixture()
         source = {

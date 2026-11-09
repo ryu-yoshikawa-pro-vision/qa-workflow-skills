@@ -243,3 +243,13 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 4. `feature_registry.py`は今回新規のDIFの`after_revision`をsourceの現在revisionへ照合し、PR更新／rebaseの`before_revision`を正当な旧SHAへ制限する。過去に登録したDIFは旧revisionのまま保持する。`persist_snapshot`ではcode sourceごとに信頼済み呼出し元が指定したGit root・base/head refを`git_inventory_requests`で受け、保存前に実際のGit tree／diffを再列挙し、`reconcile_git_coverage`を再実行する。未登録差分・submodule未取得・HEAD不一致・必要な差分未列挙ならblocked。code sourceを含まない台帳は既存の保存経路を保持する。
 
 自動テストには保存済み方針と呼出し元の承認revision不一致、Git承認revision不一致、gitlinkの未取得、偽ったDIF revision、未登録Git差分、保存前のGit再列挙と旧DIF履歴維持を追加した。実案件の遠隔保存provider・承認認証元・実Agent・製品CIの実環境検証は利用者指示どおり実施しない。全工程・他owner横断の統合はPR #22で別に判定する。
+
+## PR #34 再レビュー指摘3件の修正（2026-11-09）
+
+担当Bの再レビューで確認した3件を追加修正した。
+
+1. **過去DIFと今回差分の分離**：保存済みDIF IDとその全フィールドをappend-onlyに維持する。PR更新・rebaseのGit差分照合では現在イベントで追加したDIFのみを計上し、過去行の`after_revision`を現HEADへ書き換えない。base→今回HEADと前回HEAD→今回HEADの両方の必要な差分は新IDで登録する。同一HEADの分析修正は既存の有効DIFを再利用する。
+2. **複数repositoryのrevision**：主イベントの`source_revision`と、個別`sources[].revision`を分離する。各code sourceに独立したGit root・base/head SHA・前回HEADがあり、独立してGit tree/diffを取得・照合する。主repoと異なるHEADであることを理由に拒否しない。
+3. **DIF分類変更の履歴・承認**：既存DIFの分類・理由・承認refなどの上書き・削除を拒否する。見直しでは新DIFに`supersedes_id`、別の根拠、承認ref・revisionを付け、保存前に信頼済み承認元で検証する。旧DIFは履歴として維持し、置換済みの旧分類を現在の未分類・分類率に重複計上しない。
+
+検証は単体・一時Git repository・GitHub Actionsで実施する。連続2回のPR更新、2つのGit repositoryでの異なるHEADとその更新、古いDIFの改変拒否、承認されない再分類、未分類から承認済み分類への変化を回帰テストに追加した。実環境provider・Agent・製品CIは利用者の従来指示どおり未実施。PR #22の横断統合とmergeは本PRの対象外。

@@ -63,3 +63,13 @@ Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`
 ## 保存前のGit現在性確認
 
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
+
+## 継続PRのDIF履歴と複数repository
+
+`feature-inventory-v1`の`changes[]`は履歴を含む追記型です。前回snapshotに存在するDIF IDの全フィールドは改変・削除しません。再分類する場合は別のDIF IDに`supersedes_id`（前回DIF ID）、新しい`evidence_ref`、`reason`、`approval_ref`、`approval_revision`を指定します。対象のsource ID・前後revision・locatorは一致する必要があります。旧行は履歴として残し、現在の分類率・未分類ID・下流影響は置換された行を除外します。
+
+`persist_snapshot`は再分類を新しい成果物として保存する前に、保存providerへ`operation=reclassify`、旧・新classification、承認ref／revision、対象DIF IDと置換元ID、根拠・source revision・保存先expected revisionを渡して認可します。文字列の`approval_ref`だけでは許可しません。認可されなければ旧版を維持して保存をblockedにします。
+
+PR更新・rebaseでGit差分を照合する際、前回snapshotにあるDIFは履歴として残し、**今回の差分母集団には新しく追加したDIFのみ**照合します。同一HEADでの`analysis_update`では現在有効なDIFを再利用できます。過去のDIFの旧／新revisionを現在HEADへ書き換えず、今回のbase→headと前回head→headの両差分で必要な組を登録します。
+
+複数製品repositoryでは、`snapshot.source_revision`と`event_basis`のSHAは主たるイベントrevisionを表します。各`sources[].revision`がrepository別のHEADです。`persist_snapshot`の`git_inventory_requests`にはsource IDごとに実Gitのroot・base/head SHA、PR更新時は各sourceの前回HEADを指定します。主たるsourceはイベントbase/head、他のsourceは保存済み前回source revisionと独立Git差分で照合し、別repositoryのcommitを主repositoryのSHAに揃えません。保存先・Git root・承認元の選択は信頼済み呼出し元の責務です。
