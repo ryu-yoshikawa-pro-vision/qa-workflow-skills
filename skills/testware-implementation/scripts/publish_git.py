@@ -36,7 +36,9 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _remote_head(repo: Path, remote: str, branch: str) -> str:
-    lines = _git(repo, "ls-remote", "--heads", remote, "refs/heads/" + branch).splitlines()
+    lines = _git(
+        repo, "ls-remote", "--heads", remote, "refs/heads/" + branch
+    ).splitlines()
     if len(lines) != 1:
         raise PublishError("remote_branch_unavailable")
     sha, ref = lines[0].split("\t", 1)
@@ -96,11 +98,14 @@ def publish(
             raise PublishError("non_regular_file_in_diff")
         process = subprocess.run(
             ["git", "-C", str(repo), "show", expected_head + ":" + path],
-            capture_output=True, check=False, timeout=30,
+            capture_output=True,
+            check=False,
+            timeout=30,
         )
         old = (
             "sha256:" + hashlib.sha256(process.stdout).hexdigest()
-            if process.returncode == 0 else None
+            if process.returncode == 0
+            else None
         )
         if old != prior_content_hashes[path]:
             raise PublishError("changed_base_snapshot")
@@ -110,7 +115,9 @@ def publish(
     # native fast-forward check rejects another concurrent update.
     process = subprocess.run(
         ["git", "-C", str(repo), "push", remote, candidate + ":refs/heads/" + branch],
-        capture_output=True, check=False, timeout=60,
+        capture_output=True,
+        check=False,
+        timeout=60,
     )
     if process.returncode:
         raise PublishError("push_rejected_or_response_unknown_verify_remote")
@@ -134,7 +141,9 @@ def publish(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Conditional Git publish of reviewed testware")
+    parser = argparse.ArgumentParser(
+        description="Conditional Git publish of reviewed testware"
+    )
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--publish", action="store_true")
     args = parser.parse_args()
@@ -153,11 +162,24 @@ def main() -> int:
         )
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except (PublishError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as err:
-        print(json.dumps({
-            "state": "not_attested",
-            "reason": str(err) if isinstance(err, PublishError) else type(err).__name__,
-        }, ensure_ascii=False))
+    except (
+        PublishError,
+        OSError,
+        ValueError,
+        KeyError,
+        subprocess.TimeoutExpired,
+    ) as err:
+        print(
+            json.dumps(
+                {
+                    "state": "not_attested",
+                    "reason": str(err)
+                    if isinstance(err, PublishError)
+                    else type(err).__name__,
+                },
+                ensure_ascii=False,
+            )
+        )
         return 2
 
 
