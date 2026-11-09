@@ -1,0 +1,770 @@
+"""担当H：非E2E testware route・補助testwareの実施義務・Activity完了判定の局所検証。
+
+他担当（G: testware実行）の実成果物は使わず、合意した契約と独立fixtureで検証する。
+"""
+
+from __future__ import annotations
+
+import copy
+import importlib.util
+import json
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+SKILL = REPO_ROOT / "skills" / "regression-testing"
+FIXTURE = (
+    REPO_ROOT
+    / "tests"
+    / "skills"
+    / "fixtures"
+    / "regression-testware"
+    / "vitest-qa-training-store-2a8bcf5.json"
+)
+
+
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+regression = _load("h_regression_runtime", SKILL / "scripts" / "regression_runtime.py")
+validator = _load(
+    "h_regression_validator", SKILL / "evals" / "deterministic" / "validator.py"
+)
+
+REV = "rev-A"
+
+
+def started(result="PASS", *, finalized=True, **extra):
+    return {
+        "start_state": "開始済み",
+        "actual_start_confirmed": True,
+        "result_finalized": finalized,
+        "source_result": result,
+        **extra,
+    }
+
+
+def aux_started(result="PASS", *, revision=REV, **extra):
+    return started(
+        result,
+        implementation_revision=revision,
+        attempt_ref=extra.pop("attempt_ref", "attempt-1"),
+        raw_capture_complete=extra.pop("raw_capture_complete", True),
+        **extra,
+    )
+
+
+NOT_STARTED = {
+    "start_state": "未開始",
+    "actual_start_confirmed": False,
+    "result_finalized": False,
+}
+
+
+def tc_route(tc, execution, kind="testware", **extra):
+    route = {
+        "tc_ref": tc,
+        "route_type": kind,
+        "route_ref": f"{kind}:{tc}",
+        "execution_ref": execution,
+    }
+    if kind == "testware":
+        route.update(
+            testware_ref=f"vitest:{tc}",
+            executor_owner="testware-execution",
+            implementation_revision=REV,
+            selection_basis="tests/unit/password-hasher.test.ts",
+        )
+    return {**route, **extra}
+
+
+def aux(ref, execution, *, required=True, **extra):
+    return {
+        "testware_ref": ref,
+        "execution_ref": execution,
+        "executor_owner": "testware-execution",
+        "implementation_revision": REV,
+        "selection_basis": "user_explicit" if required else "reference_only",
+        "completion_required": required,
+        **extra,
+    }
+
+
+def activity_doc(run, source, **kwargs):
+    activity = regression.project_activity(run, source, **kwargs)
+    return {
+        **activity,
+        "artifact_type": "activity",
+        "activity_ref": "ACT-H-1",
+        "snapshot_ref": "DS-1",
+        "scope_identity": "scope-1",
+        "source_executions": source,
+    }
+
+
+def check(doc, assertion):
+    rendered = "```json\n" + json.dumps(doc, ensure_ascii=False) + "\n```"
+    result = validator.validate(rendered, {}, "H-UNIT")
+    return next(item.status for item in result.assertions if item.id == assertion)
+
+
+class RequiredRouteTests(unittest.TestCase):
+    def test_testware_route_requires_owner_revision_and_selection(self):
+        valid = regression.validate_required_routes(
+            [
+                {"tc_ref": "TC-1", "route_type": "manual", "route_ref": "m"},
+                tc_route("TC-2", "X-2"),
+            ]
+        )
+        self.assertTrue(valid["valid"], valid["issues"])
+        self.assertEqual(valid["routes"][1]["testware_ref"], "vitest:TC-2")
+        # 既存manual / e2eの正規化形は変えない。
+        self.assertNotIn("testware_ref", valid["routes"][0])
+        for field in (
+            "testware_ref",
+            "executor_owner",
+            "implementation_revision",
+            "selection_basis",
+        ):
+            with self.subTest(field=field):
+                route = tc_route("TC-2", "X-2")
+                route.pop(field)
+                result = regression.validate_required_routes([route])
+                self.assertFalse(result["valid"])
+        wrong_owner = tc_route("TC-2", "X-2", executor_owner="regression-testing")
+        self.assertFalse(regression.validate_required_routes([wrong_owner])["valid"])
+        legacy_invalid = regression.validate_required_routes(
+            [{"tc_ref": "TC-1", "route_type": "unit", "route_ref": "u"}]
+        )
+        self.assertFalse(legacy_invalid["valid"])
+
+    def test_run_validator_accepts_testware_and_rejects_incomplete_route(self):
+        run = {
+            "artifact_type": "run",
+            "run_scope": "selected",
+            "suite_complete": False,
+            "baseline": {
+                "complete": True,
+                "currentness": "current",
+                "member_tc_refs": ["TC-1"],
+            },
+            "selected_tc_refs": ["TC-1"],
+            "required_routes": [tc_route("TC-1", "X-1")],
+            "auxiliary_testware_refs": [],
+            "auxiliary_testware_count": 0,
+        }
+        self.assertEqual(check(run, "REG-D008"), "pass")
+        broken = copy.deepcopy(run)
+        del broken["required_routes"][0]["implementation_revision"]
+        self.assertEqual(check(broken, "REG-D008"), "fail")
+
+
+class AuxiliarySelectionTests(unittest.TestCase):
+    details = {
+        "T-1": {"executor_owner": "testware-execution", "implementation_revision": REV},
+        "T-2": {
+            "executor_owner": "e2e-test-execution",
+            "implementation_revision": REV,
+        },
+    }
+
+    def test_obligation_follows_explicit_selection_only(self):
+        result = regression.select_auxiliary_testware(
+            requested_refs=["T-1"],
+            user_explicit_refs=["T-1"],
+            policy_refs=[],
+            available_refs=["T-1", "T-2"],
+            reference_only_refs=["T-2"],
+            testware_details=self.details,
+        )
+        self.assertEqual(result["status"], "ready")
+        by_ref = {r["testware_ref"]: r for r in result["auxiliary_routes"]}
+        self.assertIs(by_ref["T-1"]["completion_required"], True)
+        self.assertEqual(by_ref["T-1"]["selection_basis"], "user_explicit")
+        self.assertIs(by_ref["T-2"]["completion_required"], False)
+        self.assertEqual(by_ref["T-2"]["selection_basis"], "reference_only")
+        self.assertEqual(result["selected_refs"], ["T-1"])
+        self.assertEqual(result["tc_member_count"], 0)
+        policy = regression.select_auxiliary_testware(
+            requested_refs=["T-1"],
+            user_explicit_refs=[],
+            policy_refs=["T-1"],
+            available_refs=["T-1"],
+            testware_details=self.details,
+        )
+        self.assertEqual(policy["auxiliary_routes"][0]["selection_basis"], "policy")
+
+    def test_unknown_basis_or_missing_detail_is_not_guessed(self):
+        base = dict(
+            user_explicit_refs=[],
+            policy_refs=[],
+            available_refs=["T-1"],
+            testware_details=self.details,
+        )
+        unauthorized = regression.select_auxiliary_testware(
+            requested_refs=["T-1"], **base
+        )
+        self.assertEqual(unauthorized["status"], "unresolved")
+        conflict = regression.select_auxiliary_testware(
+            requested_refs=["T-1"],
+            reference_only_refs=["T-1"],
+            **{**base, "user_explicit_refs": ["T-1"]},
+        )
+        self.assertEqual(conflict["conflicting_refs"], ["T-1"])
+        no_detail = regression.select_auxiliary_testware(
+            requested_refs=["T-1"],
+            **{**base, "user_explicit_refs": ["T-1"], "testware_details": {}},
+        )
+        self.assertEqual(no_detail["missing_detail_refs"], ["T-1"])
+
+    def test_auxiliary_route_validation_reports_legacy_as_unknown(self):
+        result = regression.validate_auxiliary_routes(
+            [aux("A", "E-A"), {"testware_ref": "LEGACY", "execution_ref": "E-L"}],
+            tc_testware_refs=["vitest:TC-1"],
+        )
+        self.assertTrue(result["valid"], result["issues"])
+        self.assertEqual(result["obligation_unknown_refs"], ["LEGACY"])
+        self.assertFalse(
+            regression.validate_auxiliary_routes([aux("A", "E", required="yes")])[
+                "valid"
+            ]
+        )
+        inconsistent = aux("A", "E", required=True, selection_basis="reference_only")
+        self.assertFalse(regression.validate_auxiliary_routes([inconsistent])["valid"])
+        self.assertFalse(
+            regression.validate_auxiliary_routes(
+                [aux("vitest:TC-1", "E")], tc_testware_refs=["vitest:TC-1"]
+            )["valid"]
+        )
+        self.assertFalse(
+            regression.validate_auxiliary_routes([{**aux("A", "E"), "tc_ref": "TC-1"}])[
+                "valid"
+            ]
+        )
+
+
+class ActivityObligationTests(unittest.TestCase):
+    def test_required_auxiliary_not_started_blocks_completion_despite_tc_pass(self):
+        run = {
+            "required_routes": [tc_route("TC-1", "X-1")],
+            "auxiliary_routes": [aux("A", "E-A")],
+        }
+        source = {
+            "X-1": started("PASS", implementation_revision=REV),
+            "E-A": NOT_STARTED,
+        }
+        activity = regression.project_activity(run, source)
+        self.assertEqual(activity["activity_state"], "部分完了（ブロック中あり）")
+        self.assertEqual(activity["counts"]["executed_tc_count"], 1)
+        self.assertEqual(activity["counts"]["auxiliary_executed_count"], 0)
+        forged = {**activity_doc(run, source), "activity_state": "完了"}
+        self.assertEqual(check(forged, "REG-D011"), "fail")
+        self.assertEqual(check(activity_doc(run, source), "REG-D011"), "pass")
+
+    def test_optional_candidate_unstarted_does_not_block(self):
+        run = {
+            "required_routes": [tc_route("TC-1", "X-1")],
+            "auxiliary_routes": [aux("OPT", "E-O", required=False)],
+        }
+        source = {
+            "X-1": started("PASS", implementation_revision=REV),
+            "E-O": NOT_STARTED,
+        }
+        activity = regression.project_activity(run, source)
+        self.assertEqual(activity["activity_state"], "完了")
+        self.assertEqual(activity["counts"]["auxiliary_required_count"], 0)
+        self.assertEqual(check(activity_doc(run, source), "REG-D011"), "pass")
+
+    def test_auxiliary_only_run_progresses_from_measurement(self):
+        run = {"required_routes": [], "auxiliary_routes": [aux("A", "E-A")]}
+        steps = [
+            (NOT_STARTED, "未開始"),
+            ({**NOT_STARTED, "blocked": True}, "ブロック中"),
+            (aux_started("PASS", finalized=False), "実行中"),
+            (aux_started("PASS"), "完了"),
+        ]
+        for source_a, expected in steps:
+            with self.subTest(expected=expected, source=source_a):
+                source = {"E-A": source_a}
+                activity = regression.project_activity(run, source)
+                self.assertEqual(activity["activity_state"], expected)
+                doc = activity_doc(run, source)
+                self.assertEqual(check(doc, "REG-D011"), "pass")
+                self.assertEqual(check(doc, "REG-D015"), "pass")
+        # 補助PASSは正式TCのexecution / coverage分子へ入らない。
+        counts = regression.project_activity(run, {"E-A": aux_started("PASS")})[
+            "counts"
+        ]
+        self.assertEqual(counts["tc_member_count"], 0)
+        self.assertEqual(counts["executed_tc_count"], 0)
+        self.assertEqual(counts["source_result_counts"], {})
+        self.assertEqual(counts["auxiliary_source_result_counts"], {"PASS": 1})
+
+    def test_empty_sets_never_complete(self):
+        activity = regression.project_activity(
+            {
+                "required_routes": [],
+                "auxiliary_routes": [aux("OPT", "E", required=False)],
+            },
+            {},
+        )
+        self.assertEqual(activity["activity_state"], "未開始")
+        forced = {**activity_doc({"required_routes": []}, {}), "activity_state": "完了"}
+        self.assertEqual(check(forced, "REG-D011"), "fail")
+
+    def test_partial_run_with_two_required_auxiliaries(self):
+        run = {
+            "required_routes": [],
+            "auxiliary_routes": [aux("A", "E-A"), aux("B", "E-B")],
+        }
+        source = {"E-A": aux_started("PASS"), "E-B": NOT_STARTED}
+        activity = regression.project_activity(run, source)
+        self.assertEqual(activity["activity_state"], "部分完了（ブロック中あり）")
+        self.assertEqual(activity["counts"]["auxiliary_required_completed_count"], 1)
+
+    def test_timeout_then_retry_uses_latest_finalized_attempt(self):
+        run = {"required_routes": [], "auxiliary_routes": [aux("A", "E-A")]}
+        timeout = {
+            "E-A": aux_started(
+                "timeout",
+                finalized=False,
+                attempt_ref="attempt-1",
+                raw_capture_complete=False,
+            )
+        }
+        self.assertEqual(
+            regression.project_activity(run, timeout)["activity_state"], "実行中"
+        )
+        retry = {"E-A": aux_started("FAIL", attempt_ref="attempt-2")}
+        done = regression.project_activity(run, retry)
+        self.assertEqual(done["activity_state"], "完了")
+        self.assertEqual(done["auxiliary_route_results"][0]["attempt_ref"], "attempt-2")
+        self.assertEqual(done["auxiliary_route_results"][0]["source_result"], "FAIL")
+
+    def test_skip_runner_error_and_unconfirmed_runner_result_do_not_complete(self):
+        run = {"required_routes": [], "auxiliary_routes": [aux("A", "E-A")]}
+        cases = {
+            "skip": {**NOT_STARTED, "source_result": "skipped"},
+            "runner_error": {**NOT_STARTED, "blocked": True, "source_result": "error"},
+            "unconfirmed_start": {
+                "start_state": "開始済み",
+                "actual_start_confirmed": False,
+                "result_finalized": True,
+                "source_result": "PASS",
+            },
+        }
+        for name, source_a in cases.items():
+            with self.subTest(name):
+                activity = regression.project_activity(run, {"E-A": source_a})
+                self.assertNotEqual(activity["activity_state"], "完了")
+                self.assertFalse(activity["auxiliary_route_results"][0]["executed"])
+
+    def test_raw_capture_attempt_and_cleanup_must_be_confirmed(self):
+        run = {"required_routes": [], "auxiliary_routes": [aux("A", "E-A")]}
+        raw = regression.project_activity(
+            run, {"E-A": aux_started("PASS", raw_capture_complete=False)}
+        )
+        self.assertEqual(raw["activity_state"], "実行中")
+        no_attempt = regression.project_activity(
+            run, {"E-A": aux_started("PASS", attempt_ref=None)}
+        )
+        self.assertEqual(no_attempt["activity_state"], "実行中")
+        for cleanup in ("失敗", "未確認", "一部失敗", "進行中"):
+            with self.subTest(cleanup=cleanup):
+                source = {"E-A": aux_started("PASS", cleanup_status=cleanup)}
+                activity = regression.project_activity(run, source)
+                self.assertNotEqual(activity["activity_state"], "完了")
+                forged = {**activity_doc(run, source), "activity_state": "完了"}
+                self.assertEqual(check(forged, "REG-D011"), "fail")
+        # activity全体のcleanup未確認もTC route・補助routeの双方で完了を妨げる。
+        tc_run = {"required_routes": [tc_route("TC-1", "X-1")]}
+        tc_source = {"X-1": started("PASS", implementation_revision=REV)}
+        self.assertNotEqual(
+            regression.project_activity(tc_run, tc_source, cleanup_status="未確認")[
+                "activity_state"
+            ],
+            "完了",
+        )
+
+    def test_old_build_result_is_not_counted_for_current_run(self):
+        run = {
+            "required_routes": [tc_route("TC-1", "X-1")],
+            "auxiliary_routes": [aux("A", "E-A")],
+        }
+        source = {
+            "X-1": started("PASS", implementation_revision="rev-OLD"),
+            "E-A": aux_started("PASS", revision="rev-OLD"),
+        }
+        activity = regression.project_activity(run, source)
+        self.assertNotEqual(activity["activity_state"], "完了")
+        self.assertEqual(activity["tc_execution_state"], {"TC-1": "blocked"})
+        self.assertEqual(activity["counts"]["executed_tc_count"], 0)
+        self.assertEqual(activity["counts"]["auxiliary_executed_count"], 0)
+        self.assertTrue(
+            any(
+                v.startswith("implementation_revision_mismatch")
+                for v in activity["unresolved"]
+            )
+        )
+        doc = activity_doc(run, source)
+        self.assertEqual(check(doc, "REG-D010"), "pass")
+        # 旧buildの実行をexecutedへ偽装したActivityは独立再計算で検出される。
+        forged = copy.deepcopy(doc)
+        forged["route_results"][0]["executed"] = True
+        self.assertEqual(check(forged, "REG-D010"), "fail")
+        forged_aux = copy.deepcopy(doc)
+        forged_aux["auxiliary_route_results"][0]["executed"] = True
+        self.assertEqual(check(forged_aux, "REG-D015"), "fail")
+
+    def test_auxiliary_cannot_share_execution_with_tc_route(self):
+        run = {
+            "required_routes": [tc_route("TC-1", "X-1")],
+            "auxiliary_routes": [aux("A", "X-1")],
+        }
+        source = {"X-1": aux_started("PASS")}
+        activity = regression.project_activity(run, source)
+        self.assertNotEqual(activity["activity_state"], "完了")
+        self.assertFalse(activity["auxiliary_route_results"][0]["executed"])
+        # TC routeと補助routeが同じ実行を参照する構成自体を分離違反として拒否する。
+        shared = activity_doc(run, source)
+        self.assertEqual(check(shared, "REG-D015"), "fail")
+        self.assertEqual(
+            check({**shared, "activity_state": "完了"}, "REG-D011"), "fail"
+        )
+
+    def test_mixed_manual_e2e_testware_and_auxiliary_keep_counts_separate(self):
+        run = {
+            "required_routes": [
+                tc_route("TC-1", "M-1", "manual"),
+                tc_route("TC-1", "E-1", "e2e", e2e_testware_ref="E2E-1"),
+                tc_route("TC-2", "X-2"),
+            ],
+            "auxiliary_routes": [aux("A", "E-A"), aux("OPT", "E-O", required=False)],
+        }
+        source = {
+            "M-1": started("FAIL"),
+            "E-1": started("PASS"),
+            "X-2": started("PASS", implementation_revision=REV),
+            "E-A": aux_started("PASS"),
+            "E-O": NOT_STARTED,
+        }
+        doc = activity_doc(run, source)
+        self.assertEqual(doc["activity_state"], "完了")
+        counts = doc["counts"]
+        self.assertEqual(counts["tc_member_count"], 2)
+        self.assertEqual(counts["executed_tc_count"], 2)
+        self.assertEqual(counts["source_result_counts"], {"FAIL": 1, "PASS": 2})
+        self.assertEqual(counts["auxiliary_testware_count"], 2)
+        self.assertEqual(counts["auxiliary_executed_count"], 1)
+        for assertion in ("REG-D010", "REG-D011", "REG-D015"):
+            self.assertEqual(check(doc, assertion), "pass", assertion)
+        # 補助PASSを正式TC件数へ混ぜたActivityはD015で拒否する。
+        mixed = copy.deepcopy(doc)
+        mixed["counts"]["executed_tc_count"] = 3
+        mixed["counts"]["source_result_counts"] = {"FAIL": 1, "PASS": 3}
+        self.assertEqual(check(mixed, "REG-D015"), "fail")
+        with_tc_ref = copy.deepcopy(doc)
+        with_tc_ref["auxiliary_route_results"][0]["tc_ref"] = "TC-1"
+        self.assertEqual(check(with_tc_ref, "REG-D015"), "fail")
+
+    def test_unprojected_auxiliary_raw_result_fails_validator(self):
+        run = {"required_routes": [], "auxiliary_routes": [aux("A", "E-A")]}
+        source = {"E-A": aux_started("PASS", raw_capture_complete=False)}
+        doc = activity_doc(run, source)
+        self.assertEqual(check(doc, "REG-D015"), "pass")
+        forged = copy.deepcopy(doc)
+        forged["auxiliary_route_results"][0]["raw_capture_complete"] = True
+        forged["activity_state"] = "完了"
+        self.assertEqual(check(forged, "REG-D015"), "fail")
+        self.assertEqual(check(forged, "REG-D011"), "fail")
+
+
+class LegacyCompatibilityTests(unittest.TestCase):
+    def test_legacy_run_without_auxiliary_still_completes(self):
+        run = {"required_routes": [tc_route("TC-1", "M-1", "manual")]}
+        activity = regression.project_activity(run, {"M-1": started("PASS")})
+        self.assertEqual(activity["activity_state"], "完了")
+
+    def test_legacy_auxiliary_obligation_unknown_is_blocked(self):
+        legacy_entry = {"testware_ref": "A", "execution_ref": "E-A"}
+        for run in (
+            {
+                "required_routes": [tc_route("TC-1", "M-1", "manual")],
+                "auxiliary_routes": [legacy_entry],
+            },
+            {
+                "required_routes": [tc_route("TC-1", "M-1", "manual")],
+                "auxiliary_testware_refs": ["A"],
+            },
+        ):
+            with self.subTest(run=run):
+                source = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+                activity = regression.project_activity(run, source)
+                self.assertEqual(
+                    activity["activity_state"], "部分完了（ブロック中あり）"
+                )
+                self.assertEqual(
+                    activity["counts"]["auxiliary_obligation_unknown_count"], 1
+                )
+                self.assertIn("auxiliary_obligation_unknown:A", activity["unresolved"])
+                forced = {**activity_doc(run, source), "activity_state": "完了"}
+                self.assertEqual(check(forced, "REG-D011"), "fail")
+
+    def test_stored_legacy_activity_remains_valid_and_immutable(self):
+        fixture = (
+            SKILL / "evals" / "output" / "cases" / "reg-out-002" / "output.md"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("route_contract_version", fixture)
+        result = validator.validate(
+            fixture, {"artifact_type": "activity"}, "REG-OUT-002"
+        )
+        self.assertTrue(
+            all(item.status == "pass" for item in result.assertions),
+            [(i.id, i.status) for i in result.assertions],
+        )
+        legacy_completed = {
+            "activity_state": "完了",
+            "scope_identity": "s",
+            "snapshot_ref": "d",
+        }
+        update = regression.update_activity(legacy_completed, legacy_completed)
+        self.assertEqual(update["reason"], "completed_activity_is_immutable")
+        self.assertEqual(update["resolution"], "create_new_activity_or_run_revision")
+        # 旧形式のまま完了済みの履歴を検証しても、補助義務を遡って要求しない。
+        legacy_doc = {
+            "artifact_type": "activity",
+            "activity_ref": "A",
+            "snapshot_ref": "d",
+            "scope_identity": "s",
+            "activity_state": "完了",
+            "cleanup_status": "対象なし",
+            "unresolved": [],
+            "source_executions": {"M-1": started("PASS")},
+            "route_results": [
+                {
+                    "tc_ref": "TC-1",
+                    "route_ref": "manual",
+                    "execution_ref": "M-1",
+                    "executed": True,
+                    "result_finalized": True,
+                    "source_result_projectable": True,
+                    "source_result": "PASS",
+                }
+            ],
+            "tc_execution_state": {"TC-1": "executed"},
+            "counts": {"auxiliary_testware_count": 1},
+            "auxiliary_route_results": [{"testware_ref": "A"}],
+        }
+        self.assertEqual(check(legacy_doc, "REG-D011"), "pass")
+        self.assertEqual(check(legacy_doc, "REG-D015"), "pass")
+
+    def test_completion_required_needs_contract_version(self):
+        run = {
+            "artifact_type": "run",
+            "run_scope": "selected",
+            "suite_complete": False,
+            "baseline": {"member_tc_refs": []},
+            "selected_tc_refs": [],
+            "required_routes": [],
+            "auxiliary_routes": [aux("A", "E-A")],
+            "auxiliary_testware_refs": ["A"],
+            "auxiliary_testware_count": 1,
+        }
+        self.assertEqual(check(run, "REG-D009"), "fail")
+        self.assertEqual(
+            check({**run, "route_contract_version": "2"}, "REG-D009"), "pass"
+        )
+        legacy = {
+            **run,
+            "auxiliary_routes": [{"testware_ref": "A", "execution_ref": "E-A"}],
+        }
+        self.assertEqual(check(legacy, "REG-D009"), "pass")
+        invalid_v2 = {
+            **run,
+            "route_contract_version": "2",
+            "auxiliary_routes": [{"testware_ref": "A", "execution_ref": "E-A"}],
+        }
+        self.assertEqual(check(invalid_v2, "REG-D009"), "fail")
+
+    def test_resolve_legacy_obligations_creates_new_revision_without_mutation(self):
+        legacy_run = {
+            "required_routes": [tc_route("TC-1", "M-1", "manual")],
+            "auxiliary_routes": [{"testware_ref": "A", "execution_ref": "E-A"}],
+            "auxiliary_testware_refs": ["A", "B"],
+            "auxiliary_testware_count": 2,
+        }
+        snapshot = copy.deepcopy(legacy_run)
+        details = {
+            "A": {
+                "executor_owner": "testware-execution",
+                "implementation_revision": REV,
+            },
+            "B": {
+                "executor_owner": "e2e-test-execution",
+                "implementation_revision": REV,
+            },
+        }
+        blocked = regression.resolve_auxiliary_obligations(
+            legacy_run,
+            user_explicit_refs=["A"],
+            policy_refs=[],
+            testware_details=details,
+        )
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertEqual(blocked["unresolved_refs"], ["B"])
+        self.assertIsNone(blocked["run"])
+        ready = regression.resolve_auxiliary_obligations(
+            legacy_run,
+            user_explicit_refs=["A"],
+            policy_refs=[],
+            reference_only_refs=["B"],
+            testware_details=details,
+        )
+        self.assertEqual(ready["status"], "ready")
+        self.assertTrue(ready["new_revision_required"])
+        entries = {e["testware_ref"]: e for e in ready["run"]["auxiliary_routes"]}
+        self.assertIs(entries["A"]["completion_required"], True)
+        self.assertEqual(entries["A"]["execution_ref"], "E-A")
+        self.assertIs(entries["B"]["completion_required"], False)
+        self.assertEqual(ready["run"]["route_contract_version"], "2")
+        self.assertEqual(legacy_run, snapshot)
+        self.assertTrue(
+            regression.validate_auxiliary_routes(ready["run"]["auxiliary_routes"])[
+                "valid"
+            ]
+        )
+        missing_detail = regression.resolve_auxiliary_obligations(
+            legacy_run, user_explicit_refs=["A", "B"], policy_refs=[]
+        )
+        self.assertEqual(missing_detail["status"], "blocked")
+        self.assertEqual(missing_detail["missing_detail_refs"], ["A", "B"])
+
+    def test_non_completed_legacy_activity_can_resume_with_new_contract(self):
+        existing = {
+            "activity_state": "実行中",
+            "scope_identity": "s",
+            "snapshot_ref": "d",
+        }
+        run = {"required_routes": [tc_route("TC-1", "M-1", "manual")]}
+        incoming = {
+            **regression.project_activity(run, {"M-1": started("PASS")}),
+            "scope_identity": "s",
+            "snapshot_ref": "d",
+        }
+        self.assertEqual(
+            regression.update_activity(existing, incoming)["status"], "update_allowed"
+        )
+
+
+class VitestFixtureTests(unittest.TestCase):
+    """固定qa-training-store commitで取得したVitest JSON形式のRun→Activity判定。"""
+
+    def setUp(self):
+        self.fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+    def test_fixture_is_pinned_to_a_commit(self):
+        self.assertRegex(self.fixture["repo_revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual(self.fixture["runner"], "vitest")
+
+    def _result_by_identity(self):
+        # 永続識別はrepo revision・file・test名／階層。runner内部の一時IDは使わない。
+        return {
+            (
+                self.fixture["repo_revision"],
+                f["file"],
+                tuple(t["ancestorTitles"]),
+                t["title"],
+            ): t
+            for f in self.fixture["files"]
+            for t in f["tests"]
+        }
+
+    def test_tc_linked_vitest_selection_to_activity(self):
+        results = self._result_by_identity()
+        pick = [
+            ("tests/unit/password-hasher.test.ts", 0),
+            ("tests/unit/app-config.test.ts", 0),
+        ]
+        routes, source = [], {}
+        for index, (file, offset) in enumerate(pick, start=1):
+            entry = next(f for f in self.fixture["files"] if f["file"] == file)
+            test = entry["tests"][offset]
+            identity = (
+                self.fixture["repo_revision"],
+                file,
+                tuple(test["ancestorTitles"]),
+                test["title"],
+            )
+            self.assertIn(identity, results)
+            ref = f"vitest:{file}::{test['fullName']}"
+            routes.append(
+                {
+                    "tc_ref": f"TC-{index:03d}",
+                    "route_type": "testware",
+                    "route_ref": f"testware:{index}",
+                    "testware_ref": ref,
+                    "executor_owner": "testware-execution",
+                    "implementation_revision": self.fixture["repo_revision"],
+                    "selection_basis": f"{file} :: {test['fullName']}",
+                    "execution_ref": f"EXEC-{index}",
+                }
+            )
+            passed = test["status"] == "passed"
+            source[f"EXEC-{index}"] = started(
+                "PASS" if passed else "FAIL",
+                implementation_revision=self.fixture["repo_revision"],
+                attempt_ref=f"attempt-{index}",
+                raw_capture_complete=True,
+            )
+        validated = regression.validate_required_routes(routes)
+        self.assertTrue(validated["valid"], validated["issues"])
+        run = {"required_routes": routes}
+        doc = activity_doc(run, source)
+        self.assertEqual(doc["activity_state"], "完了")
+        self.assertEqual(doc["counts"]["tc_member_count"], 2)
+        self.assertEqual(doc["counts"]["executed_tc_count"], 2)
+        for assertion in ("REG-D010", "REG-D011", "REG-D015"):
+            self.assertEqual(check(doc, assertion), "pass", assertion)
+        # 同じ結果を別revision（旧build）として受け取ると今回Runの実行にしない。
+        stale_source = {
+            key: {**value, "implementation_revision": "0" * 40}
+            for key, value in source.items()
+        }
+        stale = regression.project_activity(run, stale_source)
+        self.assertEqual(stale["activity_state"], "ブロック中")
+        self.assertEqual(stale["counts"]["executed_tc_count"], 0)
+
+    def test_tc_less_vitest_file_as_required_auxiliary(self):
+        entry = self.fixture["files"][0]
+        ref = f"vitest:{entry['file']}"
+        run = {
+            "required_routes": [],
+            "auxiliary_routes": [
+                aux(
+                    ref,
+                    "EXEC-AUX",
+                    implementation_revision=self.fixture["repo_revision"],
+                )
+            ],
+        }
+        source = {
+            "EXEC-AUX": aux_started(
+                "PASS" if entry["status"] == "passed" else "FAIL",
+                revision=self.fixture["repo_revision"],
+            )
+        }
+        doc = activity_doc(run, source)
+        self.assertEqual(doc["activity_state"], "完了")
+        self.assertEqual(doc["counts"]["tc_member_count"], 0)
+        self.assertEqual(doc["counts"]["auxiliary_required_completed_count"], 1)
+        self.assertEqual(check(doc, "REG-D015"), "pass")
+
+
+if __name__ == "__main__":
+    unittest.main()

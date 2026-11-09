@@ -25,7 +25,7 @@ Production helperはPR #11 ownerが解決したcurrent TCデータと保存先�
 
 ## Baseline / Run / Activity input
 
-Membership decisionには`tc_ref`, `decision` (`member`, `one_off`, `out_of_scope`, `unresolved`), `reason`、空でない一意な`source_refs`、および各source refに対応する空でない`source_ref` / `revision`を持つ`source_revisions`が必要です。両listのsource ref集合は一致し、同一source refへ複数revisionを割り当てません。Run routeは`manual`またはconcrete `e2e_ref`のいずれかです。Activity route resultにsource artifact ref、source start state、owner execution contractが返す`actual_start_confirmed`と`result_finalized`、source outcome、evidence refsを保持します。source result stringはsource artifactの値をそのまま保持し、新しいRegression taxonomyへ変換しません。
+Membership decisionには`tc_ref`, `decision` (`member`, `one_off`, `out_of_scope`, `unresolved`), `reason`、空でない一意な`source_refs`、および各source refに対応する空でない`source_ref` / `revision`を持つ`source_revisions`が必要です。両listのsource ref集合は一致し、同一source refへ複数revisionを割り当てません。Run routeは`manual`、concrete E2E testware ref付きの`e2e`、または非E2Eの`testware`のいずれかです。Activity route resultにsource artifact ref、source start state、owner execution contractが返す`actual_start_confirmed`と`result_finalized`、source outcome、evidence refsを保持します。source result stringはsource artifactの値をそのまま保持し、新しいRegression taxonomyへ変換しません。
 
 `executed`はrequired routeのactual startだけから判定します。Activity `完了`には、全required routeのactual start確認、owner側result finalization、source result / outcomeのraw projection、必要cleanupの閉鎖、unresolvedなしを別々に確認します。result finalizationはsource contractから渡される事実であり、Regressionはresult文字列から推測しません。
 
@@ -39,5 +39,51 @@ Membership decisionには`tc_ref`, `decision` (`member`, `one_off`, `out_of_scop
 
 `check_baseline_currentness()`のcurrent側入力は、current discovery snapshot、current Regression scopeからcallerが解決した`scope_identity`、およびsaved Baselineが依存するsource refそれぞれのcurrent revisionを組み合わせたものです。`scope_identity`はDiscovery snapshotが生成する値ではありません。current `source_revisions`にはdiscovery sourceとsaved membership decisionが依存するsourceのcurrent revisionを含めます。たとえば`current = {**snapshot, "scope_identity": resolved_scope_identity, "source_revisions": current_dependency_revisions}`として渡します。saved Baselineの`discovery_snapshot_ref`とcurrent snapshotの`snapshot_ref`を照合し、saved refの欠落・不正は`incomplete`、current refの欠落・不正は`unresolved`、ref不一致は`stale`です。saved Baselineのtop-level `source_revisions`とcurrent側の同じref / revisionも比較し、変更確認時は`stale`、current revisionを取得できないときは`unresolved`です。complete Baselineではcurrent discovery snapshotの`cases`内で`lifecycle_status == "current"`のTC ref集合とsaved Baselineの`memberships[].tc_ref`集合が完全一致しなければ`incomplete`です。current `cases`またはBaseline membershipが不正なshapeの場合はcurrentnessを確定しません。`complete=true`のBaselineに`unresolved` decision、`unresolved_tc_refs`または`undecided_tc_refs`がある場合も`incomplete`です。current scopeを解決できない場合は`unresolved`、saved Baseline側のscope identityまたはmembership dependencyが欠落・不整合の場合は`incomplete`です。scopeやrevisionを推測して補ってはいけません。
 
-- **Run**: `run_scope`、baselineの`complete` / `currentness` / `member_tc_refs`、`selected_tc_refs`、`suite_complete`、`required_routes`を保持します。routeは`manual`または具体的E2E testware ref付き`e2e`です。TCなし補助testwareは`auxiliary_testware_refs`と`auxiliary_testware_count`に分けます。
-- **Activity**: `activity_ref`、`snapshot_ref`、`scope_identity`、`activity_state`、`source_executions`、`route_results`、`tc_execution_state`、`counts`、`cleanup_status`、`unresolved`を保持します。TCなし補助testwareがあれば`auxiliary_route_results`と補助件数へ分けます。各routeのactual start、result finalization、source result / outcomeのraw valueをowner sourceから投影します。
+- **Run**: `run_scope`、baselineの`complete` / `currentness` / `member_tc_refs`、`selected_tc_refs`、`suite_complete`、`required_routes`、`route_contract_version`を保持します。routeは`manual`、具体的E2E testware ref付き`e2e`、または非E2Eの`testware`です。TCなし補助testwareは`auxiliary_routes`、`auxiliary_testware_refs`、`auxiliary_testware_count`に分けます。
+- **Activity**: `activity_ref`、`snapshot_ref`、`scope_identity`、`activity_state`、`source_executions`、`route_results`、`tc_execution_state`、`counts`、`cleanup_status`、`unresolved`、`route_contract_version`を保持します。TCなし補助testwareがあれば`auxiliary_route_results`と補助件数へ分けます。各routeのactual start、result finalization、source result / outcomeのraw valueをowner sourceから投影します。
+
+## `testware` required route（`route_contract_version: "2"`）
+
+TCに対応する非E2Eの自動／runner実行は、`required_routes`へ`route_type: "testware"`のrouteとして追加します。`manual` / `e2e`の意味・保存形・currentnessは変更しません。
+
+| field                     | 内容                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `tc_ref` / `route_ref`    | 対象TCとroute identity（TC内で一意）                                                                           |
+| `testware_ref`            | 実testwareへの参照（repo revision・file・test名 / 階層から解決したref）。runner内部の一時IDだけにしない        |
+| `executor_owner`          | `testware-execution`（Regressionはrunnerを起動しない）                                                         |
+| `implementation_revision` | 対象実装revision。ownerが返す結果の`implementation_revision`と一致しない結果（旧build）は今回Runの実行にしない |
+| `selection_basis`         | 選択条件（file / test名・filter等）                                                                            |
+| `execution_ref`           | Activityで`source_executions`を引くkey                                                                         |
+
+同じTCに複数routeがある場合、全routeの実開始・結果確定・cleanupを照合します。別TCや補助testwareのPASSで未実行TCを完了にしません。
+
+## TCなし補助testwareの実施義務
+
+Runの`auxiliary_routes[]`各entryは`testware_ref`、`executor_owner`（`e2e-test-execution` / `testware-execution`）、`implementation_revision`、`selection_basis`、`completion_required`（真偽値）、`execution_ref`を持ちます。
+
+- `completion_required=true`: 利用者の明示実行指示（`selection_basis: "user_explicit"`）または有効なpolicy（`"policy"`）で今回実行する補助testwareとして選定された。
+- `completion_required=false`: 参照候補・実行不要の記録（`selection_basis: "reference_only"`）。未開始でもActivity完了を妨げない。
+- 選定根拠が不明なまま値を推測しません。`completion_required`を持たない旧entryと、`auxiliary_routes`に無い旧`auxiliary_testware_refs`のrefは**義務不明**です。
+- TCなし補助は`tc_ref`を持たず、TC routeと`execution_ref`を共有しません。補助の件数・結果はTCのexecution / coverage分子へ加算しません。
+
+補助routeのsource executionは、TC routeと同じ項目に加えて`attempt_ref`（実run / attempt）、`raw_capture_complete`（raw結果取得の完全性）、`cleanup_status`、`implementation_revision`を返します。Activityの`auxiliary_route_results`はこれらをそのまま投影します。
+
+## Activity完了判定
+
+`完了`は、今回Runの**全required TC route**と`completion_required=true`の**全補助route**について、実開始・owner側result確定・source result projection・（補助は）`raw_capture_complete`と`attempt_ref`・cleanup終了を確認でき、未解決と義務不明が無い場合だけです。両集合が空なら`完了`にしません。`completion_required=false`の候補は完了を妨げません。
+
+| 状況                                                                | `activity_state`                                                     |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 必須補助またはTC routeが未開始・blocked、cleanup未確認、未解決あり  | 開始済みの義務あり: `部分完了（ブロック中あり）`、なし: `ブロック中` |
+| 義務不明の補助がある（旧Run）                                       | 上と同じ（`auxiliary_obligation_unknown:<ref>`を`unresolved`へ追加） |
+| 実開始済みだが結果未確定・raw未取得・`attempt_ref`なし（timeout等） | `実行中`                                                             |
+| 補助のみのRunで必須補助が全て未開始かつblockedなし                  | `未開始`                                                             |
+| 上記以外で全義務を確認                                              | `完了`                                                               |
+
+実開始前のblockを実行済みにせず、skip・未実行・runnerエラー・試行途中timeoutを`executed` / `完了`へ変換しません。retryはsourceが返す最新attemptの確定結果だけを投影します。TC route / 補助routeとも、ownerが返した`implementation_revision`がRunの値と一致しない結果は実行済みに数えず、`implementation_revision_mismatch:<ref>`を未解決へ追加します。
+
+## 旧Run / Activityの互換
+
+- `route_contract_version`が無いRun / Activityは旧形式です。読取互換で保持し、保存済みの`完了`を遡って変更しません。旧Activityは従来規則（TC routeだけ）で検証します。
+- 旧形式のentryに`completion_required`を付けるには`route_contract_version: "2"`が必要です（versionなしで義務だけ主張できません）。
+- 旧Runを新しい実行へ再開するときは`resolve_auxiliary_obligations()`で現在の利用者指示・policy・旧選定証拠から義務を解決します。解決できない補助が残る場合は`blocked`のままです。解決後のRunは新revisionとして保存し、完了済みActivityは書き換えず新Activityを使います。

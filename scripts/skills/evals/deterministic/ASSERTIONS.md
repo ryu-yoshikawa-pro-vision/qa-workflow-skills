@@ -323,14 +323,14 @@
 - `REG-D005` traceability coverage gapをinventory / lifecycle不完全と分離
 - `REG-D006` full Runにcompleteかつcurrentなbaselineを要求
 - `REG-D007` selected RunをSuite memberのsubsetとしSuite完了と区別
-- `REG-D008` required routeをmanualまたはconcrete E2E testware refで表現
-- `REG-D009` TCなし補助testwareとTC countの分離
+- `REG-D008` required routeをmanual・concrete E2E testware ref・実行owner / 実装revision / 選択条件付き非E2E testwareで表現
+- `REG-D009` TCなし補助testwareとTC countの分離、補助entryの実施義務（`completion_required`・選定根拠・実行owner・実装revision）と旧形式の区別
 - `REG-D010` source actual start / resultを投影し、全required route開始後にlogical TCをexecuted化
-- `REG-D011` route開始・result確定・source result投影・cleanupの未解決時にActivityを未完了とする
+- `REG-D011` TC routeと実施義務のある補助routeについて、source由来の実開始・result確定・raw結果投影・cleanup・義務不明なしを独立再計算し、満たさない場合にActivityを完了としない（旧Activityは従来規則）
 - `REG-D012` completed Activityのimmutable性
 - `REG-D013` Activityからidentityと固定snapshotを追跡
 - `REG-D014` fixture指定のartifact kindとの一致
-- `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させない
+- `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させず、補助結果の取得完全性（attempt・raw・cleanup・実装revision）をsourceと照合する
 - `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
 

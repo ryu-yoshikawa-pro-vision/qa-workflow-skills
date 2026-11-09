@@ -2616,7 +2616,13 @@ class SQLiteWcagWorkflowStateTests(unittest.TestCase):
 class StandaloneSkillPortabilityTests(unittest.TestCase):
     def test_new_skill_candidate_outputs_pass_existing_deterministic_runner(self):
         skills = {
-            "regression-testing": ["REG-OUT-001", "REG-OUT-002"],
+            "regression-testing": [
+                "REG-OUT-001",
+                "REG-OUT-002",
+                "REG-OUT-003",
+                "REG-OUT-004",
+                "REG-OUT-005",
+            ],
             "exploratory-testing": ["EXP-OUT-001", "EXP-OUT-002"],
             "qa-knowledge": ["KN-OUT-001", "KN-OUT-002"],
         }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -16,6 +17,18 @@ ACTIVITY_STATES = {
     "ブロック中",
     "完了",
 }
+# Run / Activityのroute契約version。未設定は旧形式（補助testwareの実施義務なし）。
+ROUTE_CONTRACT_VERSION = "2"
+REQUIRED_ROUTE_TYPES = {"manual", "e2e", "testware"}
+TESTWARE_ROUTE_OWNER = "testware-execution"
+AUXILIARY_OWNERS = {"e2e-test-execution", "testware-execution"}
+AUXILIARY_REQUIRED_BASES = {"user_explicit", "policy"}
+AUXILIARY_BASES = AUXILIARY_REQUIRED_BASES | {"reference_only"}
+CLEANUP_CLOSED = {"成功", "対象なし", "意図的に残した状態"}
+
+
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _canonical(value: Any) -> bytes:
@@ -642,22 +655,64 @@ def select_auxiliary_testware(
     user_explicit_refs: list[str],
     policy_refs: list[str],
     available_refs: list[str],
+    reference_only_refs: list[str] | None = None,
+    testware_details: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    authorized = set(user_explicit_refs) | set(policy_refs)
+    """Select TC-less auxiliary testware and record each completion obligation.
+
+    `requested_refs`は今回Runで実行する補助testware。利用者の明示指示または有効な
+    policyがある場合だけ`completion_required=true`にする。`reference_only_refs`は
+    参照候補として記録するだけで`false`。根拠が不明な値は推測せずunresolvedにする。
+    """
+    user_explicit = set(user_explicit_refs)
+    authorized = user_explicit | set(policy_refs)
     available = set(available_refs)
     requested = set(requested_refs)
+    reference_only = set(reference_only_refs or [])
     unauthorized = sorted(requested - authorized)
-    missing = sorted(requested - available)
-    if unauthorized or missing:
+    missing = sorted((requested | reference_only) - available)
+    conflicting = sorted(requested & reference_only)
+    missing_details: list[str] = []
+    if testware_details is not None:
+        for ref in sorted(requested | reference_only):
+            detail = testware_details.get(ref)
+            if (
+                not isinstance(detail, dict)
+                or detail.get("executor_owner") not in AUXILIARY_OWNERS
+                or not _text(detail.get("implementation_revision"))
+            ):
+                missing_details.append(ref)
+    if unauthorized or missing or conflicting or missing_details:
         return {
             "status": "unresolved",
             "selected_refs": [],
             "unauthorized_refs": unauthorized,
             "missing_refs": missing,
+            "conflicting_refs": conflicting,
+            "missing_detail_refs": missing_details,
         }
+    details = testware_details or {}
+    routes: list[dict[str, Any]] = []
+    for ref in sorted(requested | reference_only):
+        detail = details.get(ref, {})
+        is_required = ref in requested
+        routes.append(
+            {
+                "testware_ref": ref,
+                "executor_owner": detail.get("executor_owner"),
+                "implementation_revision": detail.get("implementation_revision"),
+                "selection_basis": (
+                    ("user_explicit" if ref in user_explicit else "policy")
+                    if is_required
+                    else "reference_only"
+                ),
+                "completion_required": is_required,
+            }
+        )
     return {
         "status": "ready",
         "selected_refs": sorted(requested),
+        "auxiliary_routes": routes,
         "tc_member_count": 0,
         "tc_coverage_refs": [],
     }
@@ -671,7 +726,7 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
         tc_ref = route.get("tc_ref")
         kind = route.get("route_type")
         route_ref = route.get("route_ref")
-        if kind not in {"manual", "e2e"}:
+        if kind not in REQUIRED_ROUTE_TYPES:
             issues.append(f"invalid_required_route_type:{tc_ref}")
         if (
             not isinstance(tc_ref, str)
@@ -682,19 +737,171 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
             issues.append("missing_tc_or_route_ref")
         if kind == "e2e" and not route.get("e2e_testware_ref"):
             issues.append(f"missing_e2e_testware_ref:{tc_ref}")
+        if kind == "testware":
+            if not _text(route.get("testware_ref")):
+                issues.append(f"missing_testware_ref:{tc_ref}")
+            if route.get("executor_owner") != TESTWARE_ROUTE_OWNER:
+                issues.append(f"invalid_testware_executor_owner:{tc_ref}")
+            if not _text(route.get("implementation_revision")):
+                issues.append(f"missing_implementation_revision:{tc_ref}")
+            if not _text(route.get("selection_basis")):
+                issues.append(f"missing_selection_basis:{tc_ref}")
         key = f"{tc_ref}|{route_ref}"
         if key in seen:
             issues.append(f"duplicate_required_route:{key}")
         seen.add(key)
-        normalized.append(
+        item = {
+            "tc_ref": tc_ref,
+            "route_type": kind,
+            "route_ref": route_ref,
+            "e2e_testware_ref": route.get("e2e_testware_ref"),
+        }
+        if kind == "testware":
+            for field in (
+                "testware_ref",
+                "executor_owner",
+                "implementation_revision",
+                "selection_basis",
+            ):
+                item[field] = route.get(field)
+        normalized.append(item)
+    return {"routes": normalized, "valid": not issues, "issues": issues}
+
+
+def validate_auxiliary_routes(
+    routes: list[dict[str, Any]], *, tc_testware_refs: list[str] | None = None
+) -> dict[str, Any]:
+    """Validate Run `auxiliary_routes`; legacy entries are reported as unknown."""
+    issues: list[str] = []
+    unknown: list[str] = []
+    seen: set[str] = set()
+    tc_refs = set(tc_testware_refs or [])
+    for index, entry in enumerate(routes):
+        if not isinstance(entry, dict):
+            issues.append(f"invalid_auxiliary_route:{index}")
+            continue
+        ref = entry.get("testware_ref")
+        if not _text(ref):
+            issues.append(f"missing_auxiliary_testware_ref:{index}")
+            continue
+        if ref in seen:
+            issues.append(f"duplicate_auxiliary_route:{ref}")
+        seen.add(ref)
+        if entry.get("tc_ref"):
+            issues.append(f"auxiliary_route_has_tc_ref:{ref}")
+        if ref in tc_refs:
+            issues.append(f"auxiliary_ref_also_tc_route:{ref}")
+        required = entry.get("completion_required")
+        if required is None:
+            unknown.append(ref)
+            continue
+        if type(required) is not bool:
+            issues.append(f"invalid_completion_required:{ref}")
+            continue
+        if entry.get("executor_owner") not in AUXILIARY_OWNERS:
+            issues.append(f"invalid_auxiliary_executor_owner:{ref}")
+        if not _text(entry.get("implementation_revision")):
+            issues.append(f"missing_auxiliary_implementation_revision:{ref}")
+        basis = entry.get("selection_basis")
+        if basis not in AUXILIARY_BASES or required is not (
+            basis in AUXILIARY_REQUIRED_BASES
+        ):
+            issues.append(f"invalid_auxiliary_selection_basis:{ref}")
+    return {
+        "valid": not issues,
+        "issues": issues,
+        "obligation_unknown_refs": sorted(unknown),
+    }
+
+
+def resolve_auxiliary_obligations(
+    run: dict[str, Any],
+    *,
+    user_explicit_refs: list[str],
+    policy_refs: list[str],
+    reference_only_refs: list[str] | None = None,
+    testware_details: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Resolve legacy Run auxiliary obligations into a new Run revision.
+
+    入力のRunは変更しない。現在の利用者指示・policyで根拠を解決できない補助は
+    `blocked`のまま残し、完了済みActivityを書き換えず新revisionで復旧する。
+    """
+    user_explicit = set(user_explicit_refs)
+    policy = set(policy_refs)
+    reference_only = set(reference_only_refs or [])
+    details = testware_details or {}
+    entries = [
+        dict(entry)
+        for entry in run.get("auxiliary_routes", [])
+        if isinstance(entry, dict)
+    ]
+    known = {entry.get("testware_ref") for entry in entries}
+    for ref in run.get("auxiliary_testware_refs", []):
+        if ref not in known:
+            entries.append({"testware_ref": ref})
+    resolved: list[dict[str, Any]] = []
+    unresolved: list[str] = []
+    missing_details: list[str] = []
+    for entry in entries:
+        ref = entry.get("testware_ref")
+        if type(entry.get("completion_required")) is bool:
+            resolved.append(entry)
+            continue
+        if ref in user_explicit:
+            basis, required = "user_explicit", True
+        elif ref in policy:
+            basis, required = "policy", True
+        elif ref in reference_only:
+            basis, required = "reference_only", False
+        else:
+            unresolved.append(str(ref))
+            continue
+        detail = details.get(ref, {})
+        owner = entry.get("executor_owner") or detail.get("executor_owner")
+        revision = entry.get("implementation_revision") or detail.get(
+            "implementation_revision"
+        )
+        if owner not in AUXILIARY_OWNERS or not _text(revision):
+            missing_details.append(str(ref))
+            continue
+        resolved.append(
             {
-                "tc_ref": tc_ref,
-                "route_type": kind,
-                "route_ref": route_ref,
-                "e2e_testware_ref": route.get("e2e_testware_ref"),
+                **entry,
+                "executor_owner": owner,
+                "implementation_revision": revision,
+                "selection_basis": basis,
+                "completion_required": required,
             }
         )
-    return {"routes": normalized, "valid": not issues, "issues": issues}
+    if unresolved or missing_details:
+        return {
+            "status": "blocked",
+            "reason": "auxiliary_obligation_unresolved",
+            "unresolved_refs": sorted(unresolved),
+            "missing_detail_refs": sorted(missing_details),
+            "run": None,
+            "new_revision_required": True,
+        }
+    resolved.sort(key=lambda item: str(item.get("testware_ref")))
+    return {
+        "status": "ready",
+        "unresolved_refs": [],
+        "missing_detail_refs": [],
+        "run": {
+            **copy.deepcopy(run),
+            "route_contract_version": ROUTE_CONTRACT_VERSION,
+            "auxiliary_routes": resolved,
+            "auxiliary_testware_refs": [item["testware_ref"] for item in resolved],
+            "auxiliary_testware_count": len(resolved),
+        },
+        "new_revision_required": True,
+    }
+
+
+def _revision_confirmed(declared: Any, source: dict[str, Any]) -> bool:
+    """旧build・別revisionの結果を今回の実行として数えない。"""
+    return not _text(declared) or source.get("implementation_revision") == declared
 
 
 def project_activity(
@@ -705,15 +912,22 @@ def project_activity(
     unresolved: list[Any] | None = None,
 ) -> dict[str, Any]:
     routes = run.get("required_routes", [])
+    derived_unresolved: list[str] = []
     projected: list[dict[str, Any]] = []
     by_tc: dict[str, list[dict[str, Any]]] = {}
     for route in routes:
         execution_ref = route.get("execution_ref")
         source = source_executions.get(execution_ref, {}) if execution_ref else {}
         start_state = source.get("start_state", "未開始")
-        actual_start = (
+        started = (
             start_state == "開始済み" and source.get("actual_start_confirmed") is True
         )
+        revision_ok = _revision_confirmed(route.get("implementation_revision"), source)
+        actual_start = started and revision_ok
+        if started and not revision_ok:
+            derived_unresolved.append(
+                f"implementation_revision_mismatch:{route.get('route_ref')}"
+            )
         source_result = source.get("source_result")
         result_finalized = source.get("result_finalized") is True
         source_result_projectable = isinstance(source_result, str) and bool(
@@ -722,40 +936,90 @@ def project_activity(
         item = {
             "tc_ref": route.get("tc_ref"),
             "route_ref": route.get("route_ref"),
+            "route_type": route.get("route_type"),
             "execution_ref": execution_ref,
+            "implementation_revision": route.get("implementation_revision"),
             "source_start_state": start_state,
             "source_result": source_result,
             "result_finalized": result_finalized,
             "source_result_projectable": source_result_projectable,
+            "cleanup_status": source.get("cleanup_status", "対象なし"),
             "evidence_refs": list(source.get("evidence_refs", [])),
             "executed": actual_start,
-            "blocked": not actual_start and source.get("blocked") is True,
+            "blocked": not actual_start
+            and (source.get("blocked") is True or (started and not revision_ok)),
         }
         projected.append(item)
         by_tc.setdefault(str(route.get("tc_ref")), []).append(item)
+
+    tc_execution_refs = {
+        route.get("execution_ref") for route in routes if route.get("execution_ref")
+    }
+    auxiliary_entries = [
+        entry for entry in run.get("auxiliary_routes", []) if isinstance(entry, dict)
+    ]
+    covered = {entry.get("testware_ref") for entry in auxiliary_entries}
+    # 旧Runのrefだけの補助は義務不明のまま別枠に残し、完了へ数えない。
+    auxiliary_entries += [
+        {"testware_ref": ref}
+        for ref in run.get("auxiliary_testware_refs", [])
+        if ref not in covered
+    ]
     auxiliary_projected: list[dict[str, Any]] = []
-    for route in run.get("auxiliary_routes", []):
+    for route in auxiliary_entries:
         execution_ref = route.get("execution_ref")
         source = source_executions.get(execution_ref, {}) if execution_ref else {}
-        actual_start = (
+        started = (
             source.get("start_state") == "開始済み"
             and source.get("actual_start_confirmed") is True
         )
+        revision_ok = _revision_confirmed(route.get("implementation_revision"), source)
+        shared = bool(execution_ref) and execution_ref in tc_execution_refs
+        if shared:
+            derived_unresolved.append(
+                f"execution_ref_shared_with_tc_route:{execution_ref}"
+            )
+        if started and not revision_ok:
+            derived_unresolved.append(
+                f"implementation_revision_mismatch:{route.get('testware_ref')}"
+            )
+        actual_start = started and revision_ok and not shared
+        required = route.get("completion_required")
+        if type(required) is not bool:
+            required = None
         source_result = source.get("source_result")
         auxiliary_projected.append(
             {
                 "testware_ref": route.get("testware_ref"),
+                "executor_owner": route.get("executor_owner"),
+                "implementation_revision": route.get("implementation_revision"),
+                "selection_basis": route.get("selection_basis"),
+                "completion_required": required,
                 "execution_ref": execution_ref,
+                "attempt_ref": source.get("attempt_ref"),
                 "source_start_state": source.get("start_state", "未開始"),
                 "source_result": source_result,
                 "result_finalized": source.get("result_finalized") is True,
                 "source_result_projectable": isinstance(source_result, str)
                 and bool(source_result.strip()),
+                "raw_capture_complete": source.get("raw_capture_complete") is True,
+                "cleanup_status": source.get("cleanup_status", "対象なし"),
                 "evidence_refs": list(source.get("evidence_refs", [])),
                 "executed": actual_start,
-                "blocked": not actual_start and source.get("blocked") is True,
+                "blocked": not actual_start
+                and (
+                    source.get("blocked") is True
+                    or shared
+                    or (started and not revision_ok)
+                ),
             }
         )
+        if required is None:
+            derived_unresolved.append(
+                f"auxiliary_obligation_unknown:{route.get('testware_ref')}"
+            )
+
+    required_aux = [i for i in auxiliary_projected if i["completion_required"] is True]
     tc_states = {}
     for tc_ref, items in by_tc.items():
         started = all(item["executed"] for item in items)
@@ -776,21 +1040,57 @@ def project_activity(
         value = item.get("source_result")
         if item["executed"] and isinstance(value, str) and value:
             auxiliary_result_counts[value] = auxiliary_result_counts.get(value, 0) + 1
+
+    def aux_completed(item: dict[str, Any]) -> bool:
+        return bool(
+            item["executed"]
+            and item["result_finalized"]
+            and item["source_result_projectable"]
+            and item["raw_capture_complete"]
+            and _text(item["attempt_ref"])
+        )
+
     unresolved_values = list(unresolved or [])
-    if cleanup_status in {"失敗", "未確認", "一部失敗"} or unresolved_values:
-        state = "部分完了（ブロック中あり）" if started_count else "ブロック中"
-    elif unexecuted_count or blocked_count:
-        state = "部分完了（ブロック中あり）" if started_count else "ブロック中"
-    elif routes and any(
+    unresolved_values += [v for v in derived_unresolved if v not in unresolved_values]
+    started_units = started_count + sum(i["executed"] for i in required_aux)
+    started_cleanups = [
+        item["cleanup_status"]
+        for item in [*projected, *auxiliary_projected]
+        if item["executed"]
+    ]
+    bad_cleanups = [
+        value
+        for value in [cleanup_status, *started_cleanups]
+        if value not in CLEANUP_CLOSED
+    ]
+    if bad_cleanups and cleanup_status in CLEANUP_CLOSED:
+        cleanup_status = bad_cleanups[0]
+    if bad_cleanups or unresolved_values:
+        state = "部分完了（ブロック中あり）" if started_units else "ブロック中"
+    elif (
+        unexecuted_count
+        or blocked_count
+        or any(not i["executed"] for i in required_aux)
+    ):
+        if (
+            not routes
+            and not started_units
+            and not any(i["blocked"] for i in required_aux)
+        ):
+            state = "未開始"
+        else:
+            state = "部分完了（ブロック中あり）" if started_units else "ブロック中"
+    elif any(
         not (item["result_finalized"] and item["source_result_projectable"])
         for item in projected
-    ):
+    ) or any(not aux_completed(i) for i in required_aux):
         state = "実行中"
-    elif routes:
+    elif routes or required_aux:
         state = "完了"
     else:
         state = "未開始"
     return {
+        "route_contract_version": ROUTE_CONTRACT_VERSION,
         "activity_state": state,
         "route_results": projected,
         "auxiliary_route_results": auxiliary_projected,
@@ -806,6 +1106,13 @@ def project_activity(
                 1 for item in auxiliary_projected if item["executed"]
             ),
             "auxiliary_source_result_counts": auxiliary_result_counts,
+            "auxiliary_required_count": len(required_aux),
+            "auxiliary_required_completed_count": sum(
+                1 for item in required_aux if aux_completed(item)
+            ),
+            "auxiliary_obligation_unknown_count": sum(
+                1 for item in auxiliary_projected if item["completion_required"] is None
+            ),
         },
         "cleanup_status": cleanup_status,
         "unresolved": unresolved_values,
@@ -816,7 +1123,11 @@ def update_activity(
     existing: dict[str, Any], incoming: dict[str, Any]
 ) -> dict[str, Any]:
     if existing.get("activity_state") == "完了":
-        return {"status": "blocked", "reason": "completed_activity_is_immutable"}
+        return {
+            "status": "blocked",
+            "reason": "completed_activity_is_immutable",
+            "resolution": "create_new_activity_or_run_revision",
+        }
     if existing.get("scope_identity") != incoming.get("scope_identity") or existing.get(
         "snapshot_ref"
     ) != incoming.get("snapshot_ref"):

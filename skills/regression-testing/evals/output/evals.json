@@ -11,6 +11,21 @@
       "id": "REG-OUT-002",
       "input": "cases/reg-out-002/input.md",
       "expected": "cases/reg-out-002/expected.json"
+    },
+    {
+      "id": "REG-OUT-003",
+      "input": "cases/reg-out-003/input.md",
+      "expected": "cases/reg-out-003/expected.json"
+    },
+    {
+      "id": "REG-OUT-004",
+      "input": "cases/reg-out-004/input.md",
+      "expected": "cases/reg-out-004/expected.json"
+    },
+    {
+      "id": "REG-OUT-005",
+      "input": "cases/reg-out-005/input.md",
+      "expected": "cases/reg-out-005/expected.json"
     }
   ]
 }

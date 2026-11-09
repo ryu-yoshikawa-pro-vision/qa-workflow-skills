@@ -58,7 +58,7 @@
 
 ## 着手基準
 
-- [ ] `regression_runtime.py`、REG-D011／D015、旧Run・Activityと全呼び出し元を確認した。
+- [x] `regression_runtime.py`、REG-D011／D015、旧Run・Activityと全呼び出し元を確認した。
 - [ ] Gとtestware実行結果、Eと正式TC参照、Fと管理計画の分離を合意した。
 
 ## 作業内容
@@ -81,18 +81,18 @@
 
 ## 完了基準
 
-- [ ] manual/e2e/testwareの正式route選定と実行ownerへの引継ぎが成立する。
-- [ ] 必須補助が未実行ならActivity完了拒否、補助だけのRunでも未開始に固定されない状態導出がPASSする。
-- [ ] 正式TCと補助testwareの母集団・結果・件数が混同されない。
-- [ ] legacy／old RunとActivity、partial Run、unknown obligation、timeout／retry／cleanup不全を含む決定論的validatorと履歴互換がPASSする。
-- [ ] 固定qa-training-storeで確認したVitestの形式と独立fixtureを用い、H担当のRun→Activity判定・既存互換を検証した。Gが生成した正本runとの実参照・統合受入はPR #22へ引き継いだ。
-- [ ] Regression既存のtrigger／決定論的／意味評価と関係テストの回帰がPASSする。
+- [x] manual/e2e/testwareの正式route選定と実行ownerへの引継ぎが成立する。
+- [x] 必須補助が未実行ならActivity完了拒否、補助だけのRunでも未開始に固定されない状態導出がPASSする。
+- [x] 正式TCと補助testwareの母集団・結果・件数が混同されない。
+- [x] legacy／old RunとActivity、partial Run、unknown obligation、timeout／retry／cleanup不全を含む決定論的validatorと履歴互換がPASSする。
+- [x] 固定qa-training-storeで確認したVitestの形式と独立fixtureを用い、H担当のRun→Activity判定・既存互換を検証した。Gが生成した正本runとの実参照・統合受入はPR #22へ引き継いだ。
+- [x] Regression既存のtrigger／決定論的／意味評価と関係テストの回帰がPASSする。
 
-- [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
+- [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
 - [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
-- [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
-- [ ] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
+- [x] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
+- [x] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
@@ -100,3 +100,84 @@
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+## 実装・検証記録（担当H、2026-11-09時点）
+
+### 変更ファイルと公開契約
+
+| 対象                                                                                                        | 内容                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `skills/regression-testing/scripts/regression_runtime.py`                                                   | `testware` required route、補助`completion_required`、`validate_auxiliary_routes()`、`resolve_auxiliary_obligations()`、`project_activity()`の完了・状態導出 |
+| `skills/regression-testing/evals/deterministic/validator.py`                                                | REG-D008／D009（Run）、REG-D010／D011／D015（Activity）をowner sourceから独立再計算。旧形式は従来規則                                                        |
+| `references/data-contract.md`・`guidance.md`・`SKILL.md`・`assets/output-template.md`                       | route・義務・完了判定・旧形式互換の契約                                                                                                                      |
+| `scripts/skills/evals/deterministic/ASSERTIONS.md`                                                          | REG-D008／D009／D011／D015の説明                                                                                                                             |
+| `evals/output/cases/reg-out-003`〜`005`、`evals.json`                                                       | Run（manual＋testware＋補助）、Activity完了、必須補助未開始の負例                                                                                            |
+| `tests/skills/evals/deterministic/test_regression_routing.py`、`tests/skills/fixtures/regression-testware/` | 担当固有の局所テスト26件と、固定`qa-training-store`のVitest JSON形式fixture                                                                                  |
+| `tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`                                         | 出力評価manifestのcase一覧にREG-OUT-003〜005を追加（既存テストの変更はこの1箇所のみ）                                                                        |
+
+公開契約の要点（詳細は`data-contract.md`）：
+
+- `required_routes[].route_type`に`testware`を追加。`testware_ref`・`executor_owner=testware-execution`・`implementation_revision`・`selection_basis`が必須。`manual`／`e2e`の正規化形は変更なし。
+- Run／Activityに`route_contract_version: "2"`。未設定は旧形式で、読取互換・従来規則のまま。
+- 補助`auxiliary_routes[]`は`completion_required`・選定根拠・実行owner・実装revisionを持つ。source executionは`attempt_ref`・`raw_capture_complete`・`cleanup_status`・`implementation_revision`を返す。
+- Activity `完了`はrequired TC routeと`completion_required=true`の補助routeの全確定時のみ。両集合が空・義務不明・旧build結果・TC／補助間の`execution_ref`共有は完了にしない。補助の件数・結果はTCのexecution／coverage分子へ加算しない。
+
+### 局所検証（個別に実行・判定）
+
+実行環境: Python 3.12.0、ruff 0.16.8（`ruff.toml`の固定versionに合わせて隔離venvへ導入）、dprint 0.55.2、Node v22.20.0、Codex CLI 0.164.0。
+
+| 検証                                                                                                                                                                         | 結果                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `unittest discover tests/skills/evals/deterministic`（316件）                                                                                                                | PASS（短縮形のTEMPで1件が環境要因で失敗するため、TEMPを長いパスにして実行）                                                                                                                |
+| `test_regression_routing.py`（26件）、`test_qa_artifact_graph_skills.py`（40件、Regression 18件を含む）                                                                      | PASS                                                                                                                                                                                       |
+| `scripts/skills/evals/deterministic/tests`（12件）、`tests/skills/evals/semantic`（13件、1 skip）、`tests/skills/evals/trigger`、`scripts/skills/evals/semantic/validate.py` | PASS                                                                                                                                                                                       |
+| `ruff format --check`／`ruff check`（変更したPython）、`dprint check`（変更したmd／json）、`git diff --check`                                                                | PASS                                                                                                                                                                                       |
+| `unittest discover tests/skills/runtime`（496件）                                                                                                                            | `test_ci_handoff`（6 FAIL）と`test_sqlite_workflow_history`（14 ERROR）が失敗。変更前HEAD（`git archive`）でも同数が失敗するためH差分と無関係（Windows環境起因）。Regression関連の失敗なし |
+
+### 固定`qa-training-store`のVitest形式
+
+固定commit `2a8bcf57ff091e84a8b3bf7b123568e967000d88`（`origin/main`）をexportし、`tests/unit/password-hasher.test.ts`と`tests/unit/app-config.test.ts`を`vitest run --reporter=json`で実行して得た形式（`ancestorTitles`・`title`・`fullName`・`status`）を`tests/skills/fixtures/regression-testware/vitest-qa-training-store-2a8bcf5.json`に保存した。永続識別はrepo revision・file・test名／階層とし、runner内部IDは使わない。このfixtureでTC紐付きtestware route→実開始→結果確定→Activity、旧build（別revision）の不採用、TCなしVitestの必須補助化を検証した。Gが保存した正本runではない。
+
+### 未実施・blocked・PR #22へ引き継ぐ項目
+
+- **Gの実runner・実attempt／cleanupとの実参照**：未実施。`attempt_ref`・`raw_capture_complete`・`cleanup_status`・`implementation_revision`をsource executionが返す前提の契約とfixtureで検証した。Gが保存した実成果物でのID／revision／currentness接続はPR #22。
+- **意味評価（モデルを使うJudge）**：`REG-SEM-007`の新規追加と、影響する`REG-SEM-004`・`REG-SEM-006`の再評価を実施済み（下記「意味評価・Skill validationの追加検証」）。単一Judge・単一試行で、統計的な再現性は未確認。
+- **A（PR #23）の共通runtime・保存・CAS／readback・承認との接続**：契約と実コードの照合と、`regression-testing`のverifier登録に必要な入力の引渡しは上記「Aの共通契約との照合と登録依頼」に記録した。登録（`skills/qa-workflow/scripts/**`・`EVALS.md`）はAの編集範囲。新revisionのRun／Activityの実保存・承認、Aが登録したverifierを通すworkflow完了判定は、各ownerの実成果物が必要なためPR #22で結合確認する。
+- **実Agent経路・S1〜S17・人間編集8ケース・15＋10条件の最終判定**：PR #22。
+
+### 旧Run／Activityの互換・移行・rollback
+
+- `route_contract_version`が無い保存物は旧形式。読取・検証は従来規則で、完了済みActivityを遡って変更しない（`reg-out-002`は無変更で通る）。
+- 旧Runの補助義務が不明な範囲は`project_activity()`が`auxiliary_obligation_unknown:<ref>`を残して`blocked`系の状態にする。`resolve_auxiliary_obligations()`は入力Runを変更せず、現在の利用者指示・policy・選定証拠で解決できた場合だけ新revisionのRunを返す。
+- rollbackは本変更のrevertで足りる。保存済み旧形式は書き換えていない。
+
+### 発見したドキュメントと既存コードの食い違い
+
+- `references/data-contract.md`の「Run routeは`manual`またはconcrete `e2e_ref`」は、コード・validator・fixtureの`e2e_testware_ref`と不一致だった。コードに合わせて「E2E testware ref」へ修正した。
+- Plan 04は補助routeを`auxiliary_routes`と記載するが、既存のdata contractとtemplateは`auxiliary_testware_refs`のみを定義し、`project_activity()`だけが`auxiliary_routes`を読んでいた。`auxiliary_routes`をdata contractへ追記し、refsだけの旧Runは義務不明として扱う。
+
+### A（PR #23）の共通契約との照合と登録依頼
+
+[A担当文書](./A_runtime-integration.md)の公開契約を実コードと照合した。
+
+- `skills/qa-workflow/scripts/**`にRegression固有の参照は無く、`workflow_runtime.py`は未登録Skillを`unsupported_skill_verifier`で`blocked`にする。`regression-testing`は現在この未登録Skillに当たる。H差分はこの経路を変更していない（`skills/qa-workflow/scripts/**`・`EVALS.md`・共通CIはAのみ編集のため、Hでは触れていない）。
+- 保存・承認・CAS／readbackはAの契約に従う。Regressionは保存先・条件付き更新を新設しない。Activity／Runの更新は既存どおり、提供先のnative条件付き保存を確認できない場合に`blocked`、新revisionのRun（`resolve_auxiliary_obligations()`の`new_revision_required`）と新Activityの保存は、Aの`claim_mutable_operation`（operation identity・期待revision・承認ref・resume owner）経由でPR #22に結合確認する。
+
+Aが`regression-testing`をworkflowのverifierへ登録するための入力（A文書「他担当から…正式validator入口、scopeの粒度、正本参照形式と検証fixtureを受け取ってから登録を追加する」への引渡し）：
+
+| 項目                      | 内容                                                                                                                                                                                                                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| owner skill / 検証入口    | `regression-testing`。`skills/regression-testing/evals/deterministic/validator.py::validate(text, expected, eval_id)`（REG-D001〜D017）と`scripts/regression_runtime.py`（`validate_required_routes`・`validate_auxiliary_routes`・`project_activity`・`resolve_auxiliary_obligations`） |
+| scopeの粒度               | Baseline／Run／Activity artifact単位。identityは`baseline_ref`／`activity_ref`＋`snapshot_ref`＋`scope_identity`                                                                                                                                                                         |
+| 参照形式                  | `source_executions`のkey（`execution_ref`）、`attempt_ref`、`implementation_revision`、`testware_ref`、`route_contract_version`（無ければ旧形式）                                                                                                                                        |
+| 状態→workflow状態の投影案 | `完了`＝全義務確定でcurrent相当、`実行中`／`部分完了（ブロック中あり）`／`ブロック中`＝未完了（blocked）、`未開始`＝未着手。`unresolved`に`auxiliary_obligation_unknown:*`・`implementation_revision_mismatch:*`がある間は完了にしない。ownerの内部状態とworkflow全体の状態は別          |
+| 固定fixture               | 正常：`reg-out-003`（Run）・`reg-out-004`（Activity完了）。拒否：`reg-out-005`（必須補助未開始）、`tests/skills/evals/deterministic/test_regression_routing.py`の負例、旧形式`reg-out-002`                                                                                               |
+| 意味評価                  | `REG-SEM-007`（candidate・Judge結果は`evals/semantic/candidate_outputs/`）                                                                                                                                                                                                               |
+| `EVALS.md`の更新依頼      | Regression意味評価の行（現在`REG-SEM-001` ～ `REG-SEM-006`）を`REG-SEM-007`まで、決定論出力評価の件数を`REG-OUT-005`までへ更新（共通ファイルのためHでは未編集）                                                                                                                          |
+
+### 意味評価・Skill validationの追加検証（2026-11-09）
+
+- `REG-SEM-007`（testware route・補助testwareの実施義務）を新規追加した。評価対象Agent（subagent）がSKILL.md・references・templateと`input.md`だけを読んで候補を生成し、別の独立Judge（subagent）が既存runnerの`build_judge_prompt`のプロンプトで評価した。応答は既存runner（`scripts/skills/evals/semantic/run.py`）で正規化した。結果：**pass、rating 3**（Judge所見：入力に無い補助routeのimplementation_revisionとcleanup_status=unconfirmedを補完している軽微な指摘。状態判断・件数には影響なし）。候補は`candidate_outputs/REG-SEM-007.md`、結果は`candidate_outputs/results/REG-SEM-007.json`。
+- SKILL.md・guidanceの変更で影響を受ける既存caseを更新後のSkillで再評価した。`REG-SEM-004`（route・actual start）は**pass、rating 4**（`REG-SEM-004-recheck`）、`REG-SEM-006`（補助testware境界）は**pass、rating 4**（`REG-SEM-006`、従来は保存済み候補が無かった）。旧`REG-SEM-004`の保存済み結果は変更していない。
+- Judgeは候補生成Agentと別contextで実行し、`reference.md`は生成側に渡していない。評価は単一Judge・単一試行であり、再現性の統計的保証ではない。
+- `skills-ref validate`（CI `validate-skills.yml`と同じ固定commit）：`skills/*`の23 Skill全てPASS（Windowsでは`PYTHONUTF8=1`が必要）。
