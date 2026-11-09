@@ -144,7 +144,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - 既存`adversarial-review`: 非E2E testwareのassertion・fixture独立反証と、TC不要の製品要求／設計／コードの意味的静的レビューを追加。既存`test-execution`: ブラウザ直接TC実行異常の第一分析ownerと非ブラウザとの責務境界を明確化。
 - `tests/skills/runtime/test_non_e2e_contract.py`: 担当固有の正常・負例テスト。
 
-### 実施した検証と条件
+### 実施した検証と条件（初回の履歴。現在の結果は上記チェックリストとPR #29 Checksを参照）
 
 | 実行環境                                                                                                            | コマンド／対象                                                                          | 結果                                                              | 証拠・制約                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -157,7 +157,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 ### 既知の未完了と再開条件
 
 1. `runner.py`で隔離checkout上の実subprocess起動とattempt／timeout／raw／cleanupを実装した。ただし案件の実Vitest・API-only Playwright・静的解析toolと、実副作用・認証が必要な環境の受入は未実施。独立Python subprocessと固定JSON reporterの結果から製品runの完了を主張しない。
-2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitをGit remoteに非強制fast-forward反映・readbackする経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
+2. `snapshot_guard.py`の読取検査に加え`publish_git.py`で隔離commitを、期待HEADのlease付き更新（候補はそのHEADの単一親fast-forward）とreadbackで確定する経路を設けた。共有workspaceの直接編集、Git以外の保存先のnative reservation／CAS／承認、既存E2E側の競合対策は共通ownerと実providerの受入が必要。
 3. 共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #23はclosed・merge済み。共有正本と新Skillとの接続について、PR #22統合ownerに引き継ぐ。PR #29のtrigger正負件数不均衡はGで修正済み。README未登録による`Validate Agent Skills` failureは旧HEADの履歴で、PR #22側の共有README同期後、commit `481eada`ではsuccessを確認した。
 4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
 5. 担当Gの実装・局所テストとレビュー指摘への修正は後続のHEAD `85cc433`で完了している。実runner・実provider・他ownerとの受入はPR #22の未完了条件とし、PR #29はDraftを維持する。正式なレビュー承認・merge完了とは区別する。
