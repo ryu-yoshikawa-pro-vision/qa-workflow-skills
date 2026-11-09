@@ -437,6 +437,13 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["existing_policy"] = {**policy, "decision_id": "DEC-001"}
         request["existing_decisions"] = [old_decision]
         self.assertEqual(handle(request)["status"], "reuse_candidate")
+        forged = {**request["existing_policy"], "approval_revision": "approval-v9"}
+        request["existing_policy"] = forged
+        request["policy"] = {**policy, "approval_revision": "approval-v9"}
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["existing_policy"] = {**policy, "decision_id": "DEC-001"}
+        request["policy"] = policy
+        self.assertEqual(handle(request)["status"], "reuse_candidate")
         request["policy"] = {
             **policy,
             "target_ref": "qa/new-artifacts",

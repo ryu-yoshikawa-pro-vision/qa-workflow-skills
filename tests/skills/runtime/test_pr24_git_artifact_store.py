@@ -318,10 +318,112 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertIn("QA-Approval-Ref: approval/verified", message)
         self.assertIn("QA-Source-Revision: source-1", message)
 
-    def test_feature_inventory_uses_same_git_cas_without_schema_copy(self) -> None:
+    def _code_registry(self, *, additional_file: bool = False) -> tuple[dict, list]:
+        baseline = git(self.root, "rev-parse", "qa-artifacts")
+        source = self.root / "src"
+        source.mkdir(exist_ok=True)
+        (source / "auth.py").write_text("def access(): return True\n", encoding="utf-8")
+        if additional_file:
+            (source / "batch.py").write_text("def job(): pass\n", encoding="utf-8")
+        git(self.root, "add", "src")
+        git(self.root, "commit", "-qm", "source changes")
+        head = git(self.root, "rev-parse", "HEAD")
         request = fixture()
-        request["snapshot"]["project_ref"] = "Sample"
-        request["snapshot"]["artifact_ref"] = "qa/feature-inventory.json"
+        snap = request["snapshot"]
+        snap["project_ref"] = "Sample"
+        snap["artifact_ref"] = "qa/feature-inventory.json"
+        snap["source_revision"] = head
+        snap["sources"][0]["revision"] = head
+        snap["changes"][0].update(
+            before_revision=baseline,
+            after_revision=head,
+            locator="src/auth.py",
+        )
+        snap["history"][0]["revision"] = head
+        request["observed_head_revision"] = head
+        evidence = [{
+            "source_id": "SRC-001",
+            "repository_root": str(self.root),
+            "authorized_root": str(self.root),
+            "base_sha": baseline,
+            "head_sha": head,
+        }]
+        return request, evidence
+
+    def test_code_save_rechecks_actual_git_tree_and_rejects_unlisted_diff(
+        self,
+    ) -> None:
+        request, evidence = self._code_registry(additional_file=True)
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="unlisted code diff",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertTrue(
+            any("git_coverage_not_verified" in reason for reason in result["reasons"])
+        )
+        self.assertIsNone(
+            self.store.read_current(
+                "feature-inventory", "Sample", "qa/feature-inventory.json"
+            )
+        )
+
+    def test_code_save_rejects_wrong_git_diff_revision(self) -> None:
+        request, evidence = self._code_registry()
+        request["snapshot"]["changes"][0]["after_revision"] = "forged-head"
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="forged diff",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn(
+            "change_source_revision_mismatch:DIF-001", result["reasons"]
+        )
+
+    def test_code_save_requires_complete_submodule_inventory(self) -> None:
+        request, evidence = self._code_registry()
+        git(
+            self.root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            evidence[0]["base_sha"],
+            "vendor/module",
+        )
+        git(self.root, "commit", "-qm", "submodule added")
+        head = git(self.root, "rev-parse", "HEAD")
+        evidence[0]["head_sha"] = head
+        request["observed_head_revision"] = head
+        snapshot = request["snapshot"]
+        snapshot["source_revision"] = head
+        snapshot["sources"][0]["revision"] = head
+        snapshot["changes"][0]["after_revision"] = head
+        snapshot["history"][0]["revision"] = head
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="submodule not retrieved",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIn("git_source_listing_incomplete", result["reasons"])
+
+    def test_feature_inventory_uses_same_git_cas_without_schema_copy(self) -> None:
+        request, evidence = self._code_registry()
         saved = persist_snapshot(
             self.store,
             request,
@@ -329,13 +431,14 @@ class GitArtifactStoreTests(unittest.TestCase):
             approval_ref="approval/verified",
             approval_revision="policy-v1",
             change_reason="first inventory",
+            git_inventory_requests=evidence,
         )
         self.assertEqual(saved["status"], "stored", saved)
         before = copy.deepcopy(request["snapshot"])
         request["previous_snapshot"] = before
         request["snapshot"]["event"] = "analysis_update"
         request["snapshot"]["event_basis"] = {
-            "source_revision": "head-v1",
+            "source_revision": request["snapshot"]["source_revision"],
             "evidence_ref": "review/checked",
         }
         request["snapshot"]["operation_id"] = "op-v2"
@@ -348,6 +451,7 @@ class GitArtifactStoreTests(unittest.TestCase):
             approval_ref="approval/verified",
             approval_revision="policy-v1",
             change_reason="inventory review",
+            git_inventory_requests=evidence,
         )
         self.assertEqual(saved2["status"], "stored", saved2)
 
