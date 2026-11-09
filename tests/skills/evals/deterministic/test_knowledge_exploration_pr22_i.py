@@ -3082,5 +3082,178 @@ class ExploratoryEmptySourceRefsValidatorTests(unittest.TestCase):
         self.assertFalse(started["formal_tc_required"])
 
 
+class ExploratoryCharterListContractTests(unittest.TestCase):
+    """Empty lists in a Charter: one contract for runtime, validator and operations.
+
+    out_of_scope and block_conditions may be empty (nothing more to exclude / no
+    extra block condition; origin, operation, side-effect and cleanup safety are
+    separate required fields). in_scope is the fixed target of the exploration and
+    must be fixed before any operation (guidance "Charter gate").
+    """
+
+    LIST_FIELDS = (
+        "in_scope",
+        "out_of_scope",
+        "source_refs",
+        "focus_refs",
+        "allowed_origins",
+        "allowed_operations",
+        "side_effect_operations",
+        "block_conditions",
+    )
+    EMPTY_ALLOWED = {
+        "out_of_scope",
+        "source_refs",
+        "focus_refs",
+        "side_effect_operations",
+        "block_conditions",
+    }
+
+    def with_field(self, field, value):
+        data = session(charter=charter())
+        if value is ...:
+            del data["charter"][field]
+        else:
+            data["charter"][field] = value
+        return data
+
+    def runtime_valid(self, data):
+        return exploratory.validate_charter(data["mode"], data["charter"])["valid"]
+
+    def test_empty_list_decision_per_field_matches_in_runtime_and_validator(self):
+        for field in self.LIST_FIELDS:
+            data = self.with_field(field, [])
+            expected = field in self.EMPTY_ALLOWED
+            with self.subTest(field=field):
+                self.assertEqual(self.runtime_valid(data), expected)
+                self.assertEqual(
+                    _grade(data)["EXP-D002"], "pass" if expected else "fail"
+                )
+                self.assertEqual(exploratory.validate_session(data)["valid"], expected)
+
+    def test_absent_null_and_blank_values_are_rejected_by_both(self):
+        for field in exploratory.CHARTER_FIELDS:
+            for name, value in (("absent", ...), ("none", None), ("blank", "")):
+                with self.subTest(field=field, value=name):
+                    data = self.with_field(field, value)
+                    self.assertFalse(self.runtime_valid(data))
+                    self.assertEqual(_grade(data)["EXP-D002"], "fail")
+
+    def test_out_of_scope_and_block_conditions_may_be_empty_without_losing_safety(self):
+        data = self.with_field("out_of_scope", [])
+        data["charter"]["block_conditions"] = []
+        self.assertEqual(exploratory.validate_session(data)["issues"], [])
+        self.assertEqual(_grade(data)["EXP-D002"], "pass")
+        self.assertEqual(
+            exploratory.resolve_direct_start({"charter": data["charter"]})["status"],
+            "start",
+        )
+        # origin, operation and side-effect limits still apply to every operation
+        c = data["charter"]
+        self.assertEqual(
+            exploratory.authorize_operation(
+                c,
+                target_url="https://other.example.test/",
+                operation="navigate",
+                prior_side_effect_attempts=0,
+            )["reason"],
+            "origin_not_allowed",
+        )
+        self.assertEqual(
+            exploratory.authorize_operation(
+                c,
+                target_url="https://staging.example.test/",
+                operation="delete_all",
+                prior_side_effect_attempts=0,
+            )["reason"],
+            "operation_not_allowed",
+        )
+        self.assertEqual(
+            exploratory.authorize_operation(
+                c,
+                target_url="https://staging.example.test/",
+                operation="submit_form",
+                prior_side_effect_attempts=c["side_effect_maximum"],
+            )["reason"],
+            "side_effect_limit_reached",
+        )
+        for field in ("allowed_origins", "allowed_operations", "cleanup_plan"):
+            self.assertFalse(
+                self.runtime_valid(
+                    self.with_field(field, [] if field != "cleanup_plan" else "")
+                )
+            )
+
+    def test_an_unfixed_in_scope_is_rejected_and_stops_every_operation(self):
+        for bad in (
+            [],
+            {},
+            5,
+            True,
+            "checkout",
+            [""],
+            ["  "],
+            [None],
+            [["x"]],
+            [{"a": 1}],
+        ):
+            with self.subTest(in_scope=bad):
+                data = self.with_field("in_scope", bad)
+                result = exploratory.validate_charter("exploration", data["charter"])
+                self.assertFalse(result["valid"])
+                self.assertIn("in_scope_required", result["issues"])
+                self.assertEqual(_grade(data)["EXP-D002"], "fail")
+                self.assertFalse(exploratory.validate_session(data)["valid"])
+                started = exploratory.resolve_direct_start({"charter": data["charter"]})
+                self.assertEqual(started["status"], "blocked")
+                self.assertEqual(started["reason"], "charter_invalid")
+                operation = exploratory.authorize_operation(
+                    data["charter"],
+                    target_url="https://staging.example.test/",
+                    operation="navigate",
+                    prior_side_effect_attempts=0,
+                )
+                self.assertEqual(operation["status"], "blocked")
+                self.assertEqual(operation["reason"], "in_scope_not_fixed")
+
+    def test_a_fixed_in_scope_still_allows_the_operation(self):
+        for good in (["checkout"], ["checkout", "cart"]):
+            with self.subTest(in_scope=good):
+                data = self.with_field("in_scope", good)
+                self.assertTrue(self.runtime_valid(data))
+                self.assertEqual(_grade(data)["EXP-D002"], "pass")
+                self.assertEqual(
+                    exploratory.authorize_operation(
+                        data["charter"],
+                        target_url="https://staging.example.test/",
+                        operation="navigate",
+                        prior_side_effect_attempts=0,
+                    )["status"],
+                    "allowed",
+                )
+
+    def test_the_blank_session_template_is_not_an_executable_charter(self):
+        template = json.loads(
+            (
+                REPO_ROOT / "skills/exploratory-testing/assets/session-template.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(template["charter"]["in_scope"], [])
+        result = exploratory.validate_charter("exploration", template["charter"])
+        self.assertFalse(result["valid"])
+        self.assertIn("in_scope_required", result["issues"])
+        self.assertIn("allowed_origins_required", result["issues"])
+        self.assertEqual(
+            exploratory.authorize_operation(
+                template["charter"],
+                target_url="https://staging.example.test/",
+                operation="navigate",
+                prior_side_effect_attempts=0,
+            )["status"],
+            "blocked",
+        )
+        self.assertEqual(_grade(template)["EXP-D002"], "fail")
+
+
 if __name__ == "__main__":
     unittest.main()

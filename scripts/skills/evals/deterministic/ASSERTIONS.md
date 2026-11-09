@@ -337,7 +337,7 @@
 ## exploratory-testing
 
 - `EXP-D001` Session artifactが一つだけ整形式で存在する
-- `EXP-D002` modeとCharter必須項目が揃う。`source_refs`・`focus_refs`・`side_effect_operations`は空listでも可（キーは必須。runtimeの`validate_charter()`と同じ）
+- `EXP-D002` modeとCharter必須項目が揃う。`source_refs`・`focus_refs`・`side_effect_operations`・`out_of_scope`・`block_conditions`は空listでも可（キーは必須）。`in_scope`は空でない文字列のlist、`allowed_origins`・`allowed_operations`は空でないlistが必須（runtimeの`validate_charter()`と同じ）
 - `EXP-D003` investigationをsymptom・hypothesis・unresolved Findingのいずれか（空白でない文字列）から開始。runtimeの`validate_charter()`と同じ規則
 - `EXP-D004` Observation / Finding、unique ref、evidence、source / follow-upの分離・追跡。refは空でない文字列、Observationの`evidence_refs`・Findingのsource Observation refs・evidence refsは空でないref list、Observationの`action_or_observation`・`observed_fact`は空白でない文字列で、`recommended_routing`は空でない文字列。不正型は例外ではなくFAIL
 - `EXP-D005` required cleanupの未確認 / 失敗を安全完了にしない

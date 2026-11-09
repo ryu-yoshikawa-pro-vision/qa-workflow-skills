@@ -108,7 +108,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 - `skills/qa-knowledge/evals/deterministic/validator.py`／`scripts/skills/evals/deterministic/ASSERTIONS.md`：`KN-D012`（identityと直下のkind／scope_refsの一致）。
 - 両Skillの`SKILL.md`・`references/`、trigger（各train／validationに正負1件ずつ。exploratory-testingのtrain負例1件は、下記の実Agent確認の結果に基づき差し替え）、両Skillの`description`、semantic（`KN-SEM-007`・`EXP-SEM-005`）、`EVALS.md`の対象ID範囲。
 - 既存テスト`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`：`plan_update()`／`plan_replacement()`が現・新entryを必須にした契約変更に合わせて呼出しを更新（検証内容は維持）。
-- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（127件。うちレビュー指摘への回帰は後述）。
+- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（133件。うちレビュー指摘への回帰は後述）。
 
 ### 公開入出力契約（PR #22／Aへ引渡し）
 
@@ -123,9 +123,9 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 | 検証                                                                                                                                                | 環境                    | 結果                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `unittest test_knowledge_exploration_pr22_i`（127件）                                                                                               | Windows                 | PASS（再々レビュー対応後。symlink 5件は権限不足でSKIP、Linuxで実行）                                                                                                                      |
-| `unittest discover -s tests/skills/evals/deterministic`（419件）                                                                                    | Windows                 | TEMPを長いパスにして419件PASS（5件SKIPはsymlink。既定TEMPは短縮パス`RYU-YO~1`のため、1件が環境依存でFAILする。変更前から）                                                                |
-| 同上（419件、symlinkを含む）                                                                                                                        | Linux(WSL, Python 3.12) | PASS（`git init`したコピーで実行。修正前のコードに新規テストを当てると62件失敗）                                                                                                          |
+| `unittest test_knowledge_exploration_pr22_i`（133件）                                                                                               | Windows                 | PASS（最終レビュー対応後。symlink 5件は権限不足でSKIP、Linuxで実行）                                                                                                                      |
+| `unittest discover -s tests/skills/evals/deterministic`（425件）                                                                                    | Windows                 | TEMPを長いパスにして425件PASS（5件SKIPはsymlink。既定TEMPは短縮パス`RYU-YO~1`のため、1件が環境依存でFAILする。変更前から）                                                                |
+| 同上（425件、symlinkを含む）                                                                                                                        | Linux(WSL, Python 3.12) | PASS（`git init`したコピーで実行。修正前のコードに最終レビュー分の新規テストを当てると15件失敗）                                                                                          |
 | `unittest discover -s tests/skills/runtime`（581件）                                                                                                | Windows                 | 6 failures／16 errors（`test_sqlite_workflow_history`・`test_ci_handoff`）。修正前HEADのexportで取得した失敗22件の名前と完全に一致（Windowsのファイルロック等）。追加レビュー対応でも同じ |
 | 同上（581件）                                                                                                                                       | Linux(WSL, Python 3.12) | 581件中1件FAIL（`test_ci_handoff`の`test_json_nesting_failure_...`。変更前HEADのexportでも同じ失敗。CIはPython 3.11）。本変更と無関係                                                     |
 | `unittest discover -s scripts/skills/evals/deterministic/tests`、`.../trigger`、`.../semantic`、`scripts/skills/evals/semantic/{validate.py,tests}` | Windows／Linux          | PASS（semantic datasetは25 Skill／171 case。`validate.py`で再計測）                                                                                                                       |
@@ -153,7 +153,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 **同じ原因の追加対応**：探索の`validate_charter()`／`validate_session()`も、`allowed_operations`・`side_effect_operations`・`mode`・`state`・`cleanup`・Observation／Findingのref・`source_observation_refs`に配列／objectを与える、または非objectのSessionを渡すと`TypeError`／`AttributeError`になったため、issueとして返すようにした（回帰テストあり）。Findingの`unresolved`がlistでない場合は`unresolved_must_be_list`でblockする。
 
-**未対応（既存で、本PRの変更対象外）**：探索の`authorize_operation()`・`record_attempt()`は、`allowed_operations`／`side_effect_operations`が非listのCharterを直接渡されると例外になりうる。いずれもSession検証（`validate_charter()`）で拒否される入力で、本PRで追加・変更した経路ではないため、変更していない。
+**未対応（既存で、本PRの変更対象外）**：探索の`authorize_operation()`・`record_attempt()`は、`allowed_operations`／`side_effect_operations`が非listのCharterを直接渡されると例外になりうる（`authorize_operation()`の`in_scope`確認は最終レビュー指摘への対応で追加した）。いずれもSession検証（`validate_charter()`）で拒否される入力で、本PRで追加・変更した経路ではないため、変更していない。
 
 #### 完了基準の再判定（実コード・テストで確認）
 
@@ -167,7 +167,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 | 探索・症状調査の直接開始                     | 満たす（修正後）      | unresolved Finding起点を含む3起点が、開始・Session検証・再開まで一貫（`ExploratoryInvestigationOriginTests`）。routingは既存のまま                 |
 | Findingの引継ぎと未確定状態の保持            | 満たす（修正後）      | sourceごとのrevision、未取得revisionのunresolved／blocked／再開先（`ExploratorySourceRevisionHandoffTests`）。Aの実成果物との接続はPR #22          |
 | 既存Skillとのrouting境界                     | 部分的（擬似確認）    | haikuのdescription判定は48／48だが、同一dataset・haikuのみ・実ハーネスではない。全current Skill同時のrouting・保留dataはPR #22                     |
-| 履歴・旧entry・既存呼び出し元の互換性        | 満たす                | 既存`test_qa_artifact_graph_skills`等を含むdeterministic 419件。runtimeの失敗集合は変更前と一致。公開形状の変更は「互換・移行・rollback」を参照    |
+| 履歴・旧entry・既存呼び出し元の互換性        | 満たす                | 既存`test_qa_artifact_graph_skills`等を含むdeterministic 425件。runtimeの失敗集合は変更前と一致。公開形状の変更は「互換・移行・rollback」を参照    |
 | standalone packaging・評価データ・関連CI     | 満たす（局所）        | isolated packagingテスト、trigger／semantic dataset検証、deterministic。semantic評価のLLM判定は未実施（PR #22）。最終HEADのActionsは下の記録を参照 |
 
 ### 追加レビュー指摘への対応（2026-11-09、レビュー対象`6f5f403`）
@@ -202,7 +202,23 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 **検証（個別判定）**：新規テストは16件（担当テストは計127件）。修正前のコードに対して62件の失敗を確認した。
 
-**既知の差（未対応）**：runtimeは`in_scope`・`out_of_scope`・`block_conditions`の`[]`を許すが、`EXP-D002`はFAILにする（validatorのほうが厳しい側で、本指摘の対象外）。
+**既知の差**：次の節（最終レビュー指摘への対応）で解消した。
+
+### 最終レビュー指摘への対応（2026-11-10、レビュー対象`cd2d6d5`）
+
+`cd2d6d5`のレビューで、Charterの空listの扱いがruntime（`validate_charter()`）とvalidator（`EXP-D002`）で一致しない点が残った。runtimeは`in_scope`・`out_of_scope`・`block_conditions`の`[]`を許し、`EXP-D002`はFAILにしていた。`session-template.json`はこの3項目を`[]`で持つ。根拠は、Plan（06）の「目的・scope・side effect・cleanup・Charterを渡す」、`guidance.md`の「Charter gate」（実対象へ操作する前に、対象と非対象・許可origin・許可操作・side-effect上限・cleanup・block条件を確定する）、実装（`authorize_operation()`は`in_scope`・`out_of_scope`・`block_conditions`をいずれも見ず、許可origin・許可操作・side-effect上限だけで操作を判定する）の3点。
+
+| 項目                  | 最終判定                                   | 根拠                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `out_of_scope=[]`     | 許可（`EXP-D002`をruntimeに合わせた）      | 「追加の非対象なし」を表せる。非対象の有無で操作の安全は決まらず、操作の範囲は許可origin・許可操作が別に制限する。実行側で参照されない                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `block_conditions=[]` | 許可（`EXP-D002`をruntimeに合わせた）      | 「追加のblock条件なし」を表せる。許可origin・許可操作・side-effect上限・cleanup・必要な権限／証拠・実対象への接続可否は別の必須項目と`authorize_operation()`が確認し、`block_conditions`が空でも省略しない（回帰テストで確認）                                                                                                                                                                                                                                                                                                                       |
+| `in_scope=[]`         | **不許可（runtimeをvalidatorに合わせた）** | 「Charter gate」は操作前に対象を確定することを要求する。空は「対象が未確定」であり、制限なしではない。runtimeは従来これを通し、`authorize_operation()`も`in_scope`を確認しなかったため、対象が未確定でも操作を許可できた。`validate_charter()`は`in_scope`が空でない（空白でない文字列の）listでなければ`in_scope_required`とし、`resolve_direct_start()`は`charter_invalid`でblock、`authorize_operation()`は`in_scope_not_fixed`でblockする。`session-template.json`は記入前の雛形（`purpose`や`allowed_origins`も空）で、そのままでは実行できない |
+
+**変更**：`exploratory_runtime.py`の`validate_charter()`・`authorize_operation()`（`_text_list()`を追加）、`validator.py`の`EXP-D002`（`_MAY_BE_EMPTY_LIST`に`out_of_scope`・`block_conditions`を追加し、`in_scope`は空でない文字列のlistを要求）。`allowed_origins=[]`・`allowed_operations=[]`の拒否、`source_refs=[]`・`focus_refs=[]`・`side_effect_operations=[]`の許可、必須キーの欠落・null・空文字の拒否、`EXP-D001`・`D003`〜`D008`、Finding引継ぎ（source不足は`blocked`）は不変。正式TC／TR／E2E testwareを開始条件にしない扱いも不変。validatorはruntimeをimportしない。
+
+**修正前の再現**：新規の`ExploratoryCharterListContractTests`（6件）を修正前のコードに当てると15件失敗した（`out_of_scope=[]`・`block_conditions=[]`で`EXP-D002`がFAIL、`in_scope=[]`・空白要素・list以外をruntimeが有効とし`authorize_operation()`が許可、雛形Charterの`authorize_operation()`が`blocked`にならない）。修正後は、全Charter項目のabsent／null／blank、list項目の空listをruntimeとvalidatorで突き合わせて一致を確認する。
+
+**互換性**：`in_scope`が空list・list以外・空白要素のSession／Charterは、従来runtimeで有効だったが無効になる（既存のoutput evalと既存テストのCharterは空でない文字列のlist）。`authorize_operation()`は`in_scope`が未確定のCharterを`in_scope_not_fixed`でblockする（従来は許可）。`out_of_scope=[]`・`block_conditions=[]`のSessionは`EXP-D002`でPASSになる。entry ID・保存形式・履歴は不変。rollbackはcommit単位。
 
 ### 未検証／blocked／SKIP と再開条件
 

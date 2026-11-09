@@ -26,6 +26,11 @@ def _text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _text_list(value: Any) -> bool:
+    """Same rule as exploratory_runtime._text_list: a non-empty list of non-blank text."""
+    return isinstance(value, list) and bool(value) and all(_text(v) for v in value)
+
+
 def _usable_origin(value: Any) -> bool:
     """Same rule as exploratory_runtime.validate_charter: a non-blank string."""
     return isinstance(value, str) and bool(value.strip())
@@ -41,9 +46,18 @@ _ORIGIN_KEYS = (
     "hypothesis",
 )
 # Starting an exploration needs the keys, not their contents: a Charter may have no
-# source yet (the Finding hand-off is what needs a source) and no focus; a read-only
-# exploration has no side effect operations. Same as exploratory_runtime.
-_MAY_BE_EMPTY_LIST = {"source_refs", "focus_refs", "side_effect_operations"}
+# source yet (the Finding hand-off is what needs a source), no focus, nothing more
+# to exclude and no extra block condition (origin / operation / side-effect / cleanup
+# safety are separate required fields); a read-only exploration has no side effect
+# operations. in_scope is the fixed target and must not be empty. Same as
+# exploratory_runtime.validate_charter.
+_MAY_BE_EMPTY_LIST = {
+    "source_refs",
+    "focus_refs",
+    "side_effect_operations",
+    "out_of_scope",
+    "block_conditions",
+}
 _MODES = {"exploration", "investigation"}
 _STATES = {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
 
@@ -83,6 +97,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         charter = {}
     mode = doc.get("mode")
     state = doc.get("state")
+    in_scope = charter.get("in_scope")
     required = {
         "purpose",
         "in_scope",
@@ -108,6 +123,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         or charter[key] == ""
         or (key not in _MAY_BE_EMPTY_LIST and charter[key] == [])
     )
+    if "in_scope" not in missing and not _text_list(in_scope):
+        missing = sorted([*missing, "in_scope"])
     result.add(
         "EXP-D002",
         isinstance(mode, str) and mode in _MODES and not missing,

@@ -71,6 +71,14 @@ def charter_identity(
     ).hexdigest()
 
 
+def _text_list(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
 def validate_charter(mode: str, charter: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(charter, dict):
         return {
@@ -91,6 +99,10 @@ def validate_charter(mode: str, charter: dict[str, Any]) -> dict[str, Any]:
         for key in INVESTIGATION_ORIGIN_KEYS
     ):
         issues.append("investigation_requires_symptom_or_hypothesis")
+    # The in-scope target is fixed before any operation (guidance "Charter gate");
+    # an empty list is an unfixed target, not "no restriction".
+    if not _text_list(charter.get("in_scope")):
+        issues.append("in_scope_required")
     if not isinstance(charter.get("allowed_origins"), list) or not charter.get(
         "allowed_origins"
     ):
@@ -145,6 +157,8 @@ def authorize_operation(
     prior_side_effect_attempts: int,
     uncertain_previous_attempt: bool = False,
 ) -> dict[str, Any]:
+    if not _text_list(charter.get("in_scope")):
+        return {"status": "blocked", "reason": "in_scope_not_fixed"}
     target_origin = _origin(target_url)
     allowed = {
         _origin(value)

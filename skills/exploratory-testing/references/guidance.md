@@ -9,7 +9,7 @@ current UI / accessible name / 既知範囲の事実収集は`test-target-inspec
 
 ## Charter gate
 
-実対象へ操作する前に、mode、目的、対象と非対象、source refs、重点Risk / Questionまたはsymptom / hypothesis、timebox / 終了条件、許可origin、許可操作範囲とside effectとなる操作、side-effect scope / 一回の定義 / 最大回数、cleanup方法、evidence保管方法、block条件を確定します。詳細TCは事前必須にしません。
+実対象へ操作する前に、mode、目的、対象と非対象、source refs、重点Risk / Questionまたはsymptom / hypothesis、timebox / 終了条件、許可origin、許可操作範囲とside effectとなる操作、side-effect scope / 一回の定義 / 最大回数、cleanup方法、evidence保管方法、block条件を確定します。詳細TCは事前必須にしません。Charterの空listの扱いは、`out_of_scope`（追加の非対象なし）・`block_conditions`（追加のblock条件なし）・`source_refs`・`focus_refs`・`side_effect_operations`（読取専用）は空でもよく、`in_scope`（対象）・`allowed_origins`・`allowed_operations`は空を認めません（`validate_charter()`と`EXP-D002`で同じ。`in_scope`が空・空白要素・listでないSessionは`in_scope_required`で、`authorize_operation()`も`in_scope_not_fixed`でblockします）。空のscope・origin・操作を持つ`assets/session-template.json`は、記入前の雛形で、そのままでは実行できません。block条件が空でも、許可origin・許可操作・side-effect上限・cleanupの確認は省略しません。
 
 実対象へ接続できない、必須権限 / dataがない、許可操作で仮説を検証できない、side-effect / safety条件を満たせない、必須evidenceを得られない場合は影響scopeをblockします。独立した安全なscopeは継続できます。
 
