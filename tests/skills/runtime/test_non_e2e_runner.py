@@ -497,10 +497,17 @@ class ActualRunnerTests(unittest.TestCase):
         )
         proc = subprocess.run(
             [
-                sys.executable, "-c", code,
-                "--plan", str(plan_file), "--artifacts", str(self.logs),
+                sys.executable,
+                "-c",
+                code,
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(self.logs),
             ],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         self.assertEqual(proc.returncode, 2)
         self.assertEqual(
@@ -613,9 +620,7 @@ class ActualRunnerTests(unittest.TestCase):
             self.assertIsNone(evidence)
         for wildcard in ("*", "node*", "node?", "[nb]ode", "{node,browser}"):
             case = dict(plan)
-            case["selected"] = [
-                {**plan["selected"][0], "project_name": wildcard}
-            ]
+            case["selected"] = [{**plan["selected"][0], "project_name": wildcard}]
             case["argv"] = [*plan["argv"][:-1], "--project=" + wildcard]
             case["reviewed_argv"] = case["argv"]
             code, summary, evidence = self.call(case)

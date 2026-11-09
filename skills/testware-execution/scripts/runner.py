@@ -590,10 +590,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     raise RunnerError("vitest_multi_project_requires_separate_runs")
                 project_name = next(iter(named))
                 # Even one Vitest project glob can select multiple projects.
-                if (
-                    any(char in project_name for char in "*?[]{}()|\\")
-                    or project_name.startswith("!")
-                ):
+                if any(
+                    char in project_name for char in "*?[]{}()|\\"
+                ) or project_name.startswith("!"):
                     raise RunnerError("vitest_project_filter_unverified")
                 declared_projects = []
                 for index, arg in enumerate(command):
