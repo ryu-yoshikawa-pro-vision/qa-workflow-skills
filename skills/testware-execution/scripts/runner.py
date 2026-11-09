@@ -84,8 +84,8 @@ def _verified_tc_expectations(
     if (
         not isinstance(relative, str)
         or not relative
-        or "\\\\" in relative
-        or "\\x00" in relative
+        or "\\" in relative
+        or "\x00" in relative
         or any(ord(ch) < 32 for ch in relative)
         or relative.startswith("/")
         or any(part in {"", ".", "..", ".git"} for part in relative.split("/"))
@@ -102,9 +102,9 @@ def _verified_tc_expectations(
     if entry.returncode or not entry.stdout.strip():
         raise RunnerError("direct_tc_authority_not_tracked")
     rows = entry.stdout.strip().splitlines()
-    if len(rows) != 1 or "\\t" not in rows[0]:
+    if len(rows) != 1 or "\t" not in rows[0]:
         raise RunnerError("direct_tc_authority_not_regular")
-    header, name = rows[0].split("\\t", 1)
+    header, name = rows[0].split("\t", 1)
     details = header.split()
     if (
         name != relative
