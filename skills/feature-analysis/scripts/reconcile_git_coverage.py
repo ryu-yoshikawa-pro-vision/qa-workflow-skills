@@ -157,6 +157,39 @@ def analyze(request: Any) -> dict[str, Any]:
             "reasons": ["git_revision_registry_mismatch"],
             "coverage": None,
         }
+    if event == "analysis_update":
+        previous = registry_request.get("previous_snapshot") or {}
+        older = previous.get("changes", [])
+        superseded_ids = {
+            ref for row in older for ref in _superseded_ids(row)
+        }
+        current_bases = {
+            row["before_revision"]
+            for row in older
+            if row["source_id"] == source_id
+            and row["after_revision"] == head_sha
+            and row["id"] not in superseded_ids
+        }
+        if previous.get("event") in {"pr_update", "rebase"}:
+            if source_id == _primary_code_source_id(previous):
+                original = previous["event_basis"]
+                current_bases.update(
+                    (original["base_sha"], original["previous_head_sha"])
+                )
+        chosen_bases = {
+            ref
+            for ref in (
+                git["base_sha"],
+                source_basis.get("previous_head_sha") if source_basis else None,
+            )
+            if ref is not None
+        }
+        if chosen_bases != current_bases or len(current_bases) > 2:
+            return {
+                "status": "stale",
+                "reasons": ["analysis_git_baselines_mismatch"],
+                "coverage": None,
+            }
     if event in {"merge", "release"}:
         # Neither event provides a PR base. The saved source revision is
         # the only verified baseline for its complete change inventory.
