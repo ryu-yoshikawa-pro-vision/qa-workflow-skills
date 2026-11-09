@@ -509,15 +509,19 @@ class ActualRunnerTests(unittest.TestCase):
                 None,
                 {
                     "success": True,
-                    "testResults": [{
-                        "name": "tests/broken.test.ts",
-                        "status": "passed",
-                        "assertionResults": [{
-                            "ancestorTitles": ["suite"],
-                            "title": "one",
-                            "status": [],
-                        }],
-                    }],
+                    "testResults": [
+                        {
+                            "name": "tests/broken.test.ts",
+                            "status": "passed",
+                            "assertionResults": [
+                                {
+                                    "ancestorTitles": ["suite"],
+                                    "title": "one",
+                                    "status": [],
+                                }
+                            ],
+                        }
+                    ],
                 },
                 [{"path": "tests/broken.test.ts", "title_path": ["suite", "one"]}],
             ),
@@ -527,21 +531,27 @@ class ActualRunnerTests(unittest.TestCase):
                 {
                     "config": {"version": "fixture-version"},
                     "errors": [],
-                    "stats": {
-                        "expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0
-                    },
-                    "suites": [{
-                        "title": "tests/api.spec.ts",
-                        "specs": [{
-                            "file": "tests/api.spec.ts",
-                            "title": "one",
-                            "tests": [{
-                                "status": [],
-                                "expectedStatus": "passed",
-                                "results": [{"status": "passed", "retry": 0}],
-                            }],
-                        }],
-                    }],
+                    "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
+                    "suites": [
+                        {
+                            "title": "tests/api.spec.ts",
+                            "specs": [
+                                {
+                                    "file": "tests/api.spec.ts",
+                                    "title": "one",
+                                    "tests": [
+                                        {
+                                            "status": [],
+                                            "expectedStatus": "passed",
+                                            "results": [
+                                                {"status": "passed", "retry": 0}
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
                 },
                 [{"path": "tests/api.spec.ts", "title_path": ["one"]}],
             ),
@@ -554,12 +564,14 @@ class ActualRunnerTests(unittest.TestCase):
                     "testware_revision": "fixture-revision",
                     "runner_version": "fixture-version",
                     "complete": True,
-                    "results": [{
-                        "path": "tests/event.py",
-                        "title_path": ["one"],
-                        "status": [],
-                        "attempt_results": [{"status": "passed", "retry": 0}],
-                    }],
+                    "results": [
+                        {
+                            "path": "tests/event.py",
+                            "title_path": ["one"],
+                            "status": [],
+                            "attempt_results": [{"status": "passed", "retry": 0}],
+                        }
+                    ],
                 },
                 [{"path": "tests/event.py", "title_path": ["one"]}],
             ),
@@ -581,15 +593,17 @@ class ActualRunnerTests(unittest.TestCase):
                     )
                     argv = [sys.executable, "-c", script, "{reporter_file}"]
                 plan = self.plan(argv, kind=kind)
-                plan.update({
-                    "testware_ref": "fixture:testware",
-                    "testware_revision": "fixture-revision",
-                    "runner_version": "fixture-version",
-                    "selected": selected,
-                    "selection_verified": True,
-                    "selection_evidence_ref": "fixture:selection",
-                    "planned_scope_ref": "fixture:scope",
-                })
+                plan.update(
+                    {
+                        "testware_ref": "fixture:testware",
+                        "testware_revision": "fixture-revision",
+                        "runner_version": "fixture-version",
+                        "selected": selected,
+                        "selection_verified": True,
+                        "selection_evidence_ref": "fixture:selection",
+                        "planned_scope_ref": "fixture:scope",
+                    }
+                )
                 if reporter_format is not None:
                     plan["reporter_format"] = reporter_format
                 cleanup = [sys.executable, "-c", "print('cleanup marker')"]
@@ -604,8 +618,11 @@ class ActualRunnerTests(unittest.TestCase):
                 self.assertEqual(attempt["cleanup_state"], "success")
                 self.assertIn(
                     "cleanup marker",
-                    (Path(artifact["artifact_directory"]) / "attempt-1" / "cleanup.stdout.log")
-                    .read_text(encoding="utf-8"),
+                    (
+                        Path(artifact["artifact_directory"])
+                        / "attempt-1"
+                        / "cleanup.stdout.log"
+                    ).read_text(encoding="utf-8"),
                 )
                 self.assertTrue(Path(attempt["raw_report_ref"]).is_file())
                 self.assertFalse(artifact["collection_verified"])
@@ -822,7 +839,9 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(artifact["outcome"], "runner_pass")
         source = artifact["direct_tc_authority_evidence"]
         self.assertEqual(source["authority_repo_revision"], self.sha)
-        self.assertEqual(source["authority_review_status"], "not_authenticated_by_runner")
+        self.assertEqual(
+            source["authority_review_status"], "not_authenticated_by_runner"
+        )
 
         # Omitting even one actual expectation must stop before launching.
         plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
