@@ -511,9 +511,15 @@ def reconcile_playwright(
             "\\", "/"
         ).rstrip("/")
         # Check the root itself before combining with any untrusted spec.file.
-        if not (normalized_root.startswith("/") or PureWindowsPath(normalized_root).is_absolute()):
+        if not (
+            normalized_root.startswith("/")
+            or PureWindowsPath(normalized_root).is_absolute()
+        ):
             raise ContractError("invalid_playwright_root_dir")
-        if normalized_root != _required_str(repo_root, "repo_root").replace("\\", "/").rstrip("/"):
+        checked_root = _required_str(repo_root, "repo_root").replace(
+            "\\", "/"
+        ).rstrip("/")
+        if normalized_root != checked_root:
             _report_path(normalized_root + "/__root_check__", repo_root)
     observed: list[dict[str, Any]] = []
 

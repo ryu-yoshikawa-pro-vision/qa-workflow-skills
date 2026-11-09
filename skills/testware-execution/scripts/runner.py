@@ -229,6 +229,34 @@ def _git_clean(repo: Path) -> bool:
     return not proc.stdout.strip()
 
 
+def _process_group_state(pid: int | None) -> str:
+    """Check the POSIX process group, not just the exited leader's PID."""
+    if pid is None:
+        return "not_started"
+    if os.name != "posix":
+        # There is no portable stdlib API for verifying a Windows descendant tree.
+        return "unverified"
+    try:
+        os.killpg(pid, 0)
+    except ProcessLookupError:
+        return "terminated"
+    except OSError:
+        return "unverified"
+    return "lingering"
+
+
+def _terminate_group(proc: subprocess.Popen[Any]) -> None:
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
+    except ProcessLookupError:
+        pass
+    finally:
+        proc.wait()
+
+
 def _run_command(
     argv: list[str],
     cwd: Path,
@@ -242,6 +270,7 @@ def _run_command(
     started = False
     pid = None
     timed_out = False
+    interrupted = False
     return_code = None
     with stdout.open("xb") as out, stderr.open("xb") as err:
         try:
@@ -260,11 +289,13 @@ def _run_command(
                 return_code = proc.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 timed_out = True
-                if os.name == "posix":
-                    os.killpg(proc.pid, signal.SIGKILL)
-                else:
-                    proc.kill()
-                proc.wait()
+                _terminate_group(proc)
+                return_code = proc.returncode
+            except KeyboardInterrupt:
+                # Without this handler Ctrl-C can leave a detached test worker
+                # running and bypass the manifest/cleanup paths entirely.
+                interrupted = True
+                _terminate_group(proc)
                 return_code = proc.returncode
         except OSError as exc:
             # Do not serialize potentially sensitive environment values.
@@ -273,6 +304,7 @@ def _run_command(
                 "pid": pid,
                 "return_code": return_code,
                 "timeout": timed_out,
+                "interrupted": interrupted,
                 "launch_error": type(exc).__name__,
                 "started_at": started_at,
                 "finished_at": time.time(),
@@ -282,6 +314,7 @@ def _run_command(
         "pid": pid,
         "return_code": return_code,
         "timeout": timed_out,
+        "interrupted": interrupted,
         "launch_error": None,
         "started_at": started_at,
         "finished_at": time.time(),
@@ -732,12 +765,23 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     "success"
                     if clean["started"]
                     and not clean["timeout"]
+                    and not clean["interrupted"]
                     and clean["return_code"] == 0
                     else "failed_or_unknown"
                 )
             except Exception as error:
                 run["cleanup_state"] = "failed_or_unknown"
                 run["cleanup_error"] = type(error).__name__
+        run["process_tree_state"] = _process_group_state(run["pid"])
+        if run["process_tree_state"] == "lingering":
+            # Prevent an orphaned fixture from continuing after reporting
+            # success. Evidence remains blocked even when termination works.
+            try:
+                if os.name == "posix":
+                    os.killpg(run["pid"], signal.SIGKILL)
+                    run["process_tree_state"] = "lingering_terminated"
+            except OSError:
+                run["process_tree_state"] = "lingering_unverified"
         try:
             run["workspace_head_after_cleanup"] = _git_head(repo)
             run["workspace_state_after_cleanup"] = (
@@ -751,6 +795,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         if (
             run["cleanup_state"] == "failed_or_unknown"
             or run["timeout"]
+            or run["interrupted"]
+            or run["process_tree_state"] != "terminated"
             or run["result_collection"] != "complete"
             or scope.get("side_effects")
             or run["workspace_state_after_cleanup"] != "clean"
@@ -778,7 +824,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         outcome = "blocked_revision_changed"
     elif last["workspace_state_after_cleanup"] != "clean":
         outcome = "blocked_workspace_not_restored"
-    elif last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
+    elif (
+        last["cleanup_state"] == "failed_or_unknown"
+        or last["timeout"]
+        or last["interrupted"]
+        or last["process_tree_state"] != "terminated"
+    ):
         outcome = "blocked_cleanup_or_timeout"
     elif not last["started"] or last["result_collection"] != "complete":
         outcome = "incomplete"
