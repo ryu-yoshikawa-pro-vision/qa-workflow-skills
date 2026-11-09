@@ -28,9 +28,11 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
 
-### UIテスト対象分析のroutingとscope readiness
+### UIテスト対象分析とscope readiness
 
-spec-analysisのUI target modeが要求された場合は、package作成・更新後に必ず`ui_target_package.py inspect`を実行し、`current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]`をそのまま使います。current UNKNOWN全件や手作業で選んだscope集合からready状態を推定しません。
+UI構造・画面・操作・状態・遷移を分析し、継続利用する`ui-target-v1` packageを作成・更新する要求は`ui-target-analysis`へroutingします。既存writer、validator、runtime、共通helperを再利用し、single writer、履歴、migration、`ui-target-v1`互換性を維持します。期待仕様、Authority、US / UC / Behavior / AC、UNKNOWNは`spec-analysis`が所有します。repository factや実装状態から期待仕様を推定しません。
+
+package作成・更新後は必ず`ui_target_package.py inspect`を実行し、`current_scope_ids[] / ready_scope_ids[] / blocked_scope_ids[]`をそのまま使います。current UNKNOWN全件や手作業で選んだscope集合からready状態を推定しません。
 
 - migrationが必要なartifactでは`migration_preflight.py`の`migration_status / cutover_next_action`に従い、runtime-v2 cutoverを固定Skill順で先に完了します。TCDの内部phaseは同Skillの`runtime_v1_cutover.py phase=resume`へ委譲します。
 - 既存downstreamにscope ownershipがなく、migration preflightが`scope_ownership_baseline_required`を返した場合は、全current scopeがreadyの時だけ全scopeを含む初回TRD→TCD→TC normalizationを実施します。blocked scopeへownershipを推測配分しません。
@@ -69,13 +71,18 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 | 工程固有ロジック                                    | 担当Skill                     |
 | --------------------------------------------------- | ----------------------------- |
 | 現在有効な仕様根拠                                  | `spec-analysis`               |
+| UI構造・画面・操作・状態・遷移、human editing       | `ui-target-analysis`          |
 | 不明点・矛盾 / 仮定                                 | `question-analysis`           |
 | プロダクトリスク / テスト重点                       | `test-analysis`               |
 | テスト要求                                          | `test-requirement-design`     |
+| テストアイテム候補                                  | `test-item-analysis`          |
+| テスト条件候補                                      | `test-condition-analysis`     |
 | テスト条件 / カバレッジ基準 / カバレッジ項目        | `test-condition-design`       |
 | 詳細テストケース / 期待結果の根拠の具体化           | `test-case-design`            |
 | 生きたテスト対象のUI情報・ふるまい収集 / 管理       | `test-target-inspection`      |
 | AIによる詳細TCの実行・期待結果比較・結果記録        | `test-execution`              |
+| 非E2E testware実装・静的 / 軽量検証                 | `testware-implementation`     |
+| 非E2E testware runner・実行結果・cleanup            | `testware-execution`          |
 | カバレッジ / ギャップ                               | `coverage-analysis`           |
 | 独立レビュー / 重大度                               | `adversarial-review`          |
 | E2E対象・実装可能性・安全条件                       | `e2e-test-inspection`         |
