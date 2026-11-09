@@ -319,13 +319,14 @@ class ActualRunnerTests(unittest.TestCase):
             "schema": "non-e2e-cases/v1",
             "source_revision": self.sha,
             "testware_revision": "fixture-event-revision",
+            "runner_version": "adapter-fixture-1",
             "complete": True,
             "results": [
                 {
                     "path": "tests/event.test.py",
                     "title_path": ["event", "processed"],
                     "status": "passed",
-                    "attempt_results": [{"status": "passed"}],
+                    "attempt_results": [{"status": "passed", "retry": 0}],
                 }
             ],
         }
@@ -442,13 +443,14 @@ class ActualRunnerTests(unittest.TestCase):
             "schema": "non-e2e-cases/v1",
             "source_revision": self.sha,
             "testware_revision": "v1",
+            "runner_version": "adapter-fixture",
             "complete": True,
             "results": [
                 {
                     "path": "tests/batch.py",
                     "title_path": ["batch"],
                     "status": "failed",
-                    "attempt_results": [{"status": "failed"}],
+                    "attempt_results": [{"status": "failed", "retry": 0}],
                 }
             ],
         }
