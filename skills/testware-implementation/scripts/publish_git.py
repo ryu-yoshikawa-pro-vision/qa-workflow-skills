@@ -1,8 +1,10 @@
 """Conditional Git publish for isolated testware changes.
 
-Only a non-forced fast-forward push can update the shared branch. The candidate
-must have the inspected base as its single parent. A failed push must not be
-retried without reading the remote branch and re-reviewing changed content.
+The candidate must have the inspected expected HEAD as its single parent.
+The push uses an explicit expected-ref lease and therefore cannot resurrect
+discarded commits after an intervening remote rewind. Each permitted update
+is a fast-forward relative to the exact expected HEAD. Never retry a failed
+push without reading and re-reviewing the remote branch.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ class PublishError(ValueError):
     pass
 
 
-def _git(repo: Path, *args: str) -> str:
+def _git_bytes(repo: Path, *args: str) -> bytes:
     process = subprocess.run(
         ["git", "-C", str(repo), *args],
         capture_output=True,
@@ -32,7 +34,21 @@ def _git(repo: Path, *args: str) -> str:
     )
     if process.returncode:
         raise PublishError("git_" + args[0] + "_failed")
-    return process.stdout.decode("utf-8", "strict").strip()
+    return process.stdout
+
+
+def _git(repo: Path, *args: str) -> str:
+    return _git_bytes(repo, *args).decode("utf-8", "strict").strip()
+
+
+def _changed_paths(repo: Path, base: str, candidate: str) -> list[str]:
+    # --name-only without -z C-quotes non-ASCII, tabs and newlines.
+    raw = _git_bytes(
+        repo, "diff", "-z", "--name-only", "--no-renames", base, candidate
+    )
+    if not raw or not raw.endswith(b"\x00"):
+        raise PublishError("invalid_diff_paths")
+    return [item.decode("utf-8", "strict") for item in raw[:-1].split(b"\x00")]
 
 
 def _remote_head(repo: Path, remote: str, branch: str) -> str:
@@ -70,10 +86,7 @@ def publish(
     parents = _git(repo, "rev-list", "--parents", "-n", "1", candidate).split()
     if parents != [candidate, expected_head]:
         raise PublishError("candidate_not_based_on_expected_head")
-    paths_raw = _git(
-        repo, "diff", "--name-only", "--no-renames", expected_head, candidate
-    )
-    paths = paths_raw.splitlines()
+    paths = _changed_paths(repo, expected_head, candidate)
     if not paths or len(paths) != len(set(paths)):
         raise PublishError("empty_or_duplicate_diff")
     if set(paths) != set(prior_content_hashes):
@@ -87,11 +100,20 @@ def publish(
             if prefix and not prefix.startswith("/") and ".." not in prefix.split("/")
         ):
             raise PublishError("path_out_of_scope")
-        mode = _git(repo, "ls-tree", candidate, "--", path).split("\t")
-        if len(mode) != 2 or not (
-            mode[0].startswith("100644 blob ") or mode[0].startswith("100755 blob ")
+        new_entry = _git(repo, "ls-tree", candidate, "--", path)
+        old_entry = _git(repo, "ls-tree", expected_head, "--", path)
+        if new_entry and not (
+            new_entry.startswith("100644 blob ")
+            or new_entry.startswith("100755 blob ")
         ):
             raise PublishError("non_regular_file_in_diff")
+        if old_entry and not (
+            old_entry.startswith("100644 blob ")
+            or old_entry.startswith("100755 blob ")
+        ):
+            raise PublishError("non_regular_file_in_base")
+        if not old_entry and not new_entry:
+            raise PublishError("missing_diff_file")
         process = subprocess.run(
             ["git", "-C", str(repo), "show", expected_head + ":" + path],
             capture_output=True,
@@ -107,10 +129,18 @@ def publish(
             raise PublishError("changed_base_snapshot")
     if _remote_head(repo, remote, branch) != expected_head:
         raise PublishError("remote_branch_changed")
-    # This is deliberately NOT --force or --force-with-lease. The remote's
-    # native fast-forward check rejects another concurrent update.
+    # An ordinary non-forced push checks only fast-forward ancestry and can
+    # accidentally restore a branch rewound after the preflight read. The
+    # expected-ref lease atomically rejects that ABA/rewind race. The candidate
+    # is already verified to be a direct child of expected_head, so successful
+    # updates cannot rewrite or discard any commit at the expected ref.
+    target_ref = "refs/heads/" + branch
     process = subprocess.run(
-        ["git", "-C", str(repo), "push", remote, candidate + ":refs/heads/" + branch],
+        [
+            "git", "-C", str(repo), "push",
+            "--force-with-lease=" + target_ref + ":" + expected_head,
+            remote, candidate + ":" + target_ref,
+        ],
         capture_output=True,
         check=False,
         timeout=60,
@@ -123,9 +153,10 @@ def publish(
     if _git(repo, "rev-parse", "FETCH_HEAD") != candidate:
         raise PublishError("fetched_readback_mismatch")
     for path in paths:
-        local_blob = _git(repo, "rev-parse", candidate + ":" + path)
-        remote_blob = _git(repo, "rev-parse", "FETCH_HEAD:" + path)
-        if local_blob != remote_blob:
+        local_entry = _git(repo, "ls-tree", candidate, "--", path)
+        remote_entry = _git(repo, "ls-tree", "FETCH_HEAD", "--", path)
+        if local_entry != remote_entry:
+            # Empty entries attest to a reviewed deletion.
             raise PublishError("published_blob_mismatch")
     return {
         "state": "published_and_readback_verified",
