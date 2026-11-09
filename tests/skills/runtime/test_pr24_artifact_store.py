@@ -301,6 +301,54 @@ class ArtifactStoreTests(unittest.TestCase):
             ],
         )
 
+    def test_section_update_requires_expected_revision_and_history(self) -> None:
+        initial = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": "context.md", "status": "absent"}],
+            "artifact_ref": "context.md",
+            "source_ref": "source/1",
+            "source_revision": "r1",
+            "change_reason": "init",
+        }
+        first = persist_prepared(
+            self.store,
+            initial,
+            project_ref="Sample",
+            operation_id="create",
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+        )
+        self.assertEqual(first["status"], "stored")
+        current = self.store.read_current("project-context", "Sample", "context.md")
+        update = {
+            "operation": "prepare-sections",
+            "markdown": current["content"],
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "source/2",
+            "source_revision": "r2",
+            "change_reason": "scope confirmed",
+            "section_updates": {"2": "- 製品: Sample Store"},
+        }
+        changed = persist_prepared(
+            self.store,
+            update,
+            project_ref="Sample",
+            operation_id="scope-update",
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+        )
+        self.assertEqual(changed["status"], "stored", changed)
+        self.assertEqual(changed["revision"], "r2")
+        self.assertEqual(
+            self.store.read_revision("project-context", "Sample", "context.md", "r1")[
+                "content"
+            ],
+            current["content"],
+        )
+
     def test_feature_inventory_snapshot_requires_saved_predecessor(self) -> None:
         request = fixture()
         request["snapshot"]["project_ref"] = "Sample"

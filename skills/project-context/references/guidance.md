@@ -13,3 +13,5 @@ prepare-create / prepare-updateの戻り値はdraftです。保存provider固有
 Section 12/13がDEC/ASMの正本である案件では、`prepare-ids`で既存のID helperにID採番を委譲します。元の表の前後にある自由記述を残し、表以外の節を更新しません。元IDの消失や正本owner不一致は拒否します。新たに作ったdraftは保存済みの正本ではありません。
 
 既存成果物の配置方針を新規に記録するには`prepare-placement`でDECのID履歴とSection 14の正本参照を同じ更新候補に含めます。正本の現在revision、合意の対象scope・editable_scope・feature_index_ref、承認元参照が一致しない場合は別の方針として扱い、無承認移動をしません。旧Section 12/13の行はexisting_decisions／existing_assumptionsで維持し、未確認の既存IDを削除せずにblockedとします。
+
+Section 1〜11・15の既存の説明や環境資料を根拠付きで改版するときは`prepare-sections`を使います。Section 12/13は`prepare-ids`、14は`prepare-placement`、16は`prepare-update`を使い、互いの正本領域を無断で上書きしません。初回案件では`prepare-create`の`section_updates`に確認済み資料のみ指定できます。

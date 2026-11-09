@@ -89,6 +89,20 @@ class ProjectContextOwnerTests(unittest.TestCase):
         }
         self.assertEqual(handle(req)["status"], "unconfirmed")
 
+    def test_new_project_includes_only_supplied_sections(self) -> None:
+        result = handle(
+            {
+                "operation": "prepare-create",
+                "project_name": "Sample",
+                "enumeration_complete": True,
+                "candidates": [{"ref": "context.md", "status": "absent"}],
+                "section_updates": {"2": "- 既知の根拠: docs/spec-1"},
+            }
+        )
+        self.assertEqual(result["status"], "draft", result)
+        self.assertIn("- 既知の根拠: docs/spec-1", result["artifact_markdown"])
+        self.assertIn("qa.feature_source_refs", result["artifact_markdown"])
+
     def test_new_project_requires_absence_and_provider(self) -> None:
         data = {
             "operation": "prepare-create",
@@ -311,6 +325,40 @@ class ProjectContextOwnerTests(unittest.TestCase):
         self.assertEqual(handle(request)["status"], "reuse_candidate")
         request["target_ref"] = "moved.md"
         self.assertEqual(handle(request)["status"], "approval_required")
+
+    def test_section_updates_preserve_id_tables_and_required_fields(self) -> None:
+        original = context()
+        request = {
+            "operation": "prepare-sections",
+            "markdown": original,
+            "artifact_ref": "context.md",
+            "expected_revision": "r1",
+            "source_ref": "issue/2",
+            "source_revision": "v2",
+            "change_reason": "project scope confirmed",
+            "section_updates": {"2": "- 製品: Sample Store\n- 根拠: issue/2"},
+        }
+        result = handle(request)
+        self.assertEqual(result["status"], "draft", result)
+        self.assertIn("- 製品: Sample Store", result["artifact_markdown"])
+        self.assertEqual(
+            original.split("## 12.")[1],
+            result["artifact_markdown"].split("## 12.")[1],
+        )
+        self.assertEqual(
+            handle(
+                {
+                    "operation": "inspect",
+                    "markdown": result["artifact_markdown"],
+                    "required_keys": [],
+                }
+            )["status"],
+            "current",
+        )
+        request["section_updates"] = {"14": "unapproved movement"}
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["section_updates"] = {"2": "## 17. fake heading"}
+        self.assertEqual(handle(request)["status"], "blocked")
 
     def test_placement_policy_draft_records_decision_and_reference(self) -> None:
         policy = {

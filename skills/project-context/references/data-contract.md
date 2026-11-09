@@ -35,3 +35,5 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 `prepare-placement`は、既存Project Contextの`markdown`、`dec_asm_owner=project-context`、`artifact_ref`、`expected_revision`、`source_ref`／`source_revision`、`change_reason`、`policy`を受け取ります。`policy`の必須keyは`owner`、`scope`、`target_ref`、`revision`、`approval_ref`、`approval_revision`、`editable_scope`、`feature_index_ref`です。既存DEC/ASMがある場合は`existing_decisions`／`existing_assumptions`へ保存済み行を含め、既存helperの履歴検証に通します。
 
 初回または方針変更時は、既存Section 12のDECとSection 14の参照を同一draftに記録します。同一方針は`existing_policy`との一致で`reuse_candidate`を返し、不要なrevisionを作りません。この段階の`approval_ref`は自己申告値です。`persist_prepared`から実保存する際には、承認scope・revisionを外部認証した`authorize`callbackが必要です。
+
+`prepare-sections`は、根拠source・revision、変更理由、元文書ref／revisionを必須にし、既存文書の1〜11節と15節の本文だけを差分更新します。DEC/ASMの12/13節、成果物参照の14節、stable keyの16節はそれぞれ専用の更新操作へ委譲します。`prepare-create`にも任意の`section_updates`を指定でき、取得できた案件情報だけで既定templateを初期化します。いずれも保存済み正本への変更ではなく、実書込みには`persist_prepared`と認証済み承認を必要とします。
