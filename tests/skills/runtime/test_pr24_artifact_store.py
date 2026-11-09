@@ -243,9 +243,9 @@ class ArtifactStoreTests(unittest.TestCase):
             approval_revision="approval-v1",
         )
         self.assertEqual(first["status"], "stored", first)
-        markdown = self.store.read_current(
-            "project-context", "Sample", "context.md"
-        )["content"]
+        markdown = self.store.read_current("project-context", "Sample", "context.md")[
+            "content"
+        ]
         policy = {
             "owner": "project-context",
             "scope": "Sample",
