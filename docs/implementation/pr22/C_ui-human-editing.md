@@ -89,7 +89,7 @@ UI構造と期待仕様を分離し、既存ui-target-v1を破壊せず人間の
 - [ ] isolated copyではshared writer不在時に書込みhelperがblockedになることを検証した。trigger dataset契約とsemantic candidateはローカル検証したが、実trigger rateと独立Judge実行、既存TC/E2E consumerの実成果物接続は未検証。
 
 - [x] `SKILL.md`、入出力、停止条件、人間編集・互換性文書、isolated copy test、trigger dataset、semantic rubric/cases/candidate outputsを追加した。semantic結果は実装者と同一のsession LLMによる自己評価であり、独立Judge実行とは扱わない。
-- [ ] 担当Skillとpackage/migrationの局所回帰はPASS。全runtime・deterministic suiteはローカル環境要件によりFAIL（結果表参照）。remote head `109a005c71f9b259e3529837bbe48c95b789bba7`ではruntime unit/integration、deterministic、semantic、Codex HarnessがPASS。root READMEと`qa-workflow`に旧route記述が残り、shared owner修正前のSkill validationは完了しない。
+- [ ] 担当Skillとpackage/migrationの局所回帰はPASS。全runtime・deterministic suiteはローカル環境要件によりFAIL（結果表参照）。remote head `166f63299a4bcd51b3dce5fe5d5a265548c5e6ad`ではruntime unit/integration、deterministic、semantic、Codex HarnessがPASS。root READMEと`qa-workflow`に旧route記述が残り、shared owner修正前のSkill validationは完了しない。
 - [ ] 専用unit／package／migration／semantic dataset・trigger datasetの各契約検証はPASS。Ruffと`skills-ref`はローカル環境にない。remote Code QualityはPASS。公式Skill形式validation step自体もPASSしたが、同jobのrepository eval structure stepはREADMEのcatalog不足でFAIL。
 - [ ] source／artifact／承認認証／native CAS／保存readbackとshared runtime owner検証をAへ接続できていない。以下のPR #22 handoff契約で継続する。
 - [x] 本branchの実装と可能な局所検証を完了し、未検証条件を分けて記録した。PR #22だけで行う横断検証、全Skill routing、15＋10条件とS1〜S17の最終判定は担当branchでPASS扱いしない。
@@ -126,7 +126,7 @@ triggerデータはCI形式と均衡を検査しただけで、全Skillを同時
 
 ### GitHub Actionsの記録
 
-remote head `109a005c71f9b259e3529837bbe48c95b789bba7`の[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555687945)、[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555688037)、[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555687899)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555687940)はPASS。[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42555687951)は公式Skill仕様validationがPASS、repository eval structureがREADMEの`ui-target-analysis` catalog不足でFAIL。Cの変更境界外のREADME・shared route更新はA/PR #22に引き継ぐ。
+最新remote head `166f63299a4bcd51b3dce5fe5d5a265548c5e6ad`の[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42556473373)、[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42556473447)、[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42556473374)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42556473380)はPASS。[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42556473293)はofficial `skills-ref` specification validationがPASS、repository eval structureがREADMEの`ui-target-analysis` catalog不足でFAILし、後続のform／semantic counts／trigger contract stepsはskip。Cの変更境界外のREADME・shared route更新はA/PR #22に引き継ぐ。
 
 ## PR #22への引継ぎとshared owner依頼
 
