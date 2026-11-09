@@ -216,5 +216,29 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertTrue(all(a["return_code"] == 1 for a in artifact["attempts"]))
 
 
+    def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
+        plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
+        plan["direct_expectations"] = [
+            {"id": "exit_code", "expected": 0},
+            {"id": "stdout_json", "expected": {"ok": True}},
+        ]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "observed_FAIL")
+        self.assertEqual(artifact["tc_verdict"], "FAIL")
+        self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+
+    def test_direct_missing_side_effect_observation_is_unknown(self):
+        plan = self.plan([sys.executable, "-c", "print('{\"ok\": true}')"])
+        plan["direct_expectations"] = [
+            {"id": "stdout_json", "expected": {"ok": True}},
+            {"id": "db_change", "expected": "unchanged"},
+        ]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["tc_verdict"], "判定不能")
+        self.assertEqual(artifact["outcome"], "observations_incomplete")
+
+
 if __name__ == "__main__":
     unittest.main()
