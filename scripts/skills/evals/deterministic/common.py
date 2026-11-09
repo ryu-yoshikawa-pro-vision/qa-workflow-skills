@@ -18,6 +18,8 @@ CANONICAL_SKILLS = {
     "test-case-design",
     "test-target-inspection",
     "test-execution",
+    "testware-implementation",
+    "testware-execution",
     "regression-testing",
     "exploratory-testing",
     "qa-knowledge",
