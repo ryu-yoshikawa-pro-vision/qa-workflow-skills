@@ -135,7 +135,7 @@ class ProjectContextOwnerTests(unittest.TestCase):
             "change_reason": "設定修正",
         }
         self.assertEqual(
-            handle({**base, "updates": {"qa.feature_artifact_root": "out"}})["status"],
+            handle({**base, "updates": {"qa.not_a_registered_field": "out"}})["status"],
             "blocked",
         )
         self.assertEqual(
