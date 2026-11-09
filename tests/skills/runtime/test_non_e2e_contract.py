@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import importlib.util
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def load(relative: str, name: str):
+    spec = importlib.util.spec_from_file_location(name, ROOT / relative)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+contract = load("skills/testware-execution/scripts/contract.py", "non_e2e_contract")
+guard = load("skills/testware-implementation/scripts/snapshot_guard.py", "non_e2e_guard")
+
+
+class RoutingTests(unittest.TestCase):
+    def test_activity_not_runner_brand(self):
+        self.assertEqual(contract.classify_owner(activity="run", tool="playwright", browser=False), "testware-execution")
+        self.assertEqual(contract.classify_owner(activity="run", tool="playwright", browser=True, persistent=True), "e2e-test-execution")
+        self.assertEqual(contract.classify_owner(activity="direct_tc", tool="http", browser=True), "test-execution")
+        self.assertEqual(contract.classify_owner(activity="static_tool", tool="ruff"), "testware-execution")
+        self.assertEqual(contract.classify_owner(activity="meaning_review", tool="agent"), "adversarial-review")
+
+    def test_preflight_fail_closed(self):
+        spec = {"source_ref": "TC-1", "source_revision": "v1", "build_revision": "a1",
+                "environment_ref": "fixture", "operation_ref": "op1", "runner_ref": "vitest",
+                "script_chain_reviewed": True, "permissions_verified": True,
+                "side_effects": [], "isolated_environment": True}
+        self.assertTrue(contract.preflight(spec)["may_start"])
+        self.assertFalse(contract.preflight({**spec, "script_chain_reviewed": False})["may_start"])
+        self.assertEqual(contract.preflight({**spec, "shared_resource": True})["reason"], "shared_reservation_provider_required")
+        self.assertEqual(contract.preflight({**spec, "side_effects": [{"scope": "mail", "max_count": 1}]})["reason"], "cleanup_unverified")
+        self.assertEqual(contract.preflight({**spec, "external_side_effects": True})["reason"], "external_approval_required")
+
+
+class VitestTests(unittest.TestCase):
+    def test_partial_and_skipped_remain_incomplete(self):
+        selected = [{"path": "tests/a.test.ts", "title_path": ["suite", "one"]},
+                    {"path": "tests/a.test.ts", "title_path": ["suite", "two"]}]
+        report = {"testResults": [{"name": "tests/a.test.ts", "assertionResults": [
+            {"ancestorTitles": ["suite"], "title": "one", "status": "passed"}]}]}
+        result = contract.reconcile_vitest(selected=selected, report=report,
+                                          source_revision="sha123", raw_ref="local:report",
+                                          selection_verified=True)
+        self.assertFalse(result["collection_complete"])
+        self.assertEqual(result["results"][1]["runner_status"], "not_collected")
+        self.assertFalse(result["tc_verdicts_assessed"])
+        self.assertIsNone(result["results"][0]["tc_verdict"])
+
+    def test_duplicates_are_not_implicitly_matched(self):
+        case = {"ancestorTitles": ["s"], "title": "a", "status": "passed"}
+        report = {"testResults": [{"name": "tests/a.test.ts", "assertionResults": [case, case]}]}
+        actual = contract.reconcile_vitest(selected=[{"path": "tests/a.test.ts", "title_path": ["s", "a"]}],
+                                          report=report, source_revision="v1", raw_ref="raw",
+                                          selection_verified=True)
+        self.assertEqual(actual["results"][0]["runner_status"], "ambiguous")
+        self.assertFalse(actual["collection_complete"])
+
+    def test_skip_todo_and_file_revision(self):
+        report = {"testResults": [{"name": "tests/new.test.ts", "assertionResults": [
+            {"ancestorTitles": [], "title": "skipped", "status": "pending"},
+            {"ancestorTitles": [], "title": "todo", "status": "todo"}]}]}
+        selected = [{"path": "tests/new.test.ts", "title_path": [x]} for x in ("skipped", "todo")]
+        r = contract.reconcile_vitest(selected=selected, report=report,
+                                     source_revision="fixed-sha", raw_ref="raw",
+                                     selection_verified=True)
+        self.assertTrue(r["collection_complete"])
+        self.assertEqual([x["runner_status"] for x in r["results"]], ["pending", "todo"])
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_vitest(selected=selected,
+                                      report={"testResults": [{"name": "/private/old.test.ts", "assertionResults": []}]},
+                                      source_revision="fixed-sha", raw_ref="raw")
+
+
+class DirectAndStaticTests(unittest.TestCase):
+    def test_http_200_but_body_fails(self):
+        checks = [{"id": "code", "expected": 200}, {"id": "body", "expected": {"ok": True}}]
+        r = contract.compare_direct(started=True, expectations=checks,
+                                    observations={"code": 200, "body": {"ok": False}})
+        self.assertEqual(r["result"], "FAIL")
+        self.assertEqual(contract.compare_direct(started=True, expectations=checks,
+                                                observations={"code": 200})["result"], "判定不能")
+        self.assertEqual(contract.compare_direct(started=False, expectations=checks,
+                                                observations={})["result"], "未実行")
+
+    def test_static_zero_exit_is_not_auto_zero_findings(self):
+        self.assertEqual(contract.interpret_static(started=True, exit_code=0, raw_ref="raw", findings_count=None)["state"], "取得不完全")
+        self.assertEqual(contract.interpret_static(started=True, exit_code=0, raw_ref="raw", findings_count=0)["state"], "実行済み")
+        with self.assertRaises(contract.ContractError):
+            contract.interpret_static(started=False, exit_code=0, raw_ref=None, findings_count=None)
+
+    def test_hypotheses_cannot_become_defects(self):
+        d = contract.diagnosis(run_ref="run-v1", hypotheses=[{"cause": "fixture", "confidence": "low", "evidence_ref": "raw:1", "next_owner": "testware-implementation"}])
+        self.assertFalse(d["defect_confirmed"])
+
+
+class GuardTests(unittest.TestCase):
+    def test_stale_path_and_dirty_rejected(self):
+        digest = guard.file_digest(b"first")
+        args = dict(expected_head="h1", actual_head="h1", tracked={"tests/a.py": digest},
+                    actual={"tests/a.py": b"first"}, allowed_prefixes=["tests"],
+                    dirty_paths=[], change_paths=["tests/a.py"])
+        self.assertTrue(guard.check_snapshot(**args)["safe_to_prepare"])
+        self.assertFalse(guard.check_snapshot(**{**args, "actual": {"tests/a.py": b"second"}})["safe_to_prepare"])
+        self.assertFalse(guard.check_snapshot(**{**args, "actual_head": "h2"})["safe_to_prepare"])
+        self.assertFalse(guard.check_snapshot(**{**args, "dirty_paths": ["tests/a.py"]})["safe_to_prepare"])
+        self.assertTrue(guard.check_snapshot(**{**args, "dirty_paths": ["README.md"]})["safe_to_prepare"])
+
+    def test_out_of_scope_and_missing_snapshot_refused(self):
+        with self.assertRaises(guard.SnapshotError):
+            guard.check_snapshot(expected_head="a", actual_head="a", tracked={}, actual={},
+                                 allowed_prefixes=["tests"], dirty_paths=[], change_paths=["../src/app.py"])
+        with self.assertRaises(guard.SnapshotError):
+            guard.check_snapshot(expected_head="a", actual_head="a", tracked={}, actual={},
+                                 allowed_prefixes=["tests"], dirty_paths=[], change_paths=["tests/a.py"])
+
+
+if __name__ == "__main__":
+    unittest.main()

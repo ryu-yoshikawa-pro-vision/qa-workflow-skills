@@ -103,3 +103,37 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+
+## 実装・局所検証記録（2026-11-09）
+
+### 追加・更新した担当範囲
+
+- 新規Skill: `skills/testware-implementation/`、`skills/testware-execution/`。各Skillに入口、責務境界、入力・出力・trigger、決定論的・意味評価データを用意。
+- `skills/testware-implementation/scripts/snapshot_guard.py`: 隔離編集の対象path、dirty、HEAD、変更前hashの比較と競合拒否。これは**読取専用**であり、GitHubへの共有反映はnative条件付きHEAD更新と独立readbackが別途必要。
+- `skills/testware-execution/scripts/contract.py`: Playwright API-onlyとブラウザE2Eのrouting、開始前の不足条件、Vitest JSONの個別結果・部分取得・重複名・skip/todo・期待母集団、非ブラウザTCの期待値比較、静的ツールの取得完全性、独立診断の保守的な照合。
+- 既存`adversarial-review`: 非E2E testwareのassertion・fixture独立反証と、TC不要の製品要求／設計／コードの意味的静的レビューを追加。既存`test-execution`: ブラウザ直接TC実行異常の第一分析ownerと非ブラウザとの責務境界を明確化。
+- `tests/skills/runtime/test_non_e2e_contract.py`: 担当固有の正常・負例テスト。
+
+### 実施した検証と条件
+
+| 実行環境 | コマンド／対象 | 結果 | 証拠・制約 |
+| --- | --- | --- | --- |
+| ローカル隔離Python 3.13.5 | `python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v`（担当固有10件） | 10件PASS | routing・preflight・Vitest重複／未収集／skip／todo・直接観測・静的tool・変更前hash拒否。独立fixtureによるunitであり実runner受入ではない |
+| GitHub Actions（PR #29） | validate-skills／deterministic／semantic／format・lint等 | 未確認 | branch反映後の最新HEAD Checksを正本として確認が必要 |
+| 固定qa-training-store commitでの実Vitest、API-only Playwright、batch／event／component／非機能の実runnerと生raw結果 | 実製品／実runner受入 | **未実施** | この実行環境では外部製品repo・runnerへ接続できない。対象commit、認証、テストデータ権限、runner入口・副作用・cleanupを固定してから再開 |
+| 実source／artifact provider、承認、共有資源reservation・readback | native CAS・認証済み承認 | **blocked** | PR #23/Aの公開契約および案件provider選定・権限が必要。local補助検査をatomic publish保証と読み替えない |
+| H/Jの実保存成果物との結合、S1〜S17・人間編集8ケース等 | 横断受入 | **PR #22に引継ぎ** | fixtureによる局所検証は他ownerの実成果物の証明ではない |
+
+### 既知の未完了と再開条件
+
+1. `contract.py`はraw JSONが与えられたときの**照合helper**であり、Vitest・Playwright・静的ツールを実際に起動するrunner adapter、timeout・attempt全取得や実cleanupの保証ではない。実runnerが導入された対象で入口chain・reporter・attempt・artifact鮮度・cleanupを実測し、対応方式のfixtureとテストを補う必要がある。
+2. `snapshot_guard.py`は事前・反映直前の不一致を検出する補助で、local共有pathに対するatomic write/commitを実装しない。既存E2E実装にもPlan詳細05で要求された同じ競合保証が必要。対象ownerと協調し、shared編集のnative予約と実反映の条件付き確定の正当性を再検証する。
+3. repo共有`README.md`／`EVALS.md`／`qa-workflow`のSkill登録・共通評価・CIはAの書込みowner範囲。PR #29からは勝手に変更せず、Aへ両新Skill名とvalidator／route契約を引き渡す。現行`validate-skills.yml`はREADMEに全current Skill名を要求するため、A側での同期が終わるまで該当CIは失敗し得る。
+4. 非E2E testwareの独立assertionの実レビュー、公式TC／採用基準との対応、非機能の閾値、静的解析の誤検出・改版、H/Jとのrun・source revision参照は実成果物が揃った範囲で局所／横断再検証が必要。
+5. 全対応方式の実runnerと保存先で必須受入を完了するまで、PR #29はDraftとし、**担当G完了**を宣言しない。PR #22の最終完了とは区別する。
+
+### Planとの既存差分
+
+- 詳細Plan 05は、共有workspaceでのreservationと変更反映時のnative競合検出を同時に要求する。現行`artifact_graph.reserve_shared_resource()`は実provider不在時にblockedを返すため、provider未選定環境で共有編集の開始はできない。今回のlocal fixture成功を例外扱いしない。
+- 既存`test-execution`はUI手動相当のbrowser経路だけを担当する。非ブラウザ直接TCは新Skillへ分離したが、既存結果の移行・再採点は行わない。

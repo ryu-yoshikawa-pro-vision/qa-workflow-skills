@@ -18,6 +18,8 @@ description: 詳細テストケースを実対象上でAIが手動テスト相�
 9. password / token / cookie / secret / storageState等の実値はYAML・報告・証跡説明へ複製しません。既存の参照方法がある場合だけその参照を記録します。
 10. 準備、TC操作、TC事後処理、cleanupの状態変更は副作用scopeごとに回数を共有し、結果不明でも発生可能性があれば1回消費します。必要cleanup未完了や許可されていない残存状態があれば範囲を完了にしません。
 
+11. ブラウザ直接TC実行の異常分析では元実行結果を変更せず、実測・Authority・環境・データの確認から原因仮説／反証／確度・不足証拠・修正先を別成果物へ記録します。TC外の状態変更を診断のために無断実行しません。非ブラウザの直接TCはtestware-executionが担当します。
+
 ## 主な成果物
 
 assets/execution-plan-template.yamlに沿う全TCの実行前YAMLを最終Markdownにも保持し、assets/output-template.mdを使ってTC参照、run固定条件、TC実行条件、手順・観測、結果、cleanup、集計、ユーザー向け報告を記録します。
@@ -30,6 +32,7 @@ assets/execution-plan-template.yamlに沿う全TCの実行前YAMLを最終Markdo
 - 既存repo E2Eの正式runner実行: e2e-test-execution
 - 既存repo E2Eの原因分析: e2e-test-result-analysis
 - Playwright runner固有報告: e2e-test-reporting
+- 非ブラウザTC直接操作・非E2E実行・静的ツール: testware-execution
 - workflow routing / 再開: qa-workflow
 
 既存repo E2Eのraw resultを一般TC結果へ再集約しません。TC外の状態変更を伴う診断操作を行わず、原因未確認のFAILを製品不具合と断定しません。

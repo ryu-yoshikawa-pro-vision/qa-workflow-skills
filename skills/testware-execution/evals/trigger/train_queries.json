@@ -1,0 +1,50 @@
+[
+  {
+    "query": "既存Vitestを実runnerで実行し、個別結果とskipを保存して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Playwright TestのAPI-onlyテストを実行してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "テストコードを作らずHTTP APIのTCを操作し本文も観測してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "静的解析ツールを安全確認の後実行して、raw結果を記録してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "バッチテストを実行し、cleanup失敗とretryを区別してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "非機能計測を実行し、測定条件と閾値を照合してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "非E2EのVitestコードを追加してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "ブラウザのPlaywright E2Eを実行してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "UIを手動TC通りに操作して。",
+    "should_trigger": false
+  },
+  {
+    "query": "静的な要求レビューで矛盾を探して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既存E2Eのレポートを作成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "リグレッション対象の選定だけ行って。",
+    "should_trigger": false
+  }
+]

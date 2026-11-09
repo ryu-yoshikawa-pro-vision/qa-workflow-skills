@@ -1,0 +1,23 @@
+{
+  "skill": "testware-execution",
+  "criteria": [
+    {
+      "id": "TW-EXEC-SEM-001",
+      "title": "preflightとcleanup",
+      "description": "承認・副作用・共有資源・fixture・run開始条件が不明なら開始しない。",
+      "critical": true
+    },
+    {
+      "id": "TW-EXEC-SEM-002",
+      "title": "実行母集団とraw",
+      "description": "個別testとTC、retry、skip、未取得を混同せず、raw run statusを保存する。",
+      "critical": true
+    },
+    {
+      "id": "TW-EXEC-SEM-003",
+      "title": "判定と診断",
+      "description": "直接観測の不一致と未観測、静的tool rawとレビュー、元結果と仮説を分ける。",
+      "critical": true
+    }
+  ]
+}

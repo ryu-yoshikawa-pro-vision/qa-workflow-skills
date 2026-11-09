@@ -1,0 +1,34 @@
+[
+  {
+    "query": "APIテストのassertionとfixtureを既存repoの構成に沿って新規追加して。",
+    "should_trigger": true
+  },
+  {
+    "query": "テスト仕様に基づくバッチtestwareの差分を作り、HEAD競合を拒否して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ブラウザを開かないPlaywright TestのAPIケースを修正して。",
+    "should_trigger": true
+  },
+  {
+    "query": "イベント重複受信を検証する保存用テストコードを作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "ブラウザE2E testを追加してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "非ブラウザTCをコードを作らず直接実行してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "静的解析ツールを実行しrawログを残して。",
+    "should_trigger": false
+  },
+  {
+    "query": "テスト成果物のcoverageを分析して。",
+    "should_trigger": false
+  }
+]
