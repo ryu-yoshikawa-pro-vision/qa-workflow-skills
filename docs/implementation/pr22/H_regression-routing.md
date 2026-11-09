@@ -89,8 +89,8 @@
 - [x] Regression既存のtrigger／決定論的／意味評価と関係テストの回帰がPASSする。
 
 - [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
-- [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
+- [x] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
+- [x] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
 - [x] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
 - [x] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
@@ -181,3 +181,7 @@ Aが`regression-testing`をworkflowのverifierへ登録するための入力（A
 - SKILL.md・guidanceの変更で影響を受ける既存caseを更新後のSkillで再評価した。`REG-SEM-004`（route・actual start）は**pass、rating 4**（`REG-SEM-004-recheck`）、`REG-SEM-006`（補助testware境界）は**pass、rating 4**（`REG-SEM-006`、従来は保存済み候補が無かった）。旧`REG-SEM-004`の保存済み結果は変更していない。
 - Judgeは候補生成Agentと別contextで実行し、`reference.md`は生成側に渡していない。評価は単一Judge・単一試行であり、再現性の統計的保証ではない。
 - `skills-ref validate`（CI `validate-skills.yml`と同じ固定commit）：`skills/*`の23 Skill全てPASS（Windowsでは`PYTHONUTF8=1`が必要）。
+
+### GitHub Actions（HEAD `e134412`）
+
+`Code Quality`、`Codex Harness`（codex-contract・windows-launcher）、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`、`Validate Agent Skills`の全てがPASS。初回HEAD（`82efb1b`）では`Code Quality`が、`REG-SEM-007`候補出力内のJSONのdprint整形差で失敗したため整形して再pushし、最新HEADでPASSを確認した（途中HEADの失敗を最新HEADの成功で読み替えていない）。ローカルのdprintはパス引数指定だと未整形を検出しなかったため、以後はリポジトリ全体の`dprint check`で確認する。
