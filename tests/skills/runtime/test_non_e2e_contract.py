@@ -211,7 +211,7 @@ class VitestTests(unittest.TestCase):
                         {"ancestorTitles": [], "title": "todo", "status": "todo"},
                     ],
                 }
-            ]
+            ],
         }
         selected = [
             {"path": "tests/new.test.ts", "title_path": [x]}

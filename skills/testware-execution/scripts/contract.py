@@ -226,12 +226,9 @@ def reconcile_vitest(
     # Official Vitest 4 / Jest JSON contains global success and every test
     # counter. A partial or truncated JSON report cannot prove completeness
     # even when the selected individual assertions happen to match.
-    reporter_consistent = (
-        type(report.get("success")) is bool
-        and all(
-            type(report.get(key)) is int and report[key] == val
-            for key, val in counters.items()
-        )
+    reporter_consistent = type(report.get("success")) is bool and all(
+        type(report.get(key)) is int and report[key] == val
+        for key, val in counters.items()
     )
     if report.get("success") is True and statuses["failed"]:
         reporter_consistent = False
