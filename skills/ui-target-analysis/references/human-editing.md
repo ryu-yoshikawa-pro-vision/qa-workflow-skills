@@ -19,7 +19,7 @@
   "edit_root": "<isolated human worktree or copy>",
   "previous_snapshot": {
     "package_version": "vNN",
-    "payload_file_sha256": [{"path": "<payload path>", "sha256": "<sha256>"}],
+    "payload_file_sha256": [{ "path": "<payload path>", "sha256": "<sha256>" }],
     "manifest_sha256": "<sha256>"
   },
   "review": {
@@ -28,7 +28,7 @@
     "placement_agreement_ref": "<Project Context Q06 ref>",
     "change_summary": "<owner-reviewed summary>",
     "approved_change_keys": ["PAGE-001"],
-    "evidence_refs": {"PAGE-001": ["<source ref>"]},
+    "evidence_refs": { "PAGE-001": ["<source ref>"] },
     "approved_retirements": [],
     "retirement_evidence_refs": {}
   }
