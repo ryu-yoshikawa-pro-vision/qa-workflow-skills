@@ -3,6 +3,7 @@
 ## 判断範囲
 
 - selection ref / revision: E2ESEL-003 / 3
+- current revision digest: sha256:e4ef4b56d1d0074ca2693a7041e4bc727e90e87b679a80eff52a7f8469e2e6c7
 - current change reason: current source更新とreceipt-view候補の評価
 - 自動化目的: checkout完了経路の反復回帰確認
 - 候補母集団と完全性: checkoutとreceipt-viewを確認。完全
@@ -21,10 +22,10 @@
 
 ## 履歴
 
-| revision | previous revision | candidate IDs / keys                                        | source refs / revisions / currentness  | retired candidate IDs / reason                     | change reason          |
-| -------- | ----------------- | ----------------------------------------------------------- | -------------------------------------- | -------------------------------------------------- | ---------------------- |
-| 1        | なし              | E2E-CAND-001 / checkout-primary; E2E-CAND-002 / non-payment | SPEC-001@r8=current、TI-001@r4=current | なし                                               | 初回のcheckout経路選定 |
-| 2        | 1                 | E2E-CAND-001 / checkout-primary                             | SPEC-001@r8=current、TI-001@r4=current | E2E-CAND-002: currentな既存E2Eと重複するためretire | 既存E2Eとの重複を確認  |
+| revision | previous revision | candidate IDs / keys                                        | decisions / rationale                                                                                                                      | source refs / revisions / currentness  | retired candidate IDs / reason                     | change reason                                 | revision digest                                                         |
+| -------- | ----------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | -------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------- |
+| 1        | なし              | E2E-CAND-001 / checkout-primary; E2E-CAND-002 / non-payment | E2E-CAND-001: selected — 主要業務経路で変更ごとの反復確認価値がある; E2E-CAND-002: not_selected — currentな既存E2Eが同じ経路を確認している | SPEC-001@r8=current、TI-001@r4=current | なし                                               | 初回のcheckout経路選定                        | sha256:302469d858209482edd5f93901e0f8b302e4519714510f60e25114eddbc9c25e |
+| 2        | 1                 | E2E-CAND-001 / checkout-primary                             | E2E-CAND-001: not_selected — SPEC-001 r9では既存E2Eによる確認が優先されると判断した                                                        | SPEC-001@r9=current、TI-001@r4=current | E2E-CAND-002: currentな既存E2Eと重複するためretire | SPEC改版で価値を再評価し既存E2Eとの重複を確認 | sha256:2c4f32c1d43597555d54b344429a852fab93d87c497475b72a04599ada483c9c |
 
 ## 下流への受渡し
 

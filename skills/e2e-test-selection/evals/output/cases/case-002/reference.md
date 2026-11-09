@@ -3,6 +3,7 @@
 ## 判断範囲
 
 - selection ref / revision: E2ESEL-002 / 1
+- current revision digest: sha256:83d96f33eff463ccad7d55e9c7d3b83291da22ad68f31b1461ea8abba20a7120
 - current change reason: source revisionと候補母集団を確認できず保留
 - 自動化目的: 対象UI経路の価値判断
 - 候補母集団と完全性: 未確認
@@ -19,8 +20,8 @@
 
 ## 履歴
 
-| revision | previous revision | candidate IDs / keys | source refs / revisions / currentness | retired candidate IDs / reason | change reason |
-| -------- | ----------------- | -------------------- | ------------------------------------- | ------------------------------ | ------------- |
+| revision | previous revision | candidate IDs / keys | decisions / rationale | source refs / revisions / currentness | retired candidate IDs / reason | change reason | revision digest |
+| -------- | ----------------- | -------------------- | --------------------- | ------------------------------------- | ------------------------------ | ------------- | --------------- |
 
 - retired candidate IDs / 理由: なし
 

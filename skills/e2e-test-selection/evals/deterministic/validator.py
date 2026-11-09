@@ -10,11 +10,15 @@ from scripts.skills.evals.deterministic.markdown_parser import (
 from scripts.skills.evals.deterministic.result import EvalResult
 
 ID_RE = re.compile(r"^E2E-CAND-\d{3,}$")
+REVISION_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 DECISIONS = {"selected", "not_selected", "deferred", "blocked"}
 SOURCE_RE = re.compile(r"^([A-Z][A-Z0-9-]*)@([^=,、，;；\s]+)=(current|stale|unknown)$")
 SOURCE_REVISION_RE = re.compile(r"([A-Z][A-Z0-9-]*)@([^@,、，;；\s]+)")
 RETIREMENT_RE = re.compile(r"(E2E-CAND-\d{3,})\s*:\s*([^;；]+)")
 HISTORY_CANDIDATE_RE = re.compile(r"(E2E-CAND-\d{3,})\s*/\s*([^;；]+)")
+HISTORY_DECISION_RE = re.compile(
+    r"(E2E-CAND-\d{3,})\s*:\s*(selected|not_selected|deferred|blocked)\s*[—-]\s*([^;；]+)"
+)
 
 
 def _clean(value: str) -> str:
@@ -58,6 +62,28 @@ def _parse_retirements(value: str) -> dict[str, str] | None:
     return result
 
 
+def _parse_history_decisions(value: str) -> dict[str, dict[str, str]] | None:
+    cleaned = _clean(value)
+    if cleaned in {"", "なし", "none"}:
+        return {}
+    matches = list(HISTORY_DECISION_RE.finditer(cleaned))
+    remainder = HISTORY_DECISION_RE.sub("", cleaned)
+    if not matches or remainder.strip(" ,、，;；"):
+        return None
+    result = {
+        match.group(1): {
+            "decision": match.group(2),
+            "rationale": match.group(3).strip(),
+        }
+        for match in matches
+    }
+    if len(result) != len(matches) or any(
+        not row["rationale"] for row in result.values()
+    ):
+        return None
+    return result
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("e2e-test-selection", eval_id)
     bullets = parse_bullets(text)
@@ -79,9 +105,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "revision",
             "previous revision",
             "candidate IDs / keys",
+            "decisions / rationale",
             "source refs / revisions / currentness",
             "retired candidate IDs / reason",
             "change reason",
+            "revision digest",
         ),
     )
     expected_history = expected.get("history", [])
@@ -99,6 +127,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         row = history_rows[index]
         actual_sources = _parse_sources(row["source refs / revisions / currentness"])
         actual_retirements = _parse_retirements(row["retired candidate IDs / reason"])
+        actual_decisions = _parse_history_decisions(row["decisions / rationale"])
         actual_candidates = HISTORY_CANDIDATE_RE.findall(row["candidate IDs / keys"])
         actual_ids = [candidate_id for candidate_id, _key in actual_candidates]
         actual_keys = {
@@ -118,14 +147,29 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             details["candidate_ids"] = actual_ids
         if actual_keys != expected_row.get("candidate_keys", {}):
             details["candidate_keys"] = actual_keys
+        if actual_decisions != expected_row.get("candidate_decisions", {}):
+            details["candidate_decisions"] = actual_decisions
         if actual_sources != expected_sources:
             details["sources"] = actual_sources
         if actual_retirements != expected_row.get("retired_candidates", {}):
             details["retired_candidates"] = actual_retirements
         if _clean(row["change reason"]) != expected_row.get("change_reason"):
             details["change_reason"] = _clean(row["change reason"])
+        actual_digest = _clean(row["revision digest"])
+        if (
+            not REVISION_DIGEST_RE.fullmatch(actual_digest)
+            or actual_digest != expected_row.get("revision_digest")
+        ):
+            details["revision_digest"] = actual_digest
         if details:
             history_errors.append({"row": index + 1, **details})
+    current_revision_digest = _clean(bullets.get("current revision digest", ""))
+    current_digest_ok = bool(
+        REVISION_DIGEST_RE.fullmatch(current_revision_digest)
+        and current_revision_digest == expected.get("required_current_revision_digest")
+    )
+    if not current_digest_ok:
+        history_errors.append({"current_revision_digest": current_revision_digest})
     current_retirements = _parse_retirements(
         bullets.get("retired candidate IDs / 理由", "")
     )
@@ -134,6 +178,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "E2E-SEL-D001",
         identity_ok
+        and current_digest_ok
         and not history_errors
         and bool(bullets.get("current change reason", "").strip()),
         "selection ref/revision、current change reason、連続履歴とretirementを保持する",

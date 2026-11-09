@@ -1,6 +1,7 @@
 {
   "required_selection_ref": "E2ESEL-002",
   "required_selection_revision": 1,
+  "required_current_revision_digest": "sha256:83d96f33eff463ccad7d55e9c7d3b83291da22ad68f31b1461ea8abba20a7120",
   "required_sources": [
     { "ref": "TI-009", "revision": "unknown", "currentness": "unknown" }
   ],

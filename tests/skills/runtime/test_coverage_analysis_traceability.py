@@ -7,6 +7,22 @@ from tests.skills.runtime.test_traceability_runtime import (
     base_request,
     run,
 )
+from tests.skills.runtime.test_formal_design_contract import (
+    contract as formal_contract,
+    drafts as formal_drafts,
+    packet as formal_packet,
+)
+
+
+def verified_formal_design(packet: dict | None = None) -> dict:
+    validated = formal_contract.validate_formal_design(
+        formal_packet() if packet is None else packet,
+        formal_drafts(),
+    )
+    return {
+        **validated["__formal_design_summary__"],
+        "formal_design_record": validated["__formal_design_record__"],
+    }
 
 
 class CoverageAnalysisTraceabilityTests(unittest.TestCase):
@@ -14,6 +30,20 @@ class CoverageAnalysisTraceabilityTests(unittest.TestCase):
         TraceabilityRuntimeTests().test_expected_sets_and_graph_are_complete()
 
     def test_formal_candidate_coverage_stays_separate_from_ci_graph(self) -> None:
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [verified_formal_design()]
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertTrue(result["payload"]["can_complete"], result["issues"])
+        self.assertEqual(
+            result["payload"]["formal_design_metrics"][0]["pair_coverage"], "1/1"
+        )
+        self.assertTrue(result["payload"]["formal_design_metrics"][0]["record_verified"])
+        self.assertFalse(
+            any(node["node_type"] == "COND" for node in result["payload"]["nodes"])
+        )
+
+    def test_self_consistent_summary_without_formal_record_cannot_complete(self) -> None:
         request = base_request()
         request["input"]["formal_design_summaries"] = [
             {
@@ -30,19 +60,145 @@ class CoverageAnalysisTraceabilityTests(unittest.TestCase):
         ]
         result = run(request)
         self.assertEqual(result["runtime_status"], "ok", result)
-        self.assertTrue(result["payload"]["can_complete"], result["issues"])
-        self.assertEqual(
-            result["payload"]["formal_design_metrics"][0]["pair_coverage"], "2/2"
+        self.assertFalse(result["payload"]["can_complete"], result["issues"])
+        metric = result["payload"]["formal_design_metrics"][0]
+        self.assertFalse(metric["record_verified"])
+        self.assertIsNone(metric["pair_coverage"])
+
+    def test_forged_two_of_two_summary_cannot_hide_unconfirmed_record_pair(self) -> None:
+        value = formal_packet()
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-001"})
+        unresolved = {
+            **value["pair_assessments"][0],
+            "item_ref": "TI-002",
+            "decision": "unconfirmed",
+            "rationale": "ownerからTI-002の適用範囲を確認する",
+            "tcn_draft_key": None,
+            "expected_result_candidates": [],
+            "covered_by_pair": None,
+            "reopen_condition": "TI-002 owner confirmation",
+        }
+        value["pair_assessments"].append(unresolved)
+        summary = verified_formal_design(value)
+        summary.update(
+            {
+                "pair_closed": 2,
+                "pair_coverage": "2/2",
+                "pair_coverage_status": "complete",
+                "unresolved_pairs": [],
+            }
         )
-        self.assertFalse(
-            any(node["node_type"] == "COND" for node in result["payload"]["nodes"])
-        )
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"], result["issues"])
+        metric = result["payload"]["formal_design_metrics"][0]
+        self.assertEqual(metric["pair_coverage"], "1/2")
+        self.assertEqual(metric["pair_coverage_status"], "incomplete")
+        self.assertEqual(metric["unresolved_pairs"][0]["decision"], "unconfirmed")
+
+    def test_formal_design_ref_or_revision_mismatch_cannot_be_current(self) -> None:
+        for field, value in (("design_ref", "FD-009"), ("revision", 2)):
+            with self.subTest(field=field):
+                summary = verified_formal_design()
+                summary[field] = value
+                request = base_request()
+                request["input"]["formal_design_summaries"] = [summary]
+                result = run(request)
+                self.assertEqual(result["runtime_status"], "ok", result)
+                self.assertFalse(result["payload"]["can_complete"], result["issues"])
         self.assertFalse(
             any(
                 "COND-001" in (edge["from"], edge["to"])
                 for edge in result["payload"]["edges"]
             )
         )
+
+    def test_stale_formal_source_cannot_close_its_pair(self) -> None:
+        value = formal_packet()
+        next(row for row in value["source_refs"] if row["ref"] == "TI-001")[
+            "currentness"
+        ] = "stale"
+        summary = verified_formal_design(value)
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"], result["issues"])
+        metric = result["payload"]["formal_design_metrics"][0]
+        self.assertEqual(metric["pair_coverage_status"], "incomplete")
+        self.assertEqual(metric["pair_closed"], 0)
+        self.assertEqual(metric["unresolved_pairs"][0]["decision"], "blocked")
+
+    def test_unmapped_stale_formal_source_blocks_all_pairs(self) -> None:
+        value = formal_packet()
+        value["source_refs"].append(
+            {"ref": "UNMAPPED-001", "revision": "u1", "currentness": "stale"}
+        )
+        summary = verified_formal_design(value)
+        summary.update(
+            {
+                "pair_closed": 1,
+                "pair_coverage": "1/1",
+                "pair_coverage_status": "complete",
+                "unresolved_pairs": [],
+                "items_complete": True,
+                "conditions_complete": True,
+            }
+        )
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"], result["issues"])
+        metric = result["payload"]["formal_design_metrics"][0]
+        self.assertEqual(metric["pair_coverage_status"], "incomplete")
+        self.assertEqual(metric["pair_closed"], 0)
+        self.assertEqual(metric["unresolved_pairs"][0]["decision"], "blocked")
+
+    def test_formal_record_with_incomplete_history_cannot_be_verified(self) -> None:
+        value = formal_packet()
+        value["revision"] = 2
+        value["history"] = [
+            {
+                "revision": 1,
+                "change_reason": "rev2 reason",
+                "pair_decisions": [
+                    {
+                        "item_ref": "TI-001",
+                        "condition_ref": "COND-001",
+                        "decision": "adopted",
+                    }
+                ],
+                "candidate_assignments": [
+                    {
+                        "candidate_ref": "ER-001",
+                        "item_ref": "TI-001",
+                        "condition_ref": "COND-001",
+                    },
+                    {
+                        "candidate_ref": "ER-002",
+                        "item_ref": "TI-001",
+                        "condition_ref": "COND-001",
+                    },
+                ],
+                "retired_candidate_refs": [],
+            }
+        ]
+        summary = verified_formal_design(value)
+        summary["formal_design_record"]["history"][0]["candidate_assignments"] = []
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "invalid_input")
+        self.assertNotEqual(result.get("result_status"), "ready")
 
     def test_zero_or_incomplete_candidate_population_never_reports_100_percent(
         self,

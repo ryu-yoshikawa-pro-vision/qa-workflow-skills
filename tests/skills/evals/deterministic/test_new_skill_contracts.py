@@ -1081,8 +1081,8 @@ class E2ESelectionDeterministicContractTests(unittest.TestCase):
         validate = load_validator("e2e-test-selection")
         text, expected = eval_case("e2e-test-selection", "E2E-SEL-OUT-003")
         broken = text.replace(
-            "E2E-CAND-002: currentな既存E2Eと重複するためretire | 既存E2Eとの重複を確認",
-            "なし | 既存E2Eとの重複を確認",
+            "E2E-CAND-002: currentな既存E2Eと重複するためretire",
+            "なし",
             1,
         )
         result = validate(broken, expected, "E2E-SEL-OUT-003")

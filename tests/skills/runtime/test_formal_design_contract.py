@@ -139,11 +139,201 @@ class FormalDesignContractTests(unittest.TestCase):
         with self.assertRaises(contract.FormalDesignError):
             contract.validate_formal_design(value, drafts())
 
-    def test_stale_authority_is_rejected(self) -> None:
+    def test_stale_authority_blocks_only_pairs_that_depend_on_it(self) -> None:
         value = packet()
+        value["source_refs"].extend(
+            [
+                {"ref": "SPEC-002", "revision": "s3", "currentness": "current"},
+                {"ref": "TI-002", "revision": "i2", "currentness": "current"},
+            ]
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        value["authorities"].append(
+            {
+                "authority_ref": "SPEC-002",
+                "revision": "s3",
+                "currentness": "current",
+            }
+        )
+        second_assessment = copy.deepcopy(value["pair_assessments"][0])
+        second_assessment.update(
+            {
+                "item_ref": "TI-002",
+                "tcn_draft_key": "formal-ti2-cond1",
+                "expected_result_candidates": [
+                    {
+                        **second_assessment["expected_result_candidates"][0],
+                        "candidate_ref": "ER-003",
+                        "authority_refs": ["SPEC-002"],
+                    }
+                ],
+            }
+        )
+        value["pair_assessments"].append(second_assessment)
         value["authorities"][0]["currentness"] = "stale"
-        with self.assertRaises(contract.FormalDesignError):
-            contract.validate_formal_design(value, drafts())
+        value["source_refs"][2]["currentness"] = "stale"
+
+        result = contract.validate_formal_design(
+            value,
+            [
+                *drafts(),
+                {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]},
+            ],
+        )
+        summary = result["__formal_design_summary__"]
+        self.assertEqual(summary["pair_coverage"], "1/2")
+        self.assertEqual(summary["unresolved_pairs"], [{
+            "item_ref": "TI-001",
+            "condition_ref": "COND-001",
+            "decision": "blocked",
+        }])
+        self.assertNotIn("formal-ti1-cond1", result)
+        self.assertEqual(result["formal-ti2-cond1"]["item_ref"], "TI-002")
+
+        shared_condition = packet()
+        shared_condition["source_refs"].extend(
+            [
+                {"ref": "TI-002", "revision": "i2", "currentness": "current"},
+            ]
+        )
+        shared_condition["items"].append(
+            {"item_ref": "TI-002", "source_ref": "TI-002"}
+        )
+        shared_assessment = copy.deepcopy(
+            shared_condition["pair_assessments"][0]
+        )
+        shared_assessment.update(
+            {
+                "item_ref": "TI-002",
+                "tcn_draft_key": "formal-ti2-cond1",
+                "expected_result_candidates": [
+                    {
+                        **shared_assessment["expected_result_candidates"][0],
+                        "candidate_ref": "ER-003",
+                    }
+                ],
+            }
+        )
+        shared_condition["pair_assessments"].append(shared_assessment)
+        shared_condition["source_refs"][1]["currentness"] = "stale"
+        shared_result = contract.validate_formal_design(
+            shared_condition,
+            [
+                *drafts(),
+                {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]},
+            ],
+        )
+        self.assertEqual(
+            shared_result["__formal_design_summary__"]["unresolved_pairs"],
+            [
+                {
+                    "item_ref": "TI-001",
+                    "condition_ref": "COND-001",
+                    "decision": "blocked",
+                },
+                {
+                    "item_ref": "TI-002",
+                    "condition_ref": "COND-001",
+                    "decision": "blocked",
+                },
+            ],
+        )
+
+    def test_unmapped_stale_source_blocks_all_pairs_safely(self) -> None:
+        value = packet()
+        value["source_refs"].extend(
+            [
+                {"ref": "TI-002", "revision": "i2", "currentness": "current"},
+                {"ref": "UNMAPPED-001", "revision": "u3", "currentness": "stale"},
+            ]
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        second_assessment = copy.deepcopy(value["pair_assessments"][0])
+        second_assessment.update(
+            {
+                "item_ref": "TI-002",
+                "tcn_draft_key": "formal-ti2-cond1",
+                "expected_result_candidates": [
+                    {
+                        **second_assessment["expected_result_candidates"][0],
+                        "candidate_ref": "ER-003",
+                    }
+                ],
+            }
+        )
+        value["pair_assessments"].append(second_assessment)
+
+        result = contract.validate_formal_design(
+            value,
+            [*drafts(), {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]}],
+        )
+
+        summary = result["__formal_design_summary__"]
+        self.assertEqual(summary["pair_coverage"], "0/2")
+        self.assertEqual(summary["pair_coverage_status"], "incomplete")
+        self.assertEqual(
+            summary["unresolved_pairs"],
+            [
+                {
+                    "item_ref": item_ref,
+                    "condition_ref": "COND-001",
+                    "decision": "blocked",
+                }
+                for item_ref in ("TI-001", "TI-002")
+            ],
+        )
+
+    def test_item_scoped_test_levels_resolve_independently(self) -> None:
+        value = packet()
+        value["source_refs"].append(
+            {"ref": "TI-002", "revision": "i2", "currentness": "current"}
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        value["test_level_evidence"] = [
+            {
+                "item_ref": "TI-001",
+                "evidence": copy.deepcopy(packet()["test_level_evidence"]),
+            },
+            {
+                "item_ref": "TI-002",
+                "evidence": {
+                    "explicit": None,
+                    "architecture": {
+                        "level": "acceptance",
+                        "source_ref": "ARCH-001",
+                        "approved": False,
+                    },
+                    "default": {"level": "system", "source_ref": "SPEC-001"},
+                },
+            },
+        ]
+        second_assessment = copy.deepcopy(value["pair_assessments"][0])
+        second_assessment.update(
+            {
+                "item_ref": "TI-002",
+                "test_level": "system",
+                "tcn_draft_key": "formal-ti2-cond1",
+                "expected_result_candidates": [
+                    {
+                        **second_assessment["expected_result_candidates"][0],
+                        "candidate_ref": "ER-003",
+                    }
+                ],
+            }
+        )
+        value["pair_assessments"].append(second_assessment)
+
+        result = contract.validate_formal_design(
+            value,
+            [*drafts(), {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]}],
+        )
+
+        self.assertEqual(result["formal-ti1-cond1"]["test_level"], "integration")
+        self.assertEqual(result["formal-ti2-cond1"]["test_level"], "system")
+        self.assertEqual(
+            result["formal-ti2-cond1"]["test_level_source"], "default"
+        )
+        self.assertEqual(result["__formal_design_summary__"]["pair_coverage"], "2/2")
 
     def test_authority_revision_must_match_its_source_revision(self) -> None:
         value = packet()

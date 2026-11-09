@@ -43,7 +43,7 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 
 ## item × 共通conditionの正式適用
 
-`condition_structure`内のformal design validatorはTI／COND candidateの参照とrevision、全pairの明示判定、テストレベル優先順位、期待結果候補のAuthority・観測方法・副作用を検証します。current revisionのchange reasonとrevision 1から直前revisionまでの連続履歴を要求し、履歴の各candidate retirementと理由を保持してID再利用を拒否します。採用pairだけ既存のTCN draftへ投影し、item_ref・condition_ref・formal design revision・期待結果candidate refsをTCN Entityへ保持します。全pair判断、候補、source revision、履歴、retirement reasonは`payload.formal_design_record`へ保持します。採用しない候補は対象外、別テストレベル、重複、未確認、blockedを区別します。候補母集団が不完全、unconfirmed／blockedが残る、分母が0のときはcoverageをcomplete／100%へ昇格しません。
+`condition_structure`内のformal design validatorはTI／COND candidateの参照とrevision、全pairの明示判定、テストレベル優先順位、期待結果候補のAuthority・観測方法・副作用を検証します。test levelはpacket全体の単一値にせず、TRへ対応するitemごとに解決し、採用pair・TCN・対応TRの割当が一致することを確認します。current revisionのchange reasonとrevision 1から直前revisionまでの連続履歴を要求し、履歴の各candidate retirementと理由を保持してID再利用を拒否します。採用pairだけ既存のTCN draftへ投影し、item_ref・condition_ref・formal design revision・期待結果candidate refsをTCN Entityへ保持します。全pair判断、候補、source revision、履歴、retirement reasonは`payload.formal_design_record`へ保持します。採用しない候補は対象外、別テストレベル、重複、未確認、blockedを区別します。sourceがstale／unknownなら、そのsourceに依存するpairとduplicate経由で依存するpairだけをblockedにし、影響しないpairの判断と既存IDを維持します。依存関係が不明ならpacketを安全に利用可能と推測しません。候補母集団が不完全、unconfirmed／blockedが残る、分母が0のときはcoverageをcomplete／100%へ昇格しません。
 
 formal_designのitem／condition source refsは固定fixtureで局所検証できます。実owner artifactのID・revision・currentness照合と保存readbackは、owner統合時のPR #22確認事項です。
 

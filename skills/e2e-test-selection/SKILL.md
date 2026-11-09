@@ -12,14 +12,14 @@ description: UIを通すE2E自動化の価値、候補範囲、選定理由を�
 3. `test-analysis`のProduct Risk、`test-requirement-design`のTR、`test-condition-design`のTCN／CI、`test-case-design`のTCを作成・複製しません。既存refを入力として追跡します。
 4. TCが直接指定された経路、明示的にTCを伴わないE2E候補経路、既存E2Eの実行だけの経路を区別します。後二者をTCがあると偽装しません。
 5. 候補集合を明示し、各候補を選定・不選定・保留・blockedのいずれかへ理由付きで閉じます。候補母集団、source currentness、根拠が不完全なら完成扱いしません。
-6. 既存結果を改訂する場合はselection IDを保ち、revisionを増やし、現在の`change_reason`とrevision 1から直前revisionまでの全snapshotを残します。各snapshotは候補集合とretirementを含み、過去にretireしたcandidateと理由を後続履歴・現行結果から削除しません。candidate IDは同じcandidate_keyで維持し、IDを再利用しません。
+6. 既存結果を改訂する場合はselection IDを保ち、revisionを増やし、現在の`change_reason`とrevision 1から直前revisionまでの全snapshotを残します。各snapshotはcandidate ID/key・decision・rationale、candidate別source refとそのrevision/currentness、scope・母集団状態、retirementを復元できる情報と、直前revisionの`revision_digest`を持ちます。digest欠落は推測再生成せず履歴をblockedにし、snapshotとdigestが不一致なら改変として拒否します。過去にretireしたcandidateと理由を後続履歴・現行結果から削除しません。candidate IDは同じcandidate_keyで維持し、IDを再利用しません。
 7. 最終成果物は`assets/output-template.md`に従い、必要なら`selection_contract.py`でJSON契約を検証します。source revisionと実保存先readbackを確認できない場合は、記録上のcurrentnessを実証済みと扱いません。
 
 ## インターフェース
 
 - **入力**: 自動化目的、対象範囲、現在有効な仕様／業務根拠、feature/item/condition/Authority等のsource refとrevision、既存選定結果と履歴（ある場合）。
 - **処理**: 候補ごとにUIを通したシステムレベル検証の価値、主要業務経路、反復確認価値、既存のより適切なテスト経路との重複を技術非依存で評価します。
-- **出力**: selection ID・revision、対象scope、source refs、候補集合、各decisionと理由、未解決候補、履歴、停止・再開条件。
+- **出力**: selection ID・revision、現在revisionの`current_revision_digest`、対象scope、source refs、候補集合、各decisionと理由、未解決候補、履歴、停止・再開条件。
 
 ## ルーティング
 
@@ -32,7 +32,7 @@ description: UIを通すE2E自動化の価値、候補範囲、選定理由を�
 
 ## 決定論的runtime dispatch
 
-`scripts/selection_contract.py`はPython 3.11標準ライブラリのみを使用し、stdinからJSON objectを1つ受けてstdoutへJSON envelopeを1つ返します。検証済み候補・source revision・decision・履歴を`payload.selection_record`に保持します。契約検証は純粋関数で、外部保存、provider選択、approval、CAS、readbackを仮定しません。共有workflow runtimeへの登録とMachine Entityの保存currentness確認はA ownerとの受渡し対象です。
+`scripts/selection_contract.py`はPython 3.11標準ライブラリのみを使用し、最大2 MiBのUTF-8 JSON objectを1つ受けてstdoutへ最大16 MiBのJSON envelopeを1つ返します。1文字列は64 KiB、JSON number token／展開値は4096桁、nesting depthは64までです。duplicate key、上限超過、非有限数、不正UTF-8、unpaired surrogateを構造化エラーで拒否します。検証済み候補・source revision・decision・履歴を`payload.selection_record`に保持し、現在revisionの`current_revision_digest`を返します。各過去snapshotは直前のruntime出力から得た`revision_digest`を必要とします。旧history rowは読めますが、decision・rationale・source snapshotまたはdigestを復元できないrowを含む選定は`blocked`とし、推測でsnapshotを補いません。revision digestはrecord内容の整合性値で、作成者や保存先の真正性は証明しません。契約検証は純粋関数で、外部保存、provider選択、approval、CAS、readbackを仮定しません。共有workflow runtimeへの登録とMachine Entityの保存currentness確認はA ownerとの受渡し対象です。
 
 ## リソース
 

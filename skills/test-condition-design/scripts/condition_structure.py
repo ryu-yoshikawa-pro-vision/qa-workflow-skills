@@ -103,6 +103,36 @@ def resolve_test_level(evidence: Any) -> dict[str, str]:
     }
 
 
+def resolve_item_test_levels(
+    evidence: Any, item_refs: set[str], source_by_ref: dict[str, tuple[str, str]]
+) -> dict[str, dict[str, str]]:
+    if isinstance(evidence, dict):
+        resolved = resolve_test_level(evidence)
+        if resolved["source_ref"] not in source_by_ref:
+            raise FormalDesignError("test level source_refがsource_refsにありません")
+        return {item_ref: resolved for item_ref in item_refs}
+
+    rows = _rows(evidence, "test_level_evidence")
+    by_item: dict[str, dict[str, str]] = {}
+    for index, row in enumerate(rows):
+        if set(row) != {"item_ref", "evidence"}:
+            raise FormalDesignError(
+                f"test_level_evidence[{index}] schemaが不正です"
+            )
+        item_ref = _require_text(row["item_ref"], "test_level_evidence.item_ref")
+        if item_ref not in item_refs or item_ref in by_item:
+            raise FormalDesignError("item別test_level_evidenceが未知または重複しています")
+        resolved = resolve_test_level(row["evidence"])
+        if resolved["source_ref"] not in source_by_ref:
+            raise FormalDesignError("test level source_refがsource_refsにありません")
+        by_item[item_ref] = resolved
+    if set(by_item) != item_refs:
+        raise FormalDesignError(
+            "item別test_level_evidenceとformal design itemsの集合が一致しません"
+        )
+    return by_item
+
+
 def validate_formal_design(
     packet: Any, tcn_drafts: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:
@@ -352,9 +382,9 @@ def validate_formal_design(
             )
         authorities[ref] = currentness
 
-    resolved_level = resolve_test_level(packet["test_level_evidence"])
-    if resolved_level["source_ref"] not in source_by_ref:
-        raise FormalDesignError("test level source_refがsource_refsにありません")
+    resolved_levels = resolve_item_test_levels(
+        packet["test_level_evidence"], set(items), source_by_ref
+    )
     drafts_by_key = {row.get("draft_key"): row for row in tcn_drafts}
     if len(drafts_by_key) != len(tcn_drafts):
         raise FormalDesignError("TCN draft_keyが重複しています")
@@ -392,14 +422,15 @@ def validate_formal_design(
         candidates = _rows(
             row["expected_result_candidates"], "expected_result_candidates"
         )
+        resolved_level = resolved_levels[pair[0]]
         if row["decision"] == "adopted":
             if level != resolved_level["level"]:
                 raise FormalDesignError(
                     "採用pairのtest levelが優先順位の解決結果と不一致です"
                 )
             draft_key = _require_text(draft_key, "adopted tcn_draft_key")
-            if draft_key not in drafts_by_key or draft_key in projection:
-                raise FormalDesignError("採用pairに一意な既存TCN draftがありません")
+            if draft_key in projection:
+                raise FormalDesignError("採用pairのTCN draft_keyが重複しています")
             if not candidates:
                 raise FormalDesignError(
                     "採用pairにexpected result candidateがありません"
@@ -448,32 +479,30 @@ def validate_formal_design(
                     or refs != sorted(set(refs))
                 ):
                     raise FormalDesignError("expected result authority_refsが必要です")
-                if any(
-                    ref not in authorities or authorities[ref] != "current"
-                    for ref in refs
-                ):
+                if any(ref not in authorities for ref in refs):
                     raise FormalDesignError(
-                        "expected resultにcurrent Authority以外のrefがあります"
+                        "expected resultに未知のAuthority refがあります"
                     )
                 candidate_rows.append(dict(candidate))
             if candidate_ids != sorted(candidate_ids):
                 raise FormalDesignError(
                     "expected result candidatesはcandidate_ref順が必要です"
                 )
-            draft = drafts_by_key[draft_key]
-            if not set(draft["tr_refs"]):
-                raise FormalDesignError("採用pairのTCN draftにTRがありません")
-            projection[draft_key] = {
-                "item_ref": pair[0],
-                "condition_ref": pair[1],
-                "formal_design_ref": design_ref,
-                "formal_design_revision": revision,
-                "expected_result_candidate_refs": sorted(candidate_ids),
-                "expected_result_candidates": candidate_rows,
-                "test_level": level,
-                "test_level_source": resolved_level["source"],
-                "test_level_source_ref": resolved_level["source_ref"],
-            }
+            draft = drafts_by_key.get(draft_key)
+            if draft is not None:
+                if not set(draft["tr_refs"]):
+                    raise FormalDesignError("採用pairのTCN draftにTRがありません")
+                projection[draft_key] = {
+                    "item_ref": pair[0],
+                    "condition_ref": pair[1],
+                    "formal_design_ref": design_ref,
+                    "formal_design_revision": revision,
+                    "expected_result_candidate_refs": sorted(candidate_ids),
+                    "expected_result_candidates": candidate_rows,
+                    "test_level": level,
+                    "test_level_source": resolved_level["source"],
+                    "test_level_source_ref": resolved_level["source_ref"],
+                }
         elif draft_key is not None or candidates:
             raise FormalDesignError(
                 "非採用pairがTCN draftまたはexpected resultを生成しています"
@@ -512,8 +541,6 @@ def validate_formal_design(
         raise FormalDesignError(
             f"item × condition populationのassessmentが不足しています: {missing}"
         )
-    if set(projection) != set(drafts_by_key):
-        raise FormalDesignError("formal_designで対応しないTCN draftがあります")
     for pair, row in assessments.items():
         if row["decision"] == "duplicate":
             target = tuple(
@@ -585,19 +612,102 @@ def validate_formal_design(
         raise FormalDesignError(
             "削除された過去expected-result candidateにはretirement reasonが必要です"
         )
-    if any(state != "current" for _revision, state in source_by_ref.values()):
-        raise FormalDesignError("source refsにstaleまたはcurrentness unknownがあります")
-    if any(state != "current" for state in authorities.values()):
-        raise FormalDesignError("Authorityにstaleまたはcurrentness unknownがあります")
-    unresolved_pairs = [
-        {"item_ref": item, "condition_ref": condition, "decision": row["decision"]}
-        for (item, condition), row in sorted(assessments.items())
-        if row["decision"] in {"unconfirmed", "blocked"}
-    ]
+    pair_stale_sources: dict[tuple[str, str], list[str]] = {}
+    mapped_source_refs = set(items.values()) | set(conditions.values()) | {
+        assignment["source_ref"] for assignment in resolved_levels.values()
+    }
+    for pair, row in assessments.items():
+        source_refs = {
+            items[pair[0]],
+            conditions[pair[1]],
+            resolved_levels[pair[0]]["source_ref"],
+        }
+        if row["decision"] == "adopted":
+            authority_refs = {
+                ref
+                for candidate in row["expected_result_candidates"]
+                for ref in candidate["authority_refs"]
+            }
+            draft = drafts_by_key.get(row["tcn_draft_key"])
+            if draft is not None:
+                draft_authorities = set(draft.get("authority_refs", []))
+                if draft_authorities - set(authorities):
+                    raise FormalDesignError(
+                        "TCN draftにformal design外のAuthority refがあります"
+                    )
+                authority_refs.update(draft_authorities)
+            mapped_source_refs.update(authority_refs)
+            source_refs.update(authority_refs)
+        pair_stale_sources[pair] = sorted(
+            ref
+            for ref in source_refs
+            if source_by_ref[ref][1] != "current"
+        )
+    unmapped_stale_sources = {
+        ref
+        for ref, (_revision, currentness) in source_by_ref.items()
+        if currentness != "current" and ref not in mapped_source_refs
+    }
+    if unmapped_stale_sources:
+        # An unresolved source without a pair link cannot safely be ignored.
+        # Conservatively block every pair until its dependency scope is explicit.
+        for pair in pair_stale_sources:
+            pair_stale_sources[pair] = sorted(
+                set(pair_stale_sources[pair]) | unmapped_stale_sources
+            )
+    stale_pairs = {
+        pair for pair, stale_refs in pair_stale_sources.items() if stale_refs
+    }
+    changed = True
+    while changed:
+        changed = False
+        for pair, row in assessments.items():
+            if row["decision"] != "duplicate" or pair in stale_pairs:
+                continue
+            target = tuple(
+                row["covered_by_pair"][key] for key in ("item_ref", "condition_ref")
+            )
+            if target in stale_pairs:
+                stale_pairs.add(pair)
+                pair_stale_sources[pair] = sorted(
+                    set(pair_stale_sources[pair]) | set(pair_stale_sources[target])
+                )
+                changed = True
+
+    blocked_draft_keys = {
+        row["tcn_draft_key"]
+        for pair, row in assessments.items()
+        if pair in stale_pairs
+        and row["decision"] == "adopted"
+        and row["tcn_draft_key"] in drafts_by_key
+    }
+    # A formal packet covers the full candidate matrix, while test_conditions may
+    # be scoped to the current partial rerun. Missing drafts therefore remain
+    # outside this generation scope; an in-scope TR without a TCN is still caught
+    # by the existing closure check below.
+    if set(projection) - blocked_draft_keys != set(drafts_by_key) - blocked_draft_keys:
+        raise FormalDesignError("formal_designで対応しないTCN draftがあります")
+    for draft_key in blocked_draft_keys:
+        projection.pop(draft_key, None)
+
+    unresolved_pairs = []
+    for pair, row in sorted(assessments.items()):
+        if row["decision"] in {"unconfirmed", "blocked"} or pair in stale_pairs:
+            unresolved_pairs.append(
+                {
+                    "item_ref": pair[0],
+                    "condition_ref": pair[1],
+                    "decision": (
+                        row["decision"]
+                        if row["decision"] in {"unconfirmed", "blocked"}
+                        else "blocked"
+                    ),
+                }
+            )
     denominator = len(expected_pairs)
     closed = sum(
-        row["decision"] not in {"unconfirmed", "blocked"}
-        for row in assessments.values()
+        row["decision"] not in {"unconfirmed", "blocked"} and pair not in stale_pairs
+        for pair, row in assessments.items()
     )
     formal_design_record = dict(packet)
     formal_design_record["source_refs"] = sorted(
@@ -646,10 +756,23 @@ def validate_formal_design(
         (dict(row) for row in packet["retired_candidate_refs"]),
         key=lambda row: row["candidate_ref"],
     )
-    formal_design_record["test_level_evidence"] = {
-        key: dict(value) if isinstance(value, dict) else value
-        for key, value in packet["test_level_evidence"].items()
-    }
+    if isinstance(packet["test_level_evidence"], dict):
+        formal_design_record["test_level_evidence"] = {
+            key: dict(value) if isinstance(value, dict) else value
+            for key, value in packet["test_level_evidence"].items()
+        }
+    else:
+        formal_design_record["test_level_evidence"] = [
+            {
+                "item_ref": row["item_ref"],
+                "evidence": {
+                    key: dict(value) if isinstance(value, dict) else value
+                    for key, value in row["evidence"].items()
+                },
+            }
+            for row in sorted(packet["test_level_evidence"], key=lambda row: row["item_ref"])
+        ]
+    projection["__blocked_draft_keys__"] = sorted(blocked_draft_keys)
     projection["__formal_design_record__"] = formal_design_record
     projection["__formal_design_summary__"] = {
         "design_ref": design_ref,
@@ -1293,7 +1416,12 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             raise InvalidInput(str(exc)) from exc
         formal_design_summary = formal_projection.pop("__formal_design_summary__")
         formal_design_record = formal_projection.pop("__formal_design_record__")
+        blocked_tcn_draft_keys = set(
+            formal_projection.pop("__blocked_draft_keys__", [])
+        )
         for draft in tcn_drafts:
+            if draft["draft_key"] in blocked_tcn_draft_keys:
+                continue
             draft.update(formal_projection[draft["draft_key"]])
             for tr_ref in draft["tr_refs"]:
                 tr_row = tr_rows.get(tr_ref)
@@ -1301,13 +1429,26 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                     continue
                 if (
                     tr_row.get("test_level") != draft["test_level"]
+                    or tr_row.get("test_level_source")
+                    != draft["test_level_source"]
                     or tr_row.get("test_level_source_ref")
                     != draft["test_level_source_ref"]
                 ):
                     raise InvalidInput(
                         "formal TCNのtest levelがcurrent TR assignmentと一致しません"
                     )
+        tcn_drafts = [
+            draft
+            for draft in tcn_drafts
+            if draft["draft_key"] not in blocked_tcn_draft_keys
+        ]
     model_drafts = _validate_model_drafts(input_value["models"])
+    if "formal_design" in input_value:
+        model_drafts = [
+            draft
+            for draft in model_drafts
+            if draft["parent_tcn_draft_key"] not in blocked_tcn_draft_keys
+        ]
     previous_tcn = _validate_state_rows(input_value["previous_tcn_ids"], "tcn")
     previous_models = _validate_state_rows(input_value["previous_model_keys"], "model")
     inactive_tcn_ids = set(

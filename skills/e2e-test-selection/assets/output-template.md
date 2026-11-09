@@ -3,6 +3,7 @@
 ## 判断範囲
 
 - selection ref / revision:
+- current revision digest: `sha256:<64 lowercase hex>`
 - current change reason:
 - 自動化目的:
 - 候補母集団と完全性:
@@ -22,9 +23,11 @@
 
 履歴にはcurrent revisionより前のsnapshotをrevision順にすべて記録します。初回revisionでは履歴行を作りません。過去にretireしたcandidateは後続snapshotにも理由付きで残します。
 
-| revision | previous revision | candidate IDs / keys | source refs / revisions / currentness | retired candidate IDs / reason | change reason |
-| -------- | ----------------- | -------------------- | ------------------------------------- | ------------------------------ | ------------- |
-|          |                   |                      |                                       |                                |               |
+| revision | previous revision | candidate IDs / keys | decisions / rationale | source refs / revisions / currentness | retired candidate IDs / reason | change reason | revision digest |
+| -------- | ----------------- | -------------------- | --------------------- | ------------------------------------- | ------------------------------ | ------------- | --------------- |
+|          |                   |                      |                       |                                       |                                |               |                 |
+
+各履歴行はそのrevisionの候補判断・理由と、candidateが参照したsourceのrevision/currentnessを復元できる完全snapshotです。`revision digest`には、そのrevisionのdecision・rationale・source・retirement・change reasonを含みます。digestが欠けている、またはsnapshotと一致しない場合は推測せず、history incomplete／改変としてblockedを記録します。digestは保存先の真正性を証明しないため、実readbackを確認します。
 
 ## 下流への受渡し
 

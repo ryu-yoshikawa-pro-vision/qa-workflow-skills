@@ -3,6 +3,7 @@
 ## 判断範囲
 
 - selection ref / revision: E2ESEL-001 / 1
+- current revision digest: sha256:26ca0a700aef1d2842c4335bec040700814767cd5eac90abb0cebf6fb0981b66
 - current change reason: 初回のcheckout E2E対象選定
 - 自動化目的: checkout完了経路の反復回帰確認
 - 候補母集団と完全性: TI-001、TI-002。完全
@@ -20,8 +21,8 @@
 
 ## 履歴
 
-| revision | previous revision | candidate IDs / keys | source refs / revisions / currentness | retired candidate IDs / reason | change reason |
-| -------- | ----------------- | -------------------- | ------------------------------------- | ------------------------------ | ------------- |
+| revision | previous revision | candidate IDs / keys | decisions / rationale | source refs / revisions / currentness | retired candidate IDs / reason | change reason | revision digest |
+| -------- | ----------------- | -------------------- | --------------------- | ------------------------------------- | ------------------------------ | ------------- | --------------- |
 
 - retired candidate IDs / 理由: なし
 

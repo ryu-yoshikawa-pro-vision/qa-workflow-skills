@@ -1,6 +1,7 @@
 {
   "required_selection_ref": "E2ESEL-003",
   "required_selection_revision": 3,
+  "required_current_revision_digest": "sha256:e4ef4b56d1d0074ca2693a7041e4bc727e90e87b679a80eff52a7f8469e2e6c7",
   "required_sources": [
     { "ref": "SPEC-001", "revision": "r9", "currentness": "current" },
     { "ref": "TI-001", "revision": "r5", "currentness": "current" }
@@ -30,12 +31,23 @@
         "E2E-CAND-001": "checkout-primary",
         "E2E-CAND-002": "non-payment"
       },
+      "candidate_decisions": {
+        "E2E-CAND-001": {
+          "decision": "selected",
+          "rationale": "主要業務経路で変更ごとの反復確認価値がある"
+        },
+        "E2E-CAND-002": {
+          "decision": "not_selected",
+          "rationale": "currentな既存E2Eが同じ経路を確認している"
+        }
+      },
       "sources": [
         { "ref": "SPEC-001", "revision": "r8", "currentness": "current" },
         { "ref": "TI-001", "revision": "r4", "currentness": "current" }
       ],
       "retired_candidates": {},
-      "change_reason": "初回のcheckout経路選定"
+      "change_reason": "初回のcheckout経路選定",
+      "revision_digest": "sha256:302469d858209482edd5f93901e0f8b302e4519714510f60e25114eddbc9c25e"
     },
     {
       "revision": 2,
@@ -43,13 +55,20 @@
       "candidate_ids": ["E2E-CAND-001"],
       "candidate_keys": { "E2E-CAND-001": "checkout-primary" },
       "sources": [
-        { "ref": "SPEC-001", "revision": "r8", "currentness": "current" },
+        { "ref": "SPEC-001", "revision": "r9", "currentness": "current" },
         { "ref": "TI-001", "revision": "r4", "currentness": "current" }
       ],
       "retired_candidates": {
         "E2E-CAND-002": "currentな既存E2Eと重複するためretire"
       },
-      "change_reason": "既存E2Eとの重複を確認"
+      "candidate_decisions": {
+        "E2E-CAND-001": {
+          "decision": "not_selected",
+          "rationale": "SPEC-001 r9では既存E2Eによる確認が優先されると判断した"
+        }
+      },
+      "change_reason": "SPEC改版で価値を再評価し既存E2Eとの重複を確認",
+      "revision_digest": "sha256:2c4f32c1d43597555d54b344429a852fab93d87c497475b72a04599ada483c9c"
     }
   ]
 }
