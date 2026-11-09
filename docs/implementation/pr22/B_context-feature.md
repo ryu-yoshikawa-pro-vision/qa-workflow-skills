@@ -141,3 +141,9 @@
 - `feature_registry`：実際に変更されたartifactのrevision使回しを拒否し、split/mergedの履歴要件を確認する。handoffにcanonical snapshot SHA-256と取得source別状態・revision・未取得範囲を追加する。これらはproviderによる保存履歴・readbackの代替ではない。
 - `git_source_inventory`：Gitの大量出力を一時ファイルへ退避してから容量を判定し、巨大repoの出力によるプロセスメモリ消費を抑える。既存のGit差分と改名判定は維持する。
 - 上記の負例を担当unitへ追加。最新HEADのCI結果は実行後に確認し、未完了は未検証と記載する。
+
+## 差分母集団の照合追加（2026-11-09）
+
+- `reconcile_git_coverage.py`を追加。実際に列挙したGit差分の各変更pathと、feature inventoryに登録された差分locatorを照合し、漏れたpath／根拠のない差分IDを`incomplete`にする。旧HEAD／取得不完全は成功へ変換しない。
+- `test_git_change_coverage.py`は一時GitリポジトリでbaseとHEADの変更2件を作り、台帳に1件しか登録していない場合の漏れ、2件分類したときの整合、未分類・旧revision・存在しないpathの負例を検証する。
+- この照合はコードの変更path単位であり、意味上の全製品機能・全差分hunk・外部資料の列挙を保証しない。製品CI接続はA・PR #22に引き継ぐ。

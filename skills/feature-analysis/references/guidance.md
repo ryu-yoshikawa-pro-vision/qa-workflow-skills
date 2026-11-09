@@ -13,3 +13,5 @@
 ## Git情報源の取得
 
 `scripts/git_source_inventory.py`に許可されたcheckout rootをrepository_root・authorized_rootとして同一の正本pathで渡し、base_sha／head_shaは完全なcommit SHAで指定します。初回はbase_sha=nullです。Gitファイル一覧とrename/moveのbefore/after pathを証拠として受取り、各ファイルを自動的に別機能と数えません。Gitの出力が大きすぎる・権限不足・HEAD不一致ならcompleteとせず再取得します。Git以外のIssue／仕様・設計情報源は権限のある提供経路で列挙し、未接続ならpartial／unavailableを保持します。
+
+Git code sourceを取得した場合は、`git_source_inventory.py`のbase→head一覧と`reconcile_git_coverage.py`による変更path照合を記録します。機能対応率だけでGit差分の全件登録を推定しません。変更ファイル内の複数振る舞いや外部資料差分の分類は別途確認します。
