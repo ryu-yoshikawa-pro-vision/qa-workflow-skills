@@ -404,6 +404,13 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - A共有`ci_handoff`のnesting負例は期待するJSON depth errorと実際のtop-level object errorが異なる。担当外なので未変更、Aへ再現条件を引継ぎ。
 - 以上以外、今回追加レビュー対象のtest-analysis、test-requirement-design、test-case-design、既存CI coverage graphとの局所契約不一致は確認していない。
 
+## push試行・remote確認（2026-11-10）
+
+- 実装commitは`9c663401c932b803651cc4fbddc33a69c8611a75`、その時点のPlan記録commitは`ae4a45529c64594737a19cc35ba86d54cffed144`。指定の`HEAD:refs/heads/...`形式はrepository PreToolUse Hookが宛先を現在branchとして認識できず拒否した。Safety harness文書に沿う同一宛先の`HEAD:feat/pr22-e-formal-design-e2e-selection`形式で通常pushを試したが、GitHub HTTPSがusernameを取得できず`could not read Username ... No such device or address`で失敗した。force、別credential経路、ref更新APIは使っていない。
+- push後に予定していた`git status -sb`／`git ls-remote`での一致確認はできていない。read-only GitHub PR metadataではPR #27はopen／Draft、base `feat/development-qa-traceability`、remote headは引き続き`54e54262768ed256aacdc811875e4a02b7d08fd7`だった。したがってlocalの2 commitは未pushで、local／remote HEADは不一致。PR本文は未変更。
+- GitHub Actionsはremote head `54e54262768ed256aacdc811875e4a02b7d08fd7`に対する結果のみ確認した。Code Quality run 848、Validate Deterministic Output Evals run 2153、Validate Semantic Output Evals run 2118、Codex Harness run 848はsuccess。Validate Agent Skills run 2155は`validate` jobの`Validate repository eval structure` stepでfailure。原因は共有`README.md`に`e2e-test-selection`登録がないことで、owner A。これらはlocal未push commitsの検証ではない。
+- local再開条件：通常のGitHub HTTPS認証がこの実行環境から利用可能になった後、先に`git fetch origin`と`git status -sb`でremote先行を再確認し、remoteがlocal履歴のancestorの場合だけ指定branchへ通常pushする。remoteが進んでいた場合はpushを停止し、force／無断rebaseをせず調整する。認証情報の表示・コピー・別経路利用はしない。
+
 ## 進捗保存（2026-11-10）
 
 - 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。
