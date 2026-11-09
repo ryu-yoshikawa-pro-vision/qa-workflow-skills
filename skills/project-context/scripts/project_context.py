@@ -651,7 +651,9 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
     safe: dict[str, str] = {}
     for key in required:
         value = _single_line(policy[key], key)
-        if any(mark in value for mark in ("|", ";", "=", "<!--", "-->")):
+        if value != value.strip():
+            raise Invalid(f"placement_field_whitespace:{key}")
+        if any(mark in value for mark in ("|", ";", "<!--", "-->")):
             raise Invalid(f"unsafe_placement_field:{key}")
         safe[key] = value
     if safe["scope"] != _project_name(markdown):
@@ -662,7 +664,14 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
     if recorded is not None:
         if not isinstance(existing, dict) or set(existing) != set(recorded):
             raise Invalid("existing_placement_policy_unconfirmed")
-        if existing != recorded:
+        if existing != recorded and (
+            recorded["approval_revision"] is not None
+            or any(
+                existing[key] != value
+                for key, value in recorded.items()
+                if key != "approval_revision"
+            )
+        ):
             raise Invalid("existing_placement_policy_not_saved")
         if all(recorded.get(key) == safe[key] for key in required):
             return {
