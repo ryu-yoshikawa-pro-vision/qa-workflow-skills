@@ -61,6 +61,29 @@ class ActualRunnerTests(unittest.TestCase):
             },
         }
 
+    def attach_direct_tc_authority(self, plan: dict) -> None:
+        """Commit the accepted complete TC expected observations in source HEAD."""
+        authority = self.repo / "tests" / "direct-authority.json"
+        authority.parent.mkdir(exist_ok=True)
+        authority.write_text(
+            json.dumps(
+                {
+                    "tc_ref": plan["tc_ref"],
+                    "tc_revision": plan["tc_revision"],
+                    "expected_authority_ref": plan["expected_authority_ref"],
+                    "direct_expectations": plan["direct_expectations"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        git(self.repo, "add", "tests/direct-authority.json")
+        git(self.repo, "commit", "-qm", "fixture direct TC expected outcomes")
+        self.sha = git(self.repo, "rev-parse", "HEAD")
+        plan["repo_revision"] = self.sha
+        plan["preflight"]["source_revision"] = self.sha
+        plan["preflight"]["build_revision"] = self.sha
+        plan["direct_tc_authority_file"] = "tests/direct-authority.json"
+
     def call(self, plan: dict) -> tuple[int, dict, dict | None]:
         plan_file = Path(self.space.name) / "plan.json"
         plan_file.write_text(json.dumps(plan), encoding="utf-8")
@@ -597,6 +620,7 @@ class ActualRunnerTests(unittest.TestCase):
             {"id": "exit_code", "expected": 0},
             {"id": "stdout_json", "expected": {"ok": True}},
         ]
+        self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "observed_FAIL")
@@ -633,6 +657,7 @@ class ActualRunnerTests(unittest.TestCase):
         plan["direct_expectations"] = [
             {"id": "stdout_json", "expected": {"status": 200, "body": {"ok": True}}}
         ]
+        self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["tc_verdict"], "FAIL")
@@ -649,6 +674,7 @@ class ActualRunnerTests(unittest.TestCase):
             {"id": "stdout_json", "expected": {"ok": True}},
             {"id": "db_change", "expected": "unchanged"},
         ]
+        self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["tc_verdict"], "判定不能")
@@ -778,6 +804,53 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "incomplete")
+
+    def test_direct_tc_requires_full_pinned_expectation_set(self):
+        plan = self.plan([sys.executable, "-c", "print('{\\\"ok\\\": true}')"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-complete"
+        plan["tc_revision"] = "accepted-revision"
+        plan["expected_authority_ref"] = "accepted:reference"
+        plan["direct_expectations"] = [
+            {"id": "exit_code", "expected": 0},
+            {"id": "stdout_json", "expected": {"ok": True}},
+        ]
+        self.attach_direct_tc_authority(plan)
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertEqual(artifact["tc_verdict"], "PASS")
+        self.assertEqual(artifact["outcome"], "runner_pass")
+        source = artifact["direct_tc_authority_evidence"]
+        self.assertEqual(source["authority_repo_revision"], self.sha)
+        self.assertEqual(source["authority_review_status"], "not_authenticated_by_runner")
+
+        # Omitting even one actual expectation must stop before launching.
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(
+            summary["reason"], "direct_tc_expectations_incomplete_or_mismatched"
+        )
+        self.assertIsNone(artifact)
+
+    def test_direct_tc_rejects_untracked_authority_and_mismatched_revision(self):
+        plan = self.plan([sys.executable, "-c", "pass"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-1"
+        plan["tc_revision"] = "v1"
+        plan["expected_authority_ref"] = "accepted:spec"
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
+        plan["direct_tc_authority_file"] = "tests/not-committed.json"
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "direct_tc_authority_not_tracked")
+        self.assertIsNone(artifact)
+        self.attach_direct_tc_authority(plan)
+        plan["tc_revision"] = "v2"
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "direct_tc_authority_identity_mismatch")
+        self.assertIsNone(artifact)
 
     def test_direct_tc_without_authority_is_refused(self):
         plan = self.plan([sys.executable, "-c", "print('ok')"])
