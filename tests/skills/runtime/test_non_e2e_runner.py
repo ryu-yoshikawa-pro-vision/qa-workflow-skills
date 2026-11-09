@@ -225,6 +225,10 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-fixture"
+        plan["tc_revision"] = "r1"
+        plan["expected_authority_ref"] = "fixture:authority"
         plan["direct_expectations"] = [
             {"id": "exit_code", "expected": 0},
             {"id": "stdout_json", "expected": {"ok": True}},
@@ -259,6 +263,9 @@ class ActualRunnerTests(unittest.TestCase):
         )
         plan = self.plan([sys.executable, "-c", script])
         plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-fixture"
+        plan["tc_revision"] = "r1"
+        plan["expected_authority_ref"] = "fixture:authority"
         plan["direct_expectations"] = [
             {"id": "stdout_json", "expected": {"status": 200, "body": {"ok": True}}}
         ]
@@ -270,6 +277,10 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_direct_missing_side_effect_observation_is_unknown(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": true}')"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-fixture"
+        plan["tc_revision"] = "r1"
+        plan["expected_authority_ref"] = "fixture:authority"
         plan["direct_expectations"] = [
             {"id": "stdout_json", "expected": {"ok": True}},
             {"id": "db_change", "expected": "unchanged"},
@@ -382,6 +393,7 @@ class ActualRunnerTests(unittest.TestCase):
             "rules_ref": "fixture-rule",
             "config_ref": "fixture-config",
             "expected_paths": ["README.md"],
+            "accepted_exit_codes": [0, 1],
         }
         raw = {
             "findings_count": 0,
@@ -402,6 +414,44 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "incomplete")
+
+    def test_direct_tc_without_authority_is_refused(self):
+        plan = self.plan([sys.executable, "-c", "print('ok')"])
+        plan["direct_tc"] = True
+        plan["direct_expectations"] = [{"id": "stdout_text", "expected": "ok"}]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "tc_ref_required_for_direct_tc")
+        self.assertIsNone(artifact)
+
+    def test_static_unapproved_exit_is_incomplete(self):
+        plan = self.plan([sys.executable, "-c", "print('ok')"], kind="static")
+        plan["static_analysis"] = {
+            "tool_ref": "fixture",
+            "tool_version": "0.1",
+            "rules_ref": "fixture-rule",
+            "config_ref": "fixture-config",
+            "expected_paths": ["README.md"],
+            "accepted_exit_codes": [0, 1],
+        }
+        report = {
+            "findings_count": 0,
+            "analyzed_paths": ["README.md"],
+            "skipped_paths": [],
+            "tool_version": "0.1",
+            "rules_ref": "fixture-rule",
+            "config_ref": "fixture-config",
+        }
+        plan["argv"] = [
+            sys.executable,
+            "-c",
+            "print(" + repr(json.dumps(report)) + ");raise SystemExit(2)",
+        ]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+        self.assertFalse(artifact["attempts"][0]["static_analysis"]["complete"])
 
     def test_preflight_flags_must_be_explicit(self):
         plan = self.plan([sys.executable, "-c", "print('ok')"])
