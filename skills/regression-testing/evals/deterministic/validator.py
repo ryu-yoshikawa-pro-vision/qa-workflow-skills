@@ -111,16 +111,39 @@ def _auxiliary_run_issues(doc: dict[str, Any]) -> list[str]:
         basis = entry.get("selection_basis")
         if (
             type(required) is not bool
-            or entry.get("executor_owner") not in AUXILIARY_OWNERS
+            or not _in(entry.get("executor_owner"), AUXILIARY_OWNERS)
             or not _text(entry.get("implementation_revision"))
-            or basis not in AUXILIARY_BASES
-            or required is not (basis in AUXILIARY_REQUIRED_BASES)
+            or not _in(basis, AUXILIARY_BASES)
+            or required is not _in(basis, AUXILIARY_REQUIRED_BASES)
         ):
             issues.append(f"invalid_auxiliary_obligation:{ref}")
     ref_set = {ref for ref in refs if _text(ref)}
     if v2 and (ref_set != seen or len(ref_set) != len(refs)):
         issues.append("auxiliary_refs_routes_mismatch")
     return issues
+
+
+def _auxiliary_count_issues(doc: dict[str, Any], *, v2: bool) -> list[str]:
+    """`auxiliary_testware_count`は型を厳密に確認し、実際の補助数と照合する。
+
+    boolや小数・文字列・負数を件数へ変換しない。refs一覧を宣言していれば
+    その長さと、v2 Runでは`auxiliary_routes`の件数とも一致しなければならない。
+    """
+    count = doc.get("auxiliary_testware_count")
+    if type(count) is not int or count < 0:
+        return ["invalid_auxiliary_testware_count"]
+    actual: list[int] = []
+    refs = doc.get("auxiliary_testware_refs", [])
+    if isinstance(refs, list):
+        actual.append(len(refs))
+    entries = doc.get("auxiliary_routes", [])
+    if v2 and isinstance(entries, list):
+        actual.append(len(entries))
+    return (
+        ["auxiliary_testware_count_mismatch"]
+        if any(count != value for value in actual)
+        else []
+    )
 
 
 def _ref_set(value: Any) -> set[str] | None:
@@ -143,6 +166,7 @@ _ROUTE_IDENTITY = (
     "route_type",
     "execution_ref",
     "implementation_revision",
+    "e2e_testware_ref",
     "testware_ref",
     "executor_owner",
     "selection_basis",
@@ -188,7 +212,7 @@ def _required_route_issues(routes: Any) -> list[str]:
             issues.append(f"invalid_required_route_type:{tc_ref}")
         if not _text(tc_ref) or not _text(route_ref):
             issues.append("missing_tc_or_route_ref")
-        if kind == "e2e" and not route.get("e2e_testware_ref"):
+        if kind == "e2e" and not _text(route.get("e2e_testware_ref")):
             issues.append(f"missing_e2e_testware_ref:{tc_ref}")
         if kind == "testware" and (
             not _text(route.get("testware_ref"))
@@ -224,6 +248,12 @@ def _run_contract_issues(run: dict[str, Any]) -> list[str]:
             for index, ref in enumerate(refs)
             if not _text(ref)
         ]
+    if run.get("route_contract_version") == ROUTE_CONTRACT_VERSION:
+        # refs一覧を宣言していないv2 Runでは、auxiliary_routesの件数とだけ照合する。
+        declared = "auxiliary_testware_refs" in run
+        issues += _auxiliary_count_issues(
+            run if declared else {**run, "auxiliary_testware_refs": None}, v2=True
+        )
     return issues
 
 
@@ -480,7 +510,7 @@ def validate(
     kind = doc.get("artifact_type")
     result.add(
         "REG-D002",
-        kind in {"baseline", "run", "activity"},
+        _in(kind, {"baseline", "run", "activity"}),
         "artifact typeがbaseline / run / activityのいずれかであること",
         evidence=kind,
     )
@@ -563,7 +593,7 @@ def validate(
         )
         valid_decisions = {"member", "one_off", "out_of_scope", "unresolved"}
         decisions_valid = membership_shape_valid and all(
-            item.get("decision") in valid_decisions
+            _in(item.get("decision"), valid_decisions)
             for item in memberships
             if isinstance(item, dict)
         )
@@ -746,11 +776,12 @@ def validate(
             evidence=route_issues or None,
         )
         auxiliary_issues = _auxiliary_run_issues(doc)
+        auxiliary_issues += _auxiliary_count_issues(
+            doc, v2=doc.get("route_contract_version") == ROUTE_CONTRACT_VERSION
+        )
         result.add(
             "REG-D009",
-            not auxiliary_issues
-            and doc.get("auxiliary_testware_count")
-            == len(doc.get("auxiliary_testware_refs", [])),
+            not auxiliary_issues,
             "TCなし補助testwareをTC countから分離し、今回Runの実施義務と選定根拠を保持すること",
             evidence=auxiliary_issues or None,
         )
@@ -820,6 +851,12 @@ def validate(
                         "issue": "source_result_finalization_not_projected",
                     }
                 )
+            if v2 and route.get("route_type") == "e2e":
+                # E2E routeは実行対象のtestware参照をRunから保持する。
+                if not _text(route.get("e2e_testware_ref")):
+                    source_mismatches.append(
+                        {"tc_ref": tc_ref, "issue": "e2e_testware_ref_missing"}
+                    )
             if v2 and is_testware:
                 # testware routeはRunの選定情報（testware・owner・選定根拠）を保持する。
                 if (

@@ -324,7 +324,7 @@
 - `REG-D006` full Runにcompleteかつcurrentなbaselineを要求
 - `REG-D007` selected RunをSuite memberのsubsetとしSuite完了と区別
 - `REG-D008` required routeをmanual・concrete E2E testware ref・実行owner / 実装revision / 選択条件付き非E2E testwareで表現し、未知のroute種別・識別子欠落・不正な`execution_ref`・重複routeを拒否する
-- `REG-D009` TCなし補助testwareとTC countの分離、補助entryの実施義務（`completion_required`・選定根拠・実行owner・実装revision）と旧形式の区別
+- `REG-D009` TCなし補助testwareとTC countの分離、補助entryの実施義務（`completion_required`・選定根拠・実行owner・実装revision。不正型は例外にせず失敗）、`auxiliary_testware_count`の型・件数照合と旧形式の区別
 - `REG-D010` source actual start / resultを投影し、全required route開始後にlogical TCをexecuted化
 - `REG-D011` TC routeと実施義務のある補助routeについて、source由来の実開始・result確定・raw結果投影・cleanup・義務不明なしを独立再計算し、満たさない場合にActivityを完了とせず、申告された`activity_state`をsourceから再計算した状態と照合する（旧Activityは従来規則）
 - `REG-D012` completed Activityのimmutable性
@@ -333,7 +333,7 @@
 - `REG-D015` TCなし補助testwareを別枠に保ちTC ref / countへ混在させず、補助結果の取得完全性（attempt・raw・cleanup・実装revision）をsourceと照合する
 - `REG-D016` Baselineのscope / source revisions・membership provenance / member・one_off projectionがcurrentness / Run planning用に一致すること
 - `REG-D017` Baselineがtemplateのschema / identity / list fieldとcomplete時の未解決refなしを満たす
-- `REG-D018` v2 Activityのrouteと実施義務を保存済みRun（`run`引数または`expected.json`の`run`）と照合する。Run自体の妥当性、TC付きtestwareの選定情報（`testware_ref`・`executor_owner`・`selection_basis`）、Runからsourceで再計算した`activity_state`も照合し、不正な補助refは例外にせず失敗とする。Runが無い経路では完了の主張を拒否し、それ以外は警告にとどめる。旧形式のActivityは対象外
+- `REG-D018` v2 Activityのrouteと実施義務を保存済みRun（`run`引数または`expected.json`の`run`）と照合する。Run自体の妥当性、TC付きtestwareの選定情報（`testware_ref`・`executor_owner`・`selection_basis`）、E2E routeの`e2e_testware_ref`、`auxiliary_testware_count`、Runからsourceで再計算した`activity_state`も照合し、不正な補助refは例外にせず失敗とする。Runが無い経路では完了の主張を拒否し、それ以外は警告にとどめる。旧形式のActivityは対象外
 
 ## exploratory-testing
 

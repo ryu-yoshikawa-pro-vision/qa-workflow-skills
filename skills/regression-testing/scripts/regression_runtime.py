@@ -767,7 +767,7 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
             issues.append(f"invalid_required_route_type:{tc_ref}")
         if not _text(tc_ref) or not _text(route_ref):
             issues.append("missing_tc_or_route_ref")
-        if kind == "e2e" and not route.get("e2e_testware_ref"):
+        if kind == "e2e" and not _text(route.get("e2e_testware_ref")):
             issues.append(f"missing_e2e_testware_ref:{tc_ref}")
         if kind == "testware":
             if not _text(route.get("testware_ref")):
@@ -1005,6 +1005,18 @@ def _run_contract_issues(run: Any) -> list[str]:
             for index, ref in enumerate(refs)
             if not _text(ref)
         ]
+        # v2 Runの件数は型を厳密に確認し、補助routeの件数（refs宣言時はその件数）と一致させる。
+        count = run.get("auxiliary_testware_count")
+        if run.get("route_contract_version") == ROUTE_CONTRACT_VERSION and isinstance(
+            entries, list
+        ):
+            actual = [len(entries)]
+            if isinstance(refs, list) and "auxiliary_testware_refs" in run:
+                actual.append(len(refs))
+            if type(count) is not int or count < 0:
+                issues.append("invalid_auxiliary_testware_count")
+            elif any(count != value for value in actual):
+                issues.append("auxiliary_testware_count_mismatch")
         # refsを宣言したv2 Runは、補助routeの集合と一致しなければならない（宣言が無い場合は検査しない）。
         if (
             run.get("route_contract_version") == ROUTE_CONTRACT_VERSION
@@ -1110,6 +1122,9 @@ def project_activity(
             "blocked": not actual_start
             and (source.get("blocked") is True or (started and not revision_ok)),
         }
+        if route.get("route_type") == "e2e":
+            # 実行対象のE2E testware参照もRun照合できるよう投影する。
+            item["e2e_testware_ref"] = route.get("e2e_testware_ref")
         if is_testware:
             # Runの選定情報（testware・owner・選定根拠）もRun照合できるよう投影する。
             for field in ("testware_ref", "executor_owner", "selection_basis"):
