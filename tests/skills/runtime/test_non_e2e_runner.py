@@ -531,6 +531,20 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, evidence = self.call(plan)
         self.assertEqual(code, 0)
         self.assertTrue(evidence["collection_verified"])
+        for extra in (
+            ["--project=browser"],
+            ["--project", "browser"],
+            ["--project=*"],
+            ["--project", "node*"],
+            ["--project"],
+        ):
+            case = dict(plan)
+            case["argv"] = [*plan["argv"], *extra]
+            case["reviewed_argv"] = case["argv"]
+            code, summary, evidence = self.call(case)
+            self.assertEqual(code, 2)
+            self.assertEqual(summary["reason"], "vitest_project_filter_unverified")
+            self.assertIsNone(evidence)
         plan["selected"].append({**plan["selected"][0], "project_name": "browser"})
         code, summary, evidence = self.call(plan)
         self.assertEqual(code, 2)

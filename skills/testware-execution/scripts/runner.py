@@ -489,15 +489,17 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 if len(named) != 1 or None in named:
                     raise RunnerError("vitest_multi_project_requires_separate_runs")
                 project_name = next(iter(named))
-                if not any(
-                    (
-                        arg == "--project"
-                        and index + 1 < len(command)
-                        and command[index + 1] == project_name
-                    )
-                    or arg == "--project=" + project_name
-                    for index, arg in enumerate(command)
-                ):
+                declared_projects = []
+                for index, arg in enumerate(command):
+                    if arg == "--project":
+                        declared_projects.append(
+                            command[index + 1] if index + 1 < len(command) else None
+                        )
+                    elif arg.startswith("--project="):
+                        declared_projects.append(arg.removeprefix("--project="))
+                # Vitest accepts repeated project selectors and globs; merely
+                # finding one matching argument does NOT prove a single project.
+                if declared_projects != [project_name]:
                     raise RunnerError("vitest_project_filter_unverified")
         for field in (
             "testware_ref",
