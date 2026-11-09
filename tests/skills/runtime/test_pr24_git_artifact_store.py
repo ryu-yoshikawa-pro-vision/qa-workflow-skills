@@ -388,9 +388,7 @@ class GitArtifactStoreTests(unittest.TestCase):
             git_inventory_requests=evidence,
         )
         self.assertEqual(result["status"], "blocked", result)
-        self.assertIn(
-            "change_source_revision_mismatch:DIF-001", result["reasons"]
-        )
+        self.assertIn("change_source_revision_mismatch:DIF-001", result["reasons"])
 
     def test_code_save_requires_complete_submodule_inventory(self) -> None:
         request, evidence = self._code_registry()
