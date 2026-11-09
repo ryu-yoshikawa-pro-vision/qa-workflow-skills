@@ -23,11 +23,11 @@ from contract import (
     ContractError,
     compare_direct,
     compare_metrics,
+    diagnosis,
     preflight,
-    reconcile_vitest,
     reconcile_case_report,
     reconcile_playwright,
-    diagnosis,
+    reconcile_vitest,
 )
 
 KINDS = {
