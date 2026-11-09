@@ -264,3 +264,9 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `tests/component/cart-page.test.tsx`の「keeps the cart visible while surfacing a mutation failure」は`updateQuantity`が呼ばれたこととエラー表示を確認する一方、要求した数量`2`、対象itemや期待versionが正しく渡されたことはassertionしていない。このテスト単独では引数の取り違えを検知できないため、対象TC・既存別テストでの検証有無を製品testwareのownerが確認する。
 - 既存仕様`docs/spec/features/storefront.md`で価格・会員ランクの表示は確認できたが、数値の割引率・閾値を採用するAuthorityはこの参照範囲から確定できなかった。製品実装の定数だけを独立oracleとしない。
 - いずれも「テスト観点／品質上の未検証候補」であり、SUTの製品欠陥や既存testwareの修正をこのPRで確定しない。Gでの確認結果をH/Jと製品testware ownerへ引き継ぎ、元runの判定を変更しない。
+
+## Vitest reporter構造の追加負例（2026-11-09）
+
+- `contract._test_key()`は先頭の空root名を`while`で無制限に除いていた。Vitest 4の既知の公式形式で許容する先頭空rootは1つだけなので、2つ以上の空rootを持つreporterは拒否する。
+- `reconcile_vitest()`はfile suiteが`skipped`／`pending`／`todo`と報告する一方、個別assertionに`passed`／`failed`が含まれる矛盾を検出していなかった。取得完全と誤認しないよう、suite statusとの照合を追加した。
+- `test_non_e2e_contract.py`に、重複した先頭空rootと、suite `skipped`＋assertion `passed`の負例を追加。これらは独立の構造テストであり、固定`qa-training-store`実runnerでの受入を済ませた証拠ではない。

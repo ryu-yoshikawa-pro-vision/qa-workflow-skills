@@ -128,7 +128,7 @@ def _test_key(path: Any, title_path: Any) -> tuple[str, tuple[str, ...]]:
     # structural, not a user-defined suite title. Do not accept empty names
     # elsewhere: those would make distinct test identities ambiguous.
     titles = list(title_path)
-    while titles and titles[0] == "":
+    if titles and titles[0] == "":
         titles.pop(0)
     if not titles:
         raise ContractError("invalid_title_path")
@@ -200,8 +200,13 @@ def reconcile_vitest(
         ]
         if status == "failed" and not file["assertionResults"]:
             failed_suites_without_tests.append(path)
-        if (status == "failed" and "failed" not in case_statuses) or (
-            status == "passed" and "failed" in case_statuses
+        if (
+            (status == "failed" and "failed" not in case_statuses)
+            or (status == "passed" and "failed" in case_statuses)
+            or (
+                status in {"pending", "todo", "skipped"}
+                and any(s in {"passed", "failed"} for s in case_statuses)
+            )
         ):
             inconsistent_suites.append(path)
         for case in file["assertionResults"]:

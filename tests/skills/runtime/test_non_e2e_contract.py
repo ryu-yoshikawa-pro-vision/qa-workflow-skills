@@ -176,6 +176,25 @@ class VitestTests(unittest.TestCase):
                 raw_ref="raw",
                 selection_verified=True,
             )
+        # Official Vitest 4 has one structural empty root, not several.
+        report["testResults"][0]["assertionResults"][0]["ancestorTitles"] = [
+            "",
+            "",
+            "first test file",
+        ]
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_vitest(
+                selected=[
+                    {
+                        "path": "tests/official.test.ts",
+                        "title_path": ["first test file", "2 + 2 should equal 4"],
+                    }
+                ],
+                report=report,
+                source_revision="fixed",
+                raw_ref="raw",
+                selection_verified=True,
+            )
 
     def test_duplicates_are_not_implicitly_matched(self):
         case = {"ancestorTitles": ["s"], "title": "a", "status": "passed"}
@@ -257,6 +276,40 @@ class VitestTests(unittest.TestCase):
                 source_revision="fixed-sha",
                 raw_ref="raw",
             )
+
+    def test_skipped_suite_with_executed_assertion_is_incomplete(self):
+        report = {
+            "success": True,
+            "numTotalTests": 1,
+            "numPassedTests": 1,
+            "numFailedTests": 0,
+            "numPendingTests": 0,
+            "numTodoTests": 0,
+            "testResults": [
+                {
+                    "name": "tests/skipped.test.ts",
+                    "status": "skipped",
+                    "assertionResults": [
+                        {
+                            "ancestorTitles": ["group"],
+                            "title": "really ran",
+                            "status": "passed",
+                        }
+                    ],
+                }
+            ],
+        }
+        actual = contract.reconcile_vitest(
+            selected=[
+                {"path": "tests/skipped.test.ts", "title_path": ["group", "really ran"]}
+            ],
+            report=report,
+            source_revision="pinned",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertEqual(actual["inconsistent_suites"], ["tests/skipped.test.ts"])
+        self.assertFalse(actual["collection_complete"])
 
     def test_suite_failure_with_passing_assertions_is_not_complete(self):
         report = {
