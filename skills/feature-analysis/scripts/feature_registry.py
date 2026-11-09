@@ -186,15 +186,31 @@ def _candidates(
     return candidates, issues
 
 
+def _superseded_ids(row: dict[str, Any]) -> list[str]:
+    """Return explicit, mutually exclusive supersession references."""
+    one = row.get("supersedes_id")
+    many = row.get("supersedes_ids")
+    if one is not None and many is not None:
+        raise ContractError("change_supersession_schema_ambiguous")
+    if many is not None:
+        ids = _refs(many, "supersedes_ids", required=True)
+        if len(ids) < 2:
+            raise ContractError("change_supersession_group_too_small")
+        return ids
+    return [_text(one, "supersedes_id")] if one is not None else []
+
+
 def _changes(
-    snapshot: dict[str, Any], sources: dict, features: dict
+    snapshot: dict[str, Any],
+    sources: dict,
+    features: dict,
+    previous: dict | None,
 ) -> tuple[dict, list[str]]:
     changes = _rows(snapshot.get("changes"), "changes", "DIF")
+    old = _rows(previous.get("changes"), "previous_changes", "DIF") if previous else {}
     issues: list[str] = []
     superseded = {
-        row.get("supersedes_id")
-        for row in changes.values()
-        if row.get("supersedes_id") is not None
+        parent for row in changes.values() for parent in _superseded_ids(row)
     }
     for did, row in changes.items():
         if row.get("source_id") not in sources:
@@ -226,7 +242,11 @@ def _changes(
             row["locator"],
         )
         if identity in seen:
-            raise ContractError(f"duplicate_active_change:{seen[identity]}:{did}")
+            previous_id = seen[identity]
+            if did in old and previous_id in old and old[did] == row and old[previous_id] == changes[previous_id]:
+                issues.append(f"legacy_duplicate_active_change:{previous_id}:{did}")
+                continue
+            raise ContractError(f"duplicate_active_change:{previous_id}:{did}")
         seen[identity] = did
     return changes, issues
 
@@ -258,9 +278,7 @@ def _current_changes(
 ) -> dict[str, dict[str, Any]]:
     """Scope current QA impact to this event, preserving append-only history."""
     superseded = {
-        row["supersedes_id"]
-        for row in changes.values()
-        if row.get("supersedes_id") is not None
+        parent for row in changes.values() for parent in _superseded_ids(row)
     }
     previous_ids = (
         set(_rows(previous.get("changes"), "previous_changes", "DIF"))
@@ -273,7 +291,7 @@ def _current_changes(
             continue
         # A correction of a saved DIF is not a new Git change. Only a
         # same-revision analysis update can include it in current QA impact.
-        if row.get("supersedes_id") is not None and (
+        if _superseded_ids(row) and (
             snapshot["event"] != "analysis_update"
             or row["after_revision"] != sources[row["source_id"]]["revision"]
         ):
@@ -308,7 +326,7 @@ def _change_revisions(
     basis = snapshot.get("event_basis") or {}
     primary = _primary_code_source_id(snapshot)
     for did, row in changes.items():
-        if did in prior or row.get("supersedes_id") is not None:
+        if did in prior or _superseded_ids(row):
             continue
         source = sources[row["source_id"]]
         if source["status"] != "complete":
@@ -363,7 +381,7 @@ def _history(
         if event["kind"] == "merged" and (len(from_ids) < 2 or not to_ids):
             raise ContractError("merge_requires_multiple_ancestors")
     if previous is None:
-        if any(row.get("supersedes_id") for row in snapshot["changes"]):
+        if any(_superseded_ids(row) for row in snapshot["changes"]):
             raise ContractError("change_supersession_without_predecessor")
         if snapshot.get("previous_artifact_revision") is not None:
             raise ContractError("unexpected_previous_artifact_revision")
@@ -416,32 +434,37 @@ def _history(
     for did in old_changes.keys() & new_changes.keys():
         if old_changes[did] != new_changes[did]:
             raise ContractError(f"change_history_rewritten:{did}")
-    replaced: set[str] = {
-        row["supersedes_id"]
-        for row in old_changes.values()
-        if row.get("supersedes_id") is not None
+    replaced = {
+        parent for row in old_changes.values() for parent in _superseded_ids(row)
     }
     for did in new_changes.keys() - old_changes.keys():
         row = new_changes[did]
-        parent = row.get("supersedes_id")
-        if parent is None:
+        parents = _superseded_ids(row)
+        if not parents:
             continue
-        if parent not in old_changes or parent in replaced:
+        if any(parent not in old_changes or parent in replaced for parent in parents):
             raise ContractError(f"change_supersession_invalid:{did}")
-        prior = old_changes[parent]
         fields = ("source_id", "before_revision", "after_revision", "locator")
-        if any(row.get(key) != prior.get(key) for key in fields):
-            raise ContractError(f"change_supersession_target_mismatch:{did}")
-        if row.get("classification") == prior.get("classification") or row.get(
-            "classification"
-        ) not in {"impact", "no_impact", "out_of_scope"}:
+        for parent in parents:
+            prior = old_changes[parent]
+            if any(row.get(key) != prior.get(key) for key in fields):
+                raise ContractError(f"change_supersession_target_mismatch:{did}")
+            if row.get("evidence_ref") == prior.get("evidence_ref"):
+                raise ContractError(f"change_supersession_evidence_not_new:{did}")
+        if len(parents) > 1:
+            identity = tuple(row[key] for key in fields)
+            old_matching = {
+                oid for oid, old_row in old_changes.items()
+                if oid not in replaced and tuple(old_row.get(key) for key in fields) == identity
+            }
+            if set(parents) != old_matching:
+                raise ContractError(f"change_supersession_group_incomplete:{did}")
+        if row.get("classification") not in {"impact", "no_impact", "out_of_scope"}:
             raise ContractError(f"change_supersession_classification_invalid:{did}")
-        if row.get("evidence_ref") == prior.get("evidence_ref"):
-            raise ContractError(f"change_supersession_evidence_not_new:{did}")
         _text(row.get("approval_ref"), f"{did}_approval_ref")
         _text(row.get("approval_revision"), f"{did}_approval_revision")
         _text(row.get("reason"), f"{did}_change_reason")
-        replaced.add(parent)
+        replaced.update(parents)
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:
@@ -541,6 +564,13 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             or previous.get("source_revision") != snapshot["source_revision"]
         ):
             raise ContractError("analysis_update_source_revision_changed")
+        old_sources = _rows(previous["sources"], "previous_sources", "SRC")
+        new_sources = _rows(snapshot["sources"], "sources", "SRC")
+        if set(old_sources) != set(new_sources) or any(
+            old_sources[sid].get("revision") != new_sources[sid].get("revision")
+            for sid in old_sources
+        ):
+            raise ContractError("analysis_update_source_revisions_changed")
         return
     if event in {"pr_update", "rebase", "merge", "release"}:
         if previous is None:
@@ -558,7 +588,14 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             row.get("revision") == head for row in code_sources
         ):
             raise ContractError("event_code_source_revision_mismatch")
-        _primary_code_source_id(snapshot)
+        primary_id = _primary_code_source_id(snapshot)
+        if event in {"pr_update", "rebase", "merge"}:
+            old_sources = _rows(previous["sources"], "previous_sources", "SRC")
+            if (
+                primary_id not in old_sources
+                or old_sources[primary_id].get("revision") != basis["previous_head_sha"]
+            ):
+                raise ContractError("event_primary_previous_source_mismatch")
         if event == "rebase" and basis["base_sha"] == basis["previous_base_sha"]:
             raise ContractError("rebase_base_unchanged")
     else:
@@ -623,7 +660,7 @@ def analyze(request: Any) -> dict[str, Any]:
     issues.extend(more)
     candidates, more = _candidates(snapshot, sources, features)
     issues.extend(more)
-    changes, more = _changes(snapshot, sources, features)
+    changes, more = _changes(snapshot, sources, features, previous)
     issues.extend(more)
     issues.extend(_change_revisions(snapshot, previous, sources, changes))
     _history(snapshot, previous, features, idempotent=idempotent)
@@ -854,16 +891,17 @@ def _authorize_reclassifications(
     """Check each new classification override with the trusted approval owner."""
     prior = request.get("previous_snapshot")
     if prior is None:
-        if any(row.get("supersedes_id") for row in request["snapshot"]["changes"]):
+        if any(_superseded_ids(row) for row in request["snapshot"]["changes"]):
             raise ContractError("change_supersession_without_predecessor")
         return
     old = _rows(prior.get("changes"), "previous_changes", "DIF")
     snapshot = request["snapshot"]
     for row in snapshot["changes"]:
-        if row["id"] in old or not row.get("supersedes_id"):
+        if row["id"] in old or not _superseded_ids(row):
             continue
-        replaced = old[row["supersedes_id"]]
-        decision = {
+        for parent in _superseded_ids(row):
+            replaced = old[parent]
+            decision = {
             "operation": "reclassify",
             "kind": "feature-inventory",
             "project_ref": snapshot["project_ref"],
@@ -871,7 +909,7 @@ def _authorize_reclassifications(
             "expected_revision": expected_revision,
             "operation_id": snapshot["operation_id"],
             "change_id": row["id"],
-            "supersedes_id": row["supersedes_id"],
+            "supersedes_id": parent,
             "old_classification": replaced["classification"],
             "classification": row["classification"],
             "source_id": row["source_id"],
@@ -896,14 +934,14 @@ def _authorize_reclassifications(
             "approval_revision": row["approval_revision"],
             "reason": row["reason"],
         }
-        try:
-            verified = store.authorize(decision)
-        except Exception as exc:
-            raise ContractError("change_approval_provider_unavailable") from exc
-        if verified is not True:
-            raise ContractError(
-                f"change_reclassification_approval_unverified:{row['id']}"
-            )
+            try:
+                verified = store.authorize(decision)
+            except Exception as exc:
+                raise ContractError("change_approval_provider_unavailable") from exc
+            if verified is not True:
+                raise ContractError(
+                    f"change_reclassification_approval_unverified:{row['id']}"
+                )
 
 
 def persist_snapshot(
