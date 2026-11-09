@@ -31,9 +31,12 @@ skills/
 ├── project-context/
 ├── feature-analysis/
 ├── spec-analysis/
+├── ui-target-analysis/
 ├── question-analysis/
 ├── agent-answer-form/
 ├── test-analysis/
+├── test-item-analysis/
+├── test-condition-analysis/
 ├── test-requirement-design/
 ├── test-condition-design/
 ├── test-case-design/
@@ -46,6 +49,8 @@ skills/
 ├── e2e-test-reporting/
 ├── test-target-inspection/
 ├── test-execution/
+├── testware-implementation/
+├── testware-execution/
 ├── regression-testing/
 ├── exploratory-testing/
 ├── qa-knowledge/
@@ -68,10 +73,13 @@ skills/
 | `qa-workflow`                 | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了                                 |
 | `project-context`             | 案件Project Contextの既存正本の発見・差分更新候補、DEC/ASM ID・配置契約                    |
 | `feature-analysis`            | 製品機能の安定IDと階層、情報源母集団・Git差分分類・履歴の正本                                   |
-| `spec-analysis`               | 仕様分類 / 現在有効な仕様根拠                                                                  |
+| `spec-analysis`               | 期待仕様 / Authority / US / UC / Behavior / AC / UNKNOWN lifecycle                              |
+| `ui-target-analysis`          | UI構造・操作・状態・遷移、ui-target-v1 packageとhuman editing / history                         |
 | `question-analysis`           | 未解決事項分類 / 仮定 / 回答正規化                                                             |
 | `agent-answer-form`           | JSONからの回答用HTML生成・Markdown回答回収（分類・正規化はしない）                             |
 | `test-analysis`               | プロダクトリスク / 重点 / 深度                                                                 |
+| `test-item-analysis`          | テストアイテム候補の分析                                                                       |
+| `test-condition-analysis`     | テスト条件候補の分析                                                                           |
 | `test-requirement-design`     | テスト要求としての検証責務                                                                     |
 | `test-condition-design`       | テスト条件 / カバレッジ基準 / カバレッジ項目                                                   |
 | `test-case-design`            | 詳細テストケース / 期待結果の根拠の具体化                                                      |
@@ -84,6 +92,8 @@ skills/
 | `e2e-test-reporting`          | 検証済み実行・分析結果の人間向け報告                                                           |
 | `test-target-inspection`      | 生きた実対象のUI情報・ふるまい確認とテスト対象資料管理                                         |
 | `test-execution`              | 詳細TCの今回run、観測・比較、構造化結果とcleanup                                               |
+| `testware-implementation`     | 非E2E testwareの実装と静的 / 軽量検証                                                         |
+| `testware-execution`          | 非E2E testwareの安全確認、runner実行、構造化結果とcleanup                                      |
 | `regression-testing`          | Regression baseline / membership / Run selection / Activity / history                          |
 | `exploratory-testing`         | Charterベースのexplorationとowner不明hypothesisのinvestigation                                 |
 | `qa-knowledge`                | QA knowledge candidate triage / entry lifecycle / lookup                                       |
@@ -147,13 +157,13 @@ flowchart TB
 
 修正が必要な場合は最も早い責任工程へ、ブロック解除後は回答に応じた再開先工程へルーティングします。上流変更時は影響する範囲だけを担当工程へ戻します。
 
-今後のテスト設計で継続利用するUI仕様理解packageは、`spec-analysis`のUIテスト対象分析modeで作成します。仕様理解だけが要求された場合はそこで終了し、テスト設計を自動開始しません。不明点への回答は`question-analysis`で扱った後、`spec-analysis`へ戻してpackageへ反映します。current live UIの観測、保存済み画面資料のUI/UX評価、live usability inspection、formal WCAG評価は、それぞれ既存の`test-target-inspection`、`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`が担当します。
+UI構造、画面・操作・状態・遷移を分析して継続利用する`ui-target-v1` packageを作成・更新する場合は、`ui-target-analysis`を使います。既存writer、validator、runtime、共通helperを再利用し、単一writer、履歴、migration、既存`ui-target-v1`互換性を維持します。期待仕様、Authority、US / UC / Behavior / AC、UNKNOWNは引き続き`spec-analysis`の責務です。実装や観測で得たUI構造を期待仕様のAuthorityへ昇格しません。不明点への回答は`question-analysis`を経て`spec-analysis`へ戻します。current live UIの観測、保存済み画面資料のUI/UX評価、live usability inspection、formal WCAG評価は、それぞれ既存の`test-target-inspection`、`usability-evaluation`、`usability-inspection`、`wcag-conformance-evaluation`が担当します。
 
-### E2E要求時の条件分岐
+### testware / E2E要求時の条件分岐
 
 すべてのSkillを常に通すわけではありません。要求成果物と有効な既存成果物に応じ、必要な依存だけを実行します。
 
-currentな実対象情報の確認が必要な場合だけ`test-target-inspection`を使い、設計前には必要な設計Skillへ戻します。詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
+`test-item-analysis`と`test-condition-analysis`は候補分析を担当し、正式なテスト要求・テスト条件の設計を置き換えません。正式設計は`test-requirement-design`と`test-condition-design`へ進みます。非E2Eのtestware実装・runner実行は`testware-implementation`と`testware-execution`が担当し、詳細TCをAIが今回runとして実行する要求は`test-execution`へ進めます。repoへ残すPlaywright E2Eのinspection・実装・既存runner実行は既存の`e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`が担当します。
 
 ```text
 詳細TC / 明示E2E対象 / 既存E2E参照
@@ -223,13 +233,18 @@ e2e-test-execution
 | 工程固有ロジック                                            | 正本                       |
 | ----------------------------------------------------------- | -------------------------- |
 | 現在有効な仕様根拠 / SPEC・DECISION・ASM                    | `spec-analysis`            |
+| UI構造・画面・操作・状態・遷移、human editing               | `ui-target-analysis`       |
 | 不明点 / 仮定                                               | `question-analysis`        |
 | プロダクトリスク                                            | `test-analysis`            |
+| テストアイテム候補                                          | `test-item-analysis`       |
+| テスト条件候補                                              | `test-condition-analysis`  |
 | テスト要求                                                  | `test-requirement-design`  |
 | カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`    |
 | 詳細テストケース / 期待結果の根拠                           | `test-case-design`         |
 | 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`   |
 | AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`           |
+| 非E2E testware実装・静的 / 軽量検証                         | `testware-implementation`  |
+| 非E2E testware runner・実行結果・cleanup                    | `testware-execution`       |
 | カバレッジ / ギャップ                                       | `coverage-analysis`        |
 | 独立レビュー / 重大度                                       | `adversarial-review`       |
 | E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`      |
