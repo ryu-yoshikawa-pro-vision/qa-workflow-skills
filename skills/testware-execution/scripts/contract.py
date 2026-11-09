@@ -139,9 +139,12 @@ def _report_path(value: Any, repo_root: str | None) -> str:
             compare_root = [part.casefold() for part in root_parts]
         else:
             compare_actual, compare_root = actual_parts, root_parts
-        if len(actual_parts) <= len(root_parts) or compare_actual[:len(root_parts)] != compare_root:
+        if (
+            len(actual_parts) <= len(root_parts)
+            or compare_actual[: len(root_parts)] != compare_root
+        ):
             raise ContractError("reporter_path_outside_root")
-        candidate = "/".join(actual_parts[len(root_parts):])
+        candidate = "/".join(actual_parts[len(root_parts) :])
     return _relative(candidate)
 
 
@@ -168,13 +171,17 @@ def reconcile_vitest(
     raw: list[dict[str, Any]] = []
     failed_suites_without_tests: list[str] = []
     for file in report["testResults"]:
-        if not isinstance(file, dict) or not isinstance(file.get("assertionResults"), list):
+        if not isinstance(file, dict) or not isinstance(
+            file.get("assertionResults"), list
+        ):
             raise ContractError("invalid_report_file")
         path = _report_path(file.get("name"), repo_root)
         if file.get("status") == "failed" and not file["assertionResults"]:
             failed_suites_without_tests.append(path)
         for case in file["assertionResults"]:
-            if not isinstance(case, dict) or not isinstance(case.get("ancestorTitles"), list):
+            if not isinstance(case, dict) or not isinstance(
+                case.get("ancestorTitles"), list
+            ):
                 raise ContractError("invalid_report_assertion")
             key = _test_key(path, [*case["ancestorTitles"], case.get("title")])
             status = case.get("status")
@@ -207,20 +214,30 @@ def reconcile_vitest(
             status = "not_collected"
         else:
             status = matches[0]["raw_status"]
-        results.append({
-            "path": path, "title_path": list(titles),
-            "expected_instances": count, "collected_instances": len(matches),
-            "runner_status": status, "tc_verdict": None,
-        })
+        results.append(
+            {
+                "path": path,
+                "title_path": list(titles),
+                "expected_instances": count,
+                "collected_instances": len(matches),
+                "runner_status": status,
+                "tc_verdict": None,
+            }
+        )
     unplanned = [
         {"path": path, "title_path": list(titles), "count": count}
-        for (path, titles), count in seen.items() if (path, titles) not in wanted
+        for (path, titles), count in seen.items()
+        if (path, titles) not in wanted
     ]
     complete = (
-        selection_verified is True and reporter_consistent
-        and not failed_suites_without_tests and not unplanned
+        selection_verified is True
+        and reporter_consistent
+        and not failed_suites_without_tests
+        and not unplanned
         and wanted == seen
-        and all(x["runner_status"] not in {"ambiguous", "not_collected"} for x in results)
+        and all(
+            x["runner_status"] not in {"ambiguous", "not_collected"} for x in results
+        )
     )
     return {
         "source_revision": source_revision,
