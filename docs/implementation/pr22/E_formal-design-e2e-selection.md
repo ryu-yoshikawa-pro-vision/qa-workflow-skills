@@ -403,3 +403,10 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - 共有`ASSERTIONS.md`のRISK-D016／D017はlegacy `test-analysis` table用で、新Skill assertionsの移管記述が未反映。A ownerへ引継ぎ、legacy compatibilityは維持した。
 - A共有`ci_handoff`のnesting負例は期待するJSON depth errorと実際のtop-level object errorが異なる。担当外なので未変更、Aへ再現条件を引継ぎ。
 - 以上以外、今回追加レビュー対象のtest-analysis、test-requirement-design、test-case-design、既存CI coverage graphとの局所契約不一致は確認していない。
+
+## 進捗保存（2026-11-10）
+
+- 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。
+- commit前の`git diff --check`と`git diff --cached --check`はPASS。cached path一覧・statは予定した23ファイルと一致し、未追跡ファイルはなかった。テスト／formatter／評価結果は本節の上にある2026-11-10レビュー検証表を参照し、そこに記録したFAIL／ERROR／SKIP／未実施は未解消のまま保持する。
+- review HEADの過去Actions結果をこのcommitの結果として扱わない。push後にCode Quality、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Codex Harnessの状態を最新branch HEADと照合して記録する。
+- 次の作業：この担当branchへの通常push後、remote HEAD一致とPR #27のDraft状態を確認し、該当commit SHAごとのActions成功／失敗／実行中／未実行を追記する。README／ASSERTIONS、A provider連携、実Agent／Judge、PR #22横断統合は未完了のまま各owner引継ぎを維持する。
