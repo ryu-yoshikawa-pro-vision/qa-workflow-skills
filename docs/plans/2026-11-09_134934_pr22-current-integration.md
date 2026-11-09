@@ -6,20 +6,20 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 ## 現在の状態と根拠
 
-2026-11-09時点でPR #22はopen、base `main`、integration branch `feat/development-qa-traceability`、head `7cc8ac8bcebdacd6ac35aede3bed8555c73f276c`。このheadのCode Quality、Validate Agent Skills、Deterministic Output Evals、Semantic Output Evals、Codex Harnessはすべてsuccess。
+2026-11-09確認時点でPR #22はopen、base `main`、integration branch `feat/development-qa-traceability`、head `053fe475be8c29dee107db327ff2a96be8ff34d1`。PR #24（B）のsquash統合後、このheadの[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42564895161)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42564895227)、[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42564895073)、[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42564895110)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42564895115)は各workflow個別にsuccess。
 
-| 担当PR | 現状                                                              | CI・依存                                                                                                                              |
-| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| #23 A  | merged。共通runtime・保存／承認／CI基盤を統合済み                 | head `2c2dcab` の5 workflow success。実provider・認証主体・製品CI・実Agent統合は未接続                                                |
-| #24 B  | open、ready for review。Project Context・feature-analysis実装あり | head `7bc6395` の5 workflow success。実案件・実providerの横断接続は未検証                                                             |
-| #25 C  | open、Draft。UI分析・人間編集実装と局所受入を完了                 | head `fba2b38` でCode Quality／Deterministic／Semantic／Codex Harness success。Validate Agent Skillsは共有README catalog不足でfailure |
-| #26 D  | open、Draft。item／condition候補の実装と局所評価あり              | head `9afd18f` の4 workflow success。実provider、B/E成果物との接続、実Agent評価は未完了                                               |
-| #27 E  | open、Draft。作業文書のみで実装コードなし                         | 担当Eの実装・局所受入待ち                                                                                                             |
-| #28 F  | open、Draft。作業文書のみで実装コードなし                         | 担当Fの実装・局所受入待ち                                                                                                             |
-| #29 G  | open、Draft。非E2E testware／execution実装あり                    | head `2650c7d` の4 workflow success。実案件runner・provider・H/J接続は未完了                                                          |
-| #30 H  | open、Draft。作業文書のみで実装コードなし                         | 担当Hの実装・局所受入待ち                                                                                                             |
-| #31 I  | open、Draft。作業文書のみで実装コードなし                         | 担当Iの実装・局所受入待ち                                                                                                             |
-| #32 J  | open、Draft。作業文書のみで実装コードなし                         | 担当Jの実装・局所受入待ち                                                                                                             |
+| 担当PR | 現状                                                                           | CI・依存                                                                                                                              |
+| ------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| #23 A  | merged。共通runtime・保存／承認／CI基盤を統合済み                              | head `2c2dcab` の5 workflow success。実provider・認証主体・製品CI・実Agent統合は未接続                                                |
+| #24 B  | PR #22へsquash統合済み（`053fe47`）。Project Context・feature-analysis実装あり | PR #24 head `7bc6395` の5 workflow success。実案件・実providerとの横断接続は未検証                                                    |
+| #25 C  | open、Draft。UI分析・人間編集実装と局所受入を完了                              | head `fba2b38` でCode Quality／Deterministic／Semantic／Codex Harness success。Validate Agent Skillsは共有README catalog不足でfailure |
+| #26 D  | open、Draft。item／condition候補の実装と局所評価あり                           | head `9afd18f` の4 workflow success。実provider、B/E成果物との接続、実Agent評価は未完了                                               |
+| #27 E  | open、Draft。作業文書のみで実装コードなし                                      | 担当Eの実装・局所受入待ち                                                                                                             |
+| #28 F  | open、Draft。作業文書のみで実装コードなし                                      | 担当Fの実装・局所受入待ち                                                                                                             |
+| #29 G  | open、Draft。非E2E testware／execution実装あり                                 | head `2650c7d` の4 workflow success。実案件runner・provider・H/J接続は未完了                                                          |
+| #30 H  | open、Draft。作業文書のみで実装コードなし                                      | 担当Hの実装・局所受入待ち                                                                                                             |
+| #31 I  | open、Draft。作業文書のみで実装コードなし                                      | 担当Iの実装・局所受入待ち                                                                                                             |
+| #32 J  | open、Draft。作業文書のみで実装コードなし                                      | 担当Jの実装・局所受入待ち                                                                                                             |
 
 証拠は各担当PRのhead・Checks・作業定義を正本とする。Draftのコードやfixtureを、担当完了・実環境受入として扱わない。
 
