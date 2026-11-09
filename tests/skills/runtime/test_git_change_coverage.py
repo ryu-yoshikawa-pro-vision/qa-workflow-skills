@@ -173,6 +173,17 @@ class GitChangeCoverageTests(unittest.TestCase):
         )
         snapshot["changes"].append(second)
         req = self.request()
+        forged = {
+            **req,
+            "source_event_basis": {
+                "base_sha": self.base,
+                "head_sha": self.inventory["head_sha"],
+                "previous_head_sha": self.base,
+            },
+        }
+        blocked = reconcile(forged)
+        self.assertEqual(blocked["status"], "blocked", blocked)
+        self.assertIn("primary_source_event_basis_override", blocked["reasons"])
         result = reconcile(req)
         self.assertEqual(result["status"], "incomplete", result)
         self.assertIn("previous_head_diff_not_enumerated", result["reasons"])
