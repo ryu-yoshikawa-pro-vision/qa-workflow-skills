@@ -200,9 +200,7 @@ def analyze(request: Any) -> dict[str, Any]:
                 raise Invalid("previous_head_paths_mismatch")
             previous_head_paths.add(after)
     git_paths |= previous_head_paths
-    required_pairs = {
-        (git["base_sha"], path) for path in base_change_paths
-    } | {
+    required_pairs = {(git["base_sha"], path) for path in base_change_paths} | {
         (basis["previous_head_sha"], path) for path in previous_head_paths
     }
     registered_pairs: set[tuple[str, str]] = set()

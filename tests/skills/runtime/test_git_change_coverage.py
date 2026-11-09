@@ -178,7 +178,6 @@ class GitChangeCoverageTests(unittest.TestCase):
         req["previous_head_git_inventory"]["base_sha"] = "f" * 40
         self.assertEqual(reconcile(req)["status"], "stale")
 
-
     def test_previous_head_only_change_uses_its_actual_before_sha(self) -> None:
         previous_head = self.inventory["head_sha"]
         git(self.root, "checkout", "-q", "-b", "intermediate", self.base)

@@ -117,7 +117,6 @@ class ArtifactStoreTests(unittest.TestCase):
             self.write()["sha256"],
         )
 
-
     def test_read_denied_for_other_project_and_revoked_access(self) -> None:
         self.write()
         with self.assertRaisesRegex(StoreError, "access_denied"):
@@ -218,7 +217,6 @@ class ArtifactStoreTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(StoreError, "readback_hash_mismatch"):
             self.store.read_current("project-context", "Sample", "artifact.md")
-
 
     def test_create_cannot_redirect_absence_to_unchecked_path(self) -> None:
         request = {
@@ -385,7 +383,6 @@ class ArtifactStoreTests(unittest.TestCase):
             ],
         )
 
-
     def test_placement_change_retires_earlier_decision(self) -> None:
         initial = {
             "operation": "prepare-create",
@@ -490,7 +487,6 @@ class ArtifactStoreTests(unittest.TestCase):
         self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |", current)
         self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", current)
         self.assertIn("| QA成果物配置 | qa/new | Sample |", current)
-
 
     def test_section_update_requires_expected_revision_and_history(self) -> None:
         initial = {

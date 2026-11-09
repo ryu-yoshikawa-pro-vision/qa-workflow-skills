@@ -93,7 +93,6 @@ def fixture() -> dict:
     }
 
 
-
 def continue_analysis(data: dict) -> dict:
     """Represent a manual correction at an unchanged source revision."""
     data["snapshot"]["event"] = "analysis_update"
@@ -327,7 +326,6 @@ class FeatureRegistryTests(unittest.TestCase):
                     }
                 )
                 self.assertEqual(handle(data)["status"], "blocked")
-
 
     def test_initial_event_with_previous_changed_snapshot_is_rejected(self) -> None:
         data = fixture()

@@ -89,7 +89,6 @@ class ProjectContextOwnerTests(unittest.TestCase):
         }
         self.assertEqual(handle(req)["status"], "unconfirmed")
 
-
     def test_create_ref_requires_confirmed_absence_at_same_ref(self) -> None:
         request = {
             "operation": "prepare-create",
