@@ -68,6 +68,11 @@ class GitArtifactStore:
         assert top is not None
         if Path(top.decode().strip()).resolve(strict=True) != self.root:
             raise StoreError("git_repository_root_mismatch")
+        gitdir = self._git("rev-parse", "--absolute-git-dir")
+        assert gitdir is not None
+        metadata = Path(gitdir.decode().strip()).resolve(strict=True)
+        if not metadata.is_relative_to(self.root):
+            raise StoreError("git_metadata_outside_authorized_root")
         self._git("check-ref-format", "--branch", self.branch)
         self._head()
 

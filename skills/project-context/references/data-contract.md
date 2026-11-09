@@ -43,3 +43,5 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 正本が既存のGit管理Markdownである場合は、`scripts/git_artifact_store.py`の`GitArtifactStore`を明示選択できます。対象Git branchの`docs/PROJECT_CONTEXT.md`等を正本とし、Git commit SHAをexpected revisionに使う`update-ref`のnative CASで同一pathを更新します。履歴はGit commitから独立読戻しします。選択したbranchのGit objectが正本であり、未checkoutの作業ディレクトリを現行文書とは扱いません。ローカルSQLiteは別の案件でSQLiteを正本に選択した場合にのみ利用します。
 
 読み取りにも信頼済みhostから注入された`authorize`による案件scopeの権限確認を行います。operation再送時も権限を再評価します。両保存providerは認証済み呼出し元を仮定し、権限を自己申告するJSON CLIからは呼び出しません。
+
+Git providerは許可済みrepository rootの外にGit metadataを保存するworktree／外部Git dirを拒否します。対象branchの履歴・objectが許可外rootへ暗黙に作成されないようにするためです。

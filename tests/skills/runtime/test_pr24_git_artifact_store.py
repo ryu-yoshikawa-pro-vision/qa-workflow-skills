@@ -217,6 +217,22 @@ class GitArtifactStoreTests(unittest.TestCase):
             "git:" + git(self.root, "rev-parse", "qa-artifacts"),
         )
 
+    def test_git_metadata_outside_authorized_root_is_rejected(self) -> None:
+        worktree = self.root / "isolated-checkout"
+        metadata = self.root / "external-gitdir"
+        git(self.root, "init", "-q", "--separate-git-dir", str(metadata), str(worktree))
+        with self.assertRaisesRegex(
+            StoreError, "git_metadata_outside_authorized_root"
+        ):
+            GitArtifactStore(
+                worktree,
+                worktree,
+                "qa-artifacts",
+                self.authorize,
+                author_name="QA",
+                author_email="qa@example.invalid",
+            )
+
     def test_unknown_authorization_or_path_is_rejected(self) -> None:
         with self.assertRaisesRegex(StoreError, "artifact_ref_invalid"):
             self.write(ref="../escape.md")
