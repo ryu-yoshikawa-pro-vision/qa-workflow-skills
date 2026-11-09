@@ -19,8 +19,8 @@ from artifact_graph import (  # noqa: E402
     parse_project_context,
     validate_required_context_fields,
 )
-from project_context_ids import handle as identity_handle  # noqa: E402
 from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
+from project_context_ids import handle as identity_handle  # noqa: E402
 
 MAX_BYTES = 16 * 1024 * 1024
 TEMPLATE = SHARED / "assets" / "project-context-template.md"

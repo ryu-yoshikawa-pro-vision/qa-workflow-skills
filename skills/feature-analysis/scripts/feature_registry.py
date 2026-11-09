@@ -10,8 +10,8 @@ import hashlib
 import json
 import re
 import sys
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 PROJECT_CONTEXT_SCRIPT = Path(__file__).resolve().parents[2] / "project-context" / "scripts"
 sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPT))
