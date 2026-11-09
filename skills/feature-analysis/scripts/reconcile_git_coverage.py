@@ -36,11 +36,11 @@ def _text(value: Any, name: str) -> str:
 
 
 def analyze(request: Any) -> dict[str, Any]:
-    if not isinstance(request, dict) or set(request) != {
-        "git_inventory",
-        "registry_request",
-        "source_id",
-    }:
+    required = {"git_inventory", "registry_request", "source_id"}
+    allowed = required | {"previous_head_git_inventory"}
+    if not isinstance(request, dict) or not required <= set(request) or not set(
+        request
+    ) <= allowed:
         raise Invalid("request_schema_invalid")
     source_id = _text(request["source_id"], "source_id")
     git = request["git_inventory"]
@@ -73,6 +73,50 @@ def analyze(request: Any) -> dict[str, Any]:
             "coverage": None,
         }
     head_sha = _text(git.get("head_sha"), "git_head_sha")
+    event = snapshot.get("event")
+    basis = snapshot.get("event_basis")
+    previous_inventory = request.get("previous_head_git_inventory")
+    if event in {"pr_update", "rebase"}:
+        if not isinstance(basis, dict):
+            raise Invalid("event_basis_required")
+        if (
+            git.get("base_sha") != basis["base_sha"]
+            or head_sha != basis["head_sha"]
+        ):
+            return {
+                "status": "stale",
+                "reasons": ["pr_base_head_inventory_mismatch"],
+                "coverage": None,
+            }
+        if previous_inventory is None:
+            return {
+                "status": "incomplete",
+                "reasons": ["previous_head_diff_not_enumerated"],
+                "coverage": None,
+            }
+        if not isinstance(previous_inventory, dict):
+            raise Invalid("previous_head_inventory_invalid")
+        if (
+            previous_inventory.get("status") != "complete"
+            or previous_inventory.get("complete_change_listing") is not True
+            or previous_inventory.get("unretrieved") != []
+        ):
+            return {
+                "status": "incomplete",
+                "reasons": ["previous_head_diff_incomplete"],
+                "coverage": None,
+            }
+        if (
+            previous_inventory.get("base_sha") != basis["previous_head_sha"]
+            or previous_inventory.get("head_sha") != head_sha
+        ):
+            return {
+                "status": "stale",
+                "reasons": ["previous_head_diff_revision_mismatch"],
+                "coverage": None,
+            }
+    elif previous_inventory is not None:
+        raise Invalid("previous_head_inventory_unexpected")
     source_rows = [
         row
         for row in snapshot["sources"]
@@ -126,6 +170,37 @@ def analyze(request: Any) -> dict[str, Any]:
             raise Invalid("changed_path_missing_at_head")
         if status[:1] not in {"R", "C"} and before != after:
             raise Invalid("non_rename_change_paths_mismatch")
+    base_change_paths = set(git_paths)
+    previous_head_paths: set[str] = set()
+    if isinstance(previous_inventory, dict):
+        preceding = previous_inventory.get("changes")
+        if not isinstance(preceding, list):
+            raise Invalid("previous_head_changes_invalid")
+        for row in preceding:
+            if not isinstance(row, dict):
+                raise Invalid("previous_head_change_invalid")
+            status = _text(row.get("status"), "previous_head_status")
+            before = _text(row.get("before_path"), "previous_head_before_path")
+            after = _text(row.get("after_path"), "previous_head_after_path")
+            if not (
+                status in {"A", "M", "D", "T", "U", "X", "B"}
+                or (
+                    status[:1] in {"R", "C"}
+                    and status[1:].isdigit()
+                    and len(status[1:]) <= 3
+                )
+            ):
+                raise Invalid("previous_head_change_status_invalid")
+            if after in previous_head_paths:
+                raise Invalid("previous_head_change_duplicate")
+            if status == "D" and after in head_paths:
+                raise Invalid("previous_head_deleted_path_present")
+            if status != "D" and after not in head_paths:
+                raise Invalid("previous_head_changed_path_missing_at_head")
+            if status[:1] not in {"R", "C"} and before != after:
+                raise Invalid("previous_head_paths_mismatch")
+            previous_head_paths.add(after)
+    git_paths |= previous_head_paths
     registry_paths: set[str] = set()
     unmatched_ids: list[str] = []
     mismatched_revision_ids: list[str] = []
@@ -161,6 +236,8 @@ def analyze(request: Any) -> dict[str, Any]:
             "source_id": source_id,
             "git_head_sha": head_sha,
             "git_change_paths": sorted(git_paths),
+            "base_change_paths": sorted(base_change_paths),
+            "previous_head_change_paths": sorted(previous_head_paths),
             "registered_paths": sorted(registry_paths & git_paths),
             "missing_git_paths": missing,
             "unmatched_registry_change_ids": sorted(unmatched_ids),
