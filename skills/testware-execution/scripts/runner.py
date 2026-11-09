@@ -8,6 +8,7 @@ caller must inspect the full command/package-script/fixture chain beforehand.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -154,8 +155,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     checked = preflight(scope)
     if checked["may_start"] is not True:
         raise RunnerError("preflight_" + str(checked["reason"]))
-    if scope.get("external_side_effects") or scope.get("shared_resource"):
+    if scope["external_side_effects"] or scope["shared_resource"]:
         raise RunnerError("native_provider_authorization_required")
+    # Arbitrary subprocesses cannot enforce a per-resource effect count. Until
+    # an authenticated effect-counting provider exists, refuse declared effects.
+    if scope["side_effects"]:
+        raise RunnerError("side_effect_limits_unenforceable")
     repo_path = plan.get("repo_path")
     if not isinstance(repo_path, str) or not Path(repo_path).is_absolute():
         raise RunnerError("absolute_repo_path_required")
@@ -177,6 +182,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             raise RunnerError("cleanup_not_reviewed")
     if scope.get("side_effects") and cleanup is None:
         raise RunnerError("effect_cleanup_required")
+    if plan.get("direct_tc") is True and not plan.get("direct_expectations"):
+        raise RunnerError("direct_tc_expectations_required")
     direct_expectations = plan.get("direct_expectations")
     if direct_expectations is not None:
         if (
@@ -188,6 +195,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         # Validate the complete expectation contract before the first operation.
         compare_direct(started=False, expectations=direct_expectations, observations={})
     metric_criteria = plan.get("metric_criteria")
+    if kind == "nonfunctional" and not metric_criteria:
+        raise RunnerError("missing_nonfunctional_criteria")
     if metric_criteria is not None:
         if (
             kind != "nonfunctional"
@@ -201,6 +210,32 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             condition_ref=plan.get("measurement_condition_ref"),
             authority_ref=plan.get("threshold_authority_ref"),
         )
+    static_plan = plan.get("static_analysis")
+    if kind == "static":
+        if not isinstance(static_plan, dict):
+            raise RunnerError("static_analysis_contract_required")
+        for field in ("tool_ref", "tool_version", "rules_ref", "config_ref"):
+            if not isinstance(static_plan.get(field), str) or not static_plan[field].strip():
+                raise RunnerError("static_" + field + "_required")
+        targets = static_plan.get("expected_paths")
+        if (
+            not isinstance(targets, list)
+            or not targets
+            or any(not isinstance(x, str) or not x for x in targets)
+            or len(targets) != len(set(targets))
+        ):
+            raise RunnerError("invalid_static_expected_paths")
+    elif static_plan is not None:
+        raise RunnerError("static_contract_for_non_static_runner")
+    if kind == "vitest" and plan.get("selection_verified") is True:
+        if not isinstance(plan.get("selection_evidence_ref"), str) or not plan[
+            "selection_evidence_ref"
+        ].strip():
+            raise RunnerError("selection_evidence_required")
+        if not isinstance(plan.get("planned_scope_ref"), str) or not plan[
+            "planned_scope_ref"
+        ].strip():
+            raise RunnerError("planned_scope_ref_required")
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -216,16 +251,26 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
     folder = Path(tempfile.mkdtemp(prefix="non-e2e-", dir=root))
     records: list[dict[str, Any]] = []
     for number in range(1, attempts + 1):
+        # Check again immediately before the launch. This is not a native
+        # provider reservation; later changes are detected after cleanup.
+        if _git_head(repo) != expected_sha or not _git_clean(repo):
+            if not records:
+                raise RunnerError("repo_changed_before_start")
+            break
         attempt = folder / f"attempt-{number}"
         attempt.mkdir(mode=0o700)
         reporter = attempt / "reporter.json"
         argv = [part.replace("{reporter_file}", str(reporter)) for part in command]
+        argv_digest = hashlib.sha256(
+            json.dumps(argv, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
         run = _run_command(
             argv, repo, attempt / "stdout.log", attempt / "stderr.log", limit
         )
         run.update(
             {
                 "number": number,
+                "executed_argv_sha256": argv_digest,
                 "stdout_ref": str(attempt / "stdout.log"),
                 "stderr_ref": str(attempt / "stderr.log"),
                 "raw_report_ref": None,
@@ -250,6 +295,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     run["result_collection"] = (
                         "complete"
                         if run["reconciliation"]["collection_complete"]
+                        and run["return_code"] == 0
                         else "incomplete"
                     )
                 except (ValueError, ContractError, UnicodeError):
@@ -290,6 +336,50 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 condition_ref=plan["measurement_condition_ref"],
                 authority_ref=plan["threshold_authority_ref"],
             )
+        if kind == "static":
+            from contract import interpret_static
+
+            report_data: dict[str, Any] = {}
+            stdout_file = attempt / "stdout.log"
+            if run["started"] and stdout_file.stat().st_size <= 1_048_576:
+                try:
+                    parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                    if isinstance(parsed, dict):
+                        report_data = parsed
+                except (ValueError, UnicodeError):
+                    pass
+            actual = report_data.get("analyzed_paths")
+            omitted = report_data.get("skipped_paths")
+            expected_set = set(static_plan["expected_paths"])
+            paths_complete = (
+                isinstance(actual, list)
+                and len(actual) == len(set(actual))
+                and set(actual) == expected_set
+                and omitted == []
+            ) if isinstance(actual, list) else False
+            finding_count = report_data.get("findings_count")
+            if type(finding_count) is not int or finding_count < 0:
+                finding_count = None
+            assessment = interpret_static(
+                started=run["started"],
+                exit_code=run["return_code"],
+                raw_ref=str(stdout_file) if run["started"] else None,
+                findings_count=finding_count if paths_complete else None,
+            )
+            run["static_analysis"] = {
+                **assessment,
+                "expected_paths": static_plan["expected_paths"],
+                "analyzed_paths": actual if isinstance(actual, list) else None,
+                "skipped_paths": omitted if isinstance(omitted, list) else None,
+                "selection_complete": paths_complete,
+                "tool_ref": static_plan["tool_ref"],
+                "tool_version": static_plan["tool_version"],
+                "rules_ref": static_plan["rules_ref"],
+                "config_ref": static_plan["config_ref"],
+            }
+            run["result_collection"] = (
+                "complete" if assessment["complete"] else "incomplete"
+            )
         if cleanup is not None and run["started"]:
             clean = _run_command(
                 cleanup,
@@ -307,10 +397,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 else "failed_or_unknown"
             )
         try:
+            run["workspace_head_after_cleanup"] = _git_head(repo)
             run["workspace_state_after_cleanup"] = (
                 "clean" if _git_clean(repo) else "dirty"
             )
         except RunnerError:
+            run["workspace_head_after_cleanup"] = None
             run["workspace_state_after_cleanup"] = "unverified"
         records.append(run)
         # Retrying an ambiguous state can repeat a side effect; never do it.
@@ -319,6 +411,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             or run["timeout"]
             or scope.get("side_effects")
             or run["workspace_state_after_cleanup"] != "clean"
+            or run["workspace_head_after_cleanup"] != expected_sha
         ):
             break
         if (
@@ -338,7 +431,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             break
     outcome = "unknown"
     last = records[-1]
-    if last["workspace_state_after_cleanup"] != "clean":
+    if last["workspace_head_after_cleanup"] != expected_sha:
+        outcome = "blocked_revision_changed"
+    elif last["workspace_state_after_cleanup"] != "clean":
         outcome = "blocked_workspace_not_restored"
     elif last["cleanup_state"] == "failed_or_unknown" or last["timeout"]:
         outcome = "blocked_cleanup_or_timeout"
@@ -354,7 +449,22 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         outcome = "runner_fail"
     result = {
         "runner_kind": kind,
-        "source_revision": expected_sha,
+        "source_ref": scope["source_ref"],
+        "source_revision": scope["source_revision"],
+        "build_revision": scope["build_revision"],
+        "repo_revision": expected_sha,
+        "environment_ref": scope["environment_ref"],
+        "runner_ref": scope["runner_ref"],
+        "runner_version": plan.get("runner_version"),
+        "testware_ref": plan.get("testware_ref"),
+        "testware_revision": plan.get("testware_revision"),
+        "tc_ref": plan.get("tc_ref"),
+        "tc_revision": plan.get("tc_revision"),
+        "planned_scope_ref": plan.get("planned_scope_ref"),
+        "selection_evidence_ref": plan.get("selection_evidence_ref"),
+        "selection_filter": plan.get("selection_filter"),
+        "selection_verified_by_runner": False,
+        "declared_selected": plan.get("selected", []),
         "run_ref": scope["operation_ref"],
         "artifact_directory": str(folder),
         "attempts": records,
@@ -364,10 +474,21 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
     }
+    if "diagnosis_hypotheses" in plan:
+        from contract import diagnosis
+
+        result["diagnosis"] = diagnosis(
+            run_ref=scope["operation_ref"],
+            hypotheses=plan["diagnosis_hypotheses"],
+        )
     if result["tc_verdict"] == "FAIL" and outcome == "runner_pass":
         result["outcome"] = "observed_FAIL"
     elif result["tc_verdict"] == "判定不能" and outcome == "runner_pass":
         result["outcome"] = "observations_incomplete"
+    if kind == "vitest":
+        result["selection_verified_by_runner"] = bool(
+            last.get("reconciliation", {}).get("collection_complete")
+        )
     if result["quality_verdict"] == "FAIL" and result["outcome"] == "runner_pass":
         result["outcome"] = "measurement_FAIL"
     elif result["quality_verdict"] == "判定不能" and result["outcome"] == "runner_pass":
