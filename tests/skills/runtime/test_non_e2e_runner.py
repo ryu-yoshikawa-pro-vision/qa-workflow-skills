@@ -93,8 +93,8 @@ class ActualRunnerTests(unittest.TestCase):
             {"id": "stdout_text", "expected": "runner observation\n"}
         ]
         code, summary, artifact = self.call(plan)
-        self.assertEqual(code, 0)
-        self.assertEqual(summary["outcome"], "runner_pass")
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["outcome"], "incomplete")
         self.assertEqual(artifact["source_revision"], self.sha)
         attempt = artifact["attempts"][0]
         self.assertTrue(attempt["started"])
@@ -145,7 +145,7 @@ class ActualRunnerTests(unittest.TestCase):
             }
         ]
         code, _, artifact = self.call(plan)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(artifact["diagnosis"]["original_run_ref"], "test-fixture")
         self.assertFalse(artifact["diagnosis"]["original_result_modified"])
         self.assertIsNone(artifact["tc_verdict"])
