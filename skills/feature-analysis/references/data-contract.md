@@ -53,3 +53,7 @@ Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORI
 `reconcile_git_coverage`は各DIFのpathが今回base→HEAD／前回HEAD→今回HEADのどちらに出現したかに応じて旧revisionを照合します。片方の差分だけに出現したpathに別の基準SHAを強制しません。
 
 同一pathがPR base→headと前回head→現在headの両方に含まれ、旧SHAが異なる場合、`reconcile_git_coverage`は`(before_revision, path, after_revision)`の組ごとにDIFを要求します。いずれかの旧revisionが未分類なら`missing_git_revision_pairs`と`git_change_revision_pairs_not_registered`を返し、網羅率の分母からその組を除きません。同一の旧SHA・pathが両diffに現れる場合は重複計上しません。
+
+Gitのgitlink（submodule）は親repositoryの`ls-tree`で確認できるentryですが、内部ファイルは列挙できていません。`git_source_inventory`は`status=incomplete`、`complete_file_listing=false`、`unretrieved=[gitlink:path@commit]`を返し、submoduleを検証済みの別情報源へ登録するまで完全取得とみなしません。PR差分一覧の取得完了は`complete_change_listing`で別途表します。
+
+Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`、`source_ref`／`source_revision`、`operation_id`、`change_reason`、内容hashが渡されます。認証済み承認のscopeとrevisionの検証は信頼済みproviderの責務です。未確認の承認revisionでは書込みを拒否します。

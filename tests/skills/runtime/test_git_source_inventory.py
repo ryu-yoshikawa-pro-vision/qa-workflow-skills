@@ -87,6 +87,44 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertEqual(rename["after_path"], "api renamed.py")
         self.assertTrue(result["complete_change_listing"])
 
+    def test_submodule_is_unretrieved_not_complete(self) -> None:
+        git(
+            self.root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            self.first,
+            "vendor/submodule",
+        )
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "register gitlink",
+        )
+        head = git(self.root, "rev-parse", "HEAD")
+        report = handle(self.request(self.first, head))
+        self.assertEqual(report["status"], "incomplete", report)
+        self.assertFalse(report["complete_file_listing"])
+        self.assertTrue(report["complete_change_listing"])
+        self.assertEqual(
+            report["unretrieved"], [f"gitlink:vendor/submodule@{self.first}"]
+        )
+        self.assertEqual(
+            next(x for x in report["files"] if x["path"] == "vendor/submodule")[
+                "kind"
+            ],
+            "commit",
+        )
+        self.assertIn(
+            "vendor/submodule", [row["after_path"] for row in report["changes"]]
+        )
+
     def test_path_with_newline_is_preserved_as_one_path(self) -> None:
         name = "line\nbreak.txt"
         (self.root / name).write_text("x", encoding="utf-8")

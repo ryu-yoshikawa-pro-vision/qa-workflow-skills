@@ -56,6 +56,7 @@ class GitArtifactStoreTests(unittest.TestCase):
             return (
                 self.allow_write
                 and request["approval_ref"] == "approval/verified"
+                and request["approval_revision"] == "policy-v1"
                 and request["kind"] in {"project-context", "feature-inventory"}
             )
 
@@ -255,6 +256,59 @@ class GitArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(StoreError, "access_denied"):
             self.write()
         self.assertEqual(git(self.root, "rev-list", "--count", "qa-artifacts"), "1")
+
+    def test_git_approval_revision_and_source_are_verified_before_write(self) -> None:
+        authorized: list[dict] = []
+
+        def inspect(request: dict) -> bool:
+            authorized.append(request.copy())
+            if request["operation"] == "read":
+                return True
+            return (
+                request["approval_revision"] == "policy-v1"
+                and request["source_revision"] == "source-1"
+                and request["source_ref"] == "issue/1"
+                and request["operation_id"] == "op-1"
+                and request["change_reason"] == "approved change"
+                and request["sha256"] == hashlib.sha256(b"first").hexdigest()
+            )
+
+        store = GitArtifactStore(
+            self.root,
+            self.root,
+            "qa-artifacts",
+            inspect,
+            author_name="QA",
+            author_email="qa@example.invalid",
+        )
+
+        def attempt(approval_revision: str) -> dict:
+            return store.write(
+                kind="project-context",
+                project_ref="Sample",
+                artifact_ref="docs/PROJECT_CONTEXT.md",
+                content="first",
+                expected_revision=None,
+                operation_id="op-1",
+                source_ref="issue/1",
+                source_revision="source-1",
+                approval_ref="approval/verified",
+                approval_revision=approval_revision,
+                change_reason="approved change",
+            )
+
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            attempt("policy-invalid")
+        self.assertEqual(git(self.root, "rev-list", "--count", "qa-artifacts"), "1")
+        self.assertEqual(attempt("policy-v1")["status"], "stored")
+        approved = next(
+            request
+            for request in authorized
+            if request["operation"] == "write"
+            and request["approval_revision"] == "policy-v1"
+        )
+        self.assertEqual(approved["source_revision"], "source-1")
+        self.assertEqual(approved["operation_id"], "op-1")
 
     def test_source_ref_and_digest_are_preserved_in_git_history(self) -> None:
         result = self.write(content="verified")

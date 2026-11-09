@@ -138,6 +138,11 @@ class GitArtifactStore:
         *,
         approval_ref: str | None = None,
         digest: str | None = None,
+        approval_revision: str | None = None,
+        source_ref: str | None = None,
+        source_revision: str | None = None,
+        operation_id: str | None = None,
+        change_reason: str | None = None,
     ) -> None:
         try:
             allowed = self.authorize(
@@ -149,6 +154,11 @@ class GitArtifactStore:
                     "expected_revision": revision,
                     "approval_ref": approval_ref,
                     "sha256": digest,
+                    "approval_revision": approval_revision,
+                    "source_ref": source_ref,
+                    "source_revision": source_revision,
+                    "operation_id": operation_id,
+                    "change_reason": change_reason,
                 }
             )
         except Exception as exc:
@@ -250,6 +260,11 @@ class GitArtifactStore:
             expected_revision,
             approval_ref=approval_ref,
             digest=digest,
+            approval_revision=approval_revision,
+            source_ref=source_ref,
+            source_revision=source_revision,
+            operation_id=operation_id,
+            change_reason=change_reason,
         )
         current = self._read_at(kind, project_ref, path, head)
         same_operation = False

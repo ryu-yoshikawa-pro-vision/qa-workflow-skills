@@ -152,6 +152,7 @@ def analyze(request: Any) -> dict[str, Any]:
     if base is not None:
         _git(root, "cat-file", "-e", base + "^{commit}")
     files = _tree(_git(root, "ls-tree", "-r", "--full-tree", "-z", head))
+    gitlinks = [row for row in files if row["kind"] == "commit"]
     changes = (
         _changes(
             _git(
@@ -170,15 +171,17 @@ def analyze(request: Any) -> dict[str, Any]:
         else []
     )
     return {
-        "status": "complete",
+        "status": "incomplete" if gitlinks else "complete",
         "repository_root": str(root),
         "base_sha": base,
         "head_sha": head,
         "files": files,
         "changes": changes,
-        "complete_file_listing": True,
+        "complete_file_listing": not gitlinks,
         "complete_change_listing": base is not None,
-        "unretrieved": [],
+        "unretrieved": [
+            f"gitlink:{row['path']}@{row['object_sha']}" for row in gitlinks
+        ],
         "feature_count": None,
     }
 
