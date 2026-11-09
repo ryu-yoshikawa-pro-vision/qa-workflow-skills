@@ -17,7 +17,11 @@ from scripts.skills.evals.deterministic.result import EvalResult
 
 SEVERITIES = {"致命的", "重大", "軽微", "提案"}
 TREATMENTS = {"未処置", "修正済み", "残存リスクとして受容", "ブロック中"}
-REPAIR_TARGETS = CANONICAL_SKILLS | {"案件コンテキスト / 仕様決定", "testware-implementation", "testware-execution"}
+REPAIR_TARGETS = CANONICAL_SKILLS | {
+    "案件コンテキスト / 仕様決定",
+    "testware-implementation",
+    "testware-execution",
+}
 
 
 def _normalize_treatment(value: str) -> str:
