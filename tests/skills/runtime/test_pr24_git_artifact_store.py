@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[3] / "skills"
@@ -1181,6 +1182,82 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertEqual(result["status"], "stored", result)
         self.assertEqual(sorted(calls), ["DIF-001", "DIF-002"])
         self.assertEqual(len(snap["changes"]), 3)
+
+    def test_source_head_cannot_advance_while_git_artifact_is_being_saved(self) -> None:
+        request, evidence = self._code_registry()
+        expected_head = evidence[0]["head_sha"]
+        source_branch = git(self.root, "symbolic-ref", "HEAD")
+        (self.root / "src" / "concurrent.py").write_text(
+            "def later(): pass\n", encoding="utf-8"
+        )
+        git(self.root, "add", "src/concurrent.py")
+        saving = Event()
+        resume = Event()
+        original_write = self.store.write
+
+        def paused_write(**kwargs: object) -> dict:
+            # The source has been verified, but the artifact CAS has not run.
+            saving.set()
+            if not resume.wait(timeout=20):
+                raise StoreError("test_write_gate_timed_out")
+            return original_write(**kwargs)
+
+        self.store.write = paused_write
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                pending = executor.submit(
+                    persist_snapshot,
+                    self.store,
+                    request,
+                    expected_revision=None,
+                    approval_ref="approval/verified",
+                    approval_revision="policy-v1",
+                    change_reason="source HEAD locked across write",
+                    git_inventory_requests=evidence,
+                )
+                try:
+                    self.assertTrue(
+                        saving.wait(timeout=20), "save did not reach the artifact CAS"
+                    )
+                    commit = subprocess.run(
+                        ["git", "-C", str(self.root), "commit", "-qm", "concurrent"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(commit.returncode, 0, commit.stdout)
+                    self.assertIn("lock", commit.stderr.lower())
+                    redirect = subprocess.run(
+                        [
+                            "git", "-C", str(self.root), "symbolic-ref",
+                            "HEAD", "refs/heads/concurrent-branch",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(redirect.returncode, 0, redirect.stdout)
+                    self.assertIn("lock", redirect.stderr.lower())
+                    self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), source_branch)
+                    self.assertEqual(git(self.root, "rev-parse", "HEAD"), expected_head)
+                finally:
+                    resume.set()
+                saved = pending.result(timeout=20)
+        finally:
+            self.store.write = original_write
+
+        self.assertEqual(saved["status"], "stored", saved)
+        self.assertEqual(saved["source_revision"], expected_head)
+        self.assertEqual(git(self.root, "rev-parse", "HEAD"), expected_head)
+        self.assertEqual(
+            self.store.read_current(
+                "feature-inventory", "Sample", "qa/feature-inventory.json"
+            )["revision"],
+            saved["revision"],
+        )
+        # Locks are released after readback; the same staged commit now succeeds.
+        git(self.root, "commit", "-qm", "commit after source lock released")
+        self.assertNotEqual(git(self.root, "rev-parse", "HEAD"), expected_head)
 
     def test_source_ref_lock_conflict_prevents_artifact_write(self) -> None:
         request, evidence = self._code_registry()
