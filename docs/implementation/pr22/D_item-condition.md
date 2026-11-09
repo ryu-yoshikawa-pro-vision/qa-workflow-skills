@@ -82,13 +82,13 @@
 - [x] 相互不足検出と候補／適用判断／正式設計／実行の別指標が成立し、未確認・blocked・分母0を100%にしない。
 - [x] 同名別ID、ID誤統合、循環、分割・廃止、source欠落、旧revision、CAS競合の負例がPASSする。
 - [x] E向けに正規のitem・condition refと固定fixture・revision・拒否例を提供し、D側の契約を局所検証した。Eの実成果物との接続試験はPR #22に引き継いだ。
-- [ ] 新Skillの構造・isolated/trigger・決定論的・意味・局所回帰を実行した。
+- [x] 新Skillの構造・isolated/trigger・決定論的・意味・局所回帰を実行した。
 
 - [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、isolated packaging・決定論的テスト・意味評価・trigger評価のデータを揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
+- [x] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
 - [ ] source ref・artifact ref・revision・必要承認・保存readback・失敗／再開条件をAと接続し、統合時に再取得できる証拠を残した。
-- [ ] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
+- [x] 担当branch内の実装・局所検証は完了し、PR #22のみで行う横断検証と15＋10条件の最終判定を**担当branchの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
