@@ -204,3 +204,11 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - 固定`qa-training-store`のcomponent構成を再確認したところ、Web側はVitest、Native側はJestを利用するため、`component`にJestの公式`--json --outputFile`で出力するJest互換JSON形式を追加した。実runner本体ではなくJest形式JSONを生成する独立fixtureで局所検証する。
 - 固定`qa-training-store`での実Vitest・Playwright API-only・Native Jest・batch/event・静的解析・非機能計測の実run、必要なデータ／権限・安全なcleanup、外部Authority providerの承認／CAS／readback、H/J実artifactとの横断受入は未検証として残す。GitHub connector経由では対象repoのsource・package scriptを確認できるが、この実行環境からGitHubへ直接cloneできず、製品実runの証拠にはならない。
 - 上記の局所修正はPR #29の最新CIで判定する。PR #22の15＋10条件、S1〜S17、人間編集8件、詳細07の比較シナリオは削減しない。実runner・実provider受入が揃わないためG完了チェックボックスは未達のままとする。
+
+## 局所レビュー追加修正（2026-11-09：Authority判定・静的解析の同一性）
+
+- `runner.py` の直接TCは、固定Git HEADの期待結果snapshotから照合できても、そのsnapshotの仕様Authorityが実providerで認証・承認されたとは限らない。外部承認未接続のまま `tc_verdict=PASS` を出していたため、正式判定はnullに修正し、観測比較のみ `direct_observation_verdict` に維持した。固定snapshotの全件照合、元rawとrunner終了結果は従来どおり保持する。
+- 静的解析のraw summary照合に `tool_ref` を追加した。予定toolと実raw上のtoolが異なる場合は取得不完全とする。version・rules・config・対象path・終了コードの検査は維持する。これは実ツールの認証・署名検査ではない。
+- `tests/skills/runtime/test_non_e2e_runner.py` に、未認証Authorityでは正式TC PASSを出さない回帰確認と、静的解析tool不一致時の取得不完全の負例を追加した。
+- 固定`qa-training-store`の実Vitest／Playwright API-only／Web Vitest・Native Jest／batch・event／静的解析・非機能の受入、実providerの認証・許可・cleanup・readbackとH/J実artifactの横断照合は、この変更では実施していない。実runnerの安全な実行前提を確定できない対象はblockedのまま保持する。
+- 検証コマンド：`python -m unittest discover -s tests/skills/runtime -p 'test_non_e2e_*.py' -v`。実行結果と最新CIについてはPR #29のChecksを正本とし、ローカルで未実行の結果をPASSと記載しない。

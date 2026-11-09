@@ -865,6 +865,7 @@ class ActualRunnerTests(unittest.TestCase):
             "findings_count": 0,
             "analyzed_paths": ["README.md"],
             "skipped_paths": [],
+            "tool_ref": "fixture",
             "tool_version": "0.1",
             "rules_ref": "fixture-rule",
             "config_ref": "fixture-config",
@@ -875,6 +876,17 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(artifact["outcome"], "runner_pass")
         self.assertTrue(artifact["attempts"][0]["static_analysis"]["complete"])
+        wrong_tool = {**raw, "tool_ref": "unrelated-tool"}
+        plan["argv"] = [
+            sys.executable,
+            "-c",
+            "print(" + repr(json.dumps(wrong_tool)) + ")",
+        ]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+        self.assertFalse(artifact["attempts"][0]["static_analysis"]["complete"])
         plan["argv"] = [sys.executable, "-c", "print('{}')"]
         plan["reviewed_argv"] = plan["argv"]
         code, _, artifact = self.call(plan)
@@ -894,7 +906,8 @@ class ActualRunnerTests(unittest.TestCase):
         self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 0)
-        self.assertEqual(artifact["tc_verdict"], "PASS")
+        self.assertIsNone(artifact["tc_verdict"])
+        self.assertEqual(artifact["direct_observation_verdict"], "PASS")
         self.assertEqual(artifact["outcome"], "runner_pass")
         source = artifact["direct_tc_authority_evidence"]
         self.assertEqual(source["authority_repo_revision"], self.sha)

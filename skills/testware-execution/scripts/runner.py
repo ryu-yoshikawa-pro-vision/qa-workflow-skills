@@ -586,6 +586,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     and len(actual) == len(set(actual))
                     and set(actual) == expected_set
                     and omitted == []
+                    and report_data.get("tool_ref") == static_plan["tool_ref"]
                     and report_data.get("tool_version") == static_plan["tool_version"]
                     and report_data.get("rules_ref") == static_plan["rules_ref"]
                     and report_data.get("config_ref") == static_plan["config_ref"]
@@ -712,11 +713,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "attempts": records,
         "outcome": outcome,
         "direct_observation_verdict": last.get("direct_comparison", {}).get("result"),
-        "tc_verdict": (
-            last.get("direct_comparison", {}).get("result")
-            if plan.get("direct_tc") is True
-            else None
-        ),
+        # A pinned Git blob verifies the expected content, not an approved
+        # Authority. Never promote a local observation to a formal TC verdict.
+        "tc_verdict": None,
         "expected_authority_ref": plan.get("expected_authority_ref"),
         "direct_tc_authority_evidence": direct_authority,
         "quality_verdict": last.get("metric_comparison", {}).get("verdict"),

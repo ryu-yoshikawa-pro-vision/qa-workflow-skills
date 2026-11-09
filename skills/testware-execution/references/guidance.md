@@ -26,7 +26,7 @@
 ## 直接観測・静的解析・診断
 
 - 直接観測は各期待結果の実観測値・不一致・観測不能を保存する。HTTP 200でも本文が異なればFAIL。必要な副作用を観測できなければ判定不能。最初の実操作前に停止なら未実行。
-- 静的解析は適用ルール/設定、対象ファイル、実ツールversion、raw出力、取得件数・未解析範囲を記録する。意味レビューの誤検出・仕様矛盾はadversarial-reviewに渡す。
+- 静的解析は適用ルール/設定、対象ファイル、実ツールのref・version、raw出力、取得件数・未解析範囲を記録する。stdoutの構造化結果は予定したtool ref・version・rules・configとの一致を確認する。これらの一致は実ツールの署名・認証を意味しない。意味レビューの誤検出・仕様矛盾はadversarial-reviewに渡す。
 - 診断はSUT/testware/fixture/environment/runner/仕様不明を原因候補とし、観測事実、仮説、反証、確度、次のownerを記録する。元runの判定と欠陥候補は分離する。
 - 実装しただけのtestwareや独立fixtureのPASSは実製品runの証拠ではない。
 
@@ -53,8 +53,8 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 - `preflight.external_side_effects` と `preflight.shared_resource` は省略せず真偽値で指定する。いずれかがtrueなら本CLIは認証済みproviderがないため実行を拒否する。任意subprocessに対する副作用回数をOSレベルで保証できないため、`side_effects` が空でない場合も `side_effect_limits_unenforceable` として開始しない。これは副作用上限機能を実装したという意味ではなく、providerが接続されるまでの安全な停止である。
 - 実行前、各attemptの直前、cleanup後のcheckout HEADを確認する。終了後に別commitへ進んだ場合、作業ツリーがcleanでも `blocked_revision_changed` として元revisionの結果を完了扱いしない。ignored fileや外部状態についてはGit statusだけではcleanupを証明できないため、必要な環境では別の実証を要求する。
 - run manifestには `source_ref/source_revision`、`build_revision`、`repo_revision`、`environment_ref`、`runner_ref`、任意の `testware_ref/testware_revision`・`tc_ref/tc_revision`、予定scopeと選択根拠、個別attempt、raw、cleanup、結果収集を保持する。argvにはsecretが含まれ得るためコマンド全体は書き戻さず、実argvのSHA-256を保存する。入力で宣言された選択根拠をrunner自身の認証済み根拠に昇格しない。下流へ渡す際に必要な識別子・version・選択根拠が未取得ならそのまま未検証とする。
-- `direct_tc: true` は `direct_expectations`、`tc_ref`、`tc_revision`、`expected_authority_ref` に加え、`direct_tc_authority_file`を必須とする。この相対pathは実行repoの固定HEADに**通常ファイルとしてGit追跡済み**の期待結果snapshotを指定する。ファイルのJSON objectは `tc_ref`、`tc_revision`、`expected_authority_ref`、`direct_expectations` の4項目を含む。実行入力がそのsnapshotにある**全期待結果と完全一致しない**場合は開始前に拒否する。存在・版・期待値の照合元はGit blobであり、ignored/untrackedファイルや単なる自己申告は使用しない。manifestには元revisionとblob SHAを記録する。ただし**Git追跡の確認は仕様Authorityのprovider認証・承認を証明しない**。外部Authorityしかない場合は該当TCをblockedとし、A／PR #22の実provider認証へ渡す。任意出力比較は正式 `tc_verdict` にしない。非機能には別途閾値根拠と測定条件を必須とする。
-- 静的解析の実行は `runner_kind: static` と `static_analysis`（`tool_ref`、`tool_version`、`rules_ref`、`config_ref`、`expected_paths`、許可された `accepted_exit_codes`）を必須とする。実ツール／既存の許可済みadapterがstdoutへJSON objectとして `findings_count`、`analyzed_paths`、空の `skipped_paths`、同じtool/version/rules/configを出力した場合だけ取得完全とする。未実行・欠損・toolのrawだけではFinding 0件としない。各種tool固有の出力をこのJSONへ適合させるadapterは別途対象toolに沿った検証を要する。
+- `direct_tc: true` は `direct_expectations`、`tc_ref`、`tc_revision`、`expected_authority_ref` に加え、`direct_tc_authority_file`を必須とする。この相対pathは実行repoの固定HEADに**通常ファイルとしてGit追跡済み**の期待結果snapshotを指定する。ファイルのJSON objectは `tc_ref`、`tc_revision`、`expected_authority_ref`、`direct_expectations` の4項目を含む。実行入力がそのsnapshotにある**全期待結果と完全一致しない**場合は開始前に拒否する。存在・版・期待値の照合元はGit blobであり、ignored/untrackedファイルや単なる自己申告は使用しない。manifestには元revisionとblob SHAを記録する。ただし**Git追跡の確認は仕様Authorityのprovider認証・承認を証明しない**。このCLIの直接比較は `direct_observation_verdict` に記録し、実providerの承認が検証できない間は正式な `tc_verdict` をnullとする。外部Authorityしかない場合は該当TCをblockedとし、A／PR #22の実provider認証へ渡す。任意出力比較は正式 `tc_verdict` にしない。非機能には別途閾値根拠と測定条件を必須とする。
+- 静的解析の実行は `runner_kind: static` と `static_analysis`（`tool_ref`、`tool_version`、`rules_ref`、`config_ref`、`expected_paths`、許可された `accepted_exit_codes`）を必須とする。実ツール／既存の許可済みadapterがstdoutへJSON objectとして `findings_count`、`analyzed_paths`、空の `skipped_paths`、同じ`tool_ref`・`tool_version`・`rules_ref`・`config_ref`を出力した場合だけ取得完全とする。未実行・欠損・toolのrawだけではFinding 0件としない。各種tool固有の出力をこのJSONへ適合させるadapterは別途対象toolに沿った検証を要する。
 - `diagnosis_hypotheses` を指定した場合はrunの元観測と独立して原因候補・確度・証拠・次の担当を保持する。これは確定した製品欠陥でも元runの再採点でもない。
 
 ## 個別reporterの照合と実行結果
