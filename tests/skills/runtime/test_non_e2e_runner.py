@@ -309,6 +309,169 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(len(artifact["attempts"]), 2)
         self.assertTrue(all(a["return_code"] == 1 for a in artifact["attempts"]))
 
+    def test_event_case_report_requires_complete_selected_population(self):
+        report = {
+            "schema": "non-e2e-cases/v1",
+            "source_revision": self.sha,
+            "testware_revision": "fixture-event-revision",
+            "complete": True,
+            "results": [
+                {
+                    "path": "tests/event.test.py",
+                    "title_path": ["event", "processed"],
+                    "status": "passed",
+                    "attempt_results": [{"status": "passed"}],
+                }
+            ],
+        }
+        command = (
+            "import pathlib,sys;"
+            "pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')"
+        )
+        plan = self.plan(
+            [sys.executable, "-c", command, "{reporter_file}"], kind="event"
+        )
+        plan.update(
+            {
+                "reporter_format": "case-json",
+                "testware_ref": "fixture:event",
+                "testware_revision": "fixture-event-revision",
+                "runner_version": "adapter-fixture-1",
+                "selected": [
+                    {
+                        "path": "tests/event.test.py",
+                        "title_path": ["event", "processed"],
+                    }
+                ],
+                "selection_verified": True,
+                "selection_evidence_ref": "fixture:selection",
+                "planned_scope_ref": "fixture:scope",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertTrue(artifact["collection_verified"])
+        self.assertEqual(
+            artifact["attempts"][0]["reconciliation"]["results"][0]["runner_status"],
+            "passed",
+        )
+        report["results"] = []
+        plan["argv"] = [
+            sys.executable,
+            "-c",
+            "import pathlib,sys;pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')",
+            "{reporter_file}",
+        ]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+        self.assertFalse(artifact["collection_verified"])
+
+    def test_playwright_native_json_report_reconciles_api_only_tests(self):
+        report = {
+            "suites": [
+                {
+                    "title": "tests/contracts/api.spec.ts",
+                    "suites": [],
+                    "specs": [
+                        {
+                            "file": "tests/contracts/api.spec.ts",
+                            "title": "returns contract body",
+                            "tests": [
+                                {
+                                    "projectName": "api",
+                                    "status": "expected",
+                                    "results": [{"status": "passed", "retry": 0}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "errors": [],
+            "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
+        }
+        command = (
+            "import pathlib,sys;"
+            "pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')"
+        )
+        plan = self.plan(
+            [sys.executable, "-c", command, "{reporter_file}"],
+            kind="playwright-api",
+        )
+        plan.update(
+            {
+                "reporter_format": "playwright-json",
+                "testware_ref": "fixture:api-only",
+                "testware_revision": self.sha,
+                "runner_version": "playwright-json-fixture",
+                "selected": [
+                    {
+                        "path": "tests/contracts/api.spec.ts",
+                        "title_path": ["returns contract body"],
+                        "project_name": "api",
+                    }
+                ],
+                "selection_verified": True,
+                "selection_evidence_ref": "fixture:selection",
+                "planned_scope_ref": "fixture:scope",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertEqual(artifact["reporter_format"], "playwright-json")
+        self.assertTrue(artifact["collection_verified"])
+        self.assertIsNone(artifact["tc_verdict"])
+
+    def test_reporter_failure_with_exit_zero_is_not_verified(self):
+        report = {
+            "schema": "non-e2e-cases/v1",
+            "source_revision": self.sha,
+            "testware_revision": "v1",
+            "complete": True,
+            "results": [
+                {
+                    "path": "tests/batch.py",
+                    "title_path": ["batch"],
+                    "status": "failed",
+                    "attempt_results": [{"status": "failed"}],
+                }
+            ],
+        }
+        command = (
+            "import pathlib,sys;"
+            "pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')"
+        )
+        plan = self.plan([sys.executable, "-c", command, "{reporter_file}"])
+        plan.update(
+            {
+                "reporter_format": "case-json",
+                "testware_ref": "fixture:batch",
+                "testware_revision": "v1",
+                "runner_version": "adapter-fixture",
+                "selected": [
+                    {"path": "tests/batch.py", "title_path": ["batch"]}
+                ],
+                "selection_verified": True,
+                "selection_evidence_ref": "fixture:selection",
+                "planned_scope_ref": "fixture:scope",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+        self.assertFalse(artifact["collection_verified"])
+        self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+
     def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
         plan["direct_tc"] = True
