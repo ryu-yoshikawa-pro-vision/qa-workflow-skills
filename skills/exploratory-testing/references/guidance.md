@@ -29,10 +29,10 @@ PR #12の実行安全契約で与えられたorigin / side-effect / secret / cle
 
 ## Direct start
 
-Charterがあればformal TC / TR / E2E testwareなしで`exploration`を開始できます。`investigation`は`symptom_ref` / `hypothesis_ref` / `unresolved_finding_ref`のいずれかがあり、既存ownerがないと確認できた場合だけです。既知E2E失敗は`e2e-test-result-analysis`、既知TCの忠実実行は`test-execution`、current UI収集は`test-target-inspection`、owner判明済みのsymptomはそのownerへ送ります（`scripts/exploratory_runtime.py`の`resolve_direct_start()`）。blocked Sessionの再開は`can_resume()`で、Charter・scope・環境が同一の場合に限ります。
+Charterがあればformal TC / TR / E2E testwareなしで`exploration`を開始できます。`investigation`は`symptom_ref` / `hypothesis_ref` / `unresolved_finding_ref`のいずれか（空でない文字列）があり、既存ownerがないと確認できた場合だけです。この起点はCharterに保存され、`validate_charter()`・`validate_session()`・`can_resume()`・deterministic validatorが同じ起点を認めます（`resolve_direct_start()`が返す`charter`を保存します）。既知E2E失敗は`e2e-test-result-analysis`、既知TCの忠実実行は`test-execution`、current UI収集は`test-target-inspection`、owner判明済みのsymptomはそのownerへ送ります（`scripts/exploratory_runtime.py`の`resolve_direct_start()`）。blocked Sessionの再開は`can_resume()`で、Charter・scope・環境が同一の場合に限ります。
 
 ## Follow-up
 
-Finding単位の引継ぎは`build_follow_up_handoff()`が作るrefだけのpayload（owner_skill / artifact_ref / content_hash / session_ref・session_revision / Observation・evidence・source refs / validation / state（current・blocked）/ resume / required_approval）です。受け手は`follow_up_owner_skill`で、ブロック中Sessionは`resume_session`、未解決は`owner_resolution_or_investigation`を再開先にします。`defect-management`宛は欠陥候補の確認依頼で、unresolvedなFindingは対象外です。承認・Defect起票・knowledge entry作成は受け手が判断します。
+Finding単位の引継ぎは`build_follow_up_handoff()`が作るrefだけのpayload（owner_skill / artifact_ref / content_hash / session_ref・session_revision / Observation・evidence・sourceごとの`{ref, revision}` / validation / state（current・blocked）/ resume / required_approval）です。source revisionはSession revisionと別で、Charterの`source_refs`の`{ref, revision}`、または`source_revisions`（ref→revision）から取り、取得していないrevisionは作りません。revision未取得のsourceは`source_revision_unresolved:<ref>`としてunresolvedに残し、stateは`blocked`、再開先は`record_source_revisions`です（`defect-management`宛は対象外）。受け手は`follow_up_owner_skill`で、ブロック中Sessionは`resume_session`、未解決は`owner_resolution_or_investigation`を再開先にします。`defect-management`宛は欠陥候補の確認依頼で、unresolvedなFindingは対象外です。承認・Defect起票・knowledge entry作成は受け手が判断します。
 
 最も早いownerへ`qa-workflow`経由で渡します。spec → `question-analysis`、新Risk候補 → `test-analysis`、TC更新 → design Skill、current UI fact → `test-target-inspection`、E2E failure → `e2e-test-result-analysis`、複数workflowで再利用するresidual knowledge候補 → `qa-knowledge | triage`。Findingは自動Defect化 / 自動knowledge化しません。

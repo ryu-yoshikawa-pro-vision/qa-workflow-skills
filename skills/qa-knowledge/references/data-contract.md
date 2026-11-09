@@ -27,7 +27,7 @@
 }
 ```
 
-Kinds are `test_subject_or_mechanism`, `test_focus`, `test_environment`. States are `有効`, `要再検証`, `置換済み`. Provenance and dependency refs each require the revision read from their owning source. Each entry is stored as `<entry-ref>.md` with one JSON fenced block; `entry_revision` is storage metadata kept in the calling workflow / Activity, not written into the entry body. A local-file digest can identify the exact file bytes for a current read, but is never treated as an atomic update condition; if an older version cannot be fetched, historical use is blocked.
+Kinds are `test_subject_or_mechanism`, `test_focus`, `test_environment`. States are `有効`, `要再検証`, `置換済み`. Provenance and dependency refs each require a string `ref` and a string `revision` read from their owning source. A JSON array or object where a string is required (`identity.kind`, `kind`, `state`, `scope_refs`, dependency `ref` / `revision`) is a validation issue (`blocked` / `incomplete`), never an exception. Each entry is stored as `<entry-ref>.md` with one JSON fenced block; `entry_revision` is storage metadata kept in the calling workflow / Activity, not written into the entry body. A local-file digest can identify the exact file bytes for a current read, but is never treated as an atomic update condition; if an older version cannot be fetched, historical use is blocked.
 
 ## Identity and applicability invariants
 
@@ -47,7 +47,7 @@ Kinds are `test_subject_or_mechanism`, `test_focus`, `test_environment`. States 
 
 ## Lookup scope
 
-`lookup()` first checks that the root listing is complete and that each entry's identity and scope can be decided. Entries that certainly do not apply (other scope, kind, environment or version) are not checked for content or dependencies; an unfetchable dependency of such an entry is reported only in `out_of_scope_diagnostics`. An applicable entry with unresolved, invalid or stale dependencies is never returned as current. Broken identity, unresolved scope, duplicate or missing refs, unreadable files and truncated root listings make the result `incomplete`. `plan_revalidation()` selects only entries whose own dependencies changed or are unresolved.
+`lookup()` first checks that the root listing is complete and that each entry's identity and scope can be decided. Entries that certainly do not apply (other scope, kind, environment or version) are not checked for content or dependencies; an unfetchable dependency of such an entry is reported only in `out_of_scope_diagnostics`. An applicable entry with unresolved, invalid or stale dependencies is never returned as current. Broken identity, unresolved scope, duplicate or missing refs, unreadable files and truncated root listings make the result `incomplete`. `plan_revalidation()` selects only entries whose own dependencies changed or are unresolved; scope-limited requests and unchanged entries are left alone, and a repository HEAD change alone selects nothing. Each target carries the stored `entry_revision` that was read as its expected revision. A non-object entry, broken identity, a dependencies field that is not a list, or a target without a stored revision is reported in `rejected` and makes the plan `incomplete`; it is never dropped silently. Stale, unresolved-dependency and invalid-identity entries are reported separately.
 
 ## Identity input
 

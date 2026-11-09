@@ -338,7 +338,7 @@
 
 - `EXP-D001` Session artifactが一つだけ整形式で存在する
 - `EXP-D002` modeとCharter必須項目が揃う
-- `EXP-D003` investigationをsymptomまたはhypothesisから開始
+- `EXP-D003` investigationをsymptom・hypothesis・unresolved Findingのいずれかから開始
 - `EXP-D004` Observation / Finding、unique ref、evidence、source / follow-upの分離・追跡
 - `EXP-D005` required cleanupの未確認 / 失敗を安全完了にしない
 - `EXP-D006` completed Sessionのimmutable性

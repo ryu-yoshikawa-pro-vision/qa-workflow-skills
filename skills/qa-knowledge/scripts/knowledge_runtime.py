@@ -31,6 +31,11 @@ def canonical_entry_ref(identity: dict[str, Any]) -> str:
     return f"KN-{hashlib.sha256(_canonical(identity)).hexdigest()}"
 
 
+def _one_of(value: Any, allowed: set[str]) -> bool:
+    """Membership test that never raises on JSON arrays or objects."""
+    return isinstance(value, str) and value in allowed
+
+
 def _string_list(value: Any) -> bool:
     return (
         isinstance(value, list)
@@ -50,7 +55,7 @@ def identity_issues(entry: dict[str, Any]) -> list[str]:
     if not isinstance(identity, dict) or not identity:
         return ["identity_must_be_non_empty_object"]
     issues: list[str] = []
-    if identity.get("kind") not in KINDS:
+    if not _one_of(identity.get("kind"), KINDS):
         issues.append("identity_kind_invalid")
     elif identity.get("kind") != entry.get("kind"):
         issues.append("identity_kind_mismatch")
@@ -115,6 +120,16 @@ def validate_entry(
     current_dependencies: dict[str, str] | None = None,
     entry_revision: str | None = None,
 ) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        return {
+            "valid": False,
+            "issues": ["entry_must_be_object"],
+            "currentness": {
+                "status": "unresolved",
+                "changed_refs": [],
+                "unresolved": ["entry_must_be_object"],
+            },
+        }
     issues: list[str] = []
     required = (
         "entry_ref",
@@ -137,9 +152,9 @@ def validate_entry(
     if expected_ref and entry.get("entry_ref") != expected_ref:
         issues.append("entry_ref_does_not_match_identity")
     issues.extend(identity_issues(entry))
-    if entry.get("kind") not in KINDS:
+    if not _one_of(entry.get("kind"), KINDS):
         issues.append("invalid_kind")
-    if entry.get("state") not in STATES:
+    if not _one_of(entry.get("state"), STATES):
         issues.append("invalid_state")
     if (
         not isinstance(entry.get("content"), str)
@@ -166,8 +181,10 @@ def validate_entry(
         for ref in refs:
             if (
                 not isinstance(ref, dict)
-                or not ref.get("ref")
-                or not ref.get("revision")
+                or not isinstance(ref.get("ref"), str)
+                or not ref["ref"]
+                or not isinstance(ref.get("revision"), str)
+                or not ref["revision"]
             ):
                 issues.append(f"{field}_requires_ref_and_revision")
                 break
@@ -201,13 +218,23 @@ def compare_currentness(
             "changed_refs": [],
             "unresolved": ["current_dependency_snapshot_missing"],
         }
+    if not isinstance(stored_dependencies, list) or not isinstance(
+        current_dependencies, dict
+    ):
+        return {
+            "status": "unresolved",
+            "changed_refs": [],
+            "unresolved": ["invalid_dependency_record"],
+        }
     changed: list[str] = []
     unresolved: list[str] = []
     for dependency in stored_dependencies:
         if (
             not isinstance(dependency, dict)
+            or not isinstance(dependency.get("ref"), str)
             or not dependency.get("ref")
-            or not dependency.get("revision")
+            or not isinstance(dependency.get("revision"), str)
+            or not dependency["revision"]
         ):
             unresolved.append("invalid_dependency_record")
             continue
@@ -326,6 +353,8 @@ def create_entry(
     current_dependencies: dict[str, str] | None,
 ) -> dict[str, Any]:
     """Create at the canonical identity path; a conflict is re-read, never forked."""
+    if not isinstance(entry, dict):
+        return {"status": "blocked", "reason": "semantic_identity_missing"}
     if not complete_root_snapshot:
         return {"status": "blocked", "reason": "identity_snapshot_incomplete"}
     if not atomic_create_if_absent_available:
@@ -497,7 +526,7 @@ def plan_update(
         return {"status": "blocked", "reason": "entry_ref_does_not_match_identity"}
     if current_entry.get("identity") != updated_entry.get("identity"):
         target_entry_identity_unchanged = False
-    if not expected_entry_revision:
+    if not isinstance(expected_entry_revision, str) or not expected_entry_revision:
         return {"status": "blocked", "reason": "entry_revision_unavailable"}
     if not target_entry_identity_unchanged:
         return {"status": "replacement_required", "reason": "semantic_identity_changed"}
@@ -898,15 +927,28 @@ def plan_revalidation(
     outside ``scope_refs`` and entries with unchanged dependencies are left alone;
     a repository HEAD change alone selects nothing. ``changed_refs`` limits the
     selection to entries depending on those refs. Each target carries the stored
-    revision to use as the expected revision of the conditional update.
+    revision read from storage, which is the expected revision of the conditional
+    update. An input that cannot be decided (not an object, broken identity,
+    unresolved dependencies field, or a target without a stored revision) is
+    reported in ``rejected`` and makes the plan ``incomplete``; it is never
+    skipped or assumed current.
     """
+    for name, value in (("scope_refs", scope_refs), ("changed_refs", changed_refs)):
+        if value is not None and (
+            not isinstance(value, set) or any(not isinstance(ref, str) for ref in value)
+        ):
+            return _revalidation_invalid(f"{name}_invalid")
+    if not isinstance(entries, list):
+        return _revalidation_invalid("entry_listing_invalid")
+    if not isinstance(current_dependencies, dict):
+        return _revalidation_invalid("current_dependencies_invalid")
     targets: list[dict[str, Any]] = []
     unaffected: list[str] = []
     rejected: list[dict[str, Any]] = []
-    for entry in sorted(
-        (item for item in entries if isinstance(item, dict)),
-        key=lambda item: str(item.get("entry_ref", "")),
-    ):
+    for entry in entries:
+        if not isinstance(entry, dict):
+            rejected.append({"entry_ref": None, "issues": ["entry_must_be_object"]})
+            continue
         entry_ref = entry.get("entry_ref")
         problems = identity_issues(entry)
         if not _ref_matches_identity(entry):
@@ -920,7 +962,9 @@ def plan_revalidation(
         if scope_refs is not None and not scope_refs & set(entry["scope_refs"]):
             continue
         dependency_refs = {
-            item.get("ref") for item in dependencies if isinstance(item, dict)
+            item["ref"]
+            for item in dependencies
+            if isinstance(item, dict) and isinstance(item.get("ref"), str)
         }
         if changed_refs is not None and not dependency_refs & changed_refs:
             unaffected.append(entry_ref)
@@ -929,10 +973,16 @@ def plan_revalidation(
         if currentness["status"] == "current":
             unaffected.append(entry_ref)
             continue
+        revision = entry.get("entry_revision")
+        if not isinstance(revision, str) or not revision:
+            rejected.append(
+                {"entry_ref": entry_ref, "issues": ["entry_revision_unavailable"]}
+            )
+            continue
         targets.append(
             {
                 "entry_ref": entry_ref,
-                "expected_entry_revision": entry.get("entry_revision"),
+                "expected_entry_revision": revision,
                 "reason": "dependency_changed"
                 if currentness["status"] == "stale"
                 else "dependency_unresolved",
@@ -940,11 +990,21 @@ def plan_revalidation(
                 "unresolved": currentness["unresolved"],
             }
         )
+    targets.sort(key=lambda item: item["entry_ref"])
     return {
         "status": "incomplete" if rejected else "complete",
         "targets": targets,
         "unaffected_refs": sorted(unaffected),
         "rejected": rejected,
+    }
+
+
+def _revalidation_invalid(reason: str) -> dict[str, Any]:
+    return {
+        "status": "incomplete",
+        "targets": [],
+        "unaffected_refs": [],
+        "rejected": [{"entry_ref": None, "issues": [reason]}],
     }
 
 
@@ -1026,6 +1086,10 @@ def _handoff_state(
     }
 
 
+def _as_list(value: Any) -> list[Any]:
+    return list(value) if isinstance(value, list) else []
+
+
 def improvement_reference(
     entry: dict[str, Any], *, current_dependencies: dict[str, str] | None = None
 ) -> dict[str, Any]:
@@ -1070,10 +1134,8 @@ def improvement_reference(
             "entry_kind": entry["kind"],
             "scope_refs": list(entry["scope_refs"]),
             "applicability": entry.get("applicability"),
-            "source_refs": list(entry.get("provenance") or []),
-            "currentness_dependencies": list(
-                entry.get("currentness_dependencies") or []
-            ),
+            "source_refs": _as_list(entry.get("provenance")),
+            "currentness_dependencies": _as_list(entry.get("currentness_dependencies")),
             "state": state["state"],
             "validation": state["validation"],
             "unresolved": state["unresolved"],
@@ -1102,7 +1164,9 @@ def plan_approved_improvement_update(
     Registering knowledge never completes the improvement: plan revision,
     implementation and effect measurement stay with their owners.
     """
-    if not request.get("improvement_ref") or not request.get("approval_ref"):
+    if not isinstance(request, dict) or (
+        not request.get("improvement_ref") or not request.get("approval_ref")
+    ):
         return {"status": "blocked", "reason": "approved_improvement_required"}
     sources = request.get("source_refs")
     if not isinstance(sources, list) or not sources:

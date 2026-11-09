@@ -15,7 +15,7 @@ description: 固定Charterの範囲で未知の問題を探索する。既存own
 4. Observationは実測事実、Findingはfollow-upを要する検出事項として分離します。実測を仕様、原因、Defectへ自動昇格しません。
 5. unknown attemptはside effect上限を消費した扱いにし、状態を確認せず盲目的に再試行しません。必要なcleanupが失敗 / 未確認ならSessionを安全完了扱いしません。
 6. 開始に正式TC / TR / E2E testwareを必要としません。Charterから`exploration`、既存ownerのないsymptom / hypothesis / unresolved Findingだけ`investigation`を直接開始し、`resolve_direct_start()`で既存owner（既知E2E失敗、既知TC実行、current UI収集、owner判明済みsymptom）をrouteします。無関係な設計・全工程Skillを前提にしません。
-7. FindingのFollow-upは`build_follow_up_handoff()`のSession / Observation / evidence refとrevisionだけを渡し、実測や仕様・run結果の正本を複製しません。未確定の症状を欠陥候補・正式Defectやknowledge entryへ自動昇格しません。
+7. FindingのFollow-upは`build_follow_up_handoff()`のSession / Observation / evidence refとrevision、sourceごとのref・revision（Session revisionと別）だけを渡し、revision未取得のsourceをcurrent扱いせず、実測や仕様・run結果の正本を複製しません。未確定の症状を欠陥候補・正式Defectやknowledge entryへ自動昇格しません。
 8. Production helperが必須のschema / lifecycle処理に失敗した場合は`incomplete` / `unresolved` / `blocked`に閉じ、LLMで同じ処理を代替しません。
 
 ## 正規対象

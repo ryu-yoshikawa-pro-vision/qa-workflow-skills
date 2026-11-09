@@ -73,11 +73,14 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     inv_ok = doc.get("mode") != "investigation" or bool(
         charter.get("symptom_ref")
         or charter.get("hypothesis_ref")
+        or charter.get("unresolved_finding_ref")
         or charter.get("symptom")
         or charter.get("hypothesis")
     )
     result.add(
-        "EXP-D003", inv_ok, "investigationはsymptomまたはhypothesisを起点にすること"
+        "EXP-D003",
+        inv_ok,
+        "investigationはsymptom・hypothesis・unresolved Findingのいずれかを起点にすること",
     )
     observations, findings = doc.get("observations"), doc.get("findings")
     separated = isinstance(observations, list) and isinstance(findings, list)

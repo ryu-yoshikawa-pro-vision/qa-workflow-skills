@@ -108,7 +108,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 - `skills/qa-knowledge/evals/deterministic/validator.py`／`scripts/skills/evals/deterministic/ASSERTIONS.md`：`KN-D012`（identityと直下のkind／scope_refsの一致）。
 - 両Skillの`SKILL.md`・`references/`、trigger（各train／validationに正負1件ずつ。exploratory-testingのtrain負例1件は、下記の実Agent確認の結果に基づき差し替え）、両Skillの`description`、semantic（`KN-SEM-007`・`EXP-SEM-005`）、`EVALS.md`の対象ID範囲。
 - 既存テスト`tests/skills/evals/deterministic/test_qa_artifact_graph_skills.py`：`plan_update()`／`plan_replacement()`が現・新entryを必須にした契約変更に合わせて呼出しを更新（検証内容は維持）。
-- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（49件）。
+- 新規テスト：`tests/skills/evals/deterministic/test_knowledge_exploration_pr22_i.py`（74件。うちレビュー指摘への回帰は後述）。
 
 ### 公開入出力契約（PR #22／Aへ引渡し）
 
@@ -121,15 +121,15 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 ### 実行した検証（コマンドごとに個別判定）
 
-| 検証                                                                                                                                                | 環境                    | 結果                                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `unittest test_knowledge_exploration_pr22_i`（49件。繰返し実行して不安定さがないことも確認）                                                        | Windows／Linux(WSL)     | PASS                                                                                                                                                          |
-| `unittest discover -s tests/skills/evals/deterministic`（337件）                                                                                    | Windows                 | 既定TEMPで1件FAIL（`test_pre_start_claim_...`。TEMPが短縮パス`RYU-YO~1`のため）。TEMPを長いパスにすると337件PASS                                              |
-| 同上                                                                                                                                                | Linux(WSL, Python 3.12) | 1件FAIL（`test_wcag_sqlite_provider_blocks_..._git_worktree_path`）。作業ツリーのコピーが`.git`を持たないため。`git init`したコピーで単体PASS。本変更と無関係 |
-| `unittest discover -s tests/skills/runtime`                                                                                                         | Windows                 | 6 failures／14 errors（`test_sqlite_workflow_history`・`test_ci_handoff`）。変更前HEADでも同一件数・内容（Windowsのファイルロック等）                         |
-| 同上                                                                                                                                                | Linux(WSL, Python 3.12) | 496件中1件FAIL（`test_ci_handoff`の`test_json_nesting_failure_...`）。変更前HEADのexportでも同じ失敗（CIはPython 3.11）。本変更と無関係                       |
-| `unittest discover -s scripts/skills/evals/deterministic/tests`、`.../trigger`、`.../semantic`、`scripts/skills/evals/semantic/{validate.py,tests}` | Windows／Linux          | PASS（semantic datasetは23 Skill／167 case）                                                                                                                  |
-| `format_tracked.py check`（ruff 0.16.8・dprint 0.55.2）、`git diff --check`、`compileall`                                                           | Windows                 | PASS                                                                                                                                                          |
+| 検証                                                                                                                                                | 環境                    | 結果                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `unittest test_knowledge_exploration_pr22_i`（74件）                                                                                                | Windows                 | PASS（レビュー指摘対応後）                                                                                                                                                           |
+| `unittest discover -s tests/skills/evals/deterministic`（366件）                                                                                    | Windows                 | TEMPを長いパスにして366件PASS（既定TEMPは短縮パス`RYU-YO~1`のため、1件が環境依存でFAILする。変更前から）                                                                             |
+| 同上                                                                                                                                                | Linux(WSL, Python 3.12) | 1件FAIL（`test_wcag_sqlite_provider_blocks_..._git_worktree_path`）。作業ツリーのコピーが`.git`を持たないため。`git init`したコピーで単体PASS。本変更と無関係                        |
+| `unittest discover -s tests/skills/runtime`（581件）                                                                                                | Windows                 | 6 failures／16 errors（`test_sqlite_workflow_history`・`test_ci_handoff`）。変更前HEAD（`bbd5a19`）のexportで同条件に実行し、失敗22件の名前が完全に一致（Windowsのファイルロック等） |
+| 同上（581件）／deterministic（366件）                                                                                                               | Linux(WSL, Python 3.12) | runtimeは581件中1件FAIL（`test_ci_handoff`の`test_json_nesting_failure_...`。変更前HEADのexportでも同じ失敗。CIはPython 3.11）。deterministicは366件PASS。本変更と無関係             |
+| `unittest discover -s scripts/skills/evals/deterministic/tests`、`.../trigger`、`.../semantic`、`scripts/skills/evals/semantic/{validate.py,tests}` | Windows／Linux          | PASS（semantic datasetは23 Skill／167 case）                                                                                                                                         |
+| `format_tracked.py check`（ruff 0.16.8・dprint 0.55.2）、`git diff --check`、`compileall`                                                           | Windows                 | PASS                                                                                                                                                                                 |
 
 ### 実Agentによる発火確認（haikuサブエージェント、2026-11-09）
 
@@ -141,6 +141,34 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
   4. `qa-knowledge`のdescriptionに「探索のFinding / Observationを含むQA candidate」を明記：2回とも48／48（両Skillで正例24／24、負例24／24）。
 - 限界：(a) descriptionの調整に使ったdatasetと同じ48問で最終確認しており、保留データでの確認ではない。(b) 試行回数は各版2回、モデルはhaikuのみ。(c) 最終版は2回とも全問一致だったが、途中の版では同じ問いの判定が回ごとに揺れたため、この2回を再現性の保証とは扱わない。保留データ・他モデル・実ハーネスでの全current Skill同時のroutingはPR #22で行う。
 - 追加した説明の検証：`description`の変更はfrontmatterの文字列のみ。`tests/skills/evals/trigger`のdataset契約テスト、semantic dataset検証、format／lintは変更後もPASS。
+
+### レビュー指摘への対応（2026-11-09、レビュー対象`bbd5a19`）
+
+`bbd5a19`のレビューで4件の問題が指摘された。いずれも、修正前のコードで再現するテストを先に用意し（修正前のコードに対して失敗することを確認した）、同じ原因の別経路も確認した。
+
+1. **unresolved Findingからの直接調査**（`exploratory_runtime.py`）：`resolve_direct_start()`は`unresolved_finding_ref`を調査開始条件として受けたが、`validate_charter()`がその起点を認識せず、有効なCharterでも`charter_invalid`でblockされた。既存テストは`mode`しか確認しておらず、見逃していた。`INVESTIGATION_ORIGIN_KEYS`を共通にし、`validate_charter()`・`validate_session()`（経由）・`can_resume()`（Charter identityに起点が含まれる）・deterministic validator（`EXP-D003`）が同じ起点を認めるようにした。`resolve_direct_start()`は起点を含む`charter`を返し、呼出し側はこれをSessionに保存する。起点は空でない文字列に限る。既知owner・既知E2E失敗・既知TC・current UI収集のroutingは変更しない。回帰テストは`status == "start"`を必ず確認し、開始、Session検証、blocked、`can_resume()`、起点変更時の`new_session_required`までを検証する。
+2. **Knowledge entryの不正型による例外**（`knowledge_runtime.py`）：`identity.kind`・`kind`・`state`に配列／objectを与えると、集合への包含判定で`TypeError`になった。`compare_currentness()`も、依存`ref`が配列、または`currentness_dependencies`が`null`・数値のとき同様に例外になった。非objectのentryは`AttributeError`だった。`_one_of()`で型を確認してから判定し、非objectは`entry_must_be_object`、不正な依存は`invalid_dependency_record`（currentnessは`unresolved`）に変換した。`provenance`／`currentness_dependencies`の`ref`・`revision`は文字列を必須にした。`create_entry()`／`read_entry()`／`update_entry()`／`plan_update()`／`plan_replacement()`／`plan_revalidation()`／`lookup()`／`improvement_reference()`／`plan_approved_improvement_update()`は、例外ではなくblocked／incomplete／rejectedを返す。不正identityを自動修正・再採番せず、入力も変更しない。
+3. **部分再検証の入力不備**（`plan_revalidation()`）：辞書以外のentryを無言で除外し、保存済み`entry_revision`のないentryも再検証対象として`complete`で返した。非objectのentry・identity不正・`currentness_dependencies`がlistでない・再検証対象でrevisionがないentryは`rejected`に入れ、statusを`incomplete`にする。`scope_refs`／`changed_refs`／`current_dependencies`／`entries`の型が不正な場合もincompleteにする。対象外scope・依存変更のないentryは、revisionがなくても対象にもrejectedにもしない。repo HEADの変更だけでは対象を選ばない。stale（`dependency_changed`）・依存不明（`dependency_unresolved`）・identity不正（`rejected`）は別々に返す。`plan_update()`も、文字列で空でないrevisionを必須にした。
+4. **探索Finding引継ぎのsource revision**（`build_follow_up_handoff()`）：`source_refs`はCharterの文字列refをそのまま返し、sourceごとのrevisionがなかった。Aの公開契約は入力source refs／revisionsを要求する。`source_refs`を`{ref, revision}`の配列にした。revisionはCharterの`source_refs`の`{ref, revision}`、またはSessionの任意の`source_revisions`（ref→revision）から取り、Session revisionとは別に扱う。取得していないrevisionは作らず`null`のまま、`source_revision_unresolved:<ref>`をunresolvedに残し、stateを`blocked`、再開先を`record_source_revisions`にする（blocked Sessionでは`resume_session`を優先）。`defect-management`宛は、revision未取得のsourceがあると`source_revision_unresolved`でblockする。実測本文・仕様・run結果は複製せず、欠陥候補・Defect・Knowledge entryへ自動昇格しない（`promotion=not_promoted`）。共通契約（A）の項目は変更しない。
+
+**同じ原因の追加対応**：探索の`validate_charter()`／`validate_session()`も、`allowed_operations`・`side_effect_operations`・`mode`・`state`・`cleanup`・Observation／Findingのref・`source_observation_refs`に配列／objectを与える、または非objectのSessionを渡すと`TypeError`／`AttributeError`になったため、issueとして返すようにした（回帰テストあり）。Findingの`unresolved`がlistでない場合は`unresolved_must_be_list`でblockする。
+
+**未対応（既存で、本PRの変更対象外）**：探索の`authorize_operation()`・`record_attempt()`は、`allowed_operations`／`side_effect_operations`が非listのCharterを直接渡されると例外になりうる。いずれもSession検証（`validate_charter()`）で拒否される入力で、本PRで追加・変更した経路ではないため、変更していない。
+
+#### 完了基準の再判定（実コード・テストで確認）
+
+| 完了基準                                     | 判定                  | 根拠・区別                                                                                                                                         |
+| -------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| identity・scope不一致の拒否、旧entry読取互換 | 満たす（固定fixture） | `KnowledgeIdentityInvariantTests`、旧schemaのentry読取、不正型entryの回帰（`KnowledgeMalformedEntryTests`）                                        |
+| 対象外scopeを巻き込まないlookup              | 満たす（固定fixture） | `KnowledgePartialLookupTests`。対象外entryは内容・依存を検証せず、診断のみ                                                                         |
+| root列挙・読取の完全性                       | 満たす（固定fixture） | 切り詰め・読取不能・非canonical名・不正identityは`incomplete`                                                                                      |
+| 部分revalidation・revision・保存競合         | 満たす（固定fixture） | `KnowledgeRevalidationInputTests`。native CASは固定fixtureのproviderで、実providerは未検証（PR #22）                                               |
+| create → read → lookup → update → lookup     | 満たす（固定fixture） | 別sessionとして実行。保存後のreadback済みrevisionだけを使用                                                                                        |
+| 探索・症状調査の直接開始                     | 満たす（修正後）      | unresolved Finding起点を含む3起点が、開始・Session検証・再開まで一貫（`ExploratoryInvestigationOriginTests`）。routingは既存のまま                 |
+| Findingの引継ぎと未確定状態の保持            | 満たす（修正後）      | sourceごとのrevision、未取得revisionのunresolved／blocked／再開先（`ExploratorySourceRevisionHandoffTests`）。Aの実成果物との接続はPR #22          |
+| 既存Skillとのrouting境界                     | 部分的（擬似確認）    | haikuのdescription判定は48／48だが、同一dataset・haikuのみ・実ハーネスではない。全current Skill同時のrouting・保留dataはPR #22                     |
+| 履歴・旧entry・既存呼び出し元の互換性        | 満たす                | 既存`test_qa_artifact_graph_skills`等を含むdeterministic 366件。runtimeの失敗集合は変更前と一致。公開形状の変更は「互換・移行・rollback」を参照    |
+| standalone packaging・評価データ・関連CI     | 満たす（局所）        | isolated packagingテスト、trigger／semantic dataset検証、deterministic。semantic評価のLLM判定は未実施（PR #22）。最終HEADのActionsは下の記録を参照 |
 
 ### 未検証／blocked／SKIP と再開条件
 
@@ -156,5 +184,6 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 ### 互換・移行・rollback
 
+- レビュー対応での公開形状の変更：(1) `build_follow_up_handoff()`の`source_refs`は、文字列の配列から`{ref, revision}`の配列になった（本PRで導入した引継ぎで、リポジトリ内の他の呼出し元はない）。revision未取得のsourceがあるとstateは`blocked`になり、従来のようにcurrentとは返さない。(2) `resolve_direct_start()`の`start`結果に`charter`が追加された（追加のみ）。(3) `provenance`／`currentness_dependencies`の`ref`・`revision`は文字列が必須（従来は真偽判定のみで、数値・配列も通った）。(4) investigationの起点は空でない文字列に限る。(5) `plan_revalidation()`は不正入力を除外せず`incomplete`で返し、再検証対象にはrevisionが必須。rollbackはこのbranchのcommit単位で戻せる。
 - 旧entryは、`identity`が有効な`kind`と`scope_refs`を持ち直下と一致していれば、そのまま読める（`entry_ref`・保存形式・状態・履歴は不変）。identityに`kind`／`scope_refs`がない、または直下と不一致の旧entryは拒否される。該当entryは正本ownerが`identity`を再確認し、必要ならreplacementで移す。
 - `plan_update()`／`plan_replacement()`は現・新entryが必須になった（従来の2引数のみの呼出しは`entry_identity_unverified`でblock）。リポジトリ内の呼出し元は既存テストのみで、更新済み。`lookup()`の引数・戻りキーは維持し、変更は、無関係scopeのentryを内容検証しなくなる点と、診断キー`out_of_scope_diagnostics`の追加。rollbackはこのbranchのcommit単位で戻せる。

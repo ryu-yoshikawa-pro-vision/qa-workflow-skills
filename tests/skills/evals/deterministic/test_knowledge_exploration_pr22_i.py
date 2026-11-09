@@ -38,6 +38,11 @@ validator = _load(
 exploratory = _load(
     "exploratory-testing", "scripts/exploratory_runtime.py", "pr22i_exploratory"
 )
+exploratory_validator = _load(
+    "exploratory-testing",
+    "evals/deterministic/validator.py",
+    "pr22i_exploratory_validator",
+)
 
 DEPENDENCIES = {"config:a": "r1", "config:b": "r1"}
 
@@ -1245,6 +1250,7 @@ def session(**overrides):
         "cleanup": {"required": False, "status": "対象なし", "evidence_refs": []},
         "residual_side_effect": [],
         "charter_snapshot_identity": "snap-1",
+        "source_revisions": {"change:CHG-1": "rev-chg-1"},
     }
     value.update(overrides)
     return value
@@ -1274,6 +1280,7 @@ class ExploratoryDirectStartTests(unittest.TestCase):
                 started = exploratory.resolve_direct_start(
                     {key: "x:1", "owner_unknown": True, "charter": charter()}
                 )
+                self.assertEqual(started["status"], "start")
                 self.assertEqual(started["mode"], "investigation")
 
     def test_known_owner_work_is_not_routed_to_investigation(self):
@@ -1361,7 +1368,9 @@ class ExploratoryFindingHandoffTests(unittest.TestCase):
         self.assertEqual(handoff["session_revision"], "rev-7")
         self.assertEqual(handoff["source_observation_refs"], ["OBS-1"])
         self.assertEqual(handoff["evidence_refs"], ["ev:1"])
-        self.assertEqual(handoff["source_refs"], ["change:CHG-1"])
+        self.assertEqual(
+            handoff["source_refs"], [{"ref": "change:CHG-1", "revision": "rev-chg-1"}]
+        )
         self.assertEqual(handoff["follow_up_owner_skill"], "question-analysis")
         self.assertEqual(handoff["owner_skill"], "exploratory-testing")
         self.assertEqual(handoff["artifact_ref"], "SES-1")
@@ -1462,6 +1471,728 @@ class ExploratoryFindingHandoffTests(unittest.TestCase):
             broken, "FND-1", session_revision="rev-7"
         )
         self.assertEqual(result["reason"], "session_invalid")
+
+
+class ExploratoryInvestigationOriginTests(unittest.TestCase):
+    """An unresolved Finding alone must start a Session that stays valid."""
+
+    ORIGINS = ("symptom_ref", "hypothesis_ref", "unresolved_finding_ref")
+
+    def start(self, key, **extra):
+        return exploratory.resolve_direct_start(
+            {key: "origin:1", "owner_unknown": True, "charter": charter(), **extra}
+        )
+
+    def test_every_origin_starts_a_session_that_validates_resumes_and_grades(self):
+        snapshot = {"url": "https://staging.example.test", "build": "1"}
+        environment = {"browser": "chromium"}
+        for key in self.ORIGINS:
+            with self.subTest(origin=key):
+                started = self.start(key)
+                self.assertEqual(started["status"], "start")
+                self.assertEqual(started["mode"], "investigation")
+                self.assertEqual(started["start_ref"], {key: "origin:1"})
+                # The origin is kept in the Charter that is saved with the Session.
+                saved_charter = started["charter"]
+                self.assertEqual(saved_charter[key], "origin:1")
+                self.assertTrue(
+                    exploratory.validate_charter("investigation", saved_charter)[
+                        "valid"
+                    ]
+                )
+                saved = session(mode="investigation", charter=saved_charter)
+                self.assertEqual(exploratory.validate_session(saved)["issues"], [])
+                identity = exploratory.charter_identity(
+                    saved_charter, snapshot, environment
+                )
+                blocked = {
+                    **saved,
+                    "state": "ブロック中",
+                    "charter_snapshot_identity": identity,
+                }
+                self.assertEqual(
+                    exploratory.can_resume(
+                        blocked, saved_charter, snapshot, environment
+                    )["status"],
+                    "resume_allowed",
+                )
+                # A different origin is a different investigation.
+                self.assertEqual(
+                    exploratory.can_resume(
+                        blocked,
+                        {**saved_charter, key: "origin:2"},
+                        snapshot,
+                        environment,
+                    )["status"],
+                    "new_session_required",
+                )
+                output = "```json\n" + json.dumps(saved, ensure_ascii=False) + "\n```"
+                graded = exploratory_validator.validate(output, {}, "EXP-X")
+                origin_check = next(a for a in graded.assertions if a.id == "EXP-D003")
+                self.assertEqual(origin_check.status, "pass")
+
+    def test_investigation_without_a_usable_origin_is_rejected(self):
+        self.assertIn(
+            "investigation_requires_symptom_or_hypothesis",
+            exploratory.validate_charter("investigation", charter())["issues"],
+        )
+        for bad in ("", "  ", None, ["x"], {"a": 1}, 5):
+            with self.subTest(origin=bad):
+                self.assertFalse(
+                    exploratory.validate_charter(
+                        "investigation", charter(unresolved_finding_ref=bad)
+                    )["valid"]
+                )
+        broken = session(mode="investigation")
+        self.assertIn(
+            "investigation_requires_symptom_or_hypothesis",
+            exploratory.validate_session(broken)["issues"],
+        )
+        output = "```json\n" + json.dumps(broken, ensure_ascii=False) + "\n```"
+        graded = exploratory_validator.validate(output, {}, "EXP-X")
+        self.assertEqual(
+            next(a for a in graded.assertions if a.id == "EXP-D003").status, "fail"
+        )
+
+    def test_non_string_start_ref_is_blocked_not_started(self):
+        result = exploratory.resolve_direct_start(
+            {
+                "unresolved_finding_ref": ["FND-1"],
+                "owner_unknown": True,
+                "charter": charter(),
+            }
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "charter_invalid")
+
+    def test_known_owner_and_known_failures_still_route_without_a_mode(self):
+        cases = {
+            "known_owner": {"known_owner": "question-analysis"},
+            "e2e_failure": {"e2e_failure_ref": "run:R-1"},
+            "ui_collection": {"current_ui_collection": True},
+        }
+        for name, extra in cases.items():
+            with self.subTest(case=name):
+                result = exploratory.resolve_direct_start(
+                    {
+                        "unresolved_finding_ref": "FND-1",
+                        "owner_unknown": True,
+                        "charter": charter(),
+                        **extra,
+                    }
+                )
+                self.assertEqual(result["status"], "route")
+                self.assertNotIn("mode", result)
+                self.assertNotIn("charter", result)
+        tc = exploratory.resolve_direct_start({"known_tc_ref": "TC-1"})
+        self.assertEqual(tc["owner_skill"], "test-execution")
+
+    def test_unresolved_finding_start_needs_owner_confirmation_and_a_valid_charter(
+        self,
+    ):
+        unconfirmed = exploratory.resolve_direct_start(
+            {"unresolved_finding_ref": "FND-1", "charter": charter()}
+        )
+        self.assertEqual(unconfirmed["reason"], "owner_resolution_unconfirmed")
+        missing = exploratory.resolve_direct_start(
+            {"unresolved_finding_ref": "FND-1", "owner_unknown": True}
+        )
+        self.assertEqual(missing["reason"], "charter_required")
+        invalid = exploratory.resolve_direct_start(
+            {
+                "unresolved_finding_ref": "FND-1",
+                "owner_unknown": True,
+                "charter": charter(allowed_origins=[], cleanup_plan=""),
+            }
+        )
+        self.assertEqual(invalid["reason"], "charter_invalid")
+        self.assertIn("allowed_origins_required", invalid["issues"])
+        self.assertEqual(invalid["missing_fields"], ["cleanup_plan"])
+
+    def test_exploration_start_needs_no_origin_and_adds_no_formal_testware(self):
+        result = exploratory.resolve_direct_start({"charter": charter()})
+        self.assertEqual(result["status"], "start")
+        self.assertEqual(result["mode"], "exploration")
+        self.assertEqual(result["required_prerequisite_skills"], [])
+        self.assertIs(result["formal_tc_required"], False)
+        self.assertTrue(
+            exploratory.validate_session(
+                session(mode="exploration", charter=result["charter"])
+            )["valid"]
+        )
+
+
+class ExploratorySourceRevisionHandoffTests(unittest.TestCase):
+    def handoff(self, **overrides):
+        return exploratory.build_follow_up_handoff(
+            session(**overrides), "FND-1", session_revision="rev-session"
+        )
+
+    def test_each_source_keeps_its_own_revision_apart_from_the_session(self):
+        data = session(
+            charter=charter(
+                source_refs=[
+                    {"ref": "change:CHG-1", "revision": "rev-a"},
+                    "spec:SPEC-2",
+                ]
+            ),
+            source_revisions={"spec:SPEC-2": "rev-b"},
+        )
+        result = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )
+        self.assertEqual(result["status"], "ready")
+        handoff = result["handoff"]
+        self.assertEqual(
+            handoff["source_refs"],
+            [
+                {"ref": "change:CHG-1", "revision": "rev-a"},
+                {"ref": "spec:SPEC-2", "revision": "rev-b"},
+            ],
+        )
+        self.assertEqual(handoff["session_revision"], "rev-session")
+        self.assertEqual(handoff["content_hash"], "rev-session")
+        self.assertNotIn(
+            "rev-session", [item["revision"] for item in handoff["source_refs"]]
+        )
+        self.assertEqual(handoff["state"], "current")
+        self.assertIsNone(handoff["resume"])
+        self.assertEqual(handoff["unresolved"], [])
+
+    def test_missing_source_revision_is_unresolved_and_never_current(self):
+        for overrides in (
+            {"source_revisions": {}},
+            {"source_revisions": None},
+            {"source_revisions": {"change:CHG-1": ""}},
+            {"source_revisions": {"change:CHG-1": 7}},
+        ):
+            with self.subTest(overrides=overrides):
+                result = self.handoff(**overrides)
+                self.assertEqual(result["status"], "ready")
+                handoff = result["handoff"]
+                self.assertEqual(
+                    handoff["source_refs"],
+                    [{"ref": "change:CHG-1", "revision": None}],
+                )
+                self.assertEqual(handoff["state"], "blocked")
+                self.assertEqual(
+                    handoff["unresolved"],
+                    ["source_revision_unresolved:change:CHG-1"],
+                )
+                self.assertEqual(handoff["resume"]["action"], "record_source_revisions")
+                self.assertEqual(handoff["session_revision"], "rev-session")
+        data = session()
+        data.pop("source_revisions")
+        self.assertEqual(
+            exploratory.build_follow_up_handoff(
+                data, "FND-1", session_revision="rev-session"
+            )["handoff"]["state"],
+            "blocked",
+        )
+
+    def test_a_blocked_session_keeps_its_own_resume_point(self):
+        handoff = self.handoff(state="ブロック中", source_revisions={})["handoff"]
+        self.assertEqual(handoff["state"], "blocked")
+        self.assertEqual(handoff["resume"]["action"], "resume_session")
+        self.assertEqual(
+            handoff["unresolved"], ["source_revision_unresolved:change:CHG-1"]
+        )
+
+    def test_defect_candidate_is_not_built_from_an_unconfirmed_source(self):
+        data = session(source_revisions={})
+        data["findings"][0]["recommended_routing"] = "defect-management"
+        result = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "source_revision_unresolved")
+        self.assertEqual(result["unresolved"], ["change:CHG-1"])
+        data["unresolved"] = ["cause owner unknown"]
+        self.assertEqual(
+            exploratory.build_follow_up_handoff(
+                data, "FND-1", session_revision="rev-session"
+            )["reason"],
+            "unresolved_finding_not_defect_candidate",
+        )
+        data["unresolved"] = []
+        data["source_revisions"] = {"change:CHG-1": "rev-chg-1"}
+        ready = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )["handoff"]
+        self.assertEqual(ready["state"], "current")
+        self.assertIs(ready["required_approval"]["required"], True)
+        self.assertIsNone(ready["required_approval"]["approval_ref"])
+        self.assertIs(ready["formal_defect"], False)
+
+    def test_malformed_sources_and_unresolved_do_not_raise_or_invent_revisions(self):
+        data = session(
+            charter=charter(source_refs=[["a"], {"ref": ""}, 5, "spec:ok"]),
+            source_revisions=["not-a-map"],
+        )
+        result = exploratory.build_follow_up_handoff(
+            data, "FND-1", session_revision="rev-session"
+        )
+        self.assertEqual(result["status"], "ready")
+        sources = result["handoff"]["source_refs"]
+        self.assertEqual(len(sources), 4)
+        self.assertTrue(all(item["revision"] is None for item in sources))
+        self.assertEqual(result["handoff"]["state"], "blocked")
+        text_sources = session(
+            charter=charter(source_refs="change:CHG-1"), source_revisions={}
+        )
+        handoff = exploratory.build_follow_up_handoff(
+            text_sources, "FND-1", session_revision="rev-session"
+        )["handoff"]
+        self.assertEqual(
+            handoff["source_refs"], [{"ref": "change:CHG-1", "revision": None}]
+        )
+        self.assertEqual(handoff["state"], "blocked")
+        for broken in ({"unresolved": "text"}, {"unresolved": {"a": 1}}):
+            with self.subTest(broken=broken):
+                self.assertEqual(
+                    self.handoff(**broken)["reason"], "unresolved_must_be_list"
+                )
+
+    def test_hand_off_still_copies_no_observed_text(self):
+        serialized = json.dumps(self.handoff()["handoff"], ensure_ascii=False)
+        self.assertNotIn("cancelled order shown", serialized)
+        self.assertNotIn("open order detail", serialized)
+
+
+def bad_values():
+    return [[], {}, ["x"], {"a": 1}, 5, True, None, ""]
+
+
+class KnowledgeMalformedEntryTests(unittest.TestCase):
+    """JSON arrays / objects in scalar fields must become issues, not exceptions."""
+
+    def variants(self):
+        base = make_entry()
+        cases = {}
+        for index, bad in enumerate(bad_values()):
+            kind_identity = {**base["identity"], "kind": bad}
+            cases[f"identity.kind#{index}"] = {
+                **base,
+                "identity": kind_identity,
+                "entry_ref": knowledge.canonical_entry_ref(kind_identity),
+            }
+            scope_identity = {**base["identity"], "scope_refs": bad}
+            cases[f"identity.scope_refs#{index}"] = {
+                **base,
+                "identity": scope_identity,
+                "entry_ref": knowledge.canonical_entry_ref(scope_identity),
+            }
+            cases[f"state#{index}"] = {**base, "state": bad}
+            cases[f"kind#{index}"] = {**base, "kind": bad}
+            cases[f"entry_ref#{index}"] = {**base, "entry_ref": bad}
+            cases[f"scope_refs#{index}"] = {**base, "scope_refs": bad}
+            cases[f"identity#{index}"] = {**base, "identity": bad}
+            cases[f"dependencies#{index}"] = {**base, "currentness_dependencies": bad}
+        cases["dependency.ref"] = {
+            **base,
+            "currentness_dependencies": [{"ref": ["x"], "revision": "r1"}],
+        }
+        cases["dependency.revision"] = {
+            **base,
+            "currentness_dependencies": [{"ref": "config:a", "revision": ["r"]}],
+        }
+        return cases
+
+    def test_validation_never_raises_and_rejects_every_variant(self):
+        for name, entry in self.variants().items():
+            with self.subTest(case=name):
+                self.assertFalse(knowledge.validate_entry(entry)["valid"])
+                knowledge.identity_issues(entry)
+                self.assertFalse(
+                    knowledge.validate_entry(
+                        entry,
+                        current_dependencies=DEPENDENCIES,
+                        entry_revision="sha256:stored",
+                    )["valid"]
+                )
+
+    def test_non_object_entries_are_invalid_not_exceptions(self):
+        for value in (None, [], "text", 5):
+            with self.subTest(value=value):
+                result = knowledge.validate_entry(value)
+                self.assertEqual(result["issues"], ["entry_must_be_object"])
+                with tempfile.TemporaryDirectory() as temp:
+                    created = knowledge.create_entry(
+                        Path(temp) / "knowledge",
+                        value,
+                        complete_root_snapshot=True,
+                        atomic_create_if_absent_available=True,
+                        current_dependencies=DEPENDENCIES,
+                    )
+                self.assertEqual(created["status"], "blocked")
+                self.assertEqual(
+                    knowledge.plan_revalidation(
+                        [value], current_dependencies=DEPENDENCIES
+                    )["status"],
+                    "incomplete",
+                )
+
+    def test_applicable_malformed_entries_make_lookup_incomplete(self):
+        for name, entry in self.variants().items():
+            with self.subTest(case=name):
+                result = search([with_revision(entry)])
+                self.assertEqual(result["status"], "incomplete")
+                self.assertEqual(result["entries"], [])
+                self.assertIs(result["complete"], False)
+        # Entries that certainly do not apply still do not stop the search.
+        unrelated = make_entry("project:other", "other")
+        unrelated["state"] = ["x"]
+        valid = with_revision(make_entry())
+        result = search([with_revision(unrelated), valid])
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(
+            [e["entry_ref"] for e in result["entries"]], [valid["entry_ref"]]
+        )
+
+    def test_create_update_replacement_and_revalidation_block_instead_of_raising(
+        self,
+    ):
+        stored = make_entry()
+        provider = LocalCasProvider()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "knowledge"
+            created = knowledge.create_entry(
+                root,
+                stored,
+                complete_root_snapshot=True,
+                atomic_create_if_absent_available=True,
+                current_dependencies=DEPENDENCIES,
+            )
+            revision = created["entry_revision"]
+            for name, entry in self.variants().items():
+                with self.subTest(case=name):
+                    snapshot = json.dumps(entry, sort_keys=True)
+                    new = knowledge.create_entry(
+                        Path(temp) / "other",
+                        entry,
+                        complete_root_snapshot=True,
+                        atomic_create_if_absent_available=True,
+                        current_dependencies=DEPENDENCIES,
+                    )
+                    self.assertEqual(new["status"], "blocked")
+                    update = knowledge.update_entry(
+                        root,
+                        entry,
+                        expected_entry_revision=revision,
+                        conditional_write=provider,
+                        current_dependencies=DEPENDENCIES,
+                    )
+                    self.assertEqual(update["status"], "blocked")
+                    # plan_update only judges identity; it must not raise either.
+                    knowledge.plan_update(
+                        expected_entry_revision=revision,
+                        native_atomic_conditional_write=True,
+                        current_entry=stored,
+                        updated_entry=entry,
+                    )
+                    replacement = knowledge.plan_replacement(
+                        old_entry_ref=stored["entry_ref"],
+                        new_entry_ref="KN-" + "0" * 64,
+                        native_atomic_multi_entry_update=True,
+                        old_entry=stored,
+                        new_entry=entry,
+                    )
+                    self.assertEqual(replacement["status"], "blocked")
+                    plan = knowledge.plan_revalidation(
+                        [with_revision(entry)], current_dependencies=DEPENDENCIES
+                    )
+                    self.assertIn(plan["status"], {"complete", "incomplete"})
+                    knowledge.improvement_reference(
+                        with_revision(entry), current_dependencies=DEPENDENCIES
+                    )
+                    # The invalid entry is neither repaired nor stored.
+                    self.assertEqual(snapshot, json.dumps(entry, sort_keys=True))
+            self.assertEqual(
+                knowledge.read_entry(root, stored["entry_ref"])["entry_revision"],
+                revision,
+            )
+            self.assertEqual(provider.calls, 0)
+
+    def test_stored_entry_with_malformed_identity_is_blocked_on_read(self):
+        entry = make_entry()
+        malformed = {**entry["identity"], "kind": ["test_environment"]}
+        bad = {**entry, "identity": malformed}
+        bad["entry_ref"] = knowledge.canonical_entry_ref(malformed)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / f"{bad['entry_ref']}.md").write_bytes(knowledge.render_entry(bad))
+            result = knowledge.read_entry(root, bad["entry_ref"])
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["reason"], "entry_identity_invalid")
+            snapshot = knowledge.read_root_entries(root)
+            self.assertIs(snapshot["complete"], False)
+            self.assertEqual(
+                knowledge.lookup_root(
+                    root,
+                    scope_refs={"project:a"},
+                    kind=None,
+                    environment=None,
+                    version=None,
+                    current_dependencies=DEPENDENCIES,
+                )["status"],
+                "incomplete",
+            )
+
+    def test_hand_off_inputs_do_not_raise_on_malformed_values(self):
+        entry = with_revision(make_entry(provenance=5, currentness_dependencies="x"))
+        reference = knowledge.improvement_reference(
+            entry, current_dependencies=DEPENDENCIES
+        )
+        self.assertEqual(reference["reference"]["state"], "blocked")
+        self.assertEqual(reference["reference"]["source_refs"], [])
+        self.assertEqual(
+            knowledge.plan_approved_improvement_update(
+                None,
+                current_entry=entry,
+                updated_entry=entry,
+                native_atomic_conditional_write=True,
+            )["reason"],
+            "approved_improvement_required",
+        )
+
+
+class KnowledgeRevalidationInputTests(unittest.TestCase):
+    STALE = {"config:a": "r2", "config:b": "r2"}
+
+    def test_invalid_inputs_are_rejected_not_silently_dropped(self):
+        good = with_revision(make_entry("project:a", "a", "config:a"))
+        for bad in (None, [], "text", 5, ["x"]):
+            with self.subTest(entry=bad):
+                plan = knowledge.plan_revalidation(
+                    [bad, good], current_dependencies=self.STALE
+                )
+                self.assertEqual(plan["status"], "incomplete")
+                self.assertEqual(
+                    plan["rejected"],
+                    [{"entry_ref": None, "issues": ["entry_must_be_object"]}],
+                )
+                # The decidable entry is still planned.
+                self.assertEqual(
+                    [t["entry_ref"] for t in plan["targets"]], [good["entry_ref"]]
+                )
+        for name, kwargs in (
+            ("not-a-list", {"entries": "x"}),
+            ("scope", {"entries": [good], "scope_refs": ["project:a"]}),
+            ("scope-items", {"entries": [good], "scope_refs": {1}}),
+            ("changed", {"entries": [good], "changed_refs": "config:a"}),
+        ):
+            with self.subTest(case=name):
+                entries = kwargs.pop("entries")
+                plan = knowledge.plan_revalidation(
+                    entries, current_dependencies=self.STALE, **kwargs
+                )
+                self.assertEqual(plan["status"], "incomplete")
+                self.assertEqual(plan["targets"], [])
+        self.assertEqual(
+            knowledge.plan_revalidation([good], current_dependencies=None)["status"],
+            "incomplete",
+        )
+
+    def test_a_target_requires_the_stored_revision_that_was_read(self):
+        stored = make_entry("project:a", "a", "config:a")
+        for revision in (None, "", 7, ["sha256:x"]):
+            with self.subTest(revision=revision):
+                body = {**stored}
+                if revision is not None:
+                    body["entry_revision"] = revision
+                plan = knowledge.plan_revalidation(
+                    [body], current_dependencies=self.STALE
+                )
+                self.assertEqual(plan["status"], "incomplete")
+                self.assertEqual(plan["targets"], [])
+                self.assertEqual(
+                    plan["rejected"],
+                    [
+                        {
+                            "entry_ref": stored["entry_ref"],
+                            "issues": ["entry_revision_unavailable"],
+                        }
+                    ],
+                )
+        # An entry that needs no revalidation, or lies outside the requested scope,
+        # does not need a revision and is not rejected for lacking one.
+        unchanged = knowledge.plan_revalidation(
+            [stored], current_dependencies={"config:a": "r1"}
+        )
+        self.assertEqual(unchanged["status"], "complete")
+        self.assertEqual(unchanged["unaffected_refs"], [stored["entry_ref"]])
+        outside = knowledge.plan_revalidation(
+            [stored], current_dependencies=self.STALE, scope_refs={"project:z"}
+        )
+        self.assertEqual(outside["status"], "complete")
+        self.assertEqual(
+            (outside["targets"], outside["unaffected_refs"], outside["rejected"]),
+            ([], [], []),
+        )
+
+    def test_states_are_reported_separately(self):
+        changed = with_revision(make_entry("project:a", "a", "config:a"))
+        unresolved = with_revision(make_entry("project:b", "b", "config:b"))
+        invalid = with_revision(make_entry("project:c", "c", "config:c"))
+        invalid["scope_refs"] = ["project:other"]
+        fine = with_revision(make_entry("project:d", "d", "config:d"))
+        plan = knowledge.plan_revalidation(
+            [changed, unresolved, invalid, fine],
+            current_dependencies={"config:a": "r2", "config:d": "r1"},
+        )
+        reasons = {t["entry_ref"]: t["reason"] for t in plan["targets"]}
+        self.assertEqual(reasons[changed["entry_ref"]], "dependency_changed")
+        self.assertEqual(reasons[unresolved["entry_ref"]], "dependency_unresolved")
+        self.assertEqual(
+            [r["entry_ref"] for r in plan["rejected"]], [invalid["entry_ref"]]
+        )
+        self.assertIn("identity_scope_refs_mismatch", plan["rejected"][0]["issues"])
+        self.assertEqual(plan["unaffected_refs"], [fine["entry_ref"]])
+        self.assertEqual(plan["status"], "incomplete")
+
+    def test_scoped_revalidation_ignores_unrelated_changes_and_head(self):
+        a = with_revision(make_entry("project:a", "a", "config:a"), "sha256:ra")
+        b = with_revision(make_entry("project:b", "b", "config:b"), "sha256:rb")
+        head_only = knowledge.plan_revalidation(
+            [a, b],
+            current_dependencies={"config:a": "r1", "config:b": "r1", "repo:HEAD": "9"},
+        )
+        self.assertEqual((head_only["status"], head_only["targets"]), ("complete", []))
+        scoped = knowledge.plan_revalidation(
+            [a, b],
+            current_dependencies=self.STALE,
+            scope_refs={"project:a"},
+            changed_refs={"config:a", "config:unrelated"},
+        )
+        self.assertEqual(
+            [(t["entry_ref"], t["expected_entry_revision"]) for t in scoped["targets"]],
+            [(a["entry_ref"], "sha256:ra")],
+        )
+        self.assertEqual(scoped["unaffected_refs"], [])
+        unrelated = knowledge.plan_revalidation(
+            [a, b],
+            current_dependencies=self.STALE,
+            changed_refs={"config:unrelated"},
+        )
+        self.assertEqual(unrelated["targets"], [])
+        self.assertEqual(
+            unrelated["unaffected_refs"], sorted([a["entry_ref"], b["entry_ref"]])
+        )
+
+    def test_update_plan_needs_a_string_revision(self):
+        entry = make_entry()
+        for revision in (None, "", 7, ["sha256:x"], {"a": 1}):
+            with self.subTest(revision=revision):
+                plan = knowledge.plan_update(
+                    expected_entry_revision=revision,
+                    native_atomic_conditional_write=True,
+                    current_entry=entry,
+                    updated_entry=entry,
+                )
+                self.assertEqual(plan["reason"], "entry_revision_unavailable")
+
+    def test_planned_revision_is_the_conditional_update_condition(self):
+        entry = make_entry("project:a", "a", "config:a")
+        provider = LocalCasProvider()
+        stale = {"config:a": "r2"}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "knowledge"
+            created = knowledge.create_entry(
+                root,
+                entry,
+                complete_root_snapshot=True,
+                atomic_create_if_absent_available=True,
+                current_dependencies=DEPENDENCIES,
+            )
+            plan = knowledge.plan_revalidation(
+                knowledge.read_root_entries(root)["entries"],
+                current_dependencies=stale,
+                scope_refs={"project:a"},
+            )
+            self.assertEqual(plan["status"], "complete")
+            target = plan["targets"][0]
+            self.assertEqual(
+                target["expected_entry_revision"], created["entry_revision"]
+            )
+            revalidated = {
+                **entry,
+                "currentness_dependencies": [{"ref": "config:a", "revision": "r2"}],
+            }
+            updated = knowledge.update_entry(
+                root,
+                revalidated,
+                expected_entry_revision=target["expected_entry_revision"],
+                conditional_write=provider,
+                current_dependencies=stale,
+            )
+            self.assertEqual(updated["status"], "updated")
+            after = knowledge.plan_revalidation(
+                knowledge.read_root_entries(root)["entries"],
+                current_dependencies=stale,
+            )
+            self.assertEqual((after["targets"], after["status"]), ([], "complete"))
+            late = knowledge.update_entry(
+                root,
+                {**revalidated, "content": "late"},
+                expected_entry_revision=target["expected_entry_revision"],
+                conditional_write=provider,
+                current_dependencies=stale,
+            )
+            self.assertEqual(late["status"], "conflict")
+
+
+class ExploratoryMalformedInputTests(unittest.TestCase):
+    """Arrays / objects in scalar Session fields are issues, not exceptions."""
+
+    def test_malformed_charter_and_session_values_are_issues(self):
+        for bad in bad_values():
+            cases = {
+                "allowed_operations": session(charter=charter(allowed_operations=bad)),
+                "side_effect_operations": session(
+                    charter=charter(side_effect_operations=[bad])
+                ),
+                "mode": session(mode=bad),
+                "state": session(state=bad),
+                "cleanup": session(cleanup=bad),
+                "observation_ref": session(
+                    observations=[
+                        {**session()["observations"][0], "observation_ref": bad}
+                    ]
+                ),
+                "finding_ref": session(
+                    findings=[{**session()["findings"][0], "finding_ref": bad}]
+                ),
+                "finding_sources": session(
+                    findings=[
+                        {**session()["findings"][0], "source_observation_refs": bad}
+                    ]
+                ),
+                "finding_source_item": session(
+                    findings=[
+                        {**session()["findings"][0], "source_observation_refs": [bad]}
+                    ]
+                ),
+            }
+            for name, data in cases.items():
+                with self.subTest(field=name, value=bad):
+                    result = exploratory.validate_session(data)
+                    self.assertFalse(result["valid"])
+                    self.assertTrue(result["issues"])
+                    for owner in ("question-analysis", "test-analysis"):
+                        data["findings"][0]["recommended_routing"] = owner
+                        handoff = exploratory.build_follow_up_handoff(
+                            data, "FND-1", session_revision="rev-1"
+                        )
+                        self.assertEqual(handoff["status"], "blocked")
+        for value in (None, [], "text", 5):
+            with self.subTest(session=value):
+                self.assertEqual(
+                    exploratory.validate_session(value)["issues"],
+                    ["session_must_be_object"],
+                )
+                self.assertFalse(
+                    exploratory.validate_charter("exploration", value)["valid"]
+                )
 
 
 if __name__ == "__main__":
