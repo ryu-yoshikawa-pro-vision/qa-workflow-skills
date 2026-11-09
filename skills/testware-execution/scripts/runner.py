@@ -847,13 +847,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             run["result_collection"] = "invalid"
             run["processing_error"] = type(error).__name__
         # Verify the full execution scope before a cleanup can touch state.
-        run["process_tree_state"] = _quiesce_process_scope(
-            run["pid"], supervision
-        )
+        run["process_tree_state"] = _quiesce_process_scope(run["pid"], supervision)
         if cleanup is not None and run["started"]:
-            if run["process_tree_state"] not in {
-                "terminated", "lingering_terminated"
-            }:
+            if run["process_tree_state"] not in {"terminated", "lingering_terminated"}:
                 run["cleanup_state"] = "failed_or_unknown"
                 run["cleanup_error"] = "descendants_not_quiescent_before_cleanup"
             else:

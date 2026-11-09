@@ -426,9 +426,7 @@ class ActualRunnerTests(unittest.TestCase):
             self.assertEqual(
                 manifest["attempts"][0]["process_tree_state"], "terminated"
             )
-            self.assertFalse(
-                Path("/proc", marker.read_text(encoding="utf-8")).exists()
-            )
+            self.assertFalse(Path("/proc", marker.read_text(encoding="utf-8")).exists())
             self.assertEqual(manifest["outcome"], "blocked_cleanup_or_timeout")
         finally:
             if proc.poll() is None:

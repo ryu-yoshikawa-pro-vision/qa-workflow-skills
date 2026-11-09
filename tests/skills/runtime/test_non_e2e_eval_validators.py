@@ -112,7 +112,8 @@ class NonE2EOutputValidationTests(unittest.TestCase):
         legacy = validate("adversarial-review", "- レビュー種別: テスト設計成果物\n")
         self.assertIsNone(status(legacy, "REV-D018"))
         legacy_e2e = validate(
-            "adversarial-review", "- レビュー種別: E2E実装\n",
+            "adversarial-review",
+            "- レビュー種別: E2E実装\n",
             {"expected_e2e_implementation_refs": ["tests/one.spec.ts > one"]},
         )
         self.assertEqual(status(legacy_e2e, "REV-D015"), "fail")
