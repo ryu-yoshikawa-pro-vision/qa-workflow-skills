@@ -42,5 +42,9 @@
   {
     "query": "API-only Playwright Testのrunnerを実行して。",
     "should_trigger": false
+  },
+  {
+    "query": "製品のバッチテスト実装を既存fixtureに合わせて修正してコミットしてください。",
+    "should_trigger": false
   }
 ]
