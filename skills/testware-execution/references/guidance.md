@@ -18,7 +18,7 @@
 ## Vitestの識別と完全性
 
 - 固定source commit、repo相対path、suite／title path、実効filterと選択集合で個別testを照合する。ファイル移動や改名、同じtitle、パラメータ化testでは旧版へ自動対応しない。
-- contract.reconcile_vitest()はVitest JSON reporterの選択項目との集合照合を補助する。reporter中の絶対pathは検証済みrepo rootからの相対pathへ呼出元が安全に正規化する。単にpathを切り詰めない。
+- `contract.reconcile_vitest()`はVitest JSON reporterの選択集合を照合する。reporter中の絶対pathは渡された検証済みrepo rootとの一致を確認して正規化する。suite statusと個別assertion statusの矛盾・集計不一致は取得完全としない。
 - selection_verifiedは実コマンドと列挙完全性の証拠があるときだけtrueとする。重複名の解決不能、missing、unplanned、partial selectionは全件取得・全PASSとしない。
 - retry/attemptをJSON reporterが提供しない場合、attemptの取得完全性は不明と記録する。1件の最終statusを複数attemptへ捏造しない。raw passedはassertion品質やTC合格を証明しない。
 - Vitestのtest-control境界を一般HTTP APIの受入証拠に使わない。独立HTTP fixtureと実製品の結果を分けて保管する。
@@ -47,3 +47,12 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 `preflight` の確認済みbooleanは**承認や共有予約のprovider認証ではない**。本CLIはshared／外部副作用を常に拒否する。隔離checkoutはOSのサンドボックスではないため、未信頼コマンドの実行、未確認のpackage lifecycle、認証情報の利用、インターネット通信を安全化しない。全script chainの検査と実環境の許可・隔離・秘密情報保護は起動担当が行う。rawログには機密情報が含まれ得るため、自動commit・共有を禁止する。cleanupや試行状態が不明な場合は自動retryしない。
 
 独立fixtureでのPython subprocess、Vitest形式の固定JSON、Git fast-forward競合試験は、固定qa-training-storeの実Vitest／API-only Playwright／バッチ・イベント・非機能計測の受入とは区別する。これらの本物のrunnerと実providerの検証は対象commit・必要な許可が確認できたときに行う。
+
+## 実runnerの確認条件と取得完全性
+
+- `preflight.external_side_effects` と `preflight.shared_resource` は省略せず真偽値で指定する。いずれかがtrueなら本CLIは認証済みproviderがないため実行を拒否する。任意subprocessに対する副作用回数をOSレベルで保証できないため、`side_effects` が空でない場合も `side_effect_limits_unenforceable` として開始しない。これは副作用上限機能を実装したという意味ではなく、providerが接続されるまでの安全な停止である。
+- 実行前、各attemptの直前、cleanup後のcheckout HEADを確認する。終了後に別commitへ進んだ場合、作業ツリーがcleanでも `blocked_revision_changed` として元revisionの結果を完了扱いしない。ignored fileや外部状態についてはGit statusだけではcleanupを証明できないため、必要な環境では別の実証を要求する。
+- run manifestには `source_ref/source_revision`、`build_revision`、`repo_revision`、`environment_ref`、`runner_ref`、任意の `testware_ref/testware_revision`・`tc_ref/tc_revision`、予定scopeと選択根拠、個別attempt、raw、cleanup、結果収集を保持する。argvにはsecretが含まれ得るためコマンド全体は書き戻さず、実argvのSHA-256を保存する。入力で宣言された選択根拠をrunner自身の認証済み根拠に昇格しない。下流へ渡す際に必要な識別子・version・選択根拠が未取得ならそのまま未検証とする。
+- `direct_tc: true` は `direct_expectations` を必須とする。通常のbatch等の終了コード0は、期待結果の比較がない場合、実runnerの正常終了だけを表す。非機能は `metric_criteria` と採用根拠・測定条件を必須とし、未指定なら開始前に拒否する。
+- 静的解析の実行は `runner_kind: static` と `static_analysis`（`tool_ref`、`tool_version`、`rules_ref`、`config_ref`、`expected_paths`）を必須とする。実ツール／既存の許可済みadapterがstdoutへJSON objectとして `findings_count`、`analyzed_paths`、空の `skipped_paths`、同じtool/version/rules/configを出力した場合だけ取得完全とする。未実行・欠損・toolのrawだけではFinding 0件としない。各種tool固有の出力をこのJSONへ適合させるadapterは別途対象toolに沿った検証を要する。
+- `diagnosis_hypotheses` を指定した場合はrunの元観測と独立して原因候補・確度・証拠・次の担当を保持する。これは確定した製品欠陥でも元runの再採点でもない。
