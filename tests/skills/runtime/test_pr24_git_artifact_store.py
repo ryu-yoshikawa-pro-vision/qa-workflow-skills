@@ -1229,8 +1229,12 @@ class GitArtifactStoreTests(unittest.TestCase):
                     self.assertIn("lock", commit.stderr.lower())
                     redirect = subprocess.run(
                         [
-                            "git", "-C", str(self.root), "symbolic-ref",
-                            "HEAD", "refs/heads/concurrent-branch",
+                            "git",
+                            "-C",
+                            str(self.root),
+                            "symbolic-ref",
+                            "HEAD",
+                            "refs/heads/concurrent-branch",
                         ],
                         capture_output=True,
                         text=True,
@@ -1238,7 +1242,9 @@ class GitArtifactStoreTests(unittest.TestCase):
                     )
                     self.assertNotEqual(redirect.returncode, 0, redirect.stdout)
                     self.assertIn("lock", redirect.stderr.lower())
-                    self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), source_branch)
+                    self.assertEqual(
+                        git(self.root, "symbolic-ref", "HEAD"), source_branch
+                    )
                     self.assertEqual(git(self.root, "rev-parse", "HEAD"), expected_head)
                 finally:
                     resume.set()
