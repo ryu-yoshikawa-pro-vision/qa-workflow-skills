@@ -27,8 +27,8 @@ from project_context_ids import (  # noqa: E402
     DEC_HEADERS,
     DEC_HEADING,
     _table_rows,
-    handle as identity_handle,
 )
+from project_context_ids import handle as identity_handle  # noqa: E402
 
 MAX_BYTES = 16 * 1024 * 1024
 TEMPLATE = SHARED / "assets" / "project-context-template.md"
