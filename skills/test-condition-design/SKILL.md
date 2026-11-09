@@ -8,7 +8,7 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 ## 実行契約
 
 1. テスト要求を「どの条件・観点で検証するか」へ展開し、実行手順は`test-case-design`へ委ねます。
-2. 複数候補を持つ場合は候補母集団を先に識別し、カバレッジ基準、カバレッジ項目、採用しない候補の扱いを明示します。
+2. 複数候補を持つ場合は候補母集団を先に識別し、カバレッジ基準、カバレッジ項目、採用しない候補の扱いを明示します。test itemと共通condition候補があるformal_designでは全item×condition pairを明示評価します。採用時はitemごとに別TCNへ接続し、候補CIと共通condition IDを混同しません。
 3. 期待挙動をプロダクトリスクやテスト仮説から創作しません。
 4. カバレッジ設計の基本手順、閉鎖、扱い、停止条件、最低品質は`references/guidance.md`に従います。
 5. runtime dispatch表にある技法を適用する場合は`references/coverage-techniques.md`を読み、対応する技法の規則を使います。複数技法を採る場合やadapterからchild modelへ渡す場合も、各ownerの契約を確認します。
@@ -40,6 +40,12 @@ description: テスト要求を条件・観点へ展開し、同値分割、境�
 ### 最終runtime evidence gate
 
 最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文、固定booleanの`partial_rerun`を渡します。full buildでは`partial_rerun=false`かつ`previous_artifact_markdown=null`、partial rerunではscope外Entityの有無にかかわらず`partial_rerun=true`と同一成果物系列の直前artifact全文を渡します。Disposition-onlyのscope外Entityもpreviousから検証するためです。判定やprevious Entity配列を手組みしません。返却`valid=true`の場合だけ完成として返し、`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
+
+## item × 共通conditionの正式適用
+
+`condition_structure`内のformal design validatorはTI／COND candidateの参照とrevision、全pairの明示判定、テストレベル優先順位、期待結果候補のAuthority・観測方法・副作用を検証します。current revisionのchange reasonとrevision 1から直前revisionまでの連続履歴を要求し、履歴の各candidate retirementと理由を保持してID再利用を拒否します。採用pairだけ既存のTCN draftへ投影し、item_ref・condition_ref・formal design revision・期待結果candidate refsをTCN Entityへ保持します。全pair判断、候補、source revision、履歴、retirement reasonは`payload.formal_design_record`へ保持します。採用しない候補は対象外、別テストレベル、重複、未確認、blockedを区別します。候補母集団が不完全、unconfirmed／blockedが残る、分母が0のときはcoverageをcomplete／100%へ昇格しません。
+
+formal_designのitem／condition source refsは固定fixtureで局所検証できます。実owner artifactのID・revision・currentness照合と保存readbackは、owner統合時のPR #22確認事項です。
 
 ## インターフェース
 

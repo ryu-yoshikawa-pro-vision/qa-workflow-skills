@@ -1,0 +1,55 @@
+{
+  "required_selection_ref": "E2ESEL-003",
+  "required_selection_revision": 3,
+  "required_sources": [
+    { "ref": "SPEC-001", "revision": "r9", "currentness": "current" },
+    { "ref": "TI-001", "revision": "r5", "currentness": "current" }
+  ],
+  "required_candidate_sources": {
+    "E2E-CAND-001": [["TI-001", "r5"], ["SPEC-001", "r9"]],
+    "E2E-CAND-003": [["TI-001", "r5"], ["SPEC-001", "r9"]]
+  },
+  "required_candidate_keys": {
+    "E2E-CAND-001": "checkout-primary",
+    "E2E-CAND-003": "receipt-view"
+  },
+  "required_decisions": {
+    "E2E-CAND-001": "selected",
+    "E2E-CAND-003": "not_selected"
+  },
+  "required_retired_candidates": {
+    "E2E-CAND-002": "currentな既存E2Eと重複するためretire"
+  },
+  "population_complete": true,
+  "history": [
+    {
+      "revision": 1,
+      "previous_revision": "なし",
+      "candidate_ids": ["E2E-CAND-001", "E2E-CAND-002"],
+      "candidate_keys": {
+        "E2E-CAND-001": "checkout-primary",
+        "E2E-CAND-002": "non-payment"
+      },
+      "sources": [
+        { "ref": "SPEC-001", "revision": "r8", "currentness": "current" },
+        { "ref": "TI-001", "revision": "r4", "currentness": "current" }
+      ],
+      "retired_candidates": {},
+      "change_reason": "初回のcheckout経路選定"
+    },
+    {
+      "revision": 2,
+      "previous_revision": "1",
+      "candidate_ids": ["E2E-CAND-001"],
+      "candidate_keys": { "E2E-CAND-001": "checkout-primary" },
+      "sources": [
+        { "ref": "SPEC-001", "revision": "r8", "currentness": "current" },
+        { "ref": "TI-001", "revision": "r4", "currentness": "current" }
+      ],
+      "retired_candidates": {
+        "E2E-CAND-002": "currentな既存E2Eと重複するためretire"
+      },
+      "change_reason": "既存E2Eとの重複を確認"
+    }
+  ]
+}

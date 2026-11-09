@@ -1,0 +1,13 @@
+[
+  { "query": "どの業務経路をE2E自動化する価値があるか、候補と理由を選定して。", "should_trigger": true },
+  { "query": "このTC-014を使って既存Playwright E2Eを実行してください。", "should_trigger": false },
+  { "query": "Playwright locatorとfixtureの実装方法を決めて。", "should_trigger": false },
+  { "query": "E2E対象選定ではなく、変更のProduct Riskとテスト重点を分析して。", "should_trigger": false },
+  { "query": "現在の選定結果を再利用し、currentnessだけ確認して。", "should_trigger": false },
+  { "query": "TCを伴わない新規E2E候補を挙げ、反復確認の価値を評価してください。", "should_trigger": true },
+  { "query": "購入から返金までの業務フローをE2E化する価値と候補の優先度を選定してください。", "should_trigger": true },
+  {
+    "query": "利用者が初回登録して主要操作を完了する経路のE2E候補を、保守性を含めて選んでください。",
+    "should_trigger": true
+  }
+]

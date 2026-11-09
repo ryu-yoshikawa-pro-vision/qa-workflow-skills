@@ -452,7 +452,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "current_runtime_units",
         "unsupported_item_closures",
     }
-    reject_unknown(input_value, required)
+    reject_unknown(input_value, required, {"formal_design_summaries"})
     scopes = _scope_rows(input_value["analysis_scopes"])
     nodes, kinds = _nodes(input_value["nodes"])
     entities_list = _entity_rows(input_value["current_entities"])
@@ -527,6 +527,9 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         entities_list,
         normalized=[scope["normalized_input"] for scope in scopes],
     )
+    formal_design_metrics = _formal_design_summary_rows(
+        input_value.get("formal_design_summaries", [])
+    )
     issues: list[dict[str, Any]] = []
     if missing_units:
         issues.append(
@@ -570,6 +573,18 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             )
     issues.extend(freshness_issues)
     issues.extend(closure_issues)
+    for summary in formal_design_metrics:
+        if summary["pair_coverage_status"] != "complete":
+            issues.append(
+                {
+                    "issue_type": "formal_candidate_coverage_incomplete",
+                    "blocking": True,
+                    "formal_design_ref": summary["design_ref"],
+                    "pair_coverage_status": summary["pair_coverage_status"],
+                    "pair_denominator": summary["pair_denominator"],
+                    "pair_closed": summary["pair_closed"],
+                }
+            )
     issues.extend(
         _graph_issues(nodes, kinds, edges, dispositions, coverage_models_by_tcn)
     )
@@ -632,10 +647,119 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             ],
             "entity_freshness": entity_freshness,
             "unsupported_item_closures": closures,
+            "formal_design_metrics": formal_design_metrics,
             "can_complete": can_complete,
         },
         "issues": issues,
     }
+
+
+def _formal_design_summary_rows(value: Any) -> list[dict[str, Any]]:
+    rows = ensure_list(value, "formal_design_summaries")
+    result = []
+    seen = set()
+    allowed_statuses = {
+        "complete",
+        "incomplete",
+        "incomplete_population",
+        "unknown_zero_denominator",
+    }
+    for index, row in enumerate(rows):
+        required = {
+            "design_ref",
+            "revision",
+            "pair_denominator",
+            "pair_closed",
+            "pair_coverage",
+            "pair_coverage_status",
+            "unresolved_pairs",
+            "items_complete",
+            "conditions_complete",
+        }
+        if not isinstance(row, dict) or set(row) != required:
+            raise InvalidInput(f"formal_design_summaries[{index}] schemaが不正です")
+        design_ref = ensure_nonempty_string(row["design_ref"], "formal design ref")
+        revision = row["revision"]
+        denominator = row["pair_denominator"]
+        closed = row["pair_closed"]
+        if (
+            not isinstance(revision, int)
+            or isinstance(revision, bool)
+            or revision < 1
+            or not isinstance(denominator, int)
+            or isinstance(denominator, bool)
+            or denominator < 0
+            or not isinstance(closed, int)
+            or isinstance(closed, bool)
+            or closed < 0
+            or closed > denominator
+            or design_ref in seen
+        ):
+            raise InvalidInput(
+                "formal design revision / denominator / identityが不正です"
+            )
+        seen.add(design_ref)
+        if not isinstance(row["items_complete"], bool) or not isinstance(
+            row["conditions_complete"], bool
+        ):
+            raise InvalidInput("formal design discovery completenessが不正です")
+        status = row["pair_coverage_status"]
+        if status not in allowed_statuses:
+            raise InvalidInput("formal design pair_coverage_statusが不正です")
+        unresolved = ensure_list(
+            row["unresolved_pairs"], "formal design unresolved_pairs"
+        )
+        unresolved_keys = []
+        for pair in unresolved:
+            if not isinstance(pair, dict) or set(pair) != {
+                "item_ref",
+                "condition_ref",
+                "decision",
+            }:
+                raise InvalidInput("formal design unresolved pair schemaが不正です")
+            key = (
+                ensure_nonempty_string(pair["item_ref"], "formal pair item_ref"),
+                ensure_nonempty_string(
+                    pair["condition_ref"], "formal pair condition_ref"
+                ),
+            )
+            if pair["decision"] not in {"unconfirmed", "blocked"}:
+                raise InvalidInput("unresolved pair decisionが不正です")
+            unresolved_keys.append(key)
+        if (
+            unresolved_keys != sorted(set(unresolved_keys))
+            or closed + len(unresolved_keys) != denominator
+        ):
+            raise InvalidInput(
+                "formal design pair closure countとunresolved pairsが不一致です"
+            )
+        coverage = row["pair_coverage"]
+        if denominator == 0:
+            expected_status = "unknown_zero_denominator"
+            if coverage is not None:
+                raise InvalidInput(
+                    "0件のformal design denominatorをcoverage値にしてはいけません"
+                )
+        elif not row["items_complete"] or not row["conditions_complete"]:
+            expected_status = "incomplete_population"
+            if coverage is not None:
+                raise InvalidInput(
+                    "不完全なformal candidate populationをcoverage値にしてはいけません"
+                )
+        else:
+            expected_status = "incomplete" if unresolved_keys else "complete"
+            if not isinstance(coverage, str) or coverage != f"{closed}/{denominator}":
+                raise InvalidInput(
+                    "formal design pair_coverageが分子／分母と不一致です"
+                )
+        if status != expected_status:
+            raise InvalidInput("formal design pair coverage statusが根拠と不一致です")
+        if status == "complete" and closed != denominator:
+            raise InvalidInput(
+                "formal designを未閉鎖pairを含むままcompleteにしてはいけません"
+            )
+        result.append(canonicalize(row))
+    return result
 
 
 def handler(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:

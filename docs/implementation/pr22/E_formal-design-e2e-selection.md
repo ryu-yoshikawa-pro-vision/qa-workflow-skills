@@ -59,8 +59,8 @@
 
 ## 着手基準
 
-- [ ] Risk・TR・TCN・CI・TC・coverageの実装、schema、呼び出し元・先、CI・テストと既存IDを確認した。
-- [ ] B／C／D／Fの受渡し契約と`test-analysis`のE単一編集ownerを確認した。
+- [x] Risk・TR・TCN・CI・TC・coverageの実装、schema、呼び出し元・先、CI・テストと既存IDを確認した。
+- [x] B／C／D／Fの受渡し契約と`test-analysis`のE単一編集ownerを確認した。
 
 ## 作業内容
 
@@ -82,11 +82,13 @@
 
 ## 完了基準
 
-- [ ] 各正本・Authorityを守り、feature/item/condition/architectureの契約fixtureから既存設計までID・revision付きで局所検証した。B/C/D/Fの正規実成果物との横断追跡はPR #22へ引き継いだ。
-- [ ] 採否・不採用・blocked・複数expected result・別レベル・既存技法CIが互いに混同されない。
+最新の担当受入状態は末尾の「レビュー指摘対応・最終再検証」を参照する。以前の受入記録は作業履歴として保持する。
+
+- [x] 各正本・Authorityを守り、feature/item/condition/architectureの契約fixtureから既存設計までID・revision付きで局所検証した。B/C/D/Fの正規実成果物との横断追跡はPR #22へ引き継いだ。
+- [x] 採否・不採用・blocked・複数expected result・別レベル・既存技法CIが互いに混同されない。
 - [ ] 技術非依存のE2E選定がE2E実装・実行とは独立して発火し、既存E2E直接利用を妨げない。
-- [ ] Risk・TR・TCN・CI・TC・coverageのlegacy／migration／partial rerun回帰と、authorityなし期待結果・誤100%等の負例がPASSする。
-- [ ] 既存ID・証拠・既存設計／executionの直接入口が保たれ、Aによる統合検証へ渡せる。
+- [x] Risk・TR・TCN・CI・TC・coverageのlegacy／migration／partial rerun回帰と、authorityなし期待結果・誤100%等の負例がPASSする。
+- [x] 既存ID・証拠・既存設計／executionの直接入口が保たれ、Aによる統合検証へ渡せる。
 - [ ] 新Skillと改訂既存Skillのisolated/trigger/semantic・決定論的評価を実行した。
 
 - [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
@@ -101,3 +103,193 @@
 2. 変更内容・受入証拠・未実施／blocked／SKIP・データ互換・移行・rollbackの影響を担当Markdownまたは検証レポートへ記録し、PR本文は目的と現在の状態だけに更新する。
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
+
+## PR #27 実装・局所検証記録（2026-11-09）
+
+### 実装範囲
+
+- `skills/e2e-test-selection/`を追加。技術非依存のE2E候補、採否、根拠、source currentness、revision履歴、retirementを検証する単独Skill・schema runtime・output／semantic／trigger評価データを実装した。runtimeはUTF-8 JSON envelopeで完全な選定recordを返し、永続化・承認・CAS・readbackを仮定しない。
+- `test-analysis`から新規選定依頼を新Skillへrouteし、直接TC、既存selection参照、既存E2Eの直接利用は維持した。既存selection validatorはlegacy入力の読取りを維持した。
+- `test-condition-design`にitem×condition全組合せの明示採否・未確認・別レベル・blocked、item単位TCN ID、複数Authority付き期待結果候補、履歴を追加し、採用pairだけ既存TCNへ投影する。テストレベルは明示指定＞承認済architecture＞既定の順に扱う。
+- `test-requirement-design`にテストレベル根拠を追加。`test-case-design`は期待結果ごとにcurrent Authorityを要求し、formal candidateとの一致を確認する。`coverage-analysis`はformal candidate coverageをCI／QA artifact graphと分離し、分母0・不完全な母集団を100%扱いしない。
+- owner-local runtime・fixture・決定論的テストを追加し、Authority付きTC fixtureをlegacy cutover／vertical integrationにも補った。共通README、root EVALS、共有runtime登録、共有assertion registryは変更していない。
+
+### 担当範囲の受入確認
+
+以下は個別実行でPASSした。
+
+- `python -m unittest tests.skills.runtime.test_e2e_selection_contract -v` — 10 tests。
+- `python -m unittest tests.skills.runtime.test_formal_design_contract -v` — 12 tests。
+- `python -m unittest tests.skills.runtime.test_test_condition_structure -v` — 11 tests（複数itemの固有TCN ID、revision時のID再利用、未採用判断と履歴の保持を含む）。
+- `python -m unittest tests.skills.runtime.test_test_requirement_structure -v` — 11 tests。
+- `python -m unittest tests.skills.runtime.test_case_structure -v` — 10 tests（Authorityなし／stale Authority拒否を含む）。
+- `python -m unittest tests.skills.runtime.test_coverage_analysis_traceability -v` — 16 tests（誤100%拒否を含む）。
+- `python -m unittest tests.skills.runtime.test_case_runtime_v1_cutover -v` — 2 tests。
+- `python -m unittest tests.skills.runtime.test_ep_vertical_integration.EpVerticalIntegrationTests.test_standalone_evidence_and_qa_workflow_integration -v` — 1 test。
+- `python -m unittest tests.skills.runtime.test_runtime_portability -v` — 3 tests（Skill単独copy実行、未承認repo-local importなし）。
+- `python -m unittest tests.skills.runtime.test_test_analysis_entities -v` — 17 tests。
+- `python -m unittest tests.skills.runtime.test_test_analysis_risk_matrix -v` — 3 tests。
+- `python -m unittest tests.skills.runtime.test_test_analysis_change_impact -v` — 2 tests。
+- `python -m unittest tests.skills.runtime.test_test_analysis_technique_candidates -v` — 3 tests。
+- `python -m unittest tests.skills.evals.deterministic.test_new_skill_contracts.E2ESelectionDeterministicContractTests -v` — 4 tests（新Skill output／triggerと旧`test-analysis` selection assertion RISK-D016／D017の互換を含む）。
+- `python -m unittest discover -s tests/skills/evals/trigger -v` — 1 test。`python scripts/skills/evals/semantic/validate.py` — 24 Skills／168 cases。`python -m unittest discover -s scripts/skills/evals/semantic/tests -v` — 27 passed／2 Windows symlink skip。`python -m unittest discover -s tests/skills/evals/semantic -v` — 13 passed／1 Windows symlink skip。
+- deterministic output manifest CI blockと同じ検査 — 23 Skills／48 cases PASS。変更対象のcompileallと`git diff --check`もPASS。
+
+### 未完了・blocked
+
+- `python -m unittest discover -s tests/skills/runtime -p "test_*.py" -v`は525 testsでFAILED（5 failures／14 errors／6 skipped）。担当外の`test_ci_handoff` 5件はWindowsでsecure artifact readbackが`artifact_readback_unavailable`となり、`test_sqlite_workflow_history` 14件はWindowsの一時SQLite fileがopenのままcleanup時に`WinError 32`となる。各suite単独の再実行でも同じ失敗を再現した。PR #27起因の失敗は再検証で解消済み。
+- `python -m unittest tests.skills.evals.deterministic.test_new_skill_contracts -v`はE2E固有4 testsがPASSした一方、全38 testsは既存`test-execution` validatorのimport時にPyYAML未導入で16 errors。`python -m unittest tests.skills.evals.deterministic.test_e2e_contracts -v`も共有loaderが全validatorを先読みするため同じPyYAML欠落で開始できない（旧selection validator自体は上記owner-local testで直接検証済み）。`.github/workflows/deterministic-output-evals.yml`はPyYAML 6.0.3をinstallするが、この環境にはない。共通runner全体の決定論的評価は未完了。
+- `python scripts/format_tracked.py check`はruff起動時に`WinError 2`で停止。`ruff`／`dprint`／`skills-ref`はいずれもこの環境にないため、formatterと公式Agent Skills validatorは未検証。semantic judge/providerによる意味評価も未実施。
+- `validate-skills.yml`のrepository eval structure検査はcanonical Skill 24件中、新設`e2e-test-selection`が共有`README.md`にないため失敗する。READMEはA ownerの共有ファイルなので本branchでは変更していない。Aが登録後に再実行する。
+- `scripts/skills/evals/deterministic/ASSERTIONS.md`には旧`test-analysis`のE2E選定assertion RISK-D016／D017が現行契約として残る。legacy validator対応は維持したが、共有registryの移管・現行化はA／PR #22で行う。
+- 実B/C/D/F成果物、A runtime登録、保存先・承認・CAS・readbackがこのbranchでは利用できない。固定fixtureによる局所検証に留め、実artifact間のID／revision／currentness、保存後readback、必要承認は未検証。
+
+### 文書・コード契約の不一致と対応
+
+- `test-case-design`でAuthorityなし期待結果を許容していた実装がPlanのcurrent Authority必須条件と不一致だったため、current Authority必須化と欠落／stale負例を追加した。
+- `test-analysis`の既存文書・出力templateがE2E選定の現行ownerを同Skillとしていたため、新規選定は新Skillへrouteし、旧validatorのselection形式はlegacy読取り用途として明示した。
+- `test-condition-design/SKILL.md`のformal validator helper参照とruntime packaging契約が不一致だったため、validatorを既存`condition_structure.py`に内包し、文書参照も合わせた。
+- 共有`README.md`の新Skill登録漏れと共有`ASSERTIONS.md`の旧selection assertion記述は、いずれもA ownerの共有ファイルに属するため未修正。上記の通りPR #22へ引き継ぐ。
+
+### PR #22への引継ぎ
+
+1. Aがroot `README.md`のcanonical Skill一覧・責務表・E2E workflow routingに`e2e-test-selection`を登録し、直接TC／既存E2E経路を保持したまま`validate-skills.yml`を再実行する。
+2. Aが共有`ASSERTIONS.md`のRISK-D016／D017をlegacy `test-analysis`表の互換Assertionとして明記し、新SkillのE2E-SEL-D001〜D006を追加・参照する。既存Assertionは移行根拠なしに削除・無効化しない。
+3. PR #22でB/C/D/Fの実成果物を使い、source/artifact ID・revision・currentness・Authority・scopeの実接続を確認する。
+4. Aの共有保存・承認・CAS・readback契約と実runtime登録を利用して保存失敗／再開／再取得を検証する。現在のlocal validatorは意図的に永続化を行わない。
+5. Linux CIまたは必要ツール導入済み環境でPyYAML付きdeterministic suite、全runtime suite、ruff/dprint、`skills-ref validate`を再実行する。semantic judge/providerを使った意味評価を実施する。
+6. 他owner実成果物を用いる横断試験、S1〜S17、人間編集8ケース、15＋10条件の最終判定はPR #22だけで行う。
+
+## レビュー指摘対応・最終再検証（2026-11-09）
+
+> この節を現在の状態とする。上の「PR #27 実装・局所検証記録」は初回実行時点の履歴として保持する。初回のPyYAML不足・ツール不足・525件runtime結果は後続検証で更新し、同節の既存証拠は削除しない。
+
+### 3.1 新Skill登録・README・CI
+
+- `skills/e2e-test-selection/`の名称・frontmatter・resource参照・output／semantic／trigger評価一式を確認した。canonical Skillは24件、trigger queryは526件で、各datasetは非空・正負同数・train／validation重複なし。新Skillのoutput manifestは3 cases。
+- `.github/workflows/validate-skills.yml`のrepository structure step相当を再実行した。24 Skillのname・description・trigger dataの検査は通り、最後のREADME照合だけが`README.md`に`` `e2e-test-selection` ``がないため失敗する。これはSkill packageの仕様違反ではない。
+- Plan索引の共有README／CI owner Aを確認し、本branchでは`README.md`と`.github/workflows/validate-skills.yml`を変更していない。Aはcanonical Skill一覧、責務表、`test-analysis`から新Skillを経て既存inspectionへ至るE2E flowを追記し、直接TC・既存E2E実行の入口を保った状態で同workflowを再実行する。
+- 公式`skills-ref`（workflow固定commit `69ef37e9424c0a7ea9dd2293b559e43ec8176379`）は新設／変更した6 Skill（`coverage-analysis`、`test-analysis`、`test-case-design`、`test-condition-design`、`test-requirement-design`、`e2e-test-selection`）すべてPASS。
+
+### 3.2 RISK-D016／D017・新旧selection契約
+
+- 共有`ASSERTIONS.md`のRISK-D016／D017は旧`test-analysis`出力の「E2E対象選定」表に適用される。E2E選定表がない場合のD016、表の必須field欠落時のD017は今も必要であり、旧Assertionだけが残っていることは単独では不具合ではない。
+- `skills/test-analysis/evals/deterministic/validator.py`は旧tableを引き続き検証する。追加したpositive／negative testで、旧tableと技術非依存fieldが揃えば両AssertionがPASSし、table欠落ではD016／D017がFAILし、field欠落ではD017がFAILすることを確認した。新規selection依頼は`e2e-test-selection`へrouteする。
+- 新Skillの新形式は`E2E-SEL-D001`〜`D006`でselection ID／revision／履歴・retirement、候補集合・decision、source revision/currentness、status投影を検証する。旧表を新形式のcurrent selectionへ自動昇格・mergeせず、旧表はlegacy履歴として維持し、新形式recordのcurrentness・readbackが確認できない場合はcurrent扱いしない方針をSkill guidanceへ明記した。旧形式から同一IDの改訂を安全に再開できない場合はmigrationをblockedにする。
+- 既存E2Eの直接実行およびTC直接開始は新Skillを必須としない。共有`ASSERTIONS.md`はA ownerのため未変更。AはD016／D017をlegacy互換Assertionとして明記し、新SkillのD001〜D006を追加・参照する。既存Assertionを移行根拠なしに削除・無効化しない。
+
+### 3.3 全runtime suite失敗の原因・owner
+
+実行環境はWindows 10.0.19045、Python 3.11.9。最終実行は535件、5 failures／14 errors／6 skipped、exit 1。全tracebackは`%TEMP%\pr27-runtime-final-rerun.log`に保存した。
+
+| 失敗群                             | 失敗名                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 例外・実条件                                                                                                                                                                                                                                                                                                                                                                                                                                                       | PR #27との関係／処置                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI artifact readback（5 failures） | `test_artifact_hash_mismatch_is_rejected`、`test_artifact_read_enforces_limit`、`test_backslash_in_posix_changed_filename_is_a_valid_comparison_key`、`test_cli_output_and_fail_closed_exit_code`、`test_complete_integrity_transport_passes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `skills/qa-workflow/scripts/ci_handoff.py::_read_artifact`がWindows（`os.name != "posix"`）または`O_NOFOLLOW`／`O_DIRECTORY`／`O_NONBLOCK`不足時に`_SecureReadbackUnavailable`を送出し、consumerが`artifact_readback_unavailable`へfail closedする。期待するreadback testへ到達する前に起きる。                                                                                                                                                                    | A所有の共有runtimeで、PR #27差分に含まれない。PR #23の安全契約どおり。readback安全性を弱める変更はしない。POSIX descriptor-bound readback可能な環境での再実行が必要。                                                                                                                                                                                      |
+| SQLite cleanup（14 errors）        | `test_cannot_refetch_future_revision_even_if_table_is_tampered`、`test_corrupt_old_snapshot_blocks_current_read_and_future_write`、`test_divergent_history_blocks_read_and_update`、`test_dropped_tracked_history_table_blocks_current_read`、`test_history_with_invalid_json_is_not_reused`、`test_history_write_failure_rolls_back_current_update`、`test_legacy_database_does_not_fabricate_missing_earlier_revisions`、`test_legacy_pretty_json_snapshot_can_be_refetched_after_update`、`test_missing_latest_tracked_snapshot_blocks_earlier_history_read`、`test_missing_latest_tracked_snapshot_blocks_prior_to_backfill`、`test_missing_tracked_revision_cannot_be_silently_recreated`、`test_sqlite_revision_max_is_blocked_without_an_overflow_write`、`test_unmarked_complete_database_can_adopt_history_origin`、`test_unmarked_partial_history_is_ambiguous_and_blocks_updates` | 最初の例外は各test終了時の`TemporaryDirectory.cleanup()`→`shutil.rmtree()`→`os.unlink()`での`PermissionError: [WinError 32]`。Windowsが使用中の`workflow-state.sqlite3`の削除を拒否した。A所有fixtureは`with sqlite3.connect(...) as connection:`を使うがConnection context managerはcommit／rollbackを行うだけでcloseしない。fixture内connectionをcontext exit時に明示closeする診断wrapperを一時実行したところ、同class 20 tests全件PASSしcleanup errorは消えた。 | E担当コード・呼出元ではなくA所有の`tests/skills/runtime/test_sqlite_workflow_history.py`／共通runtime領域。productionの`artifact_graph.py`は4箇所を`contextlib.closing(_sqlite_connection(...))`でcloseする。Aはtest fixtureを`closing()`または明示`close()`へ修正し、通常suiteをLinux／Windowsで再実行する。データ削除・cleanup強制成功化は行っていない。 |
+
+WSLは`Wsl/EnumerateDistros/Service/E_ACCESSDENIED`、Docker serviceはStopped、Docker engine pipeがなくLinux実行環境を利用できなかった。上記cleanup診断はfixture connectionの明示closeで全20件PASSした補助検証であり、Linuxで同じbranch全体を再実行した結果の代替ではない。現在の確定できる根拠はWindows file-lock APIの`WinError 32`とclose前後の差であり、同branchのLinux全suiteは未実施。
+
+PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、Aの公開報告にruntime／integration 496 tests PASSがある。これは前提runtimeのLinux CI証拠として参照するが、今回のPR #27変更を含む535件suiteの再実行ではないため、current local suiteのPASSやLinux再実行済みとは扱わない。
+
+### 3.4 PyYAML評価依存
+
+- グローバルPythonへ実装依存を追加せず、隔離評価venv `%TEMP%\pr27-eval-venv` に`PyYAML==6.0.3`を導入した。runtime依存定義は変更していない。
+- `python -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — 12 PASS。
+- `python -m unittest discover -s tests/skills/evals/deterministic -v` — 299 PASS（最終ログ `%TEMP%\pr27-deterministic-final-after-fix.log`）。初回のPyYAML import errorは解消。E2E-selection固有の`E2ESelectionDeterministicContractTests`は9 PASS（`%TEMP%\pr27-owner-runtime-final\e2e_deterministic.log`）。
+- CI output manifest相当の構造検査は23 Skill／49 cases PASS。実Agentが生成した保存済み文章を使う決定論的CLI評価は、Agent出力がなく未実施。manifest／validator／負例をunitで検証した結果と区別する。
+
+### 3.5 formatter／lint／compile
+
+| 対象・command                                                                                                                     | 環境／result                                                                        | 証拠        |
+| --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------- |
+| `ruff --version`、`dprint --version`                                                                                              | Ruff 0.16.8、dprint 0.55.2                                                          | tool output |
+| `python scripts/format_tracked.py check`                                                                                          | PASS、217 tracked files already formatted。`PYTHONUTF8=1`とpinned tool PATHを使用。 | tool output |
+| `ruff check`および`ruff format --check`（`selection_contract.py`、E2E deterministic validator、E2E runtime／formal runtime test） | PASS、4 Python files。                                                              | tool output |
+| `dprint check`（`skills/e2e-test-selection/`の新規Markdown／JSON全件）                                                            | PASS。fixture値・期待値の意味は決定論的suite／manifest検査でも再確認。              | tool output |
+| `python -m compileall -q`（変更したSkill runtime／validatorとruntime test）                                                       | PASS。                                                                              | tool output |
+
+### 3.6 Agent Skills公式仕様検証
+
+`.github/workflows/validate-skills.yml`のpinned `skills-ref`手順で、上記6 Skillを個別に`skills-ref validate <skill path>`し、すべてPASS。frontmatter、Skill名／directory、description、参照ファイルを確認した。README登録漏れは3.1に分離しており、Skill自体の仕様適合と混同していない。
+
+### 3.7 semantic／trigger評価
+
+| 検証層                    | command／result                                                                           | 判定上の制限                                                                                                                                                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| semantic data structure   | `python scripts/skills/evals/semantic/validate.py` — 24 Skills／168 cases PASS            | dataset構造検証。LLM Judge評価ではない。                                                                                                                                                                                          |
+| semantic runtime tests    | `python -m unittest discover -s scripts/skills/evals/semantic/tests -v` — 27 PASS／2 SKIP | Windows symlink作成権限`WinError 1314`で2件skip。                                                                                                                                                                                 |
+| repository semantic tests | `python -m unittest discover -s tests/skills/evals/semantic -v` — 13 PASS／1 SKIP         | Windows symlink作成権限`WinError 1314`で1件skip。                                                                                                                                                                                 |
+| trigger dataset contract  | `python -m unittest discover -s tests/skills/evals/trigger -v` — 1 PASS                   | dataset・balance・disjoint検証。実Agent発火の証拠ではない。                                                                                                                                                                       |
+| 実semantic Judge          | 未実施                                                                                    | EVALSのJudge AdapterとAgent生成outputが必要だが、この環境にadapter／provider設定がない。Judge接続済み環境でE2E selectionと変更Skillのcaseを実行し、保存済み結果を追加する。                                                       |
+| 実Agent trigger           | 未実施／blocked                                                                           | `codex` executableがなく、この環境ではSkill load logを観測できる実Agent runtimeがない。Codex CLI等を使える承認済み環境で、E2E新規依頼・legacy参照・直接TC／既存E2E実行・無関係依頼・`test-analysis`近接負例を実際に発火観測する。 |
+
+構造検証PASSは意味評価／実Agent発火PASSへ読み替えていない。SKILL改訂・output／semantic fixtureは揃っているが、実JudgeとAgent評価が未完了のため該当完了基準は未チェックのまま。
+
+### 3.8 正式設計／E2E選定重点回帰
+
+- Product Risk→TR→TCN／CI→TCのtyped identity・revision、item×condition採否／不採用／未確認、正当な不採用と未確認の区別、stable TCN ID、複数expected resultと個別Authority、stale／撤回／未承認Authorityは、formal design・requirement・condition・caseの独立fixtureで検証した。
+- テストレベル優先順位、既存CIのpartition／boundary／ruleと共通condition ID、分母0・不完全母集団・blocked項目の誤100%、source currentness・履歴・retirement、legacy・migration・partial rerunは該当runtime／負例で検証した。具体的な証拠suiteと件数は3.4／次節の受入表に記録する。
+- 保存、readback、承認、失敗後再開、他ownerの下流consumerに対する実成果物接続はA runtimeとB/C/D/F実成果物が必要なため未検証。これはPR #22統合とAの共有runtime接続に引き継ぐ。
+
+### E担当runtime・回帰テスト（各commandを独立実行）
+
+環境はPython 3.11.9／Windows 10.0.19045。各ログは`%TEMP%\pr27-owner-runtime-final\`。
+
+| command（すべて末尾に`-v`）                                                                                                                               | result                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `python -m unittest tests.skills.runtime.test_e2e_selection_contract -v`                                                                                  | 12 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_formal_design_contract -v`                                                                                  | 15 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_test_condition_structure -v`                                                                                | 11 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_test_requirement_structure -v`                                                                              | 11 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_case_structure -v`                                                                                          | 11 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_coverage_analysis_traceability -v`                                                                          | 16 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_case_runtime_v1_cutover -v`                                                                                 | 2 PASS                                                                   |
+| `python -m unittest tests.skills.runtime.test_ep_vertical_integration.EpVerticalIntegrationTests.test_standalone_evidence_and_qa_workflow_integration -v` | 1 PASS                                                                   |
+| `python -m unittest tests.skills.runtime.test_runtime_portability -v`                                                                                     | 3 PASS                                                                   |
+| `python -m unittest tests.skills.runtime.test_test_analysis_entities -v`                                                                                  | 17 PASS                                                                  |
+| `python -m unittest tests.skills.runtime.test_test_analysis_risk_matrix -v`                                                                               | 3 PASS                                                                   |
+| `python -m unittest tests.skills.runtime.test_test_analysis_change_impact -v`                                                                             | 2 PASS                                                                   |
+| `python -m unittest tests.skills.runtime.test_test_analysis_technique_candidates -v`                                                                      | 3 PASS                                                                   |
+| `python -m unittest tests.skills.evals.deterministic.test_new_skill_contracts.E2ESelectionDeterministicContractTests -v`                                  | 9 PASS（legacy RISK-D016／D017、new output／negative／trigger contract） |
+
+上記E担当runtimeは合計107 PASS。新しい追加レビュー修正は`skills/test-case-design/scripts/case_structure.py`で、formal TCNがcandidate refのみを渡しcandidate payloadを欠くと`StopIteration`内部エラーになっていた。明示的な`invalid_input`として拒否し、`test_formal_candidate_refs_require_candidate_payloads`を追加した。該当negativeと正常candidate対応の2 test、および`test_case_structure`全11 testsがPASS。担当範囲内のfalse-pass／fail-openは追加確認で見つからなかった。
+
+### formatter・CI・Actionsの実行対象
+
+- PR #27のGitHub上の公開headは`688cacf9514dd63ccbe93641f4f86fad340d3580`。そのheadに紐づく`Codex Harness`、`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`、`Code Quality`はすべてsuccessだが、これはlocal uncommitted worktreeを含まない公開commitの結果である。
+- PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`はclosedで、同headの上記5 workflowはsuccess。Aの安全readback blocked方針とSQLite履歴runtimeの共有契約確認に使用した。PR #23の結果もPR #27 local差分のCI結果として扱わない。
+- 今回のlocal変更に対するGitHub Actionsは未実行。no pushの制約下で未commit worktreeをActionsへ渡せないため。公開headのsuccessで代替していない。
+
+### 現在の完了基準状態
+
+- [x] 各正本・Authority、ID／revisionの局所fixture、採否／不採用／blocked、複数expected result、level priority、legacy／partial rerun、誤100%負例を担当runtimeで確認した。
+- [ ] 実Agentによる新Skill trigger、非発火近接例、実semantic Judge評価が未実施。
+- [ ] full runtime suiteはA所有共有コード起因の5 failures／14 cleanup errorsがあり、Linuxでの同branch再実行も未実施。
+- [ ] README未登録によりrepository-wide Skill validationの最終stepが失敗。Aの修正後に再実行が必要。
+- [ ] 変更済みlocal worktreeに対するGitHub Actions未実施。
+- [ ] 保存／readback／承認／再開と他owner成果物を用いたsource ID・revision・currentness横断接続は未実施。
+- [ ] 以上から「担当branch内の実装・局所検証完了」はまだ宣言しない。E担当runtime・formatter・Skill仕様・構造評価は実施済みだが、未完了項目が残る。
+
+### owner別の再開・引継ぎ条件
+
+**Aへ**
+
+1. `README.md`のcanonical Skill一覧・責務表・新E2E routingを更新し、`validate-skills.yml`の全stepを再実行する。README omissionは `e2e-test-selection`、ownerはA。
+2. 共有`ASSERTIONS.md`のRISK-D016／D017をlegacy `test-analysis`表の互換対象として明記し、new SkillのE2E-SEL-D001〜D006を登録・参照する。現行positive／negative結果を維持し、既存Assertionを削除／無効化しない。
+3. `tests/skills/runtime/test_sqlite_workflow_history.py`でConnection contextをcloseする修正（`closing()`または明示close）を行い、通常のruntime suiteをLinux／Windowsで再実行する。現状の14件はすべてcleanup時WinError 32で、各testのassertion失敗とは別。
+4. `ci_handoff.py::_read_artifact`はPOSIX descriptor-bound readback不可能時の`artifact_readback_unavailable` blockedを維持する。Windowsでreadbackのnegative/positive testsをPASSさせる場合もsymlink／race安全性を保持する実装が必要。再開条件はLinux等の安全なPOSIX環境で5 testsを通すか、Aが同等の安全性を持つ別platform readerを共有すること。
+
+**PR #22へ**
+
+1. B/C/D/Fの実成果物とAの登録runtimeを用い、Product Risk→TR→TCN／CI→TC→coverageおよびE2E選定の実ref・revision・Authority・currentnessを照合する。
+2. Aの承認済み保存／CAS／readbackを接続し、保存失敗・retry／再開・保存後再取得、source変更時のstale伝播と下流consumerを検証する。
+3. Judge Adapterと実Agentが利用できる環境で今回未実施の意味評価・Skill読み込み／trigger評価を行い、TCあり・TCなし、既存E2E直接実行、legacy参照、無関係依頼を観測する。
+4. 全current Skill、S1〜S17、人間編集8ケース、開発連動QA15条件／QA全工程10条件、詳細Plan01〜08と統合後Actionsの横断最終受入を行う。このbranchでは実施しない。
+
+### 文書・コード不一致の棚卸し
+
+- `README.md`が新Skillを欠き、`.github/workflows/validate-skills.yml`のcanonical list照合で落ちる。仕様違反ではなくA ownerの共有文書未登録。未変更・引継ぎ済み。
+- 共有`ASSERTIONS.md`は旧tableを対象とするが旧artifactのvalidator互換も必要なため、旧契約の存在だけを不具合扱いしない。RISK-D016／D017のscope更新とnew Skill assertionの追加はA ownerへ引継ぎ済み。
+- 正式設計Authority revisionとsource revisionの照合、candidate removal／retirement履歴、current `change_reason`は旧runtime検証と文書条件に不足があったため、E担当runtime・fixture・Skill docs・negative testを更新した。
+- 正式TCNのcandidate IDのみを渡すと`test-case-design`で内部`StopIteration`となるschema不一致を今回の追加レビューで発見し、明示入力拒否と回帰testを追加した。
+- 上記以外に今回の差分範囲で把握した文書・コード契約の不一致はない。

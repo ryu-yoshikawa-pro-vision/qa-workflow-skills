@@ -28,6 +28,657 @@ from runtime_contract import (
     validate_upstream_entities,
 )
 
+ITEM_RE = re.compile(r"^TI-\d{3,}$")
+CONDITION_RE = re.compile(r"^COND-\d{3,}$")
+DESIGN_RE = re.compile(r"^FD-\d{3,}$")
+EXPECTED_RESULT_RE = re.compile(r"^ER-\d{3,}$")
+DECISIONS = {
+    "adopted",
+    "not_applicable",
+    "out_of_scope",
+    "other_test_level",
+    "duplicate",
+    "unconfirmed",
+    "blocked",
+}
+
+
+class FormalDesignError(ValueError):
+    pass
+
+
+def _require_text(value: Any, name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise FormalDesignError(f"{name}は空でない文字列が必要です")
+    return value.strip()
+
+
+def _rows(value: Any, name: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not all(isinstance(row, dict) for row in value):
+        raise FormalDesignError(f"{name}はobject配列が必要です")
+    return value
+
+
+def resolve_test_level(evidence: Any) -> dict[str, str]:
+    if not isinstance(evidence, dict) or set(evidence) != {
+        "explicit",
+        "architecture",
+        "default",
+    }:
+        raise FormalDesignError("test_level_evidence schemaが不正です")
+    explicit = evidence["explicit"]
+    architecture = evidence["architecture"]
+    default = evidence["default"]
+    if explicit is not None:
+        if not isinstance(explicit, dict) or set(explicit) != {"level", "source_ref"}:
+            raise FormalDesignError("explicit test level evidenceが不正です")
+        return {
+            "level": _require_text(explicit["level"], "explicit level"),
+            "source_ref": _require_text(explicit["source_ref"], "explicit source_ref"),
+            "source": "explicit",
+        }
+    if architecture is not None:
+        if (
+            not isinstance(architecture, dict)
+            or set(architecture) != {"level", "source_ref", "approved"}
+            or not isinstance(architecture["approved"], bool)
+        ):
+            raise FormalDesignError("architecture test level evidenceが不正です")
+        if architecture["approved"]:
+            return {
+                "level": _require_text(architecture["level"], "architecture level"),
+                "source_ref": _require_text(
+                    architecture["source_ref"], "architecture source_ref"
+                ),
+                "source": "approved_architecture",
+            }
+    if not isinstance(default, dict) or set(default) != {"level", "source_ref"}:
+        raise FormalDesignError("default test level evidenceが不正です")
+    if default["level"] != "system":
+        raise FormalDesignError("既定テストレベルはsystemである必要があります")
+    return {
+        "level": "system",
+        "source_ref": _require_text(default["source_ref"], "default source_ref"),
+        "source": "default",
+    }
+
+
+def validate_formal_design(
+    packet: Any, tcn_drafts: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Validate the full explicit pair population and project adopted pairs to TCN drafts."""
+    required = {
+        "schema_version",
+        "design_ref",
+        "revision",
+        "change_reason",
+        "source_refs",
+        "items",
+        "items_complete",
+        "conditions_complete",
+        "condition_candidates",
+        "authorities",
+        "test_level_evidence",
+        "pair_assessments",
+        "history",
+        "retired_candidate_refs",
+    }
+    if not isinstance(packet, dict) or set(packet) != required:
+        raise FormalDesignError("formal_design schemaが不正です")
+    if packet["schema_version"] != "formal-design-v1":
+        raise FormalDesignError("formal_design schema_versionが未対応です")
+    design_ref = _require_text(packet["design_ref"], "design_ref")
+    if not DESIGN_RE.fullmatch(design_ref):
+        raise FormalDesignError("design_refの形式が不正です")
+    revision = packet["revision"]
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise FormalDesignError("formal_design revisionは1以上の整数が必要です")
+    _require_text(packet["change_reason"], "formal_design change_reason")
+    if not isinstance(packet["items_complete"], bool) or not isinstance(
+        packet["conditions_complete"], bool
+    ):
+        raise FormalDesignError(
+            "items_complete / conditions_completeはbooleanが必要です"
+        )
+    history = _rows(packet["history"], "formal_design.history")
+    history_revisions: list[int] = []
+    historical_candidate_pairs: dict[str, tuple[str, str]] = {}
+    historical_retirements: dict[str, str] = {}
+    previous_history_candidate_ids: set[str] = set()
+    for index, row in enumerate(history):
+        if set(row) != {
+            "revision",
+            "change_reason",
+            "pair_decisions",
+            "candidate_assignments",
+            "retired_candidate_refs",
+        }:
+            raise FormalDesignError(f"formal_design.history[{index}] schemaが不正です")
+        old_revision = row["revision"]
+        if (
+            not isinstance(old_revision, int)
+            or isinstance(old_revision, bool)
+            or old_revision < 1
+        ):
+            raise FormalDesignError("formal_design history revisionが不正です")
+        history_revisions.append(old_revision)
+        _require_text(row["change_reason"], "formal_design history change_reason")
+        old_pairs = _rows(row["pair_decisions"], "history.pair_decisions")
+        seen_old_pairs: set[tuple[str, str]] = set()
+        old_decision_by_pair: dict[tuple[str, str], str] = {}
+        for old_pair in old_pairs:
+            if set(old_pair) != {"item_ref", "condition_ref", "decision"}:
+                raise FormalDesignError("history pair_decision schemaが不正です")
+            pair = (
+                _require_text(old_pair["item_ref"], "history item_ref"),
+                _require_text(old_pair["condition_ref"], "history condition_ref"),
+            )
+            old_decision = old_pair["decision"]
+            if (
+                pair in seen_old_pairs
+                or not isinstance(old_decision, str)
+                or old_decision not in DECISIONS
+            ):
+                raise FormalDesignError("history pair decisionが重複または不正です")
+            seen_old_pairs.add(pair)
+            old_decision_by_pair[pair] = old_decision
+        assignments = _rows(
+            row["candidate_assignments"], "history.candidate_assignments"
+        )
+        assignment_ids: list[str] = []
+        assigned_pairs: set[tuple[str, str]] = set()
+        for assignment in assignments:
+            if set(assignment) != {"candidate_ref", "item_ref", "condition_ref"}:
+                raise FormalDesignError("history candidate assignment schemaが不正です")
+            candidate_ref = _require_text(
+                assignment["candidate_ref"], "history candidate_ref"
+            )
+            if not EXPECTED_RESULT_RE.fullmatch(candidate_ref):
+                raise FormalDesignError("history candidate_ref形式が不正です")
+            assignment_ids.append(candidate_ref)
+            pair = (
+                _require_text(assignment["item_ref"], "history assignment item_ref"),
+                _require_text(
+                    assignment["condition_ref"], "history assignment condition_ref"
+                ),
+            )
+            if old_decision_by_pair.get(pair) != "adopted":
+                raise FormalDesignError(
+                    "history candidate assignmentは採用済みpairに属する必要があります"
+                )
+            assigned_pairs.add(pair)
+            previous_pair = historical_candidate_pairs.get(candidate_ref)
+            if previous_pair is not None and previous_pair != pair:
+                raise FormalDesignError(
+                    "過去のexpected-result candidate IDを別pairへ再利用しています"
+                )
+            historical_candidate_pairs[candidate_ref] = pair
+        if assignment_ids != sorted(set(assignment_ids)):
+            raise FormalDesignError(
+                "history candidate_assignmentsはcandidate_ref順が必要です"
+            )
+        if set(assignment_ids) & set(historical_retirements):
+            raise FormalDesignError(
+                "過去にretiredとなったexpected-result candidate IDが再利用されています"
+            )
+        if any(
+            decision == "adopted" and pair not in assigned_pairs
+            for pair, decision in old_decision_by_pair.items()
+        ):
+            raise FormalDesignError(
+                "historyの採用pairにはcandidate assignmentが必要です"
+            )
+        old_retirement_rows = _rows(
+            row["retired_candidate_refs"], "history.retired_candidate_refs"
+        )
+        old_retirements: dict[str, str] = {}
+        old_retirement_ids: list[str] = []
+        for retired in old_retirement_rows:
+            if set(retired) != {"candidate_ref", "reason"}:
+                raise FormalDesignError(
+                    "history retired_candidate_ref schemaが不正です"
+                )
+            candidate_ref = _require_text(
+                retired["candidate_ref"], "history retired candidate_ref"
+            )
+            if (
+                not EXPECTED_RESULT_RE.fullmatch(candidate_ref)
+                or candidate_ref in old_retirements
+            ):
+                raise FormalDesignError(
+                    "history retired candidate_ref形式または一意性が不正です"
+                )
+            old_retirement_ids.append(candidate_ref)
+            old_retirements[candidate_ref] = _require_text(
+                retired["reason"], "history retired candidate reason"
+            )
+        if old_retirement_ids != sorted(old_retirement_ids):
+            raise FormalDesignError(
+                "history retired_candidate_refsはcandidate_ref順が必要です"
+            )
+        removed_candidate_ids = previous_history_candidate_ids - set(assignment_ids)
+        if not removed_candidate_ids <= set(old_retirements):
+            raise FormalDesignError(
+                "historyで削除されたexpected-result candidateにはretirement reasonが必要です"
+            )
+        if set(old_retirements) & set(assignment_ids):
+            raise FormalDesignError(
+                "history内のcurrent candidateを同時にretiredにできません"
+            )
+        if set(old_retirements) - set(historical_candidate_pairs):
+            raise FormalDesignError(
+                "未使用のexpected-result candidateをhistoryでretiredにできません"
+            )
+        if not set(historical_retirements) <= set(old_retirements):
+            raise FormalDesignError(
+                "historyから過去のcandidate retirementが失われています"
+            )
+        if any(
+            old_retirements[candidate_ref] != reason
+            for candidate_ref, reason in historical_retirements.items()
+        ):
+            raise FormalDesignError(
+                "history内のcandidate retirement reasonが変化しています"
+            )
+        historical_retirements = old_retirements
+        previous_history_candidate_ids = set(assignment_ids)
+    if history_revisions != list(range(1, revision)):
+        raise FormalDesignError("formal_design revision履歴が欠落しています")
+
+    source_by_ref: dict[str, tuple[str, str]] = {}
+    for index, row in enumerate(_rows(packet["source_refs"], "source_refs")):
+        if set(row) != {"ref", "revision", "currentness"}:
+            raise FormalDesignError(f"source_refs[{index}] schemaが不正です")
+        ref = _require_text(row["ref"], "source ref")
+        source_revision = _require_text(row["revision"], "source revision")
+        currentness = row["currentness"]
+        if (
+            not isinstance(currentness, str)
+            or currentness not in {"current", "stale", "unknown"}
+            or ref in source_by_ref
+        ):
+            raise FormalDesignError("source refのcurrentnessまたは一意性が不正です")
+        source_by_ref[ref] = (source_revision, currentness)
+
+    items: dict[str, str] = {}
+    for index, row in enumerate(_rows(packet["items"], "items")):
+        if set(row) != {"item_ref", "source_ref"}:
+            raise FormalDesignError(f"items[{index}] schemaが不正です")
+        item_ref = _require_text(row["item_ref"], "item_ref")
+        source_ref = _require_text(row["source_ref"], "item source_ref")
+        if (
+            not ITEM_RE.fullmatch(item_ref)
+            or item_ref in items
+            or source_ref not in source_by_ref
+        ):
+            raise FormalDesignError("test item refが不正または未知です")
+        items[item_ref] = source_ref
+
+    conditions: dict[str, str] = {}
+    for index, row in enumerate(
+        _rows(packet["condition_candidates"], "condition_candidates")
+    ):
+        if set(row) != {"condition_ref", "source_ref"}:
+            raise FormalDesignError(f"condition_candidates[{index}] schemaが不正です")
+        condition_ref = _require_text(row["condition_ref"], "condition_ref")
+        source_ref = _require_text(row["source_ref"], "condition source_ref")
+        if (
+            not CONDITION_RE.fullmatch(condition_ref)
+            or condition_ref in conditions
+            or source_ref not in source_by_ref
+        ):
+            raise FormalDesignError("condition candidate refが不正または未知です")
+        conditions[condition_ref] = source_ref
+
+    authorities: dict[str, str] = {}
+    for index, row in enumerate(_rows(packet["authorities"], "authorities")):
+        if set(row) != {"authority_ref", "revision", "currentness"}:
+            raise FormalDesignError(f"authorities[{index}] schemaが不正です")
+        ref = _require_text(row["authority_ref"], "authority_ref")
+        authority_revision = _require_text(row["revision"], "authority revision")
+        currentness = row["currentness"]
+        if (
+            not isinstance(currentness, str)
+            or currentness not in {"current", "stale", "unknown"}
+            or ref in authorities
+        ):
+            raise FormalDesignError("Authority currentnessまたは一意性が不正です")
+        if ref not in source_by_ref or source_by_ref[ref] != (
+            authority_revision,
+            currentness,
+        ):
+            raise FormalDesignError(
+                "Authorityのrevision/currentnessがsource refsに一致しません"
+            )
+        authorities[ref] = currentness
+
+    resolved_level = resolve_test_level(packet["test_level_evidence"])
+    if resolved_level["source_ref"] not in source_by_ref:
+        raise FormalDesignError("test level source_refがsource_refsにありません")
+    drafts_by_key = {row.get("draft_key"): row for row in tcn_drafts}
+    if len(drafts_by_key) != len(tcn_drafts):
+        raise FormalDesignError("TCN draft_keyが重複しています")
+    expected_pairs = {(item, condition) for item in items for condition in conditions}
+    assessments: dict[tuple[str, str], dict[str, Any]] = {}
+    projection: dict[str, dict[str, Any]] = {}
+    current_candidate_pairs: dict[str, tuple[str, str]] = {}
+    for index, row in enumerate(_rows(packet["pair_assessments"], "pair_assessments")):
+        allowed = {
+            "item_ref",
+            "condition_ref",
+            "decision",
+            "rationale",
+            "test_level",
+            "tcn_draft_key",
+            "expected_result_candidates",
+            "covered_by_pair",
+            "reopen_condition",
+        }
+        if set(row) != allowed:
+            raise FormalDesignError(f"pair_assessments[{index}] schemaが不正です")
+        pair = (
+            _require_text(row["item_ref"], f"pair_assessments[{index}].item_ref"),
+            _require_text(
+                row["condition_ref"], f"pair_assessments[{index}].condition_ref"
+            ),
+        )
+        if pair not in expected_pairs or pair in assessments:
+            raise FormalDesignError("item × condition pairが未知または重複しています")
+        if not isinstance(row["decision"], str) or row["decision"] not in DECISIONS:
+            raise FormalDesignError("pair decisionが不正です")
+        _require_text(row["rationale"], "pair rationale")
+        level = _require_text(row["test_level"], "pair test_level")
+        draft_key = row["tcn_draft_key"]
+        candidates = _rows(
+            row["expected_result_candidates"], "expected_result_candidates"
+        )
+        if row["decision"] == "adopted":
+            if level != resolved_level["level"]:
+                raise FormalDesignError(
+                    "採用pairのtest levelが優先順位の解決結果と不一致です"
+                )
+            draft_key = _require_text(draft_key, "adopted tcn_draft_key")
+            if draft_key not in drafts_by_key or draft_key in projection:
+                raise FormalDesignError("採用pairに一意な既存TCN draftがありません")
+            if not candidates:
+                raise FormalDesignError(
+                    "採用pairにexpected result candidateがありません"
+                )
+            candidate_ids: list[str] = []
+            candidate_rows: list[dict[str, Any]] = []
+            for candidate_index, candidate in enumerate(candidates):
+                candidate_fields = {
+                    "candidate_ref",
+                    "text",
+                    "authority_refs",
+                    "observation_method",
+                    "side_effects",
+                    "revision",
+                }
+                if set(candidate) != candidate_fields:
+                    raise FormalDesignError(
+                        f"expected result candidate {candidate_index} schemaが不正です"
+                    )
+                candidate_ref = _require_text(
+                    candidate["candidate_ref"], "candidate_ref"
+                )
+                if not EXPECTED_RESULT_RE.fullmatch(candidate_ref):
+                    raise FormalDesignError(
+                        "expected result candidate_ref形式が不正です"
+                    )
+                if candidate_ref in candidate_ids:
+                    raise FormalDesignError(
+                        "expected result candidate_refが重複しています"
+                    )
+                candidate_ids.append(candidate_ref)
+                if candidate_ref in current_candidate_pairs:
+                    raise FormalDesignError(
+                        "expected-result candidate IDを複数pairへ割り当てています"
+                    )
+                current_candidate_pairs[candidate_ref] = pair
+                _require_text(candidate["text"], "expected result text")
+                _require_text(candidate["observation_method"], "observation_method")
+                _require_text(candidate["side_effects"], "side_effects")
+                _require_text(candidate["revision"], "expected result revision")
+                refs = candidate["authority_refs"]
+                if (
+                    not isinstance(refs, list)
+                    or not refs
+                    or not all(isinstance(ref, str) and ref for ref in refs)
+                    or refs != sorted(set(refs))
+                ):
+                    raise FormalDesignError("expected result authority_refsが必要です")
+                if any(
+                    ref not in authorities or authorities[ref] != "current"
+                    for ref in refs
+                ):
+                    raise FormalDesignError(
+                        "expected resultにcurrent Authority以外のrefがあります"
+                    )
+                candidate_rows.append(dict(candidate))
+            if candidate_ids != sorted(candidate_ids):
+                raise FormalDesignError(
+                    "expected result candidatesはcandidate_ref順が必要です"
+                )
+            draft = drafts_by_key[draft_key]
+            if not set(draft["tr_refs"]):
+                raise FormalDesignError("採用pairのTCN draftにTRがありません")
+            projection[draft_key] = {
+                "item_ref": pair[0],
+                "condition_ref": pair[1],
+                "formal_design_ref": design_ref,
+                "formal_design_revision": revision,
+                "expected_result_candidate_refs": sorted(candidate_ids),
+                "expected_result_candidates": candidate_rows,
+                "test_level": level,
+                "test_level_source": resolved_level["source"],
+                "test_level_source_ref": resolved_level["source_ref"],
+            }
+        elif draft_key is not None or candidates:
+            raise FormalDesignError(
+                "非採用pairがTCN draftまたはexpected resultを生成しています"
+            )
+        covered_by = row["covered_by_pair"]
+        if row["decision"] == "duplicate":
+            if not isinstance(covered_by, dict) or set(covered_by) != {
+                "item_ref",
+                "condition_ref",
+            }:
+                raise FormalDesignError("duplicate pairにはcovered_by_pairが必要です")
+            covered_pair = (
+                _require_text(covered_by["item_ref"], "covered_by_pair.item_ref"),
+                _require_text(
+                    covered_by["condition_ref"], "covered_by_pair.condition_ref"
+                ),
+            )
+            if covered_pair == pair or covered_pair not in expected_pairs:
+                raise FormalDesignError("covered_by_pairが別の既知pairではありません")
+        elif covered_by is not None:
+            raise FormalDesignError(
+                "duplicate以外のpairにcovered_by_pairを指定できません"
+            )
+        if row["decision"] in {"unconfirmed", "blocked"}:
+            _require_text(row["reopen_condition"], "reopen_condition")
+        elif row["reopen_condition"] is not None:
+            raise FormalDesignError(
+                "未確認／blocked以外のpairにreopen_conditionを指定できません"
+            )
+        if row["decision"] == "other_test_level" and level == resolved_level["level"]:
+            raise FormalDesignError("other_test_levelが解決済みlevelと同じです")
+        assessments[pair] = row
+
+    if set(assessments) != expected_pairs:
+        missing = sorted(expected_pairs - set(assessments))
+        raise FormalDesignError(
+            f"item × condition populationのassessmentが不足しています: {missing}"
+        )
+    if set(projection) != set(drafts_by_key):
+        raise FormalDesignError("formal_designで対応しないTCN draftがあります")
+    for pair, row in assessments.items():
+        if row["decision"] == "duplicate":
+            target = tuple(
+                row["covered_by_pair"][key] for key in ("item_ref", "condition_ref")
+            )
+            if assessments[target]["decision"] != "adopted":
+                raise FormalDesignError(
+                    "duplicate covered_by_pairは採用済みpairを参照する必要があります"
+                )
+    for candidate_ref, pair in current_candidate_pairs.items():
+        if candidate_ref in historical_retirements:
+            raise FormalDesignError(
+                "過去にretiredとなったexpected-result candidate IDは再利用できません"
+            )
+        if (
+            candidate_ref in historical_candidate_pairs
+            and historical_candidate_pairs[candidate_ref] != pair
+        ):
+            raise FormalDesignError(
+                "expected-result candidate IDを別pairへ再利用しています"
+            )
+    retired_rows = _rows(packet["retired_candidate_refs"], "retired_candidate_refs")
+    retired_ids: list[str] = []
+    retired_by_id: dict[str, str] = {}
+    for row in retired_rows:
+        if set(row) != {"candidate_ref", "reason"}:
+            raise FormalDesignError("retired_candidate_ref schemaが不正です")
+        candidate_ref = _require_text(row["candidate_ref"], "retired candidate_ref")
+        if not EXPECTED_RESULT_RE.fullmatch(candidate_ref):
+            raise FormalDesignError("retired candidate_ref形式が不正です")
+        reason = _require_text(row["reason"], "retired candidate reason")
+        retired_ids.append(candidate_ref)
+        retired_by_id[candidate_ref] = reason
+    if retired_ids != sorted(set(retired_ids)):
+        raise FormalDesignError(
+            "retired_candidate_refsはcandidate_ref順の一意配列が必要です"
+        )
+    if set(retired_ids) & set(current_candidate_pairs):
+        raise FormalDesignError(
+            "current expected-result candidateをretiredにできません"
+        )
+    if set(retired_ids) - set(historical_candidate_pairs):
+        raise FormalDesignError(
+            "未使用のexpected-result candidate IDをretiredにできません"
+        )
+    if not (previous_history_candidate_ids - set(current_candidate_pairs)) <= set(
+        retired_by_id
+    ):
+        raise FormalDesignError(
+            "直前revisionから削除されたexpected-result candidateにはretirement reasonが必要です"
+        )
+    if not set(historical_retirements) <= set(retired_by_id):
+        raise FormalDesignError(
+            "current formal designから過去のcandidate retirementが失われています"
+        )
+    if any(
+        retired_by_id[candidate_ref] != reason
+        for candidate_ref, reason in historical_retirements.items()
+    ):
+        raise FormalDesignError(
+            "current formal designで過去のcandidate retirement reasonが変化しています"
+        )
+    missing_retirement = sorted(
+        set(historical_candidate_pairs)
+        - set(current_candidate_pairs)
+        - set(retired_ids)
+    )
+    if missing_retirement:
+        raise FormalDesignError(
+            "削除された過去expected-result candidateにはretirement reasonが必要です"
+        )
+    if any(state != "current" for _revision, state in source_by_ref.values()):
+        raise FormalDesignError("source refsにstaleまたはcurrentness unknownがあります")
+    if any(state != "current" for state in authorities.values()):
+        raise FormalDesignError("Authorityにstaleまたはcurrentness unknownがあります")
+    unresolved_pairs = [
+        {"item_ref": item, "condition_ref": condition, "decision": row["decision"]}
+        for (item, condition), row in sorted(assessments.items())
+        if row["decision"] in {"unconfirmed", "blocked"}
+    ]
+    denominator = len(expected_pairs)
+    closed = sum(
+        row["decision"] not in {"unconfirmed", "blocked"}
+        for row in assessments.values()
+    )
+    formal_design_record = dict(packet)
+    formal_design_record["source_refs"] = sorted(
+        (dict(row) for row in packet["source_refs"]), key=lambda row: row["ref"]
+    )
+    formal_design_record["items"] = sorted(
+        (dict(row) for row in packet["items"]), key=lambda row: row["item_ref"]
+    )
+    formal_design_record["condition_candidates"] = sorted(
+        (dict(row) for row in packet["condition_candidates"]),
+        key=lambda row: row["condition_ref"],
+    )
+    formal_design_record["authorities"] = sorted(
+        (dict(row) for row in packet["authorities"]),
+        key=lambda row: row["authority_ref"],
+    )
+    formal_design_record["pair_assessments"] = [
+        {
+            **row,
+            "expected_result_candidates": [
+                dict(candidate) for candidate in row["expected_result_candidates"]
+            ],
+        }
+        for _pair, row in sorted(assessments.items())
+    ]
+    formal_design_record["history"] = [
+        {
+            "revision": row["revision"],
+            "change_reason": row["change_reason"],
+            "pair_decisions": sorted(
+                (dict(pair) for pair in row["pair_decisions"]),
+                key=lambda pair: (pair["item_ref"], pair["condition_ref"]),
+            ),
+            "candidate_assignments": sorted(
+                (dict(candidate) for candidate in row["candidate_assignments"]),
+                key=lambda candidate: candidate["candidate_ref"],
+            ),
+            "retired_candidate_refs": sorted(
+                (dict(candidate) for candidate in row["retired_candidate_refs"]),
+                key=lambda candidate: candidate["candidate_ref"],
+            ),
+        }
+        for row in history
+    ]
+    formal_design_record["retired_candidate_refs"] = sorted(
+        (dict(row) for row in packet["retired_candidate_refs"]),
+        key=lambda row: row["candidate_ref"],
+    )
+    formal_design_record["test_level_evidence"] = {
+        key: dict(value) if isinstance(value, dict) else value
+        for key, value in packet["test_level_evidence"].items()
+    }
+    projection["__formal_design_record__"] = formal_design_record
+    projection["__formal_design_summary__"] = {
+        "design_ref": design_ref,
+        "revision": revision,
+        "pair_denominator": denominator,
+        "pair_closed": closed,
+        "pair_coverage": (
+            f"{closed}/{denominator}"
+            if denominator
+            and packet["items_complete"]
+            and packet["conditions_complete"]
+            else None
+        ),
+        "pair_coverage_status": (
+            "unknown_zero_denominator"
+            if denominator == 0
+            else "incomplete_population"
+            if not packet["items_complete"] or not packet["conditions_complete"]
+            else "incomplete"
+            if unresolved_pairs
+            else "complete"
+        ),
+        "unresolved_pairs": unresolved_pairs,
+        "items_complete": packet["items_complete"],
+        "conditions_complete": packet["conditions_complete"],
+    }
+    return projection
+
+
 SKILL = "test-condition-design"
 GENERATOR = "condition_structure"
 GENERATOR_CONTRACT_VERSION = "condition-structure-v2"
@@ -282,7 +933,9 @@ def _validate_tr_rows(rows: Any) -> dict[str, dict[str, Any]]:
         if not isinstance(row, dict):
             raise InvalidInput(f"test_requirements[{index}]が不正です")
         reject_unknown(
-            row, {"tr_id", "priority", "authority_refs", "risk_refs", "scope_refs"}
+            row,
+            {"tr_id", "priority", "authority_refs", "risk_refs", "scope_refs"},
+            {"test_level", "test_level_source", "test_level_source_ref"},
         )
         tr_id = row.get("tr_id")
         if not isinstance(tr_id, str) or TR_ID_RE.fullmatch(tr_id) is None:
@@ -394,7 +1047,20 @@ def _validate_tcn_drafts(rows: Any) -> list[dict[str, Any]]:
     for index, row in enumerate(ensure_list(rows, "test_conditions")):
         if not isinstance(row, dict):
             raise InvalidInput(f"test_conditions[{index}]が不正です")
-        reject_unknown(row, required)
+        reject_unknown(
+            row,
+            required,
+            {
+                "item_ref",
+                "condition_ref",
+                "formal_design_ref",
+                "formal_design_revision",
+                "expected_result_candidate_refs",
+                "test_level",
+                "test_level_source",
+                "test_level_source_ref",
+            },
+        )
         key = ensure_nonempty_string(
             row["draft_key"], f"test_conditions[{index}].draft_key"
         )
@@ -433,7 +1099,32 @@ def _validate_tcn_drafts(rows: Any) -> list[dict[str, Any]]:
             row["priority_override_reason"], str
         ):
             raise InvalidInput("TCN priority_override_reasonが不正です")
-        result.append(canonicalize(row))
+        normalized = canonicalize(row)
+        optional_refs = (
+            "item_ref",
+            "condition_ref",
+            "formal_design_ref",
+            "test_level",
+            "test_level_source",
+            "test_level_source_ref",
+        )
+        for field in optional_refs:
+            if field in normalized:
+                ensure_nonempty_string(normalized[field], f"test_conditions.{field}")
+        if "formal_design_revision" in normalized and (
+            not isinstance(normalized["formal_design_revision"], int)
+            or isinstance(normalized["formal_design_revision"], bool)
+            or normalized["formal_design_revision"] < 1
+        ):
+            raise InvalidInput("formal_design_revisionが不正です")
+        if "expected_result_candidate_refs" in normalized:
+            candidate_refs = _unique_strings(
+                normalized["expected_result_candidate_refs"],
+                "expected_result_candidate_refs",
+            )
+            if not candidate_refs or candidate_refs != sorted(candidate_refs):
+                raise InvalidInput("expected_result_candidate_refsが不正です")
+        result.append(normalized)
     return result
 
 
@@ -550,7 +1241,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "inactive_materialize_history",
             "zero_scope_terminal",
         },
-        {"legacy_tcn_ids"},
+        {"legacy_tcn_ids", "formal_design"},
     )
     current_entities = validate_upstream_entities(metadata)
     tr_rows = _validate_tr_rows(input_value["test_requirements"])
@@ -575,6 +1266,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             raise InvalidInput(
                 "test_requirements.scope_refsがcurrent TR Entityと一致しません"
             )
+        for field in ("test_level", "test_level_source", "test_level_source_ref"):
+            if field in row and entity["content"].get(field) != row[field]:
+                raise InvalidInput(
+                    f"test_requirements.{field}がcurrent TR Entityと一致しません"
+                )
     selections = _validate_selection_rows(input_value["technique_selections"])
     disposition_rows = _validate_dispositions(
         input_value["requirement_dispositions"],
@@ -585,6 +1281,32 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         row["upstream_entity"]["entity_ref"] for row, _deps in disposition_rows
     }
     tcn_drafts = _validate_tcn_drafts(input_value["test_conditions"])
+    formal_projection = {}
+    formal_design_summary = None
+    formal_design_record = None
+    if "formal_design" in input_value:
+        try:
+            formal_projection = validate_formal_design(
+                input_value["formal_design"], tcn_drafts
+            )
+        except ValueError as exc:
+            raise InvalidInput(str(exc)) from exc
+        formal_design_summary = formal_projection.pop("__formal_design_summary__")
+        formal_design_record = formal_projection.pop("__formal_design_record__")
+        for draft in tcn_drafts:
+            draft.update(formal_projection[draft["draft_key"]])
+            for tr_ref in draft["tr_refs"]:
+                tr_row = tr_rows.get(tr_ref)
+                if tr_row is None:
+                    continue
+                if (
+                    tr_row.get("test_level") != draft["test_level"]
+                    or tr_row.get("test_level_source_ref")
+                    != draft["test_level_source_ref"]
+                ):
+                    raise InvalidInput(
+                        "formal TCNのtest levelがcurrent TR assignmentと一致しません"
+                    )
     model_drafts = _validate_model_drafts(input_value["models"])
     previous_tcn = _validate_state_rows(input_value["previous_tcn_ids"], "tcn")
     previous_models = _validate_state_rows(input_value["previous_model_keys"], "model")
@@ -936,6 +1658,19 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "priority_override_reason": draft["priority_override_reason"],
             "status": "active",
         }
+        for field in (
+            "item_ref",
+            "condition_ref",
+            "formal_design_ref",
+            "formal_design_revision",
+            "expected_result_candidate_refs",
+            "expected_result_candidates",
+            "test_level",
+            "test_level_source",
+            "test_level_source_ref",
+        ):
+            if field in draft:
+                content[field] = draft[field]
         dependency_identities = [
             ("test-requirement-design", "tr", ref)
             for ref in draft["tr_refs"]
@@ -943,6 +1678,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         ]
         dependency_identities.extend(
             ("spec-analysis", "authority", ref) for ref in draft["authority_refs"]
+        )
+        dependency_identities.extend(
+            ("spec-analysis", "authority", ref)
+            for candidate in draft.get("expected_result_candidates", [])
+            for ref in candidate["authority_refs"]
         )
         dependency_identities.extend(
             ("test-analysis", "product_risk", ref) for ref in draft["risk_refs"]
@@ -1148,6 +1888,24 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             input_value["requirement_dispositions"], "requirement_dispositions"
         )
     )
+    if formal_design_summary is not None:
+        for pair in formal_design_summary["unresolved_pairs"]:
+            pair_key = f"{pair['item_ref']}:{pair['condition_ref']}"
+            violations.append(
+                {
+                    "target_key": f"violation:formal-pair:{pair_key}",
+                    "issue_type": f"formal_pair_{pair['decision']}",
+                    "entity_ref": pair_key,
+                }
+            )
+        if formal_design_summary["pair_coverage_status"] != "complete":
+            violations.append(
+                {
+                    "target_key": "violation:formal-pair-population-incomplete",
+                    "issue_type": formal_design_summary["pair_coverage_status"],
+                    "entity_ref": formal_design_summary["design_ref"],
+                }
+            )
     violations = sorted(violations, key=lambda row: row["target_key"])
     issues = [
         {
@@ -1158,7 +1916,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         }
         for row in violations
     ]
-    return {
+    result = {
         "runtime_status": "ok",
         "result_status": "ready" if not violations else "unresolved",
         "support_status": "supported",
@@ -1176,6 +1934,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 if next_tcn_status.get(ref) != "deleted"
             ],
             "active_model_metadata": active_model_metadata,
+            "formal_design_summary": formal_design_summary,
             "violations": violations,
             "expected_entity_identities": [
                 {"skill": SKILL, "entity_type": entity_type, "entity_ref": entity_ref}
@@ -1192,6 +1951,9 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         },
         "issues": issues,
     }
+    if formal_design_record is not None:
+        result["payload"]["formal_design_record"] = formal_design_record
+    return result
 
 
 def _dedupe_state(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:

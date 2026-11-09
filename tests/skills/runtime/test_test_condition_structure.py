@@ -55,7 +55,327 @@ def request_for(value: dict, source_entities: list[dict]) -> dict:
     return {"metadata": metadata, "input": value}
 
 
+def formal_design_packet(
+    item_refs: tuple[str, ...] = ("TI-001",),
+    *,
+    revision: int = 1,
+    history: list[dict] | None = None,
+) -> dict:
+    return {
+        "schema_version": "formal-design-v1",
+        "design_ref": "FD-001",
+        "revision": revision,
+        "change_reason": "正式設計の更新",
+        "history": [] if history is None else history,
+        "retired_candidate_refs": [],
+        "items_complete": True,
+        "conditions_complete": True,
+        "source_refs": [
+            {"ref": "ARCH-001", "revision": "a7", "currentness": "current"},
+            {"ref": "COND-001", "revision": "c3", "currentness": "current"},
+            {"ref": "SPEC-001", "revision": "s9", "currentness": "current"},
+            *[
+                {
+                    "ref": item_ref,
+                    "revision": f"{item_ref.lower()}-r1",
+                    "currentness": "current",
+                }
+                for item_ref in item_refs
+            ],
+        ],
+        "items": [
+            {"item_ref": item_ref, "source_ref": item_ref} for item_ref in item_refs
+        ],
+        "condition_candidates": [
+            {"condition_ref": "COND-001", "source_ref": "COND-001"}
+        ],
+        "authorities": [
+            {"authority_ref": "SPEC-001", "revision": "s9", "currentness": "current"}
+        ],
+        "test_level_evidence": {
+            "explicit": None,
+            "architecture": {
+                "level": "integration",
+                "source_ref": "ARCH-001",
+                "approved": True,
+            },
+            "default": {"level": "system", "source_ref": "SPEC-001"},
+        },
+        "pair_assessments": [
+            {
+                "item_ref": item_ref,
+                "condition_ref": "COND-001",
+                "decision": "adopted",
+                "rationale": "item固有の統合経路を確認する",
+                "test_level": "integration",
+                "tcn_draft_key": "tcn-draft" if index == 1 else f"tcn-draft-{index}",
+                "covered_by_pair": None,
+                "reopen_condition": None,
+                "expected_result_candidates": [
+                    {
+                        "candidate_ref": f"ER-{index:03}",
+                        "text": f"{item_ref}の状態が確定済みになる",
+                        "authority_refs": ["SPEC-001"],
+                        "observation_method": "current order readback",
+                        "side_effects": "在庫確保イベントを1件発行",
+                        "revision": f"fd{revision}.{index}",
+                    }
+                ],
+            }
+            for index, item_ref in enumerate(item_refs, start=1)
+        ],
+    }
+
+
 class ConditionStructureRuntimeTests(unittest.TestCase):
+    def test_formal_item_condition_packet_projects_to_formal_tcn(self) -> None:
+        value = condition_input()
+        value["test_requirements"][0].update(
+            {
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            }
+        )
+        value["formal_design"] = formal_design_packet()
+        sources = current_sources()
+        sources[0] = runtime.make_machine_entity(
+            "test-requirement-design",
+            "tr",
+            "TR-001",
+            {
+                "tr_id": "TR-001",
+                "text": "current TR",
+                "scope_refs": [],
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            },
+        )
+        result = run_script(CONDITION_SCRIPT, request_for(value, sources))
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        tcn = next(
+            row for row in result["payload"]["entities"] if row["entity_type"] == "tcn"
+        )
+        self.assertEqual(tcn["content"]["item_ref"], "TI-001")
+        self.assertEqual(tcn["content"]["condition_ref"], "COND-001")
+        self.assertEqual(tcn["content"]["expected_result_candidate_refs"], ["ER-001"])
+        self.assertEqual(tcn["content"]["test_level"], "integration")
+        record = result["payload"]["formal_design_record"]
+        self.assertEqual(record["design_ref"], "FD-001")
+        self.assertEqual(
+            record["pair_assessments"][0]["rationale"], "item固有の統合経路を確認する"
+        )
+
+    def test_formal_record_retains_non_adopted_decisions_and_history(self) -> None:
+        value = condition_input()
+        value["test_requirements"][0].update(
+            {
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            }
+        )
+        packet = formal_design_packet(("TI-001", "TI-002"), revision=2)
+        packet["history"] = [
+            {
+                "revision": 1,
+                "change_reason": "item population reviewed",
+                "pair_decisions": [
+                    {
+                        "item_ref": "TI-001",
+                        "condition_ref": "COND-001",
+                        "decision": "adopted",
+                    }
+                ],
+                "candidate_assignments": [
+                    {
+                        "candidate_ref": "ER-001",
+                        "item_ref": "TI-001",
+                        "condition_ref": "COND-001",
+                    }
+                ],
+                "retired_candidate_refs": [],
+            }
+        ]
+        packet["pair_assessments"][1].update(
+            {
+                "decision": "not_applicable",
+                "rationale": "このitemは共通条件の対象外である",
+                "tcn_draft_key": None,
+                "expected_result_candidates": [],
+            }
+        )
+        value["formal_design"] = packet
+        sources = current_sources()
+        sources[0] = runtime.make_machine_entity(
+            "test-requirement-design",
+            "tr",
+            "TR-001",
+            {
+                "tr_id": "TR-001",
+                "text": "current TR",
+                "scope_refs": [],
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            },
+        )
+
+        result = run_script(CONDITION_SCRIPT, request_for(value, sources))
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        self.assertEqual(
+            result["payload"]["formal_design_summary"]["pair_coverage"], "2/2"
+        )
+        record = result["payload"]["formal_design_record"]
+        self.assertEqual(record["revision"], 2)
+        self.assertEqual(
+            [row["decision"] for row in record["pair_assessments"]],
+            ["adopted", "not_applicable"],
+        )
+        self.assertEqual(record["history"][0]["revision"], 1)
+
+    def test_formal_multiple_items_receive_distinct_tcn_ids(self) -> None:
+        value = condition_input()
+        value["test_requirements"][0].update(
+            {
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            }
+        )
+        second_tcn = dict(value["test_conditions"][0])
+        second_tcn["draft_key"] = "tcn-draft-2"
+        value["test_conditions"].append(second_tcn)
+        second_model = dict(value["models"][0])
+        second_model["draft_key"] = "model-draft-2"
+        second_model["parent_tcn_draft_key"] = "tcn-draft-2"
+        value["models"].append(second_model)
+        value["formal_design"] = formal_design_packet(("TI-001", "TI-002"))
+
+        sources = current_sources()
+        sources[0] = runtime.make_machine_entity(
+            "test-requirement-design",
+            "tr",
+            "TR-001",
+            {
+                "tr_id": "TR-001",
+                "text": "current TR",
+                "scope_refs": [],
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            },
+        )
+        result = run_script(CONDITION_SCRIPT, request_for(value, sources))
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        tcns = [
+            row for row in result["payload"]["entities"] if row["entity_type"] == "tcn"
+        ]
+        self.assertEqual(
+            {row["content"]["item_ref"]: row["entity_ref"] for row in tcns},
+            {"TI-001": "TCN-001", "TI-002": "TCN-002"},
+        )
+        self.assertEqual(
+            {
+                row["content"]["item_ref"]: row["content"]["condition_ref"]
+                for row in tcns
+            },
+            {"TI-001": "COND-001", "TI-002": "COND-001"},
+        )
+        self.assertEqual(
+            {
+                row["content"]["item_ref"]: row["content"][
+                    "expected_result_candidate_refs"
+                ]
+                for row in tcns
+            },
+            {"TI-001": ["ER-001"], "TI-002": ["ER-002"]},
+        )
+
+    def test_formal_revision_reuses_existing_tcn_id(self) -> None:
+        first_value = condition_input()
+        first_value["test_requirements"][0].update(
+            {
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            }
+        )
+        first_value["formal_design"] = formal_design_packet()
+        sources = current_sources()
+        sources[0] = runtime.make_machine_entity(
+            "test-requirement-design",
+            "tr",
+            "TR-001",
+            {
+                "tr_id": "TR-001",
+                "text": "current TR",
+                "scope_refs": [],
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            },
+        )
+        first = run_script(CONDITION_SCRIPT, request_for(first_value, sources))
+        self.assertEqual(first["runtime_status"], "ok", first)
+        self.assertEqual(first["payload"]["tcn_id_map"][0]["tcn_id"], "TCN-001")
+
+        second_value = condition_input()
+        second_value["test_requirements"][0].update(first_value["test_requirements"][0])
+        second_value["test_conditions"][0].update(
+            {"identity_action": "reuse", "reuse_id": "TCN-001"}
+        )
+        second_value["models"][0].update(
+            {"identity_action": "reuse", "reuse_model_key": "ep-001"}
+        )
+        second_value.update(
+            {
+                "previous_tcn_ids": first["payload"]["tcn_id_state"],
+                "previous_model_keys": first["payload"]["model_key_state"],
+                "update_scope_tcn_ids": ["TCN-001"],
+                "update_scope_model_keys": ["ep-001"],
+            }
+        )
+        second_value["formal_design"] = formal_design_packet(
+            revision=2,
+            history=[
+                {
+                    "revision": 1,
+                    "change_reason": "expected result candidate revision updated",
+                    "pair_decisions": [
+                        {
+                            "item_ref": "TI-001",
+                            "condition_ref": "COND-001",
+                            "decision": "adopted",
+                        }
+                    ],
+                    "candidate_assignments": [
+                        {
+                            "candidate_ref": "ER-001",
+                            "item_ref": "TI-001",
+                            "condition_ref": "COND-001",
+                        }
+                    ],
+                    "retired_candidate_refs": [],
+                }
+            ],
+        )
+        second = run_script(CONDITION_SCRIPT, request_for(second_value, sources))
+        self.assertEqual(second["runtime_status"], "ok", second)
+        self.assertEqual(second["result_status"], "ready", second)
+        self.assertEqual(second["payload"]["tcn_id_map"][0]["tcn_id"], "TCN-001")
+        tcn = next(
+            row for row in second["payload"]["entities"] if row["entity_type"] == "tcn"
+        )
+        self.assertEqual(tcn["content"]["formal_design_revision"], 2)
+        self.assertEqual(
+            tcn["content"]["expected_result_candidates"][0]["revision"], "fd2.1"
+        )
+
     def test_scope_ownership_propagates_and_inactive_identity_reactivates(self) -> None:
         value = condition_input()
         value["test_requirements"][0]["scope_refs"] = ["SCOPE-001"]

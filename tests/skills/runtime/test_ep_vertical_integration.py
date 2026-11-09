@@ -781,8 +781,15 @@ class EpVerticalIntegrationTests(unittest.TestCase):
             if row["entity_type"] == "ci"
         ]
         data_entities = requirement_entities
+        authority_entity = runtime.make_machine_entity(
+            "spec-analysis",
+            "authority",
+            "SPEC-001",
+            {"authority_id": "SPEC-001", "text": "current authority"},
+        )
         case_current_entities = [
             tr_entity,
+            authority_entity,
             next(row for row in condition_entities if row["entity_type"] == "tcn"),
             *ci_entities,
             *data_entities,
@@ -828,7 +835,7 @@ class EpVerticalIntegrationTests(unittest.TestCase):
                         {
                             "number": 1,
                             "text": "管理者向け結果が表示される",
-                            "authority_refs": [],
+                            "authority_refs": ["SPEC-001"],
                         }
                     ],
                     "postconditions_or_cleanup": ["作成データを削除する"],

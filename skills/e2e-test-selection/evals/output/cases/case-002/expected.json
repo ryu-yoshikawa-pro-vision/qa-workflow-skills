@@ -1,0 +1,15 @@
+{
+  "required_selection_ref": "E2ESEL-002",
+  "required_selection_revision": 1,
+  "required_sources": [
+    { "ref": "TI-009", "revision": "unknown", "currentness": "unknown" }
+  ],
+  "required_candidate_sources": {
+    "E2E-CAND-003": [["TI-009", "unknown"]]
+  },
+  "required_candidate_keys": { "E2E-CAND-003": "unknown-ui" },
+  "required_decisions": { "E2E-CAND-003": "blocked" },
+  "required_retired_candidates": {},
+  "population_complete": false,
+  "history": []
+}

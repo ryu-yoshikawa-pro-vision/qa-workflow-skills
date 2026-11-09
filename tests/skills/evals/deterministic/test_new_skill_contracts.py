@@ -985,5 +985,160 @@ class NewSkillDeterministicContractTests(unittest.TestCase):
         )
 
 
+class E2ESelectionDeterministicContractTests(unittest.TestCase):
+    def test_test_analysis_keeps_legacy_e2e_selection_validation(self):
+        validate = load_validator("test-analysis")
+        text = """# legacy test-analysis selection
+- 対象 / 実行範囲: E2E対象選定
+## E2E対象選定
+| 自動化目的 | 候補範囲 | 技術非依存の判断基準 / 根拠 |
+| --- | --- | --- |
+| checkout回帰 | 購入item | 反復頻度と業務影響 |
+"""
+        result = validate(
+            text, {"require_e2e_selection": True}, "legacy-test-analysis-selection"
+        )
+        for assertion_id in ("RISK-D016", "RISK-D017"):
+            with self.subTest(assertion_id=assertion_id):
+                self.assertEqual(
+                    next(
+                        item.status
+                        for item in result.assertions
+                        if item.id == assertion_id
+                    ),
+                    "pass",
+                )
+
+    def test_legacy_e2e_selection_missing_table_fails_required_assertion(self):
+        validate = load_validator("test-analysis")
+        result = validate(
+            "# legacy test-analysis\n- 対象 / 実行範囲: E2E対象選定\n",
+            {"require_e2e_selection": True},
+            "legacy-e2e-selection-missing-table",
+        )
+        statuses = {item.id: item.status for item in result.assertions}
+        self.assertEqual(statuses["RISK-D016"], "fail")
+        self.assertEqual(statuses["RISK-D017"], "fail")
+
+    def test_legacy_e2e_selection_missing_technical_independent_field_fails(self):
+        validate = load_validator("test-analysis")
+        text = """# legacy test-analysis selection
+- 対象 / 実行範囲: E2E対象選定
+## E2E対象選定
+| 自動化目的 | 候補範囲 | 技術非依存の判断基準 / 根拠 |
+| --- | --- | --- |
+| checkout回帰 | 購入item | |
+"""
+        result = validate(
+            text,
+            {"require_e2e_selection": True},
+            "legacy-e2e-selection-missing-field",
+        )
+        statuses = {item.id: item.status for item in result.assertions}
+        self.assertEqual(statuses["RISK-D016"], "pass")
+        self.assertEqual(statuses["RISK-D017"], "fail")
+
+    def test_e2e_selection_output_fixtures_pass(self):
+        validate = load_validator("e2e-test-selection")
+        for eval_id in ("E2E-SEL-OUT-001", "E2E-SEL-OUT-002", "E2E-SEL-OUT-003"):
+            with self.subTest(eval_id=eval_id):
+                text, expected = eval_case(
+                    "e2e-test-selection", eval_id, compact_table_spacing=False
+                )
+                self.assertEqual(validate(text, expected, eval_id).status, "pass")
+
+    def test_e2e_selection_ready_status_cannot_hide_incomplete_source(self):
+        validate = load_validator("e2e-test-selection")
+        text, expected = eval_case("e2e-test-selection", "E2E-SEL-OUT-002")
+        broken = text.replace("選定状態: blocked", "選定状態: ready", 1)
+        result = validate(broken, expected, "E2E-SEL-OUT-002")
+        self.assertEqual(
+            next(
+                item.status for item in result.assertions if item.id == "E2E-SEL-D006"
+            ),
+            "fail",
+        )
+
+    def test_e2e_selection_ready_cannot_claim_stale_source_is_current(self):
+        validate = load_validator("e2e-test-selection")
+        text, expected = eval_case("e2e-test-selection", "E2E-SEL-OUT-001")
+        broken = text.replace("SPEC-001@r8=current", "SPEC-001@r8=stale", 1)
+        result = validate(broken, expected, "E2E-SEL-OUT-001")
+        self.assertEqual(
+            next(
+                item.status for item in result.assertions if item.id == "E2E-SEL-D005"
+            ),
+            "fail",
+        )
+        self.assertEqual(
+            next(
+                item.status for item in result.assertions if item.id == "E2E-SEL-D006"
+            ),
+            "fail",
+        )
+
+    def test_e2e_selection_output_cannot_drop_retirement_from_history(self):
+        validate = load_validator("e2e-test-selection")
+        text, expected = eval_case("e2e-test-selection", "E2E-SEL-OUT-003")
+        broken = text.replace(
+            "E2E-CAND-002: currentな既存E2Eと重複するためretire | 既存E2Eとの重複を確認",
+            "なし | 既存E2Eとの重複を確認",
+            1,
+        )
+        result = validate(broken, expected, "E2E-SEL-OUT-003")
+        self.assertEqual(
+            next(
+                item.status for item in result.assertions if item.id == "E2E-SEL-D001"
+            ),
+            "fail",
+        )
+
+    def test_e2e_selection_output_cannot_drop_current_retirement(self):
+        validate = load_validator("e2e-test-selection")
+        text, expected = eval_case("e2e-test-selection", "E2E-SEL-OUT-003")
+        broken = text.replace(
+            "- retired candidate IDs / 理由: E2E-CAND-002: currentな既存E2Eと重複するためretire",
+            "- retired candidate IDs / 理由: なし",
+            1,
+        )
+        result = validate(broken, expected, "E2E-SEL-OUT-003")
+        self.assertEqual(
+            next(
+                item.status for item in result.assertions if item.id == "E2E-SEL-D001"
+            ),
+            "fail",
+        )
+
+    def test_e2e_selection_trigger_examples_are_well_formed_and_disjoint(self):
+        selection_root = SKILLS_ROOT / "e2e-test-selection" / "evals" / "trigger"
+        analysis_root = SKILLS_ROOT / "test-analysis" / "evals" / "trigger"
+        selection_queries = json.loads(
+            (selection_root / "train_queries.json").read_text(encoding="utf-8")
+        )
+        validation_queries = json.loads(
+            (selection_root / "validation_queries.json").read_text(encoding="utf-8")
+        )
+        analysis_queries = json.loads(
+            (analysis_root / "train_queries.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(any(row["should_trigger"] for row in selection_queries))
+        self.assertTrue(
+            any(
+                not row["should_trigger"] and "E2E" in row["query"]
+                for row in analysis_queries
+            )
+        )
+        for dataset in (selection_queries, validation_queries):
+            positives = sum(row["should_trigger"] is True for row in dataset)
+            negatives = sum(row["should_trigger"] is False for row in dataset)
+            self.assertGreater(positives, 0)
+            self.assertEqual(positives, negatives)
+        self.assertTrue(
+            {row["query"] for row in selection_queries}.isdisjoint(
+                row["query"] for row in validation_queries
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
