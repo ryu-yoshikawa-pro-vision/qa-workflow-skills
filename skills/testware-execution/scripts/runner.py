@@ -386,7 +386,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         )
                     else:
                         reconciliation = reconcile_case_report(
-                            **shared, testware_revision=plan["testware_revision"]
+                            **shared,
+                            testware_revision=plan["testware_revision"],
+                            runner_version=plan["runner_version"],
                         )
                         reporter_reports_failure = any(
                             item.get("status") in {"failed", "timedOut", "interrupted"}
