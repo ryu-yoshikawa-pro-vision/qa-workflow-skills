@@ -129,12 +129,12 @@
 ## 12. 確定事項（決定事項の正本一覧）
 
 | ID | 確定内容 | 状態 | 決定根拠 | 影響範囲 | 関係 | 関連仕様根拠ID | 置換先ID | 備考 |
-| -- | -------- | ---- | -------- | -------- | ---- | -------------- | -------- | ---- |
+| --- | -------- | ---- | -------- | -------- | ---- | -------------- | -------- | ---- |
 
 ## 13. 仮定（仮定の正本一覧）
 
 | ID | 仮定 | 状態 | 理由 / 根拠 | 承認根拠 | 影響範囲 | 置換先ID | 備考 |
-| -- | ---- | ---- | ----------- | -------- | -------- | -------- | ---- |
+| --- | ---- | ---- | ----------- | -------- | -------- | -------- | ---- |
 
 ## 14. 既存QA成果物
 
@@ -187,5 +187,31 @@
 （未設定）
 
 <!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_source_refs type=ordered_lines -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_artifact_root type=path -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_base_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_approval_policy_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+feature-analysisは情報源参照・機能一覧のroot・基準branch/revision・承認方針refのみを保持し、source全文やsecret・認証情報・機能一覧そのものをProject Contextへ複製しません。
 
 root pathはproject-local fixed locationにし、同じ案件内のworkflowから一意に解決できる値を記録します。secret実値は追加しません。
