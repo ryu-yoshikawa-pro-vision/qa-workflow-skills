@@ -65,7 +65,7 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 - `jest-json`はcomponentのNativeテスト用。Jestの`--json --outputFile={reporter_file}`によるJest互換JSONをVitestと共通の個別assertion照合で処理する。Jestの実CLI／環境での受入は別に確認する。
 - `playwright-json`は公式`PLAYWRIGHT_JSON_OUTPUT_FILE`を子プロセスに設定する。CLIの`--reporter=json`、Playwright TestのAPI-only実行であること（ブラウザ利用のないテストコードとscript chain）を実行前に確認する。suite/spec/test/project・個別retry・global error・statsを照合する。
 - `case-json`は採用済みbatch/event adapterが`{reporter_file}`へ固定schema `non-e2e-cases/v1`のJSONを出す。必須rootは`schema`、`source_revision`、`testware_revision`、`runner_version`、`complete`、`results[]`。個別resultは`path`、`title_path`、`status`（passed/failed/pending/todo/skipped/timedOut/interrupted）、`attempt_results`（`status`と0始まりの連続した`retry`を保持する配列）。各itemのstatusと最終attemptが食い違えば拒否する。変換前の実ツールrawも保存する。
-- source/testware revision、選択集合、個別statusの重複・欠落、未取得attempt、raw失敗と終了コード0の矛盾は完全としない。任意の`direct_expectations`だけを自動testwareの個別取得の代わりに使わない。正式直接TCは`direct_tc=true`とTC ref・revision・仕様Authority refを必要とする。
+- source/testware revision、選択集合、個別statusの重複・欠落、未取得attempt、raw失敗と終了コード0の矛盾は完全としない。Vitest／Jestの公式reporterでrootの`success`が欠落・不正な場合も、終了コード0だけでは成功としない。任意の`direct_expectations`だけを自動testwareの個別取得の代わりに使わない。正式直接TCは`direct_tc=true`とTC ref・revision・仕様Authority refを必要とする。
 - 実装済みの個別reporterテストはPython subprocessで固定JSONを模擬生成した独立fixture。固定`qa-training-store`の実Vitest／Playwright／採用済みbatch・event実runを証明しない。
 
 ## reporter異常とcleanup

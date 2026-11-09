@@ -292,6 +292,22 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertIsNone(reconciliation["results"][0]["tc_verdict"])
         self.assertEqual(artifact["attempts"][0]["result_collection"], "complete")
 
+        # Missing official global success must not turn a zero-exit process
+        # into a verified Vitest pass, even with a matching selected test.
+        report.pop("success")
+        incomplete_script = (
+            "import pathlib,sys;"
+            "pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')"
+        )
+        plan["argv"] = [sys.executable, "-c", incomplete_script, "{reporter_file}"]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["outcome"], "incomplete")
+        self.assertEqual(artifact["attempts"][0]["result_collection"], "incomplete")
+
     def test_component_native_jest_compatible_json_report(self):
         report = {
             "success": True,
@@ -700,7 +716,8 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "observed_FAIL")
-        self.assertEqual(artifact["tc_verdict"], "FAIL")
+        self.assertIsNone(artifact["tc_verdict"])
+        self.assertEqual(artifact["direct_observation_verdict"], "FAIL")
         self.assertEqual(artifact["attempts"][0]["return_code"], 0)
 
     def test_real_local_http_status_200_with_wrong_body_fails(self):
@@ -736,7 +753,8 @@ class ActualRunnerTests(unittest.TestCase):
         self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
-        self.assertEqual(artifact["tc_verdict"], "FAIL")
+        self.assertIsNone(artifact["tc_verdict"])
+        self.assertEqual(artifact["direct_observation_verdict"], "FAIL")
         self.assertEqual(artifact["outcome"], "observed_FAIL")
         self.assertEqual(artifact["attempts"][0]["return_code"], 0)
 
@@ -753,7 +771,8 @@ class ActualRunnerTests(unittest.TestCase):
         self.attach_direct_tc_authority(plan)
         code, _, artifact = self.call(plan)
         self.assertEqual(code, 1)
-        self.assertEqual(artifact["tc_verdict"], "判定不能")
+        self.assertIsNone(artifact["tc_verdict"])
+        self.assertEqual(artifact["direct_observation_verdict"], "判定不能")
         self.assertEqual(artifact["outcome"], "observations_incomplete")
 
     def test_nonfunctional_threshold_is_evaluated_from_real_measurement(self):

@@ -212,3 +212,9 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `tests/skills/runtime/test_non_e2e_runner.py` に、未認証Authorityでは正式TC PASSを出さない回帰確認と、静的解析tool不一致時の取得不完全の負例を追加した。
 - 固定`qa-training-store`の実Vitest／Playwright API-only／Web Vitest・Native Jest／batch・event／静的解析・非機能の受入、実providerの認証・許可・cleanup・readbackとH/J実artifactの横断照合は、この変更では実施していない。実runnerの安全な実行前提を確定できない対象はblockedのまま保持する。
 - 検証コマンド：`python -m unittest discover -s tests/skills/runtime -p 'test_non_e2e_*.py' -v`。実行結果と最新CIについてはPR #29のChecksを正本とし、ローカルで未実行の結果をPASSと記載しない。
+
+### CI回帰・公式reporterの欠落検査（2026-11-09）
+
+- commit `320c196` のDeterministic Output Evalsで、既存の直接TCテスト3件が旧`tc_verdict`値を期待してFAILした。新契約で未認証の正式`tc_verdict`はnull、観測比較は`direct_observation_verdict`へ分離するため、3件のassertionを修正した。元runの`observed_FAIL`／`observations_incomplete`は維持する。
+- 公式Vitest／Jest JSONのroot `success`が欠落しても、終了コード0と個別resultだけで成功にしてしまう経路を修正。欠落rootの負例を追加した。
+- 修正後の検証結果は更新後HEADのChecksを正本とする。旧commitのFAILと新HEADの結果を混同しない。

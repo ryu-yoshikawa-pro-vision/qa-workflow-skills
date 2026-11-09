@@ -481,7 +481,9 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                             reconciliation = reconcile_vitest(
                                 **shared, repo_root=str(repo)
                             )
-                            reporter_reports_failure = raw.get("success") is False
+                            # A successful process with a missing global JSON
+                            # status cannot attest an official Vitest/Jest result.
+                            reporter_reports_failure = raw.get("success") is not True
                         elif reporter_format == "playwright-json":
                             reconciliation = reconcile_playwright(
                                 **shared,
