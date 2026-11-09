@@ -433,7 +433,8 @@ def reconcile_case_report(
         if (
             attempts
             and attempts[-1]["status"] != item["status"]
-            or item["status"] in {"pending", "todo"} and attempts
+            or item["status"] in {"pending", "todo"}
+            and attempts
         ):
             raise ContractError("case_status_attempt_mismatch")
     return _reconcile_individual_results(
@@ -494,9 +495,8 @@ def reconcile_playwright(
                     raise ContractError("invalid_playwright_test")
                 attempts = test.get("results")
                 if (
-                    test.get("expectedStatus") not in {
-                        "passed", "failed", "skipped", "timedOut", "interrupted"
-                    }
+                    test.get("expectedStatus")
+                    not in {"passed", "failed", "skipped", "timedOut", "interrupted"}
                     or not isinstance(attempts, list)
                     or (test["status"] != "skipped" and not attempts)
                 ):
@@ -518,8 +518,10 @@ def reconcile_playwright(
                 statuses = [row["status"] for row in attempt_rows]
                 outcome = test["status"]
                 if (
-                    outcome == "expected" and statuses[-1] != expected
-                    or outcome == "unexpected" and statuses[-1] == expected
+                    outcome == "expected"
+                    and statuses[-1] != expected
+                    or outcome == "unexpected"
+                    and statuses[-1] == expected
                     or outcome == "flaky"
                     and (
                         len(statuses) < 2
@@ -527,7 +529,8 @@ def reconcile_playwright(
                         or all(status == expected for status in statuses)
                     )
                     or outcome == "skipped"
-                    and statuses and statuses[-1] != "skipped"
+                    and statuses
+                    and statuses[-1] != "skipped"
                 ):
                     raise ContractError("playwright_status_attempt_mismatch")
                 observed.append(
