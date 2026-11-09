@@ -460,19 +460,16 @@ def persist_snapshot(
         snapshot = request["snapshot"]
         project_ref = snapshot["project_ref"]
         artifact_ref = snapshot["artifact_ref"]
-        current = store.read_current("feature-inventory", project_ref, artifact_ref)
-        if current is None:
-            if (
-                expected_revision is not None
-                or request["previous_snapshot"] is not None
-            ):
+        if expected_revision is not None:
+            previous = store.read_revision(
+                "feature-inventory", project_ref, artifact_ref, expected_revision
+            )
+            if previous is None:
                 raise ContractError("previous_snapshot_missing")
-        else:
-            if current["revision"] != expected_revision:
-                raise ContractError("revision_conflict")
-            old = json.loads(current["content"])
-            if old != request["previous_snapshot"]:
+            if json.loads(previous["content"]) != request["previous_snapshot"]:
                 raise ContractError("previous_snapshot_not_current")
+        elif request["previous_snapshot"] is not None:
+            raise ContractError("previous_snapshot_without_expected_revision")
         content = json.dumps(
             snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         )

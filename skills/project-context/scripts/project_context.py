@@ -586,14 +586,12 @@ def persist_prepared(
             raise Invalid("project_scope_mismatch")
         artifact_ref = _single_line(preparation.get("artifact_ref"), "artifact_ref")
         expected = draft.get("expected_revision")
-        current = store.read_current("project-context", project_ref, artifact_ref)
         if expected is not None:
-            if current is None or current["revision"] != expected:
-                raise Invalid("revision_conflict")
-            if current["content"] != preparation.get("markdown"):
+            previous = store.read_revision(
+                "project-context", project_ref, artifact_ref, expected
+            )
+            if previous is None or previous["content"] != preparation.get("markdown"):
                 raise Invalid("previous_document_mismatch")
-        elif current is not None:
-            raise Invalid("create_if_absent_conflict")
         result = store.write(
             kind="project-context",
             project_ref=project_ref,
