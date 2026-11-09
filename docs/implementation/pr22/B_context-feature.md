@@ -61,8 +61,8 @@
 
 ## 着手基準
 
-- [ ] Project Contextの既存parser、`artifact_graph.py`、`project_context_ids.py`、template、呼び出し元と回帰テストを確認した。
-- [ ] AとSection 12／14、source revision、機能ID、provider・承認refの契約と共有ファイルの編集ownerを確認した。
+- [x] Project Contextの既存parser、`artifact_graph.py`、`project_context_ids.py`、template、呼び出し元と回帰テストを確認した。
+- [x] AとSection 12／14、source revision、機能ID、provider・承認refの契約と共有ファイルの編集ownerを確認した。
 - [ ] 対象案件の探索範囲・認証・保存先を列挙し、未確認は明示的にblockedとした。
 
 ## 作業内容
@@ -85,18 +85,18 @@
 
 ## 完了基準
 
-- [ ] `project-context`が初回作成・有効既存文書再利用・差分更新・競合拒否・読戻し・履歴を扱う。既存16節・DEC/ASM・過去成果物が維持される。
-- [ ] 配置方針が必要時のみ合意され、未承認の正本移動・二重正本化がない。機能別の正本参照ができる。
-- [ ] `feature-analysis`が非UIを含む機能全体・安定ID・階層・差分・source inventoryを保持し、PR／merge／release／外部資料変更の現在性を判定できる。
-- [ ] 機能の分割／統合／削除・partial discovery・source取得不能・0分母・旧HEAD・競合・二重受付の負例を検証した。
+- [x] `project-context`が初回作成・有効既存文書再利用・差分更新・競合拒否・読戻し・履歴を扱う。既存16節・DEC/ASM・過去成果物が維持される。
+- [x] 配置方針が必要時のみ合意され、未承認の正本移動・二重正本化がない。機能別の正本参照ができる。
+- [x] `feature-analysis`が非UIを含む機能全体・安定ID・階層・差分・source inventoryを保持し、PR／merge／release／外部資料変更の現在性を判定できる。
+- [x] 機能の分割／統合／削除・partial discovery・source取得不能・0分母・旧HEAD・競合・二重受付の負例を検証した。
 - [ ] C・D・Eへ実際の機能参照とrevisionを渡し、AへCI照合用のinventory・hash・未分類を渡せる。
-- [ ] 新SkillのSKILL／契約／template・局所unit・意味・発火テスト、既存Project Context回帰を実行して証拠を記録した。
+- [x] 新SkillのSKILL／契約／template・局所unit・意味・発火テスト、既存Project Context回帰を実行して証拠を記録した。
 
-- [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
+- [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
-- [ ] source ref・artifact ref・revision・承認・保存readback・失敗／再開の**コード上の接続契約と自動テスト**をAへ引き渡した。実providerの読戻し・実承認は本PRでは実施しない。
-- [ ] 担当branch内の実装・自動テストを完了し、実環境検証とPR #22の横断検証・15＋10条件の最終判定を**本PRの完了条件から除外して**引継ぎ項目として記録した。
+- [x] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
+- [x] source ref・artifact ref・revision・承認・保存readback・失敗／再開の**コード上の接続契約と自動テスト**をAへ引き渡した。実providerの読戻し・実承認は本PRでは実施しない。
+- [x] 担当branch内の実装・自動テストを完了し、実環境検証とPR #22の横断検証・15＋10条件の最終判定を**本PRの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
@@ -233,6 +233,14 @@
 
 検証はB専用の独立テスト・一時Git repository・GitHub Actionsで実施する。新規fixtureには正本pathの維持、競合、旧revision保全、認可取消、複数revision基準、DEC置換・二重有効防止と未承認refの負例を含めた。**実案件の認証元、遠隔provider、実Agent／製品CIへの接続は今回の依頼から除外**し、隔離テスト成功を実環境受入済みとは扱わない。PR #22側の共通runtime／他owner統合とmergeも対象外。
 
+## 担当Bチェックリストの判定（PR #34再確認）
+
+上記のチェック項目は、担当Bのコード・契約・隔離テスト・GitHub Actionsで確認済みのものだけをチェック済みにした。次は未チェックのまま維持する。
+
+- **着手基準：実案件の探索範囲・認証・保存先の列挙**：案件固有の情報源・認証・保存先の選定は指示された実環境検証対象外。未選定の場合は未接続・保存拒否として扱う。
+- **C・D・Eへの実成果物接続、Aへの製品CI受渡し**：担当Bは構造・ID・revision・handoffを提供済み。別ownerの実成果物との照合・CI接続は親PR #22で確認する。
+- **旧artifact／legacy・既存consumer・全体CIの横断回帰**：担当B単独の既存回帰と局所fixtureは実施済み。担当外の統合後経路についてはPR #22の受入が必要。
+
 ## PR #24 merge後の追加レビュー4件（2026-11-09、修正PR #34）
 
 PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除された。以後の追加修正はPR #22のbranchへ直接commitせず、担当Bだけの[PR #34](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/34)で行う。
@@ -264,3 +272,8 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 - **主source IDの明示**：複数repositoryが同じHEADを共有するときは`event_basis.primary_source_id`を要求する。実Gitで同一コミット・異なるbaseを指定した2 repositoryの保存／拒否をテストした。既存の主sourceが一意な場合の入力は互換維持。
 
 担当範囲のGitHub Actions 5系統と決定論的テストを最新HEADで再確認する。実provider／実Agent／製品CIの受入は従来の利用者指示に従い対象外とし、PR #22の横断統合はここでは完了判定しない。
+
+## PR #34 再点検：checkoutのHEAD現在性
+
+`git_source_inventory.analyze`で`cat-file`による指定コミットの存在確認に加え、許可されたcheckoutの`git rev-parse HEAD`と`head_sha`が一致することを検証する。過去コミット自体が存在してもcheckoutが進んでいれば`git_head_changed`として保存を拒否する。`test_git_source_inventory.py`に古い実在SHAの列挙拒否、`test_pr24_git_artifact_store.py`に旧SHAを使った保存拒否と正本不変を追加した。現行SHAを信頼済み呼出し元で取り直すまで保存を再試行しない。GitHub Actionsの実行結果はPR #34の最新HEADに紐付くworkflowを正とする。
+
