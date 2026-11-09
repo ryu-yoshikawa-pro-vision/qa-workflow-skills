@@ -191,6 +191,11 @@ def _changes(
 ) -> tuple[dict, list[str]]:
     changes = _rows(snapshot.get("changes"), "changes", "DIF")
     issues: list[str] = []
+    superseded = {
+        row.get("supersedes_id")
+        for row in changes.values()
+        if row.get("supersedes_id") is not None
+    }
     for did, row in changes.items():
         if row.get("source_id") not in sources:
             raise ContractError(f"{did}_unknown_source")
@@ -208,7 +213,7 @@ def _changes(
                 raise ContractError(f"{did}_impact_feature_missing")
             if cls in {"out_of_scope", "no_impact"}:
                 _text(row.get("approval_ref"), f"{did}_approval_ref")
-        else:
+        elif did not in superseded:
             issues.append(f"change_unclassified:{did}")
     return changes, issues
 
@@ -549,9 +554,17 @@ def analyze(request: Any) -> dict[str, Any]:
     unknown = _refs(snapshot.get("unknown_areas"), "unknown_areas")
     if unknown:
         issues.append("unknown_areas_present")
+    superseded = {
+        row.get("supersedes_id")
+        for row in changes.values()
+        if row.get("supersedes_id") is not None
+    }
+    effective_changes = {
+        did: row for did, row in changes.items() if did not in superseded
+    }
     classified = sorted(
         did
-        for did, row in changes.items()
+        for did, row in effective_changes.items()
         if row["classification"] in {"impact", "no_impact", "out_of_scope"}
     )
     mapped = sorted(cid for cid, row in candidates.items() if row["status"] == "mapped")
@@ -576,8 +589,12 @@ def analyze(request: Any) -> dict[str, Any]:
         "metrics": {
             "change_classification": {
                 "numerator_ids": classified,
-                "denominator_ids": sorted(changes),
-                "rate": len(classified) / len(changes) if changes else None,
+                "denominator_ids": sorted(effective_changes),
+                "rate": (
+                    len(classified) / len(effective_changes)
+                    if effective_changes
+                    else None
+                ),
             },
             "observed_candidate_mapping": {
                 "numerator_ids": mapped,
@@ -624,18 +641,20 @@ def analyze(request: Any) -> dict[str, Any]:
             "impacted_feature_ids": sorted(
                 {
                     fid
-                    for row in changes.values()
+                    for row in effective_changes.values()
                     if row["classification"] == "impact"
                     for fid in row["feature_ids"]
                 }
             ),
             "approval_required_change_ids": sorted(
                 did
-                for did, row in changes.items()
+                for did, row in effective_changes.items()
                 if row["classification"] in {"no_impact", "out_of_scope"}
             ),
             "unknown_areas": unknown,
-            "unclassified_change_ids": sorted(set(changes) - set(classified)),
+            "unclassified_change_ids": sorted(
+                set(effective_changes) - set(classified)
+            ),
             "expected_source_ids": snapshot["expected_source_ids"],
         },
     }
