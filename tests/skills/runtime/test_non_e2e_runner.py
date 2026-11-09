@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -364,6 +367,83 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertTrue(artifact["attempts"][0]["timeout"])
         self.assertEqual(artifact["outcome"], "blocked_cleanup_or_timeout")
 
+    @unittest.skipUnless(os.name == "posix", "process groups are POSIX-only")
+    def test_interrupted_command_kills_group_and_saves_cleanup_manifest(self):
+        script = "import time;print('started',flush=True);time.sleep(30)"
+        plan = self.plan([sys.executable, "-c", script])
+        plan["timeout_seconds"] = 15
+        plan["cleanup_argv"] = [sys.executable, "-c", "print('cleanup ran')"]
+        plan["reviewed_cleanup_argv"] = plan["cleanup_argv"]
+        plan_file = Path(self.space.name) / "interrupt.json"
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(self.logs),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            deadline = time.monotonic() + 6
+            started = False
+            while time.monotonic() < deadline:
+                logs = list(self.logs.glob("non-e2e-*/attempt-1/stdout.log"))
+                if logs and "started" in logs[0].read_text(encoding="utf-8"):
+                    started = True
+                    break
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(started, "fixture never entered the running state")
+            os.kill(proc.pid, signal.SIGINT)
+            stdout, stderr = proc.communicate(timeout=12)
+            self.assertEqual(proc.returncode, 1, stderr)
+            summary = json.loads(stdout)
+            manifest_path = Path(summary["artifact_directory"]) / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertTrue(manifest["attempts"][0]["interrupted"])
+            self.assertEqual(manifest["attempts"][0]["cleanup_state"], "success")
+            self.assertEqual(manifest["outcome"], "blocked_cleanup_or_timeout")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+
+    @unittest.skipUnless(os.name == "posix", "process groups are POSIX-only")
+    def test_orphaned_fixture_process_prevents_runner_pass(self):
+        script = (
+            "import json,subprocess,sys;"
+            "subprocess.Popen([sys.executable,'-c','import time;time.sleep(20)'],"
+            "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,"
+            "stderr=subprocess.DEVNULL);"
+            "print(json.dumps({'ok':True}))"
+        )
+        plan = self.plan([sys.executable, "-c", script])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-orphan"
+        plan["tc_revision"] = "r1"
+        plan["expected_authority_ref"] = "fixture:authority"
+        plan["direct_expectations"] = [
+            {"id": "stdout_json", "expected": {"ok": True}}
+        ]
+        self.attach_direct_tc_authority(plan)
+        code, _, manifest = self.call(plan)
+        self.assertEqual(code, 1)
+        attempt = manifest["attempts"][0]
+        self.assertIn(
+            attempt["process_tree_state"],
+            {"lingering_terminated", "lingering_unverified"},
+        )
+        self.assertTrue(manifest["collection_verified"])
+        self.assertEqual(manifest["outcome"], "blocked_cleanup_or_timeout")
+
     def test_bad_selected_identity_blocks_before_command(self):
         plan = self.plan([sys.executable, "-c", "print('should not run')"])
         plan.update(
@@ -440,6 +520,31 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertTrue(reconciliation["collection_complete"])
         self.assertIsNone(reconciliation["results"][0]["tc_verdict"])
         self.assertEqual(artifact["attempts"][0]["result_collection"], "complete")
+
+        # JSON has no per-test project identity. Single-project selection
+        # requires an exact reviewed --project filter; multiple projects block.
+        plan["selected"][0]["project_name"] = "node"
+        code, summary, evidence = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "vitest_project_filter_unverified")
+        self.assertIsNone(evidence)
+        plan["argv"] = [*plan["argv"], "--project=node"]
+        plan["reviewed_argv"] = plan["argv"]
+        code, _, evidence = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertTrue(evidence["collection_verified"])
+        plan["selected"].append(
+            {**plan["selected"][0], "project_name": "browser"}
+        )
+        code, summary, evidence = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(
+            summary["reason"], "vitest_multi_project_requires_separate_runs"
+        )
+        self.assertIsNone(evidence)
+        plan["selected"] = [
+            {"path": "tests/sample.test.ts", "title_path": ["suite", "one"]}
+        ]
 
         # Missing official global success must not turn a zero-exit process
         # into a verified Vitest pass, even with a matching selected test.
