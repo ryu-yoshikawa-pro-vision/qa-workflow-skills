@@ -193,14 +193,11 @@ def analyze(request: Any) -> dict[str, Any]:
     head_links = {(row["path"], row["object_sha"]) for row in gitlinks}
     # A removed or replaced submodule was also source material in the diff.
     # Do not call the parent inventory complete without that old revision.
-    missing = {
-        f"gitlink:{row['path']}@{row['object_sha']}" for row in gitlinks
-    }
+    missing = {f"gitlink:{row['path']}@{row['object_sha']}" for row in gitlinks}
     missing.update(
         f"gitlink:{row['path']}@{row['object_sha']}"
         for row in base_gitlinks
-        if row["path"] in touched
-        and (row["path"], row["object_sha"]) not in head_links
+        if row["path"] in touched and (row["path"], row["object_sha"]) not in head_links
     )
     return {
         "status": "incomplete" if missing else "complete",
