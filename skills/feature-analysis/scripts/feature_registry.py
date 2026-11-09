@@ -934,7 +934,11 @@ def _verify_git_evidence(
             if any(row["source_id"] == sid for row in snapshot["changes"]):
                 raise ContractError("git_change_diff_not_enumerated")
             if snapshot["event"] in {"pr_update", "rebase", "merge", "release"}:
-                if sid == primary_id or sid in previous_sources or event in {"merge", "release"}:
+                if (
+                    sid == primary_id
+                    or sid in previous_sources
+                    or event in {"merge", "release"}
+                ):
                     raise ContractError("event_git_base_required")
             continue
         coverage_request: dict[str, Any] = {
