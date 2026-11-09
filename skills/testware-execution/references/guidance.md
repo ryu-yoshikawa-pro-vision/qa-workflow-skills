@@ -38,7 +38,7 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 
 `python skills/testware-execution/scripts/runner.py --plan /path/to/run-plan.json --artifacts /outside/source/artifacts` で、事前に全コマンド連鎖とfixture・副作用を確認した単独対象を実行する。CLIは指定したcheckoutの固定HEADとclean状態を確認し、開始プロセス、終了コード、timeout、各attemptのstdout／stderr、任意のVitest JSON reporterとrun外cleanupを専用ディレクトリへ保存する。実runnerの成功と正式TCのPASSは別。実行前に止まった場合は証拠を捏造しない。
 
-入力JSONは `repo_path`（絶対path）、`repo_revision`（Git HEAD SHA）、`runner_kind`（vitest／playwright-api／component／batch／event／nonfunctional／static）、`argv`、同値の `reviewed_argv`、`preflight`、任意の `timeout_seconds`・`attempts`・`cleanup_argv`・`reviewed_cleanup_argv` からなる。コマンドはshellを介さず起動する。Vitestでは、実reporterの出力pathを `{reporter_file}` としてrunnerコマンドに明示し、固定された `selected`、実選択を証明できる場合のみ `selection_verified`、実checkout rootを使用して照合する。CLIが製品テストや依存関係を自動導入することはない。
+入力JSONは `repo_path`（絶対path）、`repo_revision`（Git HEAD SHA）、`runner_kind`（vitest／playwright-api／component／batch／event／nonfunctional／static）、`argv`、同値の `reviewed_argv`、`preflight`、任意の `timeout_seconds`・`attempts`・`cleanup_argv`・`reviewed_cleanup_argv` からなる。コマンドはshellを介さず起動する。相対実行pathは起動元のcwdではなく`repo_path`から解決し、相対pathでcheckout外の実行ファイルを参照する場合は拒否する。実行されるsourceはこのcheckoutの固定revisionとして照合し、現在の単独runnerでは`preflight.source_revision`と`repo_revision`の不一致を開始前に拒否する。別repoのsourceとtestwareを対応付ける認証済みprovider経路はPR #22の受入に引き継ぐ。Vitestでは、実reporterの出力pathを `{reporter_file}` としてrunnerコマンドに明示し、固定された `selected`、実選択を証明できる場合のみ `selection_verified`、実checkout rootを使用して照合する。CLIが製品テストや依存関係を自動導入することはない。
 
 非ブラウザTCで出力の直接比較を行う場合、`direct_expectations` に `{"id":"exit_code","expected":0}`、`{"id":"stdout_json","expected":{"ok":true}}` 等を列挙する。これらの期待値は実行前の仕様Authority・TCに由来するものとし、stdoutのJSON／終了コードから取得した実測と比較する。異なる場合はraw終了コード0でも `observed_FAIL`、必須観測を取得できない場合は `observations_incomplete`。結果は元attempt・rawと区別する。外部サービス・DBの副作用を実際に観測できない場合、入力だけで観測済みとしない。
 
@@ -61,16 +61,16 @@ H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/
 
 - 自動testwareでは終了コードだけで取得完全を宣言しない。`reporter_format`は`vitest-json`（Vitest／対応component）、`playwright-json`（Playwright API-only／対応component）、`case-json`（batch／eventの採用済みadapter）から選ぶ。未対応・欠落時はexit 0でも`outcome=incomplete`、`collection_verified=false`とする。
 - reporterを使うrunには`testware_ref`・`testware_revision`・`runner_version`・`selected[]`・`selection_verified=true`・`selection_evidence_ref`・`planned_scope_ref`を必須とする。`selected`はrepo相対`path`・`title_path`と必要な`project_name`を持つ。選択の根拠は起動担当の宣言であり、このCLIによる認証済みprovider readbackではない。
-- `vitest-json`は実起動引数に`{reporter_file}`を含める。Vitest 4は`vitest run --reporter=json --outputFile={reporter_file}`でJSONを出力できる。公式JSONの`ancestorTitles`先頭に含まれる空のroot名は比較時だけ除外し、途中の空タイトルは拒否する。suite・個別status・集計・選択集合の一致を照合する。
+- `vitest-json`は実起動引数に`{reporter_file}`を含める。Vitest 4は`vitest run --reporter=json --outputFile={reporter_file}`でJSONを出力できる。公式JSONの`ancestorTitles`先頭に含まれる空のroot名を1個だけ比較時に除外し、選択集合・case-jsonの空タイトルは除去せず拒否する。suite・個別status・集計・選択集合の一致を照合する。Vitest 4の公式JSONには個別`project_name`がないため、project指定の選択集合は1projectだけ認め、レビュー済み実行引数に同一`--project`指定がない場合は開始前に拒否する。複数projectは別runに分け、選択根拠と結果をPR #22の受入で確認する。
 - `jest-json`はcomponentのNativeテスト用。Jestの`--json --outputFile={reporter_file}`によるJest互換JSONをVitestと共通の個別assertion照合で処理する。Jestの実CLI／環境での受入は別に確認する。
-- `playwright-json`は公式`PLAYWRIGHT_JSON_OUTPUT_FILE`を子プロセスに設定する。CLIの`--reporter=json`、Playwright TestのAPI-only実行であること（ブラウザ利用のないテストコードとscript chain）を実行前に確認する。suite/spec/test/project・個別retry・global error・statsを照合する。
+- `playwright-json`は公式`PLAYWRIGHT_JSON_OUTPUT_FILE`を子プロセスに設定する。CLIの`--reporter=json`、Playwright TestのAPI-only実行であること（ブラウザ利用のないテストコードとscript chain）を実行前に確認する。suite/spec/test/project・個別retry・global error・statsを照合する。公式JSONの`spec.file`は`config.rootDir`相対なので、repo root直下の絶対pathと照合し、repo外／root不明を拒否する。
 - `case-json`は採用済みbatch/event adapterが`{reporter_file}`へ固定schema `non-e2e-cases/v1`のJSONを出す。必須rootは`schema`、`source_revision`、`testware_revision`、`runner_version`、`complete`、`results[]`。個別resultは`path`、`title_path`、`status`（passed/failed/pending/todo/skipped/timedOut/interrupted）、`attempt_results`（`status`と0始まりの連続した`retry`を保持する配列）。各itemのstatusと最終attemptが食い違えば拒否する。変換前の実ツールrawも保存する。
 - source/testware revision、選択集合、個別statusの重複・欠落、未取得attempt、raw失敗と終了コード0の矛盾は完全としない。Vitest／Jestの公式reporterでrootの`success`が欠落・不正な場合も、終了コード0だけでは成功としない。任意の`direct_expectations`だけを自動testwareの個別取得の代わりに使わない。正式直接TCは`direct_tc=true`とTC ref・revision・仕様Authority refを必要とする。
 - 実装済みの個別reporterテストはPython subprocessで固定JSONを模擬生成した独立fixture。固定`qa-training-store`の実Vitest／Playwright／採用済みbatch・event実runを証明しない。
 
 ## reporter異常とcleanup
 
-reporter JSONが型不正・未対応・不完全、または解釈中に例外を起こしたときは、元raw・終了コードを保持し、`result_collection=invalid`および必要に応じて例外の型名を記録する。解釈の成否に関係なく許可済みcleanupと実行後のHEAD／作業ツリー確認を試み、manifestを保存する。cleanupそのものが失敗した場合は`failed_or_unknown`として安全な完了・自動再実行を拒否する。独立fixtureでの実行成功を固定`qa-training-store`の実Vitest／Jest／Playwright受入とみなさない。
+reporter JSONが型不正・未対応・不完全、または解釈中に例外を起こしたときは、元raw・終了コードを保持し、`result_collection=invalid`および必要に応じて例外の型名を記録する。解釈の成否に関係なく許可済みcleanupと実行後のHEAD／作業ツリー確認を試み、manifestを保存する。cleanupそのものが失敗した場合は`failed_or_unknown`として安全な完了・自動再実行を拒否する。POSIXではCtrl-Cの割込み時にrunnerが子プロセスgroupを停止し、cleanupと中断のmanifest記録を試みる。終了時にも元プロセスgroupの残存を検査し、残存時は停止を試みたうえで安全な完了を拒否する。Windowsでは標準ライブラリだけで子孫process全体の終了を実証できないため、`process_tree_state=unverified`として安全な成功判定を拒否する。これはWindows実実行の受入済みを意味せず、PR #22側で隔離・後処理を確認する。独立fixtureでの実行成功を固定`qa-training-store`の実Vitest／Jest／Playwright受入とみなさない。
 
 ## 固定qa-training-store Vitest受入の再開手順
 

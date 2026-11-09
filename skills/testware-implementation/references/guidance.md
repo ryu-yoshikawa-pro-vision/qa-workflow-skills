@@ -27,6 +27,6 @@
 
 `snapshot_guard.py` は共有先への反映前検査であり、書込みの原子性を保証しない。共有branchに対する変更確定には、既存Git remoteを使う `python skills/testware-implementation/scripts/publish_git.py --plan /path/to/publish-plan.json --publish` を使用できる。これ以外のproviderの保存をGit push成功で代用しない。
 
-publish planには、`repo_path`、設定済みの `remote` 名、`branch`、検査時に取得した `expected_head`、隔離workspaceで作成した単一親の `candidate` commit、`allowed_prefixes`、変更した全pathの変更前 `sha256:` hash（未存在ならnull）を明示する。差分・許可path・HEAD・対象ファイルの通常ファイル性を確認し、**forceを使わないfast-forward push**でremoteのnative ref更新に委ねる。先行commitによりremoteが進んでいた場合はrejectし、最新commitを取り込み、対象差分と期待内容を再検証してから新しいcandidateを作り直す。
+publish planには、`repo_path`、設定済みの `remote` 名、`branch`、検査時に取得した `expected_head`、隔離workspaceで作成した単一親の `candidate` commit、`allowed_prefixes`、変更した全pathの変更前 `sha256:` hash（未存在ならnull）を明示する。差分・許可path・HEAD・対象ファイルの通常ファイル性を確認し、**候補が`expected_head`を単一親に持つfast-forward commitであること**を検査し、`--force-with-lease=refs/heads/<branch>:<expected_head>`で共有refが検査時のHEADと原子的に一致する場合にだけ更新する。フラグ上はlease付き更新だが、許すcommitは必ず検査済みHEADの直系子なので、履歴を上書きするnon-fast-forwardは許可しない。保護branchがleaseフラグを拒否する場合は公開をblockedとし、保護設定を変更・回避しない。先行commitによりremoteが進んでいた場合はrejectし、最新commitを取り込み、対象差分と期待内容を再検証してから新しいcandidateを作り直す。
 
 反映成功後はremote refとfetch後のHEAD・各blobをreadbackする。更新応答が失われた場合は成功・未実施を推測せず、保存先を再取得する。共有workspaceへ直接書くときはAが提供する認証済みreservationを別に要求し、隔離commitの成功をpath予約と混同しない。Git以外のproviderにはその保存先固有のnative CASが必要である。

@@ -300,3 +300,15 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `contract._test_key()`は先頭の空root名を`while`で無制限に除いていた。Vitest 4の既知の公式形式で許容する先頭空rootは1つだけなので、2つ以上の空rootを持つreporterは拒否する。
 - `reconcile_vitest()`はfile suiteが`skipped`／`pending`／`todo`と報告する一方、個別assertionに`passed`／`failed`が含まれる矛盾を検出していなかった。取得完全と誤認しないよう、suite statusとの照合を追加した。
 - `test_non_e2e_contract.py`に、重複した先頭空rootと、suite `skipped`＋assertion `passed`の負例を追加。これらは独立の構造テストであり、固定`qa-training-store`実runnerでの受入を済ませた証拠ではない。
+
+## CodeRabbit指摘への実装対応（2026-11-09）
+
+- 対象：PR #29のCodeRabbit `CHANGES_REQUESTED`（レビューコメント21件、2026-11-09の実装HEAD `92fe70e`に対するレビュー）。この項はGの実装・局所検証の記録であり、PR #22が担当する実runner・provider・他ownerの受入完了証拠ではない。
+- reporterと選択集合：case-jsonは空タイトルを拒否、Vitestはreporterの先頭空rootのみ除外し、単一projectの`--project`引数を確認。Playwrightは公式`config.rootDir`相対pathをrepo相対に照合する。実起動前に`selected`のtype・path・title・重複・projectの整合を検証する。
+- 実行と原観測：相対`argv`／`cleanup_argv`はcheckout基準で解決し、`source_revision`と実repo HEADを照合。JSONの大きすぎる指数値は非有限として拒否。直接TCの結果収集は実観測の有無で判定し、期待値不一致と非ゼロ終了コードを`observed_FAIL`のまま記録する。
+- process：POSIXのCtrl-Cで子process groupを停止し、cleanupとmanifestを保持。終了後のgroup残存も検出・停止を試みてsuccessを拒否。Windowsは子孫process確認の標準的な実装がないため検証不能としてsuccessを拒否する。プラットフォームごとの受入はPR #22が担当する。
+- Git公開：差分pathはNUL区切りで取得し、日本語file名、許可された削除・rename後の不在readbackに対応。候補commitは`expected_head`を単一親とし、leaseで競合する更新・巻き戻しを拒否する。実共有remoteには未公開で、独立bare Git fixtureで検証する。
+- 評価と契約：実行結果の開始・cleanup・診断、testware実装の実testware／引継ぎ、反証レビューの非E2E・静的レビュー適用時のsource revision表を出力評価へ追加。製品文書への直接静的レビューを入力契約に明示した。
+- 追加回帰：独立reporter、変更path許可、Gitの競合・削除・日本語path、direct TC、失敗したstatic tool終了コード、process中断・残存、legacyレビューとの互換性。CI結果はPR #29の最新Checksを正本とする。
+- 共有ファイル`scripts/skills/evals/deterministic/common.py`の新Skill名許可はG branchでは変更せず、PR #22統合branch `e58e2a6`で修正し、`WF-D002`の回帰テストを追加。共有ownerの正本はPR #22とする。
+- 上記実装がレビュー指摘に対応するかは最新の実装コード・個別回帰テストとCodeRabbit指摘threadごとに判定する。PR #29の全レビュー完了は未宣言で、実受入条件は引き続きPR #22へ引き継ぐ。
