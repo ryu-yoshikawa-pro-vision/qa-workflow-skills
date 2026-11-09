@@ -2,12 +2,12 @@
 
 ## 位置付け
 
-API・バッチ・コンポーネント・非機能・静的検証のtestware実装／更新・実runnerによる実測・原因分析を担当する。
+API・バッチ・コンポーネント・非機能・静的検証のtestware実装・runner契約・独立fixtureでの局所検証をGが担当する。固定製品・実provider・他ownerとの受入判定はPR #22が担当する。
 
 - 作業branch：`feat/pr22-g-non-e2e-testware`
 - PRのbase／最終統合先：`feat/development-qa-traceability`（[PR #22](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/22)）
 - 分岐元commit：`718005961ade89a848788e8ad3a354d4c711b84a`
-- このbranchのPRは**実装準備のDraft**から始め、以下の完了条件を満たしてレビューできる状態にする。**実装完了・merge済みを意味しない**。
+- このbranchのPRはDraftで進める。Gの実装・局所検証と、その実装に対するレビュー指摘の修正はGが担当する。下記の元Planに基づく受入基準はPR #22で判定し、未受入を実施済みとはしない。
 - 2026-11-08の利用者指示で、最終統合先はPR #22に変更された。既存Plan索引の「PR #22は文書変更PR」という作成時点の記載より、この統合指示を優先する。
 - このファイルは担当別の作業ガイド。要件・完了条件の正本は以下のPlan。**15＋10条件、詳細Plan 01〜08、S1〜S17、人間編集8ケースを削減しない**。全体の最終完了判定はPR #22で行う。
 
@@ -27,7 +27,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 - 新設`skills/testware-implementation/**`、`skills/testware-execution/**`
 - 既存`skills/adversarial-review/**`、`skills/test-execution/**`の必要な静的レビュー・直接実行の拡張
-- 非E2Eのrunner adapter／preflight／cleanup／trace・assertion品質と独立fixture／実製品テスト
+- 非E2Eのrunner adapter／preflight／cleanup／trace・assertion品質と独立fixture、およびPR #22で実製品受入を行うための実行plan・検証手順
 
 **変更境界**：以下に記載のない共有ファイルを変更したくなった場合は、書込みownerへ変更内容・必要な入力出力・検証例を渡す。既存実装の回帰を避けるため、既存helperの再利用を優先し、他担当の正本を新設Skillに複製しない。新規テスト・fixture・評価データは可能な限り担当固有のファイルに分ける。
 
@@ -36,12 +36,14 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 ### このbranchで実施・検証する
 
 - 本書の担当対象のSkill・runtime・helper・データ契約・既存consumerとの局所接続を実装し、担当範囲の既存テスト・回帰・負例・権限／保存・履歴互換性を検証する。
-- 担当機能の受入に必要な実runner・実保存先・実Agentの**単独経路**は、利用可能な環境で実施する。外部権限・実接続が不足する場合はその条件を未検証／blockedと明示し、独立に検証できる部分は完成させる。
+- 実runner・実保存先・実Agentの局所的な契約と独立fixtureを実装・テストし、実行手順・必要権限・未検証条件をPR #22に渡す。固定製品や実providerの実行・実証による受入判定はこのbranchで行わない。
 - 他branchの未統合実装は合意した契約と独立fixtureで代替して局所検証する。fixtureは他ownerの実成果物を統合した証拠にはしない。
 - 担当が所有する実装不具合、局所結合・回帰不具合は**このbranchで修正**し、対応したテスト・実施証拠を残す。
 
 ### PR #22だけで実施・判定する
 
+- Gの実runnerを固定`qa-training-store`や適切な実環境で起動し、Vitest／Playwright API-only／Web・Native component／batch・event／静的解析・非機能について、選択集合・実raw・attempt・cleanup・副作用・判定完全性を確認する。製品に存在しない方式の独立fixtureは製品実行の受入数に含めない。
+- 認証済み仕様Authority・期待値oracle、provider-native承認・共有予約・CAS／readbackの証拠を取得・照合する。権限不足の場合はblockedと記録する。
 - A〜Jの実装PRの取り込み、競合解消・全体再検証、**各ownerが実際に保存した成果物同士**のID／revision／currentness／承認・run参照による横断接続。
 - 全current Skill同時利用時の発火／routing、工程をまたぐ実Agent・実runner・実provider・製品CIの一連の受入、S1〜S17の総合試験、人間編集8ケースの**全体経路としての再検証**。
 - 開発連動QAの15条件、QA全工程の10条件と詳細Plan 01〜08の最終照合、Plan詳細07の5シナリオの**変更前後の横断実測・効率化判定**、統合後の全CI・回帰評価。
@@ -50,7 +52,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 ### PR #22へ引き渡す証拠
 
 - 担当の変更ファイル、公開入出力契約、参照するowner／source／artifact IDとrevision、schema／fixture、保存・承認・失敗／再開条件。
-- 局所検証のコマンドと結果、実runner／実providerの担当経路の証拠、回帰・負例、未実行／SKIP／blockedと再開条件。
+- 局所検証のコマンドと結果、独立fixture／回帰・負例、実runner・実providerの受入に必要なplan・参照情報、未実行／SKIP／blockedと再開条件。PR #22で取得した実runner／provider証拠はPR #22の受入結果として保存する。
 - 他担当の実成果物が必要な横断検証項目。**これらの未実施は担当branchの局所検証を失敗扱いする理由にはしないが、PR #22の最終受入完了には必ず必要**とする。
 
 ## 共通契約が未確定の場合の着手範囲
@@ -59,7 +61,7 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - 上記に依存しない既存実装調査、担当Skill固有ロジック、独立fixture、局所テストは先行可能。Aによる確定・共有前に、未確定の共通schema・保存形式・承認・runtimeの接続方法を推測して確定しない。
 - 契約未確定で停止する対象処理と理由・解決責任者・再開条件を記録し、独立して実施できる作業を止めない。Aが共有した契約を使う局所検証の後、他ownerの**実成果物を使う横断検証はPR #22**へ引き継ぐ。
 
-## 着手基準
+## 当初の着手基準（実データ・他ownerの合意はPR #22で確認）
 
 - [ ] 既存Playwright E2E／`test-execution`・`adversarial-review`、対象runner／fixture／cleanupとデータ権限を確認した。
 - [ ] E/F/H/JとTC/ref・実行母集団・required route・run結果の単位を合意した。
@@ -82,11 +84,11 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 **並行作業**：依存先の完成前でも固定fixtureで担当範囲を実装・局所検証する。実際の他owner成果物を用いた横断照合はPR #22で行う。必要な外部情報・権限・環境が不足する箇所は未検証／blockedと記録し、独立して実装可能な箇所は継続する。
 
-## 今回の対応範囲と完了判定（2026-11-09）
+## PR #29の実装・局所検証とPR #22の受入（2026-11-09）
 
-依頼者の「この実行環境で対応できないものを除外する」という指示に基づく、**PR #29の今回の作業完了判定**。下記はG単独で変更・検証できる範囲を評価する。外部権限・実行環境・他ownerの署名／成果物を要する項目は、実施済みとはせず今回の判定対象から除外する。元Planの必須受入を満たしたとの主張でも、PR #22の全体受入条件を削除する変更でもない。
+利用者の指示により、**受入は単独経路も含めPR #22で実施・判定**する。ここでチェック済みなのはGの独立fixture・既存CIなど、実施した範囲の事実だけを示す。Gのコードレビュー指摘は実装上の対応事項としてPR #29に残し、元Planの受入条件を削除しない。
 
-### 今回の判定対象（実施済み）
+### Gで検証済みの実装・局所テスト
 
 - [x] 担当Gの非E2E所有境界、既存E2E・直接TC・静的レビューとのroutingを実装・独立テストで検証した。
 - [x] Git隔離編集、変更前hash／HEAD照合、非強制fast-forward確定・競合拒否とreadbackについてローカルGit fixtureで検証した。
@@ -94,19 +96,25 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - [x] 未承認Authorityから正式TC判定を出さないこと、選択集合・suite・retry・集計・不正JSON・直接観測型比較・静的解析tool照合のfail-closedを回帰テストで確認した。
 - [x] 非E2E testwareの反証レビューfixtureと、固定製品に対する限定的な静的レビューを記録し、未確認の仕様oracleを独立した品質合格へ昇格しなかった。
 - [x] 担当GのSkill・guidance・評価fixture・検証記録を整備し、GitHub Actionsの5 workflowを最新の検証済みHEAD `92fe70e751ae2bc56c7f9f73ecd862f26287bb0f` で確認した。runtime unit/integration 637件、repository deterministic eval 292件がPASS。
-- [x] PR #29本文とPR #22引継ぎコメントに、変更範囲、raw証拠の限界、外部受入の再開条件を残した。
+- [x] PR #29本文とPR #22引継ぎコメントに、変更範囲、raw証拠の限界、受入の再開条件を残した。
+- [ ] CodeRabbitの`CHANGES_REQUESTED`を確認し、G実装に関係する妥当な指摘を修正・回帰検証する（受入試験とは分ける）。
 
-### 今回の完了判定から除外（未実施）
+### PR #22に引き継ぐ受入（未実施）
 
 - 固定`qa-training-store`でGの`runner.py`を実起動し、Vitest／Playwright API-only／Web・Native component／batch・event／静的解析・非機能の対象母集団とraw・cleanupを受け入れる作業。隔離された実行terminal、依存環境と実行許可がなく、単なる製品CIのPASSでは代替できない。固定Vitest 3件のfail-closed planと再開手順は本PR内に保存済み。
 - 実providerに対する認証・仕様Authorityの承認、共有資源のnative予約、CAS、保存readback。必要なproviderと権限が接続されておらず、未認証のGit snapshotやローカル模擬結果を正式な承認証拠へ昇格しない。
 - E/F/H/J各担当による契約の正式合意や他ownerの実成果物との接続。G側のschema・fixture・必要参照は記録済み。複数ownerの実データによる横断接続はPR #22で実施する。
 - 固定製品testwareの期待値についての正式な仕様Authority決定と、製品testware ownerによる変更・採否。Gの確認候補と反証根拠は記録済み。製品本体・既存製品テストは本PRの書込み対象ではない。
-- CodeRabbit等の外部サービスによるレビュー完了保証。最新HEADの全体レビュー依頼は受理され、レビュー結果はこの記録時点で未確定。結果が返った場合、担当G内の具体的な指摘は別途確認・修正が必要。
 
-上記の除外は未検証の隠蔽・免責・仕様適合の証明を意味しない。元Planに基づく全体受入を行う場合は除外した項目を再開し、同じID／revision／Authority／runner／raw／cleanupの証拠で照合する。
 
-## 完了基準
+**PR #29に残る実装上の対応**：CodeRabbitが最新の実装差分に対して`CHANGES_REQUESTED`を記録し、未解決のreview threadがある。runnerの中断・残存プロセス、Git更新時の競合、結果照合・評価の判定など、G所有コードの正しさに関する指摘はPR #22の受入へ移管しない。各指摘は既存実装・仕様・テストで確認し、妥当な修正をG branchで行う。レビュー指摘が残る時点でPR #29の実装レビューは完了していない。
+
+上記受入の移管は未検証の隠蔽や仕様適合の証明を意味しない。PR #22で同一ID／revision／Authority／runner／raw／cleanupの実証を行い、結果を記録する。
+
+## PR #22で判定する受入基準（元Planから保持）
+
+以下のチェックリストはPR #29の実装済み範囲を含めた**受入の最終照合**としてPR #22へ引き継ぐ。Gの局所CI成功をもって完了にしない。
+
 
 - [ ] 対象方式のtestware実装／更新と実runnerでの実行・raw証拠・cleanupが結びつき、独立fixtureと固定qa-training-storeの対象を区別した。
 - [ ] preflight不備・共有データ競合・応答消失・cleanup失敗・隔離worktreeの競合を安全に拒否／再開できる。
