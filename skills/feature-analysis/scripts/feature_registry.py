@@ -236,9 +236,9 @@ def _primary_code_source_id(snapshot: dict[str, Any]) -> str | None:
     if snapshot["event"] not in {"pr_update", "rebase", "merge", "release"}:
         return None
     matching = [
-        row for row in snapshot["sources"]
-        if row["kind"] == "code"
-        and row.get("revision") == snapshot["source_revision"]
+        row
+        for row in snapshot["sources"]
+        if row["kind"] == "code" and row.get("revision") == snapshot["source_revision"]
     ]
     chosen = snapshot["event_basis"].get("primary_source_id")
     if chosen is not None:
@@ -275,10 +275,9 @@ def _current_changes(
             current[did] = row
         elif did not in previous_ids:
             current[did] = row
-        elif (
-            snapshot["event"] == "analysis_update"
-            and row["after_revision"] == sources[row["source_id"]].get("revision")
-        ):
+        elif snapshot["event"] == "analysis_update" and row[
+            "after_revision"
+        ] == sources[row["source_id"]].get("revision"):
             current[did] = row
     return current
 
@@ -654,9 +653,7 @@ def analyze(request: Any) -> dict[str, Any]:
                 "numerator_ids": classified,
                 "denominator_ids": sorted(current_changes),
                 "rate": (
-                    len(classified) / len(current_changes)
-                    if current_changes
-                    else None
+                    len(classified) / len(current_changes) if current_changes else None
                 ),
             },
             "observed_candidate_mapping": {
@@ -872,11 +869,13 @@ def _authorize_reclassifications(
             "classification": row["classification"],
             "source_id": row["source_id"],
             "source_ref": next(
-                source["ref"] for source in snapshot["sources"]
+                source["ref"]
+                for source in snapshot["sources"]
                 if source["id"] == row["source_id"]
             ),
             "source_scope": next(
-                source["scope"] for source in snapshot["sources"]
+                source["scope"]
+                for source in snapshot["sources"]
                 if source["id"] == row["source_id"]
             ),
             "source_revision": row["after_revision"],

@@ -266,7 +266,9 @@ class FeatureRegistryTests(unittest.TestCase):
         snapshot = data["snapshot"]
         snapshot["event"] = "pr_update"
         snapshot["event_basis"] = {
-            "base_sha": base, "head_sha": head, "previous_head_sha": before
+            "base_sha": base,
+            "head_sha": head,
+            "previous_head_sha": before,
         }
         snapshot["source_revision"] = head
         snapshot["sources"][0]["revision"] = head
@@ -283,14 +285,16 @@ class FeatureRegistryTests(unittest.TestCase):
             implementation_refs=["src/batch.py"],
         )
         snapshot["features"].append(second)
-        snapshot["history"].append({
-            "event_id": "event-2",
-            "kind": "added",
-            "revision": head,
-            "evidence_ref": "evidence/batch",
-            "from_ids": [],
-            "to_ids": ["FEAT-002"],
-        })
+        snapshot["history"].append(
+            {
+                "event_id": "event-2",
+                "kind": "added",
+                "revision": head,
+                "evidence_ref": "evidence/batch",
+                "from_ids": [],
+                "to_ids": ["FEAT-002"],
+            }
+        )
         latest = copy.deepcopy(snapshot["changes"][0])
         latest.update(
             id="DIF-002",
@@ -351,9 +355,7 @@ class FeatureRegistryTests(unittest.TestCase):
         current_source.update(id="SRC-002", ref="product/other")
         snapshot["sources"].append(current_source)
         snapshot["expected_source_ids"].append("SRC-002")
-        before, head, base, secondary_base = (
-            "b" * 40, "a" * 40, "c" * 40, "d" * 40
-        )
+        before, head, base, secondary_base = ("b" * 40, "a" * 40, "c" * 40, "d" * 40)
         previous["source_revision"] = before
         for row in previous["sources"]:
             row["revision"] = before
@@ -384,9 +386,7 @@ class FeatureRegistryTests(unittest.TestCase):
             before_revision=secondary_base,
         )
         snapshot["changes"].extend([primary, secondary])
-        self.assertIn(
-            "event_primary_source_ambiguous", handle(data)["reasons"]
-        )
+        self.assertIn("event_primary_source_ambiguous", handle(data)["reasons"])
         snapshot["event_basis"]["primary_source_id"] = "SRC-001"
         self.assertEqual(handle(data)["status"], "complete", handle(data))
         snapshot["event_basis"]["primary_source_id"] = "SRC-002"
