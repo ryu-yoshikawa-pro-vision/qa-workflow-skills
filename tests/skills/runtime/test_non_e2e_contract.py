@@ -296,6 +296,7 @@ class OtherRunnerReportTests(unittest.TestCase):
 
     def test_playwright_report_preserves_project_and_attempts(self):
         report = {
+            "config": {"version": "fixture-playwright-1"},
             "suites": [
                 {
                     "title": "tests/api.spec.ts",
@@ -338,6 +339,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             selected=selected,
             report=report,
             source_revision="sha",
+            runner_version="fixture-playwright-1",
             raw_ref="raw",
             selection_verified=True,
         )
@@ -352,6 +354,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             selected=selected,
             report=report,
             source_revision="sha",
+            runner_version="fixture-playwright-1",
             raw_ref="raw",
             selection_verified=True,
         )
@@ -359,6 +362,7 @@ class OtherRunnerReportTests(unittest.TestCase):
 
     def test_playwright_report_rejects_missing_spec_and_wrong_selection(self):
         report = {
+            "config": {"version": "fixture-playwright-1"},
             "suites": [{"title": "tests/api.spec.ts", "specs": [], "suites": []}],
             "errors": [],
             "stats": {"expected": 0, "unexpected": 0, "flaky": 0, "skipped": 0},
@@ -367,6 +371,7 @@ class OtherRunnerReportTests(unittest.TestCase):
             selected=[{"path": "tests/api.spec.ts", "title_path": ["missing"]}],
             report=report,
             source_revision="sha",
+            runner_version="fixture-playwright-1",
             raw_ref="raw",
             selection_verified=True,
         )
