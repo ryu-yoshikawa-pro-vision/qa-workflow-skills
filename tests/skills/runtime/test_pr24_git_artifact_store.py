@@ -462,6 +462,107 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertEqual(result["status"], "blocked", result)
         self.assertIn("git_source_listing_incomplete", result["reasons"])
 
+    def _assert_merge_or_release_requires_saved_git_base(self, event: str) -> None:
+        request, evidence = self._code_registry()
+        saved = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="initial inventory",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(saved["status"], "stored", saved)
+        previous = copy.deepcopy(request["snapshot"])
+        old_head = evidence[0]["head_sha"]
+        for filename in ("earlier.py", "latest.py"):
+            (self.root / "src" / filename).write_text(
+                f"def {filename[:-3]}(): return True\n", encoding="utf-8"
+            )
+            git(self.root, "add", f"src/{filename}")
+            git(self.root, "commit", "-qm", f"source update {filename}")
+            if filename == "earlier.py":
+                middle = git(self.root, "rev-parse", "HEAD")
+        head = git(self.root, "rev-parse", "HEAD")
+        snapshot = request["snapshot"]
+        request["previous_snapshot"] = previous
+        request["observed_head_revision"] = head
+        snapshot["event"] = event
+        snapshot["event_basis"] = (
+            {
+                "merge_commit_sha": head,
+                "target_ref": "refs/heads/main",
+                "previous_head_sha": old_head,
+            }
+            if event == "merge"
+            else {
+                "commit_sha": head,
+                "build_ref": "release/2",
+                "target_ref": "refs/tags/v2",
+            }
+        )
+        snapshot["source_revision"] = head
+        snapshot["sources"][0]["revision"] = head
+        snapshot["operation_id"] = f"op-{event}"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        latest = copy.deepcopy(snapshot["changes"][0])
+        latest.update(
+            id="DIF-002",
+            before_revision=middle,
+            after_revision=head,
+            locator="src/latest.py",
+        )
+        snapshot["changes"].append(latest)
+        evidence[0].update(base_sha=middle, head_sha=head)
+        # A middle-to-HEAD comparison has 100% coverage of the supplied DIFs,
+        # but omits earlier.py added after the saved source revision.
+        rejected = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=saved["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason=f"{event} with an incomplete Git baseline",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(rejected["status"], "blocked", rejected)
+        self.assertTrue(
+            any("git_coverage_not_verified" in reason for reason in rejected["reasons"]),
+            rejected,
+        )
+        self.assertEqual(
+            self.store.read_current(
+                "feature-inventory", "Sample", "qa/feature-inventory.json"
+            )["revision"],
+            saved["revision"],
+        )
+        # The saved source is the only valid baseline; listing both paths
+        # against it allows the complete update to be persisted.
+        evidence[0]["base_sha"] = old_head
+        latest["before_revision"] = old_head
+        earlier = copy.deepcopy(latest)
+        earlier.update(id="DIF-003", locator="src/earlier.py")
+        snapshot["changes"].append(earlier)
+        accepted = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=saved["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason=f"{event} with the saved Git baseline",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(accepted["status"], "stored", accepted)
+        self.assertEqual(accepted["analysis_status"], "complete")
+
+    def test_merge_requires_saved_git_base_for_full_source_diff(self) -> None:
+        self._assert_merge_or_release_requires_saved_git_base("merge")
+
+    def test_release_requires_saved_git_base_for_full_source_diff(self) -> None:
+        self._assert_merge_or_release_requires_saved_git_base("release")
+
     def test_two_consecutive_pr_updates_preserve_earlier_dif_history(self) -> None:
         request, evidence = self._code_registry()
         saved = persist_snapshot(
