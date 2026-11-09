@@ -143,3 +143,24 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `package.json`で確認した実行入口は`pnpm run test:unit`（`vitest run tests/unit`）、`pnpm run test:integration`（`vitest run tests/integration --no-file-parallelism --maxWorkers=1`）、`pnpm run test:component:web`（`vitest run tests/component --exclude tests/component/native`）。`pnpm@10.34.5`、`vitest@4.1.11`、`vitest.config.ts`の`jsdom`／`tests/setup.ts`を確認した。
 - これらは**既存package scriptの確認結果のみ**であり、実行許可ではない。実施前に当該固定commit、script chain・setup/fixtureの全副作用、データ・認証権限、隔離／予約・cleanup、記録するreporterの絶対pathとtest選択集合を調査する。安全な対象と許容副作用を固定してから実runner・retry・rawを取得し、H/Jへ渡す。
 - ローカルcontainerではGitHubへの直接cloneが名前解決エラーとなり、当該製品repoの依存インストール／実runnerは実施できなかった。GitHub connectorによるソース閲覧は可能だったが、実行成功の証拠ではない。
+
+## 追加実装・検証記録（2026-11-09）
+
+前回レビューで指摘した未実装を次の範囲で対応した。
+
+- `skills/testware-execution/scripts/runner.py`：既存Git checkoutのHEAD・clean状態、実行許可、事前検査したargv、timeoutを検証して実subprocessを起動する。個別attemptのPID・開始／終了時刻・終了コード・stdout／stderr・Vitest JSON reporter、run外cleanup、実行後の作業ツリー残存変更を保存・照合する。shared／外部副作用はnative providerの認証済み確認ができないため拒否する。
+- 非ブラウザ直接TC：実行前に固定した期待値と、実バッチ等から得た終了コード・stdout JSONの観測値を比較する。終了コード0でも期待値不一致はFAIL、未観測は判定不能として元runner結果と分離した。非機能測定は品質特性、単位、閾値根拠、測定条件と実stdout数値を比較し、閾値違反と未測定を分ける。
+- Vitest：固定repo rootからのreporter絶対path正規化、選択集合と個別結果の重複・missing、optionalな集計件数、suite単位の起動失敗、global `success` 不整合を検出する。runner内の一時IDをTCの永続IDに変えない。retry個別testの証拠がJSONにない場合は不明のままとする。
+- `skills/testware-implementation/scripts/publish_git.py`：単一親candidateとexpected HEAD、全変更対象の変更前hash、許可path、通常ファイル性を確認後、Git remoteへの非強制fast-forward pushと、remote HEAD・fetch・blobのreadbackで変更確定を照合する。remoteが先に変更されたらpushしない。共有workspaceのnative reservationが必要な場合は別途取得し、Gitのref更新と混同しない。
+- 評価器：新Skill両方の決定論的validatorが空欄の必須項目を通す問題を修正。反証レビューの修正先に新Skill二つを追加し、非E2Eのassertion漏れ／常真assertion／誤期待値およびTCなし静的レビューの独立意味評価ケースとtrigger正負例を追加。
+- 独立fixture：実Git bare remoteと複数cloneを使う先行更新の競合拒否・readback・独立path再計画、実Python subprocessでの実開始・retry・timeout・run外cleanup・残存状態、Vitest形式JSONの不整合、直接TCの終了コード0＋内容不一致、非機能の閾値超過・未測定をテストする。これらは製品実runnerの受入証拠とは区別する。
+
+### 現時点の残条件
+
+1. 固定`qa-training-store`上の実Vitest、API-only Playwright、component、batch／event・非機能の実機能または独立runner実測は、環境・依存・認証・副作用／cleanup権限の確定を要し、**未検証**。今回のPython subprocess fixtureをVitest実行済みとしない。
+2. 静的解析CLIは実行手順が追加されたが、案件で採用されたツールの実権限・raw取得・rule・version・改版後再確認は**未検証**。非機能測定条件・閾値の案件決定と本実測も未検証。
+3. 共有workspaceの同一path予約、Git以外のsource／artifact providerのnative CAS・承認／readback、共通runtimeへの正式Skill登録と共有READMEの同期はAの書込み範囲および案件providerへの接続が必要。G独立fixtureはこれらの証明ではない。
+4. H/J実成果物とのrun参照・診断・元結果、S1〜S17・人間編集8件・全15＋10条件の横断受入はPR #22へ引継ぎ。既存E2E implementationの共有編集競合保護もそのownerと照合する。
+5. 最新HEADのCI結果はPR #29のChecksを正本とする。旧版`Validate Agent Skills`の共有README未登録FAILはAに引継ぎ済み。その他のCI・局所fixtureが成功しても、本節の未検証を完了として扱わない。
+
+このPRは上記の未検証条件が残るためDraftのままとする。製品SUT・正式仕様・他ownerの共有正本は更新していない。
