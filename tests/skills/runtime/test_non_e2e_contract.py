@@ -312,6 +312,7 @@ class OtherRunnerReportTests(unittest.TestCase):
                                     "tests": [
                                         {
                                             "projectName": "api",
+                                            "expectedStatus": "passed",
                                             "status": "flaky",
                                             "results": [
                                                 {"status": "failed", "retry": 0},
@@ -345,6 +346,17 @@ class OtherRunnerReportTests(unittest.TestCase):
         )
         self.assertTrue(result["collection_complete"])
         self.assertEqual(result["results"][0]["runner_status"], "flaky")
+        report["suites"][0]["suites"][0]["specs"][0]["tests"][0]["status"] = "expected"
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_playwright(
+                selected=selected,
+                report=report,
+                source_revision="sha",
+                runner_version="fixture-playwright-1",
+                raw_ref="raw",
+                selection_verified=True,
+            )
+        report["suites"][0]["suites"][0]["specs"][0]["tests"][0]["status"] = "flaky"
         self.assertEqual(
             [r["retry"] for r in result["results"][0]["attempt_results"]],
             [0, 1],
