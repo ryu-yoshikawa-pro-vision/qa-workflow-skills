@@ -224,7 +224,7 @@ QA Knowledgeのidentity・scope・currentnessを正し、Charter／探索／症�
 
 - semantic評価（LLM判定）は未実施。データ契約とcase追加までで、PR #22の実Agent評価で実施する。triggerは下記の擬似確認までで、実ハーネスでの全current Skill同時のroutingはPR #22。
 - 実保存先のnative atomic create／conditional write（CAS）：`update_entry()`は注入されたproviderの結果を使う。テストのproviderは固定fixture（排他lockとos.replace）で、実providerのCASを実証したものではない。実provider／実runnerでの検証はPR #22。
-- GitHub Actions（PR #31のChecks）：再々レビュー指摘対応のコミット`86250c5`で`code-quality`・`codex-contract`・`windows-launcher`・`deterministic-output-evals`・`semantic-output-evals`・`validate`が各々pass（CodeRabbitはskipping）。その前の追加レビュー指摘対応のコミット`978b89c`でも同じ6件がpass。さらにその前のレビュー指摘対応のコミット`0077bc8`でも同じ6件がpass。それ以前は`8e4425e`（ベース取り込み後）と`bbd5a19`で同じ6件がpass。`47e97d7`にrunが無かったのは、当時PRがベースとコンフリクトしていてpull_request用workflowが起動しなかったため。この記録だけを足すコミットは文書のみの変更で、そのHEADのChecksを個別に確認する。
+- GitHub Actions（PR #31のChecks）：最終レビュー指摘対応のコミット`800ecf7`で`code-quality`・`codex-contract`・`windows-launcher`・`deterministic-output-evals`・`semantic-output-evals`・`validate`が各々pass（CodeRabbitはskipping）。その前の再々レビュー指摘対応のコミット`86250c5`、追加レビュー指摘対応のコミット`978b89c`、レビュー指摘対応のコミット`0077bc8`でも、各々同じ6件がpass。それ以前は`8e4425e`（ベース取り込み後）と`bbd5a19`で同じ6件がpass。`47e97d7`にrunが無かったのは、当時PRがベースとコンフリクトしていてpull_request用workflowが起動しなかったため。この記録だけを足すコミットは文書のみの変更で、そのHEADのChecksを個別に確認する。
 - A・J・Fの実成果物との接続、validation result refの保存、承認provider、全Skill同時のrouting、S1〜S17、人間編集8ケースはPR #22で実施する。
 - 本環境の既存の失敗（上表）は、変更前HEADでも再現することを確認済み。Python 3.11のLinux CIでの再確認はPR #22。
 
