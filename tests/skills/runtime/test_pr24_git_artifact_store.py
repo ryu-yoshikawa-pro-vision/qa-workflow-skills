@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -1110,6 +1111,73 @@ class GitArtifactStoreTests(unittest.TestCase):
             git_inventory_requests=evidence,
         )
         self.assertEqual(stored["status"], "stored", stored)
+
+    def test_saved_legacy_duplicate_merge_authorizes_each_parent(self) -> None:
+        request, evidence = self._code_registry()
+        previous = copy.deepcopy(request["snapshot"])
+        second = copy.deepcopy(previous["changes"][0])
+        second.update(
+            id="DIF-002",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Old conflicting verdict",
+            approval_ref="approval/verified",
+        )
+        previous["changes"].append(second)
+        raw = json.dumps(previous, ensure_ascii=False, sort_keys=True)
+        saved = self.store.write(
+            kind="feature-inventory",
+            project_ref="Sample",
+            artifact_ref="qa/feature-inventory.json",
+            content=raw,
+            expected_revision=None,
+            operation_id="legacy-raw-save",
+            source_ref="Sample",
+            source_revision=previous["source_revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="legacy artifact from old schema",
+        )
+        self.assertEqual(saved["status"], "stored", saved)
+        snap = request["snapshot"]
+        request["previous_snapshot"] = previous
+        snap["changes"] = copy.deepcopy(previous["changes"])
+        snap["event"] = "analysis_update"
+        snap["event_basis"] = {
+            "source_revision": snap["source_revision"],
+            "evidence_ref": "review/legacy",
+        }
+        snap["previous_artifact_revision"] = "art-v1"
+        snap["artifact_revision"] = "art-v2"
+        snap["operation_id"] = "fix-legacy-duplicate"
+        correction = copy.deepcopy(snap["changes"][0])
+        correction.update(
+            id="DIF-003",
+            supersedes_ids=["DIF-001", "DIF-002"],
+            evidence_ref="review/confirmed-scope",
+            reason="Unify old conflicting classifications",
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+        )
+        snap["changes"].append(correction)
+        calls = []
+        original = self.store.authorize
+
+        def count_authorizations(data: dict) -> bool:
+            if data["operation"] == "reclassify":
+                calls.append(data["supersedes_id"])
+            return original(data)
+
+        self.store.authorize = count_authorizations
+        result = persist_snapshot(
+            self.store, request, expected_revision=saved["revision"],
+            approval_ref="approval/verified", approval_revision="policy-v1",
+            change_reason="reviewed old contradictory decisions",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "stored", result)
+        self.assertEqual(sorted(calls), ["DIF-001", "DIF-002"])
+        self.assertEqual(len(snap["changes"]), 3)
 
     def test_source_ref_lock_conflict_prevents_artifact_write(self) -> None:
         request, evidence = self._code_registry()
