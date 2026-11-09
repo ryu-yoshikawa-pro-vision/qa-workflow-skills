@@ -516,6 +516,127 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         self.assertEqual(stored["revision"], operation)
 
+    def test_shared_head_repositories_use_explicit_primary_source_and_own_base(
+        self,
+    ) -> None:
+        request, evidence = self._code_registry()
+        old_head = evidence[0]["head_sha"]
+        base = evidence[0]["base_sha"]
+        other_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(other_dir.cleanup)
+        other = Path(other_dir.name) / "replica"
+        subprocess.run(
+            ["git", "clone", "-q", str(self.root), str(other)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        snapshot = request["snapshot"]
+        secondary_source = copy.deepcopy(snapshot["sources"][0])
+        secondary_source.update(
+            id="SRC-002",
+            ref="product/replica",
+        )
+        snapshot["sources"].append(secondary_source)
+        snapshot["expected_source_ids"].append("SRC-002")
+        snapshot["features"][0]["source_ids"].append("SRC-002")
+        secondary_change = copy.deepcopy(snapshot["changes"][0])
+        secondary_change.update(id="DIF-002", source_id="SRC-002")
+        snapshot["changes"].append(secondary_change)
+        evidence.append(
+            {
+                "source_id": "SRC-002",
+                "repository_root": str(other),
+                "authorized_root": str(other),
+                "base_sha": base,
+                "head_sha": old_head,
+            }
+        )
+        first = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="same head initial",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(first["status"], "stored", first)
+        previous = copy.deepcopy(snapshot)
+        (self.root / "src" / "batch.py").write_text(
+            "def batch(): return 1\n", encoding="utf-8"
+        )
+        git(self.root, "add", "src/batch.py")
+        git(self.root, "commit", "-qm", "shared updated HEAD")
+        new_head = git(self.root, "rev-parse", "HEAD")
+        git(other, "fetch", "-q", str(self.root), new_head)
+        git(other, "checkout", "-q", "--detach", new_head)
+        self.assertEqual(git(other, "rev-parse", "HEAD"), new_head)
+        request["previous_snapshot"] = previous
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": base,
+            "head_sha": new_head,
+            "previous_head_sha": old_head,
+        }
+        snapshot["source_revision"] = new_head
+        for source in snapshot["sources"]:
+            source["revision"] = new_head
+        snapshot["operation_id"] = "op-v2"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        request["observed_head_revision"] = new_head
+        for i, (sid, before, path) in enumerate(
+            [
+                ("SRC-001", base, "src/auth.py"),
+                ("SRC-001", base, "src/batch.py"),
+                ("SRC-001", old_head, "src/batch.py"),
+                ("SRC-002", old_head, "src/batch.py"),
+            ],
+            start=3,
+        ):
+            changed = copy.deepcopy(snapshot["changes"][0])
+            changed.update(
+                id=f"DIF-{i:03d}",
+                source_id=sid,
+                before_revision=before,
+                after_revision=new_head,
+                locator=path,
+            )
+            snapshot["changes"].append(changed)
+        evidence[0].update(
+            head_sha=new_head,
+            previous_head_base_sha=old_head,
+        )
+        evidence[1].update(
+            base_sha=old_head,
+            head_sha=new_head,
+            previous_head_base_sha=old_head,
+        )
+        missing_primary = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="ambiguous owner",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(missing_primary["status"], "blocked", missing_primary)
+        self.assertIn("event_primary_source_ambiguous", missing_primary["reasons"])
+        snapshot["event_basis"]["primary_source_id"] = "SRC-001"
+        result = persist_snapshot(
+            self.store,
+            request,
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="shared SHA with independent source bases",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "stored", result)
+        self.assertEqual(result["analysis_status"], "complete")
+
     def test_two_independent_git_repositories_save_and_update(self) -> None:
         second_dir = tempfile.TemporaryDirectory()
         self.addCleanup(second_dir.cleanup)
