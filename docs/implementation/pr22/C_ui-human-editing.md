@@ -133,8 +133,9 @@ remote head `109a005c71f9b259e3529837bbe48c95b789bba7`の[Code Quality](https://
 1. **A / PR #22**：shared runtimeに`ui-target-analysis`を登録し、`review_ref`等を認証するowner verifier、Project Context Q06、保存先native CAS、revision history、独立readback、blocked/reopenを接続する。local helper requestの証拠文字列だけでは認証やexternal writeを許可しない。
 2. **B / PR #22**：実Project Context Q06 agreementと保存先権限、実feature artifact ref/revisionと明示feature-to-Scope mappingを渡す。fixture結果と実artifact横断結果を分けて記録する。
 3. **A / qa-workflow shared owner**：`README.md`は現在も`spec-analysis`のUI modeがpackageを作ると説明し、`skills/qa-workflow/SKILL.md`・`references/guidance.md`もUI package要求を`spec-analysis`へrouteしている。新Skill名のREADME登録もCIで必須。UI構造要求を`ui-target-analysis`へrouteし、仕様Authorityだけを`spec-analysis`に残すshared説明・trigger/isolated validationを更新する。Cでは共有範囲のため変更していない。
-4. **E / PR #22**：実UI package、Authority artifact、既存test-analysis／TC／E2E consumerを接続し、UI observationとcurrent Authority refの分離、changed scopeだけの下流staleness、legacy package読取を横断確認する。
-5. **PR #22**：全Skill同時のtrigger/routing、独立Judge評価、実provider経路、人間編集8ケースの統合経路、全CI、開発連動QA 15条件・QA全工程10条件・S1〜S17を統合branch上で判定する。PR #25のfixtureをowner実成果物の証拠に置換しない。
+4. **共有評価仕様owner / PR #22**：`EVALS.md`のfull-agent trigger対象一覧とsemantic責務表に`ui-target-analysis`がなく、`UI-SEM-001`〜`UI-SEM-006`の対応も未記載。共通文書へSkill・12/8 trigger dataset・4 semantic casesを登録し、全Skill同時利用時のtrigger rate（正例は`>0.5`、負例は`<0.5`）とcandidate outputsの独立Judge採点を実測する。shared fileのためCでは変更していない。検証条件はrepository eval structure、semantic dataset/runtime、trigger dataset、実Agentログの各結果を区別して記録すること。
+5. **E / PR #22**：実UI package、Authority artifact、既存test-analysis／TC／E2E consumerを接続し、UI observationとcurrent Authority refの分離、changed scopeだけの下流staleness、legacy package読取を横断確認する。
+6. **PR #22**：全Skill同時のtrigger/routing、独立Judge評価、実provider経路、人間編集8ケースの統合経路、全CI、開発連動QA 15条件・QA全工程10条件・S1〜S17を統合branch上で判定する。PR #25のfixtureをowner実成果物の証拠に置換しない。
 
 このbranchのcandidate semantic結果と独立fixture証拠は再利用可能だが、共有owner修正・実artifact接続・実trigger/remote CAS/owner authenticationの完了まではPR #25全体を統合完了として扱わない。
 
