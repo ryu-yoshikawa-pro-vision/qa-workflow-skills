@@ -292,6 +292,64 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertIsNone(reconciliation["results"][0]["tc_verdict"])
         self.assertEqual(artifact["attempts"][0]["result_collection"], "complete")
 
+    def test_component_native_jest_compatible_json_report(self):
+        report = {
+            "success": True,
+            "numTotalTests": 1,
+            "numPassedTests": 1,
+            "numFailedTests": 0,
+            "numPendingTests": 0,
+            "numTodoTests": 0,
+            "testResults": [
+                {
+                    "name": str(self.repo / "tests" / "native.test.tsx"),
+                    "status": "passed",
+                    "assertionResults": [
+                        {
+                            "ancestorTitles": ["", "Native component"],
+                            "title": "renders state",
+                            "status": "passed",
+                        }
+                    ],
+                }
+            ],
+        }
+        command = (
+            "import pathlib,sys;"
+            "pathlib.Path(sys.argv[1]).write_text("
+            + repr(json.dumps(report))
+            + ",encoding='utf-8')"
+        )
+        plan = self.plan(
+            [sys.executable, "-c", command, "{reporter_file}"],
+            kind="component",
+        )
+        plan.update(
+            {
+                "reporter_format": "jest-json",
+                "selected": [
+                    {
+                        "path": "tests/native.test.tsx",
+                        "title_path": ["Native component", "renders state"],
+                    }
+                ],
+                "testware_ref": "fixture:jest-component",
+                "testware_revision": self.sha,
+                "runner_version": "jest-fixture",
+                "selection_verified": True,
+                "selection_evidence_ref": "fixture:selection",
+                "planned_scope_ref": "fixture:scope",
+            }
+        )
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 0)
+        self.assertEqual(artifact["reporter_format"], "jest-json")
+        self.assertTrue(artifact["collection_verified"])
+        self.assertEqual(
+            artifact["attempts"][0]["reconciliation"]["selected_count"], 1
+        )
+        self.assertIsNone(artifact["tc_verdict"])
+
     def test_vitest_incorrect_totals_or_setup_failure_incomplete(self):
         report = {
             "success": False,
