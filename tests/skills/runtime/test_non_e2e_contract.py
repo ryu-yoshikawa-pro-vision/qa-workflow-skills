@@ -251,6 +251,18 @@ class OtherRunnerReportTests(unittest.TestCase):
         )
         self.assertTrue(result["collection_complete"])
         self.assertEqual(len(result["results"][0]["attempt_results"]), 2)
+        report["results"][0]["attempt_results"][1]["retry"] = 0
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_case_report(
+                selected=selected,
+                report=report,
+                source_revision="commit-1",
+                testware_revision="revision-1",
+                runner_version="fixture-runner",
+                raw_ref="run:raw",
+                selection_verified=True,
+            )
+        report["results"][0]["attempt_results"][1]["retry"] = 1
         self.assertIsNone(result["results"][0]["tc_verdict"])
         report["results"].pop()
         partial = contract.reconcile_case_report(
@@ -355,6 +367,17 @@ class OtherRunnerReportTests(unittest.TestCase):
         )
         self.assertTrue(result["collection_complete"])
         self.assertEqual(result["results"][0]["runner_status"], "flaky")
+        report["config"]["version"] = "another-playwright-version"
+        wrong_version = contract.reconcile_playwright(
+            selected=selected,
+            report=report,
+            source_revision="sha",
+            runner_version="fixture-playwright-1",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(wrong_version["collection_complete"])
+        report["config"]["version"] = "fixture-playwright-1"
         report["suites"][0]["suites"][0]["specs"][0]["tests"][0]["status"] = "expected"
         with self.assertRaises(contract.ContractError):
             contract.reconcile_playwright(
