@@ -30,7 +30,9 @@ class GitPublishTests(unittest.TestCase):
         self.remote = root / "remote.git"
         subprocess.run(["git", "init", "--bare", "-q", str(self.remote)], check=True)
         self.a = root / "writer-a"
-        subprocess.run(["git", "clone", "-q", str(self.remote), str(self.a)], check=True)
+        subprocess.run(
+            ["git", "clone", "-q", str(self.remote), str(self.a)], check=True
+        )
         git(self.a, "config", "user.name", "QA fixture")
         git(self.a, "config", "user.email", "qa@example.invalid")
         (self.a / "tests").mkdir()
@@ -58,9 +60,7 @@ class GitPublishTests(unittest.TestCase):
         git(repo, "commit", "-qm", "candidate")
         return git(repo, "rev-parse", "HEAD"), digest
 
-    def _publish(
-        self, repo: Path, base: str, candidate: str, file: str, digest: str
-    ):
+    def _publish(self, repo: Path, base: str, candidate: str, file: str, digest: str):
         return MODULE.publish(
             repo_path=repo,
             remote="origin",
@@ -77,23 +77,17 @@ class GitPublishTests(unittest.TestCase):
         published = self._publish(self.a, self.base, first, "tests/case.txt", digest)
         self.assertEqual(published["state"], "published_and_readback_verified")
         with self.assertRaisesRegex(MODULE.PublishError, "remote_branch_changed"):
-            self._publish(
-                self.b, self.base, second, "tests/case.txt", second_digest
-            )
+            self._publish(self.b, self.base, second, "tests/case.txt", second_digest)
         git(self.b, "fetch", "-q", "origin", "fixture")
         self.assertEqual(git(self.b, "rev-parse", "FETCH_HEAD"), first)
-        self.assertEqual(
-            git(self.b, "show", "FETCH_HEAD:tests/case.txt"), "first"
-        )
+        self.assertEqual(git(self.b, "show", "FETCH_HEAD:tests/case.txt"), "first")
 
     def test_independent_path_can_rebase_to_new_head_and_publish(self):
         first, digest = self._candidate(self.a, "tests/case.txt", "first\n")
         self._publish(self.a, self.base, first, "tests/case.txt", digest)
         git(self.b, "pull", "-q", "--ff-only", "origin", "fixture")
         second, other_digest = self._candidate(self.b, "tests/other.txt", "second\n")
-        result = self._publish(
-            self.b, first, second, "tests/other.txt", other_digest
-        )
+        result = self._publish(self.b, first, second, "tests/other.txt", other_digest)
         self.assertEqual(result["commit_sha"], second)
         self.assertEqual(git(self.b, "show", "HEAD:tests/case.txt"), "first")
 
@@ -110,14 +104,18 @@ class GitPublishTests(unittest.TestCase):
                 prior_content_hashes={"tests/case.txt": digest},
             )
         self.assertEqual(
-            git(self.a, "ls-remote", "--heads", "origin", "refs/heads/fixture").split()[0],
+            git(self.a, "ls-remote", "--heads", "origin", "refs/heads/fixture").split()[
+                0
+            ],
             self.base,
         )
 
     def test_wrong_base_digest_or_extra_diff_is_rejected(self):
         candidate, digest = self._candidate(self.a, "tests/case.txt", "new")
         with self.assertRaisesRegex(MODULE.PublishError, "changed_base_snapshot"):
-            self._publish(self.a, self.base, candidate, "tests/case.txt", "sha256:wrong")
+            self._publish(
+                self.a, self.base, candidate, "tests/case.txt", "sha256:wrong"
+            )
         with self.assertRaisesRegex(MODULE.PublishError, "incomplete_changed_paths"):
             self._publish(self.a, self.base, candidate, "tests/other.txt", digest)
 
