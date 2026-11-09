@@ -8,6 +8,7 @@ caller must inspect the full command/package-script/fixture chain beforehand.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import math
@@ -15,6 +16,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -229,12 +231,52 @@ def _git_clean(repo: Path) -> bool:
     return not proc.stdout.strip()
 
 
+def _enable_descendant_supervision() -> bool:
+    """Make escaped-session orphans observable in this dedicated Linux runner."""
+    if sys.platform != "linux" or not Path("/proc").is_dir():
+        return False
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        return libc.prctl(36, 1, 0, 0, 0) == 0  # PR_SET_CHILD_SUBREAPER
+    except (AttributeError, OSError):
+        return False
+
+
+def _adopted_children() -> dict[int, str] | None:
+    """Enumerate adopted children using procfs; None means proof unavailable."""
+    found: dict[int, str] = {}
+    try:
+        for item in Path("/proc").iterdir():
+            if not item.name.isdigit():
+                continue
+            try:
+                fields = (item / "stat").read_text(encoding="utf-8").rsplit(") ", 1)
+                if len(fields) != 2:
+                    return None
+                values = fields[1].split()
+                if int(values[1]) == os.getpid():
+                    found[int(item.name)] = values[0]
+            except FileNotFoundError:
+                continue
+        return found
+    except (OSError, ValueError, IndexError, UnicodeError):
+        return None
+
+
+def _reap_exited_children() -> None:
+    while True:
+        try:
+            pid, _ = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            break
+        if pid == 0:
+            break
+
+
 def _process_group_state(pid: int | None) -> str:
-    """Check the POSIX process group, not just the exited leader's PID."""
     if pid is None:
         return "not_started"
     if os.name != "posix":
-        # There is no portable stdlib API for verifying a Windows descendant tree.
         return "unverified"
     try:
         os.killpg(pid, 0)
@@ -243,6 +285,48 @@ def _process_group_state(pid: int | None) -> str:
     except OSError:
         return "unverified"
     return "lingering"
+
+
+def _quiesce_process_scope(pid: int | None, supervision: bool) -> str:
+    """Reap/stop original-group and adopted escaped-session descendants."""
+    if pid is None:
+        return "not_started"
+    if not supervision:
+        return "unverified"
+    _reap_exited_children()
+    adopted = _adopted_children()
+    group = _process_group_state(pid)
+    if adopted is None or group == "unverified":
+        return "lingering_unverified"
+    if group == "terminated" and not adopted:
+        return "terminated"
+    had_live = any(state != "Z" for state in adopted.values())
+    if group == "lingering":
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            return "lingering_unverified"
+        had_live = True
+    for child_pid, state in adopted.items():
+        if state == "Z":
+            continue
+        try:
+            os.kill(child_pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            return "lingering_unverified"
+    for _ in range(30):
+        _reap_exited_children()
+        remaining = _adopted_children()
+        if remaining is None:
+            return "lingering_unverified"
+        if not remaining and _process_group_state(pid) == "terminated":
+            return "lingering_terminated" if had_live else "terminated"
+        time.sleep(0.02)
+    return "lingering_unverified"
 
 
 def _terminate_group(proc: subprocess.Popen[Any]) -> None:
@@ -524,6 +608,11 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         raise RunnerError("invalid_attempt_count")
     if scope.get("side_effects") and attempts > 1:
         raise RunnerError("effect_retry_requires_state_readback")
+    # POSIX process groups alone cannot prove a detached child exited.
+    # Fail closed when this isolated runner cannot supervise all descendants.
+    supervision = _enable_descendant_supervision()
+    if not supervision:
+        raise RunnerError("process_supervision_unavailable")
     # Reject a forbidden destination *before* creating anything. This check
     # also resolves an existing symlink ancestor of a not-yet-created path.
     root = artifacts_root.resolve()
@@ -757,37 +846,41 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         except Exception as error:
             run["result_collection"] = "invalid"
             run["processing_error"] = type(error).__name__
+        # Verify the full execution scope before a cleanup can touch state.
+        run["process_tree_state"] = _quiesce_process_scope(
+            run["pid"], supervision
+        )
         if cleanup is not None and run["started"]:
-            try:
-                clean = _run_command(
-                    cleanup,
-                    repo,
-                    attempt / "cleanup.stdout.log",
-                    attempt / "cleanup.stderr.log",
-                    limit,
-                )
-                run["cleanup"] = clean
-                run["cleanup_state"] = (
-                    "success"
-                    if clean["started"]
-                    and not clean["timeout"]
-                    and not clean["interrupted"]
-                    and clean["return_code"] == 0
-                    else "failed_or_unknown"
-                )
-            except Exception as error:
+            if run["process_tree_state"] not in {
+                "terminated", "lingering_terminated"
+            }:
                 run["cleanup_state"] = "failed_or_unknown"
-                run["cleanup_error"] = type(error).__name__
-        run["process_tree_state"] = _process_group_state(run["pid"])
-        if run["process_tree_state"] == "lingering":
-            # Prevent an orphaned fixture from continuing after reporting
-            # success. Evidence remains blocked even when termination works.
-            try:
-                if os.name == "posix":
-                    os.killpg(run["pid"], signal.SIGKILL)
-                    run["process_tree_state"] = "lingering_terminated"
-            except OSError:
-                run["process_tree_state"] = "lingering_unverified"
+                run["cleanup_error"] = "descendants_not_quiescent_before_cleanup"
+            else:
+                try:
+                    clean = _run_command(
+                        cleanup,
+                        repo,
+                        attempt / "cleanup.stdout.log",
+                        attempt / "cleanup.stderr.log",
+                        limit,
+                    )
+                    clean["process_tree_state"] = _quiesce_process_scope(
+                        clean["pid"], supervision
+                    )
+                    run["cleanup"] = clean
+                    run["cleanup_state"] = (
+                        "success"
+                        if clean["started"]
+                        and not clean["timeout"]
+                        and not clean["interrupted"]
+                        and clean["return_code"] == 0
+                        and clean["process_tree_state"] == "terminated"
+                        else "failed_or_unknown"
+                    )
+                except Exception as error:
+                    run["cleanup_state"] = "failed_or_unknown"
+                    run["cleanup_error"] = type(error).__name__
         try:
             run["workspace_head_after_cleanup"] = _git_head(repo)
             run["workspace_state_after_cleanup"] = (
