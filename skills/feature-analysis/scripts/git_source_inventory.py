@@ -161,6 +161,15 @@ def analyze(request: Any) -> dict[str, Any]:
         _git(root, "cat-file", "-e", base + "^{commit}")
     files = _tree(_git(root, "ls-tree", "-r", "--full-tree", "-z", head))
     gitlinks = [row for row in files if row["kind"] == "commit"]
+    base_gitlinks = (
+        [
+            row
+            for row in _tree(_git(root, "ls-tree", "-r", "--full-tree", "-z", base))
+            if row["kind"] == "commit"
+        ]
+        if base is not None
+        else []
+    )
     changes = (
         _changes(
             _git(
@@ -178,18 +187,31 @@ def analyze(request: Any) -> dict[str, Any]:
         if base is not None
         else []
     )
+    touched = {
+        path for row in changes for path in (row["before_path"], row["after_path"])
+    }
+    head_links = {(row["path"], row["object_sha"]) for row in gitlinks}
+    # A removed or replaced submodule was also source material in the diff.
+    # Do not call the parent inventory complete without that old revision.
+    missing = {
+        f"gitlink:{row['path']}@{row['object_sha']}" for row in gitlinks
+    }
+    missing.update(
+        f"gitlink:{row['path']}@{row['object_sha']}"
+        for row in base_gitlinks
+        if row["path"] in touched
+        and (row["path"], row["object_sha"]) not in head_links
+    )
     return {
-        "status": "incomplete" if gitlinks else "complete",
+        "status": "incomplete" if missing else "complete",
         "repository_root": str(root),
         "base_sha": base,
         "head_sha": head,
         "files": files,
         "changes": changes,
-        "complete_file_listing": not gitlinks,
+        "complete_file_listing": not missing,
         "complete_change_listing": base is not None,
-        "unretrieved": [
-            f"gitlink:{row['path']}@{row['object_sha']}" for row in gitlinks
-        ],
+        "unretrieved": sorted(missing),
         "feature_count": None,
     }
 
