@@ -404,6 +404,150 @@ def placement(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
+    """Draft one approved placement decision and its Section 14 reference."""
+    markdown = _text(request.get("markdown"), "markdown")
+    _inspection(markdown, [])
+    if request.get("dec_asm_owner") != "project-context":
+        raise Invalid("dec_asm_owner_not_confirmed")
+    policy = request.get("policy")
+    if not isinstance(policy, dict):
+        raise Invalid("placement_policy_required")
+    required = (
+        "owner",
+        "scope",
+        "target_ref",
+        "revision",
+        "approval_ref",
+        "approval_revision",
+        "editable_scope",
+        "feature_index_ref",
+    )
+    if set(policy) != set(required):
+        raise Invalid("placement_policy_schema_invalid")
+    safe: dict[str, str] = {}
+    for key in required:
+        value = _single_line(policy[key], key)
+        if "|" in value or "<!--" in value or "-->" in value:
+            raise Invalid(f"unsafe_placement_field:{key}")
+        safe[key] = value
+    if safe["scope"] != _project_name(markdown):
+        raise Invalid("placement_project_scope_mismatch")
+    existing = request.get("existing_policy")
+    if existing is not None:
+        reused = placement(
+            {
+                "owner": safe["owner"],
+                "scope": safe["scope"],
+                "target_ref": safe["target_ref"],
+                "existing_policy": existing,
+            }
+        )
+        if reused["status"] == "reuse_candidate" and all(
+            existing.get(key) == safe[key] for key in required
+        ):
+            return reused
+    mode = "update"
+    revision = _text(request.get("expected_revision"), "expected_revision")
+    decision = {
+        "draft_key": "placement-policy",
+        "identity_action": "new",
+        "reuse_id": None,
+        "cells": {
+            "確定内容": "QA成果物配置・人間編集方針",
+            "状態": "有効",
+            "決定根拠": safe["approval_ref"],
+            "影響範囲": safe["scope"],
+            "関係": "独立",
+            "関連仕様根拠ID": "",
+            "置換先ID": "",
+            "備考": (
+                f"owner={safe['owner']}; target={safe['target_ref']}; "
+                f"policy={safe['revision']}; editable={safe['editable_scope']}; "
+                f"index={safe['feature_index_ref']}"
+            ),
+        },
+    }
+    previous_decisions = request.get("existing_decisions", [])
+    previous_assumptions = request.get("existing_assumptions", [])
+    if not isinstance(previous_decisions, list) or not isinstance(
+        previous_assumptions, list
+    ):
+        raise Invalid("existing_dec_asm_rows_invalid")
+    ids = prepare_ids(
+        {
+            "markdown": markdown,
+            "artifact_mode": mode,
+            "artifact_ref": request.get("artifact_ref"),
+            "expected_revision": revision,
+            "source_ref": request.get("source_ref"),
+            "source_revision": request.get("source_revision"),
+            "change_reason": request.get("change_reason"),
+            "dec_asm_owner": "project-context",
+            "decisions": [*previous_decisions, decision],
+            "assumptions": previous_assumptions,
+        }
+    )
+    if ids["status"] != "draft":
+        return ids
+    decision_id = next(
+        row["stable_id"]
+        for row in ids["allocated_ids"]
+        if row["draft_key"] == "placement-policy"
+    )
+    result = ids["artifact_markdown"]
+    lines = result.splitlines(keepends=True)
+    section_start = next(
+        (i for i, line in enumerate(lines) if line.startswith("## 14. ")), None
+    )
+    section_end = next(
+        (i for i, line in enumerate(lines) if line.startswith("## 15. ")), None
+    )
+    if section_start is None or section_end is None:
+        raise Invalid("section_14_missing")
+    header = "| 成果物 | 場所 | 範囲 | 鮮度 / バージョン | 備考 |"
+    locations = [
+        i for i in range(section_start, section_end) if lines[i].strip() == header
+    ]
+    if len(locations) != 1:
+        raise Invalid("section_14_table_invalid")
+    row = (
+        f"| QA成果物配置 | {safe['target_ref']} | {safe['scope']} | "
+        f"{safe['revision']} | {decision_id}; "
+        f"owner={safe['owner']}; edit={safe['editable_scope']}; "
+        f"index={safe['feature_index_ref']} |"
+    )
+    matching = [
+        i
+        for i in range(locations[0] + 2, section_end)
+        if lines[i].startswith("| QA成果物配置 |")
+        and f"| {safe['scope']} |" in lines[i]
+    ]
+    if len(matching) > 1:
+        raise Invalid("multiple_placement_references")
+    if matching:
+        lines[matching[0]] = row + "\n"
+    else:
+        lines.insert(locations[0] + 2, row + "\n")
+    candidate = "".join(lines)
+    _inspection(candidate, [])
+    return {
+        "status": "draft",
+        "artifact_mode": "update",
+        "artifact_ref": request["artifact_ref"],
+        "expected_revision": revision,
+        "artifact_markdown": candidate,
+        "decision_id": decision_id,
+        "policy_revision": safe["revision"],
+        "approval_ref": safe["approval_ref"],
+        "approval_revision": safe["approval_revision"],
+        "source_ref": request["source_ref"],
+        "source_revision": request["source_revision"],
+        "change_reason": request["change_reason"],
+        "reason": "trusted_approval_and_provider_cas_required",
+    }
+
+
 def persist_prepared(
     store: LocalArtifactStore,
     preparation: dict[str, Any],
@@ -420,9 +564,20 @@ def persist_prepared(
     """
     try:
         operation = preparation.get("operation")
-        if operation not in {"prepare-create", "prepare-update", "prepare-ids"}:
+        if operation not in {
+            "prepare-create",
+            "prepare-update",
+            "prepare-ids",
+            "prepare-placement",
+        }:
             raise Invalid("unsupported_persistence_operation")
         draft = handle(preparation)
+        if operation == "prepare-placement" and draft["status"] == "draft":
+            if (
+                draft["approval_ref"] != approval_ref
+                or draft["approval_revision"] != approval_revision
+            ):
+                raise Invalid("placement_approval_mismatch")
         if draft["status"] != "draft":
             return draft
         markdown = draft["artifact_markdown"]
@@ -475,6 +630,8 @@ def handle(request: Any) -> dict[str, Any]:
             return prepare_ids(request)
         if op == "placement":
             return placement(request)
+        if op == "prepare-placement":
+            return prepare_placement(request)
         raise Invalid("operation_invalid")
     except (Invalid, KeyError, ValueError, TypeError, RecursionError) as exc:
         return {"status": "blocked", "reason": str(exc)}
