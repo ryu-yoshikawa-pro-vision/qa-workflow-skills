@@ -125,18 +125,35 @@ class GitSourceInventoryTests(unittest.TestCase):
 
     def test_deleted_and_replaced_gitlink_revision_is_unretrieved(self) -> None:
         git(
-            self.root, "update-index", "--add", "--cacheinfo", "160000",
-            self.first, "vendor/submodule",
+            self.root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            self.first,
+            "vendor/submodule",
         )
         git(
-            self.root, "-c", "user.email=qa@example.invalid",
-            "-c", "user.name=QA", "commit", "-qm", "add submodule",
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "add submodule",
         )
         base = git(self.root, "rev-parse", "HEAD")
         git(self.root, "rm", "-q", "--cached", "vendor/submodule")
         git(
-            self.root, "-c", "user.email=qa@example.invalid",
-            "-c", "user.name=QA", "commit", "-qm", "remove submodule",
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "remove submodule",
         )
         removed = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
         self.assertEqual(removed["status"], "incomplete", removed)
@@ -147,11 +164,19 @@ class GitSourceInventoryTests(unittest.TestCase):
         # A normal file in place of the gitlink also needs the old revision.
         git(self.root, "reset", "--hard", "-q", base)
         (self.root / "vendor").mkdir(exist_ok=True)
-        (self.root / "vendor" / "submodule").write_text("ordinary file\n", encoding="utf-8")
+        (self.root / "vendor" / "submodule").write_text(
+            "ordinary file\n", encoding="utf-8"
+        )
         git(self.root, "add", "vendor/submodule")
         git(
-            self.root, "-c", "user.email=qa@example.invalid",
-            "-c", "user.name=QA", "commit", "-qm", "replace submodule",
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "replace submodule",
         )
         replaced = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
         self.assertEqual(replaced["status"], "incomplete", replaced)
