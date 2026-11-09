@@ -237,6 +237,102 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(result["handoff"]["unclassified_change_ids"], [])
         self.assertEqual(snap["changes"][0]["classification"], "unclassified")
 
+    def test_same_classification_can_correct_feature_scope_with_approval(self) -> None:
+        data = fixture()
+        prior = copy.deepcopy(data["snapshot"])
+        data["previous_snapshot"] = prior
+        continue_analysis(data)
+        snap = data["snapshot"]
+        snap["operation_id"] = "reclass-same-state"
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        other = copy.deepcopy(snap["features"][0])
+        other.update(id="FEAT-002", identity="independent endpoint", name="Endpoint")
+        snap["features"].append(other)
+        snap["history"].append(
+            {
+                "event_id": "event-2",
+                "kind": "added",
+                "revision": "head-v1",
+                "evidence_ref": "evidence/new-feature",
+                "from_ids": [],
+                "to_ids": ["FEAT-002"],
+            }
+        )
+        correction = copy.deepcopy(snap["changes"][0])
+        correction.update(
+            id="DIF-002",
+            supersedes_id="DIF-001",
+            classification="impact",
+            feature_ids=["FEAT-002"],
+            evidence_ref="review/new-feature-scope",
+            reason="Reassigned impact after source inspection",
+            approval_ref="approval/verified",
+            approval_revision="policy-v2",
+        )
+        snap["changes"].append(correction)
+        report = handle(data)
+        self.assertEqual(report["status"], "complete", report)
+        self.assertEqual(report["handoff"]["impacted_feature_ids"], ["FEAT-002"])
+
+    def test_legacy_duplicate_difs_can_be_migrated_without_data_loss(self) -> None:
+        data = fixture()
+        old = data["snapshot"]
+        duplicate = copy.deepcopy(old["changes"][0])
+        duplicate.update(id="DIF-002", classification="no_impact", feature_ids=[],
+                         approval_ref="approval/legacy", reason="Old alternate verdict")
+        old["changes"].append(duplicate)
+        previous = copy.deepcopy(old)
+        data["previous_snapshot"] = previous
+        continue_analysis(data)
+        old["operation_id"] = "op-legacy-migration"
+        old["artifact_revision"] = "art-v2"
+        old["previous_artifact_revision"] = "art-v1"
+        unresolved = handle(data)
+        self.assertEqual(unresolved["status"], "incomplete", unresolved)
+        self.assertTrue(
+            any(x.startswith("legacy_duplicate_active_change:") for x in unresolved["reasons"])
+        )
+        correction = copy.deepcopy(old["changes"][0])
+        correction.update(
+            id="DIF-003",
+            supersedes_ids=["DIF-001", "DIF-002"],
+            evidence_ref="review/legacy-merged",
+            reason="Reviewed and consolidated old conflicting verdicts",
+            approval_ref="approval/verified",
+            approval_revision="policy-v2",
+        )
+        old["changes"].append(correction)
+        merged = handle(data)
+        self.assertEqual(merged["status"], "complete", merged)
+        self.assertEqual(merged["handoff"]["impacted_feature_ids"], ["FEAT-001"])
+        self.assertEqual(len(old["changes"]), 3)
+        correction["supersedes_ids"] = ["DIF-001"]
+        self.assertEqual(handle(data)["status"], "blocked")
+        correction["supersedes_ids"] = ["DIF-001", "DIF-002"]
+        correction["locator"] = "other/path"
+        self.assertEqual(handle(data)["status"], "blocked")
+
+    def test_analysis_update_requires_all_source_revisions_unchanged(self) -> None:
+        data = fixture()
+        prior = copy.deepcopy(data["snapshot"])
+        secondary = copy.deepcopy(prior["sources"][0])
+        secondary.update(id="SRC-002", ref="product/other", revision="c" * 40)
+        prior["sources"].append(secondary)
+        prior["expected_source_ids"].append("SRC-002")
+        data["previous_snapshot"] = prior
+        data["snapshot"] = copy.deepcopy(prior)
+        continue_analysis(data)
+        snap = data["snapshot"]
+        snap["artifact_revision"] = "art-v2"
+        snap["previous_artifact_revision"] = "art-v1"
+        snap["operation_id"] = "op-v2"
+        self.assertEqual(handle(data)["status"], "complete")
+        snap["sources"][1]["revision"] = "d" * 40
+        blocked = handle(data)
+        self.assertEqual(blocked["status"], "blocked", blocked)
+        self.assertIn("analysis_update_source_revisions_changed", blocked["reasons"])
+
     def test_two_code_repositories_may_have_independent_head_revision(self) -> None:
         data = fixture()
         source = {
