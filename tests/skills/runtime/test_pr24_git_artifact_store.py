@@ -408,7 +408,7 @@ class GitArtifactStoreTests(unittest.TestCase):
             git_inventory_requests=evidence,
         )
         self.assertEqual(result["status"], "blocked", result)
-        self.assertIn("git_source_listing_incomplete", result["reasons"])
+        self.assertIn("git_head_changed", result["reasons"])
         self.assertIsNone(
             self.store.read_current(
                 "feature-inventory", "Sample", "qa/feature-inventory.json"
@@ -460,7 +460,10 @@ class GitArtifactStoreTests(unittest.TestCase):
             git_inventory_requests=evidence,
         )
         self.assertEqual(result["status"], "blocked", result)
-        self.assertIn("git_source_listing_incomplete", result["reasons"])
+        self.assertTrue(
+            any(reason.startswith("gitlink_source_evidence_missing:") for reason in result["reasons"]),
+            result,
+        )
 
     def _assert_merge_or_release_requires_saved_git_base(self, event: str) -> None:
         request, evidence = self._code_registry()
