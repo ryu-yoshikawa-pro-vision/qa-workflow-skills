@@ -599,6 +599,7 @@ def compare_direct(
         type(started) is not bool
         or not isinstance(expectations, list)
         or not expectations
+        or any(not isinstance(item, dict) for item in expectations)
     ):
         raise ContractError("invalid_direct_execution")
     if not isinstance(observations, dict):
