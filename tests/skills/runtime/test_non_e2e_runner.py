@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sys
 import tempfile
 import unittest
@@ -231,6 +233,39 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(artifact["outcome"], "observed_FAIL")
         self.assertEqual(artifact["tc_verdict"], "FAIL")
+        self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+
+    def test_real_local_http_status_200_with_wrong_body_fails(self):
+        class FixtureHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps({"ok": False}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FixtureHandler)
+        self.addCleanup(lambda: (server.shutdown(), server.server_close()))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        script = (
+            "import json,urllib.request;"
+            f"response=urllib.request.urlopen('http://127.0.0.1:{server.server_port}/',timeout=3);"
+            "print(json.dumps({'status':response.status,'body':json.load(response)}))"
+        )
+        plan = self.plan([sys.executable, "-c", script])
+        plan["direct_tc"] = True
+        plan["direct_expectations"] = [
+            {"id": "stdout_json", "expected": {"status": 200, "body": {"ok": True}}}
+        ]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["tc_verdict"], "FAIL")
+        self.assertEqual(artifact["outcome"], "observed_FAIL")
         self.assertEqual(artifact["attempts"][0]["return_code"], 0)
 
     def test_direct_missing_side_effect_observation_is_unknown(self):
