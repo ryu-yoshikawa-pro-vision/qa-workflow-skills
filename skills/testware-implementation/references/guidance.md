@@ -23,7 +23,6 @@
 
 既存E2E側の同時編集と変更反映の保証は詳細Plan 05に従うが、共有e2e-test-implementationの編集ownerとの照合を要するため、このSkillの安全検査だけで全体保証としない。
 
-
 ## 隔離commitの変更確定
 
 `snapshot_guard.py` は共有先への反映前検査であり、書込みの原子性を保証しない。共有branchに対する変更確定には、既存Git remoteを使う `python skills/testware-implementation/scripts/publish_git.py --plan /path/to/publish-plan.json --publish` を使用できる。これ以外のproviderの保存をGit push成功で代用しない。
