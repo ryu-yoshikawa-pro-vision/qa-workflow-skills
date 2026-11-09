@@ -58,5 +58,9 @@
   {
     "query": "静的解析ツールを実際に起動しlintのrawログを保存して。",
     "should_trigger": false
+  },
+  {
+    "query": "既存のAPI-onlyテストの実runnerを起動して取得したJSONレポートを保存してください。",
+    "should_trigger": false
   }
 ]
