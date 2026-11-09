@@ -116,9 +116,7 @@ class GitArtifactStoreTests(unittest.TestCase):
                 "operation": "prepare-create",
                 "project_name": "Sample",
                 "enumeration_complete": True,
-                "candidates": [
-                    {"ref": "docs/PROJECT_CONTEXT.md", "status": "absent"}
-                ],
+                "candidates": [{"ref": "docs/PROJECT_CONTEXT.md", "status": "absent"}],
             }
         )
         self.assertEqual(initial["status"], "draft")
@@ -158,7 +156,9 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(
             self.store.read_revision(
-                "project-context", "Sample", "docs/PROJECT_CONTEXT.md",
+                "project-context",
+                "Sample",
+                "docs/PROJECT_CONTEXT.md",
                 before["revision"],
             )["content"],
             before["content"],

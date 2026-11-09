@@ -447,10 +447,21 @@ class ProjectContextOwnerTests(unittest.TestCase):
         updated = handle(request)
         self.assertEqual(updated["status"], "draft", updated)
         self.assertEqual(updated["decision_id"], "DEC-002")
-        self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |", updated["artifact_markdown"])
-        self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", updated["artifact_markdown"])
-        self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み | approval/verified | Sample | 独立 |  | DEC-002 |", updated["artifact_markdown"])
-        self.assertIn("| QA成果物配置 | qa/new-artifacts | Sample |", updated["artifact_markdown"])
+        self.assertIn(
+            "| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |",
+            updated["artifact_markdown"],
+        )
+        self.assertIn(
+            "| DEC-002 | QA成果物配置・人間編集方針 | 有効 |",
+            updated["artifact_markdown"],
+        )
+        self.assertIn(
+            "| DEC-001 | QA成果物配置・人間編集方針 | 置換済み | approval/verified | Sample | 独立 |  | DEC-002 |",
+            updated["artifact_markdown"],
+        )
+        self.assertIn(
+            "| QA成果物配置 | qa/new-artifacts | Sample |", updated["artifact_markdown"]
+        )
         self.assertEqual(
             handle(
                 {

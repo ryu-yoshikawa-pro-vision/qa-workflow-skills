@@ -190,7 +190,9 @@ class GitArtifactStore:
             raise StoreError("revision_invalid")
         self._permission("read", kind, project_ref, path, revision)
         head = self._head()
-        reachable = self._git("merge-base", "--is-ancestor", sha, head, allow_failure=True)
+        reachable = self._git(
+            "merge-base", "--is-ancestor", sha, head, allow_failure=True
+        )
         if reachable is None:
             raise StoreError("revision_not_in_authorized_history")
         return self._read_at(kind, project_ref, path, sha)
@@ -225,8 +227,13 @@ class GitArtifactStore:
         digest = hashlib.sha256(raw).hexdigest()
         head = self._head()
         self._permission(
-            "write", kind, project_ref, path, expected_revision,
-            approval_ref=approval_ref, digest=digest,
+            "write",
+            kind,
+            project_ref,
+            path,
+            expected_revision,
+            approval_ref=approval_ref,
+            digest=digest,
         )
         current = self._read_at(kind, project_ref, path, head)
         same_operation = False
@@ -291,7 +298,12 @@ class GitArtifactStore:
             index = Path(folder) / "index"
             self._git("read-tree", head, index=index)
             self._git(
-                "update-index", "--add", "--cacheinfo", "100644", blob_sha, path,
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "100644",
+                blob_sha,
+                path,
                 index=index,
             )
             tree = self._git("write-tree", index=index)
@@ -314,13 +326,15 @@ class GitArtifactStore:
         new_sha = commit_raw.decode("ascii").strip()
         if not COMMIT.fullmatch(new_sha):
             raise StoreError("git_commit_invalid")
-        updated = self._git(
-            "update-ref", self.ref, new_sha, head, allow_failure=True
-        )
+        updated = self._git("update-ref", self.ref, new_sha, head, allow_failure=True)
         if updated is None:
             raise StoreError("revision_conflict")
         history = self.read_revision(kind, project_ref, path, "git:" + new_sha)
-        if history is None or history["content"] != content or history["sha256"] != digest:
+        if (
+            history is None
+            or history["content"] != content
+            or history["sha256"] != digest
+        ):
             raise StoreError("independent_readback_mismatch")
         return {
             "status": "stored",

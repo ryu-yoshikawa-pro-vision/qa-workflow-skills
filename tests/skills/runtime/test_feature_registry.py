@@ -336,9 +336,7 @@ class FeatureRegistryTests(unittest.TestCase):
         data["snapshot"]["artifact_revision"] = "art-v2"
         data["snapshot"]["previous_artifact_revision"] = "art-v1"
         self.assertEqual(handle(data)["status"], "blocked")
-        self.assertIn(
-            "initial_event_with_previous_snapshot", handle(data)["reasons"]
-        )
+        self.assertIn("initial_event_with_previous_snapshot", handle(data)["reasons"])
         continue_analysis(data)
         self.assertEqual(handle(data)["status"], "complete")
 

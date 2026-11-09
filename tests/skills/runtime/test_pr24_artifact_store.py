@@ -109,7 +109,11 @@ class ArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(self.write()["status"], "stored")
         self.assertEqual(
-            next(item["sha256"] for item in self.approvals if item["operation"] == "write"),
+            next(
+                item["sha256"]
+                for item in self.approvals
+                if item["operation"] == "write"
+            ),
             self.write()["sha256"],
         )
 
@@ -119,14 +123,10 @@ class ArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(StoreError, "access_denied"):
             self.store.read_current("project-context", "Other", "artifact.md")
         with self.assertRaisesRegex(StoreError, "access_denied"):
-            self.store.read_revision(
-                "project-context", "Other", "artifact.md", "r1"
-            )
+            self.store.read_revision("project-context", "Other", "artifact.md", "r1")
         self.allowed = False
         with self.assertRaisesRegex(StoreError, "access_denied"):
-            self.store.read_revision(
-                "project-context", "Sample", "artifact.md", "r1"
-            )
+            self.store.read_revision("project-context", "Sample", "artifact.md", "r1")
         with self.assertRaisesRegex(StoreError, "access_denied"):
             self.write()
         self.allowed = True
@@ -440,9 +440,9 @@ class ArtifactStoreTests(unittest.TestCase):
             approval_revision="policy-v1",
         )
         self.assertEqual(stored["status"], "stored")
-        previous = self.store.read_current(
-            "project-context", "Sample", "context.md"
-        )["content"]
+        previous = self.store.read_current("project-context", "Sample", "context.md")[
+            "content"
+        ]
         prior_decision = {
             "draft_key": None,
             "identity_action": "reuse",
@@ -484,9 +484,9 @@ class ArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(changed["status"], "stored", changed)
         self.assertEqual(changed["revision"], "r3")
-        current = self.store.read_current(
-            "project-context", "Sample", "context.md"
-        )["content"]
+        current = self.store.read_current("project-context", "Sample", "context.md")[
+            "content"
+        ]
         self.assertIn("| DEC-001 | QA成果物配置・人間編集方針 | 置換済み |", current)
         self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", current)
         self.assertIn("| QA成果物配置 | qa/new | Sample |", current)

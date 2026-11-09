@@ -272,7 +272,10 @@ def prepare_create(request: dict[str, Any]) -> dict[str, Any]:
             "discovery": discovery,
         }
     artifact_ref = request.get("artifact_ref")
-    if artifact_ref is not None and artifact_ref not in discovery["authorized_candidate_refs"]:
+    if (
+        artifact_ref is not None
+        and artifact_ref not in discovery["authorized_candidate_refs"]
+    ):
         raise Invalid("artifact_ref_absence_not_confirmed")
     template = TEMPLATE.read_text(encoding="utf-8")
     if len(PROJECT.findall(template)) != 1:
@@ -505,9 +508,7 @@ def _placement_reference(markdown: str, scope: str) -> str | None:
     lines = markdown.splitlines()
     start = next(
         (i for i, line in enumerate(lines) if line.startswith("## 14. ")), None
-    )
-    end = next(
-        (i for i, line in enumerate(lines) if line.startswith("## 15. ")), None
+
     )
     if start is None or end is None:
         raise Invalid("section_14_missing")
@@ -657,8 +658,7 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         if ids["status"] != "draft":
             return ids
         if not any(
-            row["draft_key"] == "placement-policy"
-            and row["stable_id"] == decision_id
+            row["draft_key"] == "placement-policy" and row["stable_id"] == decision_id
             for row in ids["allocated_ids"]
         ):
             raise Invalid("placement_decision_id_changed")
