@@ -17,7 +17,7 @@ Do not start for product feature discovery alone (`feature-analysis`), UI struct
 
 ## Required work
 
-1. Read the current `feature-inventory-v1` from `feature-analysis`, preserving its project, artifact, stored revision, source revision, and snapshot hash. Accept an incomplete inventory for local candidate analysis, but keep its boundary incomplete. Reject stale or blocked input.
+1. Read the exact B snapshot and its separate `feature_registry.analyze()` report as `{ "snapshot": ..., "analysis": ... }`. Preserve project/artifact refs, artifact and source revisions, snapshot hash, source inventory, feature IDs, and unknown areas. Accept `incomplete` only as incomplete input; reject `stale`, `blocked`, `idempotent`, mismatched, or malformed results. Do not replace B's validator.
 2. Read the prior `test-item-candidates-v1` artifact and its provider revision when one exists. Never use a path, name, test level, or display title as an item ID.
 3. Identify candidate items from their evidence. Keep UI, API, batch, component, event, integration, data, security, and nonfunctional targets in scope where supported. Reuse one stable item ID across test levels.
 4. Decide identity from meaning and evidence. Reuse an active ID only when the candidate is the same item. A split or merge creates new IDs with explicit relation history; retire old IDs only through an explicit retirement with evidence. Names are not identity: same-name items may remain separate, and differently named items are not silently merged.
@@ -25,6 +25,8 @@ Do not start for product feature discovery alone (`feature-analysis`), UI struct
 6. Use `scripts/item_candidates.py` for deterministic allocation and contract checks. The helper creates only a candidate payload and precondition; it does not write an artifact or prove provider CAS, authorization, approval, or readback.
 7. Report uncovered known feature candidates and source uncertainty separately. Only calculate feature-to-item candidate identification over a complete, nonempty, current feature inventory. Do not turn unknown scope, stale items, or a zero denominator into 100%.
 8. Hand `ITEM-*` refs, candidate revision fingerprint, source refs/revisions, validator evidence, gaps, and unknowns to `test-condition-analysis` and `test-condition-design`. Candidate correspondence is advisory; do not decide item-condition applicability, formal coverage, expected results, or execution.
+
+Older v1 artifacts without `feature_inventory_context` remain readable and retain their IDs/history. They cannot establish a complete source population in crosscheck; the next successful materialization adds current B context without rewriting prior events.
 
 ## Save and resume
 

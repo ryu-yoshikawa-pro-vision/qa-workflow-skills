@@ -8,17 +8,22 @@ import sys
 from typing import Any
 
 from candidate_support import (
+    EVENT_ID,
     ContractError,
+    active_source_refs,
     canonical_bytes,
     feature_inventory,
     fingerprint,
     make_result,
+    operation_claim_details,
     source_key,
     source_ref,
     source_refs,
     strict_loads,
     string_list,
     text,
+    validate_feature_inventory_context,
+    validate_history_event_ids,
 )
 
 SCHEMA = "test-condition-candidates-v1"
@@ -126,6 +131,7 @@ def _history_event(
     reason: str,
     related: list[str],
     evidence: list[dict[str, str]],
+    history: list[dict[str, Any]],
 ) -> dict[str, Any]:
     event = {
         "condition_id": condition_id,
@@ -134,7 +140,17 @@ def _history_event(
         "related_condition_ids": sorted(set(related)),
         "evidence_refs": sorted(evidence, key=source_key),
     }
-    event["event_id"] = fingerprint(event)
+    event["event_id"] = fingerprint(
+        {
+            "event": event,
+            "sequence": len(history),
+            "previous_event_id": history[-1]["event_id"] if history else None,
+        }
+    )
+    if event["event_id"] in {row["event_id"] for row in history}:
+        raise ContractError(
+            "history_event_id_collision", "history event ID is already allocated"
+        )
     return event
 
 
@@ -145,6 +161,7 @@ def validate_artifact(value: Any) -> dict[str, Any]:
         "scope",
         "artifact_ref",
         "feature_inventory_ref",
+        "feature_inventory_context",
         "feature_population",
         "source_boundary_complete",
         "source_refs",
@@ -155,7 +172,11 @@ def validate_artifact(value: Any) -> dict[str, Any]:
         "history",
         "content_fingerprint",
     }
-    if not isinstance(value, dict) or set(value) != required:
+    legacy_required = required - {"feature_inventory_context"}
+    if not isinstance(value, dict) or frozenset(value) not in {
+        frozenset(required),
+        frozenset(legacy_required),
+    }:
         raise ContractError(
             "condition_artifact_schema", "condition artifact fields do not match v1"
         )
@@ -188,7 +209,12 @@ def validate_artifact(value: Any) -> dict[str, Any]:
                 "feature_population_invalid",
                 "feature population IDs must be unique FEAT IDs",
             )
-        if row["status"] not in {"planned", "implemented", "retired", "unknown"}:
+        if not isinstance(row["status"], str) or row["status"] not in {
+            "planned",
+            "implemented",
+            "retired",
+            "unknown",
+        }:
             raise ContractError(
                 "feature_population_invalid", "feature status is invalid"
             )
@@ -198,19 +224,34 @@ def validate_artifact(value: Any) -> dict[str, Any]:
             "source_boundary_invalid", "source_boundary_complete must be boolean"
         )
     all_sources = source_refs(value["source_refs"])
-    active_sources = source_refs(value["active_source_refs"])
+    active_sources = active_source_refs(value["active_source_refs"])
+    if any(ref["scope"] != value["scope"] for ref in all_sources):
+        raise ContractError(
+            "condition_source_scope_mismatch",
+            "source refs must use the artifact scope",
+        )
     all_source_keys = {source_key(ref) for ref in all_sources}
     if any(source_key(ref) not in all_source_keys for ref in active_sources):
         raise ContractError(
             "active_source_missing", "active source refs must exist in source_refs"
         )
     feature_ref = source_ref(value["feature_inventory_ref"], "feature_inventory_ref")
-    if feature_ref["owner"] != "feature-analysis" or source_key(feature_ref) not in {
-        source_key(row) for row in active_sources
-    }:
+    if (
+        feature_ref["owner"] != "feature-analysis"
+        or feature_ref["scope"] != value["scope"]
+        or source_key(feature_ref) not in {source_key(row) for row in active_sources}
+    ):
         raise ContractError(
             "feature_inventory_ref_invalid",
             "feature inventory ref must be a current source",
+        )
+    if "feature_inventory_context" in value:
+        validate_feature_inventory_context(
+            value["feature_inventory_context"],
+            scope=value["scope"],
+            feature_ref_value=feature_ref,
+            feature_population=population,
+            source_boundary_complete=value["source_boundary_complete"],
         )
     conditions = value["conditions"]
     if not isinstance(conditions, list):
@@ -228,7 +269,12 @@ def validate_artifact(value: Any) -> dict[str, Any]:
         ids.add(condition_id)
         text(row["name"], f"{condition_id}.name")
         text(row["intent"], f"{condition_id}.intent")
-        if row["kind"] not in CONDITION_KINDS or row["candidate_state"] not in STATUSES:
+        if (
+            not isinstance(row["kind"], str)
+            or row["kind"] not in CONDITION_KINDS
+            or not isinstance(row["candidate_state"], str)
+            or row["candidate_state"] not in STATUSES
+        ):
             raise ContractError(
                 "condition_classification_invalid",
                 f"{condition_id} kind or state is invalid",
@@ -307,10 +353,19 @@ def validate_artifact(value: Any) -> dict[str, Any]:
                 "condition_unknown_reason_required",
                 f"{condition_id} requires an explicit unknown or blocker",
             )
-        if row["currentness"] not in {"current", "stale", "unknown"}:
+        if not isinstance(row["currentness"], str) or row["currentness"] not in {
+            "current",
+            "stale",
+            "unknown",
+        }:
             raise ContractError(
                 "condition_currentness_invalid",
                 f"{condition_id} currentness is invalid",
+            )
+        if row["currentness"] != _currentness(evidence, active_sources):
+            raise ContractError(
+                "condition_currentness_mismatch",
+                f"{condition_id} currentness contradicts its evidence",
             )
     history_ids = string_list(value["id_history"], "id_history")
     if history_ids != sorted(history_ids) or any(
@@ -342,7 +397,11 @@ def validate_artifact(value: Any) -> dict[str, Any]:
             )
         event_id = text(event["event_id"], "history.event_id")
         condition_id = text(event["condition_id"], "history.condition_id")
-        if event_id in seen_events or not CONDITION_ID.fullmatch(condition_id):
+        if (
+            event_id in seen_events
+            or not EVENT_ID.fullmatch(event_id)
+            or not CONDITION_ID.fullmatch(condition_id)
+        ):
             raise ContractError(
                 "condition_history_invalid",
                 "history event is duplicated or has an invalid ID",
@@ -373,10 +432,28 @@ def validate_artifact(value: Any) -> dict[str, Any]:
             raise ContractError(
                 "condition_history_invalid", "history evidence ref is missing"
             )
+    validate_history_event_ids(history)
     if set(history_ids) != observed_history_ids:
         raise ContractError(
             "condition_history_incomplete",
             "each allocated ID must have retained history",
+        )
+    if any(
+        not set(event["related_condition_ids"]).issubset(history_ids)
+        for event in history
+    ):
+        raise ContractError(
+            "condition_history_invalid", "history refers to an unallocated condition ID"
+        )
+    retired_ids = {
+        event["condition_id"] for event in history if event["action"] == "retired"
+    }
+    if any(
+        condition_id not in retired_ids for condition_id in set(history_ids) - ids
+    ) or any(condition_id in retired_ids for condition_id in ids):
+        raise ContractError(
+            "condition_retirement_history_mismatch",
+            "retired condition state and history differ",
         )
     if value["content_fingerprint"] != fingerprint(_core(value)):
         raise ContractError(
@@ -439,7 +516,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         raise ContractError(
             "scope_mismatch", "feature inventory project_ref does not match scope"
         )
-    current_sources = source_refs(request["source_refs"])
+    current_sources = active_source_refs(request["source_refs"])
     feature_source = source_ref(inventory["feature_source_ref"])
     if source_key(feature_source) not in {source_key(ref) for ref in current_sources}:
         raise ContractError(
@@ -521,7 +598,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     for row in candidates:
         action = row.get("identity_action")
         key = text(row.get("candidate_key"), "candidate_key")
-        if action not in IDENTITY_ACTIONS:
+        if not isinstance(action, str) or action not in IDENTITY_ACTIONS:
             raise ContractError(
                 "identity_action_invalid",
                 "identity_action must be new, reuse, split, or merge",
@@ -601,7 +678,12 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         intent = text(row.get("intent"), "candidate.intent")
         kind = row.get("kind")
         state = row.get("candidate_state")
-        if kind not in CONDITION_KINDS or state not in STATUSES - {"retired"}:
+        if (
+            not isinstance(kind, str)
+            or kind not in CONDITION_KINDS
+            or not isinstance(state, str)
+            or state not in STATUSES - {"retired"}
+        ):
             raise ContractError(
                 "condition_classification_invalid", "candidate kind or state is invalid"
             )
@@ -683,11 +765,15 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 action
             ]
             events.append(
-                _history_event(condition_id, event_action, reason, related, evidence)
+                _history_event(
+                    condition_id, event_action, reason, related, evidence, events
+                )
             )
             changed_ids.add(condition_id)
         elif old != updated:
-            events.append(_history_event(condition_id, "updated", reason, [], evidence))
+            events.append(
+                _history_event(condition_id, "updated", reason, [], evidence, events)
+            )
             changed_ids.add(condition_id)
         conditions[condition_id] = updated
     for retirement in request["retirements"]:
@@ -718,7 +804,9 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             )
         reason = text(retirement["reason"], "retirement.reason")
         conditions.pop(condition_id)
-        events.append(_history_event(condition_id, "retired", reason, [], evidence))
+        events.append(
+            _history_event(condition_id, "retired", reason, [], evidence, events)
+        )
         changed_ids.add(condition_id)
 
     unretired_merge_sources = sorted(
@@ -730,32 +818,43 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "merge source conditions must be explicitly retired in the same update",
         )
     active_by_identity = {_source_identity(ref): ref for ref in current_sources}
+    previous_active_by_identity = (
+        {_source_identity(ref): ref for ref in previous["active_source_refs"]}
+        if previous
+        else {}
+    )
     for condition_id, condition in conditions.items():
         if condition_id in changed_ids:
             continue
-        old_state = condition["currentness"]
         currentness = _currentness(condition["evidence_refs"], current_sources)
         condition["currentness"] = currentness
-        if old_state != "stale" and currentness == "stale":
+        if currentness == "stale":
             changed_source = next(
                 (
                     active_by_identity.get(_source_identity(ref))
                     for ref in condition["evidence_refs"]
                     if _source_identity(ref) in active_by_identity
+                    and _source_identity(ref) in previous_active_by_identity
+                    and not _same_source(
+                        previous_active_by_identity[_source_identity(ref)],
+                        active_by_identity[_source_identity(ref)],
+                    )
                     and not _same_source(active_by_identity[_source_identity(ref)], ref)
                 ),
                 None,
             )
-            events.append(
-                _history_event(
-                    condition_id,
-                    "source_changed",
-                    "evidence source revision changed; revalidation is required",
-                    [],
-                    [changed_source] if changed_source else current_sources,
+            if changed_source is not None:
+                events.append(
+                    _history_event(
+                        condition_id,
+                        "source_changed",
+                        "evidence source revision changed; revalidation is required",
+                        [],
+                        [changed_source],
+                        events,
+                    )
                 )
-            )
-            changed_ids.add(condition_id)
+                changed_ids.add(condition_id)
     all_sources = _source_union(all_sources_before, current_sources)
     feature_population = [
         {
@@ -770,8 +869,9 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         "scope": scope,
         "artifact_ref": artifact_ref,
         "feature_inventory_ref": feature_source,
+        "feature_inventory_context": inventory["feature_inventory_context"],
         "feature_population": feature_population,
-        "source_boundary_complete": inventory["boundary_complete"],
+        "source_boundary_complete": inventory["source_boundary_complete"],
         "source_refs": all_sources,
         "active_source_refs": current_sources,
         "previous_artifact_revision": request["current_revision"],
@@ -820,7 +920,10 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     )
     status = (
         "candidate_ready_unpersisted"
-        if not stale and not unknown and inventory["boundary_complete"]
+        if not stale
+        and not unknown
+        and inventory["source_boundary_complete"]
+        and inventory["analysis_complete"]
         else "incomplete"
     )
     issues = []
@@ -839,11 +942,19 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
-    if not inventory["boundary_complete"]:
+    if not inventory["source_boundary_complete"]:
         issues.append(
             _issue(
                 "feature_population_incomplete",
                 "feature population is partial or unknown",
+                blocking=False,
+            )
+        )
+    if not inventory["analysis_complete"]:
+        issues.append(
+            _issue(
+                "upstream_analysis_incomplete",
+                "feature analysis has unresolved findings",
                 blocking=False,
             )
         )
@@ -869,6 +980,15 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "requires_independent_readback": True,
             "provider_selected": False,
             "approval_state": "not_resolved_by_candidate_helper",
+            "operation_claim_details": operation_claim_details(
+                owner=OWNER,
+                scope=scope,
+                artifact_ref=artifact_ref,
+                source_refs_value=current_sources,
+                expected_revision=request["expected_revision"],
+                approval_ref=approval_ref,
+                permission_scope=required_permission,
+            ),
         },
     )
 
@@ -943,7 +1063,7 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ContractError("request_schema", "impact request fields do not match v1")
     artifact = validate_artifact(request["artifact"])
-    active = source_refs(request["current_source_refs"])
+    active = active_source_refs(request["current_source_refs"])
     stale: list[str] = []
     unknown: list[str] = []
     for condition in artifact["conditions"]:
@@ -1010,26 +1130,104 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
             "feature_revision_mismatch",
             "item and condition artifacts must use the same feature inventory revision",
         )
-    item_by_id = {row["item_id"]: row for row in item_artifact["items"]}
-    condition_by_id = {
-        row["condition_id"]: row for row in condition_artifact["conditions"]
-    }
-    for condition in condition_by_id.values():
-        if any(item_ref not in item_by_id for item_ref in condition["item_refs"]):
-            raise ContractError(
-                "condition_item_ref_unknown",
-                "condition item_refs must resolve to this item artifact",
-            )
+    item_context = item_artifact.get("feature_inventory_context")
+    condition_context = condition_artifact.get("feature_inventory_context")
+    if (
+        item_context is not None
+        and condition_context is not None
+        and item_context != condition_context
+    ):
+        raise ContractError(
+            "feature_inventory_context_mismatch",
+            "item and condition artifacts must preserve the same B snapshot handoff",
+        )
+    if item_artifact["feature_population"] != condition_artifact["feature_population"]:
+        raise ContractError(
+            "feature_population_mismatch",
+            "item and condition artifacts must preserve the same feature population",
+        )
     if not isinstance(request["candidate_pairs"], list):
         raise ContractError(
             "candidate_pairs_invalid", "candidate_pairs must be an array"
         )
-    pair_rows: list[dict[str, str]] = []
-    seen_pairs: set[tuple[str, str]] = set()
-    shared_sources = {
+
+    item_by_id = {row["item_id"]: row for row in item_artifact["items"]}
+    condition_by_id = {
+        row["condition_id"]: row for row in condition_artifact["conditions"]
+    }
+    item_history = set(item_artifact["id_history"])
+    condition_history = set(condition_artifact["id_history"])
+    retired_item_ids = sorted(
+        (item_history - set(item_by_id))
+        | {item_id for item_id, row in item_by_id.items() if row["status"] == "retired"}
+    )
+    retired_condition_ids = sorted(condition_history - set(condition_by_id))
+
+    active_sources_by_identity: dict[tuple[str, str, str], dict[str, str]] = {}
+    for ref in (
+        item_artifact["active_source_refs"] + condition_artifact["active_source_refs"]
+    ):
+        identity = _source_identity(ref)
+        old = active_sources_by_identity.get(identity)
+        if old is not None and source_key(old) != source_key(ref):
+            raise ContractError(
+                "crosscheck_source_revision_mismatch",
+                "item and condition artifacts use competing revisions of one source",
+            )
+        active_sources_by_identity[identity] = ref
+    active_sources = sorted(active_sources_by_identity.values(), key=source_key)
+    all_source_keys = {
         source_key(ref)
         for ref in item_artifact["source_refs"] + condition_artifact["source_refs"]
     }
+
+    unresolved_item_refs: list[dict[str, Any]] = []
+    unresolved_condition_refs: list[dict[str, Any]] = []
+    recheck_item_ids: set[str] = set()
+    recheck_condition_ids: set[str] = set()
+
+    def item_reference_reason(item_id: str) -> str | None:
+        row = item_by_id.get(item_id)
+        if row is not None and row["status"] == "retired":
+            return "item_retired"
+        if row is not None and row["status"] == "unknown":
+            return "item_unconfirmed"
+        if row is not None and row["currentness"] == "stale":
+            return "item_stale"
+        if row is not None and row["currentness"] == "unknown":
+            return "item_currentness_unknown"
+        if row is not None:
+            return None
+        if item_id in item_history:
+            return "item_retired"
+        return "item_not_found"
+
+    def condition_reference_reason(condition_id: str) -> str | None:
+        if condition_id in condition_by_id:
+            return None
+        if condition_id in condition_history:
+            return "condition_retired"
+        return "condition_not_found"
+
+    for condition in condition_by_id.values():
+        for item_id in condition["item_refs"]:
+            reason = item_reference_reason(item_id)
+            if reason is not None:
+                unresolved_item_refs.append(
+                    {
+                        "origin": "condition_item_refs",
+                        "condition_id": condition["condition_id"],
+                        "item_id": item_id,
+                        "reason": reason,
+                        "state": "unconfirmed",
+                    }
+                )
+                recheck_condition_ids.add(condition["condition_id"])
+                recheck_item_ids.add(item_id)
+
+    pair_rows: list[dict[str, Any]] = []
+    candidate_pair_inconsistencies: list[dict[str, Any]] = []
+    seen_pairs: set[tuple[str, str]] = set()
     for index, pair in enumerate(request["candidate_pairs"]):
         expected = {"item_id", "condition_id", "status", "rationale", "evidence_refs"}
         if not isinstance(pair, dict) or set(pair) != expected:
@@ -1038,153 +1236,367 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
             )
         item_id = text(pair["item_id"], "candidate_pair.item_id")
         condition_id = text(pair["condition_id"], "candidate_pair.condition_id")
-        if item_id not in item_by_id or item_by_id[item_id]["status"] == "retired":
+        if not ITEM_ID.fullmatch(item_id):
             raise ContractError(
-                "candidate_pair_item_missing",
-                f"candidate pair item is missing or retired: {item_id}",
+                "candidate_pair_item_id_invalid", "candidate item ID format is invalid"
             )
-        if condition_id not in condition_by_id:
+        if not CONDITION_ID.fullmatch(condition_id):
             raise ContractError(
-                "candidate_pair_condition_missing",
-                f"candidate pair condition is missing or retired: {condition_id}",
+                "candidate_pair_condition_id_invalid",
+                "candidate condition ID format is invalid",
             )
-        if pair["status"] not in {"proposed", "unconfirmed", "blocked"}:
+        status = pair["status"]
+        if not isinstance(status, str) or status not in {
+            "proposed",
+            "unconfirmed",
+            "blocked",
+        }:
             raise ContractError(
                 "formal_disposition_forbidden",
-                "D crosscheck cannot record adopted, excluded, duplicate, or formal disposition decisions",
+                "D crosscheck cannot record E-owned applicability or formal disposition decisions",
             )
         rationale = text(pair["rationale"], "candidate_pair.rationale")
         evidence = source_refs(pair["evidence_refs"], "candidate_pair.evidence_refs")
-        if any(source_key(ref) not in shared_sources for ref in evidence):
+        if any(source_key(ref) not in all_source_keys for ref in evidence):
             raise ContractError(
                 "candidate_pair_evidence_missing",
                 "candidate pair evidence must come from supplied owner artifacts",
             )
-        key = (item_id, condition_id)
-        if key in seen_pairs:
+        pair_key = (item_id, condition_id)
+        if pair_key in seen_pairs:
             raise ContractError(
                 "candidate_pair_duplicate", "candidate pair is duplicated"
             )
-        seen_pairs.add(key)
-        if pair["status"] == "proposed" and (
-            item_by_id[item_id]["currentness"] != "current"
-            or condition_by_id[condition_id]["currentness"] != "current"
-            or condition_by_id[condition_id]["candidate_state"] != "candidate"
+        seen_pairs.add(pair_key)
+
+        item_reason = item_reference_reason(item_id)
+        condition_reason = condition_reference_reason(condition_id)
+        if item_reason is not None:
+            unresolved_item_refs.append(
+                {
+                    "origin": "candidate_pairs",
+                    "condition_id": condition_id,
+                    "item_id": item_id,
+                    "reason": item_reason,
+                    "state": "unconfirmed",
+                    "candidate_pair": {
+                        "status": status,
+                        "rationale": rationale,
+                        "evidence_refs": evidence,
+                    },
+                }
+            )
+            recheck_item_ids.add(item_id)
+            if condition_id in condition_by_id:
+                recheck_condition_ids.add(condition_id)
+        if condition_reason is not None:
+            unresolved_condition_refs.append(
+                {
+                    "origin": "candidate_pairs",
+                    "condition_id": condition_id,
+                    "item_id": item_id,
+                    "reason": condition_reason,
+                    "state": "unconfirmed",
+                    "candidate_pair": {
+                        "status": status,
+                        "rationale": rationale,
+                        "evidence_refs": evidence,
+                    },
+                }
+            )
+            recheck_condition_ids.add(condition_id)
+            if item_id in item_by_id and item_by_id[item_id]["status"] != "retired":
+                recheck_item_ids.add(item_id)
+        if item_reason is not None or condition_reason is not None:
+            continue
+
+        item = item_by_id[item_id]
+        condition = condition_by_id[condition_id]
+        if status == "proposed" and (
+            item["currentness"] != "current"
+            or item["status"] == "unknown"
+            or condition["currentness"] != "current"
+            or condition["candidate_state"] != "candidate"
         ):
             raise ContractError(
                 "candidate_pair_unconfirmed",
-                "only current evidence-backed candidates may be a proposed pair",
+                "only current, confirmed candidates may be a proposed pair",
             )
+
+        machine_issues: list[str] = []
+        if item["kind"] not in condition["applicable_item_kinds"]:
+            machine_issues.append("item_kind_not_in_condition_applicability")
+        if (
+            item["feature_refs"]
+            and condition["feature_refs"]
+            and not set(item["feature_refs"]).intersection(condition["feature_refs"])
+        ):
+            machine_issues.append("item_and_condition_feature_refs_disjoint")
+        pair_currentness = _currentness(evidence, active_sources)
+        if pair_currentness != "current":
+            machine_issues.append(f"pair_evidence_{pair_currentness}")
+        if machine_issues:
+            candidate_pair_inconsistencies.append(
+                {
+                    "item_id": item_id,
+                    "condition_id": condition_id,
+                    "codes": machine_issues,
+                }
+            )
+            recheck_item_ids.add(item_id)
+            recheck_condition_ids.add(condition_id)
+            if status == "proposed":
+                status = "unconfirmed"
         pair_rows.append(
             {
                 "item_id": item_id,
                 "condition_id": condition_id,
-                "status": pair["status"],
+                "status": status,
                 "rationale": rationale,
                 "evidence_refs": evidence,
+                "machine_check_issues": machine_issues,
             }
         )
-    item_features = {
-        feature
-        for row in item_artifact["items"]
-        if row["status"] != "retired"
-        for feature in row["feature_refs"]
-    }
-    population = {
-        row["feature_id"]
-        for row in item_artifact["feature_population"]
-        if row["status"] != "retired"
-    }
-    unrepresented = sorted(population - item_features)
-    active_feature_count = len(population)
-    boundary_complete = (
-        item_artifact["source_boundary_complete"]
-        and condition_artifact["source_boundary_complete"]
+
+    item_rows = list(item_by_id.values())
+    condition_rows = list(condition_by_id.values())
+    active_items = [row for row in item_rows if row["status"] != "retired"]
+    active_conditions = condition_rows
+    stale_item_ids = sorted(
+        row["item_id"] for row in active_items if row["currentness"] == "stale"
     )
-    rate_measurable = (
-        boundary_complete
-        and active_feature_count > 0
-        and all(
-            row["currentness"] == "current"
-            for row in item_artifact["items"]
-            if row["status"] != "retired"
-        )
+    unknown_item_ids = sorted(
+        row["item_id"]
+        for row in active_items
+        if row["currentness"] == "unknown" or row["status"] == "unknown"
+    )
+    stale_condition_ids = sorted(
+        row["condition_id"]
+        for row in active_conditions
+        if row["currentness"] == "stale"
+    )
+    unknown_condition_ids = sorted(
+        row["condition_id"]
+        for row in active_conditions
+        if row["currentness"] == "unknown"
+    )
+    unconfirmed_condition_ids = sorted(
+        row["condition_id"]
+        for row in active_conditions
+        if row["candidate_state"] == "unconfirmed"
+    )
+    blocked_condition_ids = sorted(
+        row["condition_id"]
+        for row in active_conditions
+        if row["candidate_state"] == "blocked"
     )
     item_candidates_in_pairs = {row["item_id"] for row in pair_rows}
     condition_candidates_in_pairs = {row["condition_id"] for row in pair_rows}
-    return make_result(
-        "incomplete"
-        if not boundary_complete or not rate_measurable
-        else "candidate_crosscheck_complete",
-        valid=True,
-        issues=(
-            []
-            if boundary_complete
-            else [
-                _issue(
-                    "source_population_incomplete",
-                    "feature source boundary is partial or unknown",
-                    blocking=False,
-                )
-            ]
+    items_without_pair = sorted(
+        row["item_id"]
+        for row in active_items
+        if row["item_id"] not in item_candidates_in_pairs
+    )
+    conditions_without_pair = sorted(
+        row["condition_id"]
+        for row in active_conditions
+        if row["condition_id"] not in condition_candidates_in_pairs
+    )
+
+    feature_population = item_artifact["feature_population"]
+    active_feature_rows = [
+        row for row in feature_population if row["status"] != "retired"
+    ]
+    active_feature_ids = {row["feature_id"] for row in active_feature_rows}
+    unknown_feature_ids = sorted(
+        row["feature_id"] for row in active_feature_rows if row["status"] == "unknown"
+    )
+    item_features = {feature for row in active_items for feature in row["feature_refs"]}
+    unrepresented = sorted(active_feature_ids - item_features)
+    active_feature_count = len(active_feature_ids)
+    context_available = item_context is not None and condition_context is not None
+    item_context = item_context or {}
+    condition_context = condition_context or {}
+    source_population_complete = context_available and (
+        item_context["analysis_status"] == "complete"
+        and condition_context["analysis_status"] == "complete"
+        and item_artifact["source_boundary_complete"]
+        and condition_artifact["source_boundary_complete"]
+    )
+    all_items_current = not stale_item_ids and not unknown_item_ids
+    all_conditions_confirmed = not (
+        stale_condition_ids
+        or unknown_condition_ids
+        or unconfirmed_condition_ids
+        or blocked_condition_ids
+    ) and all(row["candidate_state"] == "candidate" for row in active_conditions)
+    no_unresolved_references = (
+        not unresolved_item_refs and not unresolved_condition_refs
+    )
+    no_unresolved_pairs = all(row["status"] == "proposed" for row in pair_rows)
+    no_machine_conflicts = not candidate_pair_inconsistencies
+    zero_denominator = active_feature_count == 0
+    complete = (
+        source_population_complete
+        and all_items_current
+        and all_conditions_confirmed
+        and no_unresolved_references
+        and no_unresolved_pairs
+        and no_machine_conflicts
+        and not unknown_feature_ids
+        and not zero_denominator
+    )
+
+    measurable = (
+        source_population_complete
+        and all_items_current
+        and not unknown_feature_ids
+        and active_feature_count > 0
+    )
+    if active_feature_count == 0:
+        coverage_status = "not_measurable_zero_denominator"
+    elif not source_population_complete or unknown_feature_ids:
+        coverage_status = "not_measurable_incomplete_or_unknown_population"
+    elif not all_items_current:
+        coverage_status = "not_measurable_stale_or_unknown_items"
+    else:
+        coverage_status = "measured"
+    represented_count = len(active_feature_ids.intersection(item_features))
+
+    issues = []
+    if not source_population_complete:
+        issues.append(
+            _issue(
+                "source_population_incomplete",
+                "B analysis, feature source boundary, or legacy handoff context is incomplete",
+                blocking=False,
+            )
         )
-        + (
-            [
-                _issue(
-                    "zero_denominator",
-                    "confirmed active feature population is empty",
-                    blocking=False,
-                )
-            ]
-            if active_feature_count == 0
-            else []
-        ),
+    if zero_denominator:
+        issues.append(
+            _issue(
+                "zero_denominator",
+                "confirmed active feature population is empty",
+                blocking=False,
+            )
+        )
+    if stale_item_ids or stale_condition_ids:
+        issues.append(
+            _issue(
+                "stale_candidates",
+                "stale item or condition evidence requires revalidation",
+                blocking=False,
+            )
+        )
+    if unknown_item_ids or unknown_condition_ids:
+        issues.append(
+            _issue(
+                "unknown_candidates",
+                "candidate currentness or item status is unknown",
+                blocking=False,
+            )
+        )
+    if unconfirmed_condition_ids:
+        issues.append(
+            _issue(
+                "unconfirmed_conditions",
+                "unconfirmed conditions are not complete candidates",
+                blocking=False,
+            )
+        )
+    if blocked_condition_ids:
+        issues.append(
+            _issue(
+                "blocked_conditions",
+                "blocked conditions are not complete candidates",
+                blocking=False,
+            )
+        )
+    if unresolved_item_refs or unresolved_condition_refs:
+        issues.append(
+            _issue(
+                "unresolved_candidate_references",
+                "well-formed references need owner-side recheck",
+                blocking=False,
+            )
+        )
+    if candidate_pair_inconsistencies:
+        issues.append(
+            _issue(
+                "candidate_pair_inconsistency",
+                "machine-detectable pair conflicts need review",
+                blocking=False,
+            )
+        )
+    if any(row["status"] in {"unconfirmed", "blocked"} for row in pair_rows):
+        issues.append(
+            _issue(
+                "candidate_pairs_unresolved",
+                "candidate pairs include unconfirmed or blocked entries",
+                blocking=False,
+            )
+        )
+
+    return make_result(
+        "candidate_crosscheck_complete" if complete else "incomplete",
+        valid=True,
+        issues=issues,
         crosscheck_schema=CROSSCHECK_SCHEMA,
         scope=item_artifact["scope"],
         item_artifact_ref={
             "owner": item_artifact["owner"],
             "scope": item_artifact["scope"],
             "artifact_ref": item_artifact["artifact_ref"],
-            "candidate_revision": item_artifact["content_fingerprint"],
+            "content_fingerprint": item_artifact["content_fingerprint"],
         },
         condition_artifact_ref={
             "owner": condition_artifact["owner"],
             "scope": condition_artifact["scope"],
             "artifact_ref": condition_artifact["artifact_ref"],
-            "candidate_revision": condition_artifact["content_fingerprint"],
+            "content_fingerprint": condition_artifact["content_fingerprint"],
         },
         candidate_pairs=sorted(
             pair_rows, key=lambda row: (row["item_id"], row["condition_id"])
         ),
+        candidate_pair_inconsistencies=candidate_pair_inconsistencies,
+        unresolved_item_references=unresolved_item_refs,
+        unresolved_condition_references=unresolved_condition_refs,
+        recheck_item_ids=sorted(recheck_item_ids),
+        recheck_condition_ids=sorted(recheck_condition_ids),
+        retired_item_ids=retired_item_ids,
+        retired_condition_ids=retired_condition_ids,
+        unconfirmed_item_ids=sorted(set(unknown_item_ids)),
+        stale_item_ids=stale_item_ids,
+        stale_condition_ids=stale_condition_ids,
+        unknown_condition_ids=unknown_condition_ids,
+        unconfirmed_condition_ids=unconfirmed_condition_ids,
+        blocked_condition_ids=blocked_condition_ids,
         unrepresented_feature_refs=unrepresented,
-        items_without_pair_proposal=sorted(set(item_by_id) - item_candidates_in_pairs),
-        conditions_without_pair_proposal=sorted(
-            set(condition_by_id) - condition_candidates_in_pairs
-        ),
+        items_without_pair_proposal=items_without_pair,
+        conditions_without_pair_proposal=conditions_without_pair,
         candidate_identification_coverage={
-            "status": "measured"
-            if rate_measurable
-            else (
-                "not_measurable_zero_denominator"
-                if active_feature_count == 0
-                else "not_measurable_incomplete_or_stale"
-            ),
+            "status": coverage_status,
             "basis": "confirmed active feature inventory only",
-            "numerator": len(population & item_features),
-            "denominator": active_feature_count if rate_measurable else None,
-            "rate": len(population & item_features) / active_feature_count
-            if rate_measurable
-            else None,
+            "numerator": represented_count,
+            "denominator": active_feature_count if measurable else None,
+            "rate": represented_count / active_feature_count if measurable else None,
+            "zero_denominator": zero_denominator,
         },
         metrics={
             "candidate_item_count": sum(
-                row["status"] != "retired" for row in item_artifact["items"]
+                row["status"] != "retired" for row in item_rows
             ),
-            "condition_candidate_count": sum(
-                row["candidate_state"] != "retired"
-                for row in condition_artifact["conditions"]
-            ),
+            "condition_candidate_count": len(active_conditions),
             "candidate_pair_count": len(pair_rows),
+            "candidate_pair_proposed_count": sum(
+                row["status"] == "proposed" for row in pair_rows
+            ),
+            "candidate_pair_unconfirmed_count": sum(
+                row["status"] == "unconfirmed" for row in pair_rows
+            ),
+            "candidate_pair_blocked_count": sum(
+                row["status"] == "blocked" for row in pair_rows
+            ),
             "formal_applicability_decisions": {
                 "owner": "test-condition-design",
                 "state": "not_provided_to_D",

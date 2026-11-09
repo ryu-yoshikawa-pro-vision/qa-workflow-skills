@@ -17,13 +17,15 @@ Do not start for formal TCN / CI / disposition / expected-result design (`test-c
 
 ## Required work
 
-1. Read the current B-owned `feature-inventory-v1` and current Authority/source refs. Use current source revisions and content hashes; preserve partial and unknown source boundaries.
+1. Read the exact B snapshot and its separate `feature_registry.analyze()` report as `{ "snapshot": ..., "analysis": ... }`, plus current Authority/source refs. Preserve project/artifact refs, artifact and source revisions, snapshot hash, source inventory, feature IDs, and unknown areas. An `incomplete` report remains incomplete; reject `stale`, `blocked`, `idempotent`, mismatched, or malformed results. Do not replace B's validator.
 2. Identify candidates across input constraints, boundaries, authorization, business states, transitions, recovery, external dependencies, data integrity, and nonfunctional concerns. A general checklist helps discovery but is not source evidence or an expected result.
 3. Record stable `COND-*` IDs, intent, candidate kind, applicable item kinds, feature/known item refs, Authority entity refs, source refs/revisions, candidate state, unknowns, history, and currentness.
 4. Reuse an existing ID only for the same meaning. Same-name candidates with different meaning keep separate IDs. A split or merge creates new IDs and history; retirement is explicit and never permits ID reuse.
 5. Use `scripts/condition_candidates.py` for deterministic identity allocation, history, source impact, and non-formal crosscheck. The crosscheck considers only supplied candidate pairs; it never expands the full item × condition Cartesian product.
 6. Report possible missing item refs, item candidates without a pair proposal, condition candidates without a pair proposal, incomplete source population, and unconfirmed candidates as review prompts. Do not decide applicability, exclusion, duplication, or coverage.
 7. Keep candidate counts, E-owned applicability/formal-design results, and execution counts separate. D outputs `null`/not-provided for measurements owned by E or execution owners; zero candidates do not mean 100% coverage.
+
+Older v1 item and condition artifacts without `feature_inventory_context` remain readable with IDs/history preserved, but their crosscheck is incomplete until a new materialization carries current B context. A well-formed item ID that is not present is reported as unconfirmed with a recheck request; D does not create the item or decide that it is formally rejected.
 
 ## Save and resume
 

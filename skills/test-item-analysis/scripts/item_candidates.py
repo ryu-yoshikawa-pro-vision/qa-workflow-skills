@@ -8,11 +8,16 @@ import sys
 from typing import Any
 
 from candidate_support import (
+    ITEM_ID,
+    ITEM_KINDS,
+    ITEM_STATUSES,
     ContractError,
+    active_source_refs,
     canonical_bytes,
     feature_inventory,
     fingerprint,
     make_result,
+    operation_claim_details,
     source_key,
     source_ref,
     source_refs,
@@ -20,36 +25,14 @@ from candidate_support import (
     string_list,
     text,
 )
+from candidate_support import (
+    validate_item_artifact as _validate_item_artifact,
+)
 
 SCHEMA = "test-item-candidates-v1"
 OWNER = "test-item-analysis"
-ITEM_ID = re.compile(r"^ITEM-[0-9]{3,}$")
 DRAFT_REF = re.compile(r"^@draft:([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})$")
-KINDS = {
-    "ui",
-    "api",
-    "batch",
-    "component",
-    "event",
-    "integration",
-    "data",
-    "security",
-    "nonfunctional",
-    "other",
-}
-STATUSES = {"planned", "unimplemented", "implemented", "unknown", "retired"}
 IDENTITY_ACTIONS = {"new", "reuse", "split", "merge"}
-ITEM_FIELDS = {
-    "item_id",
-    "name",
-    "description",
-    "kind",
-    "status",
-    "parent_item_ids",
-    "feature_refs",
-    "evidence_refs",
-    "currentness",
-}
 
 
 def _issue(code: str, message: str, *, blocking: bool = True) -> dict[str, Any]:
@@ -100,190 +83,7 @@ def _check_cycle(items: dict[str, dict[str, Any]]) -> None:
 
 
 def validate_artifact(value: Any) -> dict[str, Any]:
-    required = {
-        "schema_version",
-        "owner",
-        "scope",
-        "artifact_ref",
-        "feature_inventory_ref",
-        "feature_population",
-        "source_boundary_complete",
-        "source_refs",
-        "active_source_refs",
-        "previous_artifact_revision",
-        "items",
-        "id_history",
-        "history",
-        "content_fingerprint",
-    }
-    if not isinstance(value, dict) or set(value) != required:
-        raise ContractError(
-            "item_artifact_schema", "item artifact fields do not match v1"
-        )
-    if value["schema_version"] != SCHEMA or value["owner"] != OWNER:
-        raise ContractError(
-            "item_artifact_identity", "item artifact owner or schema is invalid"
-        )
-    text(value["scope"], "scope")
-    text(value["artifact_ref"], "artifact_ref")
-    if value["previous_artifact_revision"] is not None:
-        text(value["previous_artifact_revision"], "previous_artifact_revision")
-    population = value["feature_population"]
-    if not isinstance(population, list):
-        raise ContractError(
-            "feature_population_invalid", "feature_population must be an array"
-        )
-    population_ids: set[str] = set()
-    for row in population:
-        if not isinstance(row, dict) or set(row) != {"feature_id", "status"}:
-            raise ContractError(
-                "feature_population_invalid", "feature population row is invalid"
-            )
-        feature_id = text(row["feature_id"], "feature_population.feature_id")
-        if (
-            not re.fullmatch(r"FEAT-[0-9]{3,}", feature_id)
-            or feature_id in population_ids
-        ):
-            raise ContractError(
-                "feature_population_invalid",
-                "feature population IDs must be unique FEAT IDs",
-            )
-        if row["status"] not in {"planned", "implemented", "retired", "unknown"}:
-            raise ContractError(
-                "feature_population_invalid", "feature status is invalid"
-            )
-        population_ids.add(feature_id)
-    if not isinstance(value["source_boundary_complete"], bool):
-        raise ContractError(
-            "source_boundary_invalid", "source_boundary_complete must be boolean"
-        )
-    all_sources = source_refs(value["source_refs"])
-    active_sources = source_refs(value["active_source_refs"])
-    if any(
-        source_key(row) not in {source_key(item) for item in all_sources}
-        for row in active_sources
-    ):
-        raise ContractError(
-            "active_source_missing", "active source refs must exist in source_refs"
-        )
-    feature_ref = source_ref(value["feature_inventory_ref"], "feature_inventory_ref")
-    if feature_ref["owner"] != "feature-analysis" or feature_key(feature_ref) not in {
-        feature_key(row) for row in active_sources
-    }:
-        raise ContractError(
-            "feature_inventory_ref_invalid",
-            "feature inventory ref must be a current source",
-        )
-    rows = value["items"]
-    if not isinstance(rows, list):
-        raise ContractError("items_invalid", "items must be an array")
-    items: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        if not isinstance(row, dict) or set(row) != ITEM_FIELDS:
-            raise ContractError("item_schema", "item fields do not match v1")
-        item_id = text(row["item_id"], "item_id")
-        if not ITEM_ID.fullmatch(item_id) or item_id in items:
-            raise ContractError(
-                "item_id_invalid", f"item ID is invalid or duplicated: {item_id}"
-            )
-        text(row["name"], f"{item_id}.name")
-        text(row["description"], f"{item_id}.description")
-        if row["kind"] not in KINDS or row["status"] not in STATUSES:
-            raise ContractError(
-                "item_type_invalid", f"{item_id} kind or status is invalid"
-            )
-        parents = string_list(row["parent_item_ids"], f"{item_id}.parent_item_ids")
-        if any(not ITEM_ID.fullmatch(parent) for parent in parents):
-            raise ContractError(
-                "item_parent_invalid", f"{item_id} parent ID is invalid"
-            )
-        features = string_list(row["feature_refs"], f"{item_id}.feature_refs")
-        if any(feature not in population_ids for feature in features):
-            raise ContractError(
-                "item_feature_unknown", f"{item_id} references an unknown feature"
-            )
-        evidence = source_refs(row["evidence_refs"], f"{item_id}.evidence_refs")
-        if any(
-            source_key(ref) not in {source_key(item) for item in all_sources}
-            for ref in evidence
-        ):
-            raise ContractError(
-                "item_evidence_unknown", f"{item_id} references an unknown source"
-            )
-        if row["currentness"] not in {"current", "stale", "unknown"}:
-            raise ContractError(
-                "item_currentness_invalid", f"{item_id} currentness is invalid"
-            )
-        items[item_id] = row
-    _check_cycle(items)
-    history_ids = string_list(value["id_history"], "id_history")
-    if history_ids != sorted(history_ids) or any(
-        not ITEM_ID.fullmatch(item_id) for item_id in history_ids
-    ):
-        raise ContractError(
-            "item_history_ids_invalid", "id_history must contain sorted ITEM IDs"
-        )
-    if not set(items).issubset(history_ids):
-        raise ContractError(
-            "item_history_missing", "current item IDs must be retained in id_history"
-        )
-    events = value["history"]
-    if not isinstance(events, list):
-        raise ContractError("item_history_invalid", "history must be an array")
-    seen_events: set[str] = set()
-    observed_history_ids: set[str] = set()
-    for event in events:
-        if not isinstance(event, dict) or set(event) != {
-            "event_id",
-            "item_id",
-            "action",
-            "reason",
-            "related_item_ids",
-            "evidence_refs",
-        }:
-            raise ContractError("item_history_invalid", "history event is invalid")
-        event_id = text(event["event_id"], "history.event_id")
-        item_id = text(event["item_id"], "history.item_id")
-        if event_id in seen_events or not ITEM_ID.fullmatch(item_id):
-            raise ContractError(
-                "item_history_invalid",
-                "history event is duplicated or has an invalid item ID",
-            )
-        seen_events.add(event_id)
-        observed_history_ids.add(item_id)
-        if event["action"] not in {
-            "created",
-            "updated",
-            "split",
-            "merged",
-            "retired",
-            "source_changed",
-        }:
-            raise ContractError("item_history_invalid", "history action is invalid")
-        text(event["reason"], "history.reason")
-        related = string_list(event["related_item_ids"], "history.related_item_ids")
-        if any(not ITEM_ID.fullmatch(ref) for ref in related):
-            raise ContractError(
-                "item_history_invalid", "history related IDs are invalid"
-            )
-        evidence = source_refs(event["evidence_refs"], "history.evidence_refs")
-        if any(
-            source_key(ref) not in {source_key(item) for item in all_sources}
-            for ref in evidence
-        ):
-            raise ContractError("item_history_invalid", "history source ref is missing")
-    if set(history_ids) != observed_history_ids:
-        raise ContractError(
-            "item_history_incomplete",
-            "every allocated ID must have a retained history event",
-        )
-    expected_hash = fingerprint(_core(value))
-    if value["content_fingerprint"] != expected_hash:
-        raise ContractError(
-            "item_fingerprint_mismatch",
-            "content_fingerprint does not match canonical artifact content",
-        )
-    return value
+    return _validate_item_artifact(value)
 
 
 def feature_key(ref: dict[str, str]) -> tuple[str, str, str]:
@@ -308,6 +108,7 @@ def _history_event(
     reason: str,
     related: list[str],
     evidence: list[dict[str, str]],
+    history: list[dict[str, Any]],
 ) -> dict[str, Any]:
     event = {
         "item_id": item_id,
@@ -316,7 +117,17 @@ def _history_event(
         "related_item_ids": sorted(set(related)),
         "evidence_refs": _sort_sources(evidence),
     }
-    event["event_id"] = fingerprint(event)
+    event["event_id"] = fingerprint(
+        {
+            "event": event,
+            "sequence": len(history),
+            "previous_event_id": history[-1]["event_id"] if history else None,
+        }
+    )
+    if event["event_id"] in {row["event_id"] for row in history}:
+        raise ContractError(
+            "history_event_id_collision", "history event ID is already allocated"
+        )
     return event
 
 
@@ -375,7 +186,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         raise ContractError(
             "scope_mismatch", "feature inventory project_ref does not match scope"
         )
-    current_sources = source_refs(request["source_refs"])
+    current_sources = active_source_refs(request["source_refs"])
     feature_source = source_ref(inventory["feature_source_ref"])
     if source_key(feature_source) not in {source_key(ref) for ref in current_sources}:
         raise ContractError(
@@ -452,7 +263,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     for row in candidates:
         action = row.get("identity_action")
         candidate_key = text(row.get("candidate_key"), "candidate_key")
-        if action not in IDENTITY_ACTIONS:
+        if not isinstance(action, str) or action not in IDENTITY_ACTIONS:
             raise ContractError(
                 "identity_action_invalid",
                 "identity_action must be new, reuse, split, or merge",
@@ -535,7 +346,12 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         description = text(row.get("description"), "candidate.description")
         kind = row.get("kind")
         status = row.get("status")
-        if kind not in KINDS or status not in STATUSES - {"retired"}:
+        if (
+            not isinstance(kind, str)
+            or kind not in ITEM_KINDS
+            or not isinstance(status, str)
+            or status not in ITEM_STATUSES - {"retired"}
+        ):
             raise ContractError(
                 "candidate_classification_invalid",
                 "candidate kind or status is invalid",
@@ -581,11 +397,15 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 action
             ]
             events.append(
-                _history_event(item_id, event_action, reason, related, evidence_refs)
+                _history_event(
+                    item_id, event_action, reason, related, evidence_refs, events
+                )
             )
             changed_ids.add(item_id)
         elif old != updated:
-            events.append(_history_event(item_id, "updated", reason, [], evidence_refs))
+            events.append(
+                _history_event(item_id, "updated", reason, [], evidence_refs, events)
+            )
             changed_ids.add(item_id)
         items[item_id] = updated
 
@@ -618,8 +438,12 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             )
         reason = text(retirement["reason"], "retirement.reason")
         items[item_id]["status"] = "retired"
-        items[item_id]["currentness"] = _currentness(evidence_refs, current_sources)
-        events.append(_history_event(item_id, "retired", reason, [], evidence_refs))
+        items[item_id]["currentness"] = _currentness(
+            items[item_id]["evidence_refs"], current_sources
+        )
+        events.append(
+            _history_event(item_id, "retired", reason, [], evidence_refs, events)
+        )
         changed_ids.add(item_id)
 
     unretired_merge_sources = sorted(
@@ -633,33 +457,43 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
 
     # A source change affects only candidates whose evidence points at the changed artifact.
     active_by_identity = {feature_key(ref): ref for ref in current_sources}
+    previous_active_by_identity = (
+        {feature_key(ref): ref for ref in previous["active_source_refs"]}
+        if previous
+        else {}
+    )
     for item_id, item in items.items():
         if item_id in changed_ids:
             continue
-        old_currentness = item["currentness"]
         currentness = _currentness(item["evidence_refs"], current_sources)
         item["currentness"] = currentness
-        if old_currentness != "stale" and currentness == "stale":
+        if currentness == "stale":
             changed_source = next(
                 (
                     active_by_identity.get(feature_key(ref))
                     for ref in item["evidence_refs"]
                     if feature_key(ref) in active_by_identity
+                    and feature_key(ref) in previous_active_by_identity
+                    and not _same_source(
+                        previous_active_by_identity[feature_key(ref)],
+                        active_by_identity[feature_key(ref)],
+                    )
                     and not _same_source(active_by_identity[feature_key(ref)], ref)
                 ),
                 None,
             )
-            source_evidence = [changed_source] if changed_source else current_sources
-            events.append(
-                _history_event(
-                    item_id,
-                    "source_changed",
-                    "evidence source revision changed; revalidation is required",
-                    [],
-                    source_evidence,
+            if changed_source is not None:
+                events.append(
+                    _history_event(
+                        item_id,
+                        "source_changed",
+                        "evidence source revision changed; revalidation is required",
+                        [],
+                        [changed_source],
+                        events,
+                    )
                 )
-            )
-            changed_ids.add(item_id)
+                changed_ids.add(item_id)
 
     current_items = sorted(items.values(), key=lambda row: row["item_id"])
     _check_cycle({row["item_id"]: row for row in current_items})
@@ -680,8 +514,9 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         "scope": scope,
         "artifact_ref": artifact_ref,
         "feature_inventory_ref": feature_population_ref,
+        "feature_inventory_context": inventory["feature_inventory_context"],
         "feature_population": feature_population,
-        "source_boundary_complete": inventory["boundary_complete"],
+        "source_boundary_complete": inventory["source_boundary_complete"],
         "source_refs": all_sources,
         "active_source_refs": current_sources,
         "previous_artifact_revision": request["current_revision"],
@@ -728,7 +563,10 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     )
     status = (
         "candidate_ready_unpersisted"
-        if not stale and not unknown and inventory["boundary_complete"]
+        if not stale
+        and not unknown
+        and inventory["source_boundary_complete"]
+        and inventory["analysis_complete"]
         else "incomplete"
     )
     issues = []
@@ -747,11 +585,19 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
-    if not inventory["boundary_complete"]:
+    if not inventory["source_boundary_complete"]:
         issues.append(
             _issue(
                 "feature_population_incomplete",
                 "feature population is partial or unknown",
+                blocking=False,
+            )
+        )
+    if not inventory["analysis_complete"]:
+        issues.append(
+            _issue(
+                "upstream_analysis_incomplete",
+                "feature analysis has unresolved findings",
                 blocking=False,
             )
         )
@@ -768,7 +614,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     metric_status = "measured"
     metric_rate = None
     metric_denominator = None
-    if not inventory["boundary_complete"]:
+    if not inventory["source_boundary_complete"] or not inventory["analysis_complete"]:
         metric_status = "not_measurable_incomplete_population"
     elif stale or unknown:
         metric_status = "not_measurable_stale_or_unknown_items"
@@ -807,6 +653,15 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "requires_independent_readback": True,
             "provider_selected": False,
             "approval_state": "not_resolved_by_candidate_helper",
+            "operation_claim_details": operation_claim_details(
+                owner=OWNER,
+                scope=scope,
+                artifact_ref=artifact_ref,
+                source_refs_value=current_sources,
+                expected_revision=request["expected_revision"],
+                approval_ref=approval_ref,
+                permission_scope=required_permission,
+            ),
         },
     )
 
@@ -836,7 +691,7 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ContractError("request_schema", "impact request fields do not match v1")
     artifact = validate_artifact(request["artifact"])
-    active = source_refs(request["current_source_refs"])
+    active = active_source_refs(request["current_source_refs"])
     stale_ids: list[str] = []
     unknown_ids: list[str] = []
     for item in artifact["items"]:

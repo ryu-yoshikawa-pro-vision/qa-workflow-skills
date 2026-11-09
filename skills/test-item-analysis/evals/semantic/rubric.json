@@ -4,7 +4,7 @@
     {
       "id": "ITEM-SEM-001",
       "title": "独立したitem identity",
-      "description": "製品機能IDやファイルpathと区別したstable item IDを使い、テストレベル間で同じitem IDを再利用する。",
+      "description": "Narrative-only inputでは暫定候補とstable IDを区別し、B snapshot/reportおよび既存ID履歴がない状態で永続IDを捏造しない。実装可能なAPI候補はcheckout/refundをまたいで1候補として保ち、テストレベルで重複させない。",
       "critical": true
     },
     {
@@ -16,7 +16,7 @@
     {
       "id": "ITEM-SEM-003",
       "title": "履歴と変更影響",
-      "description": "reuse/split/merge/retireを明示判断として記録し、source revision変更と未確認範囲を過不足なく示す。",
+      "description": "同名の旧itemをID・履歴・source revisionなしにreuse/split/merge/retire/currentと確定せず、再確認条件と欠落evidenceを示す。",
       "critical": true
     },
     {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import subprocess
@@ -10,52 +11,287 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 ITEM_SCRIPTS = ROOT / "skills" / "test-item-analysis" / "scripts"
 CONDITION_SCRIPTS = ROOT / "skills" / "test-condition-analysis" / "scripts"
+QA_WORKFLOW_SCRIPTS = ROOT / "skills" / "qa-workflow" / "scripts"
 sys.path.insert(0, str(ITEM_SCRIPTS))
 sys.path.insert(0, str(CONDITION_SCRIPTS))
+sys.path.insert(0, str(QA_WORKFLOW_SCRIPTS))
 
-from candidate_support import ContractError  # noqa: E402
+from artifact_graph import _validate_claim_details  # noqa: E402
+from candidate_support import (  # noqa: E402
+    MAX_INPUT_BYTES,
+    ContractError,
+    canonical_bytes,
+    fingerprint,
+    strict_loads,
+)
 from condition_candidates import run as run_conditions  # noqa: E402
-from item_candidates import run as run_items  # noqa: E402
+from item_artifact_contract import (  # noqa: E402
+    validate_item_artifact as validate_crosscheck_item_artifact,
+)
+from item_candidates import (  # noqa: E402
+    run as run_items,
+)
+from item_candidates import (  # noqa: E402
+    validate_artifact as validate_item_artifact,
+)
 
 
 def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def feature_inventory(*, features=None, status="complete", source_status="complete"):
-    return {
-        "schema_version": "feature-inventory-v1",
-        "project_ref": "project:shop",
-        "artifact_ref": "feature-inventory:shop",
-        "artifact_revision": "feature-r1",
-        "source_revision": "commit:abc123",
-        "previous_artifact_revision": None,
-        "operation_id": "fixture:feature-1",
-        "event": "initial",
-        "status": status,
-        "sources": [
+def _refresh_artifact_fingerprint(artifact):
+    artifact["content_fingerprint"] = fingerprint(
+        {key: value for key, value in artifact.items() if key != "content_fingerprint"}
+    )
+    return artifact
+
+
+def _feature_analysis(snapshot, status):
+    sources = sorted(snapshot["sources"], key=lambda row: row["id"])
+    features = sorted(snapshot["features"], key=lambda row: row["id"])
+    source_boundary = (
+        bool(snapshot["expected_source_ids"])
+        and not snapshot["unknown_areas"]
+        and all(
+            any(
+                source["id"] == source_id and source["status"] == "complete"
+                for source in sources
+            )
+            for source_id in snapshot["expected_source_ids"]
+        )
+    )
+    source_ids = {row["id"]: row for row in snapshot["sources"]}
+    reasons = []
+    if not snapshot["expected_source_ids"]:
+        reasons.append("source_boundary_unconfirmed")
+    for source_id in snapshot["expected_source_ids"]:
+        source = source_ids.get(source_id)
+        if source is None:
+            reasons.append(f"source_missing:{source_id}")
+        elif source["status"] != "complete":
+            reasons.append(f"source_incomplete:{source_id}")
+    if snapshot["unknown_areas"]:
+        reasons.append("unknown_areas_present")
+    if not snapshot["changes"]:
+        reasons.append("change_denominator_zero")
+    if not snapshot["candidates"]:
+        reasons.append("candidate_denominator_zero")
+    reasons = sorted(set(reasons))
+    if status == "complete" and reasons:
+        raise AssertionError(
+            "fixture cannot report a complete B analysis with unresolved reasons"
+        )
+    if status == "incomplete" and not reasons:
+        reasons = ["fixture_incomplete"]
+    snapshot_sha256 = _sha(
+        json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    )
+    handoff = {
+        "snapshot_sha256": snapshot_sha256,
+        "source_inventory": [
             {
-                "id": "SRC-001",
-                "status": source_status,
-                "revision": "source-r1",
-                "evidence_ref": "source:evidence-1"
-                if source_status == "complete"
-                else None,
+                "id": row["id"],
+                "ref": row["ref"],
+                "status": row["status"],
+                "revision": row.get("revision"),
+                "unretrieved": row["unretrieved"],
             }
+            for row in sources
         ],
-        "expected_source_ids": ["SRC-001"],
-        "features": features
+        "artifact_ref": snapshot["artifact_ref"],
+        "artifact_revision": snapshot["artifact_revision"],
+        "source_revision": snapshot["source_revision"],
+        "feature_ids": [row["id"] for row in features],
+        "feature_refs": [
+            {
+                "id": row["id"],
+                "kind": row["kind"],
+                "status": row["status"],
+                "parent_id": row["parent_id"],
+                "source_ids": row["source_ids"],
+                "implementation_refs": row["implementation_refs"],
+                "spec_refs": row["spec_refs"],
+                "qa_refs": row["qa_refs"],
+            }
+            for row in features
+        ],
+        "impacted_feature_ids": sorted(
+            {
+                feature_id
+                for row in snapshot["changes"]
+                if row["classification"] == "impact"
+                for feature_id in row["feature_ids"]
+            }
+        ),
+        "approval_required_change_ids": sorted(
+            row["id"]
+            for row in snapshot["changes"]
+            if row["classification"] in {"no_impact", "out_of_scope"}
+        ),
+        "unknown_areas": snapshot["unknown_areas"],
+        "unclassified_change_ids": sorted(
+            row["id"]
+            for row in snapshot["changes"]
+            if row["classification"] not in {"impact", "no_impact", "out_of_scope"}
+        ),
+        "expected_source_ids": snapshot["expected_source_ids"],
+    }
+    return {
+        "status": status,
+        "reasons": reasons,
+        "metrics": {
+            "change_classification": {
+                "numerator_ids": sorted(
+                    row["id"]
+                    for row in snapshot["changes"]
+                    if row["classification"] in {"impact", "no_impact", "out_of_scope"}
+                ),
+                "denominator_ids": sorted(row["id"] for row in snapshot["changes"]),
+                "rate": (
+                    sum(
+                        row["classification"] in {"impact", "no_impact", "out_of_scope"}
+                        for row in snapshot["changes"]
+                    )
+                    / len(snapshot["changes"])
+                    if snapshot["changes"]
+                    else None
+                ),
+            },
+            "observed_candidate_mapping": {
+                "numerator_ids": sorted(
+                    row["id"]
+                    for row in snapshot["candidates"]
+                    if row["status"] == "mapped"
+                ),
+                "denominator_ids": sorted(row["id"] for row in snapshot["candidates"]),
+                "rate": (
+                    sum(row["status"] == "mapped" for row in snapshot["candidates"])
+                    / len(snapshot["candidates"])
+                    if snapshot["candidates"]
+                    else None
+                ),
+            },
+            "source_boundary_complete": source_boundary,
+            "unknown_areas": snapshot["unknown_areas"],
+            "excluded_candidate_ids": sorted(
+                row["id"]
+                for row in snapshot["candidates"]
+                if row["status"] == "excluded"
+            ),
+            "all_product_features_discovered": None,
+        },
+        "handoff": handoff,
+    }
+
+
+def feature_inventory(*, features=None, status="complete", source_status="complete"):
+    rows = (
+        features
         if features is not None
         else [
             {"id": "FEAT-001", "status": "implemented"},
             {"id": "FEAT-002", "status": "planned"},
+        ]
+    )
+    feature_rows = []
+    for index, row in enumerate(rows, start=1):
+        feature_id = row["id"]
+        feature_rows.append(
+            {
+                "id": feature_id,
+                "identity": f"fixture identity {feature_id}",
+                "name": f"Fixture {feature_id}",
+                "kind": "api",
+                "status": row["status"],
+                "parent_id": None,
+                "source_ids": ["SRC-001"],
+                "implementation_refs": [f"src/feature-{index}.py"],
+                "spec_refs": [],
+                "qa_refs": [],
+            }
+        )
+    complete_source = source_status == "complete"
+    effective_status = (
+        "incomplete" if status == "complete" and not feature_rows else status
+    )
+    snapshot = {
+        "schema_version": "feature-inventory-v1",
+        "project_ref": "project:shop",
+        "artifact_ref": "feature-inventory:shop",
+        "artifact_revision": "feature-r1",
+        "previous_artifact_revision": None,
+        "source_revision": "commit:abc123",
+        "operation_id": "fixture:feature-1",
+        "event": "initial",
+        "expected_source_ids": ["SRC-001"],
+        "sources": [
+            {
+                "id": "SRC-001",
+                "kind": "code",
+                "ref": "product/repo",
+                "scope": "src",
+                "status": source_status,
+                "revision": "commit:abc123" if complete_source else None,
+                "evidence_ref": "evidence/sources" if complete_source else None,
+                "enumeration_complete": complete_source,
+                "unretrieved": [],
+                **({} if complete_source else {"reason": "source access denied"}),
+            }
+        ],
+        "features": feature_rows,
+        "candidates": [
+            {
+                "id": "CAND-001",
+                "source_ids": ["SRC-001"],
+                "evidence_ref": "evidence/candidate",
+                "status": "mapped",
+                "feature_id": "FEAT-001",
+            }
+        ],
+        "changes": [
+            {
+                "id": "DIF-001",
+                "source_id": "SRC-001",
+                "before_revision": "commit:old",
+                "after_revision": "commit:abc123",
+                "locator": "src/auth.py",
+                "evidence_ref": "evidence/diff",
+                "classification": "impact",
+                "feature_ids": ["FEAT-001"],
+                "reason": "Authorization behavior changed",
+            }
+        ],
+        "history": [
+            {
+                "event_id": "feature-event-001",
+                "kind": "added",
+                "revision": "commit:abc123",
+                "evidence_ref": "evidence/created",
+                "from_ids": [],
+                "to_ids": ["FEAT-001"],
+            }
         ],
         "unknown_areas": [],
-        "handoff": {"snapshot_sha256": "a" * 64},
+    }
+    if not feature_rows:
+        snapshot["candidates"] = []
+        snapshot["changes"] = []
+        snapshot["history"] = []
+    elif effective_status == "incomplete" and complete_source:
+        snapshot["changes"] = []
+        snapshot["candidates"] = []
+    return {
+        "snapshot": snapshot,
+        "analysis": _feature_analysis(snapshot, effective_status),
     }
 
 
-def feature_ref(revision="feature-r1", content_hash="a" * 64):
+def feature_ref(revision=None, content_hash=None):
+    if revision is None or content_hash is None:
+        snapshot = feature_inventory()
+        revision = snapshot["snapshot"]["artifact_revision"]
+        content_hash = snapshot["analysis"]["handoff"]["snapshot_sha256"]
     return {
         "owner": "feature-analysis",
         "scope": "project:shop",
@@ -66,9 +302,11 @@ def feature_ref(revision="feature-r1", content_hash="a" * 64):
 
 
 def _feature_ref_for(snapshot):
+    b_snapshot = snapshot["snapshot"]
+    handoff = snapshot["analysis"]["handoff"]
     return feature_ref(
-        revision=snapshot["artifact_revision"],
-        content_hash=snapshot["handoff"]["snapshot_sha256"],
+        revision=b_snapshot["artifact_revision"],
+        content_hash=handoff["snapshot_sha256"],
     )
 
 
@@ -786,6 +1024,7 @@ class TestConditionAnalysisContract(unittest.TestCase):
                     "status": "proposed",
                     "rationale": "shared source scope",
                     "evidence_refs": [spec_ref()],
+                    "machine_check_issues": [],
                 }
             ],
         )
@@ -803,7 +1042,11 @@ class TestConditionAnalysisContract(unittest.TestCase):
             condition_request(
                 feature_snapshot=partial,
                 candidates=[
-                    condition_candidate("one", feature_refs=["FEAT-001"]),
+                    condition_candidate(
+                        "one",
+                        feature_refs=["FEAT-001"],
+                        evidence_refs=[_feature_ref_for(partial), spec_ref()],
+                    ),
                 ],
             )
         )
@@ -866,8 +1109,11 @@ class TestConditionAnalysisContract(unittest.TestCase):
             ),
         )
         changed_feature = feature_inventory()
-        changed_feature["artifact_revision"] = "feature-r2"
-        changed_feature["handoff"]["snapshot_sha256"] = "c" * 64
+        changed_feature["snapshot"]["artifact_revision"] = "feature-r2"
+        changed_feature["analysis"] = _feature_analysis(
+            changed_feature["snapshot"], "complete"
+        )
+        changed_feature_ref = _feature_ref_for(changed_feature)
         stale_condition = _materialize_condition(
             condition_request(
                 feature_snapshot=changed_feature,
@@ -875,7 +1121,7 @@ class TestConditionAnalysisContract(unittest.TestCase):
                     condition_candidate(
                         "one",
                         feature_refs=["FEAT-001"],
-                        evidence_refs=[feature_ref("feature-r2", "c" * 64), spec_ref()],
+                        evidence_refs=[changed_feature_ref, spec_ref()],
                     )
                 ],
             )
@@ -978,6 +1224,1000 @@ class TestConditionAnalysisContract(unittest.TestCase):
         result = json.loads(completed.stdout)
         self.assertTrue(result["valid"])
         self.assertEqual(result["candidate_condition_ids"]["cli"], "COND-001")
+
+
+class TestInputSecurityContracts(unittest.TestCase):
+    def test_strict_json_rejects_malformed_and_duplicate_input(self):
+        cases = [
+            (b"{", "invalid_json"),
+            (
+                b'{"operation":"validate","operation":"materialize"}',
+                "duplicate_json_key",
+            ),
+            (b'{"value":"\xff"}', "invalid_json"),
+        ]
+        for raw, expected_code in cases:
+            with self.subTest(expected_code=expected_code, size=len(raw)):
+                with self.assertRaises(ContractError) as caught:
+                    strict_loads(raw)
+                self.assertEqual(caught.exception.code, expected_code)
+
+    def test_deep_json_cannot_become_a_valid_artifact(self):
+        nested_artifact = b"[" * 2500 + b"0" + b"]" * 2500
+        raw = b'{"operation":"validate","artifact":' + nested_artifact + b"}"
+        for script in (
+            ITEM_SCRIPTS / "item_candidates.py",
+            CONDITION_SCRIPTS / "condition_candidates.py",
+        ):
+            with self.subTest(script=script.name):
+                completed = subprocess.run(
+                    [sys.executable, str(script)],
+                    input=raw,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                )
+                result = json.loads(completed.stdout)
+                self.assertFalse(result["valid"])
+                self.assertEqual(result["status"], "blocked")
+
+    def test_non_finite_constants_and_values_are_rejected(self):
+        for constant in (b"NaN", b"Infinity", b"-Infinity"):
+            with self.subTest(constant=constant):
+                with self.assertRaises(ContractError) as caught:
+                    strict_loads(b'{"value":' + constant + b"}")
+                self.assertEqual(caught.exception.code, "invalid_json_constant")
+
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(ContractError) as caught:
+                    canonical_bytes({"value": value})
+                self.assertEqual(caught.exception.code, "invalid_json_value")
+
+    def test_input_size_limit_fails_closed_in_both_isolated_clis(self):
+        oversized = b" " * (MAX_INPUT_BYTES + 1)
+        for script in (
+            ITEM_SCRIPTS / "item_candidates.py",
+            CONDITION_SCRIPTS / "condition_candidates.py",
+        ):
+            with self.subTest(script=script.name):
+                completed = subprocess.run(
+                    [sys.executable, str(script)],
+                    input=oversized,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                )
+                result = json.loads(completed.stdout)
+                self.assertFalse(result["valid"])
+                self.assertEqual(result["status"], "blocked")
+                self.assertIn(
+                    "limit_exceeded", {issue["code"] for issue in result["issues"]}
+                )
+
+    def test_json_parse_failures_are_consistent_across_isolated_clis(self):
+        inputs = (
+            (
+                b'{"operation":"validate","operation":"materialize"}',
+                "duplicate_json_key",
+            ),
+            (b'{"operation":"validate","value":NaN}', "invalid_json_constant"),
+        )
+        for script in (
+            ITEM_SCRIPTS / "item_candidates.py",
+            CONDITION_SCRIPTS / "condition_candidates.py",
+        ):
+            for raw, expected_code in inputs:
+                with self.subTest(script=script.name, expected_code=expected_code):
+                    completed = subprocess.run(
+                        [sys.executable, str(script)],
+                        input=raw,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        check=True,
+                    )
+                    result = json.loads(completed.stdout)
+                    self.assertFalse(result["valid"])
+                    self.assertIn(
+                        expected_code,
+                        {issue["code"] for issue in result["issues"]},
+                    )
+
+
+class TestReviewRegressionFindings(unittest.TestCase):
+    @staticmethod
+    def crosscheck(item_artifact, condition_artifact, candidate_pairs=None):
+        return run_conditions(
+            {
+                "operation": "crosscheck",
+                "item_artifact": item_artifact,
+                "condition_artifact": condition_artifact,
+                "candidate_pairs": candidate_pairs or [],
+            }
+        )
+
+    def test_b_snapshot_and_analysis_are_separate_and_bound(self):
+        source = feature_inventory()
+        candidate = _materialize_item(
+            item_request(feature_snapshot=source, candidates=[])
+        )["candidate"]
+        context = candidate["feature_inventory_context"]
+        self.assertEqual(context["project_ref"], source["snapshot"]["project_ref"])
+        self.assertEqual(context["artifact_ref"], source["snapshot"]["artifact_ref"])
+        self.assertEqual(
+            context["artifact_revision"], source["snapshot"]["artifact_revision"]
+        )
+        self.assertEqual(
+            context["source_revision"], source["snapshot"]["source_revision"]
+        )
+        self.assertEqual(
+            context["snapshot_sha256"], source["analysis"]["handoff"]["snapshot_sha256"]
+        )
+        self.assertEqual(
+            context["source_inventory"],
+            source["analysis"]["handoff"]["source_inventory"],
+        )
+        self.assertEqual(
+            context["feature_ids"], source["analysis"]["handoff"]["feature_ids"]
+        )
+
+        partial = feature_inventory(status="incomplete")
+        partial["snapshot"]["unknown_areas"] = ["product routes not enumerated"]
+        partial["analysis"] = _feature_analysis(partial["snapshot"], "incomplete")
+        partial_result = _materialize_item(
+            item_request(feature_snapshot=partial, candidates=[])
+        )
+        self.assertEqual(partial_result["status"], "incomplete")
+        self.assertFalse(partial_result["candidate"]["source_boundary_complete"])
+        self.assertEqual(
+            partial_result["candidate"]["feature_inventory_context"]["unknown_areas"],
+            ["product routes not enumerated"],
+        )
+
+        mutations = [
+            (
+                "feature_snapshot_hash_mismatch",
+                lambda value: value["analysis"]["handoff"].update(
+                    snapshot_sha256="f" * 64
+                ),
+            ),
+            (
+                "feature_inventory_revision_mismatch",
+                lambda value: value["analysis"]["handoff"].update(
+                    source_revision="commit:other"
+                ),
+            ),
+            (
+                "feature_snapshot_hash_mismatch",
+                lambda value: value["snapshot"].update(artifact_revision="feature-r2"),
+            ),
+            (
+                "feature_inventory_revision_mismatch",
+                lambda value: value["analysis"]["handoff"].update(
+                    artifact_revision="feature-r2"
+                ),
+            ),
+            (
+                "feature_inventory_not_current",
+                lambda value: value["analysis"].update(status="stale"),
+            ),
+            (
+                "feature_inventory_contract_changed",
+                lambda value: value["analysis"].update(unpublished_output=True),
+            ),
+            (
+                "feature_inventory_handoff_mismatch",
+                lambda value: value["analysis"]["handoff"].update(
+                    feature_ids=["FEAT-999"]
+                ),
+            ),
+            (
+                "feature_inventory_analysis_mismatch",
+                lambda value: value["analysis"]["metrics"].update(
+                    source_boundary_complete=False
+                ),
+            ),
+            (
+                "feature_inventory_snapshot_incomplete",
+                lambda value: value["snapshot"].pop("source_revision"),
+            ),
+            (
+                "feature_inventory_analysis_mismatch",
+                lambda value: value["snapshot"]["changes"][0].update(classification=[]),
+            ),
+            (
+                "feature_inventory_analysis_mismatch",
+                lambda value: (
+                    value["snapshot"]["candidates"][0].update(
+                        status="mapped", feature_id="FEAT-999"
+                    )
+                    or value["analysis"]["handoff"].update(
+                        snapshot_sha256=fingerprint(value["snapshot"])
+                    )
+                ),
+            ),
+        ]
+        for expected_code, mutate in mutations:
+            with self.subTest(expected_code=expected_code, mutate=mutate):
+                invalid = copy.deepcopy(source)
+                mutate(invalid)
+                _assert_contract_code(
+                    self,
+                    expected_code,
+                    lambda invalid=invalid: run_items(
+                        item_request(feature_snapshot=invalid, candidates=[])
+                    ),
+                )
+
+    def test_item_owner_and_crosscheck_validators_match_semantically(self):
+        valid = _materialize_item(
+            item_request(candidates=[item_candidate("validator-parity")])
+        )["candidate"]
+        self.assertIsNotNone(validate_item_artifact(copy.deepcopy(valid)))
+        self.assertIsNotNone(validate_crosscheck_item_artifact(copy.deepcopy(valid)))
+
+        mutations = [
+            lambda value: value["items"][0].update(kind="unsupported"),
+            lambda value: value["items"][0].update(kind=[]),
+            lambda value: value["items"][0].update(status="unsupported"),
+            lambda value: value["items"][0].update(status=[]),
+            lambda value: value["items"][0].pop("description"),
+            lambda value: value["items"][0].update(parent_item_ids=["ITEM-999"]),
+            lambda value: value["items"][0].update(parent_item_ids=["ITEM-001"]),
+            lambda value: value["items"][0].update(feature_refs=["FEAT-999"]),
+            lambda value: value["history"][0].update(action="unsupported"),
+            lambda value: value["history"][0].update(action=[]),
+            lambda value: value["items"][0].update(
+                evidence_refs=[spec_ref(revision="spec-r9", content_hash="c" * 64)]
+            ),
+            lambda value: value["items"][0].update(name=""),
+            lambda value: value["history"][0].update(
+                reason="history altered after creation"
+            ),
+            lambda value: value.update(owner="test-condition-analysis"),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                invalid = copy.deepcopy(valid)
+                mutate(invalid)
+                _refresh_artifact_fingerprint(invalid)
+                owner_error = None
+                crosscheck_error = None
+                with self.assertRaises(ContractError) as owner_caught:
+                    validate_item_artifact(copy.deepcopy(invalid))
+                owner_error = owner_caught.exception.code
+                with self.assertRaises(ContractError) as consumer_caught:
+                    validate_crosscheck_item_artifact(copy.deepcopy(invalid))
+                crosscheck_error = consumer_caught.exception.code
+                self.assertEqual(owner_error, crosscheck_error)
+
+        invalid = copy.deepcopy(valid)
+        invalid["items"][0]["name"] = ""
+        _refresh_artifact_fingerprint(invalid)
+        condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("validator-consumer")])
+        )["candidate"]
+        _assert_contract_code(
+            self,
+            "invalid_field",
+            lambda: self.crosscheck(invalid, condition),
+        )
+
+    def test_history_ids_are_unique_idempotent_and_legacy_compatible(self):
+        first_item = _materialize_item(
+            item_request(candidates=[item_candidate("seed", reason="same reason")])
+        )["candidate"]
+        second_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "revision-two",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        name="revision two",
+                        reason="same reason",
+                    )
+                ],
+                previous=first_item,
+                expected="storage-r1",
+                current="storage-r1",
+            )
+        )["candidate"]
+        third_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "revision-three",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        name="revision three",
+                        reason="same reason",
+                    )
+                ],
+                previous=second_item,
+                expected="storage-r2",
+                current="storage-r2",
+            )
+        )["candidate"]
+        item_event_ids = [row["event_id"] for row in third_item["history"]]
+        self.assertEqual(len(item_event_ids), len(set(item_event_ids)))
+        self.assertNotEqual(item_event_ids[-2], item_event_ids[-1])
+        item_replay = run_items(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "revision-three",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        name="revision three",
+                        reason="same reason",
+                    )
+                ],
+                previous=third_item,
+                expected="storage-r3",
+                current="storage-r3",
+            )
+        )
+        self.assertEqual(item_replay["status"], "no_change")
+        self.assertEqual(item_replay["candidate"]["history"], third_item["history"])
+
+        first_condition = _materialize_condition(
+            condition_request(
+                candidates=[condition_candidate("seed", reason="same reason")]
+            )
+        )["candidate"]
+        second_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "revision-two",
+                        action="reuse",
+                        condition_id="COND-001",
+                        name="revision two",
+                        reason="same reason",
+                    )
+                ],
+                previous=first_condition,
+                expected="storage-r1",
+                current="storage-r1",
+            )
+        )["candidate"]
+        third_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "revision-three",
+                        action="reuse",
+                        condition_id="COND-001",
+                        name="revision three",
+                        reason="same reason",
+                    )
+                ],
+                previous=second_condition,
+                expected="storage-r2",
+                current="storage-r2",
+            )
+        )["candidate"]
+        condition_event_ids = [row["event_id"] for row in third_condition["history"]]
+        self.assertEqual(len(condition_event_ids), len(set(condition_event_ids)))
+        self.assertNotEqual(condition_event_ids[-2], condition_event_ids[-1])
+        condition_replay = run_conditions(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "revision-three",
+                        action="reuse",
+                        condition_id="COND-001",
+                        name="revision three",
+                        reason="same reason",
+                    )
+                ],
+                previous=third_condition,
+                expected="storage-r3",
+                current="storage-r3",
+            )
+        )
+        self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(
+            condition_replay["candidate"]["history"], third_condition["history"]
+        )
+
+        legacy_item = copy.deepcopy(first_item)
+        for event in legacy_item["history"]:
+            event["event_id"] = fingerprint(
+                {key: value for key, value in event.items() if key != "event_id"}
+            )
+        _refresh_artifact_fingerprint(legacy_item)
+        validate_item_artifact(legacy_item)
+        migrated_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "legacy-next",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        name="migrated without rewriting history",
+                    )
+                ],
+                previous=legacy_item,
+                expected="legacy-r1",
+                current="legacy-r1",
+            )
+        )["candidate"]
+        self.assertEqual(
+            migrated_item["history"][0]["event_id"],
+            legacy_item["history"][0]["event_id"],
+        )
+        self.assertNotEqual(
+            migrated_item["history"][1]["event_id"],
+            migrated_item["history"][0]["event_id"],
+        )
+
+        legacy_condition = copy.deepcopy(first_condition)
+        for event in legacy_condition["history"]:
+            event["event_id"] = fingerprint(
+                {key: value for key, value in event.items() if key != "event_id"}
+            )
+        _refresh_artifact_fingerprint(legacy_condition)
+        validate_crosscheck_item_artifact(legacy_item)
+        validate_condition_artifact = run_conditions(
+            {"operation": "validate", "artifact": legacy_condition}
+        )
+        self.assertTrue(validate_condition_artifact["valid"])
+        migrated_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "legacy-next",
+                        action="reuse",
+                        condition_id="COND-001",
+                        name="migrated without rewriting history",
+                    )
+                ],
+                previous=legacy_condition,
+                expected="legacy-r1",
+                current="legacy-r1",
+            )
+        )["candidate"]
+        self.assertEqual(
+            migrated_condition["history"][0]["event_id"],
+            legacy_condition["history"][0]["event_id"],
+        )
+
+        altered = copy.deepcopy(third_item)
+        altered["history"][0]["reason"] = (
+            "altered with a recomputed artifact fingerprint"
+        )
+        _refresh_artifact_fingerprint(altered)
+        _assert_contract_code(
+            self,
+            "history_event_integrity",
+            lambda: validate_item_artifact(altered),
+        )
+        duplicate_item_event = copy.deepcopy(third_item)
+        duplicate_item_event["history"][-1]["event_id"] = duplicate_item_event[
+            "history"
+        ][-2]["event_id"]
+        _refresh_artifact_fingerprint(duplicate_item_event)
+        _assert_contract_code(
+            self,
+            "item_history_invalid",
+            lambda: validate_item_artifact(duplicate_item_event),
+        )
+        truncated = copy.deepcopy(third_condition)
+        truncated["history"].pop(0)
+        _refresh_artifact_fingerprint(truncated)
+        _assert_contract_code(
+            self,
+            "history_event_integrity",
+            lambda: run_conditions({"operation": "validate", "artifact": truncated}),
+        )
+        duplicate_condition_event = copy.deepcopy(third_condition)
+        duplicate_condition_event["history"][-1]["event_id"] = (
+            duplicate_condition_event["history"][-2]["event_id"]
+        )
+        _refresh_artifact_fingerprint(duplicate_condition_event)
+        _assert_contract_code(
+            self,
+            "condition_history_invalid",
+            lambda: run_conditions(
+                {"operation": "validate", "artifact": duplicate_condition_event}
+            ),
+        )
+
+    def test_current_sources_reject_competing_revisions_but_retain_history(self):
+        snapshot = feature_inventory()
+        source_rows = [_feature_ref_for(snapshot), spec_ref()]
+        first = _materialize_item(
+            item_request(candidates=[item_candidate("ordered")], sources=source_rows)
+        )["candidate"]
+        reversed_result = _materialize_item(
+            item_request(
+                candidates=[item_candidate("ordered")],
+                sources=list(reversed(source_rows)),
+            )
+        )["candidate"]
+        self.assertEqual(
+            first["content_fingerprint"], reversed_result["content_fingerprint"]
+        )
+
+        for conflict, code in (
+            ([source_rows[0], source_rows[1], source_rows[1]], "duplicate_source_ref"),
+            (
+                [
+                    source_rows[0],
+                    source_rows[1],
+                    spec_ref(revision="spec-r2", content_hash="c" * 64),
+                ],
+                "conflicting_source_revision",
+            ),
+            (
+                [
+                    source_rows[0],
+                    source_rows[1],
+                    spec_ref(revision="spec-r1", content_hash="c" * 64),
+                ],
+                "conflicting_source_revision",
+            ),
+        ):
+            _assert_contract_code(
+                self,
+                code,
+                lambda conflict=conflict: run_items(
+                    item_request(candidates=[], sources=conflict)
+                ),
+            )
+
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "source-linked",
+                        evidence_refs=[feature_ref(), spec_ref()],
+                    )
+                ]
+            )
+        )["candidate"]
+        initial_condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("source-linked")])
+        )["candidate"]
+        revisions = [
+            spec_ref(revision="spec-r2", content_hash="c" * 64),
+            spec_ref(revision="spec-r3", content_hash="d" * 64),
+        ]
+        item_previous = initial_item
+        condition_previous = initial_condition
+        for index, revision in enumerate(revisions, start=1):
+            current_sources = [feature_ref(), revision]
+            impact_item = run_items(
+                {
+                    "operation": "impact",
+                    "artifact": item_previous,
+                    "current_source_refs": current_sources,
+                }
+            )
+            impact_condition = run_conditions(
+                {
+                    "operation": "impact",
+                    "artifact": condition_previous,
+                    "current_source_refs": current_sources,
+                }
+            )
+            self.assertEqual(impact_item["impacted_item_ids"], ["ITEM-001"])
+            self.assertEqual(impact_condition["impacted_condition_ids"], ["COND-001"])
+            item_update = _materialize_item(
+                item_request(
+                    candidates=[],
+                    sources=current_sources,
+                    previous=item_previous,
+                    expected=f"storage-r{index}",
+                    current=f"storage-r{index}",
+                )
+            )
+            condition_update = _materialize_condition(
+                condition_request(
+                    candidates=[],
+                    sources=current_sources,
+                    previous=condition_previous,
+                    expected=f"storage-r{index}",
+                    current=f"storage-r{index}",
+                )
+            )
+            item_previous = item_update["candidate"]
+            condition_previous = condition_update["candidate"]
+            self.assertEqual(
+                [row["action"] for row in item_previous["history"]].count(
+                    "source_changed"
+                ),
+                index,
+            )
+            self.assertEqual(
+                [row["action"] for row in condition_previous["history"]].count(
+                    "source_changed"
+                ),
+                index,
+            )
+        self.assertEqual(
+            sorted(
+                ref["revision"]
+                for ref in item_previous["source_refs"]
+                if ref["owner"] == "spec-analysis"
+            ),
+            ["spec-r1", "spec-r2", "spec-r3"],
+        )
+        item_replay = run_items(
+            item_request(
+                candidates=[],
+                sources=[feature_ref(), revisions[-1]],
+                previous=item_previous,
+                expected="storage-r2",
+                current="storage-r2",
+            )
+        )
+        condition_replay = run_conditions(
+            condition_request(
+                candidates=[],
+                sources=[feature_ref(), revisions[-1]],
+                previous=condition_previous,
+                expected="storage-r2",
+                current="storage-r2",
+            )
+        )
+        self.assertEqual(item_replay["status"], "no_change")
+        self.assertEqual(condition_replay["status"], "no_change")
+        self.assertEqual(
+            len(item_replay["candidate"]["history"]), len(item_previous["history"])
+        )
+        self.assertEqual(
+            len(condition_replay["candidate"]["history"]),
+            len(condition_previous["history"]),
+        )
+
+    def test_unfound_item_references_are_unconfirmed_and_can_resolve_later(self):
+        empty_items = _materialize_item(item_request(candidates=[]))["candidate"]
+        condition = _materialize_condition(
+            condition_request(
+                candidates=[condition_candidate("await-item", item_refs=["ITEM-001"])]
+            )
+        )["candidate"]
+        unresolved = self.crosscheck(empty_items, condition)
+        self.assertEqual(unresolved["status"], "incomplete")
+        self.assertEqual(
+            unresolved["unresolved_item_references"][0]["reason"], "item_not_found"
+        )
+        self.assertEqual(
+            unresolved["unresolved_item_references"][0]["state"], "unconfirmed"
+        )
+        self.assertEqual(unresolved["recheck_item_ids"], ["ITEM-001"])
+        self.assertEqual(unresolved["recheck_condition_ids"], ["COND-001"])
+        self.assertEqual(condition["conditions"][0]["condition_id"], "COND-001")
+        self.assertEqual(empty_items["items"], [])
+
+        registered = _materialize_item(
+            item_request(candidates=[item_candidate("arrived")])
+        )["candidate"]
+        resolved = self.crosscheck(registered, condition)
+        self.assertEqual(resolved["unresolved_item_references"], [])
+        self.assertEqual(resolved["status"], "candidate_crosscheck_complete")
+        self.assertEqual(condition["conditions"][0]["condition_id"], "COND-001")
+
+        malformed = condition_request(
+            candidates=[condition_candidate("malformed", item_refs=["bad-id"])]
+        )
+        _assert_contract_code(
+            self,
+            "candidate_item_ref_invalid",
+            lambda: run_conditions(malformed),
+        )
+
+        unknown_item = _materialize_item(
+            item_request(candidates=[item_candidate("unknown", status="unknown")])
+        )["candidate"]
+        unknown_condition = _materialize_condition(
+            condition_request(
+                candidates=[condition_candidate("unknown-item", item_refs=["ITEM-001"])]
+            )
+        )["candidate"]
+        unknown_result = self.crosscheck(unknown_item, unknown_condition)
+        self.assertEqual(
+            unknown_result["unresolved_item_references"][0]["reason"],
+            "item_unconfirmed",
+        )
+        self.assertEqual(unknown_result["status"], "incomplete")
+
+        active_item = _materialize_item(
+            item_request(candidates=[item_candidate("to-retire")])
+        )["candidate"]
+        retired_item = _materialize_item(
+            item_request(
+                candidates=[],
+                previous=active_item,
+                expected="storage-r1",
+                current="storage-r1",
+                retirements=[
+                    {
+                        "item_id": "ITEM-001",
+                        "reason": "owner evidence confirms removal",
+                        "evidence_refs": [feature_ref()],
+                    }
+                ],
+            )
+        )["candidate"]
+        retired_condition = _materialize_condition(
+            condition_request(
+                candidates=[condition_candidate("retired-ref", item_refs=["ITEM-001"])]
+            )
+        )["candidate"]
+        retired_result = self.crosscheck(retired_item, retired_condition)
+        self.assertEqual(retired_result["retired_item_ids"], ["ITEM-001"])
+        self.assertEqual(retired_result["items_without_pair_proposal"], [])
+        self.assertEqual(
+            retired_result["unresolved_item_references"][0]["reason"], "item_retired"
+        )
+
+    def test_crosscheck_gates_stale_retired_blocked_and_inconsistent_pairs(self):
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "current-item",
+                        evidence_refs=[feature_ref(), spec_ref()],
+                    )
+                ]
+            )
+        )["candidate"]
+        initial_condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("stale-condition")])
+        )["candidate"]
+        changed_spec = spec_ref(revision="spec-r2", content_hash="c" * 64)
+        changed_sources = [feature_ref(), changed_spec]
+        current_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "current-item",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        evidence_refs=[feature_ref(), changed_spec],
+                    )
+                ],
+                sources=changed_sources,
+                previous=initial_item,
+                expected="storage-r1",
+                current="storage-r1",
+            )
+        )["candidate"]
+        stale_condition = _materialize_condition(
+            condition_request(
+                candidates=[],
+                sources=changed_sources,
+                previous=initial_condition,
+                expected="storage-r1",
+                current="storage-r1",
+            )
+        )["candidate"]
+        stale_result = self.crosscheck(current_item, stale_condition)
+        self.assertEqual(stale_result["status"], "incomplete")
+        self.assertEqual(stale_result["stale_condition_ids"], ["COND-001"])
+        self.assertEqual(stale_result["candidate_pairs"], [])
+        self.assertEqual(stale_result["candidate_identification_coverage"]["rate"], 0.5)
+        self.assertEqual(
+            stale_result["candidate_identification_coverage"]["status"], "measured"
+        )
+
+        item_artifact = _materialize_item(
+            item_request(candidates=[item_candidate("kind-conflict", kind="api")])
+        )["candidate"]
+        condition_artifact = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "kind-conflict",
+                        item_kinds=["ui"],
+                        feature_refs=["FEAT-001"],
+                    )
+                ]
+            )
+        )["candidate"]
+        pair = {
+            "item_id": "ITEM-001",
+            "condition_id": "COND-001",
+            "status": "proposed",
+            "rationale": "explicit pair with a kind contradiction",
+            "evidence_refs": [spec_ref()],
+        }
+        conflict = self.crosscheck(item_artifact, condition_artifact, [pair])
+        self.assertEqual(conflict["status"], "incomplete")
+        self.assertEqual(conflict["candidate_pairs"][0]["status"], "unconfirmed")
+        self.assertIn(
+            "item_kind_not_in_condition_applicability",
+            conflict["candidate_pair_inconsistencies"][0]["codes"],
+        )
+        self.assertFalse(conflict["cartesian_product_generated"])
+        _assert_contract_code(
+            self,
+            "candidate_pair_duplicate",
+            lambda: self.crosscheck(item_artifact, condition_artifact, [pair, pair]),
+        )
+
+        disjoint_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "feature-conflict",
+                        item_kinds=["api"],
+                        feature_refs=["FEAT-002"],
+                    )
+                ]
+            )
+        )["candidate"]
+        disjoint = self.crosscheck(
+            item_artifact,
+            disjoint_condition,
+            [
+                {
+                    **pair,
+                    "condition_id": "COND-001",
+                    "rationale": "disjoint feature refs",
+                }
+            ],
+        )
+        self.assertIn(
+            "item_and_condition_feature_refs_disjoint",
+            disjoint["candidate_pair_inconsistencies"][0]["codes"],
+        )
+
+        reusable_items = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate("first", feature_refs=["FEAT-001"]),
+                    item_candidate("second", feature_refs=["FEAT-002"]),
+                ]
+            )
+        )["candidate"]
+        reusable_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "shared",
+                        item_kinds=["api"],
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                        item_refs=["ITEM-001", "ITEM-002"],
+                    )
+                ]
+            )
+        )["candidate"]
+        reused = self.crosscheck(
+            reusable_items,
+            reusable_condition,
+            [
+                {**pair, "item_id": "ITEM-001", "rationale": "first item"},
+                {**pair, "item_id": "ITEM-002", "rationale": "second item"},
+            ],
+        )
+        self.assertEqual(reused["metrics"]["candidate_pair_count"], 2)
+        self.assertEqual(
+            {row["condition_id"] for row in reused["candidate_pairs"]}, {"COND-001"}
+        )
+
+        blocked_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "blocked-without-pair",
+                        authorities=[],
+                        state="blocked",
+                        unknowns=["Authority unavailable"],
+                    )
+                ]
+            )
+        )["candidate"]
+        blocked = self.crosscheck(
+            _materialize_item(item_request(candidates=[]))["candidate"],
+            blocked_condition,
+        )
+        self.assertEqual(blocked["status"], "incomplete")
+        self.assertEqual(blocked["blocked_condition_ids"], ["COND-001"])
+
+        base_condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("retire-condition")])
+        )["candidate"]
+        retired_condition = _materialize_condition(
+            condition_request(
+                candidates=[],
+                previous=base_condition,
+                expected="storage-r1",
+                current="storage-r1",
+                retirements=[
+                    {
+                        "condition_id": "COND-001",
+                        "reason": "condition scope ended",
+                        "evidence_refs": [spec_ref()],
+                    }
+                ],
+            )
+        )["candidate"]
+        retired = self.crosscheck(
+            _materialize_item(item_request(candidates=[]))["candidate"],
+            retired_condition,
+        )
+        self.assertEqual(retired["retired_condition_ids"], ["COND-001"])
+        self.assertEqual(retired["conditions_without_pair_proposal"], [])
+        self.assertEqual(retired["metrics"]["condition_candidate_count"], 0)
+
+    def test_write_precondition_matches_current_a_operation_claim(self):
+        result = _materialize_item(item_request(candidates=[item_candidate("claim")]))
+        precondition = result["write_precondition"]
+        claim = precondition["operation_claim_details"]
+        self.assertEqual(_validate_claim_details(claim), claim)
+        self.assertFalse(precondition["performed"])
+        self.assertFalse(precondition["provider_selected"])
+        self.assertEqual(
+            precondition["approval_state"], "not_resolved_by_candidate_helper"
+        )
+        self.assertTrue(precondition["requires_provider_native_cas"])
+        self.assertTrue(precondition["requires_independent_readback"])
+        self.assertNotEqual(
+            result["candidate"]["content_fingerprint"],
+            result["candidate"]["feature_inventory_context"]["artifact_revision"],
+        )
+
+    def test_legacy_v1_artifacts_read_without_rewriting_history(self):
+        item = _materialize_item(
+            item_request(candidates=[item_candidate("legacy-item")])
+        )["candidate"]
+        condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("legacy-condition")])
+        )["candidate"]
+        legacy_item = copy.deepcopy(item)
+        legacy_condition = copy.deepcopy(condition)
+        legacy_item.pop("feature_inventory_context")
+        legacy_condition.pop("feature_inventory_context")
+        _refresh_artifact_fingerprint(legacy_item)
+        _refresh_artifact_fingerprint(legacy_condition)
+        item_history = copy.deepcopy(legacy_item["history"])
+        condition_history = copy.deepcopy(legacy_condition["history"])
+        self.assertIsNotNone(validate_item_artifact(legacy_item))
+        self.assertIsNotNone(validate_crosscheck_item_artifact(legacy_item))
+        self.assertTrue(
+            run_conditions({"operation": "validate", "artifact": legacy_condition})[
+                "valid"
+            ]
+        )
+
+        legacy_crosscheck = self.crosscheck(legacy_item, legacy_condition)
+        self.assertEqual(legacy_crosscheck["status"], "incomplete")
+        self.assertTrue(
+            any(
+                issue["code"] == "source_population_incomplete"
+                for issue in legacy_crosscheck["issues"]
+            )
+        )
+
+        migrated_item = _materialize_item(
+            item_request(
+                candidates=[],
+                previous=legacy_item,
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )["candidate"]
+        migrated_condition = _materialize_condition(
+            condition_request(
+                candidates=[],
+                previous=legacy_condition,
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )["candidate"]
+        self.assertEqual(migrated_item["history"], item_history)
+        self.assertEqual(migrated_condition["history"], condition_history)
+        self.assertEqual(migrated_item["id_history"], legacy_item["id_history"])
+        self.assertEqual(
+            migrated_condition["id_history"], legacy_condition["id_history"]
+        )
+        self.assertIn("feature_inventory_context", migrated_item)
+        self.assertIn("feature_inventory_context", migrated_condition)
 
 
 if __name__ == "__main__":

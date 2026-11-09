@@ -1,3 +1,5 @@
 # Eval Input
 
-Product feature inventory has a confirmed checkout workflow. The UI is planned and not implemented. A search API already exists and is implemented. The API supports both checkout and refund workflows. A nightly batch consumes API output and is planned. A reviewer supplied an older item named "Checkout" but did not confirm whether it refers to the same target as the UI. Identify test item candidates, preserve the supplied evidence revisions, and report missing or uncertain scope. Do not create formal test conditions or expected results.
+The only available evidence is this narrative: the checkout workflow is confirmed; its UI is planned and not implemented; an existing search API is implemented and supports checkout and refund; a planned nightly batch consumes API output; a reviewer supplied an older item named "Checkout" but did not confirm whether it is the UI.
+
+The exact B feature-inventory snapshot and separate analysis report, source refs/revisions/hashes, prior D item artifact/ID history, and provider revision are not available. Identify provisional item candidates from the narrative, preserve the older item separately, list missing inputs and recheck conditions, and do not invent stable IDs, source revisions, hierarchy, or currentness. Do not create formal test conditions or expected results.

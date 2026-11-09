@@ -1,21 +1,55 @@
 # Test condition candidate data contract
 
-## Inputs and outputs
+## B input and sources
 
-The upstream feature input is B's `feature-inventory-v1`. D preserves its `project_ref`, `artifact_ref`, `artifact_revision`, `source_revision`, and `handoff.snapshot_sha256`. Authority refs are `{source_ref, entity_ref}` with a source ref owned by `spec-analysis`. A source ref is `{owner, scope, artifact_ref, revision, content_hash}`. D validates shape and links but does not re-run upstream owner validators or authenticate provider readback.
+The `feature_inventory` request value is the exact B snapshot paired with the separate `feature_registry.analyze()` result:
 
-The helper accepts exact `materialize`, `validate`, `impact`, `validate_readback`, and `crosscheck` operations. Candidate rows provide request-local keys, an explicit identity action, intent, kind, applicable item kinds, feature/item refs, evidence/Authority refs, candidate state, unknowns, and reason. Unknown fields are rejected.
+```json
+{
+  "snapshot": { "schema_version": "feature-inventory-v1" },
+  "analysis": {
+    "status": "complete",
+    "reasons": [],
+    "metrics": {},
+    "handoff": {}
+  }
+}
+```
 
-## Candidate artifact
+D checks B's published analysis/handoff field sets, snapshot SHA-256, project/artifact identity and revisions, source inventory, feature projection and IDs, boundary state, and metric consistency. It does not call B's persistence path or duplicate B's full validator. `incomplete` input is preserved as incomplete and cannot establish a complete population; `stale`, `blocked`, `idempotent`, mismatched, and malformed input is rejected. `project_ref` must equal D's scope.
 
-Schema `test-condition-candidates-v1` contains owner, scope, logical artifact ref, exact feature inventory source ref and population, source-boundary state, historical/current source refs, previous provider revision, condition candidates, append-only ID history, change events, and a canonical content fingerprint. A candidate has `COND-*`, name, intent, kind, applicable item kinds, feature refs, optional item refs, Authority refs, evidence refs, candidate state (`candidate`, `unconfirmed`, `blocked`), currentness, and unknowns.
+D derives the feature source ref as `{owner: "feature-analysis", scope: project_ref, artifact_ref, revision: artifact_revision, content_hash: handoff.snapshot_sha256}`. The artifact also carries the separate B `source_revision`, source inventory, expected source IDs, feature IDs, and unknown areas in `feature_inventory_context`. The B stored revision, source revision, and snapshot hash remain distinct values.
 
-The fingerprint is SHA-256 over canonical UTF-8 JSON with sorted keys and compact separators, excluding only `content_fingerprint`. It is not the provider's artifact revision.
+Authority refs are `{source_ref, entity_ref}` with a source ref owned by `spec-analysis`. Every source ref is `{owner, scope, artifact_ref, revision, content_hash}`. A current source set may contain only one revision/hash for each logical source `(owner, scope, artifact_ref)`; historical source sets may retain older revisions. Currentness compares logical identity and exact revision/hash, independent of input order. Revision matching does not prove CAS or provider readback.
 
-An explicit merge records the new condition ID's links to its source IDs. Every merge source must also be explicitly retired in the same update with current evidence; otherwise the merge is rejected so old and merged meanings cannot remain active together. Retired IDs remain in `id_history` and are never recycled.
+The helper accepts exact `materialize`, `validate`, `impact`, `validate_readback`, and `crosscheck` request shapes. Candidate rows use request-local keys and explicit identity actions. Unknown fields are rejected.
 
-## Crosscheck and storage handoff
+## JSON input boundary
 
-`item-condition-candidate-crosscheck-v1` returns explicit proposed pairs and gaps. It never creates all combinations and never carries an E-owned formal decision. Candidate counts are numeric; out-of-owner applicability, formal design, and execution counts are `null` with `not_provided_to_D` state.
+The standalone CLI accepts strict UTF-8 JSON up to 16 MiB. Duplicate object keys, malformed JSON, non-finite constants such as NaN or Infinity, and inputs beyond the byte limit return a blocked result. Canonical serialization also rejects non-finite values; item and condition packages carry byte-identical parsing helpers.
 
-`write_precondition.performed` is always false. The A adapter must create an operation claim from owner, scope, operation kind, target ref, source revisions, expected revision, approval ref, required permission, and resume owner; then use provider-native CAS/create-if-absent and independently read back the same content hash. The local `validate_readback` only compares the supplied tuple and hash. No real provider or authenticated approval is connected in this D branch.
+## Candidate artifact and compatibility
+
+Schema `test-condition-candidates-v1` contains owner, scope, logical artifact ref, feature inventory ref and context, feature population and boundary state, historical/current source refs, previous provider revision, condition candidates, append-only ID history, change events, and a canonical content fingerprint. A candidate has a stable `COND-*`, name, intent, kind, applicable item kinds, feature refs, optional item refs, Authority refs, evidence refs, candidate state (`candidate`, `unconfirmed`, `blocked`), currentness, and unknowns.
+
+The fingerprint is SHA-256 over canonical UTF-8 JSON with sorted keys and compact separators, excluding only `content_fingerprint`. It identifies the candidate payload, not the provider's artifact revision.
+
+Older v1 item and condition artifacts without `feature_inventory_context` remain readable when their semantic fields, history, refs, and fingerprints validate. A crosscheck using such artifacts is `incomplete`; it does not infer a complete source population. The next materialization adds current B context and retains existing IDs and historical event IDs. Legacy event IDs are checked against their legacy event-body fingerprint. New appended IDs bind the event body, sequence, and previous event ID, preserving deterministic replay and uniqueness when different updates share the same reason and evidence.
+
+An explicit merge records the new condition ID's links to source IDs. Every merge source must also be explicitly retired in the same update with current evidence; otherwise the merge is rejected. Retired IDs remain in `id_history` and are never reused.
+
+## Crosscheck and D-to-E boundary
+
+`item-condition-candidate-crosscheck-v1` validates the item artifact using the same byte-identical read-only contract helper embedded in the isolated item and condition packages. It checks semantic fields and references, not just the candidate fingerprint. Scope, B feature ref/population/context, and active source revisions must agree across both artifacts.
+
+Only explicitly supplied candidate pairs are checked; no item × condition Cartesian product is generated. Duplicate pairs and malformed IDs are rejected. A well-formed but missing item ID, a retired item, or an unconfirmed/stale item is reported as unresolved with reason and recheck IDs; D never creates an item or changes the condition ID. Pair evidence must resolve to supplied source history. A proposed pair with a machine-detectable item-kind conflict, disjoint nonempty feature refs, or stale/unknown pair evidence is downgraded to `unconfirmed` and returned with issue codes. Formal applicability remains E-owned.
+
+Retired item/condition IDs are reported separately from active candidates without a pair proposal. Stale or unknown item/condition currentness, incomplete B population, unknown feature status, unconfirmed/blocked conditions, unresolved refs, pair conflicts, and a zero feature denominator prevent `candidate_crosscheck_complete`. Candidate counts, formal E applicability/design counts, and execution counts remain separate; counts outside D ownership are `null` with `not_provided_to_D`. Missing candidate pairs are reported as candidate gaps and do not become formal E disposition decisions.
+
+D exposes owner/scope/logical artifact refs, stable item/condition IDs, candidate fingerprints, current source refs/revisions, known gaps, and unknowns for E to consume. PR #27 currently publishes only the E work definition and no implementation-level input schema; this document therefore does not fix a new E schema. E owns item-condition adoption/rejection, formal Disposition, TCN/CI, and expected results. Real D artifacts and the E owner validator must be cross-connected in PR #22.
+
+## Storage handoff
+
+`write_precondition.performed` and `provider_selected` are false. The nested A operation-claim details use `owner_skill`, `scope_ref`, `operation_type`, `target_ref`, `source_revisions`, `artifact_revisions`, `expected_revision`, `approval_ref`, `permission_scope`, and `resume_owner`, matching A's current validator. D does not claim authenticated approval, persistence, CAS, or readback.
+
+The A-owned adapter must select an authorized provider, use native CAS/create-if-absent, preserve immutable history, and independently read back the saved hash. Local `validate_readback` only checks supplied identity/revision/hash consistency. A candidate fingerprint must never be presented as the saved provider revision.
