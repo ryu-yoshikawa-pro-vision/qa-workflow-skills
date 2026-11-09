@@ -1,0 +1,7 @@
+{
+  "required_population_ids": ["POP-101"],
+  "expected_acquisition": {
+    "POP-101": "未取得"
+  },
+  "must_not_claim_complete": true
+}

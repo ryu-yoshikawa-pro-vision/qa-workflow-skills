@@ -1,0 +1,8 @@
+{
+  "required_population_ids": ["POP-001", "POP-002"],
+  "expected_acquisition": {
+    "POP-001": "取得済",
+    "POP-002": "取得済"
+  },
+  "must_not_claim_complete": true
+}

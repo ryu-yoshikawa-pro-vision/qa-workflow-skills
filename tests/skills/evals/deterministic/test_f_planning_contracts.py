@@ -1,0 +1,485 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+SKILLS_ROOT = REPO_ROOT / "skills"
+
+
+def normalize_markdown_tables(text: str) -> str:
+    normalized_lines = []
+    for line in text.splitlines():
+        if line.strip().startswith("|"):
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            line = "| " + " | ".join(cells) + " |"
+        normalized_lines.append(line)
+    return "\n".join(normalized_lines) + ("\n" if text.endswith("\n") else "")
+
+
+def load_validator(skill: str):
+    path = SKILLS_ROOT / skill / "evals" / "deterministic" / "validator.py"
+    spec = importlib.util.spec_from_file_location(
+        f"{skill.replace('-', '_')}_validator", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load validator: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.validate
+
+
+def eval_case(skill: str, eval_id: str) -> tuple[str, dict]:
+    root = SKILLS_ROOT / skill / "evals" / "output"
+    manifest = json.loads((root / "evals.json").read_text(encoding="utf-8"))
+    case = next(row for row in manifest["cases"] if row["id"] == eval_id)
+    expected = json.loads((root / case["expected"]).read_text(encoding="utf-8"))
+    reference = (root / case["input"]).parent / "reference.md"
+    return normalize_markdown_tables(reference.read_text(encoding="utf-8")), expected
+
+
+def assertion_status(result, assertion_id: str) -> str:
+    return next(item.status for item in result.assertions if item.id == assertion_id)
+
+
+def update_markdown_row(text: str, row_id: str, updates: dict[str, str]) -> str:
+    lines = text.splitlines()
+    row_index = None
+    headers = []
+    cells = []
+    for index, line in enumerate(lines):
+        if not line.strip().startswith(f"| {row_id} |"):
+            continue
+        for header_index in range(index - 1, -1, -1):
+            candidate_headers = [
+                cell.strip()
+                for cell in lines[header_index].strip().strip("|").split("|")
+            ]
+            if not all(header in candidate_headers for header in updates):
+                continue
+            row_index = index
+            headers = candidate_headers
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            break
+        if row_index is not None:
+            break
+    if row_index is None:
+        raise AssertionError(
+            f"could not find {row_id} row with columns {sorted(updates)}"
+        )
+    for header, value in updates.items():
+        cells[headers.index(header)] = value
+    lines[row_index] = "| " + " | ".join(cells) + " |"
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+class QaPlanningContractTests(unittest.TestCase):
+    def test_all_output_fixtures_pass(self):
+        for skill, eval_ids in (
+            ("test-requirements-analysis", ("QRA-OUT-001", "QRA-OUT-002")),
+            ("test-architecture-design", ("TAD-OUT-001", "TAD-OUT-002")),
+            ("test-management", ("TMG-OUT-001", "TMG-OUT-002")),
+        ):
+            validate = load_validator(skill)
+            for eval_id in eval_ids:
+                with self.subTest(skill=skill, eval_id=eval_id):
+                    text, expected = eval_case(skill, eval_id)
+                    self.assertEqual(validate(text, expected, eval_id).status, "pass")
+
+    def test_reference_fixtures_form_a_revision_pinned_planning_chain(self):
+        requirements, _ = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        architecture, _ = eval_case("test-architecture-design", "TAD-OUT-001")
+        management, _ = eval_case("test-management", "TMG-OUT-001")
+
+        self.assertIn(
+            "| artifact_ref | fixture://qa/requirements/orders-q4 |", requirements
+        )
+        self.assertIn("| revision | req-r3 |", requirements)
+        self.assertIn("| scope | orders-release-q4 |", requirements)
+        self.assertIn("| 状態 | 承認済み |", requirements)
+        self.assertIn(
+            "| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3 | orders-release-q4 | current | 取得済 |",
+            architecture,
+        )
+        self.assertIn(
+            "| ARCH-001 | orders.update | API target | fixture://qa/requirements/orders-q4#QAR-001@req-r3 |",
+            architecture,
+        )
+        self.assertIn(
+            "| test-architecture-design | fixture://qa/architecture/orders-r1 | arch-r1 | orders-release-q4 | QAR-001 | current / 承認済み |",
+            requirements,
+        )
+        self.assertIn(
+            "| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3 | orders-release-q4 | current | 取得済 |",
+            management,
+        )
+        self.assertIn(
+            "| test-architecture-design | fixture://qa/architecture/orders-r1 | arch-r1 | orders-release-q4 | current | 取得済 |",
+            management,
+        )
+        self.assertIn(
+            "| PLAN-001 | fixture://qa/requirements/orders-q4#QAR-001@req-r3 | fixture://qa/architecture/orders-r1#ARCH-001@arch-r1 | orders-release-q4 |",
+            management,
+        )
+        self.assertIn(
+            "| ARCH-SOURCE@arch-4 | orders.persistence | test-analysis/RISK-001、test-requirement-design/TR-001 | orders.updateのcurrent割当 |",
+            architecture,
+        )
+
+    def test_qa_requirement_requires_source_revision_and_exact_approval(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        missing_revision = text.replace(
+            "| REQUEST-01 | doc-7 |", "| REQUEST-01 |  |", 1
+        )
+        missing_approval = text.replace(
+            "| orders-release-q4 | fixture://qa/requirements/orders-q4 | req-r3 | QA lead | APPROVAL-4 | 承認済み |",
+            "| orders-release-q4 | fixture://qa/requirements/orders-q4 | req-r3 | QA lead | - | 承認済み |",
+            1,
+        )
+        for label, broken in (
+            ("source revision", missing_revision),
+            ("approval evidence", missing_approval),
+        ):
+            with self.subTest(label=label):
+                result = validate(broken, expected, "QRA-OUT-001")
+                assertion_id = "QRA-D006" if label == "source revision" else "QRA-D013"
+                self.assertEqual(assertion_status(result, assertion_id), "fail")
+
+        source_mismatch = text.replace(
+            "| stakeholder | REQUEST-01 | doc-7 | orders-release-q4 | current | 取得済 |",
+            "| stakeholder | REQUEST-01 | doc-8 | orders-release-q4 | current | 取得済 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(source_mismatch, expected, "QRA-OUT-001"), "QRA-D015"
+            ),
+            "fail",
+        )
+
+        draft_with_current_approval = text.replace(
+            "| 状態 | 承認済み |", "| 状態 | 草案 |", 1
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(draft_with_current_approval, expected, "QRA-OUT-001"),
+                "QRA-D013",
+            ),
+            "fail",
+        )
+
+    def test_unapproved_qa_requirements_cannot_become_approved(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-002")
+        broken = text.replace("| 状態 | blocked |", "| 状態 | 承認済み |", 1)
+        result = validate(broken, expected, "QRA-OUT-002")
+        self.assertEqual(assertion_status(result, "QRA-D014"), "fail")
+
+    def test_architecture_enforces_priority_and_preserves_multiple_levels(self):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        bad_priority = text.replace(
+            "APIを明示指定で採用しsystem levelも別分担として保持",
+            "システムを明示指定で採用しsystem levelも別分担として保持",
+            1,
+        )
+        missing_level = text.replace(
+            "| ARCH-002 | orders.update | business flow | fixture://qa/requirements/orders-q4#QAR-001@req-r3 | システム | functional | system levelの別分担を保持 | staging / synthetic-orders | Playwright候補 | 承認済みarchitecture | ARCH-SOURCE@arch-4 | 実装可否は別owner確認 | e2e-test-inspection |\n",
+            "",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(bad_priority, expected, "TAD-OUT-001"), "TAD-D011"
+            ),
+            "fail",
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_level, expected, "TAD-OUT-001"), "TAD-D012"
+            ),
+            "fail",
+        )
+
+    def test_architecture_approval_must_match_current_revision(self):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        broken = text.replace(
+            "| arch-r1 | QA architecture owner |",
+            "| arch-r0 | QA architecture owner |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(validate(broken, expected, "TAD-OUT-001"), "TAD-D013"),
+            "fail",
+        )
+
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-002")
+        false_assignment = text.replace(
+            "| ARCH-004 | billing.authorization | API target | fixture://qa/requirements/billing-conflict#QAR-UNKNOWN@unknown | 未確定 | functional | 指定の解決後に分担を決める | 未確定 | 未確定 | 未確定 | REQUEST-UNKNOWN@unknown | 判断保留 | test-architecture-design |",
+            "| ARCH-004 | billing.authorization | API target | fixture://qa/requirements/billing-conflict#QAR-UNKNOWN@unknown | API | functional | 指定の解決後に分担を決める | 未確定 | 未確定 | 明示指定 | REQUEST-UNKNOWN@unknown | 準備済み | test-architecture-design |",
+            1,
+        )
+        result = validate(false_assignment, expected, "TAD-OUT-002")
+        self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
+        self.assertEqual(assertion_status(result, "TAD-D016"), "pass")
+
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        stale_source_revision = text.replace(
+            "| test-requirements-analysis | REQUEST-01@doc-7 | doc-7 | orders-release-q4 | current | 取得済 |",
+            "| test-requirements-analysis | REQUEST-01@doc-7 | doc-8 | orders-release-q4 | current | 取得済 |",
+            1,
+        )
+        result = validate(stale_source_revision, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(result, "TAD-D009"), "fail")
+
+        stale_requirement_revision = text.replace(
+            "fixture://qa/requirements/orders-q4#QAR-001@req-r3",
+            "fixture://qa/requirements/orders-q4#QAR-001@req-r2",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(stale_requirement_revision, expected, "TAD-OUT-001"),
+                "TAD-D016",
+            ),
+            "fail",
+        )
+
+    def test_plan_monitoring_counts_match_population_and_raw_states(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        mismatched_count = text.replace(
+            "| MON-8 | fixture://qa/plan/orders-q4@plan-r8 | orders-release-q4 | build-110 | staging | after-run-2 | 2 | 2 |",
+            "| MON-8 | fixture://qa/plan/orders-q4@plan-r8 | orders-release-q4 | build-110 | staging | after-run-2 | 2 | 1 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(mismatched_count, expected, "TMG-OUT-001"), "TMG-D015"
+            ),
+            "fail",
+        )
+
+        text, expected = eval_case("test-management", "TMG-OUT-002")
+        wrong_unexecuted_count = text.replace(
+            "| MON-2 | fixture://qa/plan/orders-q4@plan-r2 | orders-release-q4 | build-111 | staging | initial | 1 | 0 | 0 | 1 |",
+            "| MON-2 | fixture://qa/plan/orders-q4@plan-r2 | orders-release-q4 | build-111 | staging | initial | 1 | 0 | 0 | 0 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(wrong_unexecuted_count, expected, "TMG-OUT-002"), "TMG-D015"
+            ),
+            "fail",
+        )
+        false_result = text.replace(
+            "| POP-101 | - | - | - | - | - | - | - | - | unknown | 未取得 | 未実行 | 未判定 | - | API source inventoryが未取得 |",
+            "| POP-101 | - | - | - | - | - | - | - | - | unknown | 未取得 | 未実行 | PASS | - | API source inventoryが未取得 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(false_result, expected, "TMG-OUT-002"), "TMG-D013"
+            ),
+            "fail",
+        )
+
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        missing_readback = text.replace("| READBACK://e2e/16@run-r1 |", "| - |", 1)
+        self.assertEqual(
+            assertion_status(
+                validate(missing_readback, expected, "TMG-OUT-001"), "TMG-D013"
+            ),
+            "fail",
+        )
+
+    def test_old_plan_approval_and_missing_source_cannot_claim_completion(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-002")
+        false_completion = text.replace(
+            "| blocked | 未見積 | 未測定 |", "| 完了 | 未見積 | 未測定 |", 1
+        )
+        result = validate(false_completion, expected, "TMG-OUT-002")
+        self.assertEqual(assertion_status(result, "TMG-D015"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
+
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        stale_approval = text.replace(
+            "| plan-r8 | QA manager | APPROVAL-PLAN-8 | 承認済み |",
+            "| plan-r7 | QA manager | APPROVAL-PLAN-8 | 承認済み |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(stale_approval, expected, "TMG-OUT-001"), "TMG-D023"
+            ),
+            "fail",
+        )
+
+        stale_input = text.replace(
+            "| test-architecture-design | fixture://qa/architecture/orders-r1 | arch-r1 | orders-release-q4 | current | 取得済 |",
+            "| test-architecture-design | fixture://qa/architecture/orders-r1 | arch-r1 | orders-release-q4 | stale | 取得済 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(stale_input, expected, "TMG-OUT-001"), "TMG-D020"
+            ),
+            "fail",
+        )
+
+    def test_required_readback_must_match_planned_revision_and_build(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        stale_result = text.replace(
+            "| POP-001 | e2e-test-execution | E2E-16 | run-r1 | orders-release-q4 |",
+            "| POP-001 | e2e-test-execution | E2E-16 | run-r0 | orders-release-q4 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(stale_result, expected, "TMG-OUT-001"), "TMG-D021"
+            ),
+            "fail",
+        )
+
+        wrong_build = text.replace(
+            "| POP-001 | e2e-test-execution | E2E-16 | run-r1 | orders-release-q4 | logical primary run for release-q4 | logical E2E run | build-110 |",
+            "| POP-001 | e2e-test-execution | E2E-16 | run-r1 | orders-release-q4 | logical primary run for release-q4 | logical E2E run | build-109 |",
+            1,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(wrong_build, expected, "TMG-OUT-001"), "TMG-D021"
+            ),
+            "fail",
+        )
+
+    def test_uncompleted_required_result_blocks_completion_and_failure_is_distinct(
+        self,
+    ):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        no_final_snapshot = text.replace("| 状態 | 進行中 |", "| 状態 | 完了 |", 1)
+        no_final_snapshot_result = validate(no_final_snapshot, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(no_final_snapshot_result, "TMG-D018"), "fail")
+
+        incomplete = update_markdown_row(
+            text,
+            "POP-001",
+            {
+                "実行状態": "未実行",
+                "結果状態": "未判定",
+                "未取得 / 未実行理由": "required execution not started",
+            },
+        )
+        incomplete = update_markdown_row(
+            incomplete,
+            "MON-8",
+            {
+                "実行済み数": "1",
+                "未実行数": "1",
+                "PASS数": "0",
+                "FAIL数": "1",
+                "未判定数": "1",
+                "全体判定": "完了",
+            },
+        ).replace("| 状態 | 進行中 |", "| 状態 | 完了 |", 1)
+        incomplete_result = validate(incomplete, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(incomplete_result, "TMG-D015"), "pass")
+        self.assertEqual(assertion_status(incomplete_result, "TMG-D018"), "fail")
+
+        execution_failure = update_markdown_row(
+            text,
+            "POP-002",
+            {
+                "実行状態": "実行失敗",
+                "結果状態": "判定不能",
+                "未取得 / 未実行理由": "runner exit error; result unavailable",
+            },
+        )
+        execution_failure = update_markdown_row(
+            execution_failure,
+            "MON-8",
+            {
+                "実行済み数": "1",
+                "実行失敗数": "1",
+                "PASS数": "1",
+                "FAIL数": "0",
+                "判定不能数": "1",
+            },
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(execution_failure, expected, "TMG-OUT-001"), "TMG-D013"
+            ),
+            "pass",
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(execution_failure, expected, "TMG-OUT-001"), "TMG-D015"
+            ),
+            "pass",
+        )
+
+        misclassified = execution_failure.replace(
+            "実行失敗 | 判定不能 |", "実行失敗 | FAIL |", 1
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(misclassified, expected, "TMG-OUT-001"), "TMG-D013"
+            ),
+            "fail",
+        )
+
+    def test_confirmed_zero_is_distinct_from_missing_source(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-002")
+        expected["expected_acquisition"]["POP-101"] = "0件確認済み"
+        zero = update_markdown_row(
+            text, "POP-101", {"planned revision": "inventory-r1"}
+        )
+        zero = update_markdown_row(
+            zero,
+            "POP-101",
+            {
+                "actual source owner": "testware-execution",
+                "actual source_ref": "API-SOURCE-V2",
+                "actual revision": "inventory-r1",
+                "actual scope": "orders-release-q4",
+                "acquired range": "API inventory lookup for build-111",
+                "actual execution unit": "API logical run",
+                "actual build": "build-111",
+                "actual environment": "staging",
+                "currentness": "current",
+                "取得状態": "0件確認済み",
+                "実行状態": "対象なし",
+                "結果状態": "-",
+                "source owner readback ref": "READBACK://api/inventory@inventory-r1",
+                "未取得 / 未実行理由": "source owner confirmed zero for requested range",
+            },
+        )
+        zero = update_markdown_row(
+            zero,
+            "MON-2",
+            {
+                "未取得数": "0",
+                "0件確認済み数": "1",
+                "未実行数": "0",
+                "未判定数": "0",
+                "対象なし数": "1",
+            },
+        )
+        zero_result = validate(zero, expected, "TMG-OUT-002")
+        self.assertEqual(
+            assertion_status(zero_result, "TMG-D013"), "pass", zero_result.assertions
+        )
+        self.assertEqual(assertion_status(zero_result, "TMG-D014"), "pass")
+
+
+if __name__ == "__main__":
+    unittest.main()

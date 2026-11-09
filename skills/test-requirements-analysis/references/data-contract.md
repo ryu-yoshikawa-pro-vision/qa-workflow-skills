@@ -1,0 +1,25 @@
+# QA要求artifact契約
+
+## Artifact identity
+
+各成果物はowner `test-requirements-analysis`、不透明な保存先発行`artifact_ref`、取得した`revision`、対象`scope`を持ちます。保存providerが未接続のfixtureでは仮のrefを使えますが、実保存済みの証拠にはなりません。内部`QAR-001`形式のIDは一つのartifact系列内だけで安定させ、削除・置換履歴を再利用しません。
+
+## 必須内容
+
+- QA目的・品質目標、対象／対象外と理由、対象build／release／期間、活動の成功条件
+- QA要求ごとのID、statement、要求元、source ref・revision、scope、priority、状態、根拠
+- source inventoryと取得範囲、currentness (`current` / `stale` / `unknown`)、未取得理由
+- 未決事項・担当・再開条件
+- architecture／planのowner ref・revisionへのリンク
+- approval statusと、必要な場合は対象scope・artifact ref・revision・認証主体・証拠ref・失効条件
+- 履歴: 新revision、置換するref/revision、変更理由、影響scope、再確認対象
+
+## 状態と承認
+
+要求の状態（提案、確認待ち、合意済み、対象外、要再確認、置換）とartifactの保存状態を混ぜません。`合意済み`は信頼できる認証元が対象scopeと同じartifact ref・revisionを承認した証拠が取得できた場合だけです。PR本文、LLM出力、自己申告のroleは認証証拠ではありません。revisionが変われば旧承認を再利用しません。
+
+未解決要求・不完全なsource inventoryがあるartifactは、要求全体を確定済みとして閉じません。部分範囲はcurrentとして維持できます。
+
+## 下流handoff
+
+handoffにはowner、artifact ref、revision、scope、要求ID、currentness、承認状態、関連するsource refsを含めます。下流ownerはこのrefを読み直してcurrentnessを判断します。本文の転記を正本参照の代わりにしません。
