@@ -31,3 +31,13 @@ code sourceを含む機能台帳を正式保存するときは、信頼済み呼
 再分類時は`supersedes_id`で保存済みDIFを指定し、承認側に旧・新の機能ID、sourceの参照とscope、旧・新revision、locator、証拠と承認revisionを提示します。承認済みの対象範囲と異なる新しい機能IDへの切替は保存不可とします。
 
 複数repositoryが同一HEADを共有するPRイベントでは`event_basis.primary_source_id`で主sourceを指定します。主sourceの選択はSHAだけに頼らずsource IDで照合します。
+
+## 継続分析とGit参照の競合防止
+
+過去DIFの分類・機能範囲の訂正は新IDとsupersedes_idを使います。同じ分類への訂正も承認と別の根拠が必要です。既存の重複DIFはsupersedes_idsに全旧IDを明示して履歴を維持し、統合します。新規重複は許容しません。
+
+analysis_updateはすべてのsource revisionを前回snapshotと比較し、前回の有効なGit差分基準を再取得します。PR更新後はbase→HEADと前回HEAD→HEADをともに確認します。PR更新中の新規副次repositoryは別source IDで初回tree／差分を取得します。
+
+Gitlinkは親sourceのgitlink_sourcesで子source IDと明示的に対応付けます。現在HEADだけでなく削除・置換前の旧SHAも含み、未取得なら保存しません。
+
+保存時はGit HEADとbranch refのロックを保持して通常のGit更新との競合を防ぎます。ロック取得失敗やHEADの変更時は保存を拒否し、理由を残します。
