@@ -1119,7 +1119,10 @@ def _hold_git_source_refs(
                 if not target.is_absolute():
                     target = root / target
                 target = target.resolve(strict=False)
-                if not target.is_relative_to(root):
+                if not any(
+                    target.is_relative_to(Path(allowed_root))
+                    for allowed_root in roots
+                ):
                     raise ContractError("git_source_ref_outside_authorized_root")
                 lock = Path(str(target) + ".lock")
                 try:
