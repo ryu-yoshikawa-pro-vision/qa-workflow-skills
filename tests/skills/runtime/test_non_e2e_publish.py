@@ -141,6 +141,38 @@ class GitPublishTests(unittest.TestCase):
             == 0
         )
 
+    def test_reviewed_rename_publishes_deletion_and_creation(self):
+        old_path = "tests/case.txt"
+        new_path = "tests/renamed.txt"
+        digest = "sha256:" + hashlib.sha256(
+            (self.a / old_path).read_bytes()
+        ).hexdigest()
+        git(self.a, "mv", old_path, new_path)
+        git(self.a, "commit", "-qm", "rename testware")
+        candidate = git(self.a, "rev-parse", "HEAD")
+        result = MODULE.publish(
+            repo_path=self.a,
+            remote="origin",
+            branch="fixture",
+            expected_head=self.base,
+            candidate=candidate,
+            allowed_prefixes=["tests"],
+            prior_content_hashes={
+                old_path: digest,
+                new_path: None,
+            },
+        )
+        self.assertEqual(set(result["changed_paths"]), {old_path, new_path})
+        git(self.b, "fetch", "-q", "origin", "fixture")
+        self.assertEqual(
+            git(self.b, "show", "FETCH_HEAD:" + new_path), "old"
+        )
+        removed = subprocess.run(
+            ["git", "-C", str(self.b), "cat-file", "-e", "FETCH_HEAD:" + old_path],
+            capture_output=True,
+        )
+        self.assertNotEqual(removed.returncode, 0)
+
     def test_remote_rewind_between_read_and_push_is_rejected(self):
         first, digest = self._candidate(self.a, "tests/case.txt", "first\n")
         self._publish(self.a, self.base, first, "tests/case.txt", digest)
