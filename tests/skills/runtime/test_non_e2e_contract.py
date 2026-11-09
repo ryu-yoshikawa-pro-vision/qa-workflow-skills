@@ -210,6 +210,170 @@ class VitestTests(unittest.TestCase):
         self.assertEqual(result["inconsistent_suites"], ["tests/api.test.ts"])
 
 
+class OtherRunnerReportTests(unittest.TestCase):
+    def test_case_report_keeps_planned_population_and_attempts(self):
+        selected = [
+            {"path": "tests/batch.py", "title_path": ["batch", "one"]},
+            {"path": "tests/batch.py", "title_path": ["batch", "two"]},
+        ]
+        report = {
+            "schema": "non-e2e-cases/v1",
+            "source_revision": "commit-1",
+            "testware_revision": "revision-1",
+            "complete": True,
+            "results": [
+                {
+                    "path": "tests/batch.py",
+                    "title_path": ["batch", "one"],
+                    "status": "passed",
+                    "attempt_results": [{"status": "failed"}, {"status": "passed"}],
+                },
+                {
+                    "path": "tests/batch.py",
+                    "title_path": ["batch", "two"],
+                    "status": "skipped",
+                    "attempt_results": [],
+                },
+            ],
+        }
+        result = contract.reconcile_case_report(
+            selected=selected,
+            report=report,
+            source_revision="commit-1",
+            testware_revision="revision-1",
+            raw_ref="run:raw",
+            selection_verified=True,
+        )
+        self.assertTrue(result["collection_complete"])
+        self.assertEqual(len(result["results"][0]["attempt_results"]), 2)
+        self.assertIsNone(result["results"][0]["tc_verdict"])
+        report["results"].pop()
+        partial = contract.reconcile_case_report(
+            selected=selected,
+            report=report,
+            source_revision="commit-1",
+            testware_revision="revision-1",
+            raw_ref="run:raw",
+            selection_verified=True,
+        )
+        self.assertFalse(partial["collection_complete"])
+        self.assertEqual(partial["results"][1]["runner_status"], "not_collected")
+
+    def test_case_report_rejects_stale_and_duplicate(self):
+        selected = [{"path": "tests/event.py", "title_path": ["event"]}]
+        row = {
+            "path": "tests/event.py",
+            "title_path": ["event"],
+            "status": "passed",
+            "attempt_results": [{"status": "passed"}],
+        }
+        report = {
+            "schema": "non-e2e-cases/v1",
+            "source_revision": "base",
+            "testware_revision": "v1",
+            "complete": True,
+            "results": [row, row],
+        }
+        result = contract.reconcile_case_report(
+            selected=selected,
+            report=report,
+            source_revision="base",
+            testware_revision="v1",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(result["collection_complete"])
+        self.assertEqual(result["results"][0]["runner_status"], "ambiguous")
+        with self.assertRaises(contract.ContractError):
+            contract.reconcile_case_report(
+                selected=selected,
+                report=report,
+                source_revision="new-base",
+                testware_revision="v1",
+                raw_ref="raw",
+                selection_verified=True,
+            )
+
+    def test_playwright_report_preserves_project_and_attempts(self):
+        report = {
+            "suites": [
+                {
+                    "title": "tests/api.spec.ts",
+                    "specs": [],
+                    "suites": [
+                        {
+                            "title": "API",
+                            "suites": [],
+                            "specs": [
+                                {
+                                    "file": "tests/api.spec.ts",
+                                    "title": "returns body",
+                                    "tests": [
+                                        {
+                                            "projectName": "api",
+                                            "status": "flaky",
+                                            "results": [
+                                                {"status": "failed", "retry": 0},
+                                                {"status": "passed", "retry": 1},
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "errors": [],
+            "stats": {"expected": 0, "unexpected": 0, "flaky": 1, "skipped": 0},
+        }
+        selected = [
+            {
+                "path": "tests/api.spec.ts",
+                "title_path": ["API", "returns body"],
+                "project_name": "api",
+            }
+        ]
+        result = contract.reconcile_playwright(
+            selected=selected,
+            report=report,
+            source_revision="sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertTrue(result["collection_complete"])
+        self.assertEqual(result["results"][0]["runner_status"], "flaky")
+        self.assertEqual(
+            [r["retry"] for r in result["results"][0]["attempt_results"]],
+            [0, 1],
+        )
+        report["errors"] = [{"message": "global teardown failed"}]
+        incomplete = contract.reconcile_playwright(
+            selected=selected,
+            report=report,
+            source_revision="sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(incomplete["collection_complete"])
+
+    def test_playwright_report_rejects_missing_spec_and_wrong_selection(self):
+        report = {
+            "suites": [{"title": "tests/api.spec.ts", "specs": [], "suites": []}],
+            "errors": [],
+            "stats": {"expected": 0, "unexpected": 0, "flaky": 0, "skipped": 0},
+        }
+        r = contract.reconcile_playwright(
+            selected=[{"path": "tests/api.spec.ts", "title_path": ["missing"]}],
+            report=report,
+            source_revision="sha",
+            raw_ref="raw",
+            selection_verified=True,
+        )
+        self.assertFalse(r["collection_complete"])
+        self.assertEqual(r["results"][0]["runner_status"], "not_collected")
+
+
 class DirectAndStaticTests(unittest.TestCase):
     def test_http_200_but_body_fails(self):
         checks = [
