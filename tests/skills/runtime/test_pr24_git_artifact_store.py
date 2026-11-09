@@ -1170,8 +1170,11 @@ class GitArtifactStoreTests(unittest.TestCase):
 
         self.store.authorize = count_authorizations
         result = persist_snapshot(
-            self.store, request, expected_revision=saved["revision"],
-            approval_ref="approval/verified", approval_revision="policy-v1",
+            self.store,
+            request,
+            expected_revision=saved["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
             change_reason="reviewed old contradictory decisions",
             git_inventory_requests=evidence,
         )
