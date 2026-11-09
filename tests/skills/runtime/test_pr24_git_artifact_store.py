@@ -529,7 +529,9 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(rejected["status"], "blocked", rejected)
         self.assertTrue(
-            any("git_coverage_not_verified" in reason for reason in rejected["reasons"]),
+            any(
+                "git_coverage_not_verified" in reason for reason in rejected["reasons"]
+            ),
             rejected,
         )
         self.assertEqual(
