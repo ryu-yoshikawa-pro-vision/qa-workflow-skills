@@ -215,7 +215,6 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(len(artifact["attempts"]), 2)
         self.assertTrue(all(a["return_code"] == 1 for a in artifact["attempts"]))
 
-
     def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
         plan["direct_expectations"] = [
