@@ -87,6 +87,11 @@ def preflight(request: dict[str, Any]) -> dict[str, Any]:
         return {"may_start": False, "reason": "script_chain_unverified"}
     if request.get("permissions_verified") is not True:
         return {"may_start": False, "reason": "permissions_unverified"}
+    # Absent/ambiguous effect flags must never be treated as a verified
+    # non-shared, local-only operation.
+    for field in ("shared_resource", "external_side_effects"):
+        if type(request.get(field)) is not bool:
+            return {"may_start": False, "reason": field + "_unverified"}
     side_effects = request.get("side_effects")
     if not isinstance(side_effects, list):
         return {"may_start": False, "reason": "side_effect_scope_unverified"}
@@ -170,14 +175,27 @@ def reconcile_vitest(
     wanted = Counter(_test_key(t.get("path"), t.get("title_path")) for t in selected)
     raw: list[dict[str, Any]] = []
     failed_suites_without_tests: list[str] = []
+    inconsistent_suites: list[str] = []
     for file in report["testResults"]:
         if not isinstance(file, dict) or not isinstance(
             file.get("assertionResults"), list
         ):
             raise ContractError("invalid_report_file")
         path = _report_path(file.get("name"), repo_root)
-        if file.get("status") == "failed" and not file["assertionResults"]:
+        status = file.get("status")
+        if status not in {"passed", "failed", "pending", "todo", "skipped"}:
+            inconsistent_suites.append(path)
+        case_statuses = [
+            case.get("status")
+            for case in file["assertionResults"]
+            if isinstance(case, dict)
+        ]
+        if status == "failed" and not file["assertionResults"]:
             failed_suites_without_tests.append(path)
+        if (status == "failed" and "failed" not in case_statuses) or (
+            status == "passed" and "failed" in case_statuses
+        ):
+            inconsistent_suites.append(path)
         for case in file["assertionResults"]:
             if not isinstance(case, dict) or not isinstance(
                 case.get("ancestorTitles"), list
@@ -207,6 +225,8 @@ def reconcile_vitest(
         # A failed run with no failing assertion may have a suite/global error.
         reporter_consistent = False
     if "success" in report and type(report["success"]) is not bool:
+        reporter_consistent = False
+    if inconsistent_suites:
         reporter_consistent = False
     results = []
     for (path, titles), count in wanted.items():
@@ -250,6 +270,7 @@ def reconcile_vitest(
         "results": results,
         "unexpected": unplanned,
         "failed_suites_without_tests": failed_suites_without_tests,
+        "inconsistent_suites": sorted(set(inconsistent_suites)),
         "reporter_consistent": reporter_consistent,
         "reporter_success": report.get("success"),
         "collection_complete": complete,
