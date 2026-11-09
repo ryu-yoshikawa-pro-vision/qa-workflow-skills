@@ -50,14 +50,14 @@
     }
   ],
   "selection_verified": false,
-  "selection_evidence_ref": "PENDING:review-vitest-list-and-effective-filter",
+  "selection_evidence_ref": "",
   "planned_scope_ref": "qa-training-store:tests/unit/pricing.test.ts@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
   "preflight": {
     "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
     "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
     "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
-    "environment_ref": "PENDING:isolated-runner-host-and-permissions",
-    "operation_ref": "PENDING:pr29-G-pricing-vitest-acceptance",
+    "environment_ref": "",
+    "operation_ref": "",
     "runner_ref": "vitest@4.1.11",
     "script_chain_reviewed": false,
     "permissions_verified": false,

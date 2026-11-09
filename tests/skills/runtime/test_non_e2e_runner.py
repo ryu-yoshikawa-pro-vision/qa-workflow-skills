@@ -128,9 +128,25 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertFalse(plan["preflight"]["permissions_verified"])
         self.assertFalse(plan["preflight"]["isolated_environment"])
         self.assertFalse(plan["selection_verified"])
+        self.assertEqual(plan["preflight"]["environment_ref"], "")
+        self.assertEqual(plan["preflight"]["operation_ref"], "")
+        self.assertEqual(plan["selection_evidence_ref"], "")
         code, summary, artifact = self.call(plan)
         self.assertEqual(code, 2)
-        self.assertEqual(summary["reason"], "preflight_script_chain_unverified")
+        self.assertEqual(summary["reason"], "preflight_missing_run_identity")
+        self.assertIsNone(artifact)
+        # Simply switching approval flags cannot turn an ungrounded example
+        # into valid acceptance evidence without real run identities.
+        for field in (
+            "script_chain_reviewed",
+            "permissions_verified",
+            "isolated_environment",
+        ):
+            plan["preflight"][field] = True
+        plan["selection_verified"] = True
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "preflight_missing_run_identity")
         self.assertIsNone(artifact)
 
     def test_real_subprocess_preserves_stdout_and_identity(self):

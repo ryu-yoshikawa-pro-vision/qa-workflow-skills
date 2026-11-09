@@ -75,7 +75,7 @@ reporter JSONが型不正・未対応・不完全、または解釈中に例外�
 ## 固定qa-training-store Vitest受入の再開手順
 
 - 実行planのひな形：`assets/qa-training-store-pricing-vitest.plan.json`。固定Git revision `2a8bcf57ff091e84a8b3bf7b123568e967000d88` にある `tests/unit/pricing.test.ts` の3件すべてを選択する。実行planは意図的に `script_chain_reviewed=false`、`permissions_verified=false`、`isolated_environment=false`、`selection_verified=false` としてあり、そのままでは実行できない。
-- 実行担当は、製品repoを本番開発環境から分離した新規checkoutへ固定SHAで取得する。実行前に対象repoの `package.json`、`vitest.config.ts`、`tests/setup.ts`、対象testwareと依存先、`pnpm`の実行入口／package lifecycle、Node・Vitestのversion、無視ファイル・外部I/O・認証情報、fixtureと後処理を実際に確認する。依存導入も許可・副作用確認前には実施しない。
-- 対象testwareの3つの `it` と実際に列挙される選択集合が完全に一致すること、実効filter、環境、必要権限、sandbox、side effect／cleanupの許容範囲を確認したうえで、planの`repo_path`とPENDING値、4つのbooleanを根拠に基づいて更新する。falseを根拠なくtrueにしない。
+- ひな形の`environment_ref`・`operation_ref`・`selection_evidence_ref`は未設定の空文字列であり、実際の環境・run・母集団の検証結果を取得してから記入する。booleanをtrueにするだけでは実行できない。実行担当は、製品repoを本番開発環境から分離した新規checkoutへ固定SHAで取得する。実行前に対象repoの `package.json`、`vitest.config.ts`、`tests/setup.ts`、対象testwareと依存先、`pnpm`の実行入口／package lifecycle、Node・Vitestのversion、無視ファイル・外部I/O・認証情報、fixtureと後処理を実際に確認する。依存導入も許可・副作用確認前には実施しない。
+- 対象testwareの3つの `it` と実際に列挙される選択集合が完全に一致すること、実効filter、環境、必要権限、sandbox、side effect／cleanupの許容範囲を確認したうえで、planの`repo_path`と空欄の証拠ref、4つのbooleanを根拠に基づいて更新する。falseを根拠なくtrueにしない。
 - 参照元の固定版とcheckout HEAD／cleanが一致したら、成果物保存先をrepo外の保護された絶対pathに指定し、`python skills/testware-execution/scripts/runner.py --plan /abs/path/to/verified-plan.json --artifacts /abs/path/to/private-artifacts` で実runnerを起動する。プランの`--outputFile={reporter_file}`はrunnerが試行単位の固有pathへ置換する。stdout／stderrと生JSON、選択した3テストの個別結果、run manifest、exit・skip・retry、HEAD／cleanupの結果を別々に検証する。
 - 同一run ref、revision、検証済み選択集合、実raw、cleanup／副作用、必要なAuthority証拠が揃って初めて本物のVitestの単独受入として記録する。選択不一致、スクリプト副作用、未検証のignored残存物、機密情報流出のおそれ、環境・認証の不足があればblockedで停止する。実runnerが成功してもTC PASSや他方式の受入を自動確定しない。
