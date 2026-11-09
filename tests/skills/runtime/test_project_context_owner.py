@@ -444,6 +444,13 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["existing_policy"] = {**policy, "decision_id": "DEC-001"}
         request["policy"] = policy
         self.assertEqual(handle(request)["status"], "reuse_candidate")
+        request["policy"] = {**policy, "approval_revision": "approval-v2"}
+        approval_only = handle(request)
+        self.assertEqual(approval_only["status"], "draft", approval_only)
+        self.assertEqual(approval_only["decision_id"], "DEC-002")
+        self.assertIn(
+            "approval_revision=approval-v2", approval_only["artifact_markdown"]
+        )
         request["policy"] = {
             **policy,
             "target_ref": "qa/new-artifacts",
