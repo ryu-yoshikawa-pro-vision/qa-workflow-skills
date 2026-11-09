@@ -104,7 +104,6 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 3. PRのbaseが`feat/development-qa-traceability`であることを確認する。**PRのmain向け付け替え、merge、close、force push、branch削除は依頼なしに行わない**。
 4. PR #22へ担当の変更・証拠・依存条件を引き渡す。PR #22の統合確認は**PR #22上で実施**し、A担当branchには移さない。
 
-
 ## 実装・局所検証記録（2026-11-09）
 
 ### 追加・更新した担当範囲
