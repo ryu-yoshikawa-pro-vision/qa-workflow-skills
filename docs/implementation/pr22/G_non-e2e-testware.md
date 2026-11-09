@@ -256,3 +256,11 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `runner.py`はplan、Git追跡のTC期待値snapshot、実reporter、直接観測stdout、静的解析／非機能stdoutを通常の`json.loads()`で読んでいた。同一objectに同名キーが複数あると後の値が採用され、実行許可フラグや期待値・raw結果の解釈を曖昧にできたため、共通の`_strict_json_loads()`で重複キーと`NaN`／`Infinity`を拒否する。
 - 実行plan内の`script_chain_reviewed`が`false`と`true`で重複している場合は開始前に`duplicate_json_key`で拒否する。固定TC Authority blobの版情報が重複している場合は`invalid_direct_tc_authority`で拒否し、実コマンドを起動しない。元rawのreporter JSONが不正な場合は従来のresult collection・cleanup・manifestの処理で不完全として扱う。
 - この入力検査は外部providerの本人性や承認状態を保証しない。実製品の実runner受入は未実行のまま。
+
+## 固定製品testwareの反証レビュー（2026-11-09）
+
+- 対象は固定SHA `2a8bcf57ff091e84a8b3bf7b123568e967000d88` の`tests/unit/pricing.test.ts`、`tests/component/cart-page.test.tsx`、対応する`src/domain/services/pricing.ts`および既存の仕様記述。**ソース静的レビューのみ**で、実runner・製品欠陥の確定ではない。
+- `tests/unit/pricing.test.ts`の「uses the same subtotal shipping rule for every membership rank」は小計5,500円で全ランクの送料を確認する。実装の送料無料閾値5,000円以上なので、`platinum`の閾値未満でも送料無料となる独立分岐（`rank === "platinum"`）はこのケースでは検証されない。プラチナ特例が誤って削除されてもこのテストは通り得る。仕様Authorityと分岐根拠を確認したうえで別の閾値未満ケースが必要か、製品testwareのownerへ確認する。
+- `tests/component/cart-page.test.tsx`の「keeps the cart visible while surfacing a mutation failure」は`updateQuantity`が呼ばれたこととエラー表示を確認する一方、要求した数量`2`、対象itemや期待versionが正しく渡されたことはassertionしていない。このテスト単独では引数の取り違えを検知できないため、対象TC・既存別テストでの検証有無を製品testwareのownerが確認する。
+- 既存仕様`docs/spec/features/storefront.md`で価格・会員ランクの表示は確認できたが、数値の割引率・閾値を採用するAuthorityはこの参照範囲から確定できなかった。製品実装の定数だけを独立oracleとしない。
+- いずれも「テスト観点／品質上の未検証候補」であり、SUTの製品欠陥や既存testwareの修正をこのPRで確定しない。Gでの確認結果をH/Jと製品testware ownerへ引き継ぎ、元runの判定を変更しない。
