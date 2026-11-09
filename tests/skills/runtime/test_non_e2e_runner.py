@@ -351,7 +351,7 @@ class ActualRunnerTests(unittest.TestCase):
         plan["argv"] = [
             sys.executable,
             "-c",
-            "print('{\\\"findings_count\\\":0,\\\"analyzed_paths\\\":[\\\"README.md\\\"],\\\"skipped_paths\\\":[]}')",
+            "print('{\\\"findings_count\\\":0,\\\"analyzed_paths\\\":[\\\"README.md\\\"],\\\"skipped_paths\\\":[],\\\"tool_version\\\":\\\"0.1\\\",\\\"rules_ref\\\":\\\"fixture-rule\\\",\\\"config_ref\\\":\\\"fixture-config\\\"}')",
         ]
         plan["reviewed_argv"] = plan["argv"]
         code, _, artifact = self.call(plan)
