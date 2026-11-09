@@ -38,17 +38,19 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if primary is not None:
         result.add(
             "TW-IMPL-D003",
-            bool(primary.rows)
-            and all(
-                any(str(value).strip() for value in row.values())
+            bool(primary.rows) and all(
+                all(str(value).strip() for value in row.values())
                 for row in primary.rows
             ),
-            "対象を最低1件、または未実施理由で明示すること",
+            "対象・根拠の必須列を空欄にしないこと",
         )
     if secondary is not None:
         result.add(
             "TW-IMPL-D004",
-            bool(secondary.rows),
-            "実施または未実施の状態を記録すること",
+            bool(secondary.rows) and all(
+                all(str(value).strip() for value in row.values())
+                for row in secondary.rows
+            ),
+            "変更前・反映の必須列を空欄にしないこと",
         )
     return result
