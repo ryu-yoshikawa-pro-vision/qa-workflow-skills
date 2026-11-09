@@ -28,6 +28,6 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 
 ## Git差分母集団との照合
 
-`scripts/reconcile_git_coverage.py`は`git_inventory`（同じ案件のgit_source_inventory.pyの結果）、`registry_request`（feature_registry.pyへの検証入力）、`source_id`（code種別、expected_source_idsに所属）のJSONを受け取ります。先にregistryのschema・ID・履歴を検証し、Git側のHEAD full SHAとsource revisionが一致し、変更一覧が完全な場合のみ、全Git変更ファイルの`after_path`と当該sourceの`changes[].locator`を照合します。renameは新pathに対応付け、旧pathはGit列挙結果の`before_path`に残します。未登録path、Gitにない差分ID、未分類path、source不完全・旧HEADを判別します。
+`scripts/reconcile_git_coverage.py`は`git_inventory`（同じ案件のgit_source_inventory.pyの結果）、`registry_request`（feature_registry.pyへの検証入力）、`source_id`（code種別、expected_source_idsに所属）のJSONを受け取ります。先にregistryのschema・ID・履歴を検証し、Git側のHEAD full SHAとsource revisionが一致し、変更一覧が完全な場合のみ、全Git変更ファイルの`after_path`と当該sourceの`changes[].locator`を照合します。renameは新pathに対応付け、旧pathはGit列挙結果の`before_path`に残します。未登録path、Gitにない差分ID、base/head改版不一致、未分類path、source不完全・旧HEADを判別します。
 
 結果は`coverage.git_change_paths`、`registered_paths`、`missing_git_paths`、`unmatched_registry_change_ids`、`unclassified_git_paths`、`rate`、候補snapshot SHA-256を含みます。ファイルpathの網羅は機能・hunk・Issue・仕様の網羅ではありません。Git一覧そのものの真正性と実providerへの保存・承認は別途確認します。

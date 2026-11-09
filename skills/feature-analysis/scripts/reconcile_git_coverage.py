@@ -83,10 +83,7 @@ def analyze(request: Any) -> dict[str, Any]:
     source = source_rows[0]
     if source["kind"] != "code" or source["status"] != "complete":
         raise Invalid("git_source_not_complete_code")
-    if (
-        source["revision"] != head_sha
-        or snapshot["source_revision"] != head_sha
-    ):
+    if source["revision"] != head_sha or snapshot["source_revision"] != head_sha:
         return {
             "status": "stale",
             "reasons": ["git_revision_registry_mismatch"],
@@ -131,6 +128,7 @@ def analyze(request: Any) -> dict[str, Any]:
             raise Invalid("non_rename_change_paths_mismatch")
     registry_paths: set[str] = set()
     unmatched_ids: list[str] = []
+    mismatched_revision_ids: list[str] = []
     unclassified_paths: set[str] = set()
     for row in snapshot["changes"]:
         if row["source_id"] != source_id:
@@ -139,6 +137,8 @@ def analyze(request: Any) -> dict[str, Any]:
         registry_paths.add(locator)
         if locator not in git_paths:
             unmatched_ids.append(row["id"])
+        if row["before_revision"] != git["base_sha"] or row["after_revision"] != head_sha:
+            mismatched_revision_ids.append(row["id"])
         if row["classification"] in {"unclassified", "unresolved"}:
             unclassified_paths.add(locator)
     missing = sorted(git_paths - registry_paths)
@@ -147,6 +147,8 @@ def analyze(request: Any) -> dict[str, Any]:
         reasons.append("git_changes_not_registered")
     if unmatched_ids:
         reasons.append("registry_changes_not_in_git_diff")
+    if mismatched_revision_ids:
+        reasons.append("git_change_revisions_mismatch")
     if unclassified_paths:
         reasons.append("git_changes_unclassified")
     return {
@@ -159,11 +161,10 @@ def analyze(request: Any) -> dict[str, Any]:
             "registered_paths": sorted(registry_paths & git_paths),
             "missing_git_paths": missing,
             "unmatched_registry_change_ids": sorted(unmatched_ids),
+            "mismatched_revision_change_ids": sorted(mismatched_revision_ids),
             "unclassified_git_paths": sorted(unclassified_paths),
             "rate": (
-                len(git_paths & registry_paths) / len(git_paths)
-                if git_paths
-                else None
+                len(git_paths & registry_paths) / len(git_paths) if git_paths else None
             ),
             "candidate_snapshot_sha256": registry["handoff"]["snapshot_sha256"],
         },

@@ -9,7 +9,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT_ROOT = Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
+SCRIPT_ROOT = (
+    Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
+)
 sys.path.insert(0, str(SCRIPT_ROOT))
 
 from git_source_inventory import handle as git_inventory  # noqa: E402
@@ -38,6 +40,7 @@ class GitChangeCoverageTests(unittest.TestCase):
         git(self.root, "add", ".")
         self.commit("baseline")
         base = git(self.root, "rev-parse", "HEAD")
+        self.base = base
         for path in ("alpha.py", "beta.py"):
             (self.root / path).write_text("print('changed')\n", encoding="utf-8")
         git(self.root, "add", "-A")
@@ -57,6 +60,7 @@ class GitChangeCoverageTests(unittest.TestCase):
         snapshot = self.feature["snapshot"]
         snapshot["source_revision"] = head
         snapshot["sources"][0]["revision"] = head
+        snapshot["changes"][0]["before_revision"] = base
         snapshot["changes"][0]["after_revision"] = head
         snapshot["changes"][0]["locator"] = "alpha.py"
         self.feature["observed_head_revision"] = head
@@ -118,7 +122,17 @@ class GitChangeCoverageTests(unittest.TestCase):
         self.feature["snapshot"]["changes"][0]["locator"] = "missing.py"
         result = reconcile(self.request())
         self.assertEqual(result["status"], "incomplete")
-        self.assertEqual(result["coverage"]["unmatched_registry_change_ids"], ["DIF-001"])
+        self.assertEqual(
+            result["coverage"]["unmatched_registry_change_ids"], ["DIF-001"]
+        )
+
+    def test_change_revision_must_match_git_base_and_head(self) -> None:
+        self.feature["snapshot"]["changes"][0]["before_revision"] = "unrelated-base"
+        result = reconcile(self.request())
+        self.assertEqual(result["status"], "incomplete")
+        self.assertEqual(
+            result["coverage"]["mismatched_revision_change_ids"], ["DIF-001"]
+        )
 
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"
