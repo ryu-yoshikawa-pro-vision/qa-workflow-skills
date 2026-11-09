@@ -10,19 +10,36 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     primary = find_table(
         tables,
         section_contains="固定条件とpreflight",
-        required_headers=["run ref","TC／明示testware ref・revision","source／build commit","環境／権限／approval","runner・実入口／filter・version","preflight結果・根拠"],
+        required_headers=[
+            "run ref",
+            "TC／明示testware ref・revision",
+            "source／build commit",
+            "環境／権限／approval",
+            "runner・実入口／filter・version",
+            "preflight結果・根拠",
+        ],
     )
     secondary = find_table(
         tables,
         section_contains="選択集合と収集",
-        required_headers=["testware ref・file／title","元TC ref（なければなし）","予定対象","取得対象","attempt／raw status","証跡ref・取得完全性"],
+        required_headers=[
+            "testware ref・file／title",
+            "元TC ref（なければなし）",
+            "予定対象",
+            "取得対象",
+            "attempt／raw status",
+            "証跡ref・取得完全性",
+        ],
     )
     result.add("TW-EXEC-D001", primary is not None, "対象・根拠の表があること")
-    result.add("TW-EXEC-D002", secondary is not None, "前提と実績を区別する表があること")
+    result.add(
+        "TW-EXEC-D002", secondary is not None, "前提と実績を区別する表があること"
+    )
     if primary is not None:
         result.add(
             "TW-EXEC-D003",
-            bool(primary.rows) and all(
+            bool(primary.rows)
+            and all(
                 any(str(value).strip() for value in row.values())
                 for row in primary.rows
             ),
