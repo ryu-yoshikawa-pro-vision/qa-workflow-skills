@@ -307,6 +307,32 @@ class ActualRunnerTests(unittest.TestCase):
             self.call(plan)[1]["reason"], "native_provider_authorization_required"
         )
 
+    def test_relative_executable_and_cleanup_resolve_inside_repo(self):
+        tool_dir = self.repo / "tools"
+        tool_dir.mkdir()
+        for name in ("run", "cleanup"):
+            script = tool_dir / name
+            script.write_text("#!/usr/bin/env python3\nprint('fixture')\n", encoding="utf-8")
+            script.chmod(0o755)
+        git(self.repo, "add", "tools")
+        git(self.repo, "commit", "-qm", "fixture executables")
+        self.sha = git(self.repo, "rev-parse", "HEAD")
+        plan = self.plan(["./tools/run"])
+        plan["cleanup_argv"] = ["./tools/cleanup"]
+        plan["reviewed_cleanup_argv"] = plan["cleanup_argv"]
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertTrue(artifact["attempts"][0]["started"])
+        self.assertEqual(artifact["attempts"][0]["cleanup_state"], "success")
+
+    def test_source_revision_mismatch_blocks_before_run(self):
+        plan = self.plan([sys.executable, "-c", "print('should not run')"])
+        plan["preflight"]["source_revision"] = "different"
+        code, result, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(result["reason"], "source_revision_not_execution_revision")
+        self.assertIsNone(artifact)
+
     def test_runner_exit_zero_without_case_evidence_is_not_test_complete(self):
         plan = self.plan([sys.executable, "-c", "print('not a test report')"])
         code, summary, artifact = self.call(plan)
@@ -335,6 +361,27 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertTrue(artifact["attempts"][0]["timeout"])
         self.assertEqual(artifact["outcome"], "blocked_cleanup_or_timeout")
+
+    def test_bad_selected_identity_blocks_before_command(self):
+        plan = self.plan([sys.executable, "-c", "print('should not run')"])
+        plan.update({
+            "reporter_format": "case-json", "testware_ref": "fixture",
+            "testware_revision": self.sha, "runner_version": "v1",
+            "selected": [None], "selection_verified": True,
+            "selection_evidence_ref": "fixture:selection",
+            "planned_scope_ref": "fixture:scope",
+        })
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "invalid_selected_test")
+        self.assertIsNone(artifact)
+        plan["selected"] = [{
+            "path": "tests/a.py", "title_path": [],
+        }]
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "invalid_selected_test")
+        self.assertIsNone(artifact)
 
     def test_vitest_absolute_path_reporter_reconciled(self):
         report = {
@@ -570,7 +617,10 @@ class ActualRunnerTests(unittest.TestCase):
 
     def test_playwright_native_json_report_reconciles_api_only_tests(self):
         report = {
-            "config": {"version": "playwright-json-fixture"},
+            "config": {
+                "version": "playwright-json-fixture",
+                "rootDir": str(self.repo),
+            },
             "suites": [
                 {
                     "title": "tests/contracts/api.spec.ts",
@@ -696,7 +746,10 @@ class ActualRunnerTests(unittest.TestCase):
                 "playwright-api",
                 "playwright-json",
                 {
-                    "config": {"version": "fixture-version"},
+                    "config": {
+                        "version": "fixture-version",
+                        "rootDir": str(self.repo),
+                    },
                     "errors": [],
                     "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
                     "suites": [
@@ -794,6 +847,21 @@ class ActualRunnerTests(unittest.TestCase):
                 self.assertTrue(Path(attempt["raw_report_ref"]).is_file())
                 self.assertFalse(artifact["collection_verified"])
 
+    def test_overflowed_json_number_is_rejected_before_launch(self):
+        plan = self.plan([sys.executable, "-c", "print('should-not-run')"])
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 42.0}]
+        raw = json.dumps(plan).replace('"expected": 42.0', '"expected": 1e400')
+        plan_file = Path(self.space.name) / "overflow.json"
+        plan_file.write_text(raw, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, str(RUNNER), "--plan", str(plan_file),
+             "--artifacts", str(self.logs)],
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(json.loads(proc.stdout)["reason"], "nonfinite_json_number")
+        self.assertFalse(list(self.logs.glob("non-e2e-*/manifest.json")))
+
     def test_direct_batch_exit_zero_with_wrong_body_is_fail(self):
         plan = self.plan([sys.executable, "-c", "print('{\"ok\": false}')"])
         plan["direct_tc"] = True
@@ -811,6 +879,8 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertIsNone(artifact["tc_verdict"])
         self.assertEqual(artifact["direct_observation_verdict"], "FAIL")
         self.assertEqual(artifact["attempts"][0]["return_code"], 0)
+        self.assertTrue(artifact["collection_verified"])
+        self.assertEqual(artifact["attempts"][0]["result_collection"], "complete")
 
     def test_real_local_http_status_200_with_wrong_body_fails(self):
         class FixtureHandler(BaseHTTPRequestHandler):
@@ -866,6 +936,22 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertIsNone(artifact["tc_verdict"])
         self.assertEqual(artifact["direct_observation_verdict"], "判定不能")
         self.assertEqual(artifact["outcome"], "observations_incomplete")
+
+    def test_direct_observation_failure_preserves_nonzero_exit(self):
+        plan = self.plan([sys.executable, "-c", "raise SystemExit(3)"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-exit"
+        plan["tc_revision"] = "r1"
+        plan["expected_authority_ref"] = "fixture:authority"
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
+        self.attach_direct_tc_authority(plan)
+        code, _, artifact = self.call(plan)
+        self.assertEqual(code, 1)
+        self.assertEqual(artifact["attempts"][0]["return_code"], 3)
+        self.assertTrue(artifact["collection_verified"])
+        self.assertEqual(artifact["direct_observation_verdict"], "FAIL")
+        self.assertEqual(artifact["outcome"], "observed_FAIL")
+        self.assertIsNone(artifact["tc_verdict"])
 
     def test_nonfunctional_threshold_is_evaluated_from_real_measurement(self):
         plan = self.plan(
@@ -1119,6 +1205,7 @@ class ActualRunnerTests(unittest.TestCase):
             "findings_count": 0,
             "analyzed_paths": ["README.md"],
             "skipped_paths": [],
+            "tool_ref": "fixture",
             "tool_version": "0.1",
             "rules_ref": "fixture-rule",
             "config_ref": "fixture-config",

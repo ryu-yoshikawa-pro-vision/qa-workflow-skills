@@ -196,6 +196,38 @@ class VitestTests(unittest.TestCase):
                 selection_verified=True,
             )
 
+    def test_vitest_project_requires_verifiable_single_project(self):
+        report = {
+            "success": True, "numTotalTests": 1, "numPassedTests": 1,
+            "numFailedTests": 0, "numPendingTests": 0, "numTodoTests": 0,
+            "testResults": [{
+                "name": "tests/one.test.ts", "status": "passed",
+                "assertionResults": [{
+                    "ancestorTitles": [""], "title": "case", "status": "passed",
+                }],
+            }],
+        }
+        item = {
+            "path": "tests/one.test.ts", "title_path": ["case"],
+            "project_name": "node",
+        }
+        kwargs = dict(
+            report=report, source_revision="sha", raw_ref="raw",
+            selection_verified=True,
+        )
+        with self.assertRaisesRegex(contract.ContractError, "project_identity"):
+            contract.reconcile_vitest(selected=[item], **kwargs)
+        good = contract.reconcile_vitest(
+            selected=[item], project_name="node", project_verified=True,
+            **kwargs,
+        )
+        self.assertTrue(good["collection_complete"])
+        with self.assertRaisesRegex(contract.ContractError, "project_identity"):
+            contract.reconcile_vitest(
+                selected=[item, {**item, "project_name": "browser"}],
+                project_name="node", project_verified=True, **kwargs,
+            )
+
     def test_duplicates_are_not_implicitly_matched(self):
         case = {"ancestorTitles": ["s"], "title": "a", "status": "passed"}
         report = {
@@ -408,6 +440,28 @@ class OtherRunnerReportTests(unittest.TestCase):
         self.assertFalse(partial["collection_complete"])
         self.assertEqual(partial["results"][1]["runner_status"], "not_collected")
 
+    def test_case_report_does_not_discard_empty_titles(self):
+        selected = [{"path": "tests/event.py", "title_path": ["one"]}]
+        report = {
+            "schema": "non-e2e-cases/v1",
+            "source_revision": "a",
+            "testware_revision": "b",
+            "runner_version": "c",
+            "complete": True,
+            "results": [{
+                "path": "tests/event.py",
+                "title_path": ["", "one"],
+                "status": "passed",
+                "attempt_results": [{"status": "passed", "retry": 0}],
+            }],
+        }
+        with self.assertRaisesRegex(contract.ContractError, "invalid_title"):
+            contract.reconcile_case_report(
+                selected=selected, report=report, source_revision="a",
+                testware_revision="b", runner_version="c", raw_ref="raw",
+                selection_verified=True,
+            )
+
     def test_case_report_rejects_stale_and_duplicate(self):
         selected = [{"path": "tests/event.py", "title_path": ["event"]}]
         row = {
@@ -534,6 +588,37 @@ class OtherRunnerReportTests(unittest.TestCase):
             selection_verified=True,
         )
         self.assertFalse(incomplete["collection_complete"])
+
+    def test_playwright_root_dir_normalization_and_escape(self):
+        report = {
+            "config": {"version": "fixture", "rootDir": "/work/project/tests"},
+            "suites": [{
+                "title": "api.spec.ts",
+                "specs": [{
+                    "file": "api.spec.ts", "title": "request",
+                    "tests": [{
+                        "projectName": "api", "expectedStatus": "passed",
+                        "status": "expected",
+                        "results": [{"status": "passed", "retry": 0}],
+                    }],
+                }],
+            }],
+            "errors": [],
+            "stats": {"expected": 1, "unexpected": 0, "flaky": 0, "skipped": 0},
+        }
+        params = dict(
+            selected=[{
+                "path": "tests/api.spec.ts", "title_path": ["request"],
+                "project_name": "api",
+            }],
+            report=report, repo_root="/work/project",
+            source_revision="sha", runner_version="fixture",
+            raw_ref="raw", selection_verified=True,
+        )
+        self.assertTrue(contract.reconcile_playwright(**params)["collection_complete"])
+        report["config"]["rootDir"] = "/outside/tests"
+        with self.assertRaisesRegex(contract.ContractError, "outside_root"):
+            contract.reconcile_playwright(**params)
 
     def test_playwright_report_rejects_missing_spec_and_wrong_selection(self):
         report = {
@@ -673,6 +758,18 @@ class GuardTests(unittest.TestCase):
                 dirty_paths=[],
                 change_paths=["tests/a.py"],
             )
+        # A valid normalized path outside the permitted prefix must also fail.
+        scope = guard.check_snapshot(
+            expected_head="a",
+            actual_head="a",
+            tracked={"src/app.py": guard.file_digest(b"source")},
+            actual={"src/app.py": b"source"},
+            allowed_prefixes=["tests"],
+            dirty_paths=[],
+            change_paths=["src/app.py"],
+        )
+        self.assertFalse(scope["safe_to_prepare"])
+        self.assertIn("path_out_of_scope", scope["reasons"])
 
 
 if __name__ == "__main__":

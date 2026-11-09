@@ -7,6 +7,7 @@ import importlib.util
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -107,6 +108,55 @@ class GitPublishTests(unittest.TestCase):
             git(self.a, "ls-remote", "--heads", "origin", "refs/heads/fixture").split()[
                 0
             ],
+            self.base,
+        )
+
+    def test_unicode_path_with_core_quote_path_enabled(self):
+        git(self.a, "config", "core.quotePath", "true")
+        path = "tests/価格.test.ts"
+        (self.a / path).write_text("new\n", encoding="utf-8")
+        git(self.a, "add", path)
+        git(self.a, "commit", "-qm", "unicode path")
+        commit = git(self.a, "rev-parse", "HEAD")
+        result = self._publish(self.a, self.base, commit, path, None)
+        self.assertEqual(result["commit_sha"], commit)
+        git(self.b, "fetch", "-q", "origin", "fixture")
+        self.assertEqual(git(self.b, "show", "FETCH_HEAD:" + path), "new")
+
+    def test_reviewed_deletion_is_published_and_read_back(self):
+        path = "tests/other.txt"
+        digest = "sha256:" + hashlib.sha256((self.a / path).read_bytes()).hexdigest()
+        (self.a / path).unlink()
+        git(self.a, "add", path)
+        git(self.a, "commit", "-qm", "delete testware")
+        commit = git(self.a, "rev-parse", "HEAD")
+        result = self._publish(self.a, self.base, commit, path, digest)
+        self.assertEqual(result["state"], "published_and_readback_verified")
+        git(self.b, "fetch", "-q", "origin", "fixture")
+        self.assertFalse(
+            subprocess.run(
+                ["git", "-C", str(self.b), "cat-file", "-e",
+                 "FETCH_HEAD:" + path],
+                capture_output=True,
+            ).returncode == 0
+        )
+
+    def test_remote_rewind_between_read_and_push_is_rejected(self):
+        first, digest = self._candidate(self.a, "tests/case.txt", "first\n")
+        self._publish(self.a, self.base, first, "tests/case.txt", digest)
+        second, digest = self._candidate(self.a, "tests/other.txt", "second\n")
+        original_remote_head = MODULE._remote_head
+        def rewind_after_read(repo, remote, branch):
+            current = original_remote_head(repo, remote, branch)
+            git(self.remote, "update-ref", "refs/heads/fixture", self.base)
+            return current
+        with mock.patch.object(MODULE, "_remote_head", side_effect=rewind_after_read):
+            with self.assertRaisesRegex(
+                MODULE.PublishError, "push_rejected_or_response_unknown"
+            ):
+                self._publish(self.a, first, second, "tests/other.txt", digest)
+        self.assertEqual(
+            git(self.a, "ls-remote", "origin", "refs/heads/fixture").split()[0],
             self.base,
         )
 
