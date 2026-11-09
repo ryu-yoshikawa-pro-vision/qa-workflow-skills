@@ -193,3 +193,29 @@
 - 上記のCIはPR #22のbaseを統合したGitHub ActionsのPR検証。共有README／Codexテスト／Project Context templateの対応は、担当Bの編集範囲に混ぜず、[PR #22側のコミット `7cc8ac8`](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/7cc8ac8bcebdacd6ac35aede3bed8555c73f276c)に分離した。配置・認可・CAS等は案件ごとの契約が確定しなければ安全に拒否する。
 
 **判定**：担当Bで所有する実装・単体／結合テスト・CI検証は完了。実環境検証は依頼対象外であり未実施。A〜J横断のruntime／provider実装・PR #22統合、15＋10条件の全体判定は本PRで完了を宣言しない。PR #24のmerge、force push、base変更は実施しない。
+
+## Plan再レビュー後の実装追補（2026-11-09）
+
+利用者の指示に従い、PR #24の担当Bが所有するコード・契約・自動テストだけを変更した。PR #22／他担当branch／共有runtimeへの変更は行っていない。以前の「draftのみ／provider-native保存がない」という制約は、この節の**明示選択ローカルprovider**について更新する。ただし実案件が利用する遠隔providerと認証済み承認サービスは選定されていないため、実接続済みとは扱わない。
+
+### Project Context・配置合意
+
+- `skills/project-context/scripts/artifact_store.py`に、明示された許可root内のprivate SQLiteを用いるB担当の保存経路を実装した。トランザクションによるcreate-if-absent、expected revisionを条件にした更新、過去revisionの不変保存、独立readback、内容hash照合、operation_id冪等性、並行更新競合の拒否に対応する。
+- `project_context.persist_prepared`は`prepare-create`／`prepare-update`／`prepare-ids`／`prepare-placement`／`prepare-sections`で生成した候補を、保存済み前revision・本文と照合した後、保存providerに引き渡す。外部から渡された単なる承認refでの無条件保存はできず、信頼済み呼出し元が渡す`authorize` callbackで承認・権限・対象revisionを検証する。
+- `prepare-placement`は同一方針の再利用を判定し、新規・変更時にはDEC正本とSection 14の参照行を同一draftに記録する。`prepare-sections`はSection 1〜11・15のみを変更し、DEC/ASM（12/13）、配置参照（14）、stable key（16）の正本を直接改変しない。初回作成時は`section_updates`で既知情報のみ記録できる。
+
+### 機能分析・変更追跡
+
+- `feature_registry.py`で、既存機能の名称・状態・親・実装／仕様／QA参照を更新する場合の追記履歴を必須にした。意味上のID再利用・旧revision・履歴改変を拒否する。
+- `no_impact`／`out_of_scope`を分類済みとする前に理由と承認refを必須にした。承認refだけでは真正性を保証できないため、保存時に信頼済み承認確認を行う。
+- `event_basis`でPR更新・rebase・merge・release・外部文書のみの改版の必要な旧／新revisionを検証する。`reconcile_git_coverage.py`はPR base→headに加え、前回PR head→現在headのGit差分の和集合を照合し、片方が未取得ならcompleteを返さない。
+- `git_source_inventory.py`のCLIは信頼済み起動環境の`QA_FEATURE_AUTHORIZED_ROOT`を必須として、入力JSONの自己宣言だけによるGit root認可を拒否する。
+- 下流向けに機能階層・source／実装／仕様／QA refs、影響機能IDs、承認確認が必要な差分IDs、未知領域とsource inventoryをhandoffへ出力する。
+
+### 自動テスト・完了条件の境界
+
+- 保存provider単体とowner接続を`tests/skills/runtime/test_pr24_artifact_store.py`で検証する。原子的な同時更新、旧revision保全、操作ID再送、改変readback、権限拒否、承認providerエラー、Project Context／Feature Inventoryのcreate/update、配置合意、Section編集を含む。
+- source・イベント・履歴・Git二重差分の正常系／負例は`test_feature_registry.py`、`test_git_source_inventory.py`、`test_git_change_coverage.py`、`test_project_context_owner.py`へ追加した。
+- **実案件での保存先選択・認証サービス接続・実Agent・製品CIは対象外**。ローカルproviderの成功を、未選定のGitHub／Drive等のproviderのnative CAS・承認・readback成功へ一般化しない。
+- PR #22側の共通runtime owner登録・他ownerとの成果物受渡しはPR #24の編集範囲外。担当Bは必要な入出力契約とhandoff projectionを用意したが、PR #22の統合完了は宣言しない。
+- 最終実装コードの先頭commitは[dd5b7f5](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/commit/dd5b7f5c2327b295a0b139c50fc82189d286e6b4)。CI最終判定は最新PR headに紐付くActionsで確認する。
