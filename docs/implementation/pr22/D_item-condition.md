@@ -117,6 +117,8 @@
 
 ## 検証証拠
 
+PR #26のcommit `339020798142fc48cddc9c17cf28c5e1a7b2985b`では、Code Quality、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Codex Harnessの5 workflowすべてがPASSした。この証拠は記載したSHAに対する結果であり、後続headとは区別する。
+
 | 検証                                                                                                                                                       | 結果・境界                                                                                                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | python -m unittest discover -s tests/skills/runtime -p 'test_test_item_condition_analysis.py' -v                                                           | PASS、32 tests。                                                                                                                                                                                                    |
