@@ -515,6 +515,33 @@ def analyze(request: Any) -> dict[str, Any]:
             "artifact_revision": snapshot["artifact_revision"],
             "source_revision": snapshot["source_revision"],
             "feature_ids": sorted(features),
+            "feature_refs": [
+                {
+                    "id": fid,
+                    "kind": row["kind"],
+                    "status": row["status"],
+                    "parent_id": row["parent_id"],
+                    "source_ids": row["source_ids"],
+                    "implementation_refs": row["implementation_refs"],
+                    "spec_refs": row["spec_refs"],
+                    "qa_refs": row["qa_refs"],
+                }
+                for fid, row in sorted(features.items())
+            ],
+            "impacted_feature_ids": sorted(
+                {
+                    fid
+                    for row in changes.values()
+                    if row["classification"] == "impact"
+                    for fid in row["feature_ids"]
+                }
+            ),
+            "approval_required_change_ids": sorted(
+                did
+                for did, row in changes.items()
+                if row["classification"] in {"no_impact", "out_of_scope"}
+            ),
+            "unknown_areas": unknown,
             "unclassified_change_ids": sorted(set(changes) - set(classified)),
             "expected_source_ids": snapshot["expected_source_ids"],
         },

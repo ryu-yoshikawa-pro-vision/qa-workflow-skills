@@ -45,3 +45,5 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 PR更新・rebase時のGit差分照合には`previous_head_git_inventory`を別途要求します。これは前回PR head→今回headの完全なGit差分で、通常の`git_inventory`は今回base→今回headを示します。両方のbase/head SHAを`event_basis`に照合し、二つの変更path集合の和集合を台帳の差分IDで分類します。二つ目の差分が欠ける場合は`incomplete`であり、片方だけの分類率100%を完了扱いにしません。
 
 Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORIZED_ROOT`へ許可済みcheckout rootを渡します。入力JSONだけに記載された`authorized_root`ではread権限を主張できません。Pythonから直接`handle`を使う場合は呼出し側が認証済みの対象rootを固定する責任を負います。
+
+下流のC・D・E担当へ渡す`handoff.feature_refs[]`は、機能ID／kind／status／parent ID、source／implementation／spec／QA refsを含む読取専用のprojectionです。`impacted_feature_ids`は差分がimpactと分類された機能ID、`approval_required_change_ids`は影響なし／対象外に分類された差分IDで、後続の認証済み承認確認を省略できません。`unknown_areas`を下流でも保持し、unknownを影響なしへ推測変換しません。

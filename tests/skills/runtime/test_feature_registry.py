@@ -409,6 +409,11 @@ class FeatureRegistryTests(unittest.TestCase):
         self.assertEqual(handoff["source_inventory"][0]["id"], "SRC-001")
         self.assertEqual(handoff["source_inventory"][0]["revision"], "head-v1")
         self.assertEqual(handoff["source_inventory"][0]["unretrieved"], [])
+        self.assertEqual(handoff["feature_refs"][0]["id"], "FEAT-001")
+        self.assertEqual(
+            handoff["feature_refs"][0]["implementation_refs"], ["src/auth.py"]
+        )
+        self.assertEqual(handoff["impacted_feature_ids"], ["FEAT-001"])
 
 
 if __name__ == "__main__":
