@@ -416,9 +416,12 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 expectations=direct_expectations,
                 observations=observations,
             )
+            # Arbitrary stdout expectations are useful observations, but
+            # only an authority-bound direct TC can replace a per-test reporter.
             run["result_collection"] = (
                 "complete"
-                if run["direct_comparison"]["result"] == "PASS"
+                if plan.get("direct_tc") is True
+                and run["direct_comparison"]["result"] == "PASS"
                 else "incomplete"
             )
         if metric_criteria is not None:
