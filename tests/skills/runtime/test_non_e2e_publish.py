@@ -144,9 +144,9 @@ class GitPublishTests(unittest.TestCase):
     def test_reviewed_rename_publishes_deletion_and_creation(self):
         old_path = "tests/case.txt"
         new_path = "tests/renamed.txt"
-        digest = "sha256:" + hashlib.sha256(
-            (self.a / old_path).read_bytes()
-        ).hexdigest()
+        digest = (
+            "sha256:" + hashlib.sha256((self.a / old_path).read_bytes()).hexdigest()
+        )
         git(self.a, "mv", old_path, new_path)
         git(self.a, "commit", "-qm", "rename testware")
         candidate = git(self.a, "rev-parse", "HEAD")
@@ -164,9 +164,7 @@ class GitPublishTests(unittest.TestCase):
         )
         self.assertEqual(set(result["changed_paths"]), {old_path, new_path})
         git(self.b, "fetch", "-q", "origin", "fixture")
-        self.assertEqual(
-            git(self.b, "show", "FETCH_HEAD:" + new_path), "old"
-        )
+        self.assertEqual(git(self.b, "show", "FETCH_HEAD:" + new_path), "old")
         removed = subprocess.run(
             ["git", "-C", str(self.b), "cat-file", "-e", "FETCH_HEAD:" + old_path],
             capture_output=True,
