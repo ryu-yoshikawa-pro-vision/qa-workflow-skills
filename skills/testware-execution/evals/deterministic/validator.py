@@ -38,7 +38,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if primary is not None:
         result.add(
             "TW-EXEC-D003",
-            bool(primary.rows) and all(
+            bool(primary.rows)
+            and all(
                 all(str(value).strip() for value in row.values())
                 for row in primary.rows
             ),
@@ -47,7 +48,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     if secondary is not None:
         result.add(
             "TW-EXEC-D004",
-            bool(secondary.rows) and all(
+            bool(secondary.rows)
+            and all(
                 all(str(value).strip() for value in row.values())
                 for row in secondary.rows
             ),
