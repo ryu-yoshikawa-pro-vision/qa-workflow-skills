@@ -279,6 +279,243 @@ def reconcile_vitest(
     }
 
 
+
+def _reconcile_individual_results(
+    *,
+    selected: list[dict[str, Any]],
+    actual: list[dict[str, Any]],
+    source_revision: str,
+    raw_ref: str,
+    selection_verified: bool,
+    reporter_consistent: bool,
+) -> dict[str, Any]:
+    """Match complete per-test identities, never file-only or internal IDs."""
+    _required_str(source_revision, "source_revision")
+    _required_str(raw_ref, "raw_ref")
+    if not isinstance(selected, list) or not selected:
+        raise ContractError("empty_selected_test_set")
+    wanted = Counter(
+        (
+            *_test_key(item.get("path"), item.get("title_path")),
+            _required_str(item.get("project_name", "default"), "project_name"),
+        )
+        for item in selected
+        if isinstance(item, dict)
+    )
+    if sum(wanted.values()) != len(selected):
+        raise ContractError("invalid_selected_test")
+    seen = Counter()
+    rows: dict[tuple[str, tuple[str, ...], str], list[dict[str, Any]]] = {}
+    allowed = {
+        "passed",
+        "failed",
+        "pending",
+        "todo",
+        "skipped",
+        "timedOut",
+        "interrupted",
+        "expected",
+        "unexpected",
+        "flaky",
+    }
+    for item in actual:
+        if not isinstance(item, dict):
+            raise ContractError("invalid_report_case")
+        key = (
+            *_test_key(item.get("path"), item.get("title_path")),
+            _required_str(item.get("project_name", "default"), "project_name"),
+        )
+        if item.get("status") not in allowed:
+            raise ContractError("unknown_report_case_status")
+        attempts = item.get("attempt_results")
+        if not isinstance(attempts, list):
+            raise ContractError("missing_attempt_results")
+        seen[key] += 1
+        rows.setdefault(key, []).append(item)
+    results = []
+    for (path, titles, project), count in wanted.items():
+        matches = rows.get((path, titles, project), [])
+        status = (
+            "ambiguous"
+            if count != 1 or len(matches) > 1
+            else "not_collected"
+            if not matches
+            else matches[0]["status"]
+        )
+        results.append(
+            {
+                "path": path,
+                "title_path": list(titles),
+                "project_name": project,
+                "expected_instances": count,
+                "collected_instances": len(matches),
+                "runner_status": status,
+                "attempt_results": matches[0]["attempt_results"] if len(matches) == 1 else [],
+                "tc_verdict": None,
+            }
+        )
+    unexpected = [
+        {"path": path, "title_path": list(titles), "project_name": project, "count": count}
+        for (path, titles, project), count in seen.items()
+        if (path, titles, project) not in wanted
+    ]
+    return {
+        "source_revision": source_revision,
+        "raw_ref": raw_ref,
+        "results": results,
+        "unexpected": unexpected,
+        "reporter_consistent": reporter_consistent,
+        "collection_complete": (
+            selection_verified is True
+            and reporter_consistent
+            and wanted == seen
+            and all(
+                result["runner_status"] not in {"ambiguous", "not_collected"}
+                for result in results
+            )
+        ),
+        "selected_count": sum(wanted.values()),
+        "collected_count": sum(seen.values()),
+        "tc_verdicts_assessed": False,
+    }
+
+
+def reconcile_case_report(
+    *,
+    selected: list[dict[str, Any]],
+    report: dict[str, Any],
+    source_revision: str,
+    testware_revision: str,
+    raw_ref: str,
+    selection_verified: bool = False,
+) -> dict[str, Any]:
+    """Validate a versioned case-level result from an inspected batch/event adapter."""
+    if (
+        not isinstance(report, dict)
+        or report.get("schema") != "non-e2e-cases/v1"
+        or report.get("source_revision") != source_revision
+        or report.get("testware_revision") != testware_revision
+        or not isinstance(report.get("results"), list)
+    ):
+        raise ContractError("invalid_case_report")
+    raw = report["results"]
+    for item in raw:
+        if not isinstance(item, dict) or item.get("status") not in {
+            "passed", "failed", "pending", "todo", "skipped", "timedOut", "interrupted"
+        }:
+            raise ContractError("invalid_case_status")
+        attempts = item.get("attempt_results")
+        if not isinstance(attempts, list) or (
+            item["status"] not in {"skipped", "pending", "todo"} and not attempts
+        ):
+            raise ContractError("invalid_case_attempts")
+        for attempt in attempts:
+            if not isinstance(attempt, dict) or attempt.get("status") not in {
+                "passed", "failed", "timedOut", "interrupted", "skipped"
+            }:
+                raise ContractError("invalid_case_attempt_status")
+    return _reconcile_individual_results(
+        selected=selected,
+        actual=raw,
+        source_revision=source_revision,
+        raw_ref=raw_ref,
+        selection_verified=selection_verified,
+        reporter_consistent=(report.get("complete") is True),
+    )
+
+
+def reconcile_playwright(
+    *,
+    selected: list[dict[str, Any]],
+    report: dict[str, Any],
+    source_revision: str,
+    raw_ref: str,
+    selection_verified: bool = False,
+    repo_root: str | None = None,
+) -> dict[str, Any]:
+    """Parse native Playwright JSON suites/specs/projects and retain retry results."""
+    if (
+        not isinstance(report, dict)
+        or not isinstance(report.get("suites"), list)
+        or not isinstance(report.get("errors"), list)
+        or not isinstance(report.get("stats"), dict)
+    ):
+        raise ContractError("invalid_playwright_report")
+    observed: list[dict[str, Any]] = []
+
+    def visit(suite: dict[str, Any], parents: list[str], depth: int) -> None:
+        if not isinstance(suite, dict):
+            raise ContractError("invalid_playwright_suite")
+        title = suite.get("title")
+        if title is not None and not isinstance(title, str):
+            raise ContractError("invalid_playwright_suite_title")
+        titles = [*parents, title] if depth > 0 and title else parents
+        specs = suite.get("specs")
+        children = suite.get("suites")
+        if not isinstance(specs, list) or not isinstance(children, list):
+            raise ContractError("invalid_playwright_suite")
+        for spec in specs:
+            if not isinstance(spec, dict) or not isinstance(spec.get("tests"), list):
+                raise ContractError("invalid_playwright_spec")
+            path = _report_path(spec.get("file"), repo_root)
+            title_path = [*titles, _required_str(spec.get("title"), "spec_title")]
+            for test in spec["tests"]:
+                if not isinstance(test, dict) or test.get("status") not in {
+                    "expected", "unexpected", "flaky", "skipped"
+                }:
+                    raise ContractError("invalid_playwright_test")
+                attempts = test.get("results")
+                if not isinstance(attempts, list) or (
+                    test["status"] != "skipped" and not attempts
+                ):
+                    raise ContractError("missing_playwright_attempts")
+                attempt_rows = []
+                for entry in attempts:
+                    if not isinstance(entry, dict) or entry.get("status") not in {
+                        "passed", "failed", "timedOut", "interrupted", "skipped"
+                    }:
+                        raise ContractError("invalid_playwright_attempt")
+                    attempt_rows.append(
+                        {"status": entry["status"], "retry": entry.get("retry")}
+                    )
+                observed.append(
+                    {
+                        "path": path,
+                        "title_path": title_path,
+                        "project_name": _required_str(
+                            test.get("projectName", "default") or "default",
+                            "project_name",
+                        ),
+                        "status": test["status"],
+                        "attempt_results": attempt_rows,
+                    }
+                )
+        for nested in children:
+            visit(nested, titles, depth + 1)
+
+    for top in report["suites"]:
+        visit(top, [], 0)
+    stats = report["stats"]
+    totals = Counter(item["status"] for item in observed)
+    consistent = report["errors"] == [] and all(
+        type(stats.get(name)) is int and stats[name] == totals[status]
+        for name, status in [
+            ("expected", "expected"),
+            ("unexpected", "unexpected"),
+            ("flaky", "flaky"),
+            ("skipped", "skipped"),
+        ]
+    )
+    return _reconcile_individual_results(
+        selected=selected,
+        actual=observed,
+        source_revision=source_revision,
+        raw_ref=raw_ref,
+        selection_verified=selection_verified,
+        reporter_consistent=consistent,
+    )
+
+
 def compare_direct(
     *, started: bool, expectations: list[dict[str, Any]], observations: dict[str, Any]
 ) -> dict[str, Any]:
