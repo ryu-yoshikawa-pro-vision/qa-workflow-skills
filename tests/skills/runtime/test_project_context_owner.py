@@ -494,7 +494,9 @@ class ProjectContextOwnerTests(unittest.TestCase):
         request["policy"] = {**policy, "target_ref": "qa/|unauthorized"}
         self.assertEqual(handle(request)["status"], "blocked")
 
-    def test_placement_policy_preserves_query_urls_and_rejects_outer_space(self) -> None:
+    def test_placement_policy_preserves_query_urls_and_rejects_outer_space(
+        self,
+    ) -> None:
         policy = {
             "owner": "project-context",
             "scope": "Sample",
@@ -588,7 +590,10 @@ class ProjectContextOwnerTests(unittest.TestCase):
         )
         revised = handle(request)
         self.assertEqual(revised["status"], "draft", revised)
-        self.assertIn("| DEC-002 | QA成果物配置・人間編集方針 | 有効 |", revised["artifact_markdown"])
+        self.assertIn(
+            "| DEC-002 | QA成果物配置・人間編集方針 | 有効 |",
+            revised["artifact_markdown"],
+        )
         self.assertIn("approval_revision=approved-v2", revised["artifact_markdown"])
 
     def test_update_rejects_non_local_roots_and_fake_section(self) -> None:
