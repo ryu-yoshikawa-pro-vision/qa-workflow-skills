@@ -3,5 +3,14 @@
   "expected_acquisition": {
     "POP-101": "未取得"
   },
+  "known_local_ids": {
+    "test-requirements-analysis|fixture://qa/requirements/orders-q4@req-r3|orders-release-q4": [
+      "QAR-001",
+      "QAR-002"
+    ],
+    "test-architecture-design|fixture://qa/architecture/orders-r1@arch-r5|orders-release-q4": [
+      "ARCH-001"
+    ]
+  },
   "must_not_claim_complete": true
 }

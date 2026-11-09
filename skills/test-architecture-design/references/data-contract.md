@@ -2,7 +2,7 @@
 
 ## Identity・依存
 
-ownerは`test-architecture-design`です。成果物は保存先発行の不透明な`artifact_ref`・`revision`・`scope`を持ち、各入力はowner/source ref・revision・scope・currentnessとともに記録します。`ARCH-001`等のassignment IDはartifact系列内のstable IDであり、global ID registryやcounterを作りません。
+ownerは`test-architecture-design`です。成果物は保存先発行の不透明な`artifact_ref`・`revision`・`scope`を持ち、各入力はowner/source ref・revision・scope・currentness・取得状態とともに記録します。必要な承認状態と承認証拠refも保持します。`ARCH-001`等のassignment IDはartifact系列内のstable IDであり、global ID registryやcounterを作りません。
 
 ## Assignment
 
@@ -16,7 +16,9 @@ ownerは`test-architecture-design`です。成果物は保存先発行の不透�
 
 同じtargetに複数levelを割り当てられます。重複判定はartifact ref・scope内の同じtarget／level／type／responsibilityに限定します。
 
-QA requirement refは`<artifact_ref>#<local_id>@<revision>`で固定し、単独のlocal IDだけでcurrentnessを推定しません。要求artifactが未取得・未確定なら、architecture assignmentを確定せずblocked／未確定にします。
+QA requirement refは`<artifact_ref>#<local_id>@<revision>`で固定し、利用できるsource inventory／fixtureでlocal ID、owner、scope、revisionを照合します。単独のlocal IDだけでcurrentnessを推定しません。要求artifactがstale・unknown・未取得・未承認なら、architecture assignmentを確定せずblocked／未確定にします。
+
+依存sourceがstale・unknown・未取得の場合は、そのsourceに依存する割当だけを未確定にします。同じtargetでも独立したcurrent sourceに基づく割当は保持し、targetごとに既定値・承認済み割当・明示指定との整合を検証します。未確定の依存割当を含むartifactは承認済みとして確定しません。
 
 ## 状態・承認・currentness
 

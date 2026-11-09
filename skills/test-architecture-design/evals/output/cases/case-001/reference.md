@@ -12,12 +12,12 @@
 
 ## 入力source・依存
 
-| owner                      | source_ref                          | revision | scope              | currentness | 取得状態 |
-| -------------------------- | ----------------------------------- | -------- | ------------------ | ----------- | -------- |
-| test-requirements-analysis | REQUEST-01@doc-7                    | doc-7    | orders-release-q4  | current     | 取得済   |
-| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3   | orders-release-q4  | current     | 取得済   |
-| test-analysis              | RISK-001@risk-5                     | risk-5   | orders.update      | current     | 取得済   |
-| architecture owner         | ARCH-SOURCE@arch-4                  | arch-4   | orders.persistence | current     | 取得済   |
+| owner                      | source_ref                          | revision | scope             | currentness | 取得状態 | 承認状態 | 承認証拠ref     |
+| -------------------------- | ----------------------------------- | -------- | ----------------- | ----------- | -------- | -------- | --------------- |
+| stakeholder                | REQUEST-01@doc-7                    | doc-7    | orders-release-q4 | current     | 取得済   | 不要     | -               |
+| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3   | orders-release-q4 | current     | 取得済   | 承認済み | APPROVAL-4      |
+| test-analysis              | RISK-001@risk-5                     | risk-5   | orders.update     | current     | 取得済   | 不要     | -               |
+| architecture owner         | ARCH-SOURCE@arch-4                  | arch-4   | orders-release-q4 | current     | 取得済   | 承認済み | APPROVAL-ARCH-0 |
 
 ## テストアーキテクチャ割当
 
@@ -29,10 +29,10 @@
 
 ## レベル優先・競合
 
-| target_ref         | 明示指定 | 承認済み割当   | 既定値   | 適用判断                                            | 競合・判断元            |
-| ------------------ | -------- | -------------- | -------- | --------------------------------------------------- | ----------------------- |
-| orders.update      | API      | API・システム  | システム | APIを明示指定で採用しsystem levelも別分担として保持 | levelを単一値に丸めない |
-| orders.persistence | -        | コンポーネント | システム | コンポーネントを承認済みarchitectureから採用        | 既定値は未使用          |
+| target_ref         | 明示指定 | 承認済み割当   | 既定値   | 適用判断                                                                     | 競合・判断元            |
+| ------------------ | -------- | -------------- | -------- | ---------------------------------------------------------------------------- | ----------------------- |
+| orders.update      | API      | API・システム  | システム | APIを明示指定で採用し、承認済みarchitectureのシステムlevelも別分担として保持 | levelを単一値に丸めない |
+| orders.persistence | -        | コンポーネント | システム | コンポーネントを承認済みarchitectureから採用                                 | 既定値は未使用          |
 
 ## 非機能・環境制約
 

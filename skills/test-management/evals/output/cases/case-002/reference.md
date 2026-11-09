@@ -14,16 +14,16 @@
 
 ## 入力source
 
-| owner                      | source_ref       | revision | scope             | currentness | 取得状態 |
-| -------------------------- | ---------------- | -------- | ----------------- | ----------- | -------- |
-| test-requirements-analysis | QA-REQ-ARTIFACT  | req-r3   | orders-release-q4 | current     | 取得済   |
-| test-architecture-design   | QA-ARCH-ARTIFACT | arch-r5  | orders-release-q4 | stale       | 取得済   |
+| owner                      | source_ref                          | revision | scope             | currentness | 取得状態 | 承認状態 | 承認証拠ref  |
+| -------------------------- | ----------------------------------- | -------- | ----------------- | ----------- | -------- | -------- | ------------ |
+| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3   | orders-release-q4 | current     | 取得済   | 承認済み | APPROVAL-4   |
+| test-architecture-design   | fixture://qa/architecture/orders-r1 | arch-r5  | orders-release-q4 | stale       | 取得済   | 失効     | APPROVAL-OLD |
 
 ## 計画・資源
 
-| 計画ID   | QA要求ref / revision   | architecture ref / revision | 対象scope         | level / type | suite・順序 | 担当    | 見積工数 | resource / 準備条件  |
-| -------- | ---------------------- | --------------------------- | ----------------- | ------------ | ----------- | ------- | -------- | -------------------- |
-| PLAN-002 | QA-REQ-ARTIFACT@req-r3 | QA-ARCH-ARTIFACT@arch-r5    | orders-release-q4 | API          | API suite   | QA team | 未見積   | API source確認が必要 |
+| 計画ID   | QA要求ref / revision                               | architecture ref / revision                          | 対象scope         | level / type | suite・順序 | 担当    | 見積工数 | resource / 準備条件  |
+| -------- | -------------------------------------------------- | ---------------------------------------------------- | ----------------- | ------------ | ----------- | ------- | -------- | -------------------- |
+| PLAN-002 | fixture://qa/requirements/orders-q4#QAR-001@req-r3 | fixture://qa/architecture/orders-r1#ARCH-001@arch-r5 | orders-release-q4 | API          | API suite   | QA team | 未見積   | API source確認が必要 |
 
 ## 開始・終了基準
 
@@ -52,15 +52,20 @@
 
 ## Project risk
 
-| project risk ID | 計画遂行上のrisk                 | 影響scope         | 根拠ref / revision    | 対応                     | owner   | 状態    |
-| --------------- | -------------------------------- | ----------------- | --------------------- | ------------------------ | ------- | ------- |
-| PROJ-RISK-002   | API source access is unavailable | orders-release-q4 | API-SOURCE-V2@unknown | source ownerへ取得を依頼 | QA lead | blocked |
+| project risk ID | 計画遂行上のrisk                 | 影響scope         | 根拠ref / revision    | 対応                     | owner   | 状態    | 状態証拠ref | 承認主体・role |
+| --------------- | -------------------------------- | ----------------- | --------------------- | ------------------------ | ------- | ------- | ----------- | -------------- |
+| PROJ-RISK-002   | API source access is unavailable | orders-release-q4 | API-SOURCE-V2@unknown | source ownerへ取得を依頼 | QA lead | blocked | -           | -              |
 
 ## 是正処置
 
-| action ID | 差異 / risk ref | action                             | owner   | 期限 / 状態      | 結果ref |
-| --------- | --------------- | ---------------------------------- | ------- | ---------------- | ------- |
-| CA-002    | PROJ-RISK-002   | request API inventory and revision | QA lead | 未設定 / blocked | 未取得  |
+| action ID | 差異 / risk ref | 影響scope         | action                             | owner   | 期限 / 状態      | 結果ref | 承認主体・role |
+| --------- | --------------- | ----------------- | ---------------------------------- | ------- | ---------------- | ------- | -------------- |
+| CA-002    | PROJ-RISK-002   | orders-release-q4 | request API inventory and revision | QA lead | 未設定 / blocked | 未取得  | -              |
+
+## 差異・未処理事項
+
+| 差異ID | 影響scope | 差異 | 根拠ref / revision | 対応 | owner | 状態 | 状態証拠ref | 承認主体・role |
+| ------ | --------- | ---- | ------------------ | ---- | ----- | ---- | ----------- | -------------- |
 
 ## 承認
 

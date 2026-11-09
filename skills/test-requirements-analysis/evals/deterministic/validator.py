@@ -22,7 +22,7 @@ REQUIREMENT_STATES = {
     "置換",
 }
 CURRENTNESS = {"current", "stale", "unknown"}
-ACQUISITION = {"取得済", "部分取得", "未取得", "取得不能", "0件確認済み"}
+ACQUISITION = {"取得済", "部分取得", "未取得", "取得不能", "0件確認済み", "不明"}
 
 
 def _metadata(table) -> dict[str, str]:
@@ -113,7 +113,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         else None,
     )
 
-    requirements = nonempty_rows(requirements_table, "QA要求ID")
+    requirements = nonempty_rows(requirements_table)
     ids = [clean(row.get("QA要求ID", "")) for row in requirements]
     invalid_ids = [value for value in ids if not ID_PATTERN.fullmatch(value)]
     add_duplicate_assertion(result, "QRA-D004", ids, "QA要求ID")
@@ -176,7 +176,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=wrong_owner_ids or None,
     )
 
-    sources = nonempty_rows(source_table, "source_ref")
+    sources = nonempty_rows(source_table)
     invalid_source_states = []
     source_refs = set()
     for row in sources:
@@ -186,6 +186,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         acquisition = clean(row.get("取得状態", ""))
         if (
             not clean(row.get("owner", ""))
+            or not ref
             or not clean(row.get("revision", ""))
             or not clean(row.get("scope", ""))
         ):
@@ -202,34 +203,62 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "source owner・revision・scope・currentness・取得状態が区別されること",
         evidence=invalid_source_states or None,
     )
-    source_identities = {
-        (
-            clean(row.get("source_ref", "")),
-            clean(row.get("revision", "")),
-            clean(row.get("scope", "")),
+    sources_by_identity: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    for source in sources:
+        identity = (
+            clean(source.get("source_ref", "")),
+            clean(source.get("revision", "")),
+            clean(source.get("scope", "")),
         )
-        for row in sources
-    }
-    unmatched_requirements = [
-        {
-            "id": row.get("QA要求ID"),
-            "source_ref": row.get("source_ref"),
-            "source_revision": row.get("source_revision"),
-            "scope": row.get("scope"),
-        }
-        for row in requirements
-        if (
+        sources_by_identity.setdefault(identity, []).append(source)
+    unmatched_requirements = []
+    stale_final_requirements = []
+    for row in requirements:
+        identity = (
             clean(row.get("source_ref", "")),
             clean(row.get("source_revision", "")),
             clean(row.get("scope", "")),
         )
-        not in source_identities
-    ]
+        matching_sources = sources_by_identity.get(identity, [])
+        if len(matching_sources) != 1:
+            unmatched_requirements.append(
+                {
+                    "id": row.get("QA要求ID"),
+                    "source_ref": row.get("source_ref"),
+                    "source_revision": row.get("source_revision"),
+                    "scope": row.get("scope"),
+                    "matching_source_rows": len(matching_sources),
+                }
+            )
+            continue
+        source = matching_sources[0]
+        if clean(row.get("状態", "")) in {"合意済み", "対象外"} and (
+            clean(source.get("currentness", "")) != "current"
+            or clean(source.get("取得状態", "")) != "取得済"
+        ):
+            stale_final_requirements.append(
+                {
+                    "id": row.get("QA要求ID"),
+                    "source_ref": identity[0],
+                    "revision": identity[1],
+                    "scope": identity[2],
+                    "owner": clean(source.get("owner", "")),
+                    "currentness": clean(source.get("currentness", "")),
+                    "取得状態": clean(source.get("取得状態", "")),
+                }
+            )
     result.add(
         "QRA-D015",
-        not unmatched_requirements,
-        "各QA要求のsource ref・revision・scopeが情報源一覧と一致すること",
-        evidence=unmatched_requirements or None,
+        not unmatched_requirements and not stale_final_requirements,
+        "確定QA要求のsource owner・ref・revision・scope・currentness・取得状態が一致すること",
+        evidence=(
+            {
+                "unmatched_requirements": unmatched_requirements,
+                "stale_final_requirements": stale_final_requirements,
+            }
+            if unmatched_requirements or stale_final_requirements
+            else None
+        ),
     )
     known_sources = set(expected.get("known_sources", []))
     unknown_refs = (
@@ -282,6 +311,42 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         approval_mismatch.append(
             {"reason": "approved artifact without matching approval evidence"}
         )
+    finalized_without_approval = [
+        {"id": row.get("QA要求ID"), "state": row.get("状態")}
+        for row in requirements
+        if clean(row.get("状態", "")) in {"合意済み", "対象外"}
+        and metadata.get("状態") != "承認済み"
+    ]
+    stale_dependencies = []
+    if metadata.get("状態") == "承認済み":
+        for row in requirements:
+            identity = (
+                clean(row.get("source_ref", "")),
+                clean(row.get("source_revision", "")),
+                clean(row.get("scope", "")),
+            )
+            if clean(row.get("状態", "")) not in {"合意済み", "対象外"}:
+                continue
+            matching_sources = sources_by_identity.get(identity, [])
+            if len(matching_sources) != 1:
+                continue
+            source = matching_sources[0]
+            if (
+                clean(source.get("currentness", "")) != "current"
+                or clean(source.get("取得状態", "")) != "取得済"
+            ):
+                stale_dependencies.append(
+                    {
+                        "id": row.get("QA要求ID"),
+                        "source_ref": identity[0],
+                        "revision": identity[1],
+                        "scope": identity[2],
+                        "currentness": clean(source.get("currentness", "")),
+                        "取得状態": clean(source.get("取得状態", "")),
+                    }
+                )
+    approval_mismatch.extend(finalized_without_approval)
+    approval_mismatch.extend(stale_dependencies)
     result.add(
         "QRA-D013",
         not approval_mismatch,

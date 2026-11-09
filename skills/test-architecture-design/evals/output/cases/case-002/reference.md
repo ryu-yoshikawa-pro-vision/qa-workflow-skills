@@ -12,11 +12,11 @@
 
 ## 入力source・依存
 
-| owner                      | source_ref                                 | revision | scope                 | currentness | 取得状態 |
-| -------------------------- | ------------------------------------------ | -------- | --------------------- | ----------- | -------- |
-| stakeholder                | REQUEST-UNKNOWN@unknown                    | unknown  | billing.authorization | unknown     | 取得不能 |
-| test-requirements-analysis | fixture://qa/requirements/billing-conflict | unknown  | billing.authorization | unknown     | 取得不能 |
-| architecture owner         | ARCH-OLD@rev-1                             | rev-1    | billing.authorization | stale       | 取得済   |
+| owner                      | source_ref                                 | revision | scope                 | currentness | 取得状態 | 承認状態 | 承認証拠ref  |
+| -------------------------- | ------------------------------------------ | -------- | --------------------- | ----------- | -------- | -------- | ------------ |
+| stakeholder                | REQUEST-UNKNOWN@unknown                    | unknown  | billing.authorization | unknown     | 取得不能 | unknown  | -            |
+| test-requirements-analysis | fixture://qa/requirements/billing-conflict | unknown  | billing.authorization | unknown     | 取得不能 | unknown  | -            |
+| architecture owner         | ARCH-OLD@rev-1                             | rev-1    | billing.authorization | stale       | 取得済   | 失効     | APPROVAL-OLD |
 
 ## テストアーキテクチャ割当
 

@@ -4,5 +4,16 @@
     "POP-001": "取得済",
     "POP-002": "取得済"
   },
+  "known_local_ids": {
+    "test-requirements-analysis|fixture://qa/requirements/orders-q4@req-r3|orders-release-q4": [
+      "QAR-001",
+      "QAR-002"
+    ],
+    "test-architecture-design|fixture://qa/architecture/orders-r1@arch-r1|orders-release-q4": [
+      "ARCH-001",
+      "ARCH-002",
+      "ARCH-003"
+    ]
+  },
   "must_not_claim_complete": true
 }

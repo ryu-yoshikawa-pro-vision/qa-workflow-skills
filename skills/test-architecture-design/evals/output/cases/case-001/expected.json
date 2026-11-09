@@ -3,5 +3,8 @@
   "expected_levels": {
     "orders.update": ["API", "システム"],
     "orders.persistence": ["コンポーネント"]
+  },
+  "known_qa_requirement_ids": {
+    "fixture://qa/requirements/orders-q4@req-r3": ["QAR-001", "QAR-002"]
   }
 }

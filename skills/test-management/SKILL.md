@@ -14,7 +14,7 @@ description: QA計画の作成・改版、開始／終了基準、予定source�
 5. 計画変更は新revisionの草案として扱います。承認証拠が同じscope・artifact ref・revisionを指すまでcurrentな承認済み計画としません。旧版は履歴として保持します。
 6. 予定source inventoryと取得後readback ledgerを分けます。未取得・部分取得・0件確認・実行失敗・未実行・取消・結果不明を区別し、未取得や取得失敗を0件と扱わず、raw結果を書き換えません。
 7. 進捗は計画分母、取得済み母集団、実行状態の単位を明示します。別build／環境／retry／runの単位を足し合わせず、report側のPASS率や全体完了を代行しません。
-8. 人員・予算・日程・準備・外部依存は根拠がある場合だけ記録します。project riskとProduct Riskを分離し、是正担当・期限・状態・結果・証拠を追跡します。
+8. 人員・予算・日程・準備・外部依存は根拠がある場合だけ記録します。project riskとProduct Riskを分離し、差異・risk・actionのscope、状態、処理／受容証拠を追跡します。
 9. 保存・承認providerが未接続なら更新を草案／blockedに留めます。claimやローカルfixtureを実保存・認証済み承認とみなしません。
 10. 最終出力前に`references/guidance.md`の品質ゲートで分母・currentness・承認・差異・再開条件を確認し、不明な範囲を完了扱いしません。
 

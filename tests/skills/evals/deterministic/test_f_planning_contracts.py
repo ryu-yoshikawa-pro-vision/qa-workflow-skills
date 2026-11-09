@@ -44,15 +44,39 @@ def assertion_status(result, assertion_id: str) -> str:
     return next(item.status for item in result.assertions if item.id == assertion_id)
 
 
-def update_markdown_row(text: str, row_id: str, updates: dict[str, str]) -> str:
+def update_markdown_row(
+    text: str,
+    row_id: str,
+    updates: dict[str, str],
+    section: str | None = None,
+) -> str:
     lines = text.splitlines()
+    section_start = 0
+    section_end = len(lines)
+    if section is not None:
+        section_start = next(
+            (index for index, line in enumerate(lines) if line.strip() == section), -1
+        )
+        if section_start < 0:
+            raise AssertionError(f"could not find table section {section}")
+        section_end = next(
+            (
+                index
+                for index in range(section_start + 1, len(lines))
+                if lines[index].strip().startswith("## ")
+            ),
+            len(lines),
+        )
     row_index = None
     headers = []
     cells = []
-    for index, line in enumerate(lines):
+    for index in range(section_start + 1, section_end):
+        line = lines[index]
         if not line.strip().startswith(f"| {row_id} |"):
             continue
         for header_index in range(index - 1, -1, -1):
+            if lines[header_index].strip().startswith("## "):
+                break
             candidate_headers = [
                 cell.strip()
                 for cell in lines[header_index].strip().strip("|").split("|")
@@ -73,6 +97,100 @@ def update_markdown_row(text: str, row_id: str, updates: dict[str, str]) -> str:
         cells[headers.index(header)] = value
     lines[row_index] = "| " + " | ".join(cells) + " |"
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def completed_plan_fixture() -> tuple[str, dict]:
+    text, expected = eval_case("test-management", "TMG-OUT-001")
+    text = text.replace("| 状態 | 進行中 |", "| 状態 | 完了 |", 1)
+    text = update_markdown_row(
+        text,
+        "終了",
+        {"判定状態": "未達"},
+    )
+    text = update_markdown_row(
+        text,
+        "MON-8",
+        {"全体判定": "完了", "差異・未確定": "差異なし"},
+    )
+    text = update_markdown_row(
+        text,
+        "PROJ-RISK-001",
+        {"状態": "解決済み", "状態証拠ref": "RISK-CLOSE-1", "承認主体・role": "-"},
+    )
+    text = update_markdown_row(
+        text,
+        "CA-001",
+        {
+            "期限 / 状態": "2026-11-10 / 完了",
+            "結果ref": "ACTION-RESULT-1",
+            "承認主体・role": "-",
+        },
+    )
+    return text, expected
+
+
+def add_difference_row(text: str, row: str) -> str:
+    separator = "| ------ | --------- | ---- | ------------------ | ---- | ----- | ---- | ----------- | -------------- |"
+    if separator not in text:
+        raise AssertionError("could not find difference table separator")
+    return text.replace(separator, f"{separator}\n{row}", 1)
+
+
+def insert_table_row(text: str, section: str, row: str) -> str:
+    lines = text.splitlines()
+    section_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == section), None
+    )
+    if section_index is None:
+        raise AssertionError(f"could not find table section {section}")
+    separator_index = None
+    for index in range(section_index + 1, len(lines)):
+        line = lines[index].strip()
+        if line.startswith("|") and all(
+            set(cell.strip()) <= {"-", ":"}
+            for cell in line.strip("|").split("|")
+        ):
+            separator_index = index
+            break
+        if line.startswith("## "):
+            break
+    if separator_index is None:
+        raise AssertionError(f"could not find table separator in {section}")
+    lines.insert(separator_index + 1, row)
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def remove_markdown_row(text: str, row_id: str, section: str | None = None) -> str:
+    lines = text.splitlines()
+    if section is None:
+        section_index = -1
+        section_end = len(lines)
+    else:
+        section_index = next(
+            (index for index, line in enumerate(lines) if line.strip() == section), None
+        )
+        if section_index is None:
+            raise AssertionError(f"could not find table section {section}")
+        section_end = next(
+            (
+                index
+                for index in range(section_index + 1, len(lines))
+                if lines[index].strip().startswith("## ")
+            ),
+            len(lines),
+        )
+    row_index = next(
+        (
+            index
+            for index in range(section_index + 1, section_end)
+            if lines[index].strip().startswith(f"| {row_id} |")
+        ),
+        None,
+    )
+    if row_index is None:
+        raise AssertionError(f"could not find row {row_id}")
+    retained = [line for index, line in enumerate(lines) if index != row_index]
+    return "\n".join(retained) + ("\n" if text.endswith("\n") else "")
 
 
 class QaPlanningContractTests(unittest.TestCase):
@@ -178,12 +296,56 @@ class QaPlanningContractTests(unittest.TestCase):
         result = validate(broken, expected, "QRA-OUT-002")
         self.assertEqual(assertion_status(result, "QRA-D014"), "fail")
 
+    def test_approved_qa_requirements_reject_stale_sources_and_allow_draft_recovery(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        stale_source = text.replace(
+            "| stakeholder | REQUEST-01 | doc-7 | orders-release-q4 | current | 取得済 | approval recordを確認 |",
+            "| stakeholder | REQUEST-01 | doc-7 | orders-release-q4 | stale | 取得済 | approval recordを確認 |",
+            1,
+        )
+        stale_result = validate(stale_source, expected, "QRA-OUT-001")
+        self.assertEqual(assertion_status(stale_result, "QRA-D015"), "fail")
+        self.assertEqual(assertion_status(stale_result, "QRA-D013"), "fail")
+
+        unavailable_source = text.replace(
+            "| stakeholder | REQUEST-01 | doc-7 | orders-release-q4 | current | 取得済 | approval recordを確認 |",
+            "| stakeholder | REQUEST-01 | doc-7 | orders-release-q4 | unknown | 取得不能 | approval recordを確認 |",
+            1,
+        )
+        unavailable_result = validate(unavailable_source, expected, "QRA-OUT-001")
+        self.assertEqual(assertion_status(unavailable_result, "QRA-D015"), "fail")
+
+        draft = stale_source.replace("| 状態 | 承認済み |", "| 状態 | blocked |", 1)
+        draft = update_markdown_row(draft, "QAR-001", {"状態": "提案"})
+        draft = update_markdown_row(draft, "orders-release-q4", {"状態": "失効"})
+        draft_result = validate(draft, expected, "QRA-OUT-001")
+        self.assertEqual(assertion_status(draft_result, "QRA-D010"), "pass")
+        self.assertEqual(assertion_status(draft_result, "QRA-D015"), "pass")
+        self.assertEqual(assertion_status(draft_result, "QRA-D013"), "pass")
+
+    def test_qa_requirement_and_source_rows_without_local_ids_or_refs_are_not_ignored(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        missing_requirement_id = update_markdown_row(
+            text, "QAR-001", {"QA要求ID": ""}
+        )
+        result = validate(missing_requirement_id, expected, "QRA-OUT-001")
+        self.assertEqual(assertion_status(result, "QRA-D005"), "fail")
+
+        missing_source_ref = update_markdown_row(
+            text, "stakeholder", {"source_ref": ""}
+        )
+        result = validate(missing_source_ref, expected, "QRA-OUT-001")
+        self.assertEqual(assertion_status(result, "QRA-D010"), "fail")
+        self.assertEqual(assertion_status(result, "QRA-D015"), "fail")
+
     def test_architecture_enforces_priority_and_preserves_multiple_levels(self):
         validate = load_validator("test-architecture-design")
         text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
         bad_priority = text.replace(
-            "APIを明示指定で採用しsystem levelも別分担として保持",
-            "システムを明示指定で採用しsystem levelも別分担として保持",
+            "APIを明示指定で採用し、承認済みarchitectureのシステムlevelも別分担として保持",
+            "システムを明示指定で採用し、承認済みarchitectureのシステムlevelも別分担として保持",
             1,
         )
         missing_level = text.replace(
@@ -203,6 +365,41 @@ class QaPlanningContractTests(unittest.TestCase):
             ),
             "fail",
         )
+
+        invalid_priority = update_markdown_row(
+            text, "orders.persistence", {"明示指定": "unrecognized-level"}
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(invalid_priority, expected, "TAD-OUT-001"), "TAD-D011"
+            ),
+            "fail",
+        )
+
+        missing_precedence = remove_markdown_row(
+            text, "orders.persistence", "## レベル優先・競合"
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_precedence, expected, "TAD-OUT-001"), "TAD-D011"
+            ),
+            "fail",
+        )
+
+    def test_architecture_does_not_ignore_assignment_or_source_rows_without_keys(self):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        missing_assignment_id = update_markdown_row(
+            text, "ARCH-001", {"割当ID": ""}
+        )
+        result = validate(missing_assignment_id, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(result, "TAD-D005"), "fail")
+
+        missing_source_ref = update_markdown_row(
+            text, "stakeholder", {"source_ref": ""}
+        )
+        result = validate(missing_source_ref, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(result, "TAD-D009"), "fail")
 
     def test_architecture_approval_must_match_current_revision(self):
         validate = load_validator("test-architecture-design")
@@ -225,12 +422,13 @@ class QaPlanningContractTests(unittest.TestCase):
         )
         result = validate(false_assignment, expected, "TAD-OUT-002")
         self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
-        self.assertEqual(assertion_status(result, "TAD-D016"), "pass")
+        self.assertEqual(assertion_status(result, "TAD-D011"), "fail")
+        self.assertEqual(assertion_status(result, "TAD-D016"), "fail")
 
         text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
         stale_source_revision = text.replace(
-            "| test-requirements-analysis | REQUEST-01@doc-7 | doc-7 | orders-release-q4 | current | 取得済 |",
-            "| test-requirements-analysis | REQUEST-01@doc-7 | doc-8 | orders-release-q4 | current | 取得済 |",
+            "| stakeholder | REQUEST-01@doc-7 | doc-7 | orders-release-q4 | current | 取得済 |",
+            "| stakeholder | REQUEST-01@doc-7 | doc-8 | orders-release-q4 | current | 取得済 |",
             1,
         )
         result = validate(stale_source_revision, expected, "TAD-OUT-001")
@@ -248,6 +446,58 @@ class QaPlanningContractTests(unittest.TestCase):
             ),
             "fail",
         )
+
+    def test_architecture_requires_current_approved_qa_requirement_source(self):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        stale_requirement = update_markdown_row(
+            text,
+            "test-requirements-analysis",
+            {"currentness": "stale", "承認状態": "失効"},
+        )
+        result = validate(stale_requirement, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
+        self.assertEqual(assertion_status(result, "TAD-D011"), "fail")
+
+    def test_architecture_priority_is_target_local_and_unknown_sources_do_not_bypass_it(self):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        stale_source_a = update_markdown_row(
+            text, "stakeholder", {"currentness": "stale"}
+        )
+        stale_source_a = update_markdown_row(
+            stale_source_a,
+            "ARCH-001",
+            {
+                "level": "未確定",
+                "選択根拠": "未確定",
+                "状態・準備条件": "blocked: source stale",
+            },
+        )
+        stale_source_a = update_markdown_row(
+            stale_source_a,
+            "orders.update",
+            {
+                "適用判断": "未確定、影響する明示指定だけ採用しない。currentなsystem assignmentは保持",
+                "競合・判断元": "scopeとrevisionが一致する判断元を再取得する",
+            },
+        )
+        local_result = validate(stale_source_a, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(local_result, "TAD-D011"), "pass")
+        self.assertEqual(assertion_status(local_result, "TAD-D015"), "fail")
+        self.assertIn("| ARCH-002 | orders.update", stale_source_a)
+        self.assertIn("| システム | functional | system levelの別分担", stale_source_a)
+
+        with_unrelated_unknown = insert_table_row(
+            stale_source_a,
+            "## 入力source・依存",
+            "| other-owner | OTHER-SOURCE@unknown | unknown | payments | unknown | 不明 | unknown | - |",
+        )
+        bad_current_assignment = update_markdown_row(
+            with_unrelated_unknown, "ARCH-003", {"level": "システム"}
+        )
+        result = validate(bad_current_assignment, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(result, "TAD-D011"), "fail")
 
     def test_plan_monitoring_counts_match_population_and_raw_states(self):
         validate = load_validator("test-management")
@@ -479,6 +729,270 @@ class QaPlanningContractTests(unittest.TestCase):
             assertion_status(zero_result, "TMG-D013"), "pass", zero_result.assertions
         )
         self.assertEqual(assertion_status(zero_result, "TMG-D014"), "pass")
+
+    def test_missing_required_readback_is_reported_without_an_exception(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        missing = remove_markdown_row(
+            text, "POP-001", "## source owner readback・取得／実行状態"
+        )
+        result = validate(missing, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D015"), "fail")
+        self.assertIn("POP-001", str(next(a.evidence for a in result.assertions if a.id == "TMG-D013")))
+        self.assertIn("POP-001", str(next(a.evidence for a in result.assertions if a.id == "TMG-D015")))
+
+    def test_missing_optional_readback_is_unknown_not_zero(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        optional = update_markdown_row(text, "POP-001", {"必須 / 任意": "任意"})
+        optional = remove_markdown_row(
+            optional, "POP-001", "## source owner readback・取得／実行状態"
+        )
+        result = validate(optional, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D015"), "fail")
+
+    def test_multiple_missing_readbacks_keep_each_population_id_as_evidence(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        missing = remove_markdown_row(
+            remove_markdown_row(
+                text, "POP-001", "## source owner readback・取得／実行状態"
+            ),
+            "POP-002",
+            "## source owner readback・取得／実行状態",
+        )
+        result = validate(missing, expected, "TMG-OUT-001")
+        evidence = str(next(a.evidence for a in result.assertions if a.id == "TMG-D013"))
+        self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
+        self.assertIn("POP-001", evidence)
+        self.assertIn("POP-002", evidence)
+
+    def test_missing_readback_and_completed_monitoring_never_claim_closure(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        missing = remove_markdown_row(
+            text, "POP-001", "## source owner readback・取得／実行状態"
+        )
+        result = validate(missing, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D015"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
+
+    def test_invalid_readback_state_does_not_raise_during_monitoring(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        malformed = update_markdown_row(
+            text,
+            "POP-001",
+            {"取得状態": "not-a-state"},
+            "## source owner readback・取得／実行状態",
+        )
+        result = validate(malformed, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D015"), "fail")
+
+    def test_plan_local_ids_must_match_fixture_owner_artifact_revision_and_scope(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        malformed_refs = (
+            update_markdown_row(
+                text,
+                "PLAN-001",
+                {"QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-999@req-r3"},
+            ),
+            update_markdown_row(
+                text,
+                "PLAN-001",
+                {"architecture ref / revision": "fixture://qa/architecture/orders-r1#ARCH-999@arch-r1"},
+            ),
+            update_markdown_row(
+                text,
+                "PLAN-001",
+                {"QA要求ref / revision": "fixture://qa/other#QAR-001@req-r3"},
+            ),
+            update_markdown_row(
+                text,
+                "PLAN-001",
+                {"QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-001@req-r2"},
+            ),
+        )
+        for broken in malformed_refs:
+            with self.subTest(plan_ref=broken.split("PLAN-001", 1)[1][:100]):
+                result = validate(broken, expected, "TMG-OUT-001")
+                self.assertEqual(assertion_status(result, "TMG-D019"), "fail")
+
+        blocked, blocked_expected = eval_case("test-management", "TMG-OUT-002")
+        blocked_result = validate(blocked, blocked_expected, "TMG-OUT-002")
+        self.assertEqual(assertion_status(blocked_result, "TMG-D019"), "pass")
+        self.assertEqual(assertion_status(blocked_result, "TMG-D020"), "pass")
+
+    def test_in_progress_plan_requires_matching_current_approval(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        no_approval = update_markdown_row(text, "orders-release-q4", {"状態": "未承認"})
+        result = validate(no_approval, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D023"), "fail")
+
+        wrong_scope = update_markdown_row(
+            text, "orders-release-q4", {"対象scope": "orders-release-q3"}
+        )
+        result = validate(wrong_scope, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D023"), "fail")
+
+        result = validate(text, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D023"), "pass")
+
+        draft, draft_expected = eval_case("test-management", "TMG-OUT-002")
+        draft_result = validate(draft, draft_expected, "TMG-OUT-002")
+        self.assertEqual(assertion_status(draft_result, "TMG-D023"), "pass")
+
+    def test_closure_allows_test_fail_and_formal_unmet_criterion(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        result = validate(text, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D013"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "pass")
+
+    def test_closure_blocks_in_scope_open_risk_blocked_action_and_open_difference(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        open_risk = update_markdown_row(
+            text, "PROJ-RISK-001", {"状態": "対応中", "状態証拠ref": "-"}
+        )
+        self.assertEqual(
+            assertion_status(validate(open_risk, expected, "TMG-OUT-001"), "TMG-D018"),
+            "fail",
+        )
+
+        blocked_action = update_markdown_row(
+            text, "CA-001", {"期限 / 状態": "未設定 / blocked", "結果ref": "未取得"}
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(blocked_action, expected, "TMG-OUT-001"), "TMG-D018"
+            ),
+            "fail",
+        )
+
+        open_difference = add_difference_row(
+            text,
+            "| DIFF-001 | orders-release-q4 | API diagnosis is open | API-21@run-r2 | owner is investigating | QA lead | 対応中 | - | - |",
+        )
+        open_difference = update_markdown_row(
+            open_difference, "MON-8", {"差異・未確定": "DIFF-001"}
+        )
+        result = validate(open_difference, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D024"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
+
+    def test_closure_does_not_ignore_missing_ids_or_unknown_scope_rows(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+
+        missing_risk_id = update_markdown_row(
+            text,
+            "PROJ-RISK-001",
+            {"project risk ID": "", "状態": "対応中", "状態証拠ref": "-"},
+        )
+        risk_result = validate(missing_risk_id, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(risk_result, "TMG-D017"), "fail")
+        self.assertEqual(assertion_status(risk_result, "TMG-D018"), "fail")
+
+        missing_action_id = update_markdown_row(
+            text,
+            "CA-001",
+            {"action ID": "", "期限 / 状態": "未設定 / blocked", "結果ref": "-"},
+        )
+        action_result = validate(missing_action_id, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(action_result, "TMG-D022"), "fail")
+        self.assertEqual(assertion_status(action_result, "TMG-D018"), "fail")
+
+        missing_difference_id = insert_table_row(
+            text,
+            "## 差異・未処理事項",
+            "|  | orders-release-q4 | open gap | GAP-1@r1 | investigate | QA team | 対応中 | - | - |",
+        )
+        difference_result = validate(
+            missing_difference_id, expected, "TMG-OUT-001"
+        )
+        self.assertEqual(assertion_status(difference_result, "TMG-D024"), "fail")
+        self.assertEqual(assertion_status(difference_result, "TMG-D018"), "fail")
+
+        unknown_risk_scope = update_markdown_row(
+            text,
+            "PROJ-RISK-001",
+            {
+                "影響scope": "unknown",
+                "状態": "解決済み",
+                "状態証拠ref": "RISK-CLOSE-1",
+            },
+        )
+        unknown_scope_result = validate(unknown_risk_scope, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(unknown_scope_result, "TMG-D018"), "fail")
+
+    def test_out_of_scope_risk_does_not_block_completed_snapshot(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        unrelated = update_markdown_row(
+            text,
+            "PROJ-RISK-001",
+            {"影響scope": "payments", "状態": "blocked", "状態証拠ref": "-"},
+        )
+        result = validate(unrelated, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D017"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "pass")
+
+    def test_terminal_risk_and_action_statuses_need_evidence(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        missing_risk_evidence = update_markdown_row(
+            text, "PROJ-RISK-001", {"状態証拠ref": "-"}
+        )
+        result = validate(missing_risk_evidence, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D017"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
+
+        missing_action_result = update_markdown_row(
+            text, "CA-001", {"結果ref": "-"}
+        )
+        result = validate(missing_action_result, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D022"), "fail")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
+
+    def test_formal_risk_acceptance_and_action_disposition_allow_activity_closure(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        accepted = update_markdown_row(
+            text,
+            "PROJ-RISK-001",
+            {
+                "状態": "受容済み",
+                "状態証拠ref": "RISK-ACCEPT-1",
+                "承認主体・role": "QA director",
+            },
+        )
+        accepted = update_markdown_row(
+            accepted,
+            "CA-001",
+            {
+                "期限 / 状態": "未設定 / 対応不要",
+                "結果ref": "ACTION-NOT-NEEDED-1",
+                "承認主体・role": "QA director",
+            },
+        )
+        result = validate(accepted, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D017"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D022"), "pass")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "pass")
+
+    def test_unjudged_end_criterion_blocks_closure(self):
+        validate = load_validator("test-management")
+        text, expected = completed_plan_fixture()
+        unjudged = update_markdown_row(text, "終了", {"判定状態": "未判定"})
+        result = validate(unjudged, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
 
 
 if __name__ == "__main__":

@@ -14,10 +14,10 @@
 
 ## 入力source
 
-| owner                      | source_ref                          | revision | scope             | currentness | 取得状態 |
-| -------------------------- | ----------------------------------- | -------- | ----------------- | ----------- | -------- |
-| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3   | orders-release-q4 | current     | 取得済   |
-| test-architecture-design   | fixture://qa/architecture/orders-r1 | arch-r1  | orders-release-q4 | current     | 取得済   |
+| owner                      | source_ref                          | revision | scope             | currentness | 取得状態 | 承認状態 | 承認証拠ref     |
+| -------------------------- | ----------------------------------- | -------- | ----------------- | ----------- | -------- | -------- | --------------- |
+| test-requirements-analysis | fixture://qa/requirements/orders-q4 | req-r3   | orders-release-q4 | current     | 取得済   | 承認済み | APPROVAL-4      |
+| test-architecture-design   | fixture://qa/architecture/orders-r1 | arch-r1  | orders-release-q4 | current     | 取得済   | 承認済み | APPROVAL-ARCH-1 |
 
 ## 計画・資源
 
@@ -54,15 +54,20 @@
 
 ## Project risk
 
-| project risk ID | 計画遂行上のrisk                        | 影響scope         | 根拠ref / revision | 対応                         | owner   | 状態   |
-| --------------- | --------------------------------------- | ----------------- | ------------------ | ---------------------------- | ------- | ------ |
-| PROJ-RISK-001   | API failure diagnosis may delay closure | orders-release-q4 | API-21@run-r2      | source ownerへ原因分析を依頼 | QA lead | 対応中 |
+| project risk ID | 計画遂行上のrisk                        | 影響scope         | 根拠ref / revision | 対応                         | owner   | 状態   | 状態証拠ref | 承認主体・role |
+| --------------- | --------------------------------------- | ----------------- | ------------------ | ---------------------------- | ------- | ------ | ----------- | -------------- |
+| PROJ-RISK-001   | API failure diagnosis may delay closure | orders-release-q4 | API-21@run-r2      | source ownerへ原因分析を依頼 | QA lead | 対応中 | -           | -              |
 
 ## 是正処置
 
-| action ID | 差異 / risk ref | action                                | owner              | 期限 / 状態     | 結果ref |
-| --------- | --------------- | ------------------------------------- | ------------------ | --------------- | ------- |
-| CA-001    | PROJ-RISK-001   | API failure diagnosis and retest plan | testware-execution | 未設定 / 対応中 | 未取得  |
+| action ID | 差異 / risk ref | 影響scope         | action                                | owner              | 期限 / 状態     | 結果ref | 承認主体・role |
+| --------- | --------------- | ----------------- | ------------------------------------- | ------------------ | --------------- | ------- | -------------- |
+| CA-001    | PROJ-RISK-001   | orders-release-q4 | API failure diagnosis and retest plan | testware-execution | 未設定 / 対応中 | 未取得  | -              |
+
+## 差異・未処理事項
+
+| 差異ID | 影響scope | 差異 | 根拠ref / revision | 対応 | owner | 状態 | 状態証拠ref | 承認主体・role |
+| ------ | --------- | ---- | ------------------ | ---- | ----- | ---- | ----------- | -------------- |
 
 ## 承認
 

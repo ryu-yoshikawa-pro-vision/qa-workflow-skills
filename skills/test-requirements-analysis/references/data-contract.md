@@ -8,7 +8,7 @@
 
 - QA目的・品質目標、対象／対象外と理由、対象build／release／期間、活動の成功条件
 - QA要求ごとのID、statement、要求元、source ref・revision、scope、priority、状態、根拠
-- source inventoryと取得範囲、currentness (`current` / `stale` / `unknown`)、未取得理由
+- source inventoryと取得範囲、owner・ref・revision・scope、currentness (`current` / `stale` / `unknown`)、取得状態・未取得理由
 - 未決事項・担当・再開条件
 - architecture／planのowner ref・revisionへのリンク
 - approval statusと、必要な場合は対象scope・artifact ref・revision・認証主体・証拠ref・失効条件
@@ -18,7 +18,7 @@
 
 要求の状態（提案、確認待ち、合意済み、対象外、要再確認、置換）とartifactの保存状態を混ぜません。`合意済み`は信頼できる認証元が対象scopeと同じartifact ref・revisionを承認した証拠が取得できた場合だけです。PR本文、LLM出力、自己申告のroleは認証証拠ではありません。revisionが変われば旧承認を再利用しません。
 
-未解決要求・不完全なsource inventoryがあるartifactは、要求全体を確定済みとして閉じません。部分範囲はcurrentとして維持できます。
+合意済み／対象外にする要求は、owner・ref・revision・scopeがsource inventoryと一致し、そのsourceがcurrent・取得済みであることを確認します。stale／unknown／未取得sourceを使う要求は提案・要再確認・未解決またはblockedに保ちます。未解決要求・不完全なsource inventoryがあるartifactは、要求全体を確定済みとして閉じません。部分範囲はcurrentとして維持できます。
 
 ## 下流handoff
 

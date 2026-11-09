@@ -214,3 +214,91 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 - **PR #17／#10互換性**: 両PRの公開範囲・正本契約を再確認した。Fはlegacy Skill・共通runtime・既存consumerを編集していない。deterministic legacy suiteはPASS。共有runtime全体は上記Windows failureのため、互換性全体をPASSとは判定しない。
 
 変更一覧・実行証拠はこの担当文書およびworktreeの差分で確認できる。commit／push／merge・PR本文更新は行っていない。
+
+## PR #28レビュー指摘修正・最終検証（2026-11-10）
+
+この節は2026-11-09の検証記録を更新する。対象branchは`feat/pr22-f-qa-planning-architecture`、作業開始時HEADはレビュー基準`f86e4bc4f56b95c831997d8ca9088ee7846d8400`で、開始時のworktreeはcleanだった。現在の差分はF担当Skill・F担当文書・F回帰テストだけである。レビュー修正の記録時点ではGitHubへのpush、PR本文更新、commitを行っていない。
+
+### Commit／push前チェック（2026-11-10）
+
+今回の公開作業開始時は対象branch `feat/pr22-f-qa-planning-architecture`、HEAD `f86e4bc4f56b95c831997d8ca9088ee7846d8400`。worktreeにはこの修正作業で作成した22件のtracked変更があり、未追跡ファイルはなかった。変更pathは3 Skill配下、`tests/skills/evals/deterministic/test_f_planning_contracts.py`、この担当文書に限定され、A所有のREADME・共通runtime・routingや生成物は含まない。
+
+`git fetch origin`は成功し、`git rev-list --left-right --count HEAD...origin/feat/pr22-f-qa-planning-architecture`は`0 0`。remote-only／local-only commitはなく、履歴同期は不要。秘密情報を含む高信頼形式、意図しないpath、テスト失敗を隠す差分は今回のpush前確認で検出されていない。追記した担当文書はdprint 0.55.2の`dprint fmt`と`dprint check`をPASSした。上記のローカル検証結果は修正完了時点の記録で、この公開作業ではテストを再実行していない。push後の新HEADに対するGitHub Actionsは未確認であり、push後に確認する。今回許可された対象branchへの通常pushを行い、PR本文とDraft状態は変更しない。
+
+### 指摘別の修正結果
+
+| 指摘                                 | 原因と修正                                                                                                                                                                                                                                                                            | 結果                                                                                                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| deterministic inputのtemplate参照4件 | QRA case-002、TAD case-002、TMG case-001/002の各`input.md`に`assets/output-template.md`参照を追記した。シナリオ・入力条件・期待・拒否条件は維持。                                                                                                                                     | CIと同じdataset検査で25 Skill／52 caseがPASS。3 Skillの6保存reference fixtureを既存runnerに通して6件PASS。これは実Agent出力ではない。                                                |
+| TMG readback欠落時のKeyError         | status表を有効な状態行だけで構成し、欠落・不正・重複IDをD013の証拠に含める。監視件数は全populationに状態がある場合だけ算出し、D015に欠落ID、D018に完了不可を出す。空辞書の状態キー参照を`.get`へ変更。                                                                                | 必須／任意1件欠落、複数欠落、完了snapshotとの同時発生、不正readback行を30件のF回帰で検証。欠落状態を0件・未実行へ補完しない。                                                        |
+| 未承認`進行中`計画                   | D023を承認済み・進行中・完了に適用し、scope／artifact ref／revision／主体／証拠refを一致させる。D020で参照するQRA/TAD sourceのowner／ref／revision／scope、取得状態、currentness、必要承認を確認。草案／blockedの読取・分析は維持。                                                   | 未承認・旧revision・scope不一致を拒否し、currentな承認済み計画を維持。validatorの文字列検査は実承認主体の認証と区別。                                                                |
+| Risk／action／差異を残す完了         | D017/D022/D024で状態証拠と正式受容・対応不要の主体を要求。D018でsnapshot scopeに該当する未処理項目、根拠不足、未知scope、終了基準未判定を拒否し、snapshot差異summaryと差異IDも照合。ID欠落行をテーブル走査から落とさない。                                                            | 対応中risk、blocked action、open difference、証拠なし、未知scopeを拒否。scope外riskは維持。実行済みFAILおよび証拠付きの正式な終了基準未達は、QA活動の終了と製品release可否から分離。 |
+| stale／未取得のQA要求・割当          | QRA-D015/D013とTAD-D015/D016でsource owner／ref／revision／scope／currentness／取得状態／必要承認を確認。fixtureでknown local IDを照合し、表のID/refが空の行も検査対象へ含める。                                                                                                      | 未確定要求・割当はdraft／blockedに保持可能。確定artifactからstale／unknown依存を拒否し、source一覧にない依存も確定扱いしない。                                                       |
+| TAD-D011優先順位                     | targetごとに明示指定・承認済み割当・既定system test、競合、全level、実assignmentを比較。優先順位行の欠落・重複、未知level tokenを拒否。dependency stale時は依存するassignmentのみ保留し、同じtarget内の独立current assignmentを保持。承認済みartifactに未解決依存があればD015で拒否。 | target Aの依存だけstaleでcurrentなsystem割当を保持するcase、無関係unknown source混入、競合、複数level、assignment矛盾を追加検証。                                                    |
+| TMG-D019 local ID                    | `<artifact_ref>#<QAR/ARCH-local-id>@revision`を解析し、owner・artifact ref・fixtureで確認可能なlocal ID・revision・scopeを照合。実成果物の未取得時はfixtureにない実在性を推測しない。                                                                                                 | 存在しないQAR／ARCH ID、他artifact ID、旧revision、正しいrefを回帰確認。実owner artifact再取得はPR #22で別途検証。                                                                   |
+
+再レビューで追加確認した表行の欠落経路も修正した。`nonempty_rows(table, key)`がID欄空の行を捨て、risk/action/differenceやsource inventoryが完了判定から消える経路があったため、該当表は全データ行を検査して必須ID・scopeを判定する。TADではさらに、assignment targetに対応する優先順位行の欠落を拒否する。変更は既存validatorと既存fixtureに局所適用し、新しい共通frameworkや依存関係は追加していない。
+
+### 回帰検証・実行結果
+
+実行環境はLinux、Python 3.12.3。`python` aliasとsystem `pip`はなく、`python3`を使用した。結果は次のとおり。
+
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v` — PASS 30、FAIL/ERROR 0。
+- `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS 12、FAIL/ERROR 0。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — 320件、315件成功、4 FAIL／1 ERROR。Fの30件はPASS。4件は共有SQLite stateの3件とWCAG保存計画1件で、providerが`/tmp/.git`を含むrootをgit worktree内と判定し安全に拒否するためblockedになった。ERROR 1件はstatic serverのloopback bindが`PermissionError: [Errno 1] Operation not permitted`で拒否された。これはこのmanaged sandboxでの実行制約で、Linux GitHub Actionsの結果ではない。共有runtimeの禁止条件は迂回していない。
+- `.github/workflows/deterministic-output-evals.yml`の`Validate output eval datasets`と同等の検査 — PASS、25 Skill／52 case。3 Skillの6ケースは既存deterministic runnerで全件PASS（保存reference fixtureを用いた静的評価）。
+- `python3 -m compileall -q skills/test-requirements-analysis skills/test-architecture-design skills/test-management tests/skills/evals/deterministic` — PASS。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS、26 Skill／168 case。`python3 -m unittest discover -s scripts/skills/evals/semantic/tests -v` — PASS 27。`python3 -m unittest discover -s tests/skills/evals/semantic -v` — PASS 13。`python3 -m unittest discover -s tests/skills/evals/trigger -v` — PASS 1。
+- `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — 496件、477件成功、10 FAIL／9 ERROR。18 SQLite履歴caseは`/tmp/.git`があるためshared providerがgit worktree配下へのDB作成を拒否。残る`test_json_nesting_failure_is_a_structured_input_error`はPython 3.12.3で深い配列をJSON listとしてparseし、期待文字列`nesting`ではなく`JSON document must be an object`になった。A担当の共有runtime／Python-version contractとして引き継ぐ。Windowsで既知の5 failure／14 error／6 skipはこのLinux実行で解消されたものとは扱わない。
+- `dprint --version` — 0.55.2。変更・未追跡のMarkdown／JSON等17ファイルを明示した`dprint check --config dprint.json --config-discovery=false --no-gitignore --stdin-files` — PASS。未追跡ファイル0。`dprint fmt`はこの差分内の3 fixtureだけを整列し、意味内容は変えていない。`git diff --check` — PASS。
+- `python3 scripts/format_tracked.py ruff-check`および`python3 scripts/format_tracked.py check` — 実行したがRuff実行ファイルがなく開始できず終了code 2。Ruff 0.16.8を`uv`で用意する試みはPyPI DNS解決不可で失敗。dprint通過をRuff通過とは扱わない。
+- 固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`の`skills-ref validate`は、GitHub DNS解決不可で取得できず、今回の変更後3 Skillはローカル未検証。baseline commitの既存`Validate Agent Skills`では公式仕様validation step自体はPASSしていたが、変更後の結果へ読み替えない。
+
+### GitHub Actionsと共有CIの切分け
+
+レビュー対象commit `f86e4bc4f56b95c831997d8ca9088ee7846d8400`の最新workflow結果をGitHubで再確認した。ローカル修正はpushしていないため、このSHA以後のActions runはない。
+
+- [Validate Deterministic Output Evals #2144](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152389) — FAIL。dataset検査で停止し、後続compile・shared/repository deterministic・runtime testsはSKIP。今回ローカルで全52 datasetとF 6 fixtureを確認したが、CI成功とは扱わない。
+- [Validate Agent Skills #2146](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152375) — 公式skills-refはPASS、READMEとcanonical Skill rosterの一致検査でFAIL。後続のrepository eval構造検査はSKIP。不足は`test-requirements-analysis`、`test-architecture-design`、`test-management`。
+- [Validate Semantic Output Evals #2109](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152482)、[Code Quality #839](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152463)、[Codex Harness #839](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152446) — いずれもbaseline SHAでPASS。修正後のCI結果ではない。
+
+### 担当Aへの変更依頼
+
+共有ownerの最新公開契約`docs/implementation/pr22/A_runtime-integration.md`とbase commit `d38b775e43f7f0a86a834fef4a122f04d30ef724`を確認した。担当Aが既に登録した形跡はなく、README、共通registry、runtime、routingはこのbranchで編集していない。具体的な引継ぎは以下。
+
+1. `README.md`のcanonical Skill rosterへ3 Skillを追加し、CIのREADME整合条件を満たす。
+2. `scripts/skills/evals/deterministic/common.py::CANONICAL_SKILLS`へ登録し、`skills/qa-workflow/scripts/workflow_runtime.py::RUNTIME_V2_SKILL_ROOTS`およびqa-workflowのowner verifier／routing入口へ正式接続する。validator入口は各packageの`evals/deterministic/validator.py::validate(text, expected, eval_id)`。未登録範囲をverified／completeにせず`unverified_scopes`として残す。
+3. 各owner・scope・artifact ref／revision、依存source ref／revision、local ID、currentness、取得状態、必要承認scope／revision／証拠をAの保存後readbackと照合する。F validatorの静的文字列検査を認証済み承認とみなさない。
+4. 正常fixtureはQRA/TAD/TMG各`OUT-001/002`と6保存reference fixture。拒否fixtureはF回帰30件にある未承認／旧revision、stale／未取得、local ID不一致、missing readback、scope内open risk/action/difference、異常priorityをowner verifier gateから呼ぶ。
+5. 単独triggerに加えて複合workflow routing、current scopeとの境界、誤発火を検証する。新Skillのruntime verifierが未登録の間は、共通runnerがfixtureを処理できることと業務runtimeの検証済み状態を区別する。
+6. 登録後に`Validate Agent Skills`、`Validate Deterministic Output Evals`、`Validate Semantic Output Evals`、`Code Quality`、`Codex Harness`を新HEADで実行し、後続repository deterministic・runtime testsまで到達した結果を確認する。
+7. PR #22では実owner成果物の再取得、保存providerの選定、native CAS／履歴／独立readback、認証済み承認、F source ref／revision／scope接続を行う。fixtureや今回のlocal runner結果を実provider・実Agent証拠へ昇格しない。
+8. A範囲の追加確認: `tests/skills/evals/deterministic/test_wcag_runtime_contract.py::test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`はProject Contextを渡すが、その一時state rootがこのsandboxの`/tmp/.git`検査により拒否される。共有providerの拒否条件を緩めず、隔離されたLinux CIで再実行する。`test_ci_handoff.py::test_json_nesting_failure_is_a_structured_input_error`はPython 3.12.3で別メッセージになったため、Python 3.11／3.12間の境界と明示的depth制限を確認する。
+
+E／Jの実成果物文書はこのcheckoutにはなく、入力公開契約をPlanと共通保存・集計契約に照らした。EにはQAR ref/revision、target／scope単位のlevel・方式、影響する成果物だけの再確認とcurrent成果物保持を渡す。Jには予定populationとsource owner readbackを分けた全identity、plan ref/revision・scope・build・environment単位の件数を渡す。Risk・Regression Run・raw result・reportの正本は複製せず、PR #22で実consumerとの接続を確認する。
+
+### Plan完了判定・再レビュー
+
+- 今回のFレビュー指摘と追加した欠落ID／優先順位負例 — F専用30件と6 fixture runnerはPASS。確認範囲でF validatorの追加修正を要する問題は残っていない。
+- deterministic dataset contract — local equivalentは全52 case PASS。GitHub CIで修正後の成功は未確認。
+- 公式Skill validation、Ruff、全deterministic suite、runtime regression — 未完了。固定ツール取得不能とshared sandbox制約が残るため、担当Fの最終局所受入は**未完了**。F固有の30件PASSと、他owner／環境に依存する検証を分ける。
+- README／共通registry／routing — Aへ変更要求済み状態。CIのREADME failureはF validatorの不具合ではない。
+- E／J実成果物との横断接続、全current Skill同時利用、実Agent trigger／semantic Judge、実provider CAS／履歴／readback、認証済みapproval、保存失敗後復旧、S1〜S17と15＋10条件 — PR #22／外部provider選定待ちで未実施。再開条件はowner成果物とscopeの確定、provider／認証主体の選定、Aの正式runtime登録後に新HEADでCIを完遂すること。
+- 文書と実装の差異: root README／`CANONICAL_SKILLS`／`RUNTIME_V2_SKILL_ROOTS`にF 3 Skillがない点は現存し、A担当として未対応。F内ではvalidator、template、data-contract、fixtureの今回変更間に未解決差異を確認していない。E／J実成果物文書がcheckoutにないため実成果物接続は未確認。
+
+### PR #28本文更新案（GitHub未更新）
+
+```markdown
+## 目的
+
+PR #22の担当Fとして、QA要求・テストアーキテクチャ・計画／進捗／承認の公開契約とvalidatorを実装し、レビュー指摘とCIデータ契約を修正する。
+
+## 現在の状態
+
+- Draft。F専用回帰30件と6保存fixtureはPASS。全52 deterministic output datasetもローカル契約検査を通過。
+- full deterministic／runtime suiteには共有runtimeとsandboxに依存する未解決結果があり、Ruff・固定revision skills-ref・修正後GitHub Actionsは未確認。
+- README・共通runtime登録は担当Aへ引継ぎ中。実Agent／認証済み承認／保存provider／PR #22横断接続は未実施。
+- 詳細・検証証拠・再開条件は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
+```
+
+この案はPR本文の更新依頼ではなく、現在はGitHub上の本文を変更していない。

@@ -14,11 +14,19 @@ PLAN_ID = re.compile(r"^PLAN-\d{3}$")
 POPULATION_ID = re.compile(r"^POP-\d{3}$")
 PROJECT_RISK_ID = re.compile(r"^PROJ-RISK-\d{3}$")
 ACTION_ID = re.compile(r"^CA-\d{3}$")
+DIFFERENCE_ID = re.compile(r"^DIFF-\d{3}$")
+ARTIFACT_LOCAL_REF = re.compile(
+    r"^(?P<artifact_ref>.+)#(?P<local_id>QAR-\d{3}|ARCH-\d{3})@(?P<revision>[^@]+)$"
+)
 ARTIFACT_STATES = {"草案", "承認済み", "進行中", "要再確認", "blocked", "完了", "置換"}
 ACQUISITION = {"取得済", "部分取得", "未取得", "取得不能", "0件確認済み", "不明"}
 EXECUTION = {"実行済み", "実行中", "未実行", "取消", "実行失敗", "結果不明", "対象なし"}
 OUTCOME = {"PASS", "FAIL", "判定不能", "未判定", "-"}
 CURRENTNESS = {"current", "stale", "unknown"}
+APPROVAL_STATES = {"承認済み", "未承認", "失効", "不要", "unknown"}
+RISK_STATES = {"対応中", "blocked", "解決済み", "受容済み", "未判定", "unknown"}
+ACTION_STATES = {"対応中", "blocked", "完了", "対応不要", "未判定", "unknown"}
+FINAL_DISPOSITIONS = {"解決済み", "受容済み"}
 PLACEHOLDERS = {"", "-", "—", "unknown", "未取得"}
 ACTUAL_IDENTITY_FIELDS = (
     "actual source owner",
@@ -33,49 +41,55 @@ ACTUAL_IDENTITY_FIELDS = (
 MONITOR_COUNTS = {
     "計画population数": lambda planned, actual: len(planned),
     "取得済数": lambda planned, actual: sum(
-        row["取得状態"] == "取得済" for row in actual
+        row.get("取得状態") == "取得済" for row in actual
     ),
     "部分取得数": lambda planned, actual: sum(
-        row["取得状態"] == "部分取得" for row in actual
+        row.get("取得状態") == "部分取得" for row in actual
     ),
     "未取得数": lambda planned, actual: sum(
-        row["取得状態"] == "未取得" for row in actual
+        row.get("取得状態") == "未取得" for row in actual
     ),
     "取得不能数": lambda planned, actual: sum(
-        row["取得状態"] == "取得不能" for row in actual
+        row.get("取得状態") == "取得不能" for row in actual
     ),
     "0件確認済み数": lambda planned, actual: sum(
-        row["取得状態"] == "0件確認済み" for row in actual
+        row.get("取得状態") == "0件確認済み" for row in actual
     ),
     "取得不明数": lambda planned, actual: sum(
-        row["取得状態"] == "不明" for row in actual
+        row.get("取得状態") == "不明" for row in actual
     ),
     "実行済み数": lambda planned, actual: sum(
-        row["実行状態"] == "実行済み" for row in actual
+        row.get("実行状態") == "実行済み" for row in actual
     ),
     "実行中数": lambda planned, actual: sum(
-        row["実行状態"] == "実行中" for row in actual
+        row.get("実行状態") == "実行中" for row in actual
     ),
     "未実行数": lambda planned, actual: sum(
-        row["実行状態"] == "未実行" for row in actual
+        row.get("実行状態") == "未実行" for row in actual
     ),
-    "取消数": lambda planned, actual: sum(row["実行状態"] == "取消" for row in actual),
+    "取消数": lambda planned, actual: sum(
+        row.get("実行状態") == "取消" for row in actual
+    ),
     "実行失敗数": lambda planned, actual: sum(
-        row["実行状態"] == "実行失敗" for row in actual
+        row.get("実行状態") == "実行失敗" for row in actual
     ),
     "結果不明数": lambda planned, actual: sum(
-        row["実行状態"] == "結果不明" for row in actual
+        row.get("実行状態") == "結果不明" for row in actual
     ),
-    "PASS数": lambda planned, actual: sum(row["結果状態"] == "PASS" for row in actual),
-    "FAIL数": lambda planned, actual: sum(row["結果状態"] == "FAIL" for row in actual),
+    "PASS数": lambda planned, actual: sum(
+        row.get("結果状態") == "PASS" for row in actual
+    ),
+    "FAIL数": lambda planned, actual: sum(
+        row.get("結果状態") == "FAIL" for row in actual
+    ),
     "判定不能数": lambda planned, actual: sum(
-        row["結果状態"] == "判定不能" for row in actual
+        row.get("結果状態") == "判定不能" for row in actual
     ),
     "未判定数": lambda planned, actual: sum(
-        row["結果状態"] == "未判定" for row in actual
+        row.get("結果状態") == "未判定" for row in actual
     ),
     "対象なし数": lambda planned, actual: sum(
-        row["実行状態"] == "対象なし" for row in actual
+        row.get("実行状態") == "対象なし" for row in actual
     ),
 }
 
@@ -103,6 +117,30 @@ def _is_present(value: str) -> bool:
     return clean(value) not in PLACEHOLDERS
 
 
+def _scope_includes(scope_value: str, target_scope: str) -> bool:
+    scopes = {clean(value) for value in re.split(r"[,、;]", clean(scope_value))}
+    return clean(target_scope) in scopes
+
+
+def _action_state(value: str) -> str:
+    return clean(value).rsplit("/", 1)[-1].strip()
+
+
+def _plan_input_status(source: dict[str, str] | None) -> list[str]:
+    if source is None:
+        return ["source ref/revision/scope/owner not acquired"]
+    problems = []
+    if source.get("currentness") != "current":
+        problems.append(f"currentness={source.get('currentness', '')}")
+    if source.get("取得状態") != "取得済":
+        problems.append(f"取得状態={source.get('取得状態', '')}")
+    if source.get("承認状態") != "承認済み" or not _is_present(
+        source.get("承認証拠ref", "")
+    ):
+        problems.append("approval state/evidence is not current and approved")
+    return problems
+
+
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-management", eval_id)
     tables = parse_tables(text)
@@ -110,7 +148,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     sources_table = _table(
         tables,
         "入力source",
-        ("owner", "source_ref", "revision", "scope", "currentness", "取得状態"),
+        (
+            "owner",
+            "source_ref",
+            "revision",
+            "scope",
+            "currentness",
+            "取得状態",
+            "承認状態",
+            "承認証拠ref",
+        ),
     )
     plan_table = _table(
         tables,
@@ -191,12 +238,38 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "対応",
             "owner",
             "状態",
+            "状態証拠ref",
+            "承認主体・role",
         ),
     )
     action_table = _table(
         tables,
         "是正処置",
-        ("action ID", "差異 / risk ref", "action", "owner", "期限 / 状態", "結果ref"),
+        (
+            "action ID",
+            "差異 / risk ref",
+            "影響scope",
+            "action",
+            "owner",
+            "期限 / 状態",
+            "結果ref",
+            "承認主体・role",
+        ),
+    )
+    difference_table = _table(
+        tables,
+        "差異・未処理事項",
+        (
+            "差異ID",
+            "影響scope",
+            "差異",
+            "根拠ref / revision",
+            "対応",
+            "owner",
+            "状態",
+            "状態証拠ref",
+            "承認主体・role",
+        ),
     )
     approval_table = _table(
         tables,
@@ -220,6 +293,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         ("Monitoring snapshot", monitoring_table),
         ("Project risk", project_risk_table),
         ("是正処置", action_table),
+        ("差異・未処理事項", difference_table),
         ("承認", approval_table),
     )
     missing_tables = [name for name, table in required_tables if table is None]
@@ -258,7 +332,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         else None,
     )
 
-    plans = nonempty_rows(plan_table, "計画ID")
+    plans = nonempty_rows(plan_table)
     plan_ids = [clean(row.get("計画ID", "")) for row in plans]
     add_duplicate_assertion(result, "TMG-D004", plan_ids, "計画ID")
     invalid_plan_ids = [value for value in plan_ids if not PLAN_ID.fullmatch(value)]
@@ -282,7 +356,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=invalid_plan_rows or None,
     )
 
-    planned = nonempty_rows(planned_table, "population ID")
+    planned = nonempty_rows(planned_table)
     population_ids = [clean(row.get("population ID", "")) for row in planned]
     add_duplicate_assertion(result, "TMG-D007", population_ids, "planned population ID")
     invalid_population_ids = [
@@ -351,13 +425,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=duplicate_planned_keys or None,
     )
 
-    actual_rows = nonempty_rows(readback_table, "population ID")
+    actual_rows = nonempty_rows(readback_table)
     actual_ids = [clean(row.get("population ID", "")) for row in actual_rows]
     add_duplicate_assertion(result, "TMG-D012", actual_ids, "actual population ID")
     planned_by_id = {clean(row.get("population ID", "")): row for row in planned}
     invalid_actual_rows = []
     identity_mismatches = []
-    status_by_id: dict[str, dict[str, str]] = {}
+    status_candidates: dict[str, list[dict[str, str]]] = {}
     for row in actual_rows:
         population_id = clean(row.get("population ID", ""))
         plan = planned_by_id.get(population_id)
@@ -367,7 +441,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         currentness = clean(row.get("currentness", ""))
         readback_ref = clean(row.get("source owner readback ref", ""))
         reason = clean(row.get("未取得 / 未実行理由", ""))
-        status_by_id[population_id] = {
+        state = {
             "取得状態": acquisition,
             "実行状態": execution,
             "結果状態": outcome,
@@ -397,6 +471,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 }
             )
             continue
+
+        status_candidates.setdefault(population_id, []).append(state)
 
         identity_values = {
             field: clean(row.get(field, "")) for field in ACTUAL_IDENTITY_FIELDS
@@ -557,13 +633,26 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 }
             )
 
+    ambiguous_actual = sorted(
+        population_id
+        for population_id, rows in status_candidates.items()
+        if len(rows) != 1
+    )
+    status_by_id = {
+        population_id: rows[0]
+        for population_id, rows in status_candidates.items()
+        if len(rows) == 1
+    }
     missing_actual = sorted(set(population_ids) - set(actual_ids))
     unexpected_actual = sorted(set(actual_ids) - set(population_ids))
-    if missing_actual or unexpected_actual:
+    unusable_actual = sorted(set(population_ids) & (set(actual_ids) - set(status_by_id)))
+    if missing_actual or unexpected_actual or ambiguous_actual or unusable_actual:
         invalid_actual_rows.append(
             {
                 "missing_readbacks": missing_actual,
                 "unexpected_readbacks": unexpected_actual,
+                "ambiguous_readbacks": ambiguous_actual,
+                "unusable_readbacks": unusable_actual,
             }
         )
     result.add(
@@ -597,32 +686,48 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=identity_mismatches or None,
     )
 
-    monitoring = nonempty_rows(monitoring_table, "snapshot_ref")
+    monitoring = nonempty_rows(monitoring_table)
     monitoring_errors = []
     completion_errors = []
+    risk_rows_for_closure = nonempty_rows(project_risk_table)
+    action_rows_for_closure = nonempty_rows(action_table)
+    difference_rows_for_closure = nonempty_rows(difference_table)
+    criteria_rows = nonempty_rows(criteria_table)
     for snapshot in monitoring:
+        snapshot_scope = clean(snapshot.get("scope", ""))
+        if not _is_present(snapshot.get("snapshot_ref", "")):
+            missing_snapshot_ref = {
+                "reason": "monitoring snapshot requires a readable snapshot_ref",
+                "scope": snapshot_scope,
+            }
+            monitoring_errors.append(missing_snapshot_ref)
+            completion_errors.append(missing_snapshot_ref)
         group = [
             row
             for row in planned
-            if clean(row.get("scope", "")) == clean(snapshot.get("scope", ""))
+            if clean(row.get("scope", "")) == snapshot_scope
             and clean(row.get("target build", ""))
             == clean(snapshot.get("target build", ""))
             and clean(row.get("environment", ""))
             == clean(snapshot.get("environment", ""))
         ]
-        group_actual = [
-            status_by_id.get(clean(row.get("population ID", "")), {}) for row in group
+        group_ids = [clean(row.get("population ID", "")) for row in group]
+        group_actual = [status_by_id.get(population_id) for population_id in group_ids]
+        missing_status = [
+            population_id
+            for population_id, state in zip(group_ids, group_actual, strict=True)
+            if state is None
         ]
         values = {field: _integer(snapshot.get(field, "")) for field in MONITOR_COUNTS}
-        if any(value is None for value in values.values()):
+        invalid_counts = {field: value for field, value in values.items() if value is None}
+        if invalid_counts:
             monitoring_errors.append(
                 {
                     "snapshot_ref": snapshot.get("snapshot_ref"),
                     "reason": "counts must be nonnegative integers",
-                    "values": values,
+                    "values": invalid_counts,
                 }
             )
-            continue
         plan_ref = clean(snapshot.get("plan_ref / revision", ""))
         expected_plan_ref = (
             f"{metadata.get('artifact_ref', '')}@{metadata.get('revision', '')}"
@@ -642,69 +747,213 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     "reason": "snapshot group does not identify planned population",
                 }
             )
-        expected_counts = {
-            field: count(group, group_actual) for field, count in MONITOR_COUNTS.items()
-        }
-        mismatched_counts = {
-            field: {"expected": count, "actual": values[field]}
-            for field, count in expected_counts.items()
-            if values[field] != count
-        }
-        if mismatched_counts:
+        if missing_status:
             monitoring_errors.append(
                 {
                     "snapshot_ref": snapshot.get("snapshot_ref"),
-                    "reason": "monitoring counts do not match the plan/build/environment group",
-                    "counts": mismatched_counts,
+                    "reason": "cannot calculate monitoring state counts without every population readback",
+                    "missing_readbacks": missing_status,
                 }
             )
+        if values.get("計画population数") is not None and values["計画population数"] != len(group):
+            monitoring_errors.append(
+                {
+                    "snapshot_ref": snapshot.get("snapshot_ref"),
+                    "reason": "planned population count does not match the identified group",
+                    "expected": len(group),
+                    "actual": values["計画population数"],
+                }
+            )
+        if not missing_status and not invalid_counts:
+            expected_counts = {
+                field: count(group, group_actual)
+                for field, count in MONITOR_COUNTS.items()
+            }
+            mismatched_counts = {
+                field: {"expected": count, "actual": values[field]}
+                for field, count in expected_counts.items()
+                if values[field] != count
+            }
+            if mismatched_counts:
+                monitoring_errors.append(
+                    {
+                        "snapshot_ref": snapshot.get("snapshot_ref"),
+                        "reason": "monitoring counts do not match the plan/build/environment group",
+                        "counts": mismatched_counts,
+                    }
+                )
 
         if clean(snapshot.get("全体判定", "")) == "完了":
             for planned_row, actual_state in zip(group, group_actual, strict=True):
-                if clean(planned_row.get("必須 / 任意", "")) != "必須":
+                population_id = clean(planned_row.get("population ID", ""))
+                if actual_state is None:
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "population_id": population_id,
+                            "reason": "population readback is absent or unusable; state is unknown",
+                        }
+                    )
                     continue
                 acquisition = actual_state.get("取得状態", "")
                 execution = actual_state.get("実行状態", "")
                 outcome = actual_state.get("結果状態", "")
-                valid_zero = (
-                    acquisition == "0件確認済み"
-                    and execution == "対象なし"
-                    and outcome == "-"
-                )
-                valid_run = (
-                    acquisition == "取得済"
-                    and execution == "実行済み"
-                    and outcome in {"PASS", "FAIL"}
-                )
-                if not (valid_zero or valid_run):
-                    completion_errors.append(
-                        {
-                            "snapshot_ref": snapshot.get("snapshot_ref"),
-                            "population_id": planned_row.get("population ID"),
-                            "acquisition": acquisition,
-                            "execution": execution,
-                            "outcome": outcome,
-                        }
+                if clean(planned_row.get("必須 / 任意", "")) == "必須":
+                    valid_zero = (
+                        acquisition == "0件確認済み"
+                        and execution == "対象なし"
+                        and outcome == "-"
                     )
+                    valid_run = (
+                        acquisition == "取得済"
+                        and execution == "実行済み"
+                        and outcome in {"PASS", "FAIL"}
+                    )
+                    if not (valid_zero or valid_run):
+                        completion_errors.append(
+                            {
+                                "snapshot_ref": snapshot.get("snapshot_ref"),
+                                "population_id": population_id,
+                                "acquisition": acquisition,
+                                "execution": execution,
+                                "outcome": outcome,
+                            }
+                        )
             end_criteria = [
                 row
-                for row in nonempty_rows(criteria_table, "種別")
+                for row in criteria_rows
                 if clean(row.get("種別", "")) == "終了"
-                and clean(row.get("対象scope", "")) == clean(snapshot.get("scope", ""))
+                and clean(row.get("対象scope", "")) == snapshot_scope
             ]
             unresolved_criteria = [
                 row
                 for row in end_criteria
                 if clean(row.get("判定状態", "")) not in {"満たす", "未達"}
+                or not _is_present(row.get("evidence source / revision", ""))
             ]
             if not end_criteria or unresolved_criteria:
                 completion_errors.append(
                     {
                         "snapshot_ref": snapshot.get("snapshot_ref"),
-                        "reason": "all end criteria in this scope must have a final evidence-backed decision",
+                        "reason": "all end criteria in this scope need a final evidence-backed decision; unmet is distinct from activity closure",
                         "unresolved": unresolved_criteria,
                     }
                 )
+
+            for risk in risk_rows_for_closure:
+                risk_scope = risk.get("影響scope", "")
+                if not _is_present(risk_scope):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "project_risk_id": risk.get("project risk ID"),
+                            "reason": "risk scope is unknown and cannot be excluded from this snapshot",
+                        }
+                    )
+                    continue
+                if not _scope_includes(risk_scope, snapshot_scope):
+                    continue
+                state = clean(risk.get("状態", ""))
+                evidence = risk.get("状態証拠ref", "")
+                authority = risk.get("承認主体・role", "")
+                if (
+                    state not in FINAL_DISPOSITIONS
+                    or not _is_present(evidence)
+                    or (state == "受容済み" and not _is_present(authority))
+                ):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "project_risk_id": risk.get("project risk ID"),
+                            "scope": risk.get("影響scope"),
+                            "state": state or "unknown",
+                            "state_evidence_ref": evidence,
+                            "approval_authority": authority,
+                        }
+                    )
+
+            for action in action_rows_for_closure:
+                action_scope = action.get("影響scope", "")
+                if not _is_present(action_scope):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "action_id": action.get("action ID"),
+                            "reason": "action scope is unknown and cannot be excluded from this snapshot",
+                        }
+                    )
+                    continue
+                if not _scope_includes(action_scope, snapshot_scope):
+                    continue
+                state = _action_state(action.get("期限 / 状態", ""))
+                evidence = action.get("結果ref", "")
+                authority = action.get("承認主体・role", "")
+                if (
+                    state not in {"完了", "対応不要"}
+                    or not _is_present(evidence)
+                    or (state == "対応不要" and not _is_present(authority))
+                ):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "action_id": action.get("action ID"),
+                            "scope": action.get("影響scope"),
+                            "state": state or "unknown",
+                            "result_ref": evidence,
+                            "approval_authority": authority,
+                        }
+                    )
+
+            scope_differences = [
+                row
+                for row in difference_rows_for_closure
+                if not _is_present(row.get("影響scope", ""))
+                or _scope_includes(row.get("影響scope", ""), snapshot_scope)
+            ]
+            expected_difference_ids = {
+                clean(row.get("差異ID", "")) for row in scope_differences
+            }
+            summary = clean(snapshot.get("差異・未確定", ""))
+            summary_ids = set(re.findall(r"DIFF-\d{3}", summary))
+            if (scope_differences and summary_ids != expected_difference_ids) or (
+                not scope_differences and summary not in {"-", "差異なし"}
+            ):
+                completion_errors.append(
+                    {
+                        "snapshot_ref": snapshot.get("snapshot_ref"),
+                        "reason": "snapshot difference summary must identify every in-scope difference or state that none remain",
+                        "expected_difference_ids": sorted(expected_difference_ids),
+                        "actual_summary": summary,
+                    }
+                )
+            for difference in scope_differences:
+                if not _is_present(difference.get("影響scope", "")):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "difference_id": difference.get("差異ID"),
+                            "reason": "difference scope is unknown and cannot be excluded from this snapshot",
+                        }
+                    )
+                    continue
+                state = clean(difference.get("状態", ""))
+                evidence = difference.get("状態証拠ref", "")
+                authority = difference.get("承認主体・role", "")
+                if (
+                    state not in FINAL_DISPOSITIONS
+                    or not _is_present(evidence)
+                    or (state == "受容済み" and not _is_present(authority))
+                ):
+                    completion_errors.append(
+                        {
+                            "snapshot_ref": snapshot.get("snapshot_ref"),
+                            "difference_id": difference.get("差異ID"),
+                            "scope": difference.get("影響scope"),
+                            "state": state or "unknown",
+                            "state_evidence_ref": evidence,
+                            "approval_authority": authority,
+                        }
+                    )
 
     if metadata.get("状態") == "完了":
         required_groups = {
@@ -725,6 +974,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             for snapshot in monitoring
             if clean(snapshot.get("全体判定", "")) == "完了"
         }
+        if not required_groups:
+            completion_errors.append(
+                {"reason": "completed plan has no required population group"}
+            )
         for group in sorted(required_groups - completed_groups):
             completion_errors.append(
                 {
@@ -746,57 +999,144 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=completion_errors or None,
     )
 
-    source_identities = {
-        (
-            clean(row.get("source_ref", "")),
-            clean(row.get("revision", "")),
-            clean(row.get("scope", "")),
+    source_rows = nonempty_rows(sources_table)
+    source_by_identity: dict[tuple[str, str, str, str], list[dict[str, str]]] = {}
+    invalid_source_rows = []
+    for source in source_rows:
+        owner = clean(source.get("owner", ""))
+        source_ref = clean(source.get("source_ref", ""))
+        revision = clean(source.get("revision", ""))
+        scope = clean(source.get("scope", ""))
+        embedded_revision = source_ref.rsplit("@", 1)[1] if "@" in source_ref else ""
+        if embedded_revision == revision:
+            source_ref = source_ref.rsplit("@", 1)[0]
+        approval_state = clean(source.get("承認状態", ""))
+        approval_evidence = clean(source.get("承認証拠ref", ""))
+        if (
+            not owner
+            or not source_ref
+            or not revision
+            or not scope
+            or clean(source.get("currentness", "")) not in CURRENTNESS
+            or clean(source.get("取得状態", "")) not in ACQUISITION
+            or approval_state not in APPROVAL_STATES
+            or (approval_state == "承認済み" and not _is_present(approval_evidence))
+        ):
+            invalid_source_rows.append(source)
+        source_by_identity.setdefault((owner, source_ref, revision, scope), []).append(
+            source
         )
-        for row in nonempty_rows(sources_table, "source_ref")
-    }
+
     unresolved_plan_inputs = []
     for row in plans:
-        for field in ("QA要求ref / revision", "architecture ref / revision"):
+        for field, owner, local_id_prefix in (
+            ("QA要求ref / revision", "test-requirements-analysis", "QAR"),
+            ("architecture ref / revision", "test-architecture-design", "ARCH"),
+        ):
             value = clean(row.get(field, ""))
-            if "@" not in value:
+            match = ARTIFACT_LOCAL_REF.fullmatch(value)
+            if match is None or not match.group("local_id").startswith(
+                f"{local_id_prefix}-"
+            ):
                 unresolved_plan_inputs.append(
-                    {"plan_id": row.get("計画ID"), "field": field, "value": value}
+                    {
+                        "plan_id": row.get("計画ID"),
+                        "field": field,
+                        "value": value,
+                        "reason": "reference must include artifact_ref#local_id@revision",
+                    }
                 )
                 continue
-            source_ref, revision = value.rsplit("@", 1)
-            source_ref = source_ref.split("#", 1)[0]
-            identity = (source_ref, revision, clean(row.get("対象scope", "")))
-            if identity not in source_identities:
+            artifact_ref = match.group("artifact_ref")
+            local_id = match.group("local_id")
+            revision = match.group("revision")
+            scope = clean(row.get("対象scope", ""))
+            identity = (owner, artifact_ref, revision, scope)
+            source_matches = source_by_identity.get(identity, [])
+            known_key = f"{owner}|{artifact_ref}@{revision}|{scope}"
+            known_local_ids = expected.get("known_local_ids", {}).get(known_key)
+            if len(source_matches) != 1:
                 unresolved_plan_inputs.append(
-                    {"plan_id": row.get("計画ID"), "field": field, "value": value}
+                    {
+                        "plan_id": row.get("計画ID"),
+                        "field": field,
+                        "value": value,
+                        "reason": "owner, artifact ref, revision, and scope must match one source row",
+                    }
+                )
+            if not isinstance(known_local_ids, list) or local_id not in known_local_ids:
+                unresolved_plan_inputs.append(
+                    {
+                        "plan_id": row.get("計画ID"),
+                        "field": field,
+                        "value": value,
+                        "reason": "local ID existence is absent from the fixed artifact fixture",
+                    }
                 )
     result.add(
         "TMG-D019",
-        not unresolved_plan_inputs,
-        "計画のQA要求・architecture refとrevisionが入力source一覧に一致すること",
-        evidence=unresolved_plan_inputs or None,
+        not invalid_source_rows and not unresolved_plan_inputs,
+        "計画のQA要求・architecture refがowner・artifact・local ID・revision・scopeと利用可能なfixtureに一致すること",
+        evidence=(
+            {"invalid_source_rows": invalid_source_rows, "unresolved_refs": unresolved_plan_inputs}
+            if invalid_source_rows or unresolved_plan_inputs
+            else None
+        ),
     )
-    stale_plan_inputs = [
-        row
-        for row in nonempty_rows(sources_table, "source_ref")
-        if clean(row.get("currentness", "")) != "current"
-        or clean(row.get("取得状態", "")) not in {"取得済", "0件確認済み"}
-    ]
+    stale_plan_inputs = []
+    for plan in plans:
+        if metadata.get("状態") not in {"承認済み", "進行中", "完了"}:
+            continue
+        for field, owner, local_id_prefix in (
+            ("QA要求ref / revision", "test-requirements-analysis", "QAR"),
+            ("architecture ref / revision", "test-architecture-design", "ARCH"),
+        ):
+            match = ARTIFACT_LOCAL_REF.fullmatch(clean(plan.get(field, "")))
+            if match is None or not match.group("local_id").startswith(
+                f"{local_id_prefix}-"
+            ):
+                stale_plan_inputs.append(
+                    {"plan_id": plan.get("計画ID"), "field": field, "reason": "invalid ref"}
+                )
+                continue
+            source_matches = source_by_identity.get(
+                (
+                    owner,
+                    match.group("artifact_ref"),
+                    match.group("revision"),
+                    clean(plan.get("対象scope", "")),
+                ),
+                [],
+            )
+            problems = (
+                _plan_input_status(source_matches[0])
+                if len(source_matches) == 1
+                else ["source identity is missing or ambiguous"]
+            )
+            if problems:
+                stale_plan_inputs.append(
+                    {
+                        "plan_id": plan.get("計画ID"),
+                        "field": field,
+                        "value": plan.get(field),
+                        "problems": problems,
+                    }
+                )
     result.add(
         "TMG-D020",
-        not stale_plan_inputs
-        or metadata.get("状態") not in {"承認済み", "進行中", "完了"},
-        "stale・未取得の入力が残る計画を承認済み・進行中・完了扱いしないこと",
+        not stale_plan_inputs,
+        "対象計画のQA要求・architecture sourceがcurrent・取得済み・必要承認済みであること",
         evidence=stale_plan_inputs or None,
     )
 
-    criteria = nonempty_rows(criteria_table, "種別")
+    criteria = nonempty_rows(criteria_table)
     invalid_criteria = [
         row
         for row in criteria
-        if not clean(row.get("基準", ""))
+        if clean(row.get("種別", "")) not in {"開始", "終了"}
+        or not clean(row.get("基準", ""))
         or not clean(row.get("対象scope", ""))
-        or not clean(row.get("evidence source / revision", ""))
+        or not _is_present(row.get("evidence source / revision", ""))
         or clean(row.get("判定状態", ""))
         not in {"満たす", "未達", "未判定", "blocked", "未設定"}
     ]
@@ -807,45 +1147,103 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=invalid_criteria or None,
     )
 
-    risks = nonempty_rows(project_risk_table, "project risk ID")
+    risks = risk_rows_for_closure
     invalid_risks = [
         row
-        for row in risks
+        for row in risk_rows_for_closure
         if not PROJECT_RISK_ID.fullmatch(clean(row.get("project risk ID", "")))
         or not clean(row.get("計画遂行上のrisk", ""))
         or not clean(row.get("影響scope", ""))
-        or not clean(row.get("根拠ref / revision", ""))
+        or not _is_present(row.get("根拠ref / revision", ""))
         or not clean(row.get("owner", ""))
-        or not clean(row.get("状態", ""))
+        or clean(row.get("状態", "")) not in RISK_STATES
+        or (
+            clean(row.get("状態", "")) == "解決済み"
+            and not _is_present(row.get("状態証拠ref", ""))
+        )
+        or (
+            clean(row.get("状態", "")) == "受容済み"
+            and (
+                not _is_present(row.get("状態証拠ref", ""))
+                or not _is_present(row.get("承認主体・role", ""))
+            )
+        )
     ]
     result.add(
         "TMG-D017",
         not invalid_risks,
-        "project riskをProduct Riskと別のartifact-local ID・根拠で管理すること",
+        "project riskの状態と、解決・正式受容に必要な根拠を記録すること",
         evidence=invalid_risks or None,
     )
-    actions = nonempty_rows(action_table, "action ID")
     invalid_actions = [
         row
-        for row in actions
+        for row in action_rows_for_closure
         if not ACTION_ID.fullmatch(clean(row.get("action ID", "")))
         or not clean(row.get("差異 / risk ref", ""))
+        or not clean(row.get("影響scope", ""))
         or not clean(row.get("action", ""))
         or not clean(row.get("owner", ""))
         or not clean(row.get("期限 / 状態", ""))
+        or _action_state(row.get("期限 / 状態", "")) not in ACTION_STATES
+        or (
+            _action_state(row.get("期限 / 状態", "")) == "完了"
+            and not _is_present(row.get("結果ref", ""))
+        )
+        or (
+            _action_state(row.get("期限 / 状態", "")) == "対応不要"
+            and (
+                not _is_present(row.get("結果ref", ""))
+                or not _is_present(row.get("承認主体・role", ""))
+            )
+        )
     ]
     result.add(
         "TMG-D022",
         not invalid_actions,
-        "是正処置が根拠・担当・期限または未設定状態を持つこと",
+        "是正処置のscope・状態・完了または正式判断の証拠を記録すること",
         evidence=invalid_actions or None,
     )
 
-    approvals = [
+    differences = difference_rows_for_closure
+    difference_ids = [clean(row.get("差異ID", "")) for row in differences]
+    duplicate_differences = sorted(
+        {value for value in difference_ids if difference_ids.count(value) > 1}
+    )
+    invalid_differences = [
         row
-        for row in nonempty_rows(approval_table, "状態")
-        if clean(row.get("状態", "")) == "承認済み"
+        for row in differences
+        if not DIFFERENCE_ID.fullmatch(clean(row.get("差異ID", "")))
+        or not clean(row.get("影響scope", ""))
+        or not clean(row.get("差異", ""))
+        or not _is_present(row.get("根拠ref / revision", ""))
+        or not clean(row.get("対応", ""))
+        or not clean(row.get("owner", ""))
+        or clean(row.get("状態", "")) not in RISK_STATES
+        or (
+            clean(row.get("状態", "")) == "解決済み"
+            and not _is_present(row.get("状態証拠ref", ""))
+        )
+        or (
+            clean(row.get("状態", "")) == "受容済み"
+            and (
+                not _is_present(row.get("状態証拠ref", ""))
+                or not _is_present(row.get("承認主体・role", ""))
+            )
+        )
     ]
+    result.add(
+        "TMG-D024",
+        not duplicate_differences and not invalid_differences,
+        "差異をscope・根拠・状態と処理証拠へ結び付けること",
+        evidence=(
+            {"duplicate_ids": duplicate_differences, "invalid_rows": invalid_differences}
+            if duplicate_differences or invalid_differences
+            else None
+        ),
+    )
+
+    approval_rows = nonempty_rows(approval_table, "状態")
+    approvals = [row for row in approval_rows if clean(row.get("状態", "")) == "承認済み"]
     approval_errors = [
         row
         for row in approvals
@@ -853,16 +1251,38 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         or clean(row.get("revision", "")) != metadata.get("revision")
         or clean(row.get("対象scope", "")) != metadata.get("scope")
         or not clean(row.get("承認主体・role", ""))
-        or not clean(row.get("承認証拠ref", ""))
+        or not _is_present(row.get("承認証拠ref", ""))
+        or metadata.get("状態") not in {"承認済み", "進行中", "完了"}
     ]
-    if metadata.get("状態") in {"承認済み", "完了"} and not approvals:
+    invalid_approval_states = [
+        row
+        for row in approval_rows
+        if clean(row.get("状態", "")) not in {"承認済み", "未承認", "失効", "unknown"}
+    ]
+    if metadata.get("状態") in {"承認済み", "進行中", "完了"} and not any(
+        clean(row.get("artifact_ref", "")) == metadata.get("artifact_ref")
+        and clean(row.get("revision", "")) == metadata.get("revision")
+        and clean(row.get("対象scope", "")) == metadata.get("scope")
+        and clean(row.get("承認主体・role", ""))
+        and _is_present(row.get("承認証拠ref", ""))
+        for row in approvals
+    ):
         approval_errors.append(
-            {"reason": "approved plan without matching approval evidence"}
+            {
+                "reason": "active plan requires approval for this scope, artifact ref, and revision",
+                "artifact_ref": metadata.get("artifact_ref"),
+                "revision": metadata.get("revision"),
+                "scope": metadata.get("scope"),
+            }
         )
     result.add(
         "TMG-D023",
-        not approval_errors,
-        "承認済み計画が同一scope・artifact ref・revisionへ結び付くこと",
-        evidence=approval_errors or None,
+        not approval_errors and not invalid_approval_states,
+        "承認済み・進行中・完了の計画に同一scope・artifact ref・revisionの承認証拠があること",
+        evidence=(
+            {"approval_errors": approval_errors, "invalid_states": invalid_approval_states}
+            if approval_errors or invalid_approval_states
+            else None
+        ),
     )
     return result
