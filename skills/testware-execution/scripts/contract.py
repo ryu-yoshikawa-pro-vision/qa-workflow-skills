@@ -430,6 +430,12 @@ def reconcile_case_report(
                 "skipped",
             }:
                 raise ContractError("invalid_case_attempt_status")
+        if (
+            attempts
+            and attempts[-1]["status"] != item["status"]
+            or item["status"] in {"pending", "todo"} and attempts
+        ):
+            raise ContractError("case_status_attempt_mismatch")
     return _reconcile_individual_results(
         selected=selected,
         actual=raw,
@@ -487,8 +493,12 @@ def reconcile_playwright(
                 }:
                     raise ContractError("invalid_playwright_test")
                 attempts = test.get("results")
-                if not isinstance(attempts, list) or (
-                    test["status"] != "skipped" and not attempts
+                if (
+                    test.get("expectedStatus") not in {
+                        "passed", "failed", "skipped", "timedOut", "interrupted"
+                    }
+                    or not isinstance(attempts, list)
+                    or (test["status"] != "skipped" and not attempts)
                 ):
                     raise ContractError("missing_playwright_attempts")
                 attempt_rows = []
@@ -504,6 +514,22 @@ def reconcile_playwright(
                     attempt_rows.append(
                         {"status": entry["status"], "retry": entry.get("retry")}
                     )
+                expected = test["expectedStatus"]
+                statuses = [row["status"] for row in attempt_rows]
+                outcome = test["status"]
+                if (
+                    outcome == "expected" and statuses[-1] != expected
+                    or outcome == "unexpected" and statuses[-1] == expected
+                    or outcome == "flaky"
+                    and (
+                        len(statuses) < 2
+                        or statuses[-1] != expected
+                        or all(status == expected for status in statuses)
+                    )
+                    or outcome == "skipped"
+                    and statuses and statuses[-1] != "skipped"
+                ):
+                    raise ContractError("playwright_status_attempt_mismatch")
                 observed.append(
                     {
                         "path": path,
