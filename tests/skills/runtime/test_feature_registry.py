@@ -279,8 +279,13 @@ class FeatureRegistryTests(unittest.TestCase):
         data = fixture()
         old = data["snapshot"]
         duplicate = copy.deepcopy(old["changes"][0])
-        duplicate.update(id="DIF-002", classification="no_impact", feature_ids=[],
-                         approval_ref="approval/legacy", reason="Old alternate verdict")
+        duplicate.update(
+            id="DIF-002",
+            classification="no_impact",
+            feature_ids=[],
+            approval_ref="approval/legacy",
+            reason="Old alternate verdict",
+        )
         old["changes"].append(duplicate)
         previous = copy.deepcopy(old)
         data["previous_snapshot"] = previous
@@ -291,7 +296,10 @@ class FeatureRegistryTests(unittest.TestCase):
         unresolved = handle(data)
         self.assertEqual(unresolved["status"], "incomplete", unresolved)
         self.assertTrue(
-            any(x.startswith("legacy_duplicate_active_change:") for x in unresolved["reasons"])
+            any(
+                x.startswith("legacy_duplicate_active_change:")
+                for x in unresolved["reasons"]
+            )
         )
         correction = copy.deepcopy(old["changes"][0])
         correction.update(
