@@ -21,7 +21,14 @@ from artifact_graph import (  # noqa: E402
 )
 from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 from git_artifact_store import GitArtifactStore  # noqa: E402
-from project_context_ids import handle as identity_handle  # noqa: E402
+from project_context_ids import (  # noqa: E402
+    ASM_HEADERS,
+    ASM_HEADING,
+    DEC_HEADERS,
+    DEC_HEADING,
+    _table_rows,
+    handle as identity_handle,
+)
 
 MAX_BYTES = 16 * 1024 * 1024
 TEMPLATE = SHARED / "assets" / "project-context-template.md"
@@ -525,6 +532,33 @@ def _placement_reference(markdown: str, scope: str) -> str | None:
     return matching[0][1] + "|" + matching[0][4]
 
 
+def _verify_existing_id_rows(
+    markdown: str, decisions: list[Any], assumptions: list[Any]
+) -> None:
+    """Prevent placement updates from overwriting unrelated DEC/ASM cells."""
+    normalized = _identity_compat(markdown)
+    for supplied, heading, headers in (
+        (decisions, DEC_HEADING, DEC_HEADERS),
+        (assumptions, ASM_HEADING, ASM_HEADERS),
+    ):
+        saved = {
+            row[0]: dict(zip(headers[1:], row[1:]))
+            for row in _table_rows(normalized, heading, headers)
+        }
+        used: set[str] = set()
+        for row in supplied:
+            if not isinstance(row, dict) or row.get("identity_action") != "reuse":
+                raise Invalid("placement_requires_preserved_id_rows")
+            identity = row.get("reuse_id")
+            if identity in used or identity not in saved:
+                raise Invalid("placement_previous_id_invalid")
+            if row.get("cells") != saved[identity]:
+                raise Invalid("placement_previous_id_cells_modified")
+            used.add(identity)
+        if used != set(saved):
+            raise Invalid("placement_previous_ids_missing")
+
+
 def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
     """Draft one approved placement decision and its Section 14 reference."""
     markdown = _text(request.get("markdown"), "markdown")
@@ -611,6 +645,7 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         previous_assumptions, list
     ):
         raise Invalid("existing_dec_asm_rows_invalid")
+    _verify_existing_id_rows(markdown, previous_decisions, previous_assumptions)
     prepare_request = {
         "markdown": markdown,
         "artifact_mode": mode,

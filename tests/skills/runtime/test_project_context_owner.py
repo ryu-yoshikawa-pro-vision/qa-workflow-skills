@@ -473,6 +473,14 @@ class ProjectContextOwnerTests(unittest.TestCase):
         )
         request["existing_decisions"] = []
         self.assertEqual(handle(request)["status"], "blocked")
+        request["existing_decisions"] = [
+            {
+                **old_decision,
+                "cells": {**old_decision["cells"], "決定根拠": "forged/approval"},
+            }
+        ]
+        self.assertEqual(handle(request)["status"], "blocked")
+        request["existing_decisions"] = [old_decision]
         request["existing_policy"] = None
         self.assertEqual(handle(request)["status"], "blocked")
         request["markdown"] = context()
