@@ -14,8 +14,8 @@ from typing import Any
 from feature_registry import (  # noqa: E402
     _primary_code_source_id,
     _superseded_ids,
-    handle as validate_feature_registry,
 )
+from feature_registry import handle as validate_feature_registry  # noqa: E402
 
 MAX_INPUT = 32 * 1024 * 1024
 
@@ -123,7 +123,7 @@ def analyze(request: Any) -> dict[str, Any]:
             previous_inventory is not None
             and (
                 previous_inventory.get("status") != "complete"
-            or previous_inventory.get("complete_change_listing") is not True
+                or previous_inventory.get("complete_change_listing") is not True
                 or previous_inventory.get("unretrieved") != []
             )
         ):
