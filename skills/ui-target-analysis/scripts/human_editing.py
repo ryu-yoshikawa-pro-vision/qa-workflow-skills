@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[3]
 WRITER_DIR = ROOT / "skills" / "spec-analysis" / "scripts"
 WRITER_PATH = WRITER_DIR / "ui_target_package.py"
