@@ -430,9 +430,7 @@ class ActualRunnerTests(unittest.TestCase):
         plan["tc_ref"] = "TC-orphan"
         plan["tc_revision"] = "r1"
         plan["expected_authority_ref"] = "fixture:authority"
-        plan["direct_expectations"] = [
-            {"id": "stdout_json", "expected": {"ok": True}}
-        ]
+        plan["direct_expectations"] = [{"id": "stdout_json", "expected": {"ok": True}}]
         self.attach_direct_tc_authority(plan)
         code, _, manifest = self.call(plan)
         self.assertEqual(code, 1)
@@ -533,9 +531,7 @@ class ActualRunnerTests(unittest.TestCase):
         code, _, evidence = self.call(plan)
         self.assertEqual(code, 0)
         self.assertTrue(evidence["collection_verified"])
-        plan["selected"].append(
-            {**plan["selected"][0], "project_name": "browser"}
-        )
+        plan["selected"].append({**plan["selected"][0], "project_name": "browser"})
         code, summary, evidence = self.call(plan)
         self.assertEqual(code, 2)
         self.assertEqual(
