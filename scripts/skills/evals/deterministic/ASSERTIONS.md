@@ -191,6 +191,10 @@
 - `REV-D014` 指摘概要の重大度一意性
 - `REV-D015` E2E実装参照一覧必須
 - `REV-D016` E2E実装参照の安定性 / 期待値整合
+- `REV-D017` 非E2E・静的レビューの出力種別と評価入力の一致
+- `REV-D018` 非E2E・静的レビューの根拠表必須
+- `REV-D019` 対象source refとrevision、その他必須欄
+- `REV-D020` フィクスチャで指定したsource／revisionの保持
 
 ## e2e-test-inspection
 
