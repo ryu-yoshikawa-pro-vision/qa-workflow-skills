@@ -21,12 +21,13 @@ from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 
 MAX_INPUT = 16 * 1024 * 1024
 ID = re.compile(r"^(SRC|CAND|FEAT|DIF)-[0-9]{3,}$")
-EVENTS = {"initial", "pr_update", "merge", "release", "external_revision"}
+EVENTS = {"initial", "pr_update", "rebase", "merge", "release", "external_revision"}
 SOURCE_STATES = {"complete", "partial", "denied", "unavailable"}
 FEATURE_KINDS = {"ui", "api", "batch", "integration", "authorization", "data", "other"}
 FEATURE_STATES = {"planned", "implemented", "retired", "unknown"}
 CHANGE_STATES = {"impact", "no_impact", "out_of_scope", "unclassified", "unresolved"}
 HISTORY_KINDS = {"added", "changed", "renamed", "split", "merged", "retired"}
+COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 
 
 class ContractError(ValueError):
@@ -332,6 +333,75 @@ def _history(
                 raise ContractError(f"retirement_evidence_missing:{fid}")
 
 
+def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
+    """Require actual event-bound revisions before calling a snapshot current."""
+    event = snapshot["event"]
+    basis = snapshot.get("event_basis")
+    if event == "initial":
+        if basis not in (None, {}):
+            raise ContractError("initial_event_basis_unexpected")
+        return
+    if not isinstance(basis, dict):
+        raise ContractError("event_basis_required")
+    keys: dict[str, set[str]] = {
+        "pr_update": {"base_sha", "head_sha", "previous_head_sha"},
+        "rebase": {"base_sha", "head_sha", "previous_head_sha", "previous_base_sha"},
+        "merge": {"merge_commit_sha", "target_ref", "previous_head_sha"},
+        "release": {"commit_sha", "build_ref", "target_ref"},
+        "external_revision": {
+            "document_ref",
+            "before_revision",
+            "after_revision",
+            "evidence_ref",
+        },
+    }
+    if set(basis) != keys[event]:
+        raise ContractError("event_basis_schema_invalid")
+    for name, value in basis.items():
+        _text(value, f"event_basis_{name}")
+        if name.endswith("_sha") and not COMMIT.fullmatch(value):
+            raise ContractError(f"event_basis_{name}_not_full_sha")
+    if event in {"pr_update", "rebase", "merge", "release"}:
+        if previous is None:
+            raise ContractError("event_previous_snapshot_required")
+        head = basis.get(
+            "head_sha", basis.get("merge_commit_sha", basis.get("commit_sha"))
+        )
+        if snapshot["source_revision"] != head:
+            raise ContractError("event_source_revision_mismatch")
+        if event in {"pr_update", "rebase", "merge"}:
+            if previous.get("source_revision") != basis["previous_head_sha"]:
+                raise ContractError("event_previous_head_mismatch")
+        code_sources = [
+            row for row in snapshot["sources"] if row.get("kind") == "code"
+        ]
+        if not code_sources or not all(
+            row.get("revision") == head for row in code_sources
+        ):
+            raise ContractError("event_code_source_revision_mismatch")
+        if event == "rebase" and basis["base_sha"] == basis["previous_base_sha"]:
+            raise ContractError("rebase_base_unchanged")
+    else:
+        if basis["before_revision"] == basis["after_revision"]:
+            raise ContractError("document_revision_unchanged")
+        target = [
+            row
+            for row in snapshot["sources"]
+            if row.get("ref") == basis["document_ref"]
+        ]
+        if len(target) != 1 or target[0].get("revision") != basis["after_revision"]:
+            raise ContractError("document_current_revision_mismatch")
+        if previous is None:
+            raise ContractError("document_previous_snapshot_required")
+        old = [
+            row
+            for row in previous.get("sources", [])
+            if row.get("ref") == basis["document_ref"]
+        ]
+        if len(old) != 1 or old[0].get("revision") != basis["before_revision"]:
+            raise ContractError("document_previous_revision_mismatch")
+
+
 def analyze(request: Any) -> dict[str, Any]:
     if not isinstance(request, dict) or set(request) != {
         "snapshot",
@@ -357,6 +427,7 @@ def analyze(request: Any) -> dict[str, Any]:
         _text(snapshot.get(field), field)
     if snapshot.get("event") not in EVENTS:
         raise ContractError("event_invalid")
+    _event_basis(snapshot, previous)
     if (
         _text(request["observed_head_revision"], "observed_head_revision")
         != snapshot["source_revision"]
