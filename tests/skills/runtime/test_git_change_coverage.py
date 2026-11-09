@@ -140,6 +140,11 @@ class GitChangeCoverageTests(unittest.TestCase):
         prior = copy.deepcopy(snapshot)
         prior["source_revision"] = self.base
         prior["sources"][0]["revision"] = self.base
+        prior["changes"][0].update(
+            before_revision="historical-base",
+            after_revision=self.base,
+        )
+        snapshot["changes"][0] = copy.deepcopy(prior["changes"][0])
         self.feature["previous_snapshot"] = prior
         snapshot["event"] = "pr_update"
         snapshot["event_basis"] = {
@@ -151,7 +156,11 @@ class GitChangeCoverageTests(unittest.TestCase):
         snapshot["previous_artifact_revision"] = "art-v1"
         snapshot["operation_id"] = "op-v2"
         current = copy.deepcopy(snapshot["changes"][0])
-        current["id"] = "DIF-002"
+        current.update(
+            id="DIF-002",
+            before_revision=self.base,
+            after_revision=self.inventory["head_sha"],
+        )
         snapshot["changes"].append(current)
         second = copy.deepcopy(current)
         second.update(
@@ -201,6 +210,11 @@ class GitChangeCoverageTests(unittest.TestCase):
         old = copy.deepcopy(data["snapshot"])
         old["source_revision"] = middle_sha
         old["sources"][0]["revision"] = middle_sha
+        old["changes"][0].update(
+            before_revision="historical-base",
+            after_revision=middle_sha,
+        )
+        data["snapshot"]["changes"][0] = copy.deepcopy(old["changes"][0])
         data["previous_snapshot"] = old
         snapshot = data["snapshot"]
         snapshot["event"] = "pr_update"
