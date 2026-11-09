@@ -649,6 +649,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         if (
             run["cleanup_state"] == "failed_or_unknown"
             or run["timeout"]
+            or run["result_collection"] != "complete"
             or scope.get("side_effects")
             or run["workspace_state_after_cleanup"] != "clean"
             or run["workspace_head_after_cleanup"] != expected_sha
