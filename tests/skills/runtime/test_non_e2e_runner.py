@@ -110,6 +110,29 @@ class ActualRunnerTests(unittest.TestCase):
             )
         return proc.returncode, summary, artifact
 
+    def test_fixed_product_vitest_plan_requires_independent_preflight(self):
+        example = (
+            ROOT
+            / "skills/testware-execution/assets"
+            / "qa-training-store-pricing-vitest.plan.json"
+        )
+        plan = json.loads(example.read_text(encoding="utf-8"))
+        self.assertEqual(
+            plan["repo_revision"], "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+        )
+        self.assertEqual(plan["preflight"]["source_revision"], plan["repo_revision"])
+        self.assertEqual(plan["argv"], plan["reviewed_argv"])
+        self.assertEqual(plan["runner_kind"], "vitest")
+        self.assertEqual(len(plan["selected"]), 3)
+        self.assertFalse(plan["preflight"]["script_chain_reviewed"])
+        self.assertFalse(plan["preflight"]["permissions_verified"])
+        self.assertFalse(plan["preflight"]["isolated_environment"])
+        self.assertFalse(plan["selection_verified"])
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "preflight_script_chain_unverified")
+        self.assertIsNone(artifact)
+
     def test_real_subprocess_preserves_stdout_and_identity(self):
         plan = self.plan([sys.executable, "-c", "print('runner observation')"])
         plan["direct_expectations"] = [

@@ -242,3 +242,11 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - `runner._verified_tc_expectations()`は、Gitの追跡済み期待値と実行planの比較にPythonの`==`を使用しており、JSONの入れ子にある`true`と`1`を同一視できた。実行前の仕様期待値改変を拒否できないため、既存`contract._json_equal_strict()`を再利用して型まで照合する。
 - 独立fixtureの固定Git blobに`{"ok":true}`を保存し、実行planだけを`{"ok":1}`へ変えた場合、起動前に`direct_tc_expectations_incomplete_or_mismatched`で拒否されることを回帰テストに追加した。
 - この照合はGit snapshotの改変防止であり、仕様Authorityのprovider認証・承認ではない。正式`tc_verdict`は引き続き未判定とする。固定製品の実runner受入・実provider受入は未実施のまま。
+ 
+## 固定製品の独立assertionレビューと実run再開条件（2026-11-09）
+
+- 調査対象：`qa-training-store`の固定SHA `2a8bcf57ff091e84a8b3bf7b123568e967000d88`、`tests/unit/pricing.test.ts`（3件）、`src/domain/services/pricing.ts`、`vitest.config.ts`、`tests/setup.ts`、`docs/spec/features/storefront.md`（BR-STOREFRONT-003・AC-STOREFRONT-003）。
+- 対象3件の実コードには、セール開始／終了の境界と価格、会員割引の数量計算、会員ランク別の送料・合計金額について、固定値を用いたassertionがある。対象テストに明白な常真assertionやassertion未実装は認められなかった。ただしこの確認は**コード静的読取による限定したレビュー**であり、runnerを実行した証拠・製品コードの正しさ・他のtestwareのレビュー完了を意味しない。
+- 参照した正式仕様は、セール期間と会員割引の反映・境界を要求しているが、割引率、送料無料閾値、端数処理等の数値根拠は今回確認した節からは特定できなかった。テストに書かれた期待値が製品の計算コードと一致するだけでは独立した仕様Authorityの証明にならない。数値oracleの正式根拠が確認できるまで独立assertion品質の総合受入は**未完了**とする。
+- 固定3件を実runnerで受入するためのfail-closed planひな形を`skills/testware-execution/assets/qa-training-store-pricing-vitest.plan.json`に追加。実行前に必須の`script_chain_reviewed`、権限、隔離、母集団の検証状態をfalseとしており、検証しないまま実行可能にしない。手順は`skills/testware-execution/references/guidance.md`に記載した。
+- 本環境のGitHub接続はファイル・CI閲覧とbranchへの書込みに利用できるが、固定製品repoのclone／依存導入／任意のGitHub Actions実行を開始する権限付きterminalがない。コンテナのGitHub接続もDNS解決不能である。固定製品の実Vitest／Playwright API-only／Native Jest／バッチ・イベント・静的解析・非機能の実行、外部副作用／cleanup・provider承認の受入はこの実施では**未実行・blocked**であり、独立fixtureのCIを置き換えない。
