@@ -82,6 +82,30 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 
 **並行作業**：依存先の完成前でも固定fixtureで担当範囲を実装・局所検証する。実際の他owner成果物を用いた横断照合はPR #22で行う。必要な外部情報・権限・環境が不足する箇所は未検証／blockedと記録し、独立して実装可能な箇所は継続する。
 
+## 今回の対応範囲と完了判定（2026-11-09）
+
+依頼者の「この実行環境で対応できないものを除外する」という指示に基づく、**PR #29の今回の作業完了判定**。下記はG単独で変更・検証できる範囲を評価する。外部権限・実行環境・他ownerの署名／成果物を要する項目は、実施済みとはせず今回の判定対象から除外する。元Planの必須受入を満たしたとの主張でも、PR #22の全体受入条件を削除する変更でもない。
+
+### 今回の判定対象（実施済み）
+
+- [x] 担当Gの非E2E所有境界、既存E2E・直接TC・静的レビューとのroutingを実装・独立テストで検証した。
+- [x] Git隔離編集、変更前hash／HEAD照合、非強制fast-forward確定・競合拒否とreadbackについてローカルGit fixtureで検証した。
+- [x] 実subprocess・固定JSON reporter／直接観測・試行／タイムアウト・終了コード・cleanup・manifestの正常／負例を実装・局所検証した。実製品runnerを使用したとの主張はしない。
+- [x] 未承認Authorityから正式TC判定を出さないこと、選択集合・suite・retry・集計・不正JSON・直接観測型比較・静的解析tool照合のfail-closedを回帰テストで確認した。
+- [x] 非E2E testwareの反証レビューfixtureと、固定製品に対する限定的な静的レビューを記録し、未確認の仕様oracleを独立した品質合格へ昇格しなかった。
+- [x] 担当GのSkill・guidance・評価fixture・検証記録を整備し、GitHub Actionsの5 workflowを最新の検証済みHEAD `92fe70e751ae2bc56c7f9f73ecd862f26287bb0f` で確認した。runtime unit/integration 637件、repository deterministic eval 292件がPASS。
+- [x] PR #29本文とPR #22引継ぎコメントに、変更範囲、raw証拠の限界、外部受入の再開条件を残した。
+
+### 今回の完了判定から除外（未実施）
+
+- 固定`qa-training-store`でGの`runner.py`を実起動し、Vitest／Playwright API-only／Web・Native component／batch・event／静的解析・非機能の対象母集団とraw・cleanupを受け入れる作業。隔離された実行terminal、依存環境と実行許可がなく、単なる製品CIのPASSでは代替できない。固定Vitest 3件のfail-closed planと再開手順は本PR内に保存済み。
+- 実providerに対する認証・仕様Authorityの承認、共有資源のnative予約、CAS、保存readback。必要なproviderと権限が接続されておらず、未認証のGit snapshotやローカル模擬結果を正式な承認証拠へ昇格しない。
+- E/F/H/J各担当による契約の正式合意や他ownerの実成果物との接続。G側のschema・fixture・必要参照は記録済み。複数ownerの実データによる横断接続はPR #22で実施する。
+- 固定製品testwareの期待値についての正式な仕様Authority決定と、製品testware ownerによる変更・採否。Gの確認候補と反証根拠は記録済み。製品本体・既存製品テストは本PRの書込み対象ではない。
+- CodeRabbit等の外部サービスによるレビュー完了保証。最新HEADの全体レビュー依頼は受理され、レビュー結果はこの記録時点で未確定。結果が返った場合、担当G内の具体的な指摘は別途確認・修正が必要。
+
+上記の除外は未検証の隠蔽・免責・仕様適合の証明を意味しない。元Planに基づく全体受入を行う場合は除外した項目を再開し、同じID／revision／Authority／runner／raw／cleanupの証拠で照合する。
+
 ## 完了基準
 
 - [ ] 対象方式のtestware実装／更新と実runnerでの実行・raw証拠・cleanupが結びつき、独立fixtureと固定qa-training-storeの対象を区別した。
