@@ -467,7 +467,7 @@ def reconcile_playwright(
             raise ContractError("invalid_playwright_suite_title")
         titles = [*parents, title] if depth > 0 and title else parents
         specs = suite.get("specs")
-        children = suite.get("suites")
+        children = suite.get("suites", [])
         if not isinstance(specs, list) or not isinstance(children, list):
             raise ContractError("invalid_playwright_suite")
         for spec in specs:
