@@ -18,7 +18,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from contract import ContractError, compare_direct, preflight, reconcile_vitest
+from contract import (
+    ContractError,
+    compare_direct,
+    compare_metrics,
+    preflight,
+    reconcile_vitest,
+)
 
 KINDS = {
     "vitest",
@@ -181,6 +187,17 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             raise RunnerError("invalid_direct_expectations")
         # Validate the complete expectation contract before the first operation.
         compare_direct(started=False, expectations=direct_expectations, observations={})
+    metric_criteria = plan.get("metric_criteria")
+    if metric_criteria is not None:
+        if kind != "nonfunctional" or plan.get("measurement_conditions_verified") is not True:
+            raise RunnerError("metric_conditions_unverified")
+        compare_metrics(
+            started=False,
+            criteria=metric_criteria,
+            measurements={},
+            condition_ref=plan.get("measurement_condition_ref"),
+            authority_ref=plan.get("threshold_authority_ref"),
+        )
     limit = plan.get("timeout_seconds", 60)
     attempts = plan.get("attempts", 1)
     if type(limit) is not int or not 1 <= limit <= 3600:
@@ -253,6 +270,23 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 expectations=direct_expectations,
                 observations=observations,
             )
+        if metric_criteria is not None:
+            metrics: dict[str, Any] = {}
+            stdout_file = attempt / "stdout.log"
+            if run["started"] and stdout_file.stat().st_size <= 1_048_576:
+                try:
+                    parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                    if isinstance(parsed, dict):
+                        metrics = parsed
+                except (ValueError, UnicodeError):
+                    pass
+            run["metric_comparison"] = compare_metrics(
+                started=run["started"],
+                criteria=metric_criteria,
+                measurements=metrics,
+                condition_ref=plan["measurement_condition_ref"],
+                authority_ref=plan["threshold_authority_ref"],
+            )
         if cleanup is not None and run["started"]:
             clean = _run_command(
                 cleanup,
@@ -282,6 +316,8 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
             and run["direct_comparison"]["result"] != "PASS"
         ):
             break
+        if metric_criteria is not None and run["metric_comparison"]["verdict"] != "PASS":
+            break
         if run["return_code"] == 0 and run["result_collection"] in {
             "complete",
             "not_applicable",
@@ -309,6 +345,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         "attempts": records,
         "outcome": outcome,
         "tc_verdict": last.get("direct_comparison", {}).get("result"),
+        "quality_verdict": last.get("metric_comparison", {}).get("verdict"),
         "evidence_is_fixture": bool(plan.get("fixture_only", False)),
         "provider_readback": "not_connected",
     }
@@ -316,6 +353,10 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
         result["outcome"] = "observed_FAIL"
     elif result["tc_verdict"] == "判定不能" and outcome == "runner_pass":
         result["outcome"] = "observations_incomplete"
+    if result["quality_verdict"] == "FAIL" and result["outcome"] == "runner_pass":
+        result["outcome"] = "measurement_FAIL"
+    elif result["quality_verdict"] == "判定不能" and result["outcome"] == "runner_pass":
+        result["outcome"] = "measurements_incomplete"
     _write_json(folder / "manifest.json", result)
     return result
 
