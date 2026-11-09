@@ -253,3 +253,14 @@ PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除され�
 3. **DIF分類変更の履歴・承認**：既存DIFの分類・理由・承認refなどの上書き・削除を拒否する。見直しでは新DIFに`supersedes_id`、別の根拠、承認ref・revisionを付け、保存前に信頼済み承認元で検証する。旧DIFは履歴として維持し、置換済みの旧分類を現在の未分類・分類率に重複計上しない。
 
 検証は単体・一時Git repository・GitHub Actionsで実施する。連続2回のPR更新、2つのGit repositoryでの異なるHEADとその更新、古いDIFの改変拒否、承認されない再分類、未分類から承認済み分類への変化を回帰テストに追加した。実環境provider・Agent・製品CIは利用者の従来指示どおり未実施。PR #22の横断統合とmergeは本PRの対象外。
+
+## PR #34追加レビューの対応（2026-11-09）
+
+前回レビューの4件をコードと回帰テストへ反映した。
+
+- **現在の影響と履歴の分離**：保存済みDIFを残しながら、今回イベントの変更分類率・影響機能ID・承認対象IDを新規有効DIFから算出する。初回・同一revisionの`analysis_update`は別の集計条件とした。連続PRで旧影響機能が混入しない回帰テストを追加した。
+- **再分類の承認範囲**：`persist_snapshot`が保存前認可へ旧・新feature IDs、source ID/ref/scope、旧・新revision、locator、旧・新根拠を渡す。承認revisionが同じでも機能IDを改変した場合は拒否し、旧正本を維持する。
+- **同一Git差分の矛盾分類**：source／旧SHA／新SHA／locatorが同じ複数の有効DIFを拒否する。正規の再分類は`supersedes_id`で旧DIFを履歴として保存する。
+- **主source IDの明示**：複数repositoryが同じHEADを共有するときは`event_basis.primary_source_id`を要求する。実Gitで同一コミット・異なるbaseを指定した2 repositoryの保存／拒否をテストした。既存の主sourceが一意な場合の入力は互換維持。
+
+担当範囲のGitHub Actions 5系統と決定論的テストを最新HEADで再確認する。実provider／実Agent／製品CIの受入は従来の利用者指示に従い対象外とし、PR #22の横断統合はここでは完了判定しない。

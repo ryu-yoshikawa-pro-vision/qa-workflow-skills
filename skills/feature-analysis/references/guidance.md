@@ -25,3 +25,9 @@ code sourceを含む機能台帳を正式保存するときは、信頼済み呼
 継続PRで機能DIFを追記するときは前回のDIF行を残し、新しいbase→headと前回head→headの差分に対応するDIF IDを追加します。過去のDIFのrevision・分類・根拠を直接書き換えません。分類見直し時は新しいID、`supersedes_id`、別の根拠、承認ref／revisionで履歴をつなぎ、保存前に認可callbackで検証します。
 
 複数Git repositoryはsource ID別に各HEAD・前回HEAD・baseを確認します。主イベントの`snapshot.source_revision`が全code sourceのHEADであるという前提は使用しません。保存前のGit列挙・差分照合を省略した旧入力だけではcurrentを確定しません。
+
+継続PRの影響抽出では、DIFの履歴保存と今回の変更影響を分けます。CIと下流へ渡す変更分類率・影響機能・承認対象は**今回の差分**だけを対象とし、前回PRのDIFを再計上しません。同一のsource／旧revision／新revision／locatorに矛盾する有効なDIFがあればblockedとします。
+
+再分類時は`supersedes_id`で保存済みDIFを指定し、承認側に旧・新の機能ID、sourceの参照とscope、旧・新revision、locator、証拠と承認revisionを提示します。承認済みの対象範囲と異なる新しい機能IDへの切替は保存不可とします。
+
+複数repositoryが同一HEADを共有するPRイベントでは`event_basis.primary_source_id`で主sourceを指定します。主sourceの選択はSHAだけに頼らずsource IDで照合します。

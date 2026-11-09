@@ -8,13 +8,13 @@ scripts/feature_registry.pyはPython 3.11のstdinにJSON objectを受け、stdou
 - **sources**：内容 = id, kind, ref, scope, status, revision, evidence_ref, enumeration_complete, unretrieved[], reason
 - **features**：内容 = id, identity, name, kind, status, parent_id, source_ids[], implementation_refs[], spec_refs[], qa_refs[]
 - **candidates**：内容 = id, source_ids[], evidence_ref, status, feature_id, reason, approval_ref
-- **changes**：内容 = id, source_id, before_revision, after_revision, locator, evidence_ref, classification, feature_ids[], reason, approval_ref
+- **changes**：内容 = id, source_id, before_revision, after_revision, locator, evidence_ref, classification, feature_ids[], reason, approval_ref。分類を後から訂正する新規DIFにはsupersedes_id、approval_revisionを追加する。
 - **history**：内容 = event_id, kind, revision, evidence_ref, from_ids[], to_ids[]を追記専用
 - **unknown_areas**：内容 = 取得不能・発見不能な分析範囲の参照配列
 
 IDはSRC-001、FEAT-001、CAND-001、DIF-001形式。featureのidentityは同一案件で同じ意味を表す安定値で、path・名称変更による再採番を防ぎます。sourceのcompleteはrevisionとevidence_ref、enumeration_complete=true、unretrieved=[]を必須とします。候補・差分の対象外には理由とapproval_refが必須ですが、承認主体の真正性は本helperでは確認しません。
 
-結果はcomplete / incomplete / stale / idempotent / blocked。change_classificationは分類済み差分ID ÷ 全確認差分ID、observed_candidate_mappingは機能ID対応済み候補のみ ÷ 全確認候補。承認参照付きの対象外候補は`excluded_candidate_ids`に記録し、対応済みの分子には含めません。分母0はrate=nullです。各率は分子・分母のIDを保存し、未取得sourceと未知領域を別に示します。all_product_features_discoveredは常にnullです。 unknown_areasが残る場合はsource_boundary_complete=falseとし、取得母集団が完全であると報告しません。
+結果はcomplete / incomplete / stale / idempotent / blocked。change_classificationは**今回イベントで確認する有効DIF**の分類済みID ÷ 今回イベントの有効DIF IDであり、履歴として残す旧PRのDIFを分母・分子へ混ぜない。analysis_updateでは現在のsource revisionに対応する有効DIFと今回追加した訂正DIFを対象とする。observed_candidate_mappingは機能ID対応済み候補のみ ÷ 全確認候補。承認参照付きの対象外候補は`excluded_candidate_ids`に記録し、対応済みの分子には含めません。分母0はrate=nullです。各率は分子・分母のIDを保存し、未取得sourceと未知領域を別に示します。all_product_features_discoveredは常にnullです。 unknown_areasが残る場合はsource_boundary_complete=falseとし、取得母集団が完全であると報告しません。
 
 handoffにはartifact ref/revision、source revision、feature IDs、未分類差分IDs、expected_source_idsを返します。helperのcompleteは保存済み・承認済み・全製品発見の証明ではなく、実保存先のnative CAS・history/readbackと独立照合が必要です。仕様対応率・正式設計率・QA影響評価は別のownerが決定します。
 
@@ -32,7 +32,7 @@ handoffにはartifact ref/revision、source revision、feature IDs、未分類�
 
 結果は`coverage.git_change_paths`、`registered_paths`、`missing_git_paths`、`unmatched_registry_change_ids`、`unclassified_git_paths`、`rate`、候補snapshot SHA-256を含みます。ファイルpathの網羅は機能・hunk・Issue・仕様の網羅ではありません。Git一覧そのものの真正性と実providerへの保存・承認は別途確認します。
 
-同一artifactの更新では、前回のsource IDのkind/ref/scope、候補IDのsource_ids/evidence_ref、差分IDのsource_id/before_revision/after_revision/locatorを同じIDのまま別の意味に変更できません。変更分類や未解決候補の判定状態の更新は認めます。正式なsource移設・diff改版時はIDを再利用せず新規登録と履歴の参照を保持します。
+同一artifactの更新では、前回のsource IDのkind/ref/scope、候補IDのsource_ids/evidence_ref、差分IDのsource_id/before_revision/after_revision/locatorを同じIDのまま別の意味に変更できません。既存DIFの分類・理由・機能ID・承認refを含め、保存済みDIFの全フィールドの上書き・削除は禁止します。再分類には新しいDIF ID、supersedes_id、独立根拠、承認ref／revisionを付けて履歴を維持します。未解決候補の判定状態の更新は既存契約に従います。正式なsource移設・diff改版時はIDを再利用せず新規登録と履歴の参照を保持します。
 
 既存機能のname変更には`renamed`または`changed`、実装参照・status・親・仕様／QA参照等の変更には`changed`の追記履歴（対象IDをfrom_ids/to_idsへ記録し、今回source_revisionを付ける）が必要です。廃止は従来どおりretired等の履歴を要求します。`no_impact`も`out_of_scope`と同様に理由と承認refが必要で、実認証・承認scopeの真正性は別途確認します。
 
@@ -73,3 +73,13 @@ Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`
 PR更新・rebaseでGit差分を照合する際、前回snapshotにあるDIFは履歴として残し、**今回の差分母集団には新しく追加したDIFのみ**照合します。同一HEADでの`analysis_update`では現在有効なDIFを再利用できます。過去のDIFの旧／新revisionを現在HEADへ書き換えず、今回のbase→headと前回head→headの両差分で必要な組を登録します。
 
 複数製品repositoryでは、`snapshot.source_revision`と`event_basis`のSHAは主たるイベントrevisionを表します。各`sources[].revision`がrepository別のHEADです。`persist_snapshot`の`git_inventory_requests`にはsource IDごとに実Gitのroot・base/head SHA、PR更新時は各sourceの前回HEADを指定します。主たるsourceはイベントbase/head、他のsourceは保存済み前回source revisionと独立Git差分で照合し、別repositoryのcommitを主repositoryのSHAに揃えません。保存先・Git root・承認元の選択は信頼済み呼出し元の責務です。
+
+## 現在の差分と過去の履歴の分離（PR #34追補）
+
+過去のDIFは削除せず、PR更新・rebase・merge・release・外部資料改版では今回新規の有効DIFだけを`metrics.change_classification`と`handoff.impacted_feature_ids`／`approval_required_change_ids`／`unclassified_change_ids`へ渡します。初回分析は全有効DIF、同じsource revisionの`analysis_update`は現在source revisionに対応する有効DIFと今回追加された分類訂正DIFを対象とします。過去の未分類履歴は別途`reasons`で未解決のまま維持され、無根拠に成功へ格上げしません。
+
+同じ`source_id`、旧revision、新revision、`locator`に対して、複数の**有効な**DIFを記録できません。訂正は既存DIFを`supersedes_id`で置換し、両行を履歴に残します。Git path単位の差分照合で別hunkを独立に分類したい場合は、区別できるlocator／根拠が必要です。同じ識別子のまま異なる判定を併存させません。
+
+再分類の保存前認可`operation=reclassify`には旧・新`feature_ids`、対象`source_id`／実際の`source_ref`／`source_scope`、旧／新revision、locator、旧／新evidence ref、旧／新classification、承認ref／revision、操作IDと保存先expected revisionを渡します。認可側が承認した機能範囲と一致しなければ保存を拒否します。単なる文字列の承認refでは許可したとみなしません。
+
+PR更新・rebase・merge・releaseの主たる情報源は、イベントの`event_basis.primary_source_id`で明示できます。複数code sourceのHEADが同じSHAの場合は**必須**です。一意なcode sourceだけがイベントHEADに一致する従来データは、互換性のためそのsourceを使用します。主sourceのbase／前回HEADはイベントのSHAで検証し、他sourceのbase／前回HEADは各sourceの保存済みrevisionと実Git差分で独立検証します。同じSHAを持つ別repositoryをSHAだけで主sourceと誤判定しません。
