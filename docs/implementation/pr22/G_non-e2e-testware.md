@@ -250,3 +250,9 @@ API・バッチ・コンポーネント・非機能・静的検証のtestware実
 - 参照した正式仕様は、セール期間と会員割引の反映・境界を要求しているが、割引率、送料無料閾値、端数処理等の数値根拠は今回確認した節からは特定できなかった。テストに書かれた期待値が製品の計算コードと一致するだけでは独立した仕様Authorityの証明にならない。数値oracleの正式根拠が確認できるまで独立assertion品質の総合受入は**未完了**とする。
 - 固定3件を実runnerで受入するためのfail-closed planひな形を`skills/testware-execution/assets/qa-training-store-pricing-vitest.plan.json`に追加。実行前に必須の`script_chain_reviewed`、権限、隔離、母集団の検証状態をfalseとしており、検証しないまま実行可能にしない。手順は`skills/testware-execution/references/guidance.md`に記載した。
 - 本環境のGitHub接続はファイル・CI閲覧とbranchへの書込みに利用できるが、固定製品repoのclone／依存導入／任意のGitHub Actions実行を開始する権限付きterminalがない。コンテナのGitHub接続もDNS解決不能である。固定製品の実Vitest／Playwright API-only／Native Jest／バッチ・イベント・静的解析・非機能の実行、外部副作用／cleanup・provider承認の受入はこの実施では**未実行・blocked**であり、独立fixtureのCIを置き換えない。
+
+## JSON入力の重複キー・非有限数拒否（2026-11-09）
+
+- `runner.py`はplan、Git追跡のTC期待値snapshot、実reporter、直接観測stdout、静的解析／非機能stdoutを通常の`json.loads()`で読んでいた。同一objectに同名キーが複数あると後の値が採用され、実行許可フラグや期待値・raw結果の解釈を曖昧にできたため、共通の`_strict_json_loads()`で重複キーと`NaN`／`Infinity`を拒否する。
+- 実行plan内の`script_chain_reviewed`が`false`と`true`で重複している場合は開始前に`duplicate_json_key`で拒否する。固定TC Authority blobの版情報が重複している場合は`invalid_direct_tc_authority`で拒否し、実コマンドを起動しない。元rawのreporter JSONが不正な場合は従来のresult collection・cleanup・manifestの処理で不完全として扱う。
+- この入力検査は外部providerの本人性や承認状態を保証しない。実製品の実runner受入は未実行のまま。

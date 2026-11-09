@@ -46,6 +46,28 @@ class RunnerError(ValueError):
     """An operation cannot be started safely."""
 
 
+def _no_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Do not silently overwrite reviewed plan, reporter or Authority values."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise RunnerError("duplicate_json_key")
+        result[key] = value
+    return result
+
+
+def _no_nonfinite_json_numbers(value: str) -> None:
+    raise RunnerError("nonfinite_json_number")
+
+
+def _strict_json_loads(value: str | bytes) -> Any:
+    return json.loads(
+        value,
+        object_pairs_hook=_no_duplicate_json_keys,
+        parse_constant=_no_nonfinite_json_numbers,
+    )
+
+
 def _argv(value: Any, name: str) -> list[str]:
     if (
         not isinstance(value, list)
@@ -147,7 +169,7 @@ def _verified_tc_expectations(
     if blob.returncode:
         raise RunnerError("direct_tc_authority_unavailable")
     try:
-        source = json.loads(blob.stdout.decode("utf-8"))
+        source = _strict_json_loads(blob.stdout.decode("utf-8"))
     except (UnicodeError, ValueError):
         raise RunnerError("invalid_direct_tc_authority") from None
     if (
@@ -474,7 +496,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                     try:
                         if reporter.stat().st_size > 16 * 1024 * 1024:
                             raise RunnerError("reporter_too_large")
-                        raw = json.loads(reporter.read_text(encoding="utf-8"))
+                        raw = _strict_json_loads(reporter.read_text(encoding="utf-8"))
                         shared = {
                             "selected": plan["selected"],
                             "report": raw,
@@ -533,7 +555,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                         try:
                             content = stdout.read_text(encoding="utf-8")
                             observations["stdout_text"] = content
-                            observations["stdout_json"] = json.loads(content)
+                            observations["stdout_json"] = _strict_json_loads(content)
                         except (UnicodeError, ValueError):
                             pass
                 run["direct_comparison"] = compare_direct(
@@ -555,7 +577,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 stdout_file = attempt / "stdout.log"
                 if run["started"] and stdout_file.stat().st_size <= 1_048_576:
                     try:
-                        parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                        parsed = _strict_json_loads(stdout_file.read_text(encoding="utf-8"))
                         if isinstance(parsed, dict):
                             metrics = parsed
                     except (ValueError, UnicodeError):
@@ -579,7 +601,7 @@ def execute(plan: dict[str, Any], artifacts_root: Path) -> dict[str, Any]:
                 stdout_file = attempt / "stdout.log"
                 if run["started"] and stdout_file.stat().st_size <= 1_048_576:
                     try:
-                        parsed = json.loads(stdout_file.read_text(encoding="utf-8"))
+                        parsed = _strict_json_loads(stdout_file.read_text(encoding="utf-8"))
                         if isinstance(parsed, dict):
                             report_data = parsed
                     except (ValueError, UnicodeError):
@@ -771,7 +793,7 @@ def main() -> int:
     cli.add_argument("--artifacts", type=Path, required=True)
     args = cli.parse_args()
     try:
-        plan = json.loads(args.plan.read_text(encoding="utf-8"))
+        plan = _strict_json_loads(args.plan.read_text(encoding="utf-8"))
         result = execute(plan, args.artifacts)
         print(
             json.dumps(

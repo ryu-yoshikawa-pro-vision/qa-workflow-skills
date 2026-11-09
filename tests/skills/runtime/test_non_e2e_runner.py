@@ -149,6 +149,34 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(summary["reason"], "preflight_missing_run_identity")
         self.assertIsNone(artifact)
 
+    def test_duplicate_preflight_key_is_rejected_before_execution(self):
+        plan = self.plan([sys.executable, "-c", "print('should-not-run')"])
+        source = json.dumps(plan)
+        sentinel = '"script_chain_reviewed": true'
+        self.assertEqual(source.count(sentinel), 1)
+        source = source.replace(
+            sentinel,
+            '"script_chain_reviewed": false, "script_chain_reviewed": true',
+        )
+        plan_file = Path(self.space.name) / "duplicate-plan.json"
+        plan_file.write_text(source, encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RUNNER),
+                "--plan",
+                str(plan_file),
+                "--artifacts",
+                str(self.logs),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)["reason"], "duplicate_json_key")
+        self.assertFalse(self.logs.exists())
+
     def test_real_subprocess_preserves_stdout_and_identity(self):
         plan = self.plan([sys.executable, "-c", "print('runner observation')"])
         plan["direct_expectations"] = [
@@ -993,6 +1021,35 @@ class ActualRunnerTests(unittest.TestCase):
         self.assertEqual(
             summary["reason"], "direct_tc_expectations_incomplete_or_mismatched"
         )
+        self.assertIsNone(artifact)
+
+    def test_direct_tc_rejects_ambiguous_authority_snapshot_json(self):
+        plan = self.plan([sys.executable, "-c", "print('should-not-run')"])
+        plan["direct_tc"] = True
+        plan["tc_ref"] = "TC-duplicate-authority"
+        plan["tc_revision"] = "accepted"
+        plan["expected_authority_ref"] = "accepted:reference"
+        plan["direct_expectations"] = [{"id": "exit_code", "expected": 0}]
+        self.attach_direct_tc_authority(plan)
+        authority = self.repo / plan["direct_tc_authority_file"]
+        raw = authority.read_text(encoding="utf-8")
+        self.assertIn('"tc_revision": "accepted"', raw)
+        authority.write_text(
+            raw.replace(
+                '"tc_revision": "accepted"',
+                '"tc_revision": "stale", "tc_revision": "accepted"',
+            ),
+            encoding="utf-8",
+        )
+        git(self.repo, "add", plan["direct_tc_authority_file"])
+        git(self.repo, "commit", "-qm", "duplicate Authority key fixture")
+        self.sha = git(self.repo, "rev-parse", "HEAD")
+        plan["repo_revision"] = self.sha
+        plan["preflight"]["source_revision"] = self.sha
+        plan["preflight"]["build_revision"] = self.sha
+        code, summary, artifact = self.call(plan)
+        self.assertEqual(code, 2)
+        self.assertEqual(summary["reason"], "invalid_direct_tc_authority")
         self.assertIsNone(artifact)
 
     def test_direct_tc_rejects_untracked_authority_and_mismatched_revision(self):
