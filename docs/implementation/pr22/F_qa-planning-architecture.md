@@ -229,7 +229,7 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 
 ### push後Code Quality対応（2026-11-10）
 
-push済みhead `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`のCode Quality run #859が、TMG validatorの未使用`risks`代入（Ruff F841、当時の1150行目）でFAILした。`risks = risk_rows_for_closure`を削除し、同じtracked format checkで示されたTAD/TMG validatorとF回帰テストのRuff format差分も既存formatterで整形した。これらはFの既存変更ファイルに限る。follow-up後の`uv run --with ruff==0.16.8 python scripts/format_tracked.py check`は221 tracked files PASS、F回帰30件も再実行してPASSした。このfollow-up修正はこの文書記録時点で未commit／未pushであり、push後に5 workflowを再確認する。
+push済みhead `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`のCode Quality run #859が、TMG validatorの未使用`risks`代入（Ruff F841、当時の1150行目）でFAILした。`risks = risk_rows_for_closure`を削除し、同じtracked format checkで示されたTAD/TMG validatorとF回帰テストのRuff format差分も既存formatterで整形した。これらはFの既存変更ファイルに限る。follow-up後の`uv run --with ruff==0.16.8 python scripts/format_tracked.py check`は221 tracked files PASS、F回帰30件も再実行してPASSした。修正はcommit `caa5ed1f80c28bd392bd3daaeca6b3734f7c1ddf`としてpush済みで、remote SHAと一致する。ActionsはAgent Skillsを除く4 workflowがPASSし、Agent Skillsは担当AのREADME登録不足でFAILした。
 
 ### 指摘別の修正結果
 
@@ -268,8 +268,13 @@ push済みhead `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`に対する最新Actio
 - [Validate Agent Skills #2166](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578944) — FAIL。公式Skill仕様validationはPASSしたが、repository eval structure stepでREADMEにない3 Skill (`test-architecture-design`、`test-management`、`test-requirements-analysis`)を指摘。README／共通registryは担当Aのowner範囲。
 - [Validate Deterministic Output Evals #2164](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578889) — PASS。修正後のdataset検査と後続jobが完了した。
 - [Validate Semantic Output Evals #2129](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578964) — PASS。
-- [Code Quality #859](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578929) — FAIL。tracked format/lint stepでRuff F841、未使用`risks`代入を報告。上記follow-upで代入を削除し、Ruff format差分を解消した。修正後CIはfollow-up push後に確認する。
+- [Code Quality #859](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578929) — FAIL。tracked format/lint stepでRuff F841、未使用`risks`代入を報告。follow-up push後の[Code Quality #862](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728764570)はPASS。
 - [Codex Harness #859](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578888) — PASS。
+
+follow-up commit `caa5ed1f80c28bd392bd3daaeca6b3734f7c1ddf`の5 workflowを再確認した。
+
+- [Validate Agent Skills #2169](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728767430) — FAIL。公式Skill仕様validationはPASS。repository eval structure stepがREADMEで未登録の3 Skillを検出し、後続stepをSKIP。担当Aへ引継ぎ。
+- [Validate Deterministic Output Evals #2167](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728765000)、[Validate Semantic Output Evals #2132](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728764600)、[Code Quality #862](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728764570)、[Codex Harness #862](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42728764604) — PASS。Deterministic workflowはdataset検査、compile、shared/repository deterministic tests、runtime unit/integration testsまで全stepが成功した。
 
 ### 担当Aへの変更依頼
 
@@ -290,7 +295,7 @@ E／Jの実成果物文書はこのcheckoutにはなく、入力公開契約をP
 
 - 今回のFレビュー指摘と追加した欠落ID／優先順位負例 — F専用30件と6 fixture runnerはPASS。確認範囲でF validatorの追加修正を要する問題は残っていない。
 - deterministic dataset contract — local equivalentは全52 case PASS。GitHub CIで修正後の成功は未確認。
-- Ruffのfull tracked format/lint check — follow-up後に221 files PASS。push済みhead `ffc1030`ではF841でCode QualityがFAILしており、修正後CIはfollow-up push後に確認する。ローカル固定revision `skills-ref`は未実施だが、同headのCI仕様validation stepはPASS。全deterministic suiteとruntime regressionは未完了のため、担当Fの最終局所受入は**未完了**。
+- Ruffのfull tracked format/lint check — follow-up後に221 files PASS。`ffc1030`ではF841でCode QualityがFAILしたが、修正後head `caa5ed1f`のCode QualityはPASS。ローカル固定revision `skills-ref`は未実施だが、同headのCI仕様validation stepはPASS。全deterministic suiteとruntime regressionのローカル実行は前記sandbox制約が残り、担当Fの最終局所受入は**未完了**。
 - README／共通registry／routing — Aへ変更要求済み状態。CIのREADME failureはF validatorの不具合ではない。
 - E／J実成果物との横断接続、全current Skill同時利用、実Agent trigger／semantic Judge、実provider CAS／履歴／readback、認証済みapproval、保存失敗後復旧、S1〜S17と15＋10条件 — PR #22／外部provider選定待ちで未実施。再開条件はowner成果物とscopeの確定、provider／認証主体の選定、Aの正式runtime登録後に新HEADでCIを完遂すること。
 - 文書と実装の差異: root README／`CANONICAL_SKILLS`／`RUNTIME_V2_SKILL_ROOTS`にF 3 Skillがない点は現存し、A担当として未対応。F内ではvalidator、template、data-contract、fixtureの今回変更間に未解決差異を確認していない。E／J実成果物文書がcheckoutにないため実成果物接続は未確認。
@@ -305,7 +310,7 @@ PR #22の担当Fとして、QA要求・テストアーキテクチャ・計画�
 ## 現在の状態
 
 - Draft。F専用回帰30件と6保存fixtureはPASS。全52 deterministic output datasetもローカル契約検査を通過。
-- full deterministic／runtime suiteには共有runtimeとsandboxに依存する未解決結果がある。Ruffはfull tracked check PASS。直近のActionsではDeterministic／Semantic／Codex Harness PASS、Agent Skillsは担当AのREADME不足、Code QualityはF841でFAIL。F841は修正済みでfollow-up CI待ち。
+- full deterministic／runtime suiteには共有runtimeとsandboxに依存する未解決結果がある。Ruffはfull tracked check PASS。follow-up headではDeterministic／Semantic／Codex Harness／Code QualityがPASS、Agent Skillsは担当AのREADME不足でFAIL。
 - README・共通runtime登録は担当Aへ引継ぎ中。実Agent／認証済み承認／保存provider／PR #22横断接続は未実施。
 - 詳細・検証証拠・再開条件は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
 ```
