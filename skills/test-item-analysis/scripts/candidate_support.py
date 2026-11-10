@@ -1071,7 +1071,7 @@ def validate_item_artifact(value: Any) -> dict[str, Any]:
             raise ContractError(
                 "item_evidence_unknown", f"{item_id} references an unknown source"
             )
-        expected_currentness = _currentness(evidence, active_sources)
+        expected_currentness = derive_currentness(evidence, active_sources)
         if row["currentness"] != expected_currentness:
             raise ContractError(
                 "item_currentness_mismatch",
@@ -1195,7 +1195,9 @@ def _check_item_cycle(items: dict[str, dict[str, Any]]) -> None:
         visit(item_id)
 
 
-def _currentness(evidence: list[dict[str, str]], active: list[dict[str, str]]) -> str:
+def derive_currentness(
+    evidence: list[dict[str, str]], active: list[dict[str, str]]
+) -> str:
     by_identity = {source_identity(ref): ref for ref in active}
     unknown = False
     for ref in evidence:

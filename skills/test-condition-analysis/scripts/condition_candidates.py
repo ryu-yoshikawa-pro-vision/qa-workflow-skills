@@ -13,11 +13,13 @@ from candidate_support import (
     ContractError,
     active_source_refs,
     canonical_bytes,
+    derive_currentness,
     feature_inventory,
     fingerprint,
     identification_coverage,
     make_result,
     operation_claim_details,
+    source_identity,
     source_key,
     source_ref,
     source_refs,
@@ -94,22 +96,6 @@ def _core(artifact: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value for key, value in artifact.items() if key != "content_fingerprint"
     }
-
-
-def _source_identity(ref: dict[str, str]) -> tuple[str, str, str]:
-    return ref["owner"], ref["scope"], ref["artifact_ref"]
-
-
-def _currentness(evidence: list[dict[str, str]], active: list[dict[str, str]]) -> str:
-    by_identity = {_source_identity(ref): ref for ref in active}
-    unknown = False
-    for ref in evidence:
-        current = by_identity.get(_source_identity(ref))
-        if current is None:
-            unknown = True
-        elif not _same_source(current, ref):
-            return "stale"
-    return "unknown" if unknown else "current"
 
 
 def _authority_ref(value: Any, name: str) -> dict[str, Any]:
@@ -365,7 +351,7 @@ def validate_artifact(value: Any) -> dict[str, Any]:
                 "condition_currentness_invalid",
                 f"{condition_id} currentness is invalid",
             )
-        if row["currentness"] != _currentness(evidence, active_sources):
+        if row["currentness"] != derive_currentness(evidence, active_sources):
             raise ContractError(
                 "condition_currentness_mismatch",
                 f"{condition_id} currentness contradicts its evidence",
@@ -759,7 +745,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             ),
             "evidence_refs": evidence,
             "candidate_state": state,
-            "currentness": _currentness(evidence, current_sources),
+            "currentness": derive_currentness(evidence, current_sources),
             "unknowns": sorted(set(unknowns)),
         }
         old = previous_rows.get(condition_id)
@@ -820,29 +806,29 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "merge_sources_not_retired",
             "merge source conditions must be explicitly retired in the same update",
         )
-    active_by_identity = {_source_identity(ref): ref for ref in current_sources}
+    active_by_identity = {source_identity(ref): ref for ref in current_sources}
     previous_active_by_identity = (
-        {_source_identity(ref): ref for ref in previous["active_source_refs"]}
+        {source_identity(ref): ref for ref in previous["active_source_refs"]}
         if previous
         else {}
     )
     for condition_id, condition in conditions.items():
         if condition_id in changed_ids:
             continue
-        currentness = _currentness(condition["evidence_refs"], current_sources)
+        currentness = derive_currentness(condition["evidence_refs"], current_sources)
         condition["currentness"] = currentness
         if currentness == "stale":
             changed_source = next(
                 (
-                    active_by_identity.get(_source_identity(ref))
+                    active_by_identity.get(source_identity(ref))
                     for ref in condition["evidence_refs"]
-                    if _source_identity(ref) in active_by_identity
-                    and _source_identity(ref) in previous_active_by_identity
+                    if source_identity(ref) in active_by_identity
+                    and source_identity(ref) in previous_active_by_identity
                     and not _same_source(
-                        previous_active_by_identity[_source_identity(ref)],
-                        active_by_identity[_source_identity(ref)],
+                        previous_active_by_identity[source_identity(ref)],
+                        active_by_identity[source_identity(ref)],
                     )
-                    and not _same_source(active_by_identity[_source_identity(ref)], ref)
+                    and not _same_source(active_by_identity[source_identity(ref)], ref)
                 ),
                 None,
             )
@@ -921,12 +907,16 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         for row in candidate["conditions"]
         if row["candidate_state"] == "blocked"
     )
+    unknown_feature_ids = sorted(
+        row["feature_id"] for row in feature_population if row["status"] == "unknown"
+    )
     status = (
         "candidate_ready_unpersisted"
         if not stale
         and not unknown
         and not unconfirmed
         and not blocked
+        and not unknown_feature_ids
         and inventory["source_boundary_complete"]
         and inventory["analysis_complete"]
         else "incomplete"
@@ -966,6 +956,14 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
+    if unknown_feature_ids:
+        issues.append(
+            _issue(
+                "unknown_feature_status",
+                "some features have unknown status and are not confirmed active",
+                blocking=False,
+            )
+        )
     if unconfirmed:
         issues.append(
             _issue(
@@ -998,6 +996,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             unknown_condition_ids=unknown,
             unconfirmed_condition_ids=unconfirmed,
             blocked_condition_ids=blocked,
+            unknown_feature_ids=unknown_feature_ids,
             recheck_condition_ids=recheck_condition_ids,
             write_precondition={"performed": False, "provider_selected": False},
         )
@@ -1013,6 +1012,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         unknown_condition_ids=unknown,
         unconfirmed_condition_ids=unconfirmed,
         blocked_condition_ids=blocked,
+        unknown_feature_ids=unknown_feature_ids,
         recheck_condition_ids=recheck_condition_ids,
         write_precondition={
             "performed": False,
@@ -1139,7 +1139,7 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
     stale: list[str] = []
     unknown: list[str] = []
     for condition in artifact["conditions"]:
-        state = _currentness(condition["evidence_refs"], active)
+        state = derive_currentness(condition["evidence_refs"], active)
         if state == "stale":
             stale.append(condition["condition_id"])
         elif state == "unknown":
@@ -1239,7 +1239,7 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
     for ref in (
         item_artifact["active_source_refs"] + condition_artifact["active_source_refs"]
     ):
-        identity = _source_identity(ref)
+        identity = source_identity(ref)
         old = active_sources_by_identity.get(identity)
         if old is not None and source_key(old) != source_key(ref):
             raise ContractError(
@@ -1280,6 +1280,13 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
         if condition_id in condition_history:
             return "condition_retired"
         return "condition_not_found"
+
+    def condition_currentness_reason(row: dict[str, Any]) -> str | None:
+        if row["currentness"] == "stale":
+            return "condition_stale"
+        if row["currentness"] == "unknown":
+            return "condition_currentness_unknown"
+        return None
 
     for condition in condition_by_id.values():
         for item_id in condition["item_refs"]:
@@ -1384,16 +1391,35 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
 
         item = item_by_id[item_id]
         condition = condition_by_id[condition_id]
-        if status == "proposed" and (
-            item["currentness"] != "current"
-            or item["status"] == "unknown"
-            or condition["currentness"] != "current"
-            or condition["candidate_state"] != "candidate"
-        ):
+        # A condition recorded as unconfirmed/blocked must not be promoted to a
+        # proposed pair; that stays a contract violation. A condition that is
+        # still a candidate but whose evidence went stale/unknown is an ordinary
+        # owner-side recheck, reported like the unresolved item references above.
+        # (The item was already resolved as current and confirmed here.)
+        if status == "proposed" and condition["candidate_state"] != "candidate":
             raise ContractError(
                 "candidate_pair_unconfirmed",
-                "only current, confirmed candidates may be a proposed pair",
+                "only confirmed candidate conditions may be a proposed pair",
             )
+        currentness_reason = condition_currentness_reason(condition)
+        if currentness_reason is not None:
+            unresolved_condition_refs.append(
+                {
+                    "origin": "candidate_pairs",
+                    "condition_id": condition_id,
+                    "item_id": item_id,
+                    "reason": currentness_reason,
+                    "state": "unconfirmed",
+                    "candidate_pair": {
+                        "status": status,
+                        "rationale": rationale,
+                        "evidence_refs": evidence,
+                    },
+                }
+            )
+            recheck_condition_ids.add(condition_id)
+            recheck_item_ids.add(item_id)
+            continue
 
         machine_issues: list[str] = []
         if item["kind"] not in condition["applicable_item_kinds"]:
@@ -1404,7 +1430,7 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
             and not set(item["feature_refs"]).intersection(condition["feature_refs"])
         ):
             machine_issues.append("item_and_condition_feature_refs_disjoint")
-        pair_currentness = _currentness(evidence, active_sources)
+        pair_currentness = derive_currentness(evidence, active_sources)
         if pair_currentness != "current":
             machine_issues.append(f"pair_evidence_{pair_currentness}")
         if machine_issues:

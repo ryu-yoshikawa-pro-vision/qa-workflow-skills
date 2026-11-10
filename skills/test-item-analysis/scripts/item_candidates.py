@@ -15,11 +15,13 @@ from candidate_support import (
     ContractError,
     active_source_refs,
     canonical_bytes,
+    derive_currentness,
     feature_inventory,
     fingerprint,
     identification_coverage,
     make_result,
     operation_claim_details,
+    source_identity,
     source_key,
     source_ref,
     source_refs,
@@ -61,48 +63,8 @@ def _core(artifact: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _check_cycle(items: dict[str, dict[str, Any]]) -> None:
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(item_id: str) -> None:
-        if item_id in visiting:
-            raise ContractError("item_parent_cycle", f"parent cycle includes {item_id}")
-        if item_id in visited:
-            return
-        visiting.add(item_id)
-        for parent_id in items[item_id]["parent_item_ids"]:
-            if parent_id not in items:
-                raise ContractError(
-                    "item_parent_missing",
-                    f"{item_id} references missing parent {parent_id}",
-                )
-            visit(parent_id)
-        visiting.remove(item_id)
-        visited.add(item_id)
-
-    for item_id in items:
-        visit(item_id)
-
-
 def validate_artifact(value: Any) -> dict[str, Any]:
     return _validate_item_artifact(value)
-
-
-def feature_key(ref: dict[str, str]) -> tuple[str, str, str]:
-    return (ref["owner"], ref["scope"], ref["artifact_ref"])
-
-
-def _currentness(evidence: list[dict[str, str]], active: list[dict[str, str]]) -> str:
-    by_identity = {feature_key(ref): ref for ref in active}
-    unknown = False
-    for ref in evidence:
-        current = by_identity.get(feature_key(ref))
-        if current is None:
-            unknown = True
-        elif not _same_source(current, ref):
-            return "stale"
-    return "unknown" if unknown else "current"
 
 
 def _history_event(
@@ -382,7 +344,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                     f"parent reference cannot be resolved: {parent_ref}",
                 )
             parent_ids.append(parent_id)
-        currentness = _currentness(evidence_refs, current_sources)
+        currentness = derive_currentness(evidence_refs, current_sources)
         updated = {
             "item_id": item_id,
             "name": name,
@@ -441,7 +403,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             )
         reason = text(retirement["reason"], "retirement.reason")
         items[item_id]["status"] = "retired"
-        items[item_id]["currentness"] = _currentness(
+        items[item_id]["currentness"] = derive_currentness(
             items[item_id]["evidence_refs"], current_sources
         )
         events.append(
@@ -459,16 +421,16 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         )
 
     # A source change affects only candidates whose evidence points at the changed artifact.
-    active_by_identity = {feature_key(ref): ref for ref in current_sources}
+    active_by_identity = {source_identity(ref): ref for ref in current_sources}
     previous_active_by_identity = (
-        {feature_key(ref): ref for ref in previous["active_source_refs"]}
+        {source_identity(ref): ref for ref in previous["active_source_refs"]}
         if previous
         else {}
     )
     for item_id, item in items.items():
         if item_id in changed_ids:
             continue
-        currentness = _currentness(item["evidence_refs"], current_sources)
+        currentness = derive_currentness(item["evidence_refs"], current_sources)
         item["currentness"] = currentness
         if item["status"] == "retired":
             # Retired items need no revalidation; keep derived currentness only.
@@ -476,15 +438,15 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         if currentness == "stale":
             changed_source = next(
                 (
-                    active_by_identity.get(feature_key(ref))
+                    active_by_identity.get(source_identity(ref))
                     for ref in item["evidence_refs"]
-                    if feature_key(ref) in active_by_identity
-                    and feature_key(ref) in previous_active_by_identity
+                    if source_identity(ref) in active_by_identity
+                    and source_identity(ref) in previous_active_by_identity
                     and not _same_source(
-                        previous_active_by_identity[feature_key(ref)],
-                        active_by_identity[feature_key(ref)],
+                        previous_active_by_identity[source_identity(ref)],
+                        active_by_identity[source_identity(ref)],
                     )
-                    and not _same_source(active_by_identity[feature_key(ref)], ref)
+                    and not _same_source(active_by_identity[source_identity(ref)], ref)
                 ),
                 None,
             )
@@ -502,7 +464,6 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 changed_ids.add(item_id)
 
     current_items = sorted(items.values(), key=lambda row: row["item_id"])
-    _check_cycle({row["item_id"]: row for row in current_items})
     all_sources = _source_union(historical_sources, current_sources)
     feature_population = [
         {
@@ -735,7 +696,7 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
         if item["status"] == "retired":
             retired_ids.append(item["item_id"])
             continue
-        state = _currentness(item["evidence_refs"], active)
+        state = derive_currentness(item["evidence_refs"], active)
         if state == "stale":
             stale_ids.append(item["item_id"])
         elif state == "unknown":

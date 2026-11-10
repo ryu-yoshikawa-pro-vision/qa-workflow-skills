@@ -1923,6 +1923,118 @@ class TestConditionAnalysisContract(unittest.TestCase):
             ["readback_revision_mismatch"],
         )
 
+    def test_unknown_feature_status_keeps_condition_materialize_incomplete(self):
+        unknown_snapshot = feature_inventory(
+            features=[
+                {"id": "FEAT-001", "status": "implemented"},
+                {"id": "FEAT-002", "status": "unknown"},
+            ]
+        )
+
+        def request_for(snapshot, **extra):
+            return condition_request(
+                feature_snapshot=snapshot,
+                candidates=[
+                    condition_candidate(
+                        "covers",
+                        feature_refs=["FEAT-001"],
+                        evidence_refs=[_feature_ref_for(snapshot), spec_ref()],
+                    )
+                ],
+                **extra,
+            )
+
+        first = _materialize_condition(request_for(unknown_snapshot))
+        self.assertTrue(first["valid"])
+        self.assertEqual(first["status"], "incomplete")
+        self.assertEqual(first["analysis_status"], "incomplete")
+        self.assertEqual(first["unknown_feature_ids"], ["FEAT-002"])
+        issues = {row["code"]: row for row in first["issues"]}
+        self.assertIn("unknown_feature_status", issues)
+        self.assertFalse(issues["unknown_feature_status"]["blocking"])
+        # The unknown feature does not change the candidate artifact or its history.
+        self.assertEqual(
+            first["candidate"]["conditions"][0]["condition_id"], "COND-001"
+        )
+
+        replay = _materialize_condition(
+            condition_request(
+                feature_snapshot=unknown_snapshot,
+                candidates=[
+                    condition_candidate(
+                        "covers",
+                        action="reuse",
+                        condition_id="COND-001",
+                        feature_refs=["FEAT-001"],
+                        evidence_refs=[_feature_ref_for(unknown_snapshot), spec_ref()],
+                    )
+                ],
+                previous=first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(replay["status"], "no_change")
+        self.assertEqual(replay["analysis_status"], "incomplete")
+        self.assertEqual(replay["unknown_feature_ids"], ["FEAT-002"])
+        self.assertIn(
+            "unknown_feature_status", {row["code"] for row in replay["issues"]}
+        )
+
+        # Confirmed (and retired) features alone keep the normal path.
+        for features in (
+            None,
+            [
+                {"id": "FEAT-001", "status": "implemented"},
+                {"id": "FEAT-002", "status": "retired"},
+            ],
+        ):
+            confirmed_snapshot = feature_inventory(features=features)
+            confirmed = _materialize_condition(request_for(confirmed_snapshot))
+            self.assertEqual(confirmed["status"], "candidate_ready_unpersisted")
+            self.assertEqual(confirmed["analysis_status"], "complete")
+            self.assertEqual(confirmed["unknown_feature_ids"], [])
+            self.assertNotIn(
+                "unknown_feature_status", {row["code"] for row in confirmed["issues"]}
+            )
+
+        # A partial population stays incomplete without being reported as unknown.
+        partial = _materialize_condition(
+            request_for(feature_inventory(status="incomplete", source_status="denied"))
+        )
+        self.assertEqual(partial["analysis_status"], "incomplete")
+        self.assertEqual(partial["unknown_feature_ids"], [])
+
+        # Item, condition and crosscheck agree on the unknown-feature population.
+        item_result = _materialize_item(
+            item_request(
+                feature_snapshot=unknown_snapshot,
+                candidates=[
+                    item_candidate(
+                        "covers",
+                        feature_refs=["FEAT-001"],
+                        evidence_refs=[_feature_ref_for(unknown_snapshot)],
+                    )
+                ],
+            )
+        )
+        self.assertEqual(item_result["unknown_feature_ids"], ["FEAT-002"])
+        self.assertEqual(item_result["analysis_status"], first["analysis_status"])
+        crosscheck = run_conditions(
+            {
+                "operation": "crosscheck",
+                "item_artifact": item_result["candidate"],
+                "condition_artifact": first["candidate"],
+                "candidate_pairs": [],
+            }
+        )
+        self.assertEqual(crosscheck["status"], "incomplete")
+        self.assertEqual(
+            crosscheck["candidate_identification_coverage"]["status"],
+            "not_measurable_unknown_feature_status",
+        )
+        self.assertIsNone(crosscheck["candidate_identification_coverage"]["numerator"])
+
     def test_cli_is_self_contained_for_isolated_skill_package(self):
         item_request_json = item_request(candidates=[item_candidate("cli-item")])
         item_completed = subprocess.run(
@@ -2058,6 +2170,134 @@ class TestReviewRegressionFindings(unittest.TestCase):
                 "candidate_pairs": candidate_pairs or [],
             }
         )
+
+    def test_crosscheck_reports_stale_or_unknown_condition_in_proposed_pair(self):
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "current-item", evidence_refs=[feature_ref(), spec_ref()]
+                    )
+                ]
+            )
+        )["candidate"]
+        changed_spec = spec_ref(revision="spec-r2", content_hash="c" * 64)
+        current_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "current-item",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        evidence_refs=[feature_ref(), changed_spec],
+                    )
+                ],
+                sources=[feature_ref(), changed_spec],
+                previous=initial_item,
+                expected="storage-r1",
+                current="storage-r1",
+            )
+        )["candidate"]
+        self.assertEqual(current_item["items"][0]["currentness"], "current")
+
+        def lagging_condition(initial, sources):
+            return _materialize_condition(
+                condition_request(
+                    candidates=[],
+                    sources=sources,
+                    previous=initial,
+                    expected="storage-r1",
+                    current="storage-r1",
+                )
+            )["candidate"]
+
+        initial_condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("lagging-condition")])
+        )["candidate"]
+        stale_condition = lagging_condition(
+            initial_condition, [feature_ref(), changed_spec]
+        )
+        unknown_condition = lagging_condition(initial_condition, [feature_ref()])
+
+        def pair(status):
+            return {
+                "item_id": "ITEM-001",
+                "condition_id": "COND-001",
+                "status": status,
+                "rationale": "pair against a condition whose evidence moved",
+                "evidence_refs": [spec_ref()],
+            }
+
+        for artifact, reason, listed in (
+            (stale_condition, "condition_stale", "stale_condition_ids"),
+            (
+                unknown_condition,
+                "condition_currentness_unknown",
+                "unknown_condition_ids",
+            ),
+        ):
+            self.assertEqual(artifact["conditions"][0]["candidate_state"], "candidate")
+            for status in ("proposed", "unconfirmed"):
+                with self.subTest(reason=reason, status=status):
+                    result = self.crosscheck(current_item, artifact, [pair(status)])
+                    self.assertTrue(result["valid"])
+                    self.assertEqual(result["status"], "incomplete")
+                    # Never accepted as a confirmed pair, and no formal decision is made.
+                    self.assertEqual(result["candidate_pairs"], [])
+                    self.assertEqual(
+                        result["items_without_pair_proposal"], ["ITEM-001"]
+                    )
+                    self.assertEqual(len(result["unresolved_condition_references"]), 1)
+                    reference = result["unresolved_condition_references"][0]
+                    self.assertEqual(reference["reason"], reason)
+                    self.assertEqual(reference["condition_id"], "COND-001")
+                    self.assertEqual(reference["item_id"], "ITEM-001")
+                    self.assertEqual(reference["state"], "unconfirmed")
+                    self.assertEqual(reference["candidate_pair"]["status"], status)
+                    self.assertEqual(result["recheck_condition_ids"], ["COND-001"])
+                    self.assertEqual(result["recheck_item_ids"], ["ITEM-001"])
+                    # Other diagnostics are kept alongside the unresolved reference.
+                    self.assertEqual(result[listed], ["COND-001"])
+                    self.assertEqual(result["unresolved_item_references"], [])
+                    codes = {row["code"] for row in result["issues"]}
+                    self.assertIn("unresolved_candidate_references", codes)
+                    self.assertFalse(result["cartesian_product_generated"])
+                    self.assertIsNone(
+                        result["metrics"]["formal_applicability_decisions"]["count"]
+                    )
+
+        # A condition that is still unconfirmed/blocked must not be promoted, even when
+        # its evidence is also stale or unknown.
+        for state, unknowns, authorities in (
+            ("unconfirmed", ["owner decision pending"], None),
+            ("blocked", ["Authority evidence is unavailable"], []),
+        ):
+            initial = _materialize_condition(
+                condition_request(
+                    candidates=[
+                        condition_candidate(
+                            "not-a-candidate",
+                            state=state,
+                            unknowns=unknowns,
+                            authorities=authorities,
+                        )
+                    ]
+                )
+            )["candidate"]
+            for sources in ([feature_ref(), changed_spec], [feature_ref()]):
+                with self.subTest(state=state, sources=len(sources)):
+                    lagging = lagging_condition(initial, sources)
+                    self.assertEqual(lagging["conditions"][0]["candidate_state"], state)
+                    self.assertNotEqual(
+                        lagging["conditions"][0]["currentness"], "current"
+                    )
+                    _assert_contract_code(
+                        self,
+                        "candidate_pair_unconfirmed",
+                        lambda lagging=lagging: self.crosscheck(
+                            current_item, lagging, [pair("proposed")]
+                        ),
+                    )
 
     def test_identification_metric_uses_confirmed_active_features_in_item_and_condition(
         self,

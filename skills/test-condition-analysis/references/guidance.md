@@ -16,7 +16,7 @@ Candidate source may be incomplete. A condition without confirmed Authority must
 
 ## Advisory crosscheck
 
-`crosscheck` reads a validated item artifact and condition artifact from the same project scope and the exact same feature inventory revision. It accepts only explicit `{item_id, condition_id, status, rationale, evidence_refs}` suggestions with status `proposed`, `unconfirmed`, or `blocked`. Formal adoption, exclusion, duplicate, not-applicable, TCN, CI, and expected-result states are rejected.
+`crosscheck` reads a validated item artifact and condition artifact from the same project scope and the exact same feature inventory revision. It accepts only explicit `{item_id, condition_id, status, rationale, evidence_refs}` suggestions with status `proposed`, `unconfirmed`, or `blocked`. Formal adoption, exclusion, duplicate, not-applicable, TCN, CI, and expected-result states are rejected. A `proposed` pair for a condition that is itself `unconfirmed` or `blocked` is rejected, while a `candidate` condition whose evidence became stale or unknown is returned as an unresolved condition reference to recheck instead of stopping the crosscheck.
 
 The helper reports known feature candidates without an active item, items and conditions without pair proposals, and a candidate identification rate only when the source boundary is complete and the confirmed active feature denominator (features that are neither retired nor `unknown`) is nonzero and current; otherwise numerator, denominator, and rate are all null. This is the same rule `test-item-analysis` applies. A condition without a pair proposal is not automatically inapplicable; an item without one is not automatically missing a condition.
 

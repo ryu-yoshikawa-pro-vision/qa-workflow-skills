@@ -7,6 +7,5 @@
     "Formal applicability / adoption / disposition",
     "Formal TCN / CI / expected-result design",
     "Test execution"
-  ],
-  "required_crosscheck_label": "Advisory item-condition candidate pairs"
+  ]
 }

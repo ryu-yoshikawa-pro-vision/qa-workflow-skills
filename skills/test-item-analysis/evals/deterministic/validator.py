@@ -20,7 +20,16 @@ def _rows(table) -> list[dict[str, str]]:
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-item-analysis", eval_id)
-    tables = parse_tables(text)
+    try:
+        tables = parse_tables(text)
+    except ValueError as exc:
+        result.add(
+            "ITEM-D010",
+            False,
+            "output tables are malformed",
+            evidence=str(exc),
+        )
+        return result
     feature_table = find_table(
         tables,
         section_contains="Feature population",
@@ -128,11 +137,26 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for row in item_rows
         if _clean(row.get("Status", "")) not in STATUSES
     ]
+    actual_statuses = {
+        _clean(row.get("Item ID", "")): _clean(row.get("Status", ""))
+        for row in item_rows
+    }
+    status_mismatches = [
+        {
+            "item_id": item_id,
+            "expected": expected_status,
+            "actual": actual_statuses.get(item_id),
+        }
+        for item_id, expected_status in expected.get("expected_status", {}).items()
+        if actual_statuses.get(item_id) != expected_status
+    ]
     result.add(
         "ITEM-D004",
-        not invalid_statuses,
-        "item lifecycle status is distinct from feature status",
-        evidence=invalid_statuses or None,
+        not invalid_statuses and not status_mismatches,
+        "item lifecycle status is distinct from feature status and matches the fixture",
+        evidence={"invalid": invalid_statuses, "expected_mismatch": status_mismatches}
+        if invalid_statuses or status_mismatches
+        else None,
     )
 
     missing_required = sorted(

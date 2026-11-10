@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import tempfile
 import unittest
 from pathlib import Path
+
+from scripts.skills.evals.deterministic.markdown_parser import parse_tables
+from scripts.skills.evals.deterministic.run import grade
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -40,7 +44,103 @@ def replace_row_cell(output: str, row_prefix: str, cell_index: int, value: str) 
     raise AssertionError(f"table row not found: {row_prefix}")
 
 
+def drop_last_cell_of_first_table_row(output: str) -> str:
+    """Make the first table's first data row one column short."""
+    lines = output.splitlines()
+    for index in range(len(lines) - 2):
+        if lines[index].lstrip().startswith("|") and set(
+            lines[index + 1].replace("|", "").replace(":", "").replace(" ", "")
+        ) == {"-"}:
+            cells = lines[index + 2].rstrip().rstrip("|").rsplit("|", 1)[0]
+            lines[index + 2] = cells + "|"
+            return "\n".join(lines) + "\n"
+    raise AssertionError("no table found")
+
+
+def assertion_status(result, assertion_id: str) -> str:
+    return next(row.status for row in result.assertions if row.id == assertion_id)
+
+
 class ItemConditionOutputContractTests(unittest.TestCase):
+    def test_malformed_markdown_table_is_a_failed_evaluation_not_an_exception(self):
+        for skill, eval_id, assertion_id in (
+            ("test-item-analysis", "ITEM-OUT-001", "ITEM-D010"),
+            ("test-condition-analysis", "COND-OUT-001", "COND-D010"),
+        ):
+            with self.subTest(skill=skill):
+                validate = load_validator(skill)
+                output, expected = output_case(skill, eval_id)
+                self.assertEqual(validate(output, expected, eval_id).status, "pass")
+                broken = drop_last_cell_of_first_table_row(output)
+                with self.assertRaises(ValueError):
+                    parse_tables(broken)
+                result = validate(broken, expected, eval_id)
+                self.assertEqual(result.status, "fail")
+                self.assertEqual(assertion_status(result, assertion_id), "fail")
+                failed = next(
+                    row for row in result.assertions if row.id == assertion_id
+                )
+                self.assertIn("column count mismatch", failed.evidence)
+
+    def test_common_runner_reports_malformed_table_as_fail(self):
+        for skill, eval_id in (
+            ("test-item-analysis", "ITEM-OUT-001"),
+            ("test-condition-analysis", "COND-OUT-001"),
+        ):
+            with self.subTest(skill=skill):
+                output, _ = output_case(skill, eval_id)
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "output.md"
+                    path.write_text(
+                        drop_last_cell_of_first_table_row(output), encoding="utf-8"
+                    )
+                    graded = grade(skill, eval_id, path)
+                self.assertEqual(graded["status"], "fail")
+
+    def test_item_output_checks_expected_status_per_item(self):
+        validate = load_validator("test-item-analysis")
+        output, expected = output_case("test-item-analysis", "ITEM-OUT-001")
+        self.assertEqual(expected["expected_status"]["ITEM-002"], "planned")
+
+        # ITEM-002 drifting from planned to another *allowed* status is caught.
+        drifted = replace_row_cell(output, "| ITEM-002 | 注文CSV", 5, "implemented")
+        result = validate(drifted, expected, "ITEM-OUT-001")
+        self.assertEqual(assertion_status(result, "ITEM-D004"), "fail")
+        failed = next(row for row in result.assertions if row.id == "ITEM-D004")
+        self.assertEqual(
+            failed.evidence["expected_mismatch"],
+            [{"item_id": "ITEM-002", "expected": "planned", "actual": "implemented"}],
+        )
+        self.assertEqual(failed.evidence["invalid"], [])
+
+        # A status outside the allowed set still fails as before.
+        invalid = replace_row_cell(output, "| ITEM-002 | 注文CSV", 5, "done")
+        invalid_result = validate(invalid, expected, "ITEM-OUT-001")
+        self.assertEqual(assertion_status(invalid_result, "ITEM-D004"), "fail")
+        self.assertEqual(
+            next(
+                row for row in invalid_result.assertions if row.id == "ITEM-D004"
+            ).evidence["invalid"],
+            ["ITEM-002"],
+        )
+
+        # Items without an expected status keep the existing allowed-set contract.
+        relaxed = {**expected, "expected_status": {"ITEM-001": "implemented"}}
+        self.assertEqual(
+            assertion_status(validate(drifted, relaxed, "ITEM-OUT-001"), "ITEM-D004"),
+            "pass",
+        )
+        without = {k: v for k, v in expected.items() if k != "expected_status"}
+        self.assertEqual(
+            assertion_status(validate(drifted, without, "ITEM-OUT-001"), "ITEM-D004"),
+            "pass",
+        )
+
+        # An expected item that is missing from the output is a mismatch, not a pass.
+        missing = {**expected, "expected_status": {"ITEM-009": "planned"}}
+        missing_result = validate(output, missing, "ITEM-OUT-001")
+        self.assertEqual(assertion_status(missing_result, "ITEM-D004"), "fail")
+
     def test_item_output_fixture_passes_independent_contract(self):
         validate = load_validator("test-item-analysis")
         output, expected = output_case("test-item-analysis", "ITEM-OUT-001")

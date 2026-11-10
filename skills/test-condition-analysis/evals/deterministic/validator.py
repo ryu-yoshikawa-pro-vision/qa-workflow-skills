@@ -19,7 +19,16 @@ def _rows(table) -> list[dict[str, str]]:
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result = EvalResult("test-condition-analysis", eval_id)
-    tables = parse_tables(text)
+    try:
+        tables = parse_tables(text)
+    except ValueError as exc:
+        result.add(
+            "COND-D010",
+            False,
+            "output tables are malformed",
+            evidence=str(exc),
+        )
+        return result
     condition_table = find_table(
         tables,
         section_contains="Condition candidates",
