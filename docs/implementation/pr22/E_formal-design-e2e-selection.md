@@ -418,6 +418,12 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - Validate Agent Skills run 2165はrepository eval structure stepで`README.md`に`e2e-test-selection`がないためFAIL。Skill単体spec stepはPASS。READMEは共有A ownerのためEでは変更せず、Aへ引継ぎを継続する。
 - 上記import order修正と本Plan記録を担当branchへ次の通常commit／push対象とする。修正後HEADのActionsはpush後に別途確認し、run 858のCodex Harnessが実行中だった結果は完了と扱わない。
 
+## lint追修正とe2 commit Actions（2026-11-10）
+
+- `468eee6a9034269b8b7f8c3248dbf26b1d219a84`は通常push済みでlocal／remote一致を確認した。Actions完了後の結果：Validate Deterministic Output Evals run 2165 PASS、Validate Semantic Output Evals run 2130 PASS、Codex Harness run 860 PASS、Validate Agent Skills run 2167 FAIL、Code Quality run 860 FAIL。
+- Code Quality run 860では最初の修正で`test_e2e_selection_contract.py`のI001は解消したが、`test_coverage_analysis_traceability.py`でalias付きimportを同じ括弧内にまとめた形がRuff I001として残った。Ruffの自動修正提案に合わせ、`contract`／`drafts`／`packet`をそれぞれ独立した`from` importに変更した。local Ruff executableは未導入のため直接lintは未実施。追修正後、coverage suite 22件とE2E selection suite 26件はPASSし、対象compileall、dprint check、`git diff --check`もPASS。
+- Validate Agent Skills run 2167の失敗はREADME canonical listに`e2e-test-selection`がないこと。Skill specification validationはPASS。共有READMEはA ownerであり未変更。新しい追修正のCode Quality再判定は次のpush後に確認する。
+
 ## 進捗保存（2026-11-10）
 
 - 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。

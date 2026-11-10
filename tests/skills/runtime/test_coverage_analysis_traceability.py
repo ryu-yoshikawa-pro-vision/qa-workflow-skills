@@ -4,7 +4,11 @@ import unittest
 
 from tests.skills.runtime.test_formal_design_contract import (
     contract as formal_contract,
+)
+from tests.skills.runtime.test_formal_design_contract import (
     drafts as formal_drafts,
+)
+from tests.skills.runtime.test_formal_design_contract import (
     packet as formal_packet,
 )
 from tests.skills.runtime.test_traceability_runtime import (
