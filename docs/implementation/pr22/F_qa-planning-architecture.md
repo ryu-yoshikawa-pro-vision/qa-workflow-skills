@@ -384,3 +384,44 @@ PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidato
 - README・共通runtime登録は担当Aへ引継ぎ中。実Agent・認証済み承認・実provider・PR #22横断接続は未実施。
 - 詳細と検証証拠は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
 ```
+
+## 2026-11-10 追加レビュー3件
+
+レビュー基準HEAD `1022e6df07f3199b68f820293be0bfe6b63b138b`で、以下3件を確認・修正した。既存の公開契約は未解決要求を含むartifactを確定済みにしないこと、草案／blockedのQA目的に不足理由を残すこと、承認情報に主体・証拠を結び付けることを既に要求していた。validator側の検証不足を修正し、共有runtimeやREADMEは変更していない。
+
+### 修正
+
+1. **承認対象scopeに未解決QA要求が残る問題** — `skills/test-requirements-analysis/evals/deterministic/validator.py`の`QRA-D013`で、artifact状態が`承認済み`の場合に状態`未解決`のQA要求を確認し、要求scopeがartifact scope内ならID・scope・状態・拒否理由を証拠にしてFAILする。未決事項の担当・scope・状態・再開条件を満たしても承認条件を回避できない。既存の`QRA-D012`は未決事項の記録完全性に留め、`提案`等を一律に拒否しない。独立scopeの未解決要求はこの承認対象を一律に失効させない。
+2. **TMG承認placeholder** — `skills/test-management/evals/deterministic/validator.py`に承認欄専用の`APPROVAL_PLACEHOLDERS`と`_is_approval_value()`を追加し、`TMG-D023`の承認行検査と有効承認行検索の両方で使用する。`未設定`、`未確定`、`未確認`、`取得不能`、`N/A`等を主体・証拠として受理しない。汎用`_is_present()`と`PLACEHOLDERS`は維持し、期限・計画状態など承認以外の正当な`未設定`に影響させない。
+3. **草案／blockedのQA目的不足理由** — QRA `QRA-D001`で、目的テーブルに未確定markerがある草案／blocked行は`根拠`にplaceholderだけでない不足理由を要求する。空欄、`-`、`unknown`、`未確定`、marker単独の`stale`を拒否し、具体的説明中の`stale`や、`unknown: ...`のように理由を続けた値は受け入れる。承認済みで未確定の必須項目を拒否する条件も維持した。
+
+契約の明確化として、QRA `references/data-contract.md`／`references/guidance.md`に、scope内の未解決要求を含むartifactを承認しないことと、未確定目的の根拠欄を状態placeholderだけにしないことを明記した。TMG `references/data-contract.md`には承認主体・証拠refで拒否するplaceholderを列挙した。出力template、fixture、共有ファイル、assertion IDは変更していない。
+
+### 回帰テスト
+
+`tests/skills/evals/deterministic/test_f_planning_contracts.py`の既存33テスト関数を維持し、既存テスト内の独立した負例・正常例を拡張した。
+
+- QRA: `QAR-002`を`未解決`にし、scope・担当・状態・再開条件を満たす未決事項を追加して`QRA-D012` PASS／`QRA-D013` FAILを確認。証拠中のID・scope・状態・理由と、別scopeの未解決要求を承認対象へ混入させないことを確認。
+- TMG: 承認主体・証拠refの両方について、空欄、`-`、`—`、`unknown`／`UNKNOWN`、`未取得`、`未設定`、`未確定`、`未確認`、`取得不能`、`N/A`／`n/a`、`失効`、`未承認`、`不要`を`TMG-D023`が拒否することを確認。正常な承認、草案／blocked、および正常fixtureの`未設定 / 対応中`期限値を維持。
+- QA目的: `QRA-OUT-002`の根拠付きblocked正常系、5項目をすべて`未取得`にしたケース、根拠欠落・placeholderのみのケース、説明文中の`stale`、`unknown: ...`に不足理由が続くケースを確認。`QRA-OUT-001`の承認済み正常系と`提案`状態も維持。
+
+### ローカル検証（基準HEAD `1022e6d`上の作業差分）
+
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v` — PASS、33/33。
+- deterministic output dataset契約検査（`.github/workflows/deterministic-output-evals.yml`のPython検査と同一条件）— PASS、25 Skill／52 case。
+- 既存deterministic runnerによる`QRA-OUT-001/002`、`TAD-OUT-001/002`、`TMG-OUT-001/002` — PASS、6/6 reference fixture。
+- `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS、12。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — 323件中319 PASS、4 FAIL。失敗は共有WCAG／qa-workflowのSQLite providerによるProject Context state-root取得拒否で、4件とも`blocked`が返るローカルsandbox制約。担当F validatorのテストではない。Ubuntu CIでの再確認待ち。
+- `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — 496件中477 PASS、10 FAIL、9 ERROR。失敗・例外は共有runtimeのSQLite workflow-history／安全readback制約およびPython 3.12.3のJSON深さエラー文言差異。担当Fはruntimeコードを変更していない。Windows既知の5 FAIL／14 ERROR／6 SKIPも別途未解消。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS、26 Skill／168 case。semantic runtime tests 27、repository semantic tests 13、trigger tests 1 — すべてPASS。
+- QRA、TMG、回帰テストの`compileall` — すべてPASS。
+- Ruff 0.16.8 — PASS。`format_tracked.py check` — PASS、221 tracked files。公式`skills-ref`固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`による3 Skill検証 — すべてPASS。`git diff --check` — PASS。
+- GitHub Actionsは変更をpushする前のため、この差分に対する新しい実行結果は未取得。前のHEAD `1022e6d`のActions結果と混同せず、push後に5 workflowを確認する。
+
+### 受入・引継ぎ
+
+- 今回の3件の担当Fコード修正と回帰テスト — **ローカル検証PASS**。scope判定、placeholder専用判定、根拠判定はいずれも指定scope内で実施し、他状態の拒否条件を広げていない。
+- 担当Fの全体局所受入 — **保留**。全Repository deterministic／runtime suiteにローカル環境依存のFAIL／ERRORがあり、変更後HEADのGitHub Actionsは未確認。新HEADのdeterministic／runtime CIがPASSするか再確認する。
+- README、`CANONICAL_SKILLS`、owner verifier registry、`RUNTIME_V2_SKILL_ROOTS`、qa-workflow routingは共有owner／PR #22の作業として維持。担当Fでは変更しない。
+- 実Agent・semantic JudgeのAgent出力評価、実provider CAS／履歴／readback、認証済み承認、保存失敗後復旧、E／Jの実成果物による横断接続は未実施。provider・認証主体の選定と接続、またはPR #22統合後の実成果物が再開条件。
+- PR #28はDraftのまま。本文に「実装コードの追加と担当内の実受入は未実施」と残っているが、現在の実態に合わない。本文はGitHub上で変更せず、push後のCI結果を含む更新案を最終報告に示す。

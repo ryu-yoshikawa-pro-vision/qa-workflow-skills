@@ -29,6 +29,6 @@ Project riskとProduct Riskは別ID・別owner・別評価です。project risk 
 
 ## Approval・保存・履歴
 
-計画の承認は認証されたauthorityが対象scope・artifact ref・revisionを承認した記録と一致する必要があります。revision変更時は旧承認が失効します。静的validatorは形式の一致だけを検証し、承認元の真正性を証明しません。
+計画の承認は認証されたauthorityが対象scope・artifact ref・revisionを承認した記録と一致する必要があります。承認主体・roleと承認証拠refには有効な値を記録し、空欄、`-`、`unknown`、`未取得`、`未設定`、`未確定`、`未確認`、`取得不能`、`N/A`、`失効`、`未承認`、`不要`等のplaceholderを証拠として扱いません。revision変更時は旧承認が失効します。静的validatorは形式の一致だけを検証し、承認元の真正性を証明しません。
 
 実保存先が未選定・未認証なら書込みをblockedにします。Aのworkflow claim、fixture、Markdown出力だけをnative CAS・revision履歴・保存後readbackとみなしません。保存後に応答が失われた場合はsource ownerが実保存状態を照合してから再開します。

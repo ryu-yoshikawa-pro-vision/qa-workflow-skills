@@ -152,21 +152,31 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 for field in PURPOSE_FIELDS
                 if not _has_content(row.get(field, ""))
             ]
-            unresolved_fields = (
-                [
-                    field
-                    for field in PURPOSE_FIELDS
-                    if _contains_unresolved_marker(row.get(field, ""))
-                ]
-                if metadata.get("状態") == "承認済み"
-                else []
+            unresolved_fields = [
+                field
+                for field in PURPOSE_FIELDS
+                if _contains_unresolved_marker(row.get(field, ""))
+            ]
+            unresolved_reason = clean(row.get("根拠", ""))
+            unresolved_reason_missing = bool(unresolved_fields) and (
+                not _has_value(unresolved_reason)
+                or unresolved_reason.casefold()
+                in {marker.casefold() for marker in UNRESOLVED_PURPOSE_MARKERS}
             )
-            if missing_fields or unresolved_fields:
+            approved_with_unresolved_fields = metadata.get(
+                "状態"
+            ) == "承認済み" and bool(unresolved_fields)
+            if (
+                missing_fields
+                or approved_with_unresolved_fields
+                or unresolved_reason_missing
+            ):
                 purpose_errors.append(
                     {
                         "row": index,
                         "missing_fields": missing_fields,
                         "unresolved_fields": unresolved_fields,
+                        "unresolved_reason_missing": unresolved_reason_missing,
                     }
                 )
     result.add(
@@ -426,6 +436,21 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         approval_mismatch.append(
             {"reason": "approved artifact without matching approval evidence"}
         )
+    unresolved_approved_requirements = []
+    if metadata.get("状態") == "承認済み":
+        for row in requirements:
+            requirement_scope = clean(row.get("scope", ""))
+            if clean(row.get("状態", "")) == "未解決" and _scope_covers(
+                metadata.get("scope", ""), requirement_scope
+            ):
+                unresolved_approved_requirements.append(
+                    {
+                        "id": clean(row.get("QA要求ID", "")),
+                        "scope": requirement_scope,
+                        "state": clean(row.get("状態", "")),
+                        "reason": "unresolved QA requirement remains within approved artifact scope",
+                    }
+                )
     finalized_without_approval = [
         {"id": row.get("QA要求ID"), "state": row.get("状態")}
         for row in requirements
@@ -462,6 +487,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 )
     approval_mismatch.extend(finalized_without_approval)
     approval_mismatch.extend(stale_dependencies)
+    approval_mismatch.extend(unresolved_approved_requirements)
     result.add(
         "QRA-D013",
         not approval_mismatch,

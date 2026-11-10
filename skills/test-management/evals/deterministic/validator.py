@@ -28,6 +28,25 @@ RISK_STATES = {"対応中", "blocked", "解決済み", "受容済み", "未判�
 ACTION_STATES = {"対応中", "blocked", "完了", "対応不要", "未判定", "unknown"}
 FINAL_DISPOSITIONS = {"解決済み", "受容済み"}
 PLACEHOLDERS = {"", "-", "—", "unknown", "未取得"}
+APPROVAL_PLACEHOLDERS = {
+    placeholder.casefold()
+    for placeholder in PLACEHOLDERS
+    | {
+        "n/a",
+        "na",
+        "未設定",
+        "未確定",
+        "未確認",
+        "取得不能",
+        "失効",
+        "expired",
+        "未承認",
+        "unapproved",
+        "不要",
+        "not required",
+        "not retrieved",
+    }
+}
 ACTUAL_IDENTITY_FIELDS = (
     "actual source owner",
     "actual source_ref",
@@ -116,6 +135,10 @@ def _integer(value: str) -> int | None:
 def _is_present(value: str) -> bool:
     normalized = clean(value).casefold()
     return normalized not in {placeholder.casefold() for placeholder in PLACEHOLDERS}
+
+
+def _is_approval_value(value: str) -> bool:
+    return clean(value).casefold() not in APPROVAL_PLACEHOLDERS
 
 
 def _scope_includes(scope_value: str, target_scope: str) -> bool:
@@ -1268,8 +1291,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if clean(row.get("artifact_ref", "")) != metadata.get("artifact_ref")
         or clean(row.get("revision", "")) != metadata.get("revision")
         or clean(row.get("対象scope", "")) != metadata.get("scope")
-        or not _is_present(row.get("承認主体・role", ""))
-        or not _is_present(row.get("承認証拠ref", ""))
+        or not _is_approval_value(row.get("承認主体・role", ""))
+        or not _is_approval_value(row.get("承認証拠ref", ""))
         or metadata.get("状態") not in {"承認済み", "進行中", "完了"}
     ]
     invalid_approval_states = [
@@ -1281,8 +1304,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         clean(row.get("artifact_ref", "")) == metadata.get("artifact_ref")
         and clean(row.get("revision", "")) == metadata.get("revision")
         and clean(row.get("対象scope", "")) == metadata.get("scope")
-        and _is_present(row.get("承認主体・role", ""))
-        and _is_present(row.get("承認証拠ref", ""))
+        and _is_approval_value(row.get("承認主体・role", ""))
+        and _is_approval_value(row.get("承認証拠ref", ""))
         for row in approvals
     ):
         approval_errors.append(
