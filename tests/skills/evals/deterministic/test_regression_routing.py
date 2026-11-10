@@ -1444,7 +1444,9 @@ class InvalidInputTests(unittest.TestCase):
                 resolved = regression.resolve_auxiliary_obligations(
                     run, user_explicit_refs=["A"], policy_refs=[]
                 )
-                self.assertIn(resolved["status"], {"ready", "blocked"})
+                # 不正な宣言を除外して`ready`にしない（例外にもしない）。
+                self.assertEqual(resolved["status"], "blocked")
+                self.assertIsNone(resolved["run"])
 
     def test_project_activity_reports_invalid_input_as_unresolved(self):
         for bad in self.BAD_REFS[:4]:
@@ -2533,6 +2535,257 @@ class RunArtifactTypeVerificationTests(unittest.TestCase):
             "route_results": [],
         }
         self.assertEqual(check_with_run(legacy, "REG-D018"), "pass")
+
+
+class LegacyAuxiliaryResolutionInputTests(unittest.TestCase):
+    """不正な旧Runの補助宣言を黙って除外せず、再解決を`blocked`にする。"""
+
+    DETAILS = {
+        "A": {"executor_owner": "testware-execution", "implementation_revision": REV}
+    }
+
+    def legacy(self, **changes):
+        run = {
+            "required_routes": [tc_route("TC-1", "M-1", "manual")],
+            "auxiliary_routes": [{"testware_ref": "A", "execution_ref": "E-A"}],
+            "auxiliary_testware_refs": ["A"],
+            "auxiliary_testware_count": 1,
+        }
+        for key, value in changes.items():
+            if value is ...:
+                del run[key]
+            else:
+                run[key] = value
+        return run
+
+    def resolve(self, run, **kwargs):
+        kwargs.setdefault("user_explicit_refs", ["A"])
+        kwargs.setdefault("policy_refs", [])
+        kwargs.setdefault("testware_details", self.DETAILS)
+        return regression.resolve_auxiliary_obligations(run, **kwargs)
+
+    def test_valid_legacy_run_still_resolves_to_a_new_revision(self):
+        run = self.legacy()
+        snapshot = copy.deepcopy(run)
+        result = self.resolve(run)
+        self.assertEqual(result["status"], "ready")
+        self.assertTrue(result["new_revision_required"])
+        self.assertEqual(result["run"]["auxiliary_testware_refs"], ["A"])
+        self.assertEqual(run, snapshot)
+
+    def test_omitted_fields_are_not_confused_with_invalid_values(self):
+        for field in ("auxiliary_routes", "auxiliary_testware_refs"):
+            with self.subTest(omitted=field):
+                self.assertEqual(
+                    self.resolve(self.legacy(**{field: ...}))["status"], "ready"
+                )
+
+    def test_invalid_auxiliary_routes_block_without_a_new_run(self):
+        valid = {"testware_ref": "A", "execution_ref": "E-A"}
+        cases = {
+            "non_dict_element": [5],
+            "mixed_valid_and_invalid": [valid, 5],
+            "none_element": [valid, None],
+            "dict_value": {},
+            "string_value": "A",
+            "none_value": None,
+            "missing_ref": [{"execution_ref": "E-A"}],
+            "list_ref": [{"testware_ref": ["A"]}],
+            "empty_ref": [{"testware_ref": ""}],
+            "duplicate_ref": [valid, dict(valid)],
+        }
+        for label, value in cases.items():
+            with self.subTest(case=label):
+                run = self.legacy(auxiliary_routes=value)
+                snapshot = copy.deepcopy(run)
+                result = self.resolve(run)
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], "auxiliary_declaration_invalid")
+                self.assertTrue(result["invalid_inputs"])
+                self.assertIsNone(result["run"])
+                self.assertTrue(result["new_revision_required"])
+                self.assertEqual(run, snapshot)
+
+    def test_invalid_auxiliary_refs_block_without_a_new_run(self):
+        cases = {
+            "string_value": "A",
+            "none_value": None,
+            "dict_value": {"A": 1},
+            "mixed_types": ["A", ["B"], {"x": 1}, None],
+            "empty_string": ["A", ""],
+            "whitespace": ["A", "  "],
+            "duplicate": ["A", "A"],
+        }
+        for label, value in cases.items():
+            with self.subTest(case=label):
+                result = self.resolve(self.legacy(auxiliary_testware_refs=value))
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], "auxiliary_declaration_invalid")
+                self.assertIsNone(result["run"])
+
+    def test_non_object_run_blocks_without_raising(self):
+        for bad in (None, [], "run", 5):
+            with self.subTest(run=bad):
+                result = self.resolve(bad)
+                self.assertEqual(result["status"], "blocked")
+                self.assertIsNone(result["run"])
+
+    def test_unresolved_obligation_and_missing_details_stay_blocked(self):
+        legacy = self.legacy(
+            auxiliary_routes=[
+                {"testware_ref": "A", "execution_ref": "E-A"},
+                {"testware_ref": "B", "execution_ref": "E-B"},
+            ],
+            auxiliary_testware_refs=["A", "B"],
+        )
+        unresolved = self.resolve(legacy)
+        self.assertEqual(unresolved["status"], "blocked")
+        self.assertEqual(unresolved["reason"], "auxiliary_obligation_unresolved")
+        self.assertEqual(unresolved["unresolved_refs"], ["B"])
+        no_detail = self.resolve(self.legacy(), testware_details={})
+        self.assertEqual(no_detail["status"], "blocked")
+        self.assertEqual(no_detail["missing_detail_refs"], ["A"])
+
+
+class V2CompletionRequiredTests(unittest.TestCase):
+    """v2 Runの`completion_required`は厳密なboolだけを受理し、全検証入口で同じ結果にする。"""
+
+    SOURCE = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+
+    def run_with(self, **changes):
+        entry = aux("A", "E-A")
+        for key, value in changes.items():
+            if value is ...:
+                del entry[key]
+            else:
+                entry[key] = value
+        return mk_run([tc_route("TC-1", "M-1", "manual")], [entry])
+
+    def test_valid_obligations_pass_every_entry_point(self):
+        for label, run in (
+            ("required", self.run_with()),
+            (
+                "reference_only",
+                self.run_with(
+                    completion_required=False, selection_basis="reference_only"
+                ),
+            ),
+        ):
+            with self.subTest(case=label):
+                doc = activity_doc(run, self.SOURCE)
+                self.assertEqual(check_with_run(run, "REG-D009"), "pass")
+                self.assertEqual(
+                    verify_all(run, doc),
+                    {"d011": "pass", "d018": "pass", "runtime": True},
+                )
+
+    def test_missing_or_non_bool_obligation_is_rejected_everywhere(self):
+        for label, value in (
+            ("none", None),
+            ("omitted", ...),
+            ("zero", 0),
+            ("one", 1),
+            ("string_true", "true"),
+            ("string_false", "false"),
+            ("list", []),
+            ("dict", {}),
+        ):
+            with self.subTest(case=label):
+                run = self.run_with(completion_required=value)
+                self.assertEqual(check_with_run(run, "REG-D009"), "fail")
+                projected = activity_doc(run, self.SOURCE)
+                self.assertNotEqual(projected["activity_state"], "完了")
+                # 不正なRunから投影したActivityも、同じRunとの照合で検証済みにしない。
+                result = regression.verify_activity_against_run(run, projected)
+                self.assertFalse(result["valid"])
+                self.assertEqual(result["mismatches"], ["run_contract_invalid"])
+                self.assertEqual(check_with_run(projected, "REG-D018", run), "fail")
+                good_doc = activity_doc(self.run_with(), self.SOURCE)
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, good_doc)["valid"]
+                )
+                self.assertEqual(check_with_run(good_doc, "REG-D018", run), "fail")
+
+    def test_run_contract_issue_distinguishes_missing_from_invalid(self):
+        for value, issue in (
+            (None, "missing_completion_required:A"),
+            ("true", "invalid_completion_required:A"),
+        ):
+            with self.subTest(value=value):
+                issues = regression.project_activity(
+                    self.run_with(completion_required=value), self.SOURCE
+                )["unresolved"]
+                self.assertIn(issue, issues)
+
+    def test_legacy_run_keeps_unknown_obligation_instead_of_contract_violation(self):
+        legacy = {
+            "required_routes": [tc_route("TC-1", "M-1", "manual")],
+            "auxiliary_routes": [{"testware_ref": "A", "execution_ref": "E-A"}],
+        }
+        checked = regression.validate_auxiliary_routes(legacy["auxiliary_routes"])
+        self.assertTrue(checked["valid"])
+        self.assertEqual(checked["obligation_unknown_refs"], ["A"])
+        doc = regression.project_activity(legacy, self.SOURCE)
+        self.assertNotEqual(doc["activity_state"], "完了")
+        self.assertIn("auxiliary_obligation_unknown:A", doc["unresolved"])
+        self.assertFalse(
+            any(u.startswith("missing_completion_required") for u in doc["unresolved"])
+        )
+        # v2の検証入口を指定したときだけ、同じentryが契約違反になる。
+        strict = regression.validate_auxiliary_routes(
+            legacy["auxiliary_routes"], contract_v2=True
+        )
+        self.assertFalse(strict["valid"])
+        self.assertEqual(strict["obligation_unknown_refs"], [])
+
+
+class ActivityArtifactTypeVerificationTests(unittest.TestCase):
+    """保存済みActivityとして検証する入口は、`artifact_type: "activity"`だけを受け入れる。"""
+
+    def setUp(self):
+        self.run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        self.source = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+        self.doc = activity_doc(self.run, self.source)
+
+    def test_only_activity_artifact_type_is_accepted(self):
+        self.assertEqual(
+            regression.verify_activity_against_run(self.run, self.doc),
+            {"valid": True, "mismatches": []},
+        )
+        for value in ("run", "baseline", "", "Activity", None, [], {}, 5, True, ...):
+            with self.subTest(artifact_type=value):
+                doc = copy.deepcopy(self.doc)
+                if value is ...:
+                    del doc["artifact_type"]
+                else:
+                    doc["artifact_type"] = value
+                result = regression.verify_activity_against_run(self.run, doc)
+                self.assertEqual(
+                    result,
+                    {"valid": False, "mismatches": ["activity_artifact_required"]},
+                )
+
+    def test_other_checks_and_run_type_validation_are_kept(self):
+        forged = {**self.doc, "activity_state": "実行中"}
+        self.assertFalse(
+            regression.verify_activity_against_run(self.run, forged)["valid"]
+        )
+        bad_run = {**self.run, "artifact_type": "activity"}
+        self.assertEqual(
+            regression.verify_activity_against_run(bad_run, self.doc)["mismatches"],
+            ["run_contract_invalid"],
+        )
+        for bad in (None, [], "activity", 5):
+            with self.subTest(activity=bad):
+                self.assertEqual(
+                    regression.verify_activity_against_run(self.run, bad),
+                    {"valid": False, "mismatches": ["run_or_activity_not_object"]},
+                )
+
+    def test_project_activity_return_contract_is_unchanged(self):
+        projected = regression.project_activity(self.run, self.source)
+        self.assertNotIn("artifact_type", projected)
+        self.assertEqual(projected["activity_state"], "完了")
 
 
 class SemanticCandidateShapeTests(unittest.TestCase):

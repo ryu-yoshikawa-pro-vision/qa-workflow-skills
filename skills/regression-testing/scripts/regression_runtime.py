@@ -807,9 +807,17 @@ def validate_required_routes(routes: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def validate_auxiliary_routes(
-    routes: list[dict[str, Any]], *, tc_testware_refs: list[str] | None = None
+    routes: list[dict[str, Any]],
+    *,
+    tc_testware_refs: list[str] | None = None,
+    contract_v2: bool = False,
 ) -> dict[str, Any]:
-    """Validate Run `auxiliary_routes`; legacy entries are reported as unknown."""
+    """Validate Run `auxiliary_routes`; legacy entries are reported as unknown.
+
+    `contract_v2=True`は`route_contract_version: "2"`のRunを検証する入口の指定で、
+    `completion_required`の欠落・`None`を義務不明ではなく契約違反として報告する。
+    既定（旧形式・selection-only）は従来どおり義務不明（`obligation_unknown_refs`）にする。
+    """
     if not isinstance(routes, list):
         return {
             "valid": False,
@@ -840,7 +848,10 @@ def validate_auxiliary_routes(
             issues.append(f"invalid_execution_ref:{ref}")
         required = entry.get("completion_required")
         if required is None:
-            unknown.append(ref)
+            if contract_v2:
+                issues.append(f"missing_completion_required:{ref}")
+            else:
+                unknown.append(ref)
             continue
         if type(required) is not bool:
             issues.append(f"invalid_completion_required:{ref}")
@@ -861,6 +872,47 @@ def validate_auxiliary_routes(
     }
 
 
+def _auxiliary_declaration_issues(run: dict[str, Any]) -> list[str]:
+    """Runが宣言した補助routeと参照一覧の構造不正を返す（宣言が無ければ空）。
+
+    不正な要素を除外して再解決を続けると、宣言された補助が新revisionから黙って
+    消えるため、`resolve_auxiliary_obligations()`はこの結果が空でない限り進めない。
+    フィールド未指定（旧Runの省略）と、不正な値を明示した状態は区別する。
+    """
+    issues: list[str] = []
+    if "auxiliary_routes" in run:
+        entries = run["auxiliary_routes"]
+        if not isinstance(entries, list):
+            issues.append("auxiliary_routes_not_list")
+        else:
+            seen: set[str] = set()
+            for index, entry in enumerate(entries):
+                if not isinstance(entry, dict):
+                    issues.append(f"invalid_auxiliary_route:{index}")
+                    continue
+                ref = entry.get("testware_ref")
+                if not _text(ref):
+                    issues.append(f"missing_auxiliary_testware_ref:{index}")
+                elif ref in seen:
+                    issues.append(f"duplicate_auxiliary_route:{ref}")
+                else:
+                    seen.add(ref)
+    if "auxiliary_testware_refs" in run:
+        refs = run["auxiliary_testware_refs"]
+        if not isinstance(refs, list):
+            issues.append("auxiliary_testware_refs_not_list")
+        else:
+            listed: set[str] = set()
+            for index, ref in enumerate(refs):
+                if not _text(ref):
+                    issues.append(f"invalid_auxiliary_testware_ref:{index}")
+                elif ref in listed:
+                    issues.append(f"duplicate_auxiliary_testware_ref:{ref}")
+                else:
+                    listed.add(ref)
+    return issues
+
+
 def resolve_auxiliary_obligations(
     run: dict[str, Any],
     *,
@@ -873,21 +925,39 @@ def resolve_auxiliary_obligations(
 
     入力のRunは変更しない。現在の利用者指示・policyで根拠を解決できない補助は
     `blocked`のまま残し、完了済みActivityを書き換えず新revisionで復旧する。
+    補助routeや参照一覧が不正な型・要素を含むRunは、正常な要素だけを拾って続けず
+    `blocked`（`reason: "auxiliary_declaration_invalid"`、`invalid_inputs`に理由）にする。
     """
+    if not isinstance(run, dict):
+        return {
+            "status": "blocked",
+            "reason": "auxiliary_declaration_invalid",
+            "invalid_inputs": ["run_not_object"],
+            "unresolved_refs": [],
+            "missing_detail_refs": [],
+            "run": None,
+            "new_revision_required": True,
+        }
+    invalid_inputs = _auxiliary_declaration_issues(run)
+    if invalid_inputs:
+        return {
+            "status": "blocked",
+            "reason": "auxiliary_declaration_invalid",
+            "invalid_inputs": invalid_inputs,
+            "unresolved_refs": [],
+            "missing_detail_refs": [],
+            "run": None,
+            "new_revision_required": True,
+        }
     user_explicit = {ref for ref in _list_of(user_explicit_refs) if _text(ref)}
     policy = {ref for ref in _list_of(policy_refs) if _text(ref)}
     reference_only = {ref for ref in _list_of(reference_only_refs) if _text(ref)}
     details = testware_details if isinstance(testware_details, dict) else {}
-    entries = [
-        dict(entry)
-        for entry in _list_of(run.get("auxiliary_routes"))
-        if isinstance(entry, dict)
-    ]
-    known = {e.get("testware_ref") for e in entries if _text(e.get("testware_ref"))}
-    for ref in _list_of(run.get("auxiliary_testware_refs")):
-        if not _text(ref):
-            entries.append({"testware_ref": None})
-        elif ref not in known:
+    # 構造は上で検証済みなので、ここでは宣言された全entryをそのまま使う。
+    entries = [dict(entry) for entry in run.get("auxiliary_routes", [])]
+    known = {e.get("testware_ref") for e in entries}
+    for ref in run.get("auxiliary_testware_refs", []):
+        if ref not in known:
             entries.append({"testware_ref": ref})
     resolved: list[dict[str, Any]] = []
     unresolved: list[str] = []
@@ -995,7 +1065,11 @@ def _run_contract_issues(run: Any) -> list[str]:
         if isinstance(route, dict) and route.get("route_type") == "testware"
     ]
     entries = run.get("auxiliary_routes", [])
-    issues += validate_auxiliary_routes(entries, tc_testware_refs=tc_testware)["issues"]
+    issues += validate_auxiliary_routes(
+        entries,
+        tc_testware_refs=tc_testware,
+        contract_v2=run.get("route_contract_version") == ROUTE_CONTRACT_VERSION,
+    )["issues"]
     refs = run.get("auxiliary_testware_refs", [])
     if not isinstance(refs, list):
         issues.append("auxiliary_testware_refs_not_list")
@@ -1343,6 +1417,10 @@ def verify_activity_against_run(
     """
     if not isinstance(run, dict) or not isinstance(activity, dict):
         return {"valid": False, "mismatches": ["run_or_activity_not_object"]}
+    # 保存済みActivityとして検証する入口なので、種別が`activity`以外の成果物は受け入れない。
+    # （`project_activity()`の戻り値は投影helperであり、`artifact_type`を持たせない。）
+    if activity.get("artifact_type") != "activity":
+        return {"valid": False, "mismatches": ["activity_artifact_required"]}
     # 不正なRunを再投影して一致しただけでは、検証済みの実施義務として扱わない。
     run_issues = _run_contract_issues(run)
     # 保存済みRunの代わりに、Activity・Baseline等のRun以外のartifactを受け入れない。

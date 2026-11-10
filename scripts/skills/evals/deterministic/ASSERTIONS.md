@@ -328,7 +328,7 @@
 - `REG-D006` full Runにcompleteかつcurrentなbaselineを要求
 - `REG-D007` selected RunをSuite memberのsubsetとしSuite完了と区別
 - `REG-D008` required routeをmanual・concrete E2E testware ref・実行owner / 実装revision / 選択条件付き非E2E testwareで表現し、未知のroute種別・識別子欠落・不正な`execution_ref`・重複routeを拒否する
-- `REG-D009` TCなし補助testwareとTC countの分離、補助entryの実施義務（`completion_required`・選定根拠・実行owner・実装revision。不正型は例外にせず失敗）、`auxiliary_testware_count`の型・件数照合、`auxiliary_testware_refs`の省略（v2のみ可）と空配列・不正型の区別、旧形式の区別
+- `REG-D009` TCなし補助testwareとTC countの分離、補助entryの実施義務（`completion_required`・選定根拠・実行owner・実装revision。不正型は例外にせず失敗し、v2では`completion_required`の欠落・`None`も失敗）、`auxiliary_testware_count`の型・件数照合、`auxiliary_testware_refs`の省略（v2のみ可）と空配列・不正型の区別、旧形式の区別
 - `REG-D010` source actual start / resultを投影し、全required route開始後にlogical TCをexecuted化
 - `REG-D011` TC routeと実施義務のある補助routeについて、source由来の実開始・result確定・raw結果投影・cleanup・義務不明なしを独立再計算し、満たさない場合にActivityを完了とせず、申告された`activity_state`をsourceから再計算した状態と照合する（旧Activityは従来規則）
 - `REG-D012` completed Activityのimmutable性
