@@ -430,6 +430,12 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - この8ファイルに対する`ruff format --check`と`ruff check`はPASS。coverage suite 22件、E2E selection suite 26件、compileall、dprint check、`git diff --check`もPASS。新しい整形差分とこのPlan記録を次のcommit／通常pushに含め、Code Qualityを再確認する。
 - e3 ActionsはValidate Deterministic Output Evals run 2166 PASS、Validate Semantic Output Evals run 2131 PASS、Code Quality run 861 FAIL（上記format）、Validate Agent Skills run 2168 FAIL（READMEの新Skill登録漏れ、A owner）。Codex Harness run 861は最後の確認時点で実行中であり、PASS扱いしない。
 
+## Ruff整形commitのpush結果（2026-11-10）
+
+- Ruff 0.16.8で整形した8ファイルとこのPlan追記をcommit `ad89a52d5b962ecbc2d77788f00ef68cff5d3b59`（`style: format PR #27 implementation changes`）として通常pushした。`git status -sb`はclean、`git ls-remote --heads origin feat/pr22-e-formal-design-e2e-selection`も同じSHAを返し、local／remote一致を確認した。
+- ad89 HEADのActions：Code Quality run 863 PASS、Validate Semantic Output Evals run 2133 PASS、Validate Agent Skills run 2170 FAIL、Validate Deterministic Output Evals run 2168 実行中、Codex Harness run 863 実行中（最後の確認時点）。Code Quality passはCI pinned RuffによるI001／format検査を含む。Validate Agent Skillsは`Validate repository eval structure`で`README.md`に`e2e-test-selection`がないため失敗、owner A。残る実行中workflowは完了扱いしない。
+- PR #27はopen／Draftを維持し、PR本文は変更していない。担当内変更は保存済みだが、A ownerのREADME登録、共有ASSERTIONS／provider連携、実成果物を用いるPR #22横断検証、実Agent／Judge評価は未完了。
+
 ## 進捗保存（2026-11-10）
 
 - 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。
