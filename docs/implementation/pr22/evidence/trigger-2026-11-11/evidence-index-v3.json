@@ -1,0 +1,26 @@
+{
+  "version": "v3",
+  "source_head": "d63b5588956b767c4ffac300c34ab0f30798c70a",
+  "archive": "trigger-evidence-v3.tar.gz",
+  "sha256": "2af2def2484a1c1a32c0ffb672ccaeae350a65c8775ca33d127abcb63970d21a",
+  "bytes": 461464,
+  "trigger_checkpoint": {
+    "skill": "e2e-test-selection",
+    "split": "train",
+    "query_index": 0,
+    "attempts": 3,
+    "completed": 3,
+    "triggered": 3,
+    "rate": 1.0,
+    "status": "partial-query-pass"
+  },
+  "dataset_sha256": "1a3d7e7236d2c865bbe6cf2477b78fd4bbcdbfc12f6cd84318fa54fdf945ee01",
+  "codex_cli": "0.167.0",
+  "full_repository_snapshot": true,
+  "current_skills": 24,
+  "skill_package_files": 1051,
+  "secondary_skill_observation": {
+    "qa-workflow": 1
+  },
+  "credential_scan": "0 credential-shaped matches in archived files"
+}
