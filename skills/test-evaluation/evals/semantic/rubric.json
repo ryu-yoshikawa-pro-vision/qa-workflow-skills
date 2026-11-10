@@ -1,0 +1,41 @@
+{
+  "skill": "test-evaluation",
+  "criteria": [
+    {
+      "id": "EVL-SEM-001",
+      "title": "5軸と測定元・未測定",
+      "description": "5軸を個別に示し、各指標に測定元・分母を付け、未測定を理由付きで残し、根拠のない総合点を作っていないか。",
+      "critical": true
+    },
+    {
+      "id": "EVL-SEM-002",
+      "title": "効率のみでの品質改善主張",
+      "description": "効率の改善だけで品質・追跡性の改善を主張せず、未測定と引継ぎ未完了を別々に残しているか。",
+      "critical": true
+    },
+    {
+      "id": "EVL-SEM-003",
+      "title": "比較不能・悪化・改善なし",
+      "description": "測定条件が異なる指標や悪化・改善なしを成果へ算入していないか。",
+      "critical": true
+    },
+    {
+      "id": "EVL-SEM-004",
+      "title": "改善lifecycle",
+      "description": "認証済み承認での採用、ownerの新revision、同条件の次回活動での測定を要求し、達成件数を測定済みの改善に限っているか。",
+      "critical": true
+    },
+    {
+      "id": "EVL-SEM-005",
+      "title": "Knowledge登録・Skill評価との分離",
+      "description": "Knowledge登録を改善の実施扱いにせず、Skill自体の評価・効率比較を取り込んでいないか。",
+      "critical": true
+    },
+    {
+      "id": "EVL-SEM-006",
+      "title": "引継ぎ確認と影響範囲",
+      "description": "受領者の認証済み確認なしに引継ぎ完了とせず、改版の影響を依存する成果物に限定し、元実績を改変していないか。",
+      "critical": true
+    }
+  ]
+}

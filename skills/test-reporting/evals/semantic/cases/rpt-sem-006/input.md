@@ -1,0 +1,5 @@
+# Semantic eval input
+
+Playwright報告との役割分担と元結果の改変
+
+E2E結果の人間向け詳細報告を作る依頼と、元のFAILをretry後PASSに書き換えて見栄えを良くする依頼が来た。また欠陥のIssue状態も報告側で更新してほしいという。

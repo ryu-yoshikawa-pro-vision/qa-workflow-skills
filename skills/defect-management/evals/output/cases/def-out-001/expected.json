@@ -1,0 +1,4 @@
+{
+  "artifact_type": "candidate_assessment",
+  "expected_candidate_state": "needs_owner_analysis"
+}

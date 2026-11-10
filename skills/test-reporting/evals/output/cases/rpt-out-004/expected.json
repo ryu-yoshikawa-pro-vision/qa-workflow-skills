@@ -1,0 +1,10 @@
+{
+  "expected_complete": false,
+  "expected_exit_judgement": "undetermined",
+  "expected_planned_totals": {
+    "review": 5
+  },
+  "expected_incomplete_sources": [
+    "review"
+  ]
+}
