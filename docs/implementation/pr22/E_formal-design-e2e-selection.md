@@ -551,4 +551,12 @@ PR #27レビュー時点の`30289c915bcc64e6cdc4479c34189ab2c7740eee` Actionsは
 - E担当の2件は再現・局所修正・回帰検証済み。変更後のprovider保存／承認／CAS／readback、source変更時の別session stale propagation、実Agent／実Judge、PR #22横断実成果物確認は未実施。
 - A担当／PR #22統合owner：共有README・ASSERTIONSとcanonical Skill routingの更新、正式設計／E2E artifact registrationおよびprovider保存・承認・CAS・readbackの公開契約を担当する。加えて既存`test_ci_handoff` nesting errorとSQLite historyの9 failures／9 errorsを、安全なreadback境界を維持した状態で調査する。
 - PR #22では、実TCN draft／Machine Entity／Authorityを用いてpair依存を照合し、正式設計recordとcoverage再計算が一致すること、旧recordとpartial rerunがunresolvedを保つこと、source変更時のstale伝播を別sessionまで検証する。E2E過去snapshotの実保存readbackもproviderで検証する。
-- この更新時点の修正は未commit。push後のcommit SHAとActionsは後続記録する。PR #27はDraftを維持し、GitHub上のPR本文は変更しない。PR本文に古い「実装コードの追加と担当内の実受入は未実施」という記載が残るため、実装状況・局所test PASS・残存するActions／provider／横断受入を反映する更新案を最終報告へ示す。
+- PR #27はDraftを維持し、GitHub上のPR本文は変更しない。PR本文に古い「実装コードの追加と担当内の実受入は未実施」という記載が残るため、実装状況・局所test PASS・残存するActions／provider／横断受入を反映する更新案を最終報告へ示す。
+
+### commit・push・GitHub Actions（2026-11-10）
+
+- 12担当ファイルをcommit `37432d93c9e4edf67a9e9b296de9c10401dd99a5`（`fix: align formal authority dependencies and E2E history validation`）へ記録。push前の`git fetch origin`後、`git merge-base --is-ancestor origin/feat/pr22-e-formal-design-e2e-selection HEAD`は終了code 0。通常push成功。
+- push後のbranchは`feat/pr22-e-formal-design-e2e-selection`。local HEADとremote `ls-remote`のHEADはともに`37432d93c9e4edf67a9e9b296de9c10401dd99a5`、worktreeはclean。
+- commit SHAに関連付いた最新Actions：Code Quality run 879 PASS、Validate Deterministic Output Evals run 2184 PASS、Validate Semantic Output Evals run 2149 PASS、Codex Harness run 879 PASS、Validate Agent Skills run 2186 FAIL。各runの`head_sha`は本commit SHA。Validate Agent Skillsでは仕様検証PASS、job `validate`の`Validate repository eval structure` stepがFAILし、ログは共有`README.md`に`e2e-test-selection`がないことを示す。README変更は今回の権限外で、PR #22統合ownerへ引継ぎ済み。
+- Validate Agent Skillsのjob logでは実行checkoutがsynthetic merge commit `a248c792122f73a086d5e494179d2dea8bb95fe5`だった。GitHubは上記runを本branch HEADへ関連付けているが、merge結果の実行とbranch単体HEADの検証を同一視しない。CI結果はPR連動Actionsの現状として報告し、source-only実行証拠とはしない。
+- PR APIで確認：PR #27はopen／Draft、head `37432d93c9e4edf67a9e9b296de9c10401dd99a5`、base `feat/development-qa-traceability`。PR本文は変更していない。全体受入にはREADME登録、実provider契約、実Agent／Judge、PR #22横断検証が残る。
