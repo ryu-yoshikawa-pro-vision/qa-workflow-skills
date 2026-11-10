@@ -467,6 +467,9 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             continue
         currentness = _currentness(item["evidence_refs"], current_sources)
         item["currentness"] = currentness
+        if item["status"] == "retired":
+            # Retired items need no revalidation; keep derived currentness only.
+            continue
         if currentness == "stale":
             changed_source = next(
                 (
@@ -543,18 +546,23 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     no_change = previous is not None and fingerprint(old_projection) == fingerprint(
         new_projection
     )
+    live_items = [row for row in current_items if row["status"] != "retired"]
     stale = sorted(
-        row["item_id"] for row in current_items if row["currentness"] == "stale"
+        row["item_id"] for row in live_items if row["currentness"] == "stale"
     )
     unknown = sorted(
         row["item_id"]
-        for row in current_items
+        for row in live_items
         if row["currentness"] == "unknown" or row["status"] == "unknown"
+    )
+    unknown_feature_ids = sorted(
+        row["feature_id"] for row in feature_population if row["status"] == "unknown"
     )
     status = (
         "candidate_ready_unpersisted"
         if not stale
         and not unknown
+        and not unknown_feature_ids
         and inventory["source_boundary_complete"]
         and inventory["analysis_complete"]
         else "incomplete"
@@ -591,6 +599,14 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
                 blocking=False,
             )
         )
+    if unknown_feature_ids:
+        issues.append(
+            _issue(
+                "unknown_feature_status",
+                "some features have unknown status and are not confirmed active",
+                blocking=False,
+            )
+        )
     recheck_item_ids = sorted(set(stale) | set(unknown))
     active_features = {
         row["feature_id"] for row in feature_population if row["status"] != "retired"
@@ -620,6 +636,8 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     metric_denominator = None
     if not inventory["source_boundary_complete"] or not inventory["analysis_complete"]:
         metric_status = "not_measurable_incomplete_population"
+    elif unknown_feature_ids:
+        metric_status = "not_measurable_unknown_feature_status"
     elif stale or unknown:
         metric_status = "not_measurable_stale_or_unknown_items"
     elif active_features:
@@ -647,6 +665,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             unknown_item_ids=unknown,
             recheck_item_ids=recheck_item_ids,
             unrepresented_feature_ids=gap_ids,
+            unknown_feature_ids=unknown_feature_ids,
             item_candidate_coverage=item_candidate_coverage,
             write_precondition={"performed": False, "provider_selected": False},
         )
@@ -662,6 +681,7 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         unknown_item_ids=unknown,
         recheck_item_ids=recheck_item_ids,
         unrepresented_feature_ids=gap_ids,
+        unknown_feature_ids=unknown_feature_ids,
         item_candidate_coverage=item_candidate_coverage,
         write_precondition={
             "performed": False,
@@ -719,7 +739,11 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
     active = active_source_refs(request["current_source_refs"])
     stale_ids: list[str] = []
     unknown_ids: list[str] = []
+    retired_ids: list[str] = []
     for item in artifact["items"]:
+        if item["status"] == "retired":
+            retired_ids.append(item["item_id"])
+            continue
         state = _currentness(item["evidence_refs"], active)
         if state == "stale":
             stale_ids.append(item["item_id"])
@@ -751,10 +775,11 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
         ),
         impacted_item_ids=stale_ids,
         source_unknown_item_ids=unknown_ids,
+        retired_item_ids=sorted(retired_ids),
         unaffected_item_ids=sorted(
             row["item_id"]
             for row in artifact["items"]
-            if row["item_id"] not in set(stale_ids + unknown_ids)
+            if row["item_id"] not in set(stale_ids + unknown_ids + retired_ids)
         ),
     )
 

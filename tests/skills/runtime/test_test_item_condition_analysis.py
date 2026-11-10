@@ -1158,6 +1158,185 @@ class TestItemAnalysisContract(unittest.TestCase):
             [result["candidate_item_ids"]["feature-backed"]],
         )
 
+    def test_retired_item_source_change_needs_no_revalidation(self):
+        first = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "active",
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                        evidence_refs=[feature_ref()],
+                    ),
+                    item_candidate("legacy", evidence_refs=[spec_ref()]),
+                ]
+            )
+        )
+        legacy_id = first["candidate_item_ids"]["legacy"]
+        retired = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "active",
+                        action="reuse",
+                        item_id=first["candidate_item_ids"]["active"],
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                        evidence_refs=[feature_ref()],
+                    )
+                ],
+                retirements=[
+                    {
+                        "item_id": legacy_id,
+                        "reason": "source confirms removal",
+                        "evidence_refs": [feature_ref()],
+                    }
+                ],
+                previous=first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )["candidate"]
+        changed_sources = [
+            feature_ref(),
+            spec_ref(revision="spec-r2", content_hash="c" * 64),
+        ]
+
+        impact = run_items(
+            {
+                "operation": "impact",
+                "artifact": retired,
+                "current_source_refs": changed_sources,
+            }
+        )
+        self.assertEqual(impact["status"], "current")
+        self.assertEqual(impact["issues"], [])
+        self.assertEqual(impact["impacted_item_ids"], [])
+        self.assertEqual(impact["source_unknown_item_ids"], [])
+        self.assertEqual(impact["retired_item_ids"], [legacy_id])
+        self.assertEqual(impact["unaffected_item_ids"], ["ITEM-001"])
+
+        events_before = len(retired["history"])
+        updated = _materialize_item(
+            item_request(
+                sources=changed_sources,
+                candidates=[
+                    item_candidate(
+                        "active",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                        evidence_refs=[feature_ref()],
+                    )
+                ],
+                previous=retired,
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        self.assertEqual(updated["status"], "candidate_ready_unpersisted")
+        self.assertEqual(updated["analysis_status"], "complete")
+        self.assertEqual(updated["issues"], [])
+        self.assertEqual(updated["stale_item_ids"], [])
+        self.assertEqual(updated["unknown_item_ids"], [])
+        self.assertEqual(updated["recheck_item_ids"], [])
+        self.assertEqual(updated["impacted_item_ids"], [])
+        self.assertEqual(len(updated["candidate"]["history"]), events_before)
+        self.assertNotIn(
+            "source_changed",
+            [event["action"] for event in updated["candidate"]["history"]],
+        )
+        retired_row = next(
+            row for row in updated["candidate"]["items"] if row["item_id"] == legacy_id
+        )
+        self.assertEqual(retired_row["status"], "retired")
+        validate_item_artifact(updated["candidate"])
+
+        # The same changed evidence on a live (not retired) item still needs revalidation.
+        live = _materialize_item(
+            item_request(
+                sources=changed_sources,
+                candidates=[],
+                previous=first["candidate"],
+                expected="provider-r2",
+                current="provider-r2",
+            )
+        )
+        self.assertEqual(live["status"], "incomplete")
+        self.assertEqual(live["stale_item_ids"], [legacy_id])
+        self.assertEqual(live["recheck_item_ids"], [legacy_id])
+        self.assertIn(
+            "source_changed",
+            [event["action"] for event in live["candidate"]["history"]],
+        )
+
+    def test_unknown_feature_status_is_not_a_confirmed_active_denominator(self):
+        snapshot = feature_inventory(
+            features=[
+                {"id": "FEAT-001", "status": "implemented"},
+                {"id": "FEAT-002", "status": "unknown"},
+            ]
+        )
+        request = item_request(
+            feature_snapshot=snapshot,
+            candidates=[
+                item_candidate(
+                    "covers-all",
+                    feature_refs=["FEAT-001", "FEAT-002"],
+                    evidence_refs=[_feature_ref_for(snapshot)],
+                )
+            ],
+        )
+        first = _materialize_item(request)
+        self.assertEqual(first["status"], "incomplete")
+        self.assertEqual(first["analysis_status"], "incomplete")
+        self.assertEqual(first["unknown_feature_ids"], ["FEAT-002"])
+        self.assertEqual(first["unrepresented_feature_ids"], [])
+        self.assertIn(
+            "unknown_feature_status", {row["code"] for row in first["issues"]}
+        )
+        coverage = first["item_candidate_coverage"]
+        self.assertEqual(coverage["status"], "not_measurable_unknown_feature_status")
+        self.assertIsNone(coverage["rate"])
+        self.assertIsNone(coverage["denominator"])
+
+        replay = _materialize_item(
+            item_request(
+                feature_snapshot=snapshot,
+                candidates=[
+                    item_candidate(
+                        "covers-all",
+                        action="reuse",
+                        item_id="ITEM-001",
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                        evidence_refs=[_feature_ref_for(snapshot)],
+                    )
+                ],
+                previous=first["candidate"],
+                expected="provider-r1",
+                current="provider-r1",
+            )
+        )
+        self.assertEqual(replay["status"], "no_change")
+        self.assertEqual(replay["analysis_status"], "incomplete")
+        self.assertEqual(replay["unknown_feature_ids"], ["FEAT-002"])
+        self.assertEqual(
+            replay["item_candidate_coverage"]["status"],
+            "not_measurable_unknown_feature_status",
+        )
+
+        confirmed = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "covers-all",
+                        feature_refs=["FEAT-001", "FEAT-002"],
+                    )
+                ]
+            )
+        )
+        self.assertEqual(confirmed["unknown_feature_ids"], [])
+        self.assertEqual(confirmed["item_candidate_coverage"]["status"], "measured")
+        self.assertEqual(confirmed["item_candidate_coverage"]["rate"], 1.0)
+
     def test_readback_checks_hash_and_does_not_claim_authenticity(self):
         candidate = _materialize_item(
             item_request(candidates=[item_candidate("item")])
