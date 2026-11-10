@@ -82,7 +82,7 @@
 
 ## 完了基準
 
-最新の担当受入状態は末尾の「2026-11-11 HEAD 467bb3c current local suite・CI再確認」を参照する。以前の受入記録は作業履歴として保持する。
+最新の担当受入状態は末尾の「2026-11-11 TCN-SEM-013 実Agent・Judge評価 v11」を参照する。以前の受入記録は作業履歴として保持する。
 
 - [x] 各正本・Authorityを守り、feature/item/condition/architectureの契約fixtureから既存設計までID・revision付きで局所検証した。B/C/D/Fの正規実成果物との横断追跡はPR #22へ引き継いだ。
 - [x] 採否・不採用・blocked・複数expected result・別レベル・既存技法CIが互いに混同されない。
@@ -1031,3 +1031,12 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - E2E全current Skill trigger評価はBLOCKED。非対話`codex exec` smokeと実semantic Agent実行はできたが、全Skill同時登録に必要な一時worktree作成がrepository PreToolUseにより`approval required by policy, but AskForApproval is set to Never`で拒否され、許可されていない迂回をしていない。クエリ×3反復・holdout・Skill-load traceに基づく発火率は未実施。
 - PR #22を再取得し、current headも`0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。README canonical Skill一覧にE2E選定なし、共有ASSERTIONSにE2E-SEL-D001〜D006なし。A runtime integration planはowner artifact registrationとprovider-native save/CAS／history／readback／承認未接続を記載。実providerのE成果物保存・別reader readback・競合・stale伝播・別session再開は未実施／BLOCKED。新しいprovider契約やfixtureで代替しない。
 - 担当E局所受入は未完了。継続可能な作業はTCN-SEM-013 retry完了判定と残り5 semantic caseのactual Agent＋独立Judge評価、必要なevidence archive／Plan更新。Agent triggerはHook許可worktree・trace観測、実providerと全owner実成果物の統合はPR #22 ownerの再開条件。CI結果は完了候補判定や受入完了を意味しない。
+
+### 2026-11-11 TCN-SEM-013 実Agent・Judge評価 v11
+
+- Candidate Agentのsource HEADは`5015cc4c8f9e4412d25c0829b7f18311326d092e`、Codex CLI `0.167.0`。1回目は20分wrapper timeout、116 events／56 command events、`turn.completed`なし、candidateなし。Judgeは起動していない。fresh retryは同じeval input・Skill copy・promptを用い、60分timeoutで実施。exit 0、`turn.completed`、178 JSONL events／82 command events、1240.3秒、candidate 92,073 bytes。packageから`evals/`、`tests/`、`__pycache__`を除外し、生成promptへreference／rubricを含めていない。
+- 独立Judgeは既存`python3 scripts/skills/evals/semantic/run.py --skill test-condition-design --eval-id TCN-SEM-013 --output <actual-candidate> --skills-root skills --judge-command python3 /tmp/pr27_codex_semantic_judge.py <judge-evidence-dir> TCN-SEM-013`を使用。別fresh `codex exec` session、構造化output schema、既存`normalize_judge_response()`。adapter error 0。`run.py` exit 1はnormalized verdict `needs_review`による。結果は5 criteria中PASS 1、needs_review 3、criterion fail 1、not_evaluable 0。criteriaはSEM-TCN-001 needs_review、002 pass、003 needs_review、004 needs_review、006 fail。case verdictはneeds_reviewで、criterion failをcase failへ誤集計しない。
+- JudgeのSEM-TCN-006 failをactual candidate・input・reference・現行Skill文書で確認。candidateはA/B groupingと`role=admin`／`role=guest` requirement intersectionを別TCN/modelへ分け、2 target merge後にunionしたrequirementがconflictするとmerged CIを作らない既存`references/coverage-techniques.md`の規則を反映しなかった。Agent traceにはcoverage-techniques全文の読取がある。既存documentはその契約をすでに含み、実runtimeコードの確定不具合は確認できなかったため、期待値／rubric／Skill仕様／runtimeを変更せず、Agent outputの意味評価失敗として記録する。成功値を狙った再生成は行わない。
+- 最新semantic evidenceは`evidence/semantic-2026-11-10/semantic-evidence-v11.tar.gz`（SHA-256 `3945ae71615adf77f79a2107fe6390ec3ee777fbac4412b84b4f26d78b4869ae`、2,389,453 bytes）、`evidence-index-v11.json`、`README-v11.md`。archiveにfirst timeout attemptとsuccessful retry両方のtrace、actual candidate、reference／rubric（Judge-only）、raw Judge response／trace、normalized resultを保存した。credential-shaped pattern scanは0 hits。manifest 31件中candidate＋Judge 26件、case verdict PASS 19／needs_review 7／FAIL 0／not_evaluable 0／Judge error 0。criterionはPASS 89／needs_review 9／FAIL 1。残る5 caseはTCN-SEM-014、TC-SEM-001／002、COV-SEM-001／002。AgentとJudgeは別sessionだが同じ既定model familyで、model IDを取得できずモデル独立性は主張しない。
+- 467bb3c current-head local suite、全体runtime/deterministic結果、format結果は直前の「HEAD 467bb3c current local suite・CI再確認」に記録。`a050ebab5e941f67bc23c40b7e23b4448ce4a530`のActionsはCode Quality run `42874680554` PASS、Validate Deterministic Output Evals `42874680197` PASS、Validate Semantic Output Evals `42874680455` PASS、Codex Harness `42874680203` PASS、Validate Agent Skills `42874680295` FAIL。最後の失敗job `validate`／step `Validate repository eval structure`はREADMEに`e2e-test-selection` canonical registrationがないため。後続form／semantic count／trigger stepsはSKIP。
+- E担当局所受入は未完了。semantic実Agent＋Judgeは26/31。残り5 caseを各々独立実行し、既存Judge／rubricを使用する。E2E triggerは全current Skillを登録するworktree作成をPreToolUseに拒否されておりquery別評価未実施。実provider保存・readback／CAS／承認／別session再開はPR #22で公開provider契約未接続のためblocked。PR本文は「実装コード未追加」の旧記述が残るが依頼により変更せず、更新案は最終報告へ提示する。
