@@ -260,7 +260,9 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`はclosedで、同headの上記5 workflowはsuccess。Aの安全readback blocked方針とSQLite履歴runtimeの共有契約確認に使用した。PR #23の結果もPR #27 local差分のCI結果として扱わない。
 - 今回のlocal変更に対するGitHub Actionsは未実行。no pushの制約下で未commit worktreeをActionsへ渡せないため。公開headのsuccessで代替していない。
 
-### 現在の完了基準状態
+### 2026-11-09時点の完了基準状態（当時の記録）
+
+この時点の状態表は履歴として保持する。2026-11-10の再検証結果は末尾の「担当E残作業の再検証・外部blocked記録」を参照する。
 
 - [x] 各正本・Authority、ID／revisionの局所fixture、採否／不採用／blocked、複数expected result、level priority、legacy／partial rerun、誤100%負例を担当runtimeで確認した。
 - [ ] 実Agentによる新Skill trigger、非発火近接例、実semantic Judge評価が未実施。
@@ -560,3 +562,81 @@ PR #27レビュー時点の`30289c915bcc64e6cdc4479c34189ab2c7740eee` Actionsは
 - commit SHAに関連付いた最新Actions：Code Quality run 879 PASS、Validate Deterministic Output Evals run 2184 PASS、Validate Semantic Output Evals run 2149 PASS、Codex Harness run 879 PASS、Validate Agent Skills run 2186 FAIL。各runの`head_sha`は本commit SHA。Validate Agent Skillsでは仕様検証PASS、job `validate`の`Validate repository eval structure` stepがFAILし、ログは共有`README.md`に`e2e-test-selection`がないことを示す。README変更は今回の権限外で、PR #22統合ownerへ引継ぎ済み。
 - Validate Agent Skillsのjob logでは実行checkoutがsynthetic merge commit `a248c792122f73a086d5e494179d2dea8bb95fe5`だった。GitHubは上記runを本branch HEADへ関連付けているが、merge結果の実行とbranch単体HEADの検証を同一視しない。CI結果はPR連動Actionsの現状として報告し、source-only実行証拠とはしない。
 - PR APIで確認：PR #27はopen／Draft、head `37432d93c9e4edf67a9e9b296de9c10401dd99a5`、base `feat/development-qa-traceability`。PR本文は変更していない。全体受入にはREADME登録、実provider契約、実Agent／Judge、PR #22横断検証が残る。
+
+## 担当E残作業の再検証・外部blocked記録（2026-11-10）
+
+### 対象HEAD・GitHub状態
+
+- 対象HEADは`870c911ab76dab915a06c3b1e92b6771a1bd1d3b`。`git fetch origin`後、`git status -sb`は`feat/pr22-e-formal-design-e2e-selection...origin/feat/pr22-e-formal-design-e2e-selection`、`git log -1 --oneline`は`870c911a docs: record PR #27 authority and snapshot CI results`、localと`origin/feat/pr22-e-formal-design-e2e-selection`の`git rev-parse`は同一SHAだった。作業開始時とPlan追記前の`git status --short`、`git diff --stat`、`git diff --check`、`git ls-files --others --exclude-standard`はいずれも差分なし。
+- PR APIではPR #27はopen／Draft、baseは`feat/development-qa-traceability`、headは上記SHA。GitHub上のPR本文は未変更だが、「実装コードの追加と担当内の実受入は未実施」という記述が現状と食い違う。
+
+### 完了基準の最新照合
+
+| 担当Planの完了基準                                                  | 最新状態                   | 対象HEADの証拠・残件                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 各正本・Authorityと既存設計の局所検証                               | PASS                       | 正式設計record／coverage／E2E selectionのfixture・runtime確認は既往記録にあり、今回のHEADでも対象回帰suiteを再実行した。B/C/D/F実成果物の横断照合はPR #22へ引継ぎ。                                                                                                                                                                                                                                     |
+| 採否・blocked・別レベル・期待結果・CIの区別                         | PASS                       | `test_test_condition_structure` 16件、`test_formal_design_contract` 22件、`test_coverage_analysis_traceability` 28件がPASS。                                                                                                                                                                                                                                                                            |
+| E2E選定の実Agent発火と直接実行経路の分離                            | BLOCKED／未実施            | `codex --version`は`codex-cli 0.167.0`、`codex --no-daemon --strict-config exec --help`は成功。repositoryのQA Skillは`skills/*/SKILL.md`配下に24件ある一方、`.agents/skills/`にはCodex用の3 Skillだけで、QA Skillを同時にdiscoverして発火ログを取る正規harnessは見つからなかった。`tests/skills/evals/trigger` 1件PASSはdataset構造検査のみ。train／validation／holdoutを実Agentで各3回実行していない。 |
+| 新旧Skillのisolated packaging、trigger、semantic、deterministic評価 | 部分PASS／未完了           | Python 3.11.17で`test_e2e_selection_contract` 32件と`test_runtime_portability` 3件がPASS。Python 3.12.3でも全E担当runtimeとportable-copyテストがPASS。変更6 Skillへの公式`skills-ref validate`は全PASS、deterministic出力契約テスト43件もPASS。実Agent triggerと実semantic Judgeは未実施のため基準全体は未完了。                                                                                        |
+| 正常系・負例・legacy・下流consumer・CI回帰                          | 部分PASS／未完了           | 対象runtimeはPASS。全deterministic suiteは299件中295 PASS／4 FAIL、全runtime suiteは579件中560 PASS／10 FAIL／9 ERROR。既知の失敗群は以下に記録し、PR #22／A担当へ引継ぎ。最新CIのValidate Agent SkillsもREADME登録欠落でFAIL。                                                                                                                                                                         |
+| 実runner・実保存先・承認・CAS・readback・別session再開              | BLOCKED／未実施            | Eの`selection_contract.py`は保存を仮定しないvalidator、formal runtimeも局所record／Entity生成までで、E成果物を登録する共有provider APIはこのbranchにない。既存`qa-workflow`のSQLite保存経路はWCAG専用。実provider・承認権限・E artifact registrationがなく、fixtureやWCAG providerで代替していない。A／PR #22で契約と保存先が接続後、save／readback／CAS競合／stale／別session resumeを再開する。       |
+| source変更時のstale伝播・失敗後再開                                 | 部分PASS／未完了           | fixture runtimeではsource／Authority currentness、影響pair限定のstale、履歴維持と再評価を確認済み。実保存後のsource変更、provider stale伝播、別session readbackを示す証拠はないため、実provider条件としてPR #22へ引継ぎ。                                                                                                                                                                               |
+| repository-wide Validate Agent Skills                               | FAIL／owner引継ぎ          | run 2188はjob `validate`、step `Validate repository eval structure`でFAIL。先行する公式Agent Skills specification stepはPASS。ログは`README.md`に`e2e-test-selection`が欠落と明示。README変更は共有owner範囲のため本branchでは行わない。                                                                                                                                                                |
+| Plan・PR本文・実装・CIの整合                                        | Plan更新済み／PR本文未更新 | 本追記は対象HEADの現状を記録する。GitHub PR本文は今回変更しない。更新案は最終報告に提示する。                                                                                                                                                                                                                                                                                                           |
+| PR #22へ証拠・依存条件を引継ぎ                                      | 更新済み                   | 下記「残件・引継ぎと再開条件」にPR #22 owner、必要なartifact、保存契約、workflow、再検証を記録。横断完了条件を担当EのPASSへ繰り上げていない。                                                                                                                                                                                                                                                           |
+
+### 対象HEADでのローカル検証
+
+以下は2026-11-10にlocal HEAD `870c911ab76dab915a06c3b1e92b6771a1bd1d3b`で個別実行した結果。
+
+- `python3 -m unittest tests.skills.runtime.test_test_condition_structure -v` — PASS 16 tests。
+- `python3 -m unittest tests.skills.runtime.test_formal_design_contract -v` — PASS 22 tests。
+- `python3 -m unittest tests.skills.runtime.test_coverage_analysis_traceability -v` — PASS 28 tests。
+- `python3 -m unittest tests.skills.runtime.test_e2e_selection_contract -v` — PASS 32 tests。
+- `python3 -m unittest tests.skills.runtime.test_test_requirement_structure -v` — PASS 11 tests。
+- `python3 -m unittest tests.skills.runtime.test_case_structure -v` — PASS 11 tests。
+- `python3 -m unittest tests.skills.runtime.test_case_runtime_v1_cutover -v` — PASS 2 tests。
+- `python3 -m unittest tests.skills.evals.deterministic.test_new_skill_contracts -v` — PASS 43 tests。
+- `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS 12 tests。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — FAIL 299 tests中295 PASS／4 FAIL。失敗は`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`（いずれもproviderが`blocked`）、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`（Project Context state-root source不足）。すべて既往検証と同じA/shared WCAG provider系で、E差分外。
+- `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — FAIL 579 tests中560 PASS／10 FAIL／9 ERROR。失敗は`test_ci_handoff.CiHandoffTests.test_json_nesting_failure_is_a_structured_input_error` 1件（期待するnesting errorと実際のtop-level object errorの不一致）と、`test_sqlite_workflow_history`の9 FAIL／9 ERROR（provider blocked／unreadable、SQLite `unable to open database file`）。対象HEADのE担当runtime suiteはすべてPASS。変更前記録と同じ失敗集合。
+- `python3.11 -m unittest tests.skills.runtime.test_e2e_selection_contract -v` — PASS 32 tests。
+- `python3.11 -m unittest tests.skills.runtime.test_test_condition_structure -v` — PASS 16 tests。
+- `python3.11 -m unittest tests.skills.runtime.test_formal_design_contract -v` — PASS 22 tests。
+- `python3.11 -m unittest tests.skills.runtime.test_coverage_analysis_traceability -v` — PASS 28 tests。
+- `python3.11 -m unittest tests.skills.runtime.test_runtime_portability -v`および`python3 -m unittest tests.skills.runtime.test_runtime_portability -v` — 両方PASS 3 tests。single-copy runtimeとSkill-local helper import条件を確認。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS 24 Skills／168 cases。dataset検証のみで、Judge実評価ではない。
+- `python3 -m unittest discover -s scripts/skills/evals/semantic/tests -v` — PASS 27 tests。
+- `python3 -m unittest discover -s tests/skills/evals/semantic -v` — PASS 13 tests。
+- `python3 -m unittest discover -s tests/skills/evals/trigger -v` — PASS 1 test。trigger dataset検証のみ。
+- 対象Python 16 filesへ`uv tool run --from ruff==0.16.8 ruff check ...` — PASS。`ruff format --check ...` — PASS 16 files。
+- `uv run --no-project --with ruff==0.16.8 python3 scripts/format_tracked.py check` — PASS 221 tracked files。
+- 対象Python 16 filesへの`python3.11 -m compileall -q ...` — PASS。
+- `uv tool run --from 'git+https://github.com/agentskills/agentskills.git@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref' skills-ref validate skills/<name>` — coverage-analysis、e2e-test-selection、test-analysis、test-case-design、test-condition-design、test-requirement-designの6 SkillすべてPASS。
+- Plan追記前に行った`git status --short`、`git diff --stat`、`git diff --check`、`git ls-files --others --exclude-standard` — いずれも差分なし。その後のPlan追記で本Markdownだけが変更された。追記後は固定Ruff 0.16.8を使う`format_tracked.py check`（221 files）と`git diff --check`がPASS。
+
+### 最新GitHub Actions（PR head `870c911ab76dab915a06c3b1e92b6771a1bd1d3b`関連）
+
+| Workflow                            |  run | 結果 | 詳細                                                                                                                          |
+| ----------------------------------- | ---: | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Code Quality                        |  881 | PASS | tracked formatter／lint／差分検査を含むjob完了。                                                                              |
+| Validate Agent Skills               | 2188 | FAIL | `Validate Agent Skills specification` PASS。`Validate repository eval structure` FAILし、READMEに`e2e-test-selection`未登録。 |
+| Validate Deterministic Output Evals | 2186 | PASS | deterministic dataset／compile／shared・repository test／runtime／semantic dataset検査を含むjob完了。                         |
+| Validate Semantic Output Evals      | 2151 | PASS | semantic datasetとshared/repository runtime tests。実LLM Judge評価ではない。                                                  |
+| Codex Harness                       |  881 | PASS | Hook/config/execpolicyと公式validatorのcontract job。実Agent発火・fresh session受入とは別。                                   |
+
+runはPR head `870c911...`に関連付いているが、Validate Agent Skillsのjob logで実際にcheckoutしたrefはPR synthetic merge commit `40ce0fec6b79049f3979bd7450b17b349869a1ed`（base `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`とhead `870c911...`のmerge）だった。したがってPR Actionsをbranch単体HEADでの直接実行と同一視しない。CIの失敗原因はREADMEのみとログで確定しており、E担当branchでは共有READMEを変更しない。
+
+### 実Agent／Judge／providerを実施していない理由と再開条件
+
+- Codex CLIは`codex-cli 0.167.0`。repositoryの`.agents/skills/`にE評価対象のQA Skillsは登録されておらず、`codex exec --json`のSkill発火traceを取る正規trigger runnerもない。現在の`skills/*/evals/trigger`はdatasetのみ。2026-11-10に`codex --no-daemon --strict-config --sandbox read-only`でinteractive sessionの起動を試みたが、この実行端末は`TERM=dumb`かつstdin/stderrがTTYではないため、Codexは確認promptの前に終了した。fresh sessionの`/hooks`、実際のSkill load log、既存CLI認証状態は未確認で、Agent試行・発火結果は未実施として扱い、PASS／FAILを付けない。認証情報は読まず、起動・認証の迂回もしていない。
+- 変更対象のsemantic manifestは、e2e-test-selection 3件、test-analysis 7件、test-requirement-design 3件、test-condition-design 14件、test-case-design 2件、coverage-analysis 2件（合計31 cases）。`scripts/skills/evals/semantic/run.py`は既に生成済みcandidate outputを要求し、repositoryには実外部Judge adapterがない。現在のreference文章をcandidate outputに転用せず、実Judge結果は未実施。
+- Python `test-condition-design`／coverageとE2E selectionのlocal runtime結果は保存・readback・approval・CASを行わない。E artifactsを登録する共有runtime/provider契約と認証済み保存先が用意されていないため、実provider・別session再開は未実施。SQLite/WCAG fixture providerをE formal/E2E persistenceの証拠に流用しない。
+- 再開条件：①PR #22/A ownerが正式design／E2E selectionの登録済みsource/artifact参照、Machine Entity、承認、native create/CAS/readbackを公開、②TTYを備えた承認済み実Agent環境で`codex --no-daemon --strict-config --sandbox read-only`をrepo rootから起動し、fresh sessionの`/hooks`でrepository-owned hookを確認、全current Skillを同時利用できるowner-approved trigger harnessとskill-load traceを用意、③実際のcandidate generationを行うLLM Judge adapterと独立rubric実行先を接続。開始後はE2E trigger train／validation各3回と未使用holdout、semantic 31 candidate outputs、provider失敗・競合・stale後再開を実測して結果を追記する。`codex exec --json`単独は現状Skill登録・発火traceを満たさないため、正規harnessなしで評価済みにしない。
+
+### 残件・PR #22への引継ぎ
+
+- PR #22統合owner：共有READMEのcanonical Skill一覧・routingへ`e2e-test-selection`を登録し、他canonical一覧と件数／名前を合わせる。shared ASSERTIONSでRISK-D016／D017とE2E-SEL-D001〜D006の正本・重複を整理し、legacy `test-analysis`のE2E表／既存E2E直接入口を残す。修正後にValidate Agent Skillsの全stepを再実行し、READMEチェックを含めPASSを確認する。
+- A／共有runtime owner：formal-design recordとE2E selection recordのsource/artifact ref、revision、scope、currentness、Machine Entity登録、承認、native create-if-absent／CAS、exact historical readback契約を公開し、認証済み保存先を接続する。共有README／providerはE branchで変更しない。
+- PR #22統合後：B/C/D/F正規成果物を用いたID／revision／Authority／scope照合、stale伝播と別session再開、E formal→coverageおよびE2E selection→G/H/J接続を行う。S1〜S17、人間編集8ケース、開発連動QA15条件、QA全工程10条件は全体統合で判定し、今回のfixture/local PASSで代替しない。
+- PR #27全体はREADME失敗、実Agent/Judge/provider、横断接続が残るため受入未完了。PRはDraftのままとし、この作業でGitHub PR本文を変更しない。
