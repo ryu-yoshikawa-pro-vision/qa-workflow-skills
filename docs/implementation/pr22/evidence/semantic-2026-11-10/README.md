@@ -1,13 +1,13 @@
-# Semantic評価証拠（2026-11-10、latest v3）
+# Semantic評価証拠（2026-11-10、latest v4）
 
-- Skill/input source baseline: `6c3e9f1e8c1e848fdec716e7f17395a75d42bda6`; evidence packaging HEAD: `d5a91582563d2784a9f68888bfeef55448e890c7`
-- manifest: 31 cases; actual candidate generation and independent-session Judge completed: 18/31
-- verdicts: pass 14, needs_review 4, fail 0, not_evaluable 0, Judge errors 0
-- criterion statuses: pass 59, needs_review 4
+- Skill/input source baseline: `6c3e9f1e8c1e848fdec716e7f17395a75d42bda6`; evidence packaging HEAD: `7c76ed379b3d7210585d29e8a72956302f38faf5`
+- manifest: 31 cases; actual candidate generation and independent-session Judge completed: 19/31
+- verdicts: pass 15, needs_review 4, fail 0, not_evaluable 0, Judge errors 0
+- criterion statuses: pass 64, needs_review 4
 - Generator and Judge used independent Codex sessions per case, using the same default configured model family; model ID was not exposed, so model independence is not established.
-- v3 adds current-input `TCN-SEM-005`; its actual candidate, Agent JSONL, Judge raw response/events, normalized result, and source hashes are in the v3 archive.
-- Some earlier generated cases used packages that contained eval files. Their command traces were audited for reference/rubric reads, but filesystem isolation was weaker; v5/v6/v7/v8 excluded eval files, tests, and pycache.
-- Evaluation evidence is not repository-wide acceptance and does not cover real Agent trigger rates, a real artifact provider, or the remaining 13 semantic cases.
+- v4 adds current-input `TCN-SEM-006`; its actual candidate, Agent JSONL, Judge raw response/events, normalized result, and source hashes are in the v4 archive. The v4 archive also corrects a prior packaging error in v2/v3 for the normalized `TCN-SEM-002` Judge result.
+- Some earlier generated cases used packages that contained eval files. Their command traces were audited for reference/rubric reads, but filesystem isolation was weaker; v5/v6/v7/v8/v9 excluded eval files, tests, and pycache.
+- Evaluation evidence is not repository-wide acceptance and does not cover real Agent trigger rates, a real artifact provider, or the remaining 12 semantic cases.
 
 | Skill                     | Eval ID           |    Agent | Judge        |
 | ------------------------- | ----------------- | -------: | ------------ |
@@ -29,5 +29,6 @@
 | `test-condition-design`   | `TCN-SEM-002`     | 1189.9 s | pass         |
 | `test-condition-design`   | `TCN-SEM-004`     | 1102.4 s | pass         |
 | `test-condition-design`   | `TCN-SEM-005`     |  744.4 s | pass         |
+| `test-condition-design`   | `TCN-SEM-006`     |  897.8 s | pass         |
 
-Current detail index: `evidence-index-v3.json`. Full v3 archive: `semantic-evidence-v3.tar.gz`. The prior 17-case and 16-case evidence remains in `README-v2.md` / `evidence-index-v2.json` / `semantic-evidence-v2.tar.gz` and `README-v1.md` / `evidence-index.json` / `semantic-evidence-v1.tar.gz`.
+Current detail index: `evidence-index-v4.json`. Full v4 archive: `semantic-evidence-v4.tar.gz`. The v2/v3 archives have an incorrect normalized `TCN-SEM-002/judge-result.json` copied from a later case; their raw Judge data remains, and v4 contains the correct normalization from the TCN-002 runner output. The v1 archive has the correct 16-case TCN-002 record; prior versions are preserved with this limitation recorded in `README-v2.md` and `README-v3.md`.

@@ -30,3 +30,5 @@
 | `test-condition-design`   | `TCN-SEM-004`     | 1102.4 s | pass         |
 
 Current detail index: `evidence-index-v2.json`. Full v2 archive: `semantic-evidence-v2.tar.gz`. The prior 16-case evidence is preserved in `README-v1.md`, `evidence-index.json`, and `semantic-evidence-v1.tar.gz`.
+
+> Historical archive limitation: the `TCN-SEM-002/judge-result.json` in this version was copied from a later case by the evidence exporter. Its raw Judge response/events and summary index remain; use `README.md` and `semantic-evidence-v4.tar.gz` for the corrected normalized result. The v1 archive has the correctly normalized TCN-SEM-002 result.

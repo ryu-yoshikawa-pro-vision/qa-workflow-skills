@@ -849,3 +849,12 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - commit cd61b1aeのPR Actionsはsynthetic merge `0cac6ba8d0d0f93cb8291a526e2dd9d39c827674`。Code Quality run 909 PASS、Validate Deterministic Output Evals run 2214 PASS、Validate Semantic Output Evals run 2179 PASS、Codex Harness run 909 PASS、Validate Agent Skills run 2216 FAIL。
 - Validate Agent Skills jobは`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。logは有効Skill `skills/e2e-test-selection`を列挙した後、README.mdに同名がないため失敗した。共有READMEは担当外のため変更しない。
 - この節の追加後に生じるPlan-only commit自身のActionsはpush後に取得して最終報告する。PR #27はDraft維持、受入未完了。
+
+## 2026-11-10 最新実測の追記（TCN-SEM-006、archive v4）
+
+- `agent-v9`のTCN-SEM-006 candidateはCLI exit 0、`turn.completed`、candidateあり。Codex CLI 0.167.0、897.8秒、137 JSONL events／65 command events。生成時source HEADは`d5a91582563d2784a9f68888bfeef55448e890c7`。skill packageは`evals/`、tests、pycacheを含まない。
+- 独立Judge sessionが既存`run.py`と`normalize_judge_response()`を使って4/4 criteria PASS。従って現時点の実semantic評価は19/31 cases、pass 15、needs_review 4、fail／not_evaluable／Judge error 0、criteria pass 64／needs_review 4。残り12 casesを未完了とし、`agent-v10`から続行する。
+- evidence reviewで、v2/v3 tarballの`TCN-SEM-002/judge-result.json`が本来のTCN-002でなく、後続caseのnormalized resultを誤って含むことを発見した。case summary、raw TCN-002 response／event、元run出力は保持されている。raw TCN-002 Judge CLI出力を既存normalizerの正規化結果として保存し、v4 archiveに正しい5 criteria／PASS結果を収録した。v2/v3 archiveは削除・上書きせずREADMEに警告を加えた。v1 archiveのTCN-002 resultは正しい。
+- 最新evidenceは`evidence/semantic-2026-11-10/semantic-evidence-v4.tar.gz`、`evidence-index-v4.json`、`README.md`／`README-v4.md`。v2/v3の誤りはexport packaging defectで、E Skill実装不具合ではない。candidate、Judge response、rubric、期待値を変更せず、再採点もしなかった。
+- commit `7c76ed379b3d7210585d29e8a72956302f38faf5`のActionsはCode Quality run 910 PASS、Validate Deterministic Output Evals run 2215 PASS、Validate Semantic Output Evals run 2180 PASS、Codex Harness run 910 PASS、Validate Agent Skills run 2217 FAIL。synthetic merge `710700e4dd8e22be4229fe7c4bbc54a5b947d279`で実行され、失敗stepは`Validate repository eval structure`、AssertionErrorはREADMEに`e2e-test-selection`が欠けること。Skill specification stepはPASS。
+- TCN-006とarchive v4を含む変更、およびこの追記は未commit。次の通常pushでlocal/remote一致と最新HEADのActionsを確認する。PR #27はopen／Draft、受入未完了。
