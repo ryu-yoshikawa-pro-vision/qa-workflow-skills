@@ -870,4 +870,10 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - 実trigger評価は未完了。全24 current Skillの評価用一時worktree作成を`git worktree add --detach ... HEAD`で再試行したが、PreToolUseが`approval required by policy, but AskForApproval is set to Never`で拒否。Hookやexecpolicyを回避せず、full datasetの3反復／holdout発火率は未実施。再開条件は承認可能な環境で正規worktreeを作成し、Skill load traceを観測できること。
 - f91に紐づくActionsはCodex Harness run 911 PASS、Code Quality 911 PASS、Validate Deterministic Output Evals 2216 PASS、Validate Semantic Output Evals 2181 PASS、Validate Agent Skills 2218 FAIL。対象はPR synthetic merge `079d8ce86757b1c42bf5e593710b240f254c3cee`。失敗job `validate`のstep `Validate repository eval structure`はREADME.mdのcanonical Skill一覧に`e2e-test-selection`がないためAssertionError。official Agent Skills validationはPASS。この共有READMEは変更せず、PR #22統合ownerへ引き継ぐ。
 - PR #22 branchを再確認：`feat/development-qa-traceability` HEAD `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。現時点で共有README／ASSERTIONSへのE2E登録と、E成果物のapproval・artifact registration・provider-native CAS・historical readback契約が未接続。実provider保存・独立readback・stale伝播・別session再開はBLOCKED。固定fixtureを実provider証拠として扱わない。
-- この追記時点のPR #27はopen／Draft。担当E局所受入は未完了。次は残り11 semantic caseのcandidate生成・独立Judge、実triggerの承認可能環境での再開、共有provider／READMEのPR #22接続を進める。今回のv5証拠とPlan更新は次の通常commit・pushへ含め、push後の最新HEADに紐づくActionsを再確認する。
+- v5証拠とPlanをcommit `3bc9f7c66e0dc489a54318586c02818cba8fc53f`（`eval: add TCN-SEM-007 semantic evidence`）へ記録し、担当branchへ通常pushした。push後のlocal／remote HEADは一致し、worktreeはclean。
+
+### v5証拠push後のCI状態（commit 3bc9f7c）
+
+- `3bc9f7c66e0dc489a54318586c02818cba8fc53f`に紐づく5 workflowはすべて完了：Code Quality run 912 PASS、Validate Deterministic Output Evals run 2217 PASS、Validate Semantic Output Evals run 2182 PASS、Codex Harness run 912 PASS、Validate Agent Skills run 2219 FAIL。
+- Validate Agent Skillsのjob `validate`では`Validate Agent Skills specification`がPASSし、`Validate repository eval structure`がFAIL。対象synthetic mergeは`049d71d`（3bc9f7cをPR #22 base `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`へmerge）で、step logは`AssertionError: (PosixPath('README.md'), ['e2e-test-selection'])`。Skill package自体はvalidatorでValidとされている。共有README変更はPR #22統合ownerへ引き継ぎ、PR #27では変更しない。
+- GitHub APIでPR #27はopen／Draft、headは`3bc9f7c66e0dc489a54318586c02818cba8fc53f`と確認。PR本文は更新していない。
