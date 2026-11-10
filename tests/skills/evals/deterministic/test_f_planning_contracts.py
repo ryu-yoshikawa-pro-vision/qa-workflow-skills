@@ -549,7 +549,29 @@ class QaPlanningContractTests(unittest.TestCase):
         )
         self.assertEqual(assertion_status(all_unresolved_result, "QRA-D001"), "fail")
 
-        for missing_reason in ("", "-", "unknown", "未確定", "stale"):
+        missing_reasons = (
+            "",
+            "-",
+            "unknown",
+            "未取得",
+            "未確定",
+            "stale",
+            "unknown:",
+            "unknown:   ",
+            "未確定：",
+            "unknown: -",
+            "unknown: unknown",
+            "未取得:",
+            "unknown；",
+            "unknown（",
+            "unknown::",
+            "未確定：；",
+            "unknown: - :",
+            "unknown—",
+            "unknown–",
+            "unknown-",
+        )
+        for missing_reason in missing_reasons:
             with self.subTest(unresolved_purpose_reason=missing_reason):
                 no_reason = update_markdown_row(
                     blocked,
@@ -559,6 +581,14 @@ class QaPlanningContractTests(unittest.TestCase):
                 )
                 no_reason_result = validate(no_reason, blocked_expected, "QRA-OUT-002")
                 self.assertEqual(assertion_status(no_reason_result, "QRA-D001"), "fail")
+                purpose_evidence = next(
+                    item.evidence
+                    for item in no_reason_result.assertions
+                    if item.id == "QRA-D001"
+                )
+                self.assertTrue(
+                    purpose_evidence["purpose_errors"][0]["unresolved_reason_missing"]
+                )
 
         stale_word_in_reason = update_markdown_row(
             blocked,
@@ -806,6 +836,84 @@ class QaPlanningContractTests(unittest.TestCase):
         self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
         self.assertEqual(assertion_status(result, "TAD-D011"), "fail")
         self.assertEqual(assertion_status(result, "TAD-D016"), "fail")
+
+    def test_architecture_approval_placeholders_are_rejected_in_sources_and_artifact(
+        self,
+    ):
+        validate = load_validator("test-architecture-design")
+        text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
+        baseline = validate(text, expected, "TAD-OUT-001")
+        self.assertEqual(assertion_status(baseline, "TAD-D009"), "pass")
+        self.assertEqual(assertion_status(baseline, "TAD-D013"), "pass")
+        self.assertEqual(assertion_status(baseline, "TAD-D015"), "pass")
+
+        placeholders = (
+            "-",
+            "unknown",
+            "未取得",
+            "未設定",
+            "未確定",
+            "未確認",
+            "取得不能",
+            "N/A",
+            "失効",
+        )
+        source_section = "## 入力source・依存"
+        for owner in ("test-requirements-analysis", "architecture owner"):
+            for placeholder in placeholders:
+                with self.subTest(source_owner=owner, approval_evidence=placeholder):
+                    broken_source = update_markdown_row(
+                        text,
+                        owner,
+                        {"承認証拠ref": placeholder},
+                        source_section,
+                    )
+                    result = validate(broken_source, expected, "TAD-OUT-001")
+                    self.assertEqual(assertion_status(result, "TAD-D009"), "fail")
+                    invalid_source_evidence = next(
+                        item.evidence
+                        for item in result.assertions
+                        if item.id == "TAD-D009"
+                    )
+                    self.assertTrue(
+                        any(
+                            row.get("owner") == owner
+                            and row.get("承認証拠ref") == placeholder
+                            for row in invalid_source_evidence
+                        )
+                    )
+                    self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
+                    dependency_evidence = next(
+                        item.evidence
+                        for item in result.assertions
+                        if item.id == "TAD-D015"
+                    )
+                    self.assertIn(placeholder, str(dependency_evidence))
+
+        approval_section = "## 承認"
+        for field in ("承認主体・role", "承認証拠ref"):
+            for placeholder in placeholders:
+                with self.subTest(approval_field=field, placeholder=placeholder):
+                    broken_approval = update_markdown_row(
+                        text,
+                        "orders-release-q4",
+                        {field: placeholder},
+                        approval_section,
+                    )
+                    result = validate(broken_approval, expected, "TAD-OUT-001")
+                    self.assertEqual(assertion_status(result, "TAD-D013"), "fail")
+                    approval_evidence = next(
+                        item.evidence
+                        for item in result.assertions
+                        if item.id == "TAD-D013"
+                    )
+                    self.assertTrue(
+                        any(row.get(field) == placeholder for row in approval_evidence)
+                    )
+
+        blocked, blocked_expected = eval_case("test-architecture-design", "TAD-OUT-002")
+        blocked_result = validate(blocked, blocked_expected, "TAD-OUT-002")
+        self.assertEqual(assertion_status(blocked_result, "TAD-D013"), "pass")
 
         text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
         stale_source_revision = text.replace(
@@ -1315,6 +1423,109 @@ class QaPlanningContractTests(unittest.TestCase):
             ),
             "pass",
         )
+
+    def test_plan_input_sources_require_valid_approval_evidence(self):
+        validate = load_validator("test-management")
+        text, expected = eval_case("test-management", "TMG-OUT-001")
+        self.assertEqual(
+            assertion_status(validate(text, expected, "TMG-OUT-001"), "TMG-D019"),
+            "pass",
+        )
+        self.assertEqual(
+            assertion_status(validate(text, expected, "TMG-OUT-001"), "TMG-D020"),
+            "pass",
+        )
+        self.assertEqual(
+            assertion_status(validate(text, expected, "TMG-OUT-001"), "TMG-D023"),
+            "pass",
+        )
+        self.assertEqual(
+            assertion_status(validate(text, expected, "TMG-OUT-001"), "TMG-D016"),
+            "pass",
+        )
+        self.assertIn("未設定 / 対応中", text)
+
+        placeholders = (
+            "-",
+            "unknown",
+            "未取得",
+            "未設定",
+            "未確定",
+            "未確認",
+            "取得不能",
+            "N/A",
+            "失効",
+        )
+        source_section = "## 入力source"
+        source_fields = (
+            ("test-requirements-analysis", "QA要求ref / revision"),
+            ("test-architecture-design", "architecture ref / revision"),
+        )
+        for owner, plan_ref_field in source_fields:
+            for placeholder in placeholders:
+                with self.subTest(owner=owner, approval_evidence=placeholder):
+                    invalid_source = update_markdown_row(
+                        text,
+                        owner,
+                        {"承認証拠ref": placeholder},
+                        source_section,
+                    )
+                    result = validate(invalid_source, expected, "TMG-OUT-001")
+                    self.assertEqual(assertion_status(result, "TMG-D019"), "fail")
+                    inventory_evidence = next(
+                        item.evidence
+                        for item in result.assertions
+                        if item.id == "TMG-D019"
+                    )
+                    self.assertTrue(
+                        any(
+                            row.get("owner") == owner
+                            and row.get("承認証拠ref") == placeholder
+                            for row in inventory_evidence["invalid_source_rows"]
+                        )
+                    )
+
+                    self.assertEqual(assertion_status(result, "TMG-D020"), "fail")
+                    stale_input_evidence = next(
+                        item.evidence
+                        for item in result.assertions
+                        if item.id == "TMG-D020"
+                    )
+                    self.assertTrue(
+                        any(
+                            row.get("field") == plan_ref_field
+                            and "approval evidence ref is missing or invalid"
+                            in row.get("problems", [])
+                            for row in stale_input_evidence
+                        )
+                    )
+
+        expired_source = update_markdown_row(
+            text,
+            "test-requirements-analysis",
+            {"承認状態": "失効"},
+            source_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(expired_source, expected, "TMG-OUT-001"), "TMG-D020"
+            ),
+            "fail",
+        )
+
+        unrelated_stale_source = insert_table_row(
+            text,
+            source_section,
+            "| test-requirements-analysis | fixture://qa/requirements/other | req-r9 | other-scope | stale | 未取得 | 失効 | - |",
+        )
+        unrelated_result = validate(unrelated_stale_source, expected, "TMG-OUT-001")
+        self.assertEqual(assertion_status(unrelated_result, "TMG-D019"), "pass")
+        self.assertEqual(assertion_status(unrelated_result, "TMG-D020"), "pass")
+
+        blocked, blocked_expected = eval_case("test-management", "TMG-OUT-002")
+        blocked_result = validate(blocked, blocked_expected, "TMG-OUT-002")
+        self.assertEqual(assertion_status(blocked_result, "TMG-D019"), "pass")
+        self.assertEqual(assertion_status(blocked_result, "TMG-D020"), "pass")
 
     def test_closure_allows_test_fail_and_formal_unmet_criterion(self):
         validate = load_validator("test-management")

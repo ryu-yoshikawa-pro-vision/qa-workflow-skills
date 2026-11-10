@@ -2,7 +2,7 @@
 
 ## Identity・依存
 
-ownerは`test-architecture-design`です。成果物は保存先発行の不透明な`artifact_ref`・`revision`・`scope`を持ち、各入力はowner/source ref・revision・scope・currentness・取得状態とともに記録します。必要な承認状態と承認証拠refも保持します。`ARCH-001`等のassignment IDはartifact系列内のstable IDであり、global ID registryやcounterを作りません。
+ownerは`test-architecture-design`です。成果物は保存先発行の不透明な`artifact_ref`・`revision`・`scope`を持ち、各入力はowner/source ref・revision・scope・currentness・取得状態とともに記録します。必要な承認状態と承認証拠refも保持し、承認済みsourceの承認証拠refと承認済みartifactの承認主体・role／承認証拠refに未設定・未確定・unknown等のplaceholderを認めません。`ARCH-001`等のassignment IDはartifact系列内のstable IDであり、global ID registryやcounterを作りません。
 
 ## Assignment
 

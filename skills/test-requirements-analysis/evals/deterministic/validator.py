@@ -86,6 +86,26 @@ def _contains_unresolved_marker(value: str) -> bool:
     return False
 
 
+def _has_unresolved_reason(value: str) -> bool:
+    normalized = clean(value).casefold()
+    if not _has_value(normalized):
+        return False
+
+    for marker in UNRESOLVED_PURPOSE_MARKERS:
+        marker = marker.casefold()
+        if normalized == marker:
+            return False
+        match = re.fullmatch(re.escape(marker) + r"\s*[:：;；(（—–-](.*)", normalized)
+        if match is not None:
+            reason = re.sub(
+                r"^[\s:：;；()（）—–-]+|[\s:：;；()（）—–-]+$",
+                "",
+                clean(match.group(1)),
+            )
+            return _has_value(reason)
+    return True
+
+
 def _scope_covers(scope_value: str, target_scope: str) -> bool:
     scopes = {clean(value) for value in re.split(r"[,、;]", clean(scope_value))}
     return bool(clean(target_scope)) and clean(target_scope) in scopes
@@ -158,10 +178,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 if _contains_unresolved_marker(row.get(field, ""))
             ]
             unresolved_reason = clean(row.get("根拠", ""))
-            unresolved_reason_missing = bool(unresolved_fields) and (
-                not _has_value(unresolved_reason)
-                or unresolved_reason.casefold()
-                in {marker.casefold() for marker in UNRESOLVED_PURPOSE_MARKERS}
+            unresolved_reason_missing = bool(unresolved_fields) and not (
+                _has_unresolved_reason(unresolved_reason)
             )
             approved_with_unresolved_fields = metadata.get(
                 "状態"

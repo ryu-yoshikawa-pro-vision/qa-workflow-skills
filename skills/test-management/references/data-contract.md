@@ -6,7 +6,7 @@ ownerは`test-management`です。保存先発行の`artifact_ref`、不透明�
 
 ## 計画・source inventory
 
-計画行はplan-local ID、`<artifact_ref>#<local_id>@<revision>`形式のQA requirement／architecture ref、level／type、suite・順序、担当・見積工数・資源・開始／終了基準を持ちます。利用可能なfixtureでowner・local ID・artifact ref・revision・scopeを照合します。入力source行にはcurrentness・取得状態・必要な承認状態と証拠refを保持し、確定中の計画が参照する入力だけを検証します。無関係なscopeのstale sourceで計画全体を一律に失効させません。計画母集団と実取得を同じ行に上書きせず、次の2つの表で保持します。
+計画行はplan-local ID、`<artifact_ref>#<local_id>@<revision>`形式のQA requirement／architecture ref、level／type、suite・順序、担当・見積工数・資源・開始／終了基準を持ちます。利用可能なfixtureでowner・local ID・artifact ref・revision・scopeを照合します。入力source行にはcurrentness・取得状態・必要な承認状態と証拠refを保持し、確定中の計画が参照する入力だけを検証します。入力sourceの承認状態が`承認済み`の場合、承認証拠refに未設定・未確定・unknown等のplaceholderを認めません。無関係なscopeのstale sourceで計画全体を一律に失効させません。計画母集団と実取得を同じ行に上書きせず、次の2つの表で保持します。
 
 - **予定母集団**: population ID、source owner、期待source ref／revision、scope、query／取得範囲、execution／evidence単位、対象build、environment、必須／任意。
 - **取得readback**: population IDで予定行に対応し、実source owner・ref／revision・scope・取得範囲・execution単位・build・environment・currentness、取得状態、実行状態、結果状態、source owner readback ref、未取得／未実行理由を保持。

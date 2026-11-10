@@ -158,10 +158,10 @@ def _plan_input_status(source: dict[str, str] | None) -> list[str]:
         problems.append(f"currentness={source.get('currentness', '')}")
     if source.get("取得状態") != "取得済":
         problems.append(f"取得状態={source.get('取得状態', '')}")
-    if source.get("承認状態") != "承認済み" or not _is_present(
-        source.get("承認証拠ref", "")
-    ):
-        problems.append("approval state/evidence is not current and approved")
+    if source.get("承認状態") != "承認済み":
+        problems.append("approval state is not approved")
+    elif not _is_approval_value(source.get("承認証拠ref", "")):
+        problems.append("approval evidence ref is missing or invalid")
     return problems
 
 
@@ -1050,7 +1050,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             or clean(source.get("currentness", "")) not in CURRENTNESS
             or clean(source.get("取得状態", "")) not in ACQUISITION
             or approval_state not in APPROVAL_STATES
-            or (approval_state == "承認済み" and not _is_present(approval_evidence))
+            or (
+                approval_state == "承認済み"
+                and not _is_approval_value(approval_evidence)
+            )
         ):
             invalid_source_rows.append(source)
         source_by_identity.setdefault((owner, source_ref, revision, scope), []).append(

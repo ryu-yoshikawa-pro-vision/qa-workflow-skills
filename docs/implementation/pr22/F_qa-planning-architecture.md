@@ -457,3 +457,44 @@ PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidato
 PR #22のhead `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`を読み取り確認した。変更ファイル一覧には`README.md`、`scripts/skills/evals/deterministic/common.py`、`skills/qa-workflow/scripts/workflow_runtime.py`が含まれるが、このheadでもFの`test-requirements-analysis`、`test-architecture-design`、`test-management`はREADMEのSkill roster、`CANONICAL_SKILLS`、`RUNTIME_V2_SKILL_ROOTS`に未登録。PR #22の`tests/skills/runtime/test_owner_verifier_gate.py`も、`test-management`を未登録scopeとして完了不可にする契約を確認する。従って、PR #22で共有ファイルが更新されたこととF Skill登録の完了は区別する。
 
 担当A／PR #22への引継ぎは継続する。3 SkillをREADMEとdeterministic registryへ登録し、validator契約に対応する正式なowner verifier入口・loaderとruntime root／routingを接続する。未検証scopeを`unverified_scopes`として残し、未検証のまま完了可能にしない。登録後はAgent Skills、Deterministic Output Evals、Semantic Output Evals、Code Quality、Codex Harnessを新HEADで実行し、PR #22で実成果物のowner・ref・revision・scope・currentness・approval接続を確認する。PR #28から共有ファイルは変更していない。
+
+## 残存2件の修正と品質ゲート再実施（2026-11-10、基準HEAD `08050e7`）
+
+### 実装修正
+
+- **TMG入力source承認証拠（P1）**: `skills/test-management/evals/deterministic/validator.py`の`_plan_input_status()`は、入力sourceがcurrent・取得済・承認済みであることに加えて、承認証拠refを承認専用placeholder判定`_is_approval_value()`で検査する。`TMG-D019`のsource inventoryも、承認状態が`承認済み`の行で同じ判定を使う。修正前はこの2経路だけ一般的な`_is_present()`で証拠を確認し、`未設定`等を通し得た。一般placeholder helperは変更せず、期限・是正処置の正当な`未設定`を維持した。データ契約にsource承認証拠refの要件を明記。
+- **同根のTAD検証漏れ**: 3 Skill内を同じ原因で確認したところ、`skills/test-architecture-design/evals/deterministic/validator.py`でも一般`_has_value()`が承認専用placeholderを許容していた。TAD validator内だけに承認専用判定を加え、source inventory（`TAD-D009`）、確定依存（`TAD-D015`）、artifact承認（`TAD-D013`）で使用する。一般helperは変更せず、公開データ契約を追記した。これは今回の「同じ原因による検証漏れ」の範囲で修正し、新しい共通frameworkは追加していない。
+- **QRA不足理由（P2）**: `skills/test-requirements-analysis/evals/deterministic/validator.py`の`_has_unresolved_reason()`が既存状態marker直後の既存区切りを認識し、後続をtrimしてplaceholderのみなら理由なしと判定する。`QRA-D001`がこの判定を使う。状態markerを含む通常説明文の部分文字列検索にはせず、`stale`を含む具体的説明や`unknown: <具体的理由>`は維持する。既存のデータ契約・guidanceが不足理由を要求しているため文書の仕様変更は不要。
+
+### 回帰テスト
+
+`tests/skills/evals/deterministic/test_f_planning_contracts.py`は既存33テストを保持し、TMGと同原因のTADをそれぞれ1テスト追加して35テストとした。QRA既存テストも状態marker＋区切りだけ、空白だけ、区切り後placeholder、具体理由、`stale`を含む説明を比較し、`QRA-D001`の失敗証拠`unresolved_reason_missing`を確認する。
+
+- `test_plan_input_sources_require_valid_approval_evidence`: QA要求・architectureの両sourceについて9種のplaceholder（`-`、`unknown`、`未取得`、`未設定`、`未確定`、`未確認`、`取得不能`、`N/A`、`失効`）を個別に検証。`TMG-D019`のinventory evidenceと`TMG-D020`の対象ref・原因を直接確認し、正常source、計画自身の`TMG-D023`、blocked fixture、期限`未設定`、無関係scopeのstale sourceも維持。
+- `test_architecture_approval_placeholders_are_rejected_in_sources_and_artifact`: QRA・architecture sourceの9 placeholderを`TAD-D009`／`TAD-D015`で、artifactのauthority・evidenceを`TAD-D013`で確認。正常・blocked fixtureを維持。
+- `test_qa_purpose_success_conditions_are_required_and_finalized`: 不足理由20値を`QRA-D001`で拒否する。状態markerと複数の区切り記号のみ、およびplaceholderだけを含むsuffixを拒否し、`unknown: <具体的説明>`と具体的説明中の`stale`を許容。
+
+### ローカル品質ゲート結果
+
+実行環境はLinux、uv管理Python 3.11、PyYAML 6.0.3、Ruff 0.16.8、dprint 0.55.2。作業差分の基準はHEAD `08050e7`で、以下は今回のコード変更後の実行結果。
+
+- 担当F回帰: `uv run --with PyYAML==6.0.3 --python 3.11 -- python -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v` — **35/35 PASS**。
+- 既存deterministic runnerの6 reference fixture — **6/6 PASS**。dataset契約検査 — **25 Skill／52 case PASS**。
+- 共通deterministic tests: `uv run --with PyYAML==6.0.3 --python 3.11 -- python -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — **12/12 PASS**。
+- Repository deterministic tests: `uv run --with PyYAML==6.0.3 --python 3.11 -- python -m unittest discover -s tests/skills/evals/deterministic -v` — **325件中321 PASS／4 FAIL**。FAILは共有SQLite／WCAG経路の`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`。最後のテストでは`current Project Context state-root source is required`で`blocked`となった。`/tmp/.git`が存在し、共有SQLite実装は`.git`を含む親の下にstate DBを作らない安全ガードを持つことを確認した。Ubuntu CIによる同一HEADの切分け待ちであり、安全境界は変更していない。
+- Runtime unit／integration: `uv run --with PyYAML==6.0.3 --python 3.11 -- python -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — **496件中477 PASS／9 FAIL／9 ERROR**。全18件は共有`test_sqlite_workflow_history`経路。ERRORは直接SQLiteを開いた際の`unable to open database file`、FAILはproviderが`workflow_state_provider_unavailable`または`workflow_state_unreadable`を返す等の結果。`/tmp/.git`による共有state-root安全ガードと整合する。Ubuntu CIで同一HEADを確認する。Windowsで既知の5 FAIL／14 ERROR／6 SKIPも別途未解消。
+- Semantic dataset: `uv run --with PyYAML==6.0.3 --python 3.11 -- python scripts/skills/evals/semantic/validate.py` — **26 Skill／168 case PASS**。`python -m unittest discover -s scripts/skills/evals/semantic/tests -v` **27/27 PASS**、`python -m unittest discover -s tests/skills/evals/semantic -v` **13/13 PASS**、`python -m unittest discover -s tests/skills/evals/trigger -v` **1/1 PASS**（各unittestも同じuv Python 3.11／PyYAML環境）。
+- 固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`の`skills-ref validate skills/test-requirements-analysis`、`skills-ref validate skills/test-architecture-design`、`skills-ref validate skills/test-management` — **3/3 PASS**。`uv run --with PyYAML==6.0.3 --python 3.11 -- python -m compileall -q scripts/skills/evals/deterministic skills/*/evals/deterministic tests/skills/evals/deterministic scripts/skills/evals/semantic tests/skills/evals/semantic`とCI相当のruntime compile loop（15 Skill）— PASS。
+- Ruff lint — PASS。tracked formatter check — **221 files PASS**。formatter契約テスト **10/10 PASS**、patch whitespace契約テスト **3/3 PASS**。
+- 実行した品質コマンド: `uv run --with ruff==0.16.8 --python 3.11 -- python scripts/format_tracked.py ruff-check`、`uv run --with ruff==0.16.8 --python 3.11 -- python scripts/format_tracked.py check`、`uv run --with ruff==0.16.8 --python 3.11 -- python -m unittest discover -s tests -p 'test_format_tracked.py' -v`、`uv run --with ruff==0.16.8 --python 3.11 -- python -m unittest discover -s tests -p 'test_ci_patch_whitespace.py' -v`はいずれもPASS。`git diff --check`もPASS。
+- 新HEADのGitHub Actions — commit・push後に確認する。旧HEADの結果を今回の合格証拠として再利用しない。
+
+### 差分・引継ぎ・判定
+
+変更はQRA、TAD、TMGの担当validator／data-contract、F回帰テスト、本書に限定する。README、deterministic registry、runtime、routing等の共有ownerファイルは変更しない。token・credential・生成物は含めず、正常reference fixtureの意味・承認状態を変更していない。
+
+担当Fの2件は個別負例で再現を防ぐ変更を実装済み。ローカルF回帰、6 fixture、dataset、semantic、trigger、official Skill specification、format／lintは成功。Repository deterministicとruntimeにローカルFAIL／ERRORが残るため、品質ゲート4および担当F局所受入はUbuntu CI確認まで**判定保留**。PR #28全体は、共有README／registry／routingの3 Skill登録が未完了なら**BLOCKED**であり、Agent Skills workflowの失敗はこのF修正のPASSへ読み替えない。
+
+PR #22では、担当Aに3 SkillのREADME登録、`CANONICAL_SKILLS`、owner verifier registry、`RUNTIME_V2_SKILL_ROOTS`、routingの登録と、未検証scopeを未検証のまま保持する確認を引き継ぐ。登録後は5 workflowとdeterministic／runtime後続stepを新HEADで再確認する。実Agent／Judge、実provider CAS・履歴・readback、認証済み承認、保存失敗後復旧、E／J実成果物の横断接続は未実施であり、provider／認証主体とowner成果物の選定・接続後にPR #22で行う。
+
+PR #28本文はDraftのままで、実装・局所受入未実施という古い記述が残る。GitHub上の本文は変更していない。新HEADのActions取得後に本節を追記・更新する。

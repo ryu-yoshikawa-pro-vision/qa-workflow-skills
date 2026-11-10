@@ -20,6 +20,26 @@ BASES = {"明示指定", "承認済みarchitecture", "test-analysis既定値", "
 CURRENTNESS = {"current", "stale", "unknown"}
 ACQUISITION = {"取得済", "部分取得", "未取得", "取得不能", "0件確認済み", "不明"}
 APPROVAL_STATES = {"承認済み", "未承認", "失効", "不要", "unknown"}
+APPROVAL_PLACEHOLDERS = {
+    "",
+    "-",
+    "—",
+    "unknown",
+    "n/a",
+    "na",
+    "未取得",
+    "未設定",
+    "未確定",
+    "未確認",
+    "取得不能",
+    "失効",
+    "expired",
+    "未承認",
+    "unapproved",
+    "不要",
+    "not required",
+    "not retrieved",
+}
 
 
 def _metadata(table) -> dict[str, str]:
@@ -35,6 +55,10 @@ def _table(tables, section: str, headers: tuple[str, ...]):
 
 def _has_value(value: str) -> bool:
     return clean(value) not in {"", "-", "—", "unknown", "未取得"}
+
+
+def _is_approval_value(value: str) -> bool:
+    return clean(value).casefold() not in APPROVAL_PLACEHOLDERS
 
 
 def _source_parts(value: str) -> tuple[str, str] | None:
@@ -264,7 +288,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             or clean(source.get("currentness", "")) not in CURRENTNESS
             or clean(source.get("取得状態", "")) not in ACQUISITION
             or approval_state not in APPROVAL_STATES
-            or (approval_state == "承認済み" and not _has_value(approval_evidence))
+            or (
+                approval_state == "承認済み"
+                and not _is_approval_value(approval_evidence)
+            )
         ):
             invalid_sources.append(source)
         source_by_ref_revision.setdefault((source_ref, revision), []).append(source)
@@ -338,7 +365,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 )
             if clean(assignment.get("選択根拠", "")) == "承認済みarchitecture" and (
                 clean(root_source.get("承認状態", "")) != "承認済み"
-                or not _has_value(root_source.get("承認証拠ref", ""))
+                or not _is_approval_value(root_source.get("承認証拠ref", ""))
             ):
                 problems.append(
                     {
@@ -380,7 +407,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 clean(requirement_source.get("currentness", "")) != "current"
                 or clean(requirement_source.get("取得状態", "")) != "取得済"
                 or clean(requirement_source.get("承認状態", "")) != "承認済み"
-                or not _has_value(requirement_source.get("承認証拠ref", ""))
+                or not _is_approval_value(requirement_source.get("承認証拠ref", ""))
             ):
                 problems.append(
                     {
@@ -680,8 +707,8 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if clean(row.get("artifact_ref", "")) != metadata.get("artifact_ref")
         or clean(row.get("revision", "")) != metadata.get("revision")
         or clean(row.get("対象scope", "")) != metadata.get("scope")
-        or not _has_value(row.get("承認主体・role", ""))
-        or not _has_value(row.get("承認証拠ref", ""))
+        or not _is_approval_value(row.get("承認主体・role", ""))
+        or not _is_approval_value(row.get("承認証拠ref", ""))
         or metadata.get("状態") != "承認済み"
     ]
     if metadata.get("状態") == "承認済み" and not approvals:
