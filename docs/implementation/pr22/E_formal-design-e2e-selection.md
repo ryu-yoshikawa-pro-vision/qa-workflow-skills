@@ -411,6 +411,13 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - GitHub Actionsはremote head `54e54262768ed256aacdc811875e4a02b7d08fd7`に対する結果のみ確認した。Code Quality run 848、Validate Deterministic Output Evals run 2153、Validate Semantic Output Evals run 2118、Codex Harness run 848はsuccess。Validate Agent Skills run 2155は`validate` jobの`Validate repository eval structure` stepでfailure。原因は共有`README.md`に`e2e-test-selection`登録がないことで、owner A。これらはlocal未push commitsの検証ではない。
 - local再開条件：通常のGitHub HTTPS認証がこの実行環境から利用可能になった後、先に`git fetch origin`と`git status -sb`でremote先行を再確認し、remoteがlocal履歴のancestorの場合だけ指定branchへ通常pushする。remoteが進んでいた場合はpushを停止し、force／無断rebaseをせず調整する。認証情報の表示・コピー・別経路利用はしない。
 
+## push完了・追加CI修正（2026-11-10）
+
+- 実行環境更新後の`git fetch origin`で対象remote branchの先行変更がないことを確認し、通常pushが成功した。local／remote HEADは`e1b700915c98a89bbe958ef808844d0bdcba66af`で一致し、作業treeはclean。前項の認証失敗は解消済みとして履歴に残す。PR #27は引き続きopen／Draft。
+- このHEADのActions：Validate Deterministic Output Evals run 2163 PASS、Validate Semantic Output Evals run 2128 PASS、Code Quality run 858 FAIL、Validate Agent Skills run 2165 FAIL、Codex Harness run 858 実行中（最後の確認時点）。Code Qualityのstep `Check tracked Python, Markdown, JSON, YAML, TOML, and JavaScript`は担当テスト2ファイルのRuff I001 import order違反で失敗した。`test_coverage_analysis_traceability.py`では同一test moduleのimport順、`test_e2e_selection_contract.py`では`copy`と`importlib.util`の順を修正する。local Ruff executableがないためRuffの独立実行は未実施、対象runtime 22件＋26件、compileall、dprint check、`git diff --check`は修正後PASS。
+- Validate Agent Skills run 2165はrepository eval structure stepで`README.md`に`e2e-test-selection`がないためFAIL。Skill単体spec stepはPASS。READMEは共有A ownerのためEでは変更せず、Aへ引継ぎを継続する。
+- 上記import order修正と本Plan記録を担当branchへ次の通常commit／push対象とする。修正後HEADのActionsはpush後に別途確認し、run 858のCodex Harnessが実行中だった結果は完了と扱わない。
+
 ## 進捗保存（2026-11-10）
 
 - 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。

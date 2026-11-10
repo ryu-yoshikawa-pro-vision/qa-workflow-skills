@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import unittest
 
-from tests.skills.runtime.test_traceability_runtime import (
-    TraceabilityRuntimeTests,
-    base_request,
-    run,
-)
 from tests.skills.runtime.test_formal_design_contract import (
     contract as formal_contract,
     drafts as formal_drafts,
     packet as formal_packet,
+)
+from tests.skills.runtime.test_traceability_runtime import (
+    TraceabilityRuntimeTests,
+    base_request,
+    run,
 )
 
 
