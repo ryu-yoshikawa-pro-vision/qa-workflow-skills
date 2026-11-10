@@ -570,6 +570,13 @@ class QaPlanningContractTests(unittest.TestCase):
             "unknown—",
             "unknown–",
             "unknown-",
+            "unknown: stale",
+            "未取得: blocked",
+            "unknown: expired",
+            "未確定：未確認",
+            "stale: unknown",
+            "blocked: 未取得",
+            "UNKNOWN: STALE",
         )
         for missing_reason in missing_reasons:
             with self.subTest(unresolved_purpose_reason=missing_reason):
@@ -589,6 +596,23 @@ class QaPlanningContractTests(unittest.TestCase):
                 self.assertTrue(
                     purpose_evidence["purpose_errors"][0]["unresolved_reason_missing"]
                 )
+
+        valid_reasons = (
+            "unknown: REQUEST-MISSINGのrevisionが取得できないため",
+            "未取得: stakeholderから回答を取得できないため",
+            "REQUEST-MISSINGがstale revisionで本文を取得できないため",
+            "unknown: stale revisionのまま更新されたsourceが取得できないため",
+        )
+        for valid_reason in valid_reasons:
+            with self.subTest(unresolved_purpose_reason=valid_reason):
+                explained = update_markdown_row(
+                    blocked,
+                    blocked_row_id,
+                    {"根拠": valid_reason},
+                    blocked_section,
+                )
+                explained_result = validate(explained, blocked_expected, "QRA-OUT-002")
+                self.assertEqual(assertion_status(explained_result, "QRA-D001"), "pass")
 
         stale_word_in_reason = update_markdown_row(
             blocked,

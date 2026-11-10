@@ -102,7 +102,11 @@ def _has_unresolved_reason(value: str) -> bool:
                 "",
                 clean(match.group(1)),
             )
-            return _has_value(reason)
+            normalized_reason = clean(reason).casefold()
+            return _has_value(normalized_reason) and all(
+                normalized_reason != unresolved_marker.casefold()
+                for unresolved_marker in UNRESOLVED_PURPOSE_MARKERS
+            )
     return True
 
 

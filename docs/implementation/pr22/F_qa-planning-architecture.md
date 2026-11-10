@@ -506,3 +506,46 @@ PR #22のhead `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`を読み取り確認し
 PR #22の最新HEAD `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`を再確認した。README、`CANONICAL_SKILLS`、`RUNTIME_V2_SKILL_ROOTS`には担当Fの3 Skillが未登録で、PR #22の共有更新後もこの点は未解消。担当Aへ3 SkillのREADME登録、owner verifier registry／loader、runtime root、routingの登録と、未検証scopeを未検証のまま保持する確認を引き継ぐ。登録後はAgent Skillsを含む5 workflowを再確認する。実Agent／Judge、実provider CAS・履歴・readback、認証済み承認、保存失敗後復旧、E／J実成果物の横断接続は未実施であり、provider／認証主体とowner成果物の選定・接続後にPR #22で行う。
 
 PR #28本文はDraftのままで、実装・局所受入未実施という古い記述が残る。GitHub上の本文は変更していない。上記Actionsはcode HEAD `50c15a9`の結果であり、本書を含む後続commitのActionsも再取得して最終報告する。
+
+## QRA不足理由の状態marker再拒否（2026-11-10、基準HEAD `dad8bab45d74002b1b8ec4ba281d7465d18fef7b`）
+
+### 原因と修正
+
+`_has_unresolved_reason()`は状態markerと区切り文字を取り除いた後、一般placeholderだけを確認していた。`stale`と`blocked`は一般placeholderではないため、`unknown: stale`や`未取得: blocked`を具体的な不足理由として受理していた。状態markerのcasefold済み単独値も不足理由ではない。
+
+`skills/test-requirements-analysis/evals/deterministic/validator.py`の`_has_unresolved_reason()`で、抽出・trim後の値をcasefoldし、既存`UNRESOLVED_PURPOSE_MARKERS`のいずれかと完全一致する場合も拒否する。`_has_value()`、`_contains_unresolved_marker()`、`QRA-D001`の責務は変更していない。通常説明文中の`stale`は部分文字列照合せず、許容する。
+
+### 回帰テスト
+
+`test_qa_purpose_success_conditions_are_required_and_finalized`を拡張した。修正前の直接確認では`unknown: stale`と`未取得: blocked`が`QRA-D001=pass`となり、回帰追加後の修正前テストはそれらに加えて`UNKNOWN: STALE`でFAILした。他の新規負例は既存placeholder判定によって拒否されることも確認した。
+
+修正後は`QRA-OUT-002`で既存の不足理由負例20値を維持し、次の状態marker単独値7件を追加した。各負例で`QRA-D001=fail`とevidenceの`unresolved_reason_missing=true`を確認する。
+
+```text
+unknown: stale
+未取得: blocked
+unknown: expired
+未確定：未確認
+stale: unknown
+blocked: 未取得
+UNKNOWN: STALE
+```
+
+同じ経路で`unknown: REQUEST-MISSINGのrevisionが取得できないため`、`未取得: stakeholderから回答を取得できないため`、`REQUEST-MISSINGがstale revisionで本文を取得できないため`、`unknown: stale revisionのまま更新されたsourceが取得できないため`をPASSさせた。`QRA-OUT-001`・`QRA-OUT-002`の意味・状態は変更していない。
+
+### ローカル検証結果
+
+作業環境はLinux／uv Python 3.11／PyYAML 6.0.3。コード変更はvalidatorと既存回帰testの2ファイル。以下は基準HEAD `dad8bab`からの未commit差分に対する結果。
+
+- 担当F回帰 `python -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v`（uv Python 3.11）— **35/35 PASS**。35個のテスト関数を保持し、追加負例7値・説明付き理由4値を同じQRA-D001判定経路で確認。
+- 既存deterministic runnerによるQRA-OUT-001/002、TAD-OUT-001/002、TMG-OUT-001/002 — **6/6 PASS**。workflow同等のdataset契約検査 — **25 Skill／52 case PASS**。
+- Shared deterministic — **12/12 PASS**。Repository deterministic — **325件中321 PASS／4 FAIL**。FAILは共有SQLite／WCAGの`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`。
+- Runtime unit／integration — **496件中477 PASS／9 FAIL／9 ERROR**。18件は共有`test_sqlite_workflow_history`に限られる。9 ERRORは`sqlite3.OperationalError: unable to open database file`、9 FAILはproviderが`workflow_state_provider_unavailable`／`workflow_state_unreadable`を返す。共有`skills/qa-workflow/scripts/artifact_graph.py:1099-1100`は親階層に`.git`があれば一時DB作成を拒否し、実行環境の`/tmp/.git`がこのguardを発動することを確認した。共有runtime guardは変更せず、これらのローカル失敗をPASSとは扱わない。同一検証のUbuntu CI確認待ち。Windows既知の5 FAIL／14 ERROR／6 SKIPも未解消。
+- Semantic dataset — **26 Skill／168 case PASS**。Shared semantic **27/27 PASS**、Repository semantic **13/13 PASS**、Trigger **1/1 PASS**。CI相当のcompile（deterministic grader、全validator、repository tests、semantic scripts/tests、15 Skillのruntime scripts）— PASS。
+- Ruff lint — PASS。tracked format check — **221 files PASS**。formatter契約 **10/10 PASS**、whitespace契約 **3/3 PASS**。固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`の公式`skills-ref validate` — 3 Skill PASS。`git diff --check` — PASS。
+
+作業前にWSL checkoutの対象worktree metadata `gitdir`がWindows絶対パスを指し、repository PreToolUse hookのroot解決に失敗したため、当該worktree metadataの参照先を同じcheckoutへの相対パスに直してhook経由のGit操作を復旧した。このmetadata変更はPR差分・commit対象に含めない。作業前の`git fetch origin`後は対象branchのahead/behindが`0/0`であり、基準HEADは指定の`dad8bab`、worktreeはcleanだった。
+
+### CI・残件
+
+この修正のcode commitをpushする前のため、新HEADに対するGitHub Actionsは未実施。push後に5 workflowを確認し、head SHA・run URL・PASS／FAIL／SKIPを追記する。READMEへの3 Skill未登録は担当A／PR #22の共有残件であり、本修正では変更しない。実Agent・実provider・認証済み承認・PR #22横断接続も未実施。PR #28本文はDraftのままで、古い「実装コードと局所受入は未実施」という記述が残るが、GitHub上の本文は変更しない。
