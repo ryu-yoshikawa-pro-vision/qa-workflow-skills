@@ -647,3 +647,10 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - 対象commitに紐づく最新PR Actions：Code Quality run 885 PASS、Validate Deterministic Output Evals run 2190 PASS、Validate Semantic Output Evals run 2155 PASS、Codex Harness run 885 PASS（Linux `codex-contract`／Windows `windows-launcher`ともPASS）、Validate Agent Skills run 2192 FAIL。
 - Validate Agent Skillsのjob `validate`では`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。実行logはPR synthetic merge `2822986b98fb229f6d6eed1a954e5f95e0fb954c`をcheckoutし、READMEのcanonical一覧に`e2e-test-selection`がないため停止した。PR ActionsのPASSは実Agent発火・semantic Judge・実providerの受入を示さない。
 - PR APIで再確認：PR #27はopen／Draft、base `feat/development-qa-traceability`、head `37a4f63d6f621b683cc44a3529433b2bd65b3175`。PR本文は旧状態のままで、この作業では変更していない。次回はREADMEをPR #22統合ownerが修正した後にValidate Agent Skillsを再実行し、本Plan記載の実Agent／Judge／provider条件は別途owner-approved環境が接続した後に再開する。
+
+### 2026-11-10の最新Plan commit・Actions確認
+
+- 上記Actions確認を記録したPlan-only commit `c24be2f3c6e1f26d56d73523a8544257169cd4e6`（`docs: record PR #27 post-push checks`）を同branchへ通常pushした。push後のlocal HEADとremote HEADは一致した。
+- このcommitに紐づくActions：Code Quality run 887 PASS、Validate Deterministic Output Evals run 2192 PASS、Validate Semantic Output Evals run 2157 PASS、Codex Harness run 887 PASS（`codex-contract`と`windows-launcher`）、Validate Agent Skills run 2194 FAIL。
+- Validate Agent Skillsはjob `validate`の`Validate repository eval structure`でFAILし、ログの不一致はREADME canonical一覧に`e2e-test-selection`がないこと。公式Skill仕様検証はPASS。実際のcheckoutはsynthetic merge `e464fcf373aac894f7b31db89ecd09b2975b647e`（head `c24be2f...`とbase `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`）で、branch-only検証ではない。
+- 現時点のPR API状態：PR #27はopen／Draft、base `feat/development-qa-traceability`、head `c24be2f3c6e1f26d56d73523a8544257169cd4e6`。PR本文は未変更。次のPlan-only同期commit自体のCIはpush後に別途確認し、完了扱いせず最終報告へ記録する。
