@@ -147,8 +147,7 @@ def insert_table_row(text: str, section: str, row: str) -> str:
     for index in range(section_index + 1, len(lines)):
         line = lines[index].strip()
         if line.startswith("|") and all(
-            set(cell.strip()) <= {"-", ":"}
-            for cell in line.strip("|").split("|")
+            set(cell.strip()) <= {"-", ":"} for cell in line.strip("|").split("|")
         ):
             separator_index = index
             break
@@ -296,7 +295,9 @@ class QaPlanningContractTests(unittest.TestCase):
         result = validate(broken, expected, "QRA-OUT-002")
         self.assertEqual(assertion_status(result, "QRA-D014"), "fail")
 
-    def test_approved_qa_requirements_reject_stale_sources_and_allow_draft_recovery(self):
+    def test_approved_qa_requirements_reject_stale_sources_and_allow_draft_recovery(
+        self,
+    ):
         validate = load_validator("test-requirements-analysis")
         text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
         stale_source = text.replace(
@@ -324,12 +325,12 @@ class QaPlanningContractTests(unittest.TestCase):
         self.assertEqual(assertion_status(draft_result, "QRA-D015"), "pass")
         self.assertEqual(assertion_status(draft_result, "QRA-D013"), "pass")
 
-    def test_qa_requirement_and_source_rows_without_local_ids_or_refs_are_not_ignored(self):
+    def test_qa_requirement_and_source_rows_without_local_ids_or_refs_are_not_ignored(
+        self,
+    ):
         validate = load_validator("test-requirements-analysis")
         text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
-        missing_requirement_id = update_markdown_row(
-            text, "QAR-001", {"QA要求ID": ""}
-        )
+        missing_requirement_id = update_markdown_row(text, "QAR-001", {"QA要求ID": ""})
         result = validate(missing_requirement_id, expected, "QRA-OUT-001")
         self.assertEqual(assertion_status(result, "QRA-D005"), "fail")
 
@@ -389,9 +390,7 @@ class QaPlanningContractTests(unittest.TestCase):
     def test_architecture_does_not_ignore_assignment_or_source_rows_without_keys(self):
         validate = load_validator("test-architecture-design")
         text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
-        missing_assignment_id = update_markdown_row(
-            text, "ARCH-001", {"割当ID": ""}
-        )
+        missing_assignment_id = update_markdown_row(text, "ARCH-001", {"割当ID": ""})
         result = validate(missing_assignment_id, expected, "TAD-OUT-001")
         self.assertEqual(assertion_status(result, "TAD-D005"), "fail")
 
@@ -459,7 +458,9 @@ class QaPlanningContractTests(unittest.TestCase):
         self.assertEqual(assertion_status(result, "TAD-D015"), "fail")
         self.assertEqual(assertion_status(result, "TAD-D011"), "fail")
 
-    def test_architecture_priority_is_target_local_and_unknown_sources_do_not_bypass_it(self):
+    def test_architecture_priority_is_target_local_and_unknown_sources_do_not_bypass_it(
+        self,
+    ):
         validate = load_validator("test-architecture-design")
         text, expected = eval_case("test-architecture-design", "TAD-OUT-001")
         stale_source_a = update_markdown_row(
@@ -739,8 +740,14 @@ class QaPlanningContractTests(unittest.TestCase):
         result = validate(missing, expected, "TMG-OUT-001")
         self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
         self.assertEqual(assertion_status(result, "TMG-D015"), "fail")
-        self.assertIn("POP-001", str(next(a.evidence for a in result.assertions if a.id == "TMG-D013")))
-        self.assertIn("POP-001", str(next(a.evidence for a in result.assertions if a.id == "TMG-D015")))
+        self.assertIn(
+            "POP-001",
+            str(next(a.evidence for a in result.assertions if a.id == "TMG-D013")),
+        )
+        self.assertIn(
+            "POP-001",
+            str(next(a.evidence for a in result.assertions if a.id == "TMG-D015")),
+        )
 
     def test_missing_optional_readback_is_unknown_not_zero(self):
         validate = load_validator("test-management")
@@ -764,7 +771,9 @@ class QaPlanningContractTests(unittest.TestCase):
             "## source owner readback・取得／実行状態",
         )
         result = validate(missing, expected, "TMG-OUT-001")
-        evidence = str(next(a.evidence for a in result.assertions if a.id == "TMG-D013"))
+        evidence = str(
+            next(a.evidence for a in result.assertions if a.id == "TMG-D013")
+        )
         self.assertEqual(assertion_status(result, "TMG-D013"), "fail")
         self.assertIn("POP-001", evidence)
         self.assertIn("POP-002", evidence)
@@ -800,12 +809,16 @@ class QaPlanningContractTests(unittest.TestCase):
             update_markdown_row(
                 text,
                 "PLAN-001",
-                {"QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-999@req-r3"},
+                {
+                    "QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-999@req-r3"
+                },
             ),
             update_markdown_row(
                 text,
                 "PLAN-001",
-                {"architecture ref / revision": "fixture://qa/architecture/orders-r1#ARCH-999@arch-r1"},
+                {
+                    "architecture ref / revision": "fixture://qa/architecture/orders-r1#ARCH-999@arch-r1"
+                },
             ),
             update_markdown_row(
                 text,
@@ -815,7 +828,9 @@ class QaPlanningContractTests(unittest.TestCase):
             update_markdown_row(
                 text,
                 "PLAN-001",
-                {"QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-001@req-r2"},
+                {
+                    "QA要求ref / revision": "fixture://qa/requirements/orders-q4#QAR-001@req-r2"
+                },
             ),
         )
         for broken in malformed_refs:
@@ -914,9 +929,7 @@ class QaPlanningContractTests(unittest.TestCase):
             "## 差異・未処理事項",
             "|  | orders-release-q4 | open gap | GAP-1@r1 | investigate | QA team | 対応中 | - | - |",
         )
-        difference_result = validate(
-            missing_difference_id, expected, "TMG-OUT-001"
-        )
+        difference_result = validate(missing_difference_id, expected, "TMG-OUT-001")
         self.assertEqual(assertion_status(difference_result, "TMG-D024"), "fail")
         self.assertEqual(assertion_status(difference_result, "TMG-D018"), "fail")
 
@@ -954,9 +967,7 @@ class QaPlanningContractTests(unittest.TestCase):
         self.assertEqual(assertion_status(result, "TMG-D017"), "fail")
         self.assertEqual(assertion_status(result, "TMG-D018"), "fail")
 
-        missing_action_result = update_markdown_row(
-            text, "CA-001", {"結果ref": "-"}
-        )
+        missing_action_result = update_markdown_row(text, "CA-001", {"結果ref": "-"})
         result = validate(missing_action_result, expected, "TMG-OUT-001")
         self.assertEqual(assertion_status(result, "TMG-D022"), "fail")
         self.assertEqual(assertion_status(result, "TMG-D018"), "fail")

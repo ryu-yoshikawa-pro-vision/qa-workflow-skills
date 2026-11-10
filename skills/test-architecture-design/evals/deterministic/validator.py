@@ -63,11 +63,7 @@ def _level_tokens(value: str) -> set[str]:
     normalized = clean(value)
     if normalized in {"", "-"}:
         return set()
-    return {
-        token
-        for token in re.split(r"[、・,;/\s]+", normalized)
-        if token
-    }
+    return {token for token in re.split(r"[、・,;/\s]+", normalized) if token}
 
 
 def _mentions_level(text: str, level: str) -> bool:
@@ -358,7 +354,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         requirement_sources = []
         if requirement_match is not None:
             requirement_sources = source_by_ref_revision.get(
-                (requirement_match.group("artifact_ref"), requirement_match.group("revision")),
+                (
+                    requirement_match.group("artifact_ref"),
+                    requirement_match.group("revision"),
+                ),
                 [],
             )
             requirement_sources = [
@@ -395,9 +394,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 )
 
         source_problems_by_assignment[assignment_id] = problems
-        if problems and (
-            not held or clean(metadata.get("状態", "")) == "承認済み"
-        ):
+        if problems and (not held or clean(metadata.get("状態", "")) == "承認済み"):
             unresolved_sources.append(
                 {"id": assignment_id, "target_ref": target, "dependencies": problems}
             )
@@ -442,11 +439,13 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     }
     precedence_targets = [clean(row.get("target_ref", "")) for row in precedence]
     duplicate_precedence_targets = sorted(
-        {target for target in precedence_targets if precedence_targets.count(target) > 1}
+        {
+            target
+            for target in precedence_targets
+            if precedence_targets.count(target) > 1
+        }
     )
-    missing_precedence_targets = sorted(
-        assignment_targets - set(precedence_targets)
-    )
+    missing_precedence_targets = sorted(assignment_targets - set(precedence_targets))
     for target in duplicate_precedence_targets:
         priority_violations.append(
             {"target_ref": target, "reason": "precedence target is duplicated"}
@@ -472,7 +471,14 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         default_levels = _levels(default)
         if default in {"", "-"}:
             default_levels = {"システム"}
-        valid_level_tokens = {"コンポーネント", "API", "システム", "受入", "別レベル", "未確定"}
+        valid_level_tokens = {
+            "コンポーネント",
+            "API",
+            "システム",
+            "受入",
+            "別レベル",
+            "未確定",
+        }
         invalid_level_fields = {
             field: sorted(_level_tokens(value) - valid_level_tokens)
             for field, value in (
@@ -483,14 +489,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if _level_tokens(value) - valid_level_tokens
         }
         unresolved_level_input = any(
-            "未確定" in _level_tokens(value)
-            for value in (explicit, approved, default)
+            "未確定" in _level_tokens(value) for value in (explicit, approved, default)
         )
-        has_conflict = bool(explicit_levels and approved_levels and not explicit_levels <= approved_levels)
+        has_conflict = bool(
+            explicit_levels
+            and approved_levels
+            and not explicit_levels <= approved_levels
+        )
         dependencies_stale = any(
-            source_problems_by_assignment.get(
-                clean(assignment.get("割当ID", "")), []
-            )
+            source_problems_by_assignment.get(clean(assignment.get("割当ID", "")), [])
             for assignment in target_assignments
         )
         needs_hold = has_conflict or dependencies_stale or unresolved_level_input
@@ -598,16 +605,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             clean(assignment.get("level", "")) for assignment in target_assignments
         }
         actual_basis_by_level = {
-            clean(assignment.get("level", "")): clean(
-                assignment.get("選択根拠", "")
-            )
+            clean(assignment.get("level", "")): clean(assignment.get("選択根拠", ""))
             for assignment in target_assignments
         }
         required_decision_labels = all(
             _mentions_level(decision, level) for level in expected_target_levels
         )
         if decision_basis == "明示指定":
-            required_decision_labels = required_decision_labels and "明示指定" in decision
+            required_decision_labels = (
+                required_decision_labels and "明示指定" in decision
+            )
         elif decision_basis == "承認済みarchitecture":
             required_decision_labels = (
                 required_decision_labels and "承認済みarchitecture" in decision

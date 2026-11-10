@@ -645,7 +645,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     }
     missing_actual = sorted(set(population_ids) - set(actual_ids))
     unexpected_actual = sorted(set(actual_ids) - set(population_ids))
-    unusable_actual = sorted(set(population_ids) & (set(actual_ids) - set(status_by_id)))
+    unusable_actual = sorted(
+        set(population_ids) & (set(actual_ids) - set(status_by_id))
+    )
     if missing_actual or unexpected_actual or ambiguous_actual or unusable_actual:
         invalid_actual_rows.append(
             {
@@ -719,7 +721,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if state is None
         ]
         values = {field: _integer(snapshot.get(field, "")) for field in MONITOR_COUNTS}
-        invalid_counts = {field: value for field, value in values.items() if value is None}
+        invalid_counts = {
+            field: value for field, value in values.items() if value is None
+        }
         if invalid_counts:
             monitoring_errors.append(
                 {
@@ -755,7 +759,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                     "missing_readbacks": missing_status,
                 }
             )
-        if values.get("計画population数") is not None and values["計画population数"] != len(group):
+        if values.get("計画population数") is not None and values[
+            "計画population数"
+        ] != len(group):
             monitoring_errors.append(
                 {
                     "snapshot_ref": snapshot.get("snapshot_ref"),
@@ -1078,7 +1084,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         not invalid_source_rows and not unresolved_plan_inputs,
         "計画のQA要求・architecture refがowner・artifact・local ID・revision・scopeと利用可能なfixtureに一致すること",
         evidence=(
-            {"invalid_source_rows": invalid_source_rows, "unresolved_refs": unresolved_plan_inputs}
+            {
+                "invalid_source_rows": invalid_source_rows,
+                "unresolved_refs": unresolved_plan_inputs,
+            }
             if invalid_source_rows or unresolved_plan_inputs
             else None
         ),
@@ -1096,7 +1105,11 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 f"{local_id_prefix}-"
             ):
                 stale_plan_inputs.append(
-                    {"plan_id": plan.get("計画ID"), "field": field, "reason": "invalid ref"}
+                    {
+                        "plan_id": plan.get("計画ID"),
+                        "field": field,
+                        "reason": "invalid ref",
+                    }
                 )
                 continue
             source_matches = source_by_identity.get(
@@ -1147,7 +1160,6 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=invalid_criteria or None,
     )
 
-    risks = risk_rows_for_closure
     invalid_risks = [
         row
         for row in risk_rows_for_closure
@@ -1236,14 +1248,19 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         not duplicate_differences and not invalid_differences,
         "差異をscope・根拠・状態と処理証拠へ結び付けること",
         evidence=(
-            {"duplicate_ids": duplicate_differences, "invalid_rows": invalid_differences}
+            {
+                "duplicate_ids": duplicate_differences,
+                "invalid_rows": invalid_differences,
+            }
             if duplicate_differences or invalid_differences
             else None
         ),
     )
 
     approval_rows = nonempty_rows(approval_table, "状態")
-    approvals = [row for row in approval_rows if clean(row.get("状態", "")) == "承認済み"]
+    approvals = [
+        row for row in approval_rows if clean(row.get("状態", "")) == "承認済み"
+    ]
     approval_errors = [
         row
         for row in approvals
@@ -1280,7 +1297,10 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         not approval_errors and not invalid_approval_states,
         "承認済み・進行中・完了の計画に同一scope・artifact ref・revisionの承認証拠があること",
         evidence=(
-            {"approval_errors": approval_errors, "invalid_states": invalid_approval_states}
+            {
+                "approval_errors": approval_errors,
+                "invalid_states": invalid_approval_states,
+            }
             if approval_errors or invalid_approval_states
             else None
         ),

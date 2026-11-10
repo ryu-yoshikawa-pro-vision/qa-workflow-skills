@@ -223,9 +223,13 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 
 今回の公開作業開始時は対象branch `feat/pr22-f-qa-planning-architecture`、HEAD `f86e4bc4f56b95c831997d8ca9088ee7846d8400`。worktreeにはこの修正作業で作成した22件のtracked変更があり、未追跡ファイルはなかった。変更pathは3 Skill配下、`tests/skills/evals/deterministic/test_f_planning_contracts.py`、この担当文書に限定され、A所有のREADME・共通runtime・routingや生成物は含まない。
 
-`git fetch origin`は成功し、commit前の`git rev-list --left-right --count HEAD...origin/feat/pr22-f-qa-planning-architecture`は`0 0`。remote-only／local-only commitはなく、履歴同期は不要。秘密情報を含む高信頼形式、意図しないpath、テスト失敗を隠す差分はpush前確認で検出されていない。追記した担当文書はdprint 0.55.2の`dprint fmt`と`dprint check`をPASSした。上記のローカル検証結果は修正完了時点の記録で、この公開作業ではテストを再実行していない。
+`git fetch origin`は成功し、commit前の`git rev-list --left-right --count HEAD...origin/feat/pr22-f-qa-planning-architecture`は`0 0`。remote-only／local-only commitはなく、履歴同期は不要。秘密情報を含む高信頼形式、意図しないpath、テスト失敗を隠す差分はpush前確認で検出されていない。追記した担当文書はdprint 0.55.2の`dprint fmt`と`dprint check`をPASSした。初回pushはHTTPS認証エラーになったが、その後の通常pushは成功した。
 
-修正commit `be63df06b05970811e966d2f81b589400cc73e34`（`fix(pr28): address planning validator review findings`）は作成済み。`git push origin HEAD:feat/pr22-f-qa-planning-architecture`は`fatal: could not read Username for 'https://github.com': No such device or address`で失敗した。これは利用可能なGitHub認証がない認証エラーであり、network、権限拒否、履歴競合を示すエラーではない。`git ls-remote --heads origin feat/pr22-f-qa-planning-architecture`とGitHub PR取得はremote headが引き続き`f86e4bc4f56b95c831997d8ca9088ee7846d8400`であることを確認し、修正commitはGitHubへ反映されていない。GitHubはPR #28をDraftのまま報告し、修正commitに対するActions runは0件。既存remote headの5 workflowはValidate Agent Skills／Validate Deterministic Output EvalsがFAIL、Validate Semantic Output Evals／Code Quality／Codex HarnessがPASSだが、すべて`f86e4bc4...`上の結果で修正後CIではない。通常push可能な認証経路が利用できた後、remote SHA一致と5 workflowを再確認する。PR本文とDraft状態は変更していない。
+修正commit `be63df06b05970811e966d2f81b589400cc73e34`（`fix(pr28): address planning validator review findings`）と記録commit `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`（`docs(pr28): record push authentication blocker`）はGitHubへpush済み。`git ls-remote --heads origin feat/pr22-f-qa-planning-architecture`とGitHub PR取得でremote／local SHA `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`の一致を確認した。PR #28はopen／Draftのままで、PR本文は更新していない。
+
+### push後Code Quality対応（2026-11-10）
+
+push済みhead `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`のCode Quality run #859が、TMG validatorの未使用`risks`代入（Ruff F841、当時の1150行目）でFAILした。`risks = risk_rows_for_closure`を削除し、同じtracked format checkで示されたTAD/TMG validatorとF回帰テストのRuff format差分も既存formatterで整形した。これらはFの既存変更ファイルに限る。follow-up後の`uv run --with ruff==0.16.8 python scripts/format_tracked.py check`は221 tracked files PASS、F回帰30件も再実行してPASSした。このfollow-up修正はこの文書記録時点で未commit／未pushであり、push後に5 workflowを再確認する。
 
 ### 指摘別の修正結果
 
@@ -246,6 +250,7 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 実行環境はLinux、Python 3.12.3。`python` aliasとsystem `pip`はなく、`python3`を使用した。結果は次のとおり。
 
 - `python3 -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v` — PASS 30、FAIL/ERROR 0。
+- Code Quality FAIL後に再実行: `uvx --from ruff==0.16.8 ruff format skills/test-architecture-design/evals/deterministic/validator.py skills/test-management/evals/deterministic/validator.py tests/skills/evals/deterministic/test_f_planning_contracts.py` — 3 files reformatted。続く`uv run --with ruff==0.16.8 python scripts/format_tracked.py check` — PASS、221 tracked files。F回帰30件も再実行してPASS。Ruffはephemeral uv environmentで実行し、project dependencyは追加していない。
 - `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS 12、FAIL/ERROR 0。
 - `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — 320件、315件成功、4 FAIL／1 ERROR。Fの30件はPASS。4件は共有SQLite stateの3件とWCAG保存計画1件で、providerが`/tmp/.git`を含むrootをgit worktree内と判定し安全に拒否するためblockedになった。ERROR 1件はstatic serverのloopback bindが`PermissionError: [Errno 1] Operation not permitted`で拒否された。これはこのmanaged sandboxでの実行制約で、Linux GitHub Actionsの結果ではない。共有runtimeの禁止条件は迂回していない。
 - `.github/workflows/deterministic-output-evals.yml`の`Validate output eval datasets`と同等の検査 — PASS、25 Skill／52 case。3 Skillの6ケースは既存deterministic runnerで全件PASS（保存reference fixtureを用いた静的評価）。
@@ -253,16 +258,18 @@ PR #22ではA〜Jの実artifactを保存・readback後に接続し、Fが保持�
 - `python3 scripts/skills/evals/semantic/validate.py` — PASS、26 Skill／168 case。`python3 -m unittest discover -s scripts/skills/evals/semantic/tests -v` — PASS 27。`python3 -m unittest discover -s tests/skills/evals/semantic -v` — PASS 13。`python3 -m unittest discover -s tests/skills/evals/trigger -v` — PASS 1。
 - `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — 496件、477件成功、10 FAIL／9 ERROR。18 SQLite履歴caseは`/tmp/.git`があるためshared providerがgit worktree配下へのDB作成を拒否。残る`test_json_nesting_failure_is_a_structured_input_error`はPython 3.12.3で深い配列をJSON listとしてparseし、期待文字列`nesting`ではなく`JSON document must be an object`になった。A担当の共有runtime／Python-version contractとして引き継ぐ。Windowsで既知の5 failure／14 error／6 skipはこのLinux実行で解消されたものとは扱わない。
 - `dprint --version` — 0.55.2。変更・未追跡のMarkdown／JSON等17ファイルを明示した`dprint check --config dprint.json --config-discovery=false --no-gitignore --stdin-files` — PASS。未追跡ファイル0。`dprint fmt`はこの差分内の3 fixtureだけを整列し、意味内容は変えていない。`git diff --check` — PASS。
-- `python3 scripts/format_tracked.py ruff-check`および`python3 scripts/format_tracked.py check` — 実行したがRuff実行ファイルがなく開始できず終了code 2。Ruff 0.16.8を`uv`で用意する試みはPyPI DNS解決不可で失敗。dprint通過をRuff通過とは扱わない。
-- 固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`の`skills-ref validate`は、GitHub DNS解決不可で取得できず、今回の変更後3 Skillはローカル未検証。baseline commitの既存`Validate Agent Skills`では公式仕様validation step自体はPASSしていたが、変更後の結果へ読み替えない。
+- 初回の`python3 scripts/format_tracked.py ruff-check`／`check`はRuff実行ファイルがなく終了code 2だった。その後uvで固定版Ruff 0.16.8を一時実行し、上記のfull tracked checkがPASSした。dprintとRuffの結果は個別に記録する。
+- 固定revision `69ef37e9424c0a7ea9dd2293b559e43ec8176379`のローカル`skills-ref validate`は当初DNS解決不可で未実施。push済みhead `ffc1030`のCIでは公式`Validate Agent Skills specification` stepがPASSしたが、後続のrepository eval structure stepはREADME登録不足でFAILした。
 
 ### GitHub Actionsと共有CIの切分け
 
-レビュー対象commit `f86e4bc4f56b95c831997d8ca9088ee7846d8400`の最新workflow結果をGitHubで再確認した。ローカル修正はpushしていないため、このSHA以後のActions runはない。
+push済みhead `ffc1030637f3e65f15c8298bb8ae590a8380f6c3`に対する最新Actionsを確認した。runは次のとおり。
 
-- [Validate Deterministic Output Evals #2144](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152389) — FAIL。dataset検査で停止し、後続compile・shared/repository deterministic・runtime testsはSKIP。今回ローカルで全52 datasetとF 6 fixtureを確認したが、CI成功とは扱わない。
-- [Validate Agent Skills #2146](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152375) — 公式skills-refはPASS、READMEとcanonical Skill rosterの一致検査でFAIL。後続のrepository eval構造検査はSKIP。不足は`test-requirements-analysis`、`test-architecture-design`、`test-management`。
-- [Validate Semantic Output Evals #2109](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152482)、[Code Quality #839](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152463)、[Codex Harness #839](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42636152446) — いずれもbaseline SHAでPASS。修正後のCI結果ではない。
+- [Validate Agent Skills #2166](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578944) — FAIL。公式Skill仕様validationはPASSしたが、repository eval structure stepでREADMEにない3 Skill (`test-architecture-design`、`test-management`、`test-requirements-analysis`)を指摘。README／共通registryは担当Aのowner範囲。
+- [Validate Deterministic Output Evals #2164](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578889) — PASS。修正後のdataset検査と後続jobが完了した。
+- [Validate Semantic Output Evals #2129](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578964) — PASS。
+- [Code Quality #859](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578929) — FAIL。tracked format/lint stepでRuff F841、未使用`risks`代入を報告。上記follow-upで代入を削除し、Ruff format差分を解消した。修正後CIはfollow-up push後に確認する。
+- [Codex Harness #859](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42727578888) — PASS。
 
 ### 担当Aへの変更依頼
 
@@ -283,7 +290,7 @@ E／Jの実成果物文書はこのcheckoutにはなく、入力公開契約をP
 
 - 今回のFレビュー指摘と追加した欠落ID／優先順位負例 — F専用30件と6 fixture runnerはPASS。確認範囲でF validatorの追加修正を要する問題は残っていない。
 - deterministic dataset contract — local equivalentは全52 case PASS。GitHub CIで修正後の成功は未確認。
-- 公式Skill validation、Ruff、全deterministic suite、runtime regression — 未完了。固定ツール取得不能とshared sandbox制約が残るため、担当Fの最終局所受入は**未完了**。F固有の30件PASSと、他owner／環境に依存する検証を分ける。
+- Ruffのfull tracked format/lint check — follow-up後に221 files PASS。push済みhead `ffc1030`ではF841でCode QualityがFAILしており、修正後CIはfollow-up push後に確認する。ローカル固定revision `skills-ref`は未実施だが、同headのCI仕様validation stepはPASS。全deterministic suiteとruntime regressionは未完了のため、担当Fの最終局所受入は**未完了**。
 - README／共通registry／routing — Aへ変更要求済み状態。CIのREADME failureはF validatorの不具合ではない。
 - E／J実成果物との横断接続、全current Skill同時利用、実Agent trigger／semantic Judge、実provider CAS／履歴／readback、認証済みapproval、保存失敗後復旧、S1〜S17と15＋10条件 — PR #22／外部provider選定待ちで未実施。再開条件はowner成果物とscopeの確定、provider／認証主体の選定、Aの正式runtime登録後に新HEADでCIを完遂すること。
 - 文書と実装の差異: root README／`CANONICAL_SKILLS`／`RUNTIME_V2_SKILL_ROOTS`にF 3 Skillがない点は現存し、A担当として未対応。F内ではvalidator、template、data-contract、fixtureの今回変更間に未解決差異を確認していない。E／J実成果物文書がcheckoutにないため実成果物接続は未確認。
@@ -298,7 +305,7 @@ PR #22の担当Fとして、QA要求・テストアーキテクチャ・計画�
 ## 現在の状態
 
 - Draft。F専用回帰30件と6保存fixtureはPASS。全52 deterministic output datasetもローカル契約検査を通過。
-- full deterministic／runtime suiteには共有runtimeとsandboxに依存する未解決結果があり、Ruff・固定revision skills-ref・修正後GitHub Actionsは未確認。
+- full deterministic／runtime suiteには共有runtimeとsandboxに依存する未解決結果がある。Ruffはfull tracked check PASS。直近のActionsではDeterministic／Semantic／Codex Harness PASS、Agent Skillsは担当AのREADME不足、Code QualityはF841でFAIL。F841は修正済みでfollow-up CI待ち。
 - README・共通runtime登録は担当Aへ引継ぎ中。実Agent／認証済み承認／保存provider／PR #22横断接続は未実施。
 - 詳細・検証証拠・再開条件は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
 ```
