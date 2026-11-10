@@ -82,7 +82,7 @@
 
 ## 完了基準
 
-最新の担当受入状態は末尾の「2026-11-11 実Agent・semantic評価継続（evidence v10）」を参照する。以前の受入記録は作業履歴として保持する。
+最新の担当受入状態は末尾の「2026-11-11 isolated packaging確認・TCN-SEM-013再試行」を参照する。以前の受入記録は作業履歴として保持する。
 
 - [x] 各正本・Authorityを守り、feature/item/condition/architectureの契約fixtureから既存設計までID・revision付きで局所検証した。B/C/D/Fの正規実成果物との横断追跡はPR #22へ引き継いだ。
 - [x] 採否・不採用・blocked・複数expected result・別レベル・既存技法CIが互いに混同されない。
@@ -1009,3 +1009,11 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - commit `6c9a35da1dd8a533dd4863e268967a300104e48d`のGitHub ActionsはCode Quality run `42867712676` PASS、Validate Deterministic Output Evals run `42867712654` PASS、Validate Semantic Output Evals run `42867712760` PASS、Codex Harness run `42867712717`の`codex-contract`／`windows-launcher`双方PASS、Validate Agent Skills run `42867712951` FAIL。失敗job `validate`はofficial `skills-ref` specification step PASS後、`Validate repository eval structure`で`AssertionError: (PosixPath('README.md'), ['e2e-test-selection'])`。後続form／semantic count／trigger stepsはSKIP。
 - 最新PR #22 integration HEADは再確認時も`0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。同SHAのREADME canonical Skill tree・責務表に`e2e-test-selection`がなく、shared `scripts/skills/evals/deterministic/ASSERTIONS.md`にもE2E-SEL-D001〜D006登録なし。A planはowner validator正式登録とprovider-native create/CAS／history／readback／認証済承認を未接続と記載している。共有README／ASSERTIONS／A runtimeは変更しない。
 - TCN-SEM-013のcandidate生成はsource HEAD `6c9a35da1dd8a533dd4863e268967a300104e48d`で実行中。生成完了をまだ確認していないため評価件数には加えない。残semantic caseは、現時点ではTCN-SEM-013／014、TC-SEM-001／002、COV-SEM-001／002。
+
+### 2026-11-11 isolated packaging確認・TCN-SEM-013再試行
+
+- TCN-SEM-013の初回実Agentはsource HEAD `6c9a35da1dd8a533dd4863e268967a300104e48d`、Codex CLI 0.167.0、20分wrapper timeout。116 JSONL events／56 command eventsは保存したが`turn.completed`なし、最終応答なし、candidate fileなし。Judgeには渡しておらず25/31 semantic countに算入しない。trace内で1 commandの`CreateProcess ... No such file or directory`があり、retry後は同commandがexit 0。Agentはcondition/test-data runtime codeを読み進めていたが、timeout要因を1件のprocess errorと断定できないため、Skill不具合とは記録しない。
+- 同一EVAL input・Skill package isolation・標準promptのまま、fresh Agent sessionでTCN-SEM-013を再試行中。source HEAD `5015cc4c8f9e4412d25c0829b7f18311326d092e`。reference／rubricはprompt/packageに含めず、timeoutを60分に延長した。完了イベントとcandidateが得られるまでJudge実行・評価件数への算入はしない。
+- `python3 -m unittest tests.skills.runtime.test_runtime_portability -v` — PASS 3 tests（全Skill-local contract byte identity、単独Skill copyから代表runtime実行、repo-local import境界）。`python3 -m unittest tests.skills.evals.deterministic.test_runtime_portability -v` — PASS 1 test（単独Skill copy CLI）。source HEAD `5015cc4c8f9e4412d25c0829b7f18311326d092e`で実測。これはisolated runtime packagingの検証で、全current SkillのAgent trigger評価とは別。
+- source HEAD `5015cc4c8f9e4412d25c0829b7f18311326d092e`のGitHub Actionsは全5 workflow完了。Code Quality run `42869796904` PASS、Validate Deterministic Output Evals run `42869796913` PASS、Validate Semantic Output Evals run `42869796871` PASS、Codex Harness run `42869797070` PASS（`codex-contract`／`windows-launcher`双方PASS）、Validate Agent Skills run `42869797151` FAIL。失敗は先行するef3／6c9と同じREADME omission。official Skill spec step PASS、`Validate repository eval structure` FAIL、後続form／semantic-count／trigger steps SKIP。
+- local／remote HEAD `5015cc4c8f9e4412d25c0829b7f18311326d092e`一致、working tree cleanを確認し、PR #27はopen／Draftのまま。PR bodyには実装未実施という古い文言が残るが、依頼範囲外のため更新していない。
