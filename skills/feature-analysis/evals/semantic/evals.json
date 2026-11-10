@@ -1,0 +1,21 @@
+{
+  "skill": "feature-analysis",
+  "cases": [
+    {
+      "id": "FA-SEM-001",
+      "input": "cases/fa-sem-001/input.md",
+      "reference": "cases/fa-sem-001/reference.md",
+      "criteria": [
+        "FA-SEM-001"
+      ]
+    },
+    {
+      "id": "FA-SEM-002",
+      "input": "cases/fa-sem-002/input.md",
+      "reference": "cases/fa-sem-002/reference.md",
+      "criteria": [
+        "FA-SEM-002"
+      ]
+    }
+  ]
+}
