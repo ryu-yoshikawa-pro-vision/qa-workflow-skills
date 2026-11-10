@@ -420,8 +420,34 @@ PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidato
 
 ### 受入・引継ぎ
 
-- 今回の3件の担当Fコード修正と回帰テスト — **ローカル検証PASS**。scope判定、placeholder専用判定、根拠判定はいずれも指定scope内で実施し、他状態の拒否条件を広げていない。
-- 担当Fの全体局所受入 — **保留**。全Repository deterministic／runtime suiteにローカル環境依存のFAIL／ERRORがあり、変更後HEADのGitHub Actionsは未確認。新HEADのdeterministic／runtime CIがPASSするか再確認する。
+- 今回の3件の担当Fコード修正と回帰テスト — **PASS**。scope判定、placeholder専用判定、根拠判定はいずれも指定scope内で実施し、他状態の拒否条件を広げていない。
+- Ubuntu CI上のRepository deterministic／runtime回帰 — **PASS**。ローカルsandbox／Python環境で再現したFAIL／ERRORとは切り分け済み。Windows既知runtime制約は別の未解消事項。
+- 担当Fの今回の局所受入 — **完了**。対象回帰・6 fixture・5 workflow中4つの成功workflowを確認。Validate Agent Skillsの失敗は共有README登録不足で、今回の担当F validator不具合ではない。
 - README、`CANONICAL_SKILLS`、owner verifier registry、`RUNTIME_V2_SKILL_ROOTS`、qa-workflow routingは共有owner／PR #22の作業として維持。担当Fでは変更しない。
 - 実Agent・semantic JudgeのAgent出力評価、実provider CAS／履歴／readback、認証済み承認、保存失敗後復旧、E／Jの実成果物による横断接続は未実施。provider・認証主体の選定と接続、またはPR #22統合後の実成果物が再開条件。
-- PR #28はDraftのまま。本文に「実装コードの追加と担当内の実受入は未実施」と残っているが、現在の実態に合わない。本文はGitHub上で変更せず、push後のCI結果を含む更新案を最終報告に示す。
+- PR #28はDraftのまま。本文に「実装コードの追加と担当内の実受入は未実施」と残っているが、現在の実態に合わない。本文はGitHub上で変更していない。更新案は下記と最終報告に示す。
+
+### Push後のGitHub Actions（code HEAD `cf99894dafe6e416b694e8b925141a305ee1c56d`）
+
+| Workflow                                                                                                                             | 結果 | 内容                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Validate Agent Skills #2183](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42748746953)               | FAIL | 公式`skills-ref`検証3 SkillはPASS。`Validate repository eval structure`がREADME未登録の`test-architecture-design`、`test-management`、`test-requirements-analysis`で停止。担当A／PR #22の共有登録。後続stepはSKIP。 |
+| [Validate Deterministic Output Evals #2181](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42748748168) | PASS | dataset、compile、共通deterministic、Repository deterministic、runtime unit／integration、semantic dataset／runtimeの全stepがPASS。                                                                                 |
+| [Validate Semantic Output Evals #2146](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42748746832)      | PASS | workflow成功。                                                                                                                                                                                                      |
+| [Code Quality #876](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42748746764)                         | PASS | workflow成功。                                                                                                                                                                                                      |
+| [Codex Harness #876](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42748746942)                        | PASS | `codex-contract`と`windows-launcher`の両jobが成功。                                                                                                                                                                 |
+
+### 最新のPR #28本文更新案（GitHub未更新）
+
+```markdown
+## 目的
+
+PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidatorを実装し、承認・currentness・計画完了判定を検証する。
+
+## 現在の状態
+
+- Draft。追加レビュー3件を修正し、担当F回帰33件と6 output reference fixtureはPASS。Ubuntu CIではDeterministic Output Evals、Semantic Output Evals、Code Quality、Codex HarnessがPASS。
+- Validate Agent Skillsは公式仕様検証後、担当A範囲のREADMEに3 Skill名が未登録のためFAIL。ローカル全deterministic／runtime suiteはsandbox・Python差異によりFAIL／ERRORが残るが、Ubuntu CIの同回帰はPASS。
+- README・共通runtime登録は担当A／PR #22へ引継ぎ中。実Agent・認証済み承認・実provider・PR #22横断接続は未実施。
+- 詳細と検証証拠は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
+```
