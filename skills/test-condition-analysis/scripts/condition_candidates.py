@@ -1348,6 +1348,21 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
             )
         seen_pairs.add(pair_key)
 
+        # A registered condition recorded as unconfirmed/blocked must not be
+        # promoted to a proposed pair. This is a contract violation whatever the
+        # item's state, so it is checked before any unresolved reference is
+        # reported (an unregistered condition has nothing to check here).
+        registered_condition = condition_by_id.get(condition_id)
+        if (
+            status == "proposed"
+            and registered_condition is not None
+            and registered_condition["candidate_state"] != "candidate"
+        ):
+            raise ContractError(
+                "candidate_pair_unconfirmed",
+                "only confirmed candidate conditions may be a proposed pair",
+            )
+
         item_reason = item_reference_reason(item_id)
         condition_reason = condition_reference_reason(condition_id)
         if item_reason is not None:
@@ -1391,16 +1406,9 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
 
         item = item_by_id[item_id]
         condition = condition_by_id[condition_id]
-        # A condition recorded as unconfirmed/blocked must not be promoted to a
-        # proposed pair; that stays a contract violation. A condition that is
-        # still a candidate but whose evidence went stale/unknown is an ordinary
-        # owner-side recheck, reported like the unresolved item references above.
-        # (The item was already resolved as current and confirmed here.)
-        if status == "proposed" and condition["candidate_state"] != "candidate":
-            raise ContractError(
-                "candidate_pair_unconfirmed",
-                "only confirmed candidate conditions may be a proposed pair",
-            )
+        # A condition that is still a candidate but whose evidence went
+        # stale/unknown is an ordinary owner-side recheck, reported like the
+        # unresolved item references above.
         currentness_reason = condition_currentness_reason(condition)
         if currentness_reason is not None:
             unresolved_condition_refs.append(

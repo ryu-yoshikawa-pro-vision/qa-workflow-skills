@@ -2299,6 +2299,157 @@ class TestReviewRegressionFindings(unittest.TestCase):
                         ),
                     )
 
+    def test_proposed_pair_on_unconfirmed_or_blocked_condition_is_rejected_for_any_item(
+        self,
+    ):
+        changed_spec = spec_ref(revision="spec-r2", content_hash="c" * 64)
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "pair-item", evidence_refs=[feature_ref(), spec_ref()]
+                    )
+                ]
+            )
+        )["candidate"]
+
+        def moved_item(sources):
+            return _materialize_item(
+                item_request(
+                    candidates=[],
+                    sources=sources,
+                    previous=initial_item,
+                    expected="storage-r1",
+                    current="storage-r1",
+                )
+            )["candidate"]
+
+        stale_sources = [feature_ref(), changed_spec]
+        unknown_sources = [feature_ref()]
+        stale_item = moved_item(stale_sources)
+        unknown_item = moved_item(unknown_sources)
+        self.assertEqual(stale_item["items"][0]["currentness"], "stale")
+        self.assertEqual(unknown_item["items"][0]["currentness"], "unknown")
+
+        def condition_for(state, sources):
+            evidence = [ref for ref in sources if ref["owner"] != "spec-analysis"]
+            evidence += [ref for ref in sources if ref["owner"] == "spec-analysis"]
+            return _materialize_condition(
+                condition_request(
+                    candidates=[
+                        condition_candidate(
+                            "pair-condition",
+                            state=state,
+                            unknowns=[] if state == "candidate" else ["pending owner"],
+                            authorities=[
+                                {
+                                    "source_ref": next(
+                                        ref
+                                        for ref in sources
+                                        if ref["owner"] == "spec-analysis"
+                                    ),
+                                    "entity_ref": "AUTH-001",
+                                }
+                            ]
+                            if state == "candidate"
+                            else [],
+                            evidence_refs=evidence,
+                        )
+                    ],
+                    sources=sources,
+                )
+            )["candidate"]
+
+        def pair(status, item_id="ITEM-001", condition_id="COND-001"):
+            return {
+                "item_id": item_id,
+                "condition_id": condition_id,
+                "status": status,
+                "rationale": "pair promoted by the caller",
+                "evidence_refs": [feature_ref()],
+            }
+
+        default_sources = [feature_ref(), spec_ref()]
+        # (item artifact, sources shared with the condition, pair item ID, label)
+        scenarios = [
+            (initial_item, default_sources, "ITEM-001", "current"),
+            (stale_item, stale_sources, "ITEM-001", "stale"),
+            (unknown_item, unknown_sources, "ITEM-001", "unknown"),
+            (initial_item, default_sources, "ITEM-999", "not found"),
+        ]
+        for item_artifact, sources, item_id, label in scenarios:
+            for state in ("blocked", "unconfirmed"):
+                condition = condition_for(state, sources)
+                with self.subTest(item=label, condition=state):
+                    # Rejected regardless of the item's state, never reported as a
+                    # diagnostic that silently drops the invalid promotion.
+                    _assert_contract_code(
+                        self,
+                        "candidate_pair_unconfirmed",
+                        lambda a=item_artifact, c=condition, i=item_id: self.crosscheck(
+                            a, c, [pair("proposed", i)]
+                        ),
+                    )
+                    # The same condition as an honest unconfirmed/blocked pair is
+                    # not a contract violation.
+                    honest = self.crosscheck(
+                        item_artifact, condition, [pair(state, item_id)]
+                    )
+                    self.assertTrue(honest["valid"])
+                    self.assertEqual(honest["status"], "incomplete")
+                    self.assertFalse(honest["cartesian_product_generated"])
+
+        # A current item keeps the existing advisory pair row for honest statuses.
+        blocked_condition = condition_for("blocked", default_sources)
+        kept = self.crosscheck(initial_item, blocked_condition, [pair("blocked")])
+        self.assertEqual(
+            [(row["item_id"], row["status"]) for row in kept["candidate_pairs"]],
+            [("ITEM-001", "blocked")],
+        )
+
+        # Unresolved references against a confirmed candidate condition are still
+        # diagnostics, not rejections, so earlier fixes do not regress.
+        candidate_condition = condition_for("candidate", stale_sources)
+        stale_pair = self.crosscheck(
+            stale_item, candidate_condition, [pair("proposed")]
+        )
+        self.assertEqual(stale_pair["status"], "incomplete")
+        self.assertEqual(stale_pair["candidate_pairs"], [])
+        self.assertEqual(stale_pair["recheck_item_ids"], ["ITEM-001"])
+        self.assertEqual(
+            [row["reason"] for row in stale_pair["unresolved_item_references"]],
+            ["item_stale"],
+        )
+        missing_item = self.crosscheck(
+            _materialize_item(item_request(candidates=[item_candidate("pair-item")]))[
+                "candidate"
+            ],
+            condition_for("candidate", default_sources),
+            [pair("proposed", "ITEM-999")],
+        )
+        self.assertEqual(missing_item["status"], "incomplete")
+        self.assertEqual(
+            [row["reason"] for row in missing_item["unresolved_item_references"]],
+            ["item_not_found"],
+        )
+        self.assertEqual(missing_item["recheck_item_ids"], ["ITEM-999"])
+
+        # An unregistered condition cannot be inspected: report it, do not fail.
+        missing_condition = self.crosscheck(
+            initial_item,
+            blocked_condition,
+            [pair("proposed", condition_id="COND-009")],
+        )
+        self.assertEqual(missing_condition["status"], "incomplete")
+        self.assertEqual(
+            [
+                row["reason"]
+                for row in missing_condition["unresolved_condition_references"]
+            ],
+            ["condition_not_found"],
+        )
+        self.assertEqual(missing_condition["candidate_pairs"], [])
+
     def test_identification_metric_uses_confirmed_active_features_in_item_and_condition(
         self,
     ):
