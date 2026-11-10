@@ -1,0 +1,9 @@
+{
+  "status": "incomplete",
+  "feature_ids": [
+    "FEAT-001"
+  ],
+  "unclassified_difference_ids": [
+    "DIF-001"
+  ]
+}

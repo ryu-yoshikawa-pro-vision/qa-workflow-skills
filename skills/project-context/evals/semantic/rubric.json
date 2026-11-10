@@ -1,0 +1,17 @@
+{
+  "skill": "project-context",
+  "criteria": [
+    {
+      "id": "PC-SEM-001",
+      "title": "候補同定と非存在・権限の区別",
+      "description": "許可された探索root内の同一案件候補を確認し、read拒否や重複を不存在や自動統合として扱わない。",
+      "critical": true
+    },
+    {
+      "id": "PC-SEM-002",
+      "title": "保存・配置承認と互換",
+      "description": "16節・DEC/ASM・stable keyを保持し、旧revision・未認証承認・provider native CAS不足で保存成功を宣言しない。",
+      "critical": true
+    }
+  ]
+}
