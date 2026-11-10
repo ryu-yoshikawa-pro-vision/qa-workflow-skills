@@ -27,14 +27,14 @@ JSON keyの値は英小文字のenumとし、人間向け説明は日本語で�
 - `operation_id`：`DEFOP-`+hash（候補ref・操作・Issue ref・expected revision・対象targetの決定論的identity）。
 - `approval`：`source=trusted_approval_service`、`authentication_verified=true`、`authenticated_by`、`principal`、`role`、`policy_revision`、`issued_at`、`expires_at`、`revoked`、および`operation` / `candidate_ref` / `scope_ref` / `artifact_revision` / `target_ref` / `service_ref` / `issue_ref` / `issue_revision`。
 - `service`：`service_ref`、`write_permission`、`atomic_dedupe`、`conditional_update`。
-- 判定結果：`decision`（`allow` / `blocked` / `read_only` / `reconfirm` / `reconcile_first` / `already_applied`）、`reasons[]`、`auto_retry_allowed`、`requires_readback`。
+- 判定結果：`candidate_ref`、`issue_ref`（更新系）、`decision`（`allow` / `blocked` / `read_only` / `reconfirm` / `reconcile_first` / `already_applied`）、`reasons[]`、`auto_retry_allowed`、`requires_readback`。
 - 結果記録：`status`（`applied` / `unknown` / `conflict` / `failed` / `not_attempted`）、`external_update_performed`、`external_issue{issue_ref, revision, retrieved_at}`。
 - 前回操作：`prior_operations[]`は`{operation_id, status: applied | unknown | started | failed, side_effect?}`。
 
 ## 修正確認
 
-- 依頼：`status`（`request_ready` / `blocked`）、`request_ref`、`send_to`（元owner）、`observed_target_ref`、`fix_target_ref`、`verification_targets[]`（`ref`・`revision`・`current`）、`regression_selection_owner=regression-testing`、`notice_is_confirmation=false`。
-- 結果：`status`（`fix_confirmed` / `fix_not_confirmed` / `pending` / `rejected`）、`verified_target_ref`、`fix_confirmed`。
+- 依頼：`status`（`request_ready` / `blocked`）、`request_ref`、`candidate_ref`、`send_to`（元owner）、`observed_target_ref`、`fix_target_ref`、`verification_targets[]`（`ref`・`revision`・`current`）、`regression_selection_owner=regression-testing`、`notice_is_confirmation=false`。
+- 結果（ownerの結果は`request_ref`・`owner_skill`・`target_ref`・`state`・`actual_start_confirmed`・`result_finalized`・`cleanup_status`・`executed_targets[]{ref, revision}`を持つ）：`status`（`fix_confirmed` / `fix_not_confirmed` / `pending` / `rejected`）、`candidate_ref`、`verified_target_ref`、`fix_confirmed`。`executed_targets`が依頼した`verification_targets`と一致しなければ`pending`。
 
 ## 保存・履歴
 

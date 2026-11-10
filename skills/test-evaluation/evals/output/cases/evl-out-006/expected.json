@@ -1,0 +1,15 @@
+{
+  "expected_axis_status": {
+    "quality": "measured"
+  },
+  "expected_achieved": 0,
+  "expected_rejected_claims": [
+    [
+      "quality",
+      "improved"
+    ]
+  ],
+  "expected_axis_trend": {
+    "quality": "mixed"
+  }
+}

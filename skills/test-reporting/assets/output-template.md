@@ -10,6 +10,8 @@
   "population_basis": "planned",
   "plan_ref": "plan:...",
   "plan_revision": "...",
+  "plan_currentness": "current",
+  "period": null,
   "sources": [],
   "by_unit": {},
   "overall": { "complete": false, "population_known": true, "pass_rate": null },

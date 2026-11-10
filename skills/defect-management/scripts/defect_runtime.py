@@ -270,7 +270,7 @@ def verify_approval(
     elif not issued <= current < expires:
         problems.append("approval_expired_or_not_yet_valid")
     for field, expected in binding.items():
-        if expected is not None and approval.get(field) != expected:
+        if approval.get(field) != expected:
             problems.append(f"approval_binding_mismatch:{field}")
     return sorted(set(problems))
 
@@ -286,7 +286,11 @@ def plan_external_operation(request: dict[str, Any]) -> dict[str, Any]:
     if operation not in OPERATIONS:
         return {"decision": "blocked", "reasons": ["unsupported_operation"]}
     cand_ref = candidate.get("candidate_ref")
-    if not _text(cand_ref) or not _text(candidate.get("target_ref")):
+    if (
+        not _text(cand_ref)
+        or not _text(candidate.get("target_ref"))
+        or not _text(candidate.get("scope_ref"))
+    ):
         return {"decision": "blocked", "reasons": ["candidate_identity_required"]}
     needs_issue = operation != "create"
     if needs_issue and (issue is None or not _text(issue.get("issue_ref"))):
@@ -301,6 +305,8 @@ def plan_external_operation(request: dict[str, Any]) -> dict[str, Any]:
     base = {
         "operation": operation,
         "operation_id": op_id,
+        "candidate_ref": cand_ref,
+        "issue_ref": issue.get("issue_ref") if issue else None,
         "auto_retry_allowed": False,
         "requires_readback": True,
     }
@@ -387,6 +393,7 @@ def plan_external_operation(request: dict[str, Any]) -> dict[str, Any]:
         )
         if not (
             fix.get("status") == "fix_confirmed"
+            and fix.get("candidate_ref") == cand_ref
             and fix.get("verified_target_ref") == candidate.get("fix_target_ref")
             and _text(fix.get("verified_target_ref"))
             and fix.get("verified_target_ref") != candidate["target_ref"]
@@ -400,7 +407,10 @@ def plan_external_operation(request: dict[str, Any]) -> dict[str, Any]:
             if isinstance(request.get("fix_verification"), dict)
             else {}
         )
-        if fix.get("status") != "fix_not_confirmed":
+        if (
+            fix.get("status") != "fix_not_confirmed"
+            or fix.get("candidate_ref") != cand_ref
+        ):
             reasons.append("reopen_requires_owner_confirmed_failure")
     if reasons:
         return {**base, "decision": "blocked", "reasons": sorted(set(reasons))}
@@ -423,7 +433,8 @@ def record_operation_outcome(
             "status": "not_attempted",
             "external_update_performed": False,
         }
-    status = call.get("status") if isinstance(call, dict) else None
+    call = call if isinstance(call, dict) else {}
+    status = call.get("status")
     if status == "failure" and call.get("error") == "conflict":
         outcome = "conflict"
     elif status == "failure" and call.get("side_effect") == "none_confirmed":
@@ -434,6 +445,11 @@ def record_operation_outcome(
             and _text(readback.get("revision"))
             and readback.get("revision") == call.get("returned_revision")
             and readback.get("issue_ref") == call.get("issue_ref")
+            and (
+                plan.get("issue_ref") is None
+                or call.get("issue_ref") == plan["issue_ref"]
+            )
+            and _text(call.get("issue_ref"))
             and readback.get("matches_request") is True
         )
         outcome = "applied" if ok else "unknown"
@@ -504,6 +520,7 @@ def request_fix_verification(
     return {
         "status": "request_ready",
         "request_ref": ref,
+        "candidate_ref": candidate["candidate_ref"],
         "send_to": candidate["owner_skill"],
         "observed_target_ref": observed,
         "fix_target_ref": fix_target,
@@ -530,6 +547,8 @@ def evaluate_fix_result(
         reasons.append("wrong_owner")
     if result.get("target_ref") != request["fix_target_ref"]:
         reasons.append("target_mismatch_old_or_other_build")
+    if result.get("candidate_ref") not in (None, request.get("candidate_ref")):
+        reasons.append("candidate_mismatch")
     if reasons:
         return {"status": "rejected", "reasons": reasons, "fix_confirmed": False}
     if (
@@ -542,10 +561,24 @@ def evaluate_fix_result(
             "reasons": ["start_result_or_cleanup_unconfirmed"],
             "fix_confirmed": False,
         }
+    required = {(t["ref"], t["revision"]) for t in request["verification_targets"]}
+    executed = result.get("executed_targets")
+    executed_set = (
+        {(t.get("ref"), t.get("revision")) for t in executed if isinstance(t, dict)}
+        if isinstance(executed, list)
+        else set()
+    )
+    if executed_set != required:
+        return {
+            "status": "pending",
+            "reasons": ["verification_targets_not_all_executed_at_requested_revision"],
+            "fix_confirmed": False,
+        }
     state = result.get("state")
     if state == "PASS":
         return {
             "status": "fix_confirmed",
+            "candidate_ref": request["candidate_ref"],
             "verified_target_ref": request["fix_target_ref"],
             "fix_confirmed": True,
             "result_finalized": True,
@@ -554,6 +587,7 @@ def evaluate_fix_result(
     if state == "FAIL":
         return {
             "status": "fix_not_confirmed",
+            "candidate_ref": request["candidate_ref"],
             "verified_target_ref": request["fix_target_ref"],
             "fix_confirmed": False,
             "result_finalized": True,
@@ -604,6 +638,14 @@ def closure_status(record: dict[str, Any]) -> dict[str, Any]:
     return {"closed": not open_items, "open_items": open_items}
 
 
+def _read_stdin() -> str:
+    """Read at most MAX_INPUT_BYTES of UTF-8 from stdin, independent of the locale."""
+    raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        raise ValueError("input_too_large")
+    return raw.decode("utf-8")
+
+
 def _load(text: str) -> Any:
     if len(text.encode("utf-8", "replace")) > MAX_INPUT_BYTES:
         raise ValueError("input_too_large")
@@ -645,7 +687,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     try:
-        data = _load(sys.stdin.buffer.read().decode("utf-8"))
+        data = _load(_read_stdin())
         if not isinstance(data, dict):
             raise ValueError("input_must_be_object")
         result = COMMANDS[args[0]](data)

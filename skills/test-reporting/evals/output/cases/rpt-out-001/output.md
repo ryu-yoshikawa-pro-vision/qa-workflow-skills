@@ -36,8 +36,7 @@
       "criterion_id": "EX-1",
       "metric": "pass_rate",
       "source_ids": [
-        "e2e",
-        "api"
+        "e2e"
       ],
       "status": "satisfied",
       "value": 1.0
@@ -46,7 +45,24 @@
       "criterion_id": "EX-2",
       "metric": "fail_count",
       "source_ids": [
-        "e2e",
+        "e2e"
+      ],
+      "status": "satisfied",
+      "value": 0
+    },
+    {
+      "criterion_id": "EX-3",
+      "metric": "pass_rate",
+      "source_ids": [
+        "api"
+      ],
+      "status": "satisfied",
+      "value": 1.0
+    },
+    {
+      "criterion_id": "EX-4",
+      "metric": "fail_count",
+      "source_ids": [
         "api"
       ],
       "status": "satisfied",
@@ -61,14 +77,16 @@
     "pass_rate_note": "units_are_never_summed_see_by_unit",
     "population_known": true
   },
+  "period": null,
   "plan_approval_state": "approved",
+  "plan_currentness": "current",
   "plan_ref": "plan:qa-1",
   "plan_revision": "p3",
   "population_basis": "planned",
   "release_decision": "not_determined_by_this_skill",
   "schema_version": "1",
   "scope_ref": "scope:checkout",
-  "snapshot_ref": "RPT-661cb645b157dbc4f5423a0301dd695b880f336a",
+  "snapshot_ref": "RPT-a66f3cbc5de1c731eb18a247c17e9270ef1c8902",
   "sources": [
     {
       "closure": {
@@ -78,6 +96,7 @@
         "source_current": true
       },
       "complete": true,
+      "conflicting_unit_refs": [],
       "counts": {
         "PASS": 2
       },
@@ -91,6 +110,7 @@
       "pass_rate": 1.0,
       "pass_rate_basis": "planned_population",
       "planned_total": 2,
+      "records_digest": "c157fc9e410af97b048b12d3c224b5fff486b4431a670500abc8af8066c34726",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 1.0,
       "retrieved_total": 2,
@@ -109,6 +129,7 @@
         "source_current": true
       },
       "complete": true,
+      "conflicting_unit_refs": [],
       "counts": {
         "PASS": 3
       },
@@ -122,6 +143,7 @@
       "pass_rate": 1.0,
       "pass_rate_basis": "planned_population",
       "planned_total": 3,
+      "records_digest": "568d6d90e22b9dae49722e4736c6dd3186769e603d7b3cbb543c865e1e3b9b2a",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 1.0,
       "retrieved_total": 3,

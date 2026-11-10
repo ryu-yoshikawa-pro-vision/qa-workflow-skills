@@ -26,6 +26,16 @@
       "id": "DEF-OUT-005",
       "input": "cases/def-out-005/input.md",
       "expected": "cases/def-out-005/expected.json"
+    },
+    {
+      "id": "DEF-OUT-006",
+      "input": "cases/def-out-006/input.md",
+      "expected": "cases/def-out-006/expected.json"
+    },
+    {
+      "id": "DEF-OUT-007",
+      "input": "cases/def-out-007/input.md",
+      "expected": "cases/def-out-007/expected.json"
     }
   ]
 }

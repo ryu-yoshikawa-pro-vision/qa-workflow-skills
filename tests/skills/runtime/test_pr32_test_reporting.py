@@ -77,19 +77,35 @@ def base_input():
                 planned("api", "api", "test", ["A1", "A2", "A3"]),
             ],
             "exit_criteria": [
+                # One criterion per measurement unit: logical_primary and test
+                # results are never pooled into one denominator.
                 {
                     "criterion_id": "EX-1",
                     "metric": "pass_rate",
                     "operator": ">=",
                     "threshold": 1.0,
-                    "source_ids": ["e2e", "api"],
+                    "source_ids": ["e2e"],
                 },
                 {
                     "criterion_id": "EX-2",
                     "metric": "fail_count",
                     "operator": "<=",
                     "threshold": 0,
-                    "source_ids": ["e2e", "api"],
+                    "source_ids": ["e2e"],
+                },
+                {
+                    "criterion_id": "EX-3",
+                    "metric": "pass_rate",
+                    "operator": ">=",
+                    "threshold": 1.0,
+                    "source_ids": ["api"],
+                },
+                {
+                    "criterion_id": "EX-4",
+                    "metric": "fail_count",
+                    "operator": "<=",
+                    "threshold": 0,
+                    "source_ids": ["api"],
                 },
             ],
         },
@@ -353,8 +369,9 @@ class ExitCriteriaAndPlanTests(unittest.TestCase):
         data["retrievals"][1]["records"].pop()
         snap = reporting.build_snapshot(data)
         statuses = {c["criterion_id"]: c["status"] for c in snap["exit_criteria"]}
-        self.assertEqual(statuses["EX-1"], "unknown")
-        self.assertEqual(statuses["EX-2"], "unknown")
+        self.assertEqual(statuses["EX-3"], "unknown")
+        self.assertEqual(statuses["EX-4"], "unknown")
+        self.assertEqual(statuses["EX-1"], "satisfied")
 
     def test_observed_failures_violate_a_zero_failure_criterion_even_when_incomplete(
         self,
@@ -416,6 +433,473 @@ class ExitCriteriaAndPlanTests(unittest.TestCase):
         self.assertEqual(
             projection, {"count": 1, "issue_refs": ["ISSUE-4"], "read_only": True}
         )
+
+
+def permutations_of(data, key):
+    """Yield the input with the list under `key` in every order."""
+    import itertools
+
+    for order in itertools.permutations(range(len(data[key]))):
+        variant = copy.deepcopy(data)
+        variant[key] = [data[key][i] for i in order]
+        yield variant
+
+
+class SnapshotIdentityTests(unittest.TestCase):
+    def test_same_content_gives_a_stable_ref_regardless_of_input_order(self):
+        base = reporting.build_snapshot(base_input())["snapshot_ref"]
+        data = base_input()
+        for variant in permutations_of(data, "retrievals"):
+            for rec_variant in (variant,):
+                rec_variant["retrievals"][0]["records"].reverse()
+                self.assertEqual(
+                    reporting.build_snapshot(rec_variant)["snapshot_ref"], base
+                )
+
+    def test_different_content_never_shares_a_ref_even_with_equal_plan_revision_and_counts(
+        self,
+    ):
+        refs = {reporting.build_snapshot(base_input())["snapshot_ref"]}
+
+        def failing(d):
+            d["retrievals"][1]["records"][0]["state"] = "FAIL"
+
+        def swapped_result(d):
+            d["retrievals"][1]["records"][0]["result_ref"] = "res:other"
+
+        def different_cleanup(d):
+            d["retrievals"][0]["records"][0]["cleanup_status"] = "未確認"
+
+        def incomplete_same_count(d):
+            # same retrieved count per source, but one unit is another ref
+            d["retrievals"][1]["records"][2]["unit_ref"] = "A9"
+
+        def stale_source(d):
+            d["current_source_revisions"]["api"] = "rev2"
+
+        for name, mutate in {
+            "state": failing,
+            "result_ref": swapped_result,
+            "cleanup": different_cleanup,
+            "unit_ref": incomplete_same_count,
+            "currentness": stale_source,
+        }.items():
+            with self.subTest(name=name):
+                data = base_input()
+                mutate(data)
+                ref = reporting.build_snapshot(data)["snapshot_ref"]
+                self.assertNotIn(ref, refs)
+                refs.add(ref)
+        self.assertEqual(len(refs), 6)
+
+    def test_ref_covers_the_whole_content(self):
+        import hashlib
+
+        snap = reporting.build_snapshot(base_input())
+        body = {k: v for k, v in snap.items() if k != "snapshot_ref"}
+        digest = hashlib.sha256(
+            json.dumps(
+                body, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(snap["snapshot_ref"], "RPT-" + digest[:40])
+
+
+class PlanCurrentnessTests(unittest.TestCase):
+    def test_missing_or_blank_current_plan_revision_is_unverified_not_current(self):
+        for name, mutate in {
+            "absent": lambda d: d.pop("current_plan_revision"),
+            "none": lambda d: d.update(current_plan_revision=None),
+            "blank": lambda d: d.update(current_plan_revision="  "),
+        }.items():
+            with self.subTest(name=name):
+                data = base_input()
+                mutate(data)
+                snap = reporting.build_snapshot(data)
+                self.assertIn("plan_currentness_unverified", snap["issues"])
+                self.assertNotIn("plan_revision_superseded", snap["issues"])
+                self.assertEqual(snap["plan_currentness"], "unverified")
+                self.assertEqual(snap["exit_judgement"], "undetermined")
+                self.assertTrue(snap["overall"]["complete"])
+
+    def test_mismatch_is_superseded_and_match_is_current(self):
+        data = base_input()
+        data["current_plan_revision"] = "p9"
+        snap = reporting.build_snapshot(data)
+        self.assertEqual(snap["plan_currentness"], "superseded")
+        self.assertEqual(snap["exit_judgement"], "undetermined")
+        self.assertEqual(
+            reporting.build_snapshot(base_input())["plan_currentness"], "current"
+        )
+        self.assertEqual(
+            reporting.build_snapshot(base_input())["exit_judgement"], "satisfied"
+        )
+
+    def test_expired_revoked_and_unknown_approval_states_never_satisfy(self):
+        for state in ("expired", "revoked", "draft", None, "APPROVED"):
+            with self.subTest(state=state):
+                data = base_input()
+                data["plan"]["approval_state"] = state
+                self.assertEqual(
+                    reporting.build_snapshot(data)["exit_judgement"], "undetermined"
+                )
+
+    def test_plan_without_ref_or_revision_is_not_identifiable(self):
+        data = base_input()
+        data["plan"].pop("plan_revision")
+        snap = reporting.build_snapshot(data)
+        self.assertIn("plan_ref_and_revision_required", snap["issues"])
+        self.assertEqual(snap["exit_judgement"], "undetermined")
+
+    def test_currentness_check_distinguishes_unverified_from_stale(self):
+        snap = reporting.build_snapshot(base_input())
+        fresh = {
+            "plan_revision": "p3",
+            "source_revisions": {"e2e": "rev1", "api": "rev1"},
+        }
+        self.assertEqual(reporting.check_currentness(snap, fresh)["status"], "current")
+        missing_plan = reporting.check_currentness(
+            snap, {"source_revisions": fresh["source_revisions"]}
+        )
+        self.assertEqual(missing_plan["status"], "unverified")
+        self.assertEqual(missing_plan["unverified"], ["plan_revision"])
+        missing_source = reporting.check_currentness(
+            snap, {**fresh, "source_revisions": {"e2e": "rev1"}}
+        )
+        self.assertEqual(missing_source["status"], "unverified")
+        changed_and_missing = reporting.check_currentness(
+            snap, {"plan_revision": "p4", "source_revisions": {"e2e": "rev1"}}
+        )
+        self.assertEqual(changed_and_missing["status"], "stale")
+        self.assertEqual(reporting.check_currentness(snap, {})["status"], "unverified")
+
+
+class MeasurementUnitContractTests(unittest.TestCase):
+    def criterion(self, metric, source_ids, **extra):
+        return {
+            "criterion_id": "C",
+            "metric": metric,
+            "operator": ">=",
+            "threshold": 1.0,
+            "source_ids": source_ids,
+            **extra,
+        }
+
+    def snap(self, criteria, planned_sources=None, retrievals=None):
+        data = base_input()
+        if planned_sources is not None:
+            data["plan"]["planned_sources"] = planned_sources
+        if retrievals is not None:
+            data["retrievals"] = retrievals
+        data["plan"]["exit_criteria"] = criteria
+        data["current_source_revisions"] = {
+            r["source_id"]: "rev1" for r in data["retrievals"]
+        }
+        return reporting.build_snapshot(data)
+
+    def test_pooling_logical_primary_and_test_results_is_unknown_not_satisfied(self):
+        for metric in ("pass_rate", "executed_rate", "fail_count", "unexecuted_count"):
+            with self.subTest(metric=metric):
+                snap = self.snap(
+                    [
+                        self.criterion(
+                            metric,
+                            ["e2e", "api"],
+                            operator=">=" if metric.endswith("rate") else "<=",
+                            threshold=1.0 if metric.endswith("rate") else 99,
+                        )
+                    ]
+                )
+                criterion = snap["exit_criteria"][0]
+                self.assertEqual(criterion["status"], "unknown")
+                self.assertEqual(
+                    criterion["reason"], "mixed_units_or_kinds_not_summable"
+                )
+                self.assertEqual(snap["exit_judgement"], "undetermined")
+
+    def test_logical_primary_and_attempt_are_never_pooled_even_though_both_are_e2e(
+        self,
+    ):
+        planned_sources = [
+            planned("e2e", "e2e", "logical_primary", ["T1"]),
+            planned("att", "e2e", "attempt", ["T1#0", "T1#1"]),
+        ]
+        retrievals = [
+            retrieval("e2e", [record("logical_primary", "T1", "PASS")]),
+            retrieval(
+                "att",
+                [
+                    record("attempt", "T1", "FAIL", result="a0", attempt_no=0),
+                    record("attempt", "T1", "PASS", result="a1", attempt_no=1),
+                ],
+            ),
+        ]
+        snap = self.snap(
+            [self.criterion("pass_rate", ["e2e", "att"])], planned_sources, retrievals
+        )
+        self.assertEqual(snap["exit_criteria"][0]["status"], "unknown")
+        self.assertEqual(snap["exit_judgement"], "undetermined")
+        per_unit = self.snap(
+            [self.criterion("pass_rate", ["e2e"])], planned_sources, retrievals
+        )
+        self.assertEqual(per_unit["exit_criteria"][0]["status"], "satisfied")
+        attempts_alone = self.snap(
+            [self.criterion("pass_rate", ["att"])], planned_sources, retrievals
+        )
+        self.assertEqual(attempts_alone["exit_criteria"][0]["status"], "unsatisfied")
+
+    def test_formal_tc_individual_test_and_auxiliary_testware_are_separate_units(self):
+        sources = [
+            planned("tc", "general_tc", "resolved_testcase", ["TC1"]),
+            planned("vt", "component", "test", ["V1"]),
+            planned("aux", "e2e", "auxiliary_testware", ["X1"]),
+        ]
+        retrievals = [
+            retrieval("tc", [record("resolved_testcase", "TC1")]),
+            retrieval("vt", [record("test", "V1")]),
+            retrieval("aux", [record("auxiliary_testware", "X1")]),
+        ]
+        for ids in (["tc", "vt"], ["tc", "aux"], ["vt", "aux"], ["tc", "vt", "aux"]):
+            with self.subTest(ids=ids):
+                snap = self.snap(
+                    [self.criterion("pass_rate", ids)], sources, retrievals
+                )
+                self.assertEqual(snap["exit_criteria"][0]["status"], "unknown")
+        # two sources of the same unit may be pooled when the criterion says so
+        sources2 = [
+            planned("a", "api", "test", ["A1"]),
+            planned("c", "component", "test", ["C1"]),
+        ]
+        retrievals2 = [
+            retrieval("a", [record("test", "A1")]),
+            retrieval("c", [record("test", "C1")]),
+        ]
+        pooled = self.snap(
+            [self.criterion("pass_rate", ["a", "c"])], sources2, retrievals2
+        )
+        self.assertEqual(pooled["exit_criteria"][0]["status"], "satisfied")
+
+    def test_execution_results_and_static_review_do_not_share_metrics(self):
+        review = planned("rev", "static_review", "review_target", ["D1"])
+        reviews = retrieval("rev", [record("review_target", "D1", "reviewed")])
+        sources = [planned("api", "api", "test", ["A1"]), review]
+        retrievals = [retrieval("api", [record("test", "A1")]), reviews]
+        for metric, ids in (
+            ("pass_rate", ["rev"]),
+            ("fail_count", ["rev"]),
+            ("review_completion", ["api"]),
+            ("review_completion", ["api", "rev"]),
+        ):
+            with self.subTest(metric=metric, ids=ids):
+                snap = self.snap([self.criterion(metric, ids)], sources, retrievals)
+                self.assertEqual(snap["exit_criteria"][0]["status"], "unknown")
+        ok = self.snap(
+            [self.criterion("review_completion", ["rev"])], sources, retrievals
+        )
+        self.assertEqual(ok["exit_criteria"][0]["status"], "satisfied")
+
+    def test_executed_rate_counts_only_started_units(self):
+        data = base_input()
+        data["plan"]["exit_criteria"] = []
+        states = ["PASS", "SKIP", "blocked"]
+        for i, state in enumerate(states):
+            data["retrievals"][1]["records"][i]["state"] = state
+            data["retrievals"][1]["records"][i]["cleanup_status"] = "成功"
+        api = source(reporting.build_snapshot(data), "api")
+        self.assertEqual(api["executed_rate"], round(1 / 3, 6))
+        data["retrievals"][1]["records"][1]["state"] = "判定不能"
+        self.assertEqual(
+            source(reporting.build_snapshot(data), "api")["executed_rate"],
+            round(2 / 3, 6),
+        )
+
+
+class DuplicateAndConflictOrderTests(unittest.TestCase):
+    def test_duplicate_source_ids_are_ambiguous_in_every_order(self):
+        good = retrieval(
+            "api", [record("test", "A1"), record("test", "A2"), record("test", "A3")]
+        )
+        bad = retrieval(
+            "api", [record("test", "A1")], status="partial", pagination_complete=False
+        )
+        outcomes = []
+        for order in ((good, bad), (bad, good)):
+            data = base_input()
+            data["retrievals"] = [data["retrievals"][0], *copy.deepcopy(list(order))]
+            snap = reporting.build_snapshot(data)
+            api = source(snap, "api")
+            self.assertFalse(api["complete"])
+            self.assertIn("duplicate_retrieval_for_source_id", api["issues"])
+            self.assertIn("duplicate_retrieval_source_id", snap["issues"])
+            self.assertFalse(snap["overall"]["complete"])
+            self.assertEqual(snap["exit_judgement"], "undetermined")
+            outcomes.append(snap["snapshot_ref"])
+        self.assertEqual(outcomes[0], outcomes[1])
+
+    def test_identical_duplicate_retrievals_are_still_ambiguous(self):
+        data = base_input()
+        data["retrievals"].append(copy.deepcopy(data["retrievals"][1]))
+        snap = reporting.build_snapshot(data)
+        self.assertFalse(source(snap, "api")["complete"])
+
+    def test_retrieval_without_source_id_is_reported(self):
+        data = base_input()
+        data["retrievals"].append({"status": "complete"})
+        data["retrievals"].append("junk")
+        snap = reporting.build_snapshot(data)
+        self.assertIn("retrieval_without_source_id", snap["issues"])
+        self.assertEqual(snap["exit_judgement"], "undetermined")
+
+    def test_conflicting_records_give_the_same_result_in_either_order(self):
+        results = []
+        for first, second in (("PASS", "FAIL"), ("FAIL", "PASS")):
+            data = base_input()
+            recs = data["retrievals"][1]["records"]
+            recs[0]["state"] = first
+            recs.append(record("test", "A1", second, result="res:second"))
+            snap = reporting.build_snapshot(data)
+            api = source(snap, "api")
+            self.assertFalse(api["complete"])
+            self.assertEqual(api["conflicting_unit_refs"], ["A1"])
+            self.assertEqual(api["counts"], {"PASS": 2})
+            results.append((api["counts"], api["missing_unit_refs"], api["issues"]))
+        self.assertEqual(results[0], results[1])
+
+    def test_same_result_ref_with_different_content_is_a_conflict_not_first_wins(self):
+        for first, second in (("PASS", "FAIL"), ("FAIL", "PASS")):
+            with self.subTest(first=first):
+                data = base_input()
+                recs = data["retrievals"][1]["records"]
+                recs[0] = record("test", "A1", first, result="res:x")
+                recs.append(record("test", "A1", second, result="res:x"))
+                api = source(reporting.build_snapshot(data), "api")
+                self.assertIn("result_ref_reused_with_different_content", api["issues"])
+                self.assertFalse(api["complete"])
+
+    def test_record_order_never_improves_completeness(self):
+        data = base_input()
+        data["retrievals"][1]["records"][0]["build_ref"] = "build:40"
+        refs = set()
+        for variant in permutations_of(data["retrievals"][1], "records"):
+            d = copy.deepcopy(data)
+            d["retrievals"][1] = variant
+            snap = reporting.build_snapshot(d)
+            self.assertFalse(source(snap, "api")["complete"])
+            refs.add(snap["snapshot_ref"])
+        self.assertEqual(len(refs), 1)
+
+
+class PeriodTests(unittest.TestCase):
+    PERIOD = {"from": "2026-11-01T00:00:00+00:00", "to": "2026-11-07T23:59:59+00:00"}
+
+    def data(self, **record_extra):
+        data = base_input()
+        data["plan"]["period"] = dict(self.PERIOD)
+        for item in data["retrievals"]:
+            for rec in item["records"]:
+                rec["executed_at"] = "2026-11-05T10:00:00+00:00"
+        return data
+
+    def test_runs_inside_the_planned_period_are_counted(self):
+        snap = reporting.build_snapshot(self.data())
+        self.assertTrue(snap["overall"]["complete"])
+        self.assertEqual(snap["period"], self.PERIOD)
+
+    def test_runs_outside_or_without_a_verifiable_time_are_excluded(self):
+        for name, value, reason in (
+            ("before", "2026-10-31T23:59:59+00:00", "period_mismatch"),
+            ("after", "2026-11-08T00:00:00+00:00", "period_mismatch"),
+            ("garbage", "yesterday", "period_unverified"),
+            ("missing", None, "period_unverified"),
+        ):
+            with self.subTest(name=name):
+                data = self.data()
+                rec = data["retrievals"][1]["records"][2]
+                if value is None:
+                    rec.pop("executed_at")
+                else:
+                    rec["executed_at"] = value
+                snap = reporting.build_snapshot(data)
+                api = source(snap, "api")
+                self.assertEqual(
+                    api["excluded"],
+                    [{"result_ref": rec["result_ref"], "reason": reason}],
+                )
+                self.assertEqual(api["missing_unit_refs"], ["A3"])
+                self.assertFalse(api["complete"])
+                self.assertEqual(snap["exit_judgement"], "undetermined")
+
+    def test_boundaries_are_inclusive_and_timezones_are_honoured(self):
+        data = self.data()
+        data["retrievals"][1]["records"][0]["executed_at"] = self.PERIOD["from"]
+        data["retrievals"][1]["records"][1]["executed_at"] = self.PERIOD["to"]
+        data["retrievals"][1]["records"][2]["executed_at"] = "2026-11-08T08:00:00+09:00"
+        self.assertTrue(source(reporting.build_snapshot(data), "api")["complete"])
+        data["retrievals"][1]["records"][2]["executed_at"] = "2026-11-08T09:00:01+09:00"
+        self.assertFalse(source(reporting.build_snapshot(data), "api")["complete"])
+
+    def test_per_source_period_overrides_the_plan_and_invalid_periods_block(self):
+        data = self.data()
+        data["plan"]["planned_sources"][1]["period"] = {
+            "from": "2026-11-06T00:00:00+00:00",
+            "to": "2026-11-07T00:00:00+00:00",
+        }
+        self.assertFalse(source(reporting.build_snapshot(data), "api")["complete"])
+        for bad in (
+            {"from": "2026-11-09T00:00:00+00:00", "to": "2026-11-01T00:00:00+00:00"},
+            {"from": "x", "to": "y"},
+            "now",
+        ):
+            with self.subTest(bad=bad):
+                data = self.data()
+                data["plan"]["period"] = bad
+                snap = reporting.build_snapshot(data)
+                self.assertIn("plan_period_invalid", snap["issues"])
+                self.assertEqual(snap["exit_judgement"], "undetermined")
+                self.assertFalse(snap["overall"]["complete"])
+
+    def test_no_declared_period_means_no_period_filter(self):
+        self.assertTrue(reporting.build_snapshot(base_input())["overall"]["complete"])
+        self.assertIsNone(reporting.build_snapshot(base_input())["period"])
+
+    def test_static_review_targets_follow_the_same_period_rule(self):
+        data = StaticTestingTests().static_input(5)
+        data["plan"]["period"] = dict(self.PERIOD)
+        for rec in data["retrievals"][0]["records"]:
+            rec["executed_at"] = "2026-12-01T00:00:00+00:00"
+        review = source(reporting.build_snapshot(data), "review")
+        self.assertFalse(review["complete"])
+        self.assertFalse(review["zero_findings_claim_allowed"])
+
+
+class StateValueSetTests(unittest.TestCase):
+    def test_static_states_are_not_accepted_for_execution_and_vice_versa(self):
+        data = base_input()
+        data["retrievals"][1]["records"][0]["state"] = "reviewed"
+        self.assertIn(
+            "record_state_outside_raw_value_set",
+            source(reporting.build_snapshot(data), "api")["issues"],
+        )
+        static = StaticTestingTests().static_input(5)
+        static["retrievals"][0]["records"][0]["state"] = "PASS"
+        self.assertIn(
+            "record_state_outside_raw_value_set",
+            source(reporting.build_snapshot(static), "review")["issues"],
+        )
+
+    def test_attempt_records_need_an_integer_attempt_number(self):
+        data = base_input()
+        data["plan"]["planned_sources"] = [planned("att", "e2e", "attempt", ["T1#0"])]
+        data["plan"]["exit_criteria"] = []
+        for bad in (None, "0", True):
+            data["retrievals"] = [
+                retrieval("att", [record("attempt", "T1", attempt_no=bad)])
+            ]
+            data["current_source_revisions"] = {"att": "rev1"}
+            self.assertIn(
+                "record_unit_or_identity_invalid",
+                source(reporting.build_snapshot(data), "att")["issues"],
+            )
 
 
 class CliTests(unittest.TestCase):

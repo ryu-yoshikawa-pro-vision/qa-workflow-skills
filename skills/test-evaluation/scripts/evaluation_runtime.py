@@ -72,14 +72,19 @@ def verify_inputs(
     unverified: list[str] = []
     for item in recorded:
         ref = item.get("ref") if isinstance(item, dict) else None
-        if not _text(ref) or not _text(item.get("revision")):
+        if (
+            not _text(ref)
+            or not _text(item.get("revision"))
+            or not _text(item.get("content_hash"))
+        ):
             unverified.append(str(ref))
             continue
         now = current.get(ref)
         if now is None:
             unverified.append(ref)
-        elif now.get("revision") != item["revision"] or (
-            item.get("content_hash") and now.get("content_hash") != item["content_hash"]
+        elif (
+            now.get("revision") != item["revision"]
+            or now.get("content_hash") != item["content_hash"]
         ):
             stale.append(ref)
     status = "current" if not stale and not unverified else "stale_or_unverified"
@@ -193,10 +198,37 @@ def evaluate_metric(metric: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+UNRESOLVED = {"not_comparable", "unmeasured", "invalid"}
+
+
+def _axis_trend(statuses: set[str]) -> str:
+    """Axis-wide judgement from per-metric statuses.
+
+    A single improved metric never makes the whole axis "improved": every metric on
+    the axis must be resolved (comparable and measured) and none may have worsened.
+    """
+    if "worsened" in statuses:
+        return "mixed" if "improved" in statuses else "worsened"
+    if "invalid" in statuses:
+        return "invalid"
+    if "improved" in statuses:
+        return "partially_improved" if statuses & UNRESOLVED else "improved"
+    if statuses & {"unchanged", "measured"}:
+        return "no_change_or_baseline"
+    if "not_comparable" in statuses:
+        return "not_comparable"
+    return "unmeasured"
+
+
 def evaluate_axes(
     metrics: list[dict[str, Any]], claims: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    """Per-axis results with no composite score; reject claims the metrics do not support."""
+    """Per-axis results with no composite score; reject claims the metrics do not support.
+
+    Claims are `{axis, assertion}` where assertion is one of `improved` (axis-wide),
+    `partially_improved`, `mixed`, `worsened`, `measured`, or `metric_improved` with a
+    `metric_id`.
+    """
     evaluated = [evaluate_metric(m) for m in metrics]
     axes: dict[str, dict[str, Any]] = {
         axis: {"status": "unmeasured", "metrics": []} for axis in AXES
@@ -204,7 +236,7 @@ def evaluate_axes(
     for item in evaluated:
         if item.get("axis") in axes:
             axes[item["axis"]]["metrics"].append(item)
-    for axis, entry in axes.items():
+    for entry in axes.values():
         statuses = {m["status"] for m in entry["metrics"]}
         if statuses & {
             "improved",
@@ -214,27 +246,25 @@ def evaluate_axes(
             "not_comparable",
         }:
             entry["status"] = "measured"
-        if "worsened" in statuses:
-            entry["trend"] = "worsened"
-        elif "improved" in statuses:
-            entry["trend"] = "improved"
-        elif statuses & {"unchanged", "measured"}:
-            entry["trend"] = "no_change_or_baseline"
-        elif "not_comparable" in statuses:
-            entry["trend"] = "not_comparable"
-        else:
-            entry["trend"] = "unmeasured"
+        entry["trend"] = _axis_trend(statuses)
+        entry["unresolved_metrics"] = sorted(
+            str(m.get("metric_id"))
+            for m in entry["metrics"]
+            if m["status"] in UNRESOLVED
+        )
+    by_metric = {m.get("metric_id"): m["status"] for m in evaluated}
     rejected: list[dict[str, str]] = []
     for claim in claims or []:
         axis, assertion = claim.get("axis"), claim.get("assertion")
         entry = axes.get(axis)
-        statuses = {m["status"] for m in entry["metrics"]} if entry else set()
-        if entry is None:
+        if assertion == "metric_improved":
+            supported = by_metric.get(claim.get("metric_id")) == "improved"
+        elif entry is None:
             supported = False
-        elif assertion == "improved":
-            supported = entry["trend"] == "improved" and "worsened" not in statuses
-        elif assertion == "worsened":
-            supported = entry["trend"] == "worsened"
+        elif assertion in {"improved", "partially_improved", "mixed", "worsened"}:
+            supported = entry["trend"] == assertion or (
+                assertion == "worsened" and entry["trend"] == "mixed"
+            )
         elif assertion == "measured":
             supported = entry["status"] == "measured"
         else:
@@ -245,12 +275,20 @@ def evaluate_axes(
                     "axis": str(axis),
                     "assertion": str(assertion),
                     "reason": "claim_not_supported_by_axis_metrics",
+                    **(
+                        {"metric_id": str(claim.get("metric_id"))}
+                        if assertion == "metric_improved"
+                        else {}
+                    ),
                 }
             )
     return {
         "metrics": evaluated,
         "axes": axes,
         "rejected_claims": rejected,
+        "invalid_metrics": sorted(
+            str(m.get("metric_id")) for m in evaluated if m["status"] == "invalid"
+        ),
         "composite_score": None,
     }
 
@@ -280,7 +318,7 @@ def verify_approval(
     elif not issued <= current < expires:
         problems.append("approval_expired_or_not_yet_valid")
     for field, expected in binding.items():
-        if expected is not None and approval.get(field) != expected:
+        if approval.get(field) != expected:
             problems.append(f"approval_binding_mismatch:{field}")
     return sorted(set(problems))
 
@@ -317,6 +355,11 @@ def advance_improvement(
     if kind == "adopt":
         if state != "proposed":
             return refuse("adopt_requires_proposed_state")
+        if not (
+            _text(improvement.get("proposal_revision"))
+            and _text(improvement.get("scope_ref"))
+        ):
+            return refuse("proposal_revision_and_scope_required")
         binding = {
             "operation": "adopt_improvement",
             "improvement_ref": ref,
@@ -425,8 +468,12 @@ def handoff_status(handoffs: list[dict[str, Any]], now: str | None) -> dict[str,
     open_items: list[dict[str, Any]] = []
     for item in handoffs:
         problems = []
-        if not _text(item.get("item_ref")) or not _text(item.get("receiver")):
-            problems.append("item_and_receiver_required")
+        if (
+            not _text(item.get("item_ref"))
+            or not _text(item.get("receiver"))
+            or not _text(item.get("artifact_revision"))
+        ):
+            problems.append("item_receiver_and_artifact_revision_required")
         confirmation = item.get("confirmation")
         problems += verify_approval(
             confirmation,
@@ -464,6 +511,14 @@ def propagate_change(
             r for r in current_refs if r not in affected and r != changed_ref
         ),
     }
+
+
+def _read_stdin() -> str:
+    """Read at most MAX_INPUT_BYTES of UTF-8 from stdin, independent of the locale."""
+    raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        raise ValueError("input_too_large")
+    return raw.decode("utf-8")
 
 
 def _load(text: str) -> Any:
@@ -508,7 +563,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     try:
-        data = _load(sys.stdin.buffer.read().decode("utf-8"))
+        data = _load(_read_stdin())
         if not isinstance(data, dict):
             raise ValueError("input_must_be_object")
         result = COMMANDS[args[0]](data)

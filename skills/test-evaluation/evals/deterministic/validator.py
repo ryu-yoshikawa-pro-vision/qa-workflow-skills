@@ -43,6 +43,24 @@ MEASUREMENT_MAP = {
     "not_comparable": "not_comparable",
     "not_measurable": "unmeasured",
 }
+UNRESOLVED = {"not_comparable", "unmeasured", "invalid"}
+
+
+def _derived_trend(statuses: set[str]) -> str:
+    """Axis-wide trend derived from per-metric statuses (independent of the runtime)."""
+    if "worsened" in statuses:
+        return "mixed" if "improved" in statuses else "worsened"
+    if "invalid" in statuses:
+        return "invalid"
+    if "improved" in statuses:
+        return "partially_improved" if statuses & UNRESOLVED else "improved"
+    if statuses & {"unchanged", "measured"}:
+        return "no_change_or_baseline"
+    if "not_comparable" in statuses:
+        return "not_comparable"
+    return "unmeasured"
+
+
 _SCORE_KEYS = {"composite_score", "total_score", "overall_score", "score"}
 _SECRET = re.compile(
     r"(?i)(?:password|passwd|(?:access[_-]?|auth[_-]?|refresh[_-]?)?token|client[_-]?secret|api[_-]?key|cookie|storage[_-]?state|authorization)\s*[:=]\s*['\"]?(?:bearer\s+)?[A-Za-z0-9_./+=-]{8,}"
@@ -179,12 +197,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         statuses = {m["status"] for m in by_axis.get(axis, [])}
         if (entry.get("status") == "measured") is not bool(statuses & MEASURED):
             axis_errors.append(f"{axis}:status")
-        if entry.get("trend") == "improved" and (
-            "improved" not in statuses or "worsened" in statuses
-        ):
-            axis_errors.append(f"{axis}:improved_trend_not_backed_by_metrics")
-        if entry.get("trend") == "worsened" and "worsened" not in statuses:
-            axis_errors.append(f"{axis}:worsened_without_worsened_metric")
+        if entry.get("trend") != _derived_trend(statuses):
+            axis_errors.append(f"{axis}:trend_not_derived_from_all_metrics")
     result.add(
         "EVL-D004",
         not metric_errors and not axis_errors,
@@ -209,15 +223,24 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         statuses = (
             {m["status"] for m in by_axis.get(axis, [])} if axis in by_axis else set()
         )
-        supported = entry is not None and (
-            (
-                assertion == "improved"
-                and "improved" in statuses
-                and "worsened" not in statuses
+        if assertion == "metric_improved":
+            by_id = {
+                m.get("metric_id"): m.get("status")
+                for ms in by_axis.values()
+                for m in ms
+            }
+            supported = by_id.get(claim.get("metric_id")) == "improved"
+        elif entry is None:
+            supported = False
+        elif assertion in {"improved", "partially_improved", "mixed", "worsened"}:
+            trend = _derived_trend(statuses)
+            supported = trend == assertion or (
+                assertion == "worsened" and trend == "mixed"
             )
-            or (assertion == "worsened" and "worsened" in statuses)
-            or (assertion == "measured" and bool(statuses & MEASURED))
-        )
+        elif assertion == "measured":
+            supported = bool(statuses & MEASURED)
+        else:
+            supported = False
         if supported == ((axis, assertion) in rejected):
             claim_errors.append(f"{axis}:{assertion}")
     result.add(
@@ -269,14 +292,20 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         "EVL-D008",
         bool(inputs)
         and all(
-            isinstance(i, dict) and _text(i.get("ref")) and _text(i.get("revision"))
+            isinstance(i, dict)
+            and _text(i.get("ref"))
+            and _text(i.get("revision"))
+            and _text(i.get("content_hash"))
             for i in inputs
         )
         and (
             doc.get("evaluation_status") != "final"
-            or input_check.get("status") == "current"
+            or (
+                input_check.get("status") == "current"
+                and not doc.get("invalid_metrics")
+            )
         ),
-        "評価入力をrefとrevisionで固定し、旧版・未検証の入力がある評価をfinalにしないこと",
+        "評価入力をref・revision・content hashで固定し、旧版・未検証の入力や無効な指標がある評価をfinalにしないこと",
         evidence=input_check or None,
     )
     handoff = doc.get("handoff") if isinstance(doc.get("handoff"), dict) else {}
@@ -306,6 +335,19 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             all(actual.get(axis) == status for axis, status in wanted.items()),
             "独立した期待基準が示す軸ごとの測定状態と一致すること",
             evidence={"expected": wanted, "actual": actual},
+        )
+    if "expected_axis_trend" in expected:
+        wanted_trend = expected["expected_axis_trend"]
+        actual_trend = {
+            axis: (entry or {}).get("trend") for axis, entry in axes.items()
+        }
+        result.add(
+            "EVL-D014",
+            all(
+                actual_trend.get(axis) == trend for axis, trend in wanted_trend.items()
+            ),
+            "独立した期待基準が示す軸全体の傾向（指標単位の改善と軸全体の判定の区別）と一致すること",
+            evidence={"expected": wanted_trend, "actual": actual_trend},
         )
     if "expected_achieved" in expected:
         result.add(

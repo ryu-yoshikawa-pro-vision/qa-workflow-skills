@@ -11,6 +11,26 @@ EXCLUSION_REASONS = {
     "build_mismatch",
     "environment_mismatch",
     "record_source_revision_mismatch",
+    "period_mismatch",
+    "period_unverified",
+}
+EXECUTION_KINDS = {
+    "general_tc",
+    "e2e",
+    "regression",
+    "exploration",
+    "api",
+    "batch",
+    "component",
+    "nonfunctional",
+    "uiux",
+    "wcag",
+}
+RATE_AND_COUNT_METRICS = {
+    "pass_rate",
+    "executed_rate",
+    "fail_count",
+    "unexecuted_count",
 }
 STATIC_KINDS = {"static_review", "static_analysis"}
 CLOSURE_KEYS = (
@@ -25,6 +45,11 @@ BLOCKING_ISSUES = {
     "planned_sources_missing",
     "planned_source_ids_duplicated",
     "explicit_scope_and_discovery_roots_required",
+    "plan_currentness_unverified",
+    "plan_ref_and_revision_required",
+    "plan_period_invalid",
+    "duplicate_retrieval_source_id",
+    "retrieval_without_source_id",
 }
 _SECRET = re.compile(
     r"(?i)(?:password|passwd|(?:access[_-]?|auth[_-]?|refresh[_-]?)?token|client[_-]?secret|api[_-]?key|cookie|storage[_-]?state|authorization)\s*[:=]\s*['\"]?(?:bearer\s+)?[A-Za-z0-9_./+=-]{8,}"
@@ -247,6 +272,8 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     blocked = (
         bool(issues & BLOCKING_ISSUES)
         or doc.get("population_basis") != "planned"
+        or doc.get("plan_approval_state") != "approved"
+        or doc.get("plan_currentness") != "current"
         or not criteria
     )
     derived_exit = (
@@ -306,6 +333,102 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         not any(_SECRET.search(item) for item in _strings(doc)),
         "secret・cookie・token等の実値を成果物へ転載しないこと",
     )
+
+    # --- review-driven independent checks ---------------------------------
+    import hashlib
+
+    body = {k: v for k, v in doc.items() if k != "snapshot_ref"}
+    digest = hashlib.sha256(
+        json.dumps(
+            body, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    result.add(
+        "RPT-D017",
+        doc.get("snapshot_ref") == "RPT-" + digest[:40],
+        "snapshot refが内容全体（件数・完全性・判定・取得内容）から決定され、異なる内容が同じrefにならないこと",
+    )
+    unit_by_source = {s.get("source_id"): s.get("unit") for s in sources}
+    kind_by_source = {s.get("source_id"): s.get("kind") for s in sources}
+    mixed = []
+    for c in criteria:
+        if not isinstance(c, dict) or c.get("status") not in {
+            "satisfied",
+            "unsatisfied",
+        }:
+            continue
+        ids = c.get("source_ids") if isinstance(c.get("source_ids"), list) else []
+        units = {unit_by_source.get(i) for i in ids}
+        kinds = {kind_by_source.get(i) for i in ids}
+        allowed = (
+            STATIC_KINDS if c.get("metric") == "review_completion" else EXECUTION_KINDS
+        )
+        if c.get("metric") in RATE_AND_COUNT_METRICS | {
+            "review_completion",
+            "cleanup_complete",
+        } and (len(units) != 1 or not kinds <= allowed):
+            mixed.append(c.get("criterion_id"))
+    result.add(
+        "RPT-D018",
+        not mixed,
+        "終了基準は単一の計測単位・適用可能な方式のsourceだけを対象とし、異なる単位（logical primary / attempt / test / TC / 補助testware / 静的レビュー）を合算した率・件数で判定しないこと",
+        evidence=mixed or None,
+    )
+    issues_set = (
+        set(doc.get("issues", [])) if isinstance(doc.get("issues"), list) else set()
+    )
+    expected_currentness = (
+        "not_applicable"
+        if doc.get("population_basis") != "planned"
+        else "unverified"
+        if "plan_currentness_unverified" in issues_set
+        else "superseded"
+        if "plan_revision_superseded" in issues_set
+        else "current"
+    )
+    result.add(
+        "RPT-D019",
+        doc.get("plan_currentness") == expected_currentness
+        and (
+            doc.get("population_basis") != "planned"
+            or "plan_currentness_unverified" in issues_set
+            or "plan_revision_superseded" in issues_set
+            or doc.get("plan_currentness") == "current"
+        ),
+        "計画revisionの現在性を、未確認（unverified）・改版済み（superseded）・現在（current）で区別し、確認できない場合に現在扱いしないこと",
+        evidence={
+            "actual": doc.get("plan_currentness"),
+            "derived": expected_currentness,
+        },
+    )
+    if "expected_plan_currentness" in expected:
+        result.add(
+            "RPT-D020",
+            doc.get("plan_currentness") == expected["expected_plan_currentness"],
+            "独立した期待基準が示す計画revisionの現在性（current / unverified / superseded）と一致すること",
+            evidence={
+                "expected": expected["expected_plan_currentness"],
+                "actual": doc.get("plan_currentness"),
+            },
+        )
+    if "expected_criterion_status" in expected:
+        actual_status = {
+            c.get("criterion_id"): c.get("status")
+            for c in criteria
+            if isinstance(c, dict)
+        }
+        result.add(
+            "RPT-D021",
+            all(
+                actual_status.get(k) == v
+                for k, v in expected["expected_criterion_status"].items()
+            ),
+            "独立した期待基準が示す終了基準ごとの判定（satisfied / unsatisfied / unknown）と一致すること",
+            evidence={
+                "expected": expected["expected_criterion_status"],
+                "actual": actual_status,
+            },
+        )
     if "expected_complete" in expected:
         result.add(
             "RPT-D013",

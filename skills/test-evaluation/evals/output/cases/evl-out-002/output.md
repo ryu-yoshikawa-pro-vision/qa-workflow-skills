@@ -7,12 +7,14 @@
     "efficiency": {
       "metrics": [],
       "status": "unmeasured",
-      "trend": "unmeasured"
+      "trend": "unmeasured",
+      "unresolved_metrics": []
     },
     "process": {
       "metrics": [],
       "status": "unmeasured",
-      "trend": "unmeasured"
+      "trend": "unmeasured",
+      "unresolved_metrics": []
     },
     "quality": {
       "metrics": [
@@ -26,17 +28,20 @@
         }
       ],
       "status": "measured",
-      "trend": "improved"
+      "trend": "improved",
+      "unresolved_metrics": []
     },
     "reusability": {
       "metrics": [],
       "status": "unmeasured",
-      "trend": "unmeasured"
+      "trend": "unmeasured",
+      "unresolved_metrics": []
     },
     "traceability": {
       "metrics": [],
       "status": "unmeasured",
-      "trend": "unmeasured"
+      "trend": "unmeasured",
+      "unresolved_metrics": []
     }
   },
   "claims": [
@@ -147,6 +152,7 @@
       "revision": "p3"
     }
   ],
+  "invalid_metrics": [],
   "metrics": [
     {
       "axis": "quality",

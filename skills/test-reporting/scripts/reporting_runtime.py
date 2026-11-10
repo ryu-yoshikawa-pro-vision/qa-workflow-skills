@@ -10,11 +10,15 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from datetime import datetime, timezone
 from typing import Any
 
 PLAN_APPROVED = "approved"
 RETRIEVAL_COMPLETE = "complete"
 FINAL_STATES = {"PASS", "FAIL", "未実行", "SKIP", "判定不能", "blocked"}
+STATIC_STATES = {"reviewed", "not_reviewed", "tool_failed"}
+# Only these raw states mean the planned unit was actually started.
+STARTED_STATES = {"PASS", "FAIL", "判定不能"}
 EXECUTION_KINDS = {
     "general_tc",
     "e2e",
@@ -54,6 +58,24 @@ def _digest(value: Any) -> str:
     ).hexdigest()
 
 
+def _instant(value: Any) -> datetime | None:
+    if not _text(value):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _period(value: Any) -> tuple[datetime, datetime] | None:
+    """Return a valid closed [from, to] period, or None when absent or invalid."""
+    if not isinstance(value, dict):
+        return None
+    start, end = _instant(value.get("from")), _instant(value.get("to"))
+    return (start, end) if start and end and start <= end else None
+
+
 def _rate(numerator: int, denominator: int) -> float | None:
     return None if denominator <= 0 else round(numerator / denominator, 6)
 
@@ -63,6 +85,7 @@ def _source_summary(
     retrieval: dict[str, Any] | None,
     plan: dict[str, Any],
     current_revisions: dict[str, str],
+    ambiguous_retrieval: bool = False,
 ) -> dict[str, Any]:
     source_id = planned.get("source_id")
     kind = planned.get("kind")
@@ -119,6 +142,8 @@ def _source_summary(
         and retrieved.get("pagination_complete") is True
         and retrieved.get("permission_ok") is True
     )
+    if ambiguous_retrieval:
+        issues.append("duplicate_retrieval_for_source_id")
     if retrieval is None or retrieved.get("status") == "not_attempted":
         issues.append("source_not_retrieved")
     elif not retrieval_ok:
@@ -132,13 +157,28 @@ def _source_summary(
     if retrieval is not None and not source_current:
         issues.append("source_revision_not_current_or_unverified")
 
+    declared_period = planned.get("period") or plan.get("period")
+    period = _period(declared_period)
+    if declared_period is not None and period is None:
+        issues.append("period_invalid")
+    allowed_states = (
+        FINAL_STATES
+        if kind in EXECUTION_KINDS
+        else STATIC_STATES
+        if kind in STATIC_KINDS
+        else None
+    )
     excluded: list[dict[str, str]] = []
     eligible: dict[str, dict[str, Any]] = {}
-    seen_results: set[str] = set()
+    seen_results: dict[str, dict[str, Any]] = {}
     conflicts: set[str] = set()
     unplanned: list[str] = []
     findings: list[dict[str, Any]] = []
-    for record in retrieved.get("records", []) or []:
+    records = retrieved.get("records")
+    if records is not None and not isinstance(records, list):
+        issues.append("records_must_be_a_list")
+        records = []
+    for record in records or []:
         if (
             kind in STATIC_KINDS
             and isinstance(record, dict)
@@ -151,19 +191,28 @@ def _source_summary(
             or record.get("unit") != unit
             or not _text(record.get("unit_ref"))
             or not _text(record.get("result_ref"))
+            or (
+                unit == "attempt"
+                and (
+                    not isinstance(record.get("attempt_no"), int)
+                    or isinstance(record.get("attempt_no"), bool)
+                )
+            )
         ):
             issues.append("record_unit_or_identity_invalid")
             continue
         if record["result_ref"] in seen_results:
-            issues.append("duplicate_result_ref_ignored")
+            if seen_results[record["result_ref"]] == record:
+                issues.append("duplicate_result_ref_ignored")
+            else:
+                issues.append("result_ref_reused_with_different_content")
+                conflicts.add(f"result:{record['result_ref']}")
             continue
-        seen_results.add(record["result_ref"])
-        if (
-            kind != "defect"
-            and record.get("state") not in FINAL_STATES
-            and record.get("state")
-            not in {"reviewed", "not_reviewed", "tool_failed", "finding"}
-        ):
+        seen_results[record["result_ref"]] = record
+        if allowed_states is not None and record.get("state") not in allowed_states:
+            issues.append("record_state_outside_raw_value_set")
+            continue
+        if allowed_states is None and not _text(record.get("state")):
             issues.append("record_state_outside_raw_value_set")
             continue
         if build_ref and record.get("build_ref") != build_ref:
@@ -187,16 +236,29 @@ def _source_summary(
                 }
             )
             continue
+        if period is not None:
+            observed = _instant(record.get("executed_at"))
+            if observed is None:
+                reason = "period_unverified"
+            elif not period[0] <= observed <= period[1]:
+                reason = "period_mismatch"
+            else:
+                reason = None
+            if reason:
+                excluded.append({"result_ref": record["result_ref"], "reason": reason})
+                continue
         key = (
             record["unit_ref"]
             if unit != "attempt"
-            else f"{record['unit_ref']}#{record.get('attempt_no')}"
+            else f"{record['unit_ref']}#{record['attempt_no']}"
         )
-        if key in eligible:
+        if key in eligible or key in conflicts:
             conflicts.add(key)
+            eligible.pop(key, None)
             continue
         eligible[key] = record
-    if conflicts:
+    unit_conflicts = sorted(c for c in conflicts if not c.startswith("result:"))
+    if unit_conflicts:
         issues.append("same_unit_reported_more_than_once_with_different_results")
     if expected_set is not None:
         unplanned = sorted(set(eligible) - expected_set) if unit != "attempt" else []
@@ -204,7 +266,9 @@ def _source_summary(
         k: v for k, v in eligible.items() if expected_set is None or k in expected_set
     }
     missing = (
-        sorted(expected_set - set(planned_records)) if expected_set is not None else []
+        sorted(expected_set - set(planned_records) - set(unit_conflicts))
+        if expected_set is not None
+        else []
     )
     if missing:
         issues.append("planned_units_not_retrieved")
@@ -239,6 +303,8 @@ def _source_summary(
         and retrieval_ok
         and not missing
         and not conflicts
+        and not ambiguous_retrieval
+        and "period_invalid" not in issues
         and "retrieved_count_differs_from_expected_count" not in issues
         and "expected_refs_duplicated" not in issues
         and "expected_count_and_refs_disagree" not in issues
@@ -267,7 +333,20 @@ def _source_summary(
         ),
         "missing_unit_refs": missing,
         "unplanned_unit_refs": unplanned,
-        "excluded": excluded,
+        "conflicting_unit_refs": unit_conflicts,
+        "records_digest": _digest(
+            sorted(
+                [
+                    k,
+                    v.get("result_ref"),
+                    v.get("state"),
+                    v.get("result_finalized"),
+                    v.get("cleanup_status"),
+                ]
+                for k, v in planned_records.items()
+            )
+        ),
+        "excluded": sorted(excluded, key=lambda e: e["result_ref"]),
         "counts": counts,
         "source_revision": retrieved.get("source_revision"),
         "retrieved_at": retrieved.get("retrieved_at"),
@@ -299,7 +378,7 @@ def _source_summary(
             planned_total if complete and isinstance(planned_total, int) else None
         )
         passed = counts.get("PASS", 0)
-        executed = sum(v for k, v in counts.items() if k not in {"未実行", "blocked"})
+        executed = sum(v for k, v in counts.items() if k in STARTED_STATES)
         summary["pass_rate"] = _rate(passed, denominator) if denominator else None
         summary["executed_rate"] = _rate(executed, denominator) if denominator else None
         summary["unexecuted"] = (
@@ -338,6 +417,17 @@ def _evaluate_criterion(
             "status": "unknown",
             "reason": "criterion_source_not_planned",
         }
+    units = {s.get("unit") for s in selected}
+    kinds = {s.get("kind") for s in selected}
+    allowed_kinds = STATIC_KINDS if metric == "review_completion" else EXECUTION_KINDS
+    if len(units) != 1 or not kinds <= allowed_kinds:
+        return {
+            "criterion_id": cid,
+            "status": "unknown",
+            "reason": "mixed_units_or_kinds_not_summable"
+            if len(units) != 1
+            else "metric_not_applicable_to_source_kind",
+        }
     complete = all(s["complete"] for s in selected)
     if metric == "fail_count":
         value = sum(s["counts"].get("FAIL", 0) for s in selected)
@@ -350,13 +440,10 @@ def _evaluate_criterion(
         }
     elif metric in {"pass_rate", "executed_rate"}:
         total = sum(s["planned_total"] or 0 for s in selected)
-        key = "PASS" if metric == "pass_rate" else None
         count = sum(
             s["counts"].get("PASS", 0)
-            if key
-            else sum(
-                v for k, v in s["counts"].items() if k not in {"未実行", "blocked"}
-            )
+            if metric == "pass_rate"
+            else sum(v for k, v in s["counts"].items() if k in STARTED_STATES)
             for s in selected
         )
         value = _rate(count, total)
@@ -421,15 +508,23 @@ def _criterion(
 def build_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     plan = data.get("plan") if isinstance(data.get("plan"), dict) else None
     scope = data.get("scope") if isinstance(data.get("scope"), dict) else {}
-    retrievals = {
-        r.get("source_id"): r for r in data.get("retrievals", []) if isinstance(r, dict)
-    }
+    retrievals: dict[Any, dict[str, Any]] = {}
+    duplicated_ids: set[Any] = set()
+    issues: list[str] = []
+    for item in data.get("retrievals", []) or []:
+        if not isinstance(item, dict) or not _text(item.get("source_id")):
+            issues.append("retrieval_without_source_id")
+            continue
+        if item["source_id"] in retrievals:
+            duplicated_ids.add(item["source_id"])
+        retrievals[item["source_id"]] = item
     current_revisions = (
         data.get("current_source_revisions")
         if isinstance(data.get("current_source_revisions"), dict)
         else {}
     )
-    issues: list[str] = []
+    if duplicated_ids:
+        issues.append("duplicate_retrieval_source_id")
     if plan is None:
         planned_sources: list[dict[str, Any]] = []
         population = "unknown_direct_request"
@@ -446,14 +541,27 @@ def build_snapshot(data: dict[str, Any]) -> dict[str, Any]:
             issues.append("planned_sources_missing")
         if plan_state != PLAN_APPROVED:
             issues.append("plan_not_approved")
-        if data.get("current_plan_revision") not in (None, plan.get("plan_revision")):
+        if not _text(plan.get("plan_revision")) or not _text(plan.get("plan_ref")):
+            issues.append("plan_ref_and_revision_required")
+        current_plan = data.get("current_plan_revision")
+        if not _text(current_plan):
+            issues.append("plan_currentness_unverified")
+        elif current_plan != plan.get("plan_revision"):
             issues.append("plan_revision_superseded")
+        if plan.get("period") is not None and _period(plan.get("period")) is None:
+            issues.append("plan_period_invalid")
     ids = [p.get("source_id") for p in planned_sources]
     if len(ids) != len(set(ids)):
         issues.append("planned_source_ids_duplicated")
     summaries = [
         _source_summary(
-            p, retrievals.get(p.get("source_id")), plan or {}, current_revisions
+            p,
+            None
+            if p.get("source_id") in duplicated_ids
+            else retrievals.get(p.get("source_id")),
+            plan or {},
+            current_revisions,
+            p.get("source_id") in duplicated_ids,
         )
         for p in planned_sources
     ]
@@ -500,6 +608,11 @@ def build_snapshot(data: dict[str, Any]) -> dict[str, Any]:
             "planned_sources_missing",
             "planned_source_ids_duplicated",
             "explicit_scope_and_discovery_roots_required",
+            "plan_currentness_unverified",
+            "plan_ref_and_revision_required",
+            "plan_period_invalid",
+            "duplicate_retrieval_source_id",
+            "retrieval_without_source_id",
         }
     ]
     if gate_blockers or population != "planned" or not criteria:
@@ -511,20 +624,20 @@ def build_snapshot(data: dict[str, Any]) -> dict[str, Any]:
     else:
         exit_state = "undetermined"
     defects = [d for d in data.get("defects", []) if isinstance(d, dict)]
-    snapshot_basis = {
-        "plan": [plan.get("plan_ref"), plan.get("plan_revision")]
-        if plan
-        else [scope.get("scope_ref")],
-        "sources": [
-            [s["source_id"], s["source_revision"], s["retrieved_total"]]
-            for s in summaries
-        ],
-    }
-    return {
+    snapshot = {
         "artifact_type": "report_snapshot",
         "schema_version": "1",
-        "snapshot_ref": "RPT-" + _digest(snapshot_basis)[:40],
         "population_basis": population,
+        "plan_currentness": (
+            "not_applicable"
+            if plan is None
+            else "unverified"
+            if "plan_currentness_unverified" in issues
+            else "superseded"
+            if "plan_revision_superseded" in issues
+            else "current"
+        ),
+        "period": plan.get("period") if plan else None,
         "plan_ref": plan.get("plan_ref") if plan else None,
         "plan_revision": plan.get("plan_revision") if plan else None,
         "plan_approval_state": plan_state,
@@ -557,24 +670,53 @@ def build_snapshot(data: dict[str, Any]) -> dict[str, Any]:
         "release_decision": "not_determined_by_this_skill",
         "issues": sorted(set(issues)),
     }
+    # Content-addressed: any difference in counts, completeness, judgement or the
+    # retrieved records yields a different ref, so an immutable create-if-absent
+    # save can never alias two different snapshots.
+    return {"snapshot_ref": "RPT-" + _digest(snapshot)[:40], **snapshot}
 
 
 def check_currentness(
     snapshot: dict[str, Any], current: dict[str, Any]
 ) -> dict[str, Any]:
-    """Compare a stored snapshot with current plan and source revisions."""
+    """Compare a stored snapshot with fresh plan and source revisions.
+
+    A revision that changed is `stale`; a revision that could not be read now is
+    `unverified`. Neither is `current`.
+    """
     stale: list[str] = []
-    if snapshot.get("plan_revision") != current.get("plan_revision"):
-        stale.append("plan_revision")
+    unverified: list[str] = []
+    if snapshot.get("population_basis") == "planned":
+        if not _text(current.get("plan_revision")):
+            unverified.append("plan_revision")
+        elif current["plan_revision"] != snapshot.get("plan_revision"):
+            stale.append("plan_revision")
     revisions = (
         current.get("source_revisions")
         if isinstance(current.get("source_revisions"), dict)
         else {}
     )
     for source in snapshot.get("sources", []):
-        if revisions.get(source.get("source_id")) != source.get("source_revision"):
-            stale.append(f"source:{source.get('source_id')}")
-    return {"status": "current" if not stale else "stale", "stale": sorted(stale)}
+        name = f"source:{source.get('source_id')}"
+        fresh = revisions.get(source.get("source_id"))
+        if not _text(fresh):
+            unverified.append(name)
+        elif fresh != source.get("source_revision"):
+            stale.append(name)
+    status = "stale" if stale else "unverified" if unverified else "current"
+    return {
+        "status": status,
+        "stale": sorted(stale),
+        "unverified": sorted(unverified),
+    }
+
+
+def _read_stdin() -> str:
+    """Read at most MAX_INPUT_BYTES of UTF-8 from stdin, independent of the locale."""
+    raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        raise ValueError("input_too_large")
+    return raw.decode("utf-8")
 
 
 def _load(text: str) -> Any:
@@ -603,7 +745,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     try:
-        data = _load(sys.stdin.buffer.read().decode("utf-8"))
+        data = _load(_read_stdin())
         if not isinstance(data, dict):
             raise ValueError("input_must_be_object")
         result = (

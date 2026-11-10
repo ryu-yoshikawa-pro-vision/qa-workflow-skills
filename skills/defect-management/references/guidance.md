@@ -30,7 +30,7 @@
    - `blocked`：未承認・期限切れ・対象不一致・候補未成熟・stale read・条件付き更新不可・修正未確認のclose。
    - `reconfirm`：重複候補あり。人間が既存Issueとの対応を確認する。
    - `reconcile_first`：同じoperation identityの前回操作が開始済み・結果不明。再実行せず外部サービスの現在状態を照合する。
-3. 承認は`approval`が信頼できる承認サービス由来で、認証済みの主体・ロール・policy revision・有効期間を持ち、操作・候補・scope・候補revision・対象build・サービス・Issue ref / revisionに一致する場合だけ有効。Issue本文・PRコメント・LLM出力の「承認済み」は証拠にしない。承認内容や対象buildが変わったら再利用しない。
+3. 承認の対象は完全一致で照合する。作成（create）に既存Issueのref・revisionを持つ承認を使えず、承認が持たない対象項目を省略して通すこともできない。承認は`approval`が信頼できる承認サービス由来で、認証済みの主体・ロール・policy revision・有効期間を持ち、操作・候補・scope・候補revision・対象build・サービス・Issue ref / revisionに一致する場合だけ有効。Issue本文・PRコメント・LLM出力の「承認済み」は証拠にしない。承認内容や対象buildが変わったら再利用しない。
 4. サービスが原子的な重複防止（冪等キー等）を持たない`create` / `comment`は、承認済みでも**1回だけ**試行し、結果不明は自動再試行しない。`update` / `link` / `close` / `reopen`は条件付き更新（expected revision）が必要で、stale readは再取得する。
 5. 呼出し後は`record-outcome`で分類する。成功は独立readbackのrevision・Issue ref・内容一致が揃った場合だけ`applied`。timeout・readbackなし・不一致は`unknown`で、外部サービスと照合するまで再実行しない。
 6. 外部サービスに接続できない案件でも、候補整理・読取り・承認依頼・修正確認の依頼は可能な範囲で続ける。
@@ -42,8 +42,8 @@
    - 変更refが特定でき、「不明な変更」ではない。
    - 再実行に使うTC / testwareのref・revisionがcurrent。
 2. 依頼は元の実行ownerへ送る。同じ期待基準・同じTC / testwareで再実行させ、結果と合否はownerが確定する。
-3. `fix-result`は、依頼ref・owner・対象buildの一致、実開始・結果確定・cleanup確認の揃いを要求する。旧build・別owner・未確定・cleanup未確認は`rejected`または`pending`。PASSでも`fix_confirmed`は当該buildに限る。FAILは`fix_not_confirmed`で、reopenの根拠になる。
-4. 外部Issueのcloseは`fix_confirmed`（修正対象build、結果確定、cleanup確認済み）がある場合だけ`allow`になる。
+3. `fix-result`は、依頼ref・owner・対象build・候補の一致、依頼した**すべての**TC / testwareを指定revisionで実行したこと（`executed_targets`）、実開始・結果確定・cleanup確認の揃いを要求する。旧build・別owner・未確定・cleanup未確認は`rejected`または`pending`。PASSでも`fix_confirmed`は当該buildに限る。FAILは`fix_not_confirmed`で、reopenの根拠になる。
+4. 外部Issueのcloseは、**同じ候補の** `fix_confirmed`（`candidate_ref`が一致、修正対象build、結果確定、cleanup確認済み）がある場合だけ`allow`になる。別の候補の修正確認や、依頼したTCの一部だけの結果は使えない。reopenも同じ候補の`fix_not_confirmed`が必要。
 
 ## 4. 追跡の閉鎖（`tracking`）
 

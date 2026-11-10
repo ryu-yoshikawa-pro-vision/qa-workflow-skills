@@ -37,7 +37,9 @@
   },
   "plan": {
     "auto_retry_allowed": true,
+    "candidate_ref": "DEFC-b0f7216bf8e36a23ab85eab518f0f7aac8154c31",
     "decision": "allow",
+    "issue_ref": null,
     "operation": "create",
     "operation_id": "DEFOP-d33b01e38532fc29351482ed48070a257ec68cea",
     "reasons": [],

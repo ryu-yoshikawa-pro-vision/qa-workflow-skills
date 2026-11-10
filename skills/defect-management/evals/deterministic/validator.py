@@ -181,6 +181,8 @@ def _operation(doc: dict[str, Any], result: EvalResult) -> None:
         or operation != "close"
         or (
             fix.get("status") == "fix_confirmed"
+            and _text(plan.get("candidate_ref"))
+            and fix.get("candidate_ref") == plan.get("candidate_ref")
             and _text(fix.get("verified_target_ref"))
             and fix.get("verified_target_ref") == ctx.get("fix_target_ref")
             and fix.get("verified_target_ref") != ctx.get("observed_target_ref")
@@ -249,10 +251,24 @@ def _fix(doc: dict[str, Any], result: EvalResult) -> None:
     result_ok = True
     if outcome is not None:
         confirmed = outcome.get("status") == "fix_confirmed"
+        required = {
+            (t.get("ref"), t.get("revision"))
+            for t in request.get("verification_targets", [])
+            if isinstance(t, dict)
+        }
+        executed = outcome.get("executed_targets")
+        executed_set = (
+            {(t.get("ref"), t.get("revision")) for t in executed if isinstance(t, dict)}
+            if isinstance(executed, list)
+            else set()
+        )
         result_ok = ready and (
             not confirmed
             or (
-                outcome.get("target_ref") == request.get("fix_target_ref")
+                bool(required)
+                and executed_set == required
+                and outcome.get("candidate_ref") == request.get("candidate_ref")
+                and outcome.get("target_ref") == request.get("fix_target_ref")
                 and outcome.get("owner_skill") == request.get("send_to")
                 and outcome.get("actual_start_confirmed") is True
                 and outcome.get("result_finalized") is True
@@ -262,7 +278,7 @@ def _fix(doc: dict[str, Any], result: EvalResult) -> None:
     result.add(
         "DEF-D013",
         result_ok,
-        "fix_confirmedは依頼対象のbuildでownerが開始・確定・cleanup確認した結果だけであること",
+        "fix_confirmedは依頼対象のbuildで、依頼した全testwareを指定revisionで、ownerが開始・確定・cleanup確認した結果だけであること",
     )
 
 

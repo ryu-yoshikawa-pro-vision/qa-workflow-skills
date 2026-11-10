@@ -1,0 +1,3 @@
+# Reference
+
+依頼した全てのTC・testwareを指定revisionで実行した結果がそろっていないため、fix_confirmedにせず保留（pending）とする。TC-008の実行を元ownerへ求める。closeは同じ候補について元ownerが修正対象buildで確定した結果がある場合だけ許可され、別の候補（DEFC-b）の修正確認PASSを流用しない。

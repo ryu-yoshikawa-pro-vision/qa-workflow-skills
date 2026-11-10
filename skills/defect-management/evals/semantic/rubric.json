@@ -36,6 +36,12 @@
       "title": "責務境界とsecret",
       "description": "製品修正・外部Issueの正式状態・Regression Run選定をQA Skillに取り込まず、secretを転載していないか。",
       "critical": true
+    },
+    {
+      "id": "DEF-SEM-007",
+      "title": "修正確認の網羅と候補への紐付け",
+      "description": "依頼した全testwareを指定revisionで実行した結果だけを修正確認とし、別の候補の修正確認をcloseに流用していないか。",
+      "critical": true
     }
   ]
 }

@@ -74,7 +74,7 @@ class ManifestTests(unittest.TestCase):
                         result["status"], "pass", json.dumps(result, ensure_ascii=False)
                     )
                     total += 1
-        self.assertEqual(total, 14)
+        self.assertEqual(total, 22)
 
     def test_inputs_reference_the_canonical_template(self):
         for skill in SKILLS:
@@ -503,6 +503,232 @@ class TestEvaluationValidatorTests(unittest.TestCase):
                 lambda a: a["axes"]["process"].update(status="unmeasured"),
             ),
         )
+
+
+def rehash(artifact: dict) -> dict:
+    """Re-derive a content-addressed snapshot_ref after a deliberate edit."""
+    import hashlib
+
+    body = {k: v for k, v in artifact.items() if k != "snapshot_ref"}
+    digest = hashlib.sha256(
+        json.dumps(
+            body, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    artifact["snapshot_ref"] = "RPT-" + digest[:40]
+    return artifact
+
+
+class ReviewDrivenReportingValidatorTests(unittest.TestCase):
+    skill = "test-reporting"
+
+    def failing(self, case_id, mutate, rehash_ref=True):
+        artifact = load_artifact(self.skill, case_id)
+        mutate(artifact)
+        if rehash_ref:
+            rehash(artifact)
+        return failed(grade_artifact(self.skill, case_id, artifact))
+
+    def test_snapshot_ref_must_be_the_content_hash(self):
+        self.assertIn(
+            "RPT-D017",
+            self.failing(
+                "RPT-OUT-001",
+                lambda a: a["overall"].update(complete=False),
+                rehash_ref=False,
+            ),
+        )
+        # a content edit that is re-hashed keeps D017 satisfied; other assertions still catch it
+        self.assertNotIn(
+            "RPT-D017", self.failing("RPT-OUT-001", lambda a: a["issues"].append("x"))
+        )
+
+    def test_mixed_unit_criteria_cannot_be_judged(self):
+        def pooled(a):
+            a["exit_criteria"] = [
+                {
+                    "criterion_id": "EX-POOL",
+                    "metric": "pass_rate",
+                    "status": "satisfied",
+                    "value": 1.0,
+                    "source_ids": ["e2e", "api"],
+                }
+            ]
+
+        self.assertIn("RPT-D018", self.failing("RPT-OUT-001", pooled))
+
+        def static_pass_rate(a):
+            a["exit_criteria"].append(
+                {
+                    "criterion_id": "X",
+                    "metric": "pass_rate",
+                    "status": "unsatisfied",
+                    "source_ids": ["e2e", "nope"],
+                }
+            )
+
+        self.assertIn("RPT-D018", self.failing("RPT-OUT-001", static_pass_rate))
+
+    def test_unverified_plan_currentness_cannot_be_presented_as_current_or_satisfied(
+        self,
+    ):
+        def claim_current(a):
+            a["plan_currentness"] = "current"
+
+        failures = self.failing("RPT-OUT-006", claim_current)
+        self.assertTrue({"RPT-D019", "RPT-D020"} <= failures)
+
+        def satisfied(a):
+            a["exit_judgement"] = "satisfied"
+
+        self.assertIn("RPT-D009", self.failing("RPT-OUT-006", satisfied))
+
+        def hide_issue(a):
+            a["issues"] = []
+            a["exit_judgement"] = "satisfied"
+
+        self.assertIn("RPT-D009", self.failing("RPT-OUT-006", hide_issue))
+
+    def test_pooled_criterion_expectation_is_checked_independently(self):
+        def pretend_satisfied(a):
+            a["exit_criteria"][0]["status"] = "satisfied"
+            a["exit_judgement"] = "satisfied"
+
+        failures = self.failing("RPT-OUT-007", pretend_satisfied)
+        self.assertTrue({"RPT-D018", "RPT-D021", "RPT-D014"} <= failures)
+
+    def test_duplicate_retrieval_and_period_cases_cannot_be_reported_complete(self):
+        for case_id in ("RPT-OUT-008", "RPT-OUT-009"):
+            with self.subTest(case=case_id):
+
+                def force(a):
+                    for s in a["sources"]:
+                        s["complete"] = True
+                        s["closure"] = dict.fromkeys(s["closure"], True)
+                    a["overall"]["complete"] = True
+
+                failures = self.failing(case_id, force)
+                self.assertTrue({"RPT-D013", "RPT-D016"} <= failures)
+
+
+class ReviewDrivenEvaluationValidatorTests(unittest.TestCase):
+    skill = "test-evaluation"
+
+    def failing(self, case_id, mutate):
+        artifact = load_artifact(self.skill, case_id)
+        mutate(artifact)
+        return failed(grade_artifact(self.skill, case_id, artifact))
+
+    def test_axis_wide_trend_is_derived_from_all_metrics(self):
+        self.assertIn(
+            "EVL-D004",
+            self.failing(
+                "EVL-OUT-005", lambda a: a["axes"]["quality"].update(trend="improved")
+            ),
+        )
+        self.assertIn(
+            "EVL-D004",
+            self.failing(
+                "EVL-OUT-006", lambda a: a["axes"]["quality"].update(trend="improved")
+            ),
+        )
+        self.assertIn(
+            "EVL-D014",
+            self.failing(
+                "EVL-OUT-005",
+                lambda a: a["axes"]["quality"].update(trend="no_change_or_baseline"),
+            ),
+        )
+
+    def test_axis_wide_improvement_claim_with_unresolved_or_worsened_metrics_is_rejected(
+        self,
+    ):
+        for case_id in ("EVL-OUT-005", "EVL-OUT-006"):
+            with self.subTest(case=case_id):
+
+                def accept(a):
+                    a["rejected_claims"] = [
+                        c for c in a["rejected_claims"] if c["assertion"] != "improved"
+                    ]
+
+                self.assertIn("EVL-D005", self.failing(case_id, accept))
+
+    def test_metric_level_claims_need_the_named_metric_to_have_improved(self):
+        def wrong_metric(a):
+            a["claims"].append(
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "Q-review",
+                }
+            )
+
+        self.assertIn("EVL-D005", self.failing("EVL-OUT-005", wrong_metric))
+
+    def test_inputs_need_a_content_hash_and_invalid_metrics_block_final(self):
+        def drop_hash(a):
+            a["inputs"][0].pop("content_hash")
+
+        self.assertIn("EVL-D008", self.failing("EVL-OUT-001", drop_hash))
+
+        def final_with_invalid(a):
+            a["evaluation_status"] = "final"
+            a["invalid_metrics"] = ["M-x"]
+
+        self.assertIn("EVL-D008", self.failing("EVL-OUT-001", final_with_invalid))
+
+
+class ReviewDrivenDefectValidatorTests(unittest.TestCase):
+    skill = "defect-management"
+
+    def failing(self, case_id, mutate):
+        artifact = load_artifact(self.skill, case_id)
+        mutate(artifact)
+        return failed(grade_artifact(self.skill, case_id, artifact))
+
+    def test_close_needs_the_fix_verification_of_the_same_candidate(self):
+        def make_close(a):
+            a["plan"].update(
+                decision="allow", operation="close", requires_readback=True
+            )
+            a["context"]["fix_verification"] = {
+                "status": "fix_confirmed",
+                "candidate_ref": "DEFC-someone-else",
+                "verified_target_ref": "build:42",
+                "result_finalized": True,
+                "cleanup_status": "成功",
+            }
+
+        self.assertIn("DEF-D009", self.failing("DEF-OUT-003", make_close))
+
+    def test_confirmation_needs_every_requested_testware_at_the_requested_revision(
+        self,
+    ):
+        def confirm_partial(a):
+            a["result"].update(
+                status="fix_confirmed",
+                fix_confirmed=True,
+                candidate_ref=a["request"]["candidate_ref"],
+            )
+
+        self.assertIn("DEF-D013", self.failing("DEF-OUT-007", confirm_partial))
+
+        def other_candidate(a):
+            a["result"]["candidate_ref"] = "DEFC-other"
+
+        self.assertIn("DEF-D013", self.failing("DEF-OUT-004", other_candidate))
+
+        def old_revision(a):
+            a["result"]["executed_targets"] = [{"ref": "tc:TC-007", "revision": "t2"}]
+
+        self.assertIn("DEF-D013", self.failing("DEF-OUT-004", old_revision))
+
+    def test_approval_bound_to_another_issue_cannot_be_allowed_for_create(self):
+        def allow(a):
+            a["plan"].update(decision="allow", reasons=[])
+            a["context"]["approval"]["binding_matches"] = False
+
+        self.assertIn("DEF-D007", self.failing("DEF-OUT-006", allow))
 
 
 class IsolatedPackagingTests(unittest.TestCase):

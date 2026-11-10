@@ -36,6 +36,12 @@
       "title": "読取専用と責務境界",
       "description": "元結果を改変せず、E2E単体報告や欠陥Issue状態の更新など他ownerの責務を取り込んでいないか。",
       "critical": true
+    },
+    {
+      "id": "RPT-SEM-007",
+      "title": "計測単位の合算・現在性・期間・重複取得",
+      "description": "異なる計測単位を合算した基準で判定せず、計画revisionの未確認と不一致を区別し、対象期間外と重複したsource取得を完了扱いしていないか。",
+      "critical": true
     }
   ]
 }

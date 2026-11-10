@@ -396,6 +396,7 @@ class ExternalOperationTests(unittest.TestCase):
     def test_close_requires_owner_confirmed_fix_on_the_fix_target_only(self):
         good_fix = {
             "status": "fix_confirmed",
+            "candidate_ref": summary()["candidate_ref"],
             "verified_target_ref": "build:42",
             "result_finalized": True,
             "cleanup_status": "成功",
@@ -425,12 +426,22 @@ class ExternalOperationTests(unittest.TestCase):
 
     def test_reopen_needs_owner_confirmed_failure(self):
         plan = defect.plan_external_operation(
-            self.update_request("reopen", fix_verification={"status": "fix_confirmed"})
+            self.update_request(
+                "reopen",
+                fix_verification={
+                    "status": "fix_confirmed",
+                    "candidate_ref": summary()["candidate_ref"],
+                },
+            )
         )
         self.assertEqual(plan["decision"], "blocked")
         ok = defect.plan_external_operation(
             self.update_request(
-                "reopen", fix_verification={"status": "fix_not_confirmed"}
+                "reopen",
+                fix_verification={
+                    "status": "fix_not_confirmed",
+                    "candidate_ref": summary()["candidate_ref"],
+                },
             )
         )
         self.assertEqual(ok["decision"], "allow")
@@ -543,6 +554,7 @@ class FixVerificationTests(unittest.TestCase):
             "actual_start_confirmed": True,
             "result_finalized": True,
             "cleanup_status": "成功",
+            "executed_targets": [{"ref": "tc:TC-007", "revision": "t3"}],
         }
         value.update(overrides)
         return value
@@ -644,6 +656,164 @@ class ClosureTests(unittest.TestCase):
         self.assertTrue(defect.closure_status(ok)["closed"])
         self.assertFalse(
             defect.closure_status({"submission": {"status": "withheld"}})["closed"]
+        )
+
+
+class ReviewRegressionTests(unittest.TestCase):
+    def test_an_approval_for_an_existing_issue_cannot_authorize_a_create(self):
+        cand = summary()
+        for field, value in (("issue_ref", "ISSUE-1"), ("issue_revision", "7")):
+            with self.subTest(field=field):
+                request = create_request(
+                    cand, approval=approval("create", cand, **{field: value})
+                )
+                plan = defect.plan_external_operation(request)
+                self.assertEqual(plan["decision"], "blocked")
+                self.assertIn(f"approval_binding_mismatch:{field}", plan["reasons"])
+
+    def test_missing_scope_is_not_a_wildcard_for_approval_binding(self):
+        cand = summary()
+        cand["scope_ref"] = None
+        request = create_request(cand, approval=approval("create", cand))
+        plan = defect.plan_external_operation(request)
+        self.assertEqual(plan["decision"], "blocked")
+        self.assertEqual(plan["reasons"], ["candidate_identity_required"])
+
+    def test_close_needs_a_fix_verification_that_belongs_to_the_same_candidate(self):
+        cand = summary()
+        other = summary(candidate(run_ref="run:other"))
+        fix = {
+            "status": "fix_confirmed",
+            "candidate_ref": other["candidate_ref"],
+            "verified_target_ref": "build:42",
+            "result_finalized": True,
+            "cleanup_status": "成功",
+        }
+        issue = {"issue_ref": "ISSUE-1", "revision": "7", "current_revision": "7"}
+        request = {
+            "operation": "close",
+            "candidate": cand,
+            "issue": issue,
+            "approval": approval(
+                "close", cand, issue_ref="ISSUE-1", issue_revision="7"
+            ),
+            "service": dict(SERVICE),
+            "prior_operations": [],
+            "now": NOW,
+            "fix_verification": fix,
+        }
+        self.assertEqual(defect.plan_external_operation(request)["decision"], "blocked")
+        request["fix_verification"] = {**fix, "candidate_ref": cand["candidate_ref"]}
+        self.assertEqual(defect.plan_external_operation(request)["decision"], "allow")
+        request["fix_verification"] = {
+            k: v for k, v in fix.items() if k != "candidate_ref"
+        }
+        self.assertEqual(defect.plan_external_operation(request)["decision"], "blocked")
+
+    def test_a_result_covering_only_part_of_the_verification_targets_is_pending(self):
+        cand = summary(
+            verification_targets=[
+                {"ref": "tc:TC-007", "revision": "t3", "current": True},
+                {"ref": "tc:TC-008", "revision": "t1", "current": True},
+            ]
+        )
+        request = defect.request_fix_verification(
+            cand,
+            {
+                "issue_ref": "ISSUE-1",
+                "issue_revision": "9",
+                "fix_target_ref": "build:42",
+                "change_refs": ["c"],
+            },
+        )
+        result = {
+            "request_ref": request["request_ref"],
+            "owner_skill": "e2e-test-execution",
+            "target_ref": "build:42",
+            "state": "PASS",
+            "actual_start_confirmed": True,
+            "result_finalized": True,
+            "cleanup_status": "成功",
+        }
+        for name, executed in (
+            ("none", None),
+            ("partial", [{"ref": "tc:TC-007", "revision": "t3"}]),
+            (
+                "old_revision",
+                [
+                    {"ref": "tc:TC-007", "revision": "t3"},
+                    {"ref": "tc:TC-008", "revision": "t0"},
+                ],
+            ),
+        ):
+            with self.subTest(name=name):
+                outcome = defect.evaluate_fix_result(
+                    request, {**result, "executed_targets": executed}
+                )
+                self.assertEqual(outcome["status"], "pending")
+                self.assertFalse(outcome["fix_confirmed"])
+        full = [
+            {"ref": "tc:TC-008", "revision": "t1"},
+            {"ref": "tc:TC-007", "revision": "t3"},
+        ]
+        confirmed = defect.evaluate_fix_result(
+            request, {**result, "executed_targets": full}
+        )
+        self.assertEqual(confirmed["status"], "fix_confirmed")
+        self.assertEqual(confirmed["candidate_ref"], cand["candidate_ref"])
+        self.assertEqual(
+            defect.evaluate_fix_result(
+                request, {**result, "executed_targets": full, "candidate_ref": "DEFC-x"}
+            )["status"],
+            "rejected",
+        )
+
+    def test_outcome_for_an_update_must_touch_the_planned_issue_and_junk_is_unknown(
+        self,
+    ):
+        cand = summary()
+        issue = {"issue_ref": "ISSUE-1", "revision": "7", "current_revision": "7"}
+        plan = defect.plan_external_operation(
+            {
+                "operation": "update",
+                "candidate": cand,
+                "issue": issue,
+                "approval": approval(
+                    "update", cand, issue_ref="ISSUE-1", issue_revision="7"
+                ),
+                "service": dict(SERVICE),
+                "prior_operations": [],
+                "now": NOW,
+            }
+        )
+        self.assertEqual(plan["decision"], "allow")
+        self.assertEqual(plan["issue_ref"], "ISSUE-1")
+        call = {"status": "success", "issue_ref": "ISSUE-2", "returned_revision": "8"}
+        readback = {
+            "issue_ref": "ISSUE-2",
+            "revision": "8",
+            "matches_request": True,
+            "retrieved_at": NOW,
+        }
+        self.assertEqual(
+            defect.record_operation_outcome(plan, call, readback)["status"], "unknown"
+        )
+        good = {**call, "issue_ref": "ISSUE-1"}
+        self.assertEqual(
+            defect.record_operation_outcome(
+                plan, good, {**readback, "issue_ref": "ISSUE-1"}
+            )["status"],
+            "applied",
+        )
+        for junk in (None, [], "success"):
+            self.assertEqual(
+                defect.record_operation_outcome(plan, junk, None)["status"], "unknown"
+            )
+        self.assertEqual(
+            defect.record_operation_outcome(
+                plan, {"status": "success", "returned_revision": "8"}, readback
+            )["status"],
+            "unknown",
         )
 
 

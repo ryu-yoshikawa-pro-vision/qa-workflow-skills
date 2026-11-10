@@ -40,14 +40,16 @@
     "pass_rate_note": "units_are_never_summed_see_by_unit",
     "population_known": true
   },
+  "period": null,
   "plan_approval_state": "approved",
+  "plan_currentness": "current",
   "plan_ref": "plan:qa-1",
   "plan_revision": "p3",
   "population_basis": "planned",
   "release_decision": "not_determined_by_this_skill",
   "schema_version": "1",
   "scope_ref": "scope:checkout",
-  "snapshot_ref": "RPT-4ff149e4626e41c52ce34e803ab955cddca709ee",
+  "snapshot_ref": "RPT-bbab9d34eb36597da44d8009f31737e78ee46f7a",
   "sources": [
     {
       "closure": {
@@ -57,6 +59,7 @@
         "source_current": true
       },
       "complete": true,
+      "conflicting_unit_refs": [],
       "counts": {
         "PASS": 1
       },
@@ -70,6 +73,7 @@
       "pass_rate": 1.0,
       "pass_rate_basis": "planned_population",
       "planned_total": 1,
+      "records_digest": "eb096b1f1efd6e349256cd415daae37c3cd56c74809ac1fb59ddcb79f0da6f43",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 1.0,
       "retrieved_total": 1,
@@ -88,6 +92,7 @@
         "source_current": true
       },
       "complete": true,
+      "conflicting_unit_refs": [],
       "counts": {
         "FAIL": 1,
         "PASS": 1
@@ -102,6 +107,7 @@
       "pass_rate": 0.5,
       "pass_rate_basis": "planned_population",
       "planned_total": 2,
+      "records_digest": "4bc79d87c3cc1bce4cefc76875e20148230b7178cae05ab715375d39b1dec884",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 0.5,
       "retrieved_total": 2,

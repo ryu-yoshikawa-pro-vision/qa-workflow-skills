@@ -1,0 +1,11 @@
+{
+  "expected_complete": false,
+  "expected_exit_judgement": "undetermined",
+  "expected_planned_totals": {
+    "e2e": 2,
+    "api": 3
+  },
+  "expected_incomplete_sources": [
+    "api"
+  ]
+}

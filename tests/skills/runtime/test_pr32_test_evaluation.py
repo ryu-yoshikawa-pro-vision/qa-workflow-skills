@@ -190,7 +190,7 @@ class AxisAndClaimTests(unittest.TestCase):
             claims=[{"axis": "quality", "assertion": "improved"}],
         )
         self.assertEqual(len(mixed["rejected_claims"]), 1)
-        self.assertEqual(mixed["axes"]["quality"]["trend"], "worsened")
+        self.assertEqual(mixed["axes"]["quality"]["trend"], "mixed")
 
     def test_not_comparable_axis_has_no_trend_claim(self):
         other = metric()
@@ -475,11 +475,11 @@ class InputsHandoffAndPropagationTests(unittest.TestCase):
     def test_changed_or_missing_source_is_stale_or_unverified(self):
         recorded = [
             {"ref": "report:1", "revision": "r1", "content_hash": "h1"},
-            {"ref": "plan:1", "revision": "p1"},
+            {"ref": "plan:1", "revision": "p1", "content_hash": "h2"},
         ]
         current = {
             "report:1": {"revision": "r1", "content_hash": "h1"},
-            "plan:1": {"revision": "p1"},
+            "plan:1": {"revision": "p1", "content_hash": "h2"},
         }
         self.assertEqual(
             evaluation.verify_inputs(recorded, current)["status"], "current"
@@ -550,6 +550,249 @@ class InputsHandoffAndPropagationTests(unittest.TestCase):
         self.assertEqual(result["retained_current"], ["spec", "unrelated_tc"])
         cycle = evaluation.propagate_change("a", {"b": ["a"], "a": ["b"]}, ["a", "b"])
         self.assertEqual(cycle["revalidate"], ["b"])
+
+
+class AxisWideJudgementTests(unittest.TestCase):
+    """A metric-level improvement must not become an axis-wide improvement."""
+
+    def quality(self, *extra):
+        improved = metric("quality", metric_id="Q-improved")
+        return [improved, *extra]
+
+    def unresolved(self, kind):
+        if kind == "not_comparable":
+            item = metric("quality", metric_id="Q-other")
+            item["conditions"]["environment_ref"] = "env:prod"
+        elif kind == "unmeasured":
+            item = metric(
+                "quality",
+                metric_id="Q-other",
+                value=None,
+                numerator=None,
+                denominator=None,
+                previous=None,
+                unmeasured_reason="未取得",
+            )
+        elif kind == "invalid":
+            item = metric("quality", metric_id="Q-other", value=0.9)  # 8/10 != 0.9
+        else:  # worsened
+            item = metric(
+                "quality", metric_id="Q-other", value=0.4, numerator=4, previous=0.6
+            )
+        return item
+
+    def test_improved_plus_unresolved_metrics_is_not_an_axis_wide_improvement(self):
+        for kind in ("not_comparable", "unmeasured", "invalid"):
+            with self.subTest(kind=kind):
+                result = evaluation.evaluate_axes(
+                    self.quality(self.unresolved(kind)),
+                    claims=[
+                        {"axis": "quality", "assertion": "improved"},
+                        {"axis": "quality", "assertion": "partially_improved"},
+                        {
+                            "axis": "quality",
+                            "assertion": "metric_improved",
+                            "metric_id": "Q-improved",
+                        },
+                    ],
+                )
+                axis = result["axes"]["quality"]
+                self.assertEqual(
+                    axis["trend"],
+                    "invalid" if kind == "invalid" else "partially_improved",
+                )
+                self.assertEqual(axis["unresolved_metrics"], ["Q-other"])
+                self.assertEqual(axis["status"], "measured")
+                rejected = {
+                    (c["axis"], c["assertion"]) for c in result["rejected_claims"]
+                }
+                self.assertIn(("quality", "improved"), rejected)
+                self.assertNotIn(("quality", "metric_improved"), rejected)
+                if kind != "invalid":
+                    self.assertNotIn(("quality", "partially_improved"), rejected)
+
+    def test_improved_plus_worsened_is_mixed_and_supports_neither_improved_nor_unqualified_success(
+        self,
+    ):
+        result = evaluation.evaluate_axes(
+            self.quality(self.unresolved("worsened")),
+            claims=[
+                {"axis": "quality", "assertion": "improved"},
+                {"axis": "quality", "assertion": "mixed"},
+                {"axis": "quality", "assertion": "worsened"},
+            ],
+        )
+        self.assertEqual(result["axes"]["quality"]["trend"], "mixed")
+        self.assertEqual(
+            [c["assertion"] for c in result["rejected_claims"]], ["improved"]
+        )
+
+    def test_every_metric_improved_or_unchanged_and_resolved_is_axis_improved(self):
+        unchanged = metric(
+            "quality", metric_id="Q-same", value=0.6, numerator=6, previous=0.6
+        )
+        result = evaluation.evaluate_axes(
+            self.quality(unchanged),
+            claims=[{"axis": "quality", "assertion": "improved"}],
+        )
+        self.assertEqual(result["axes"]["quality"]["trend"], "improved")
+        self.assertEqual(result["rejected_claims"], [])
+
+    def test_a_metric_with_an_unknown_axis_is_surfaced_not_dropped(self):
+        result = evaluation.evaluate_axes(
+            [metric("quality"), metric("speed", metric_id="S-1")]
+        )
+        self.assertEqual(result["invalid_metrics"], ["S-1"])
+        self.assertTrue(
+            all(
+                axis["status"] != "measured"
+                for name, axis in result["axes"].items()
+                if name != "quality"
+            )
+        )
+
+    def test_improvement_claims_for_other_axes_or_unknown_metrics_are_rejected(self):
+        result = evaluation.evaluate_axes(
+            self.quality(),
+            claims=[
+                {"axis": "efficiency", "assertion": "improved"},
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "nope",
+                },
+                {"axis": "quality", "assertion": "excellent"},
+                {"axis": "speed", "assertion": "improved"},
+            ],
+        )
+        self.assertEqual(len(result["rejected_claims"]), 4)
+
+    def test_improvement_effect_still_comes_from_a_single_comparable_metric(self):
+        # lifecycle measurement uses one metric; an axis-level mixed result cannot be injected
+        applied = TestImprovementLifecycleHelpers.implemented()
+        activity = {
+            "activity_ref": "act:2",
+            "applied_revision": "plan-4",
+            "started_after_implementation": True,
+        }
+        result = advance(
+            applied,
+            {
+                "type": "measure",
+                "activity": activity,
+                "metric": self.unresolved("not_comparable"),
+            },
+        )
+        self.assertEqual(result["improvement"]["state"], "not_comparable")
+        invalid = advance(
+            applied,
+            {
+                "type": "measure",
+                "activity": activity,
+                "metric": self.unresolved("invalid"),
+            },
+        )
+        self.assertEqual(invalid["status"], "blocked")
+
+
+class TestImprovementLifecycleHelpers:
+    @staticmethod
+    def implemented():
+        adopted = advance(proposal(), {"type": "adopt", "approval": adoption()})[
+            "improvement"
+        ]
+        handed = advance(
+            adopted,
+            {
+                "type": "handoff",
+                "owner_skill": "test-management",
+                "request_ref": "req:1",
+                "base_revision": "plan-3",
+            },
+        )["improvement"]
+        return advance(
+            handed,
+            {
+                "type": "implement",
+                "owner_result": {
+                    "request_ref": "req:1",
+                    "owner_skill": "test-management",
+                    "status": "applied",
+                    "new_revision": "plan-4",
+                    "adoption_ref": "appr:1",
+                },
+            },
+        )["improvement"]
+
+
+class ExactBindingTests(unittest.TestCase):
+    def test_approval_must_match_every_bound_field_including_absent_ones(self):
+        binding = {
+            "operation": "adopt_improvement",
+            "improvement_ref": "IMP-1",
+            "artifact_revision": "prop-1",
+            "scope_ref": "scope:checkout",
+            "extra": None,
+        }
+        self.assertEqual(evaluation.verify_approval(adoption(), binding, NOW), [])
+        self.assertEqual(
+            evaluation.verify_approval(adoption(extra="something"), binding, NOW),
+            ["approval_binding_mismatch:extra"],
+        )
+
+    def test_adoption_needs_an_identifiable_proposal_revision_and_scope(self):
+        for field in ("proposal_revision", "scope_ref"):
+            with self.subTest(field=field):
+                item = proposal()
+                item.pop(field)
+                result = advance(
+                    item,
+                    {
+                        "type": "adopt",
+                        "approval": adoption(
+                            **{"artifact_revision": None, "scope_ref": None}
+                        ),
+                    },
+                )
+                self.assertEqual(result["status"], "blocked")
+                self.assertIn("proposal_revision_and_scope_required", result["reasons"])
+
+    def test_inputs_without_a_content_hash_cannot_prove_raw_sources_unmodified(self):
+        recorded = [{"ref": "a", "revision": "r1"}]
+        result = evaluation.verify_inputs(recorded, {"a": {"revision": "r1"}})
+        self.assertEqual(result["status"], "stale_or_unverified")
+        self.assertEqual(result["unverified_refs"], ["a"])
+        with_hash = [{"ref": "a", "revision": "r1", "content_hash": "h"}]
+        self.assertEqual(
+            evaluation.verify_inputs(with_hash, {"a": {"revision": "r1"}})[
+                "stale_refs"
+            ],
+            ["a"],
+        )
+
+    def test_handoff_confirmation_must_name_the_artifact_revision(self):
+        confirmation = {
+            "source": "trusted_approval_service",
+            "authentication_verified": True,
+            "authenticated_by": "idp",
+            "principal": "owner",
+            "role": "project_owner",
+            "policy_revision": "p1",
+            "issued_at": "2026-11-09T00:00:00+00:00",
+            "expires_at": "2026-11-11T00:00:00+00:00",
+            "operation": "confirm_handoff",
+            "item_ref": "item:1",
+        }
+        item = {"item_ref": "item:1", "receiver": "ops", "confirmation": confirmation}
+        self.assertFalse(evaluation.handoff_status([item], NOW)["closed"])
+        item_a1 = {
+            **item,
+            "artifact_revision": "a1",
+            "confirmation": {**confirmation, "artifact_revision": "a1"},
+        }
+        self.assertTrue(evaluation.handoff_status([item_a1], NOW)["closed"])
+        stale = {**item_a1, "artifact_revision": "a2"}
+        self.assertFalse(evaluation.handoff_status([stale], NOW)["closed"])
 
 
 class CliTests(unittest.TestCase):

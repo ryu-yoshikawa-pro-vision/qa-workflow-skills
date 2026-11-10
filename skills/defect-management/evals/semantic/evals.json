@@ -48,6 +48,14 @@
       "criteria": [
         "DEF-SEM-006"
       ]
+    },
+    {
+      "id": "DEF-SEM-007",
+      "input": "cases/def-sem-007/input.md",
+      "reference": "cases/def-sem-007/reference.md",
+      "criteria": [
+        "DEF-SEM-007"
+      ]
     }
   ]
 }

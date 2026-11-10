@@ -4,6 +4,7 @@
 {
   "artifact_type": "fix_verification",
   "request": {
+    "candidate_ref": "DEFC-b0f7216bf8e36a23ab85eab518f0f7aac8154c31",
     "change_refs": [
       "commit:abc"
     ],
@@ -27,7 +28,14 @@
   },
   "result": {
     "actual_start_confirmed": true,
+    "candidate_ref": "DEFC-b0f7216bf8e36a23ab85eab518f0f7aac8154c31",
     "cleanup_status": "成功",
+    "executed_targets": [
+      {
+        "ref": "tc:TC-007",
+        "revision": "t3"
+      }
+    ],
     "fix_confirmed": true,
     "owner_skill": "e2e-test-execution",
     "result_finalized": true,

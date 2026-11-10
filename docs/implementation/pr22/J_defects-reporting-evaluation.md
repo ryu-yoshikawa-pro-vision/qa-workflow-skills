@@ -68,7 +68,7 @@ raw結果の正本を保持したまま、欠陥候補・外部Issue追跡、sou
 2. 修正通知は元run ownerへ返し、旧build／不明な変更を誤修正確認扱いしない。外部Issueサービスの現在性・競合・操作済み不明を照合する。
 3. Fの予定source inventoryに対し、E2E・一般TC・Regression・探索・API／バッチ・静的テスト／非機能・欠陥の実際の元source refを収集し、取得完全性を独立照合する。
 4. 正式TC／retry／attempt／Activity／補助testwareの分母、build／revision／未実行／SKIPを区別し、見かけの100%や誤PASSを拒否する。
-5. QA活動5軸の効果・効率・保守／再利用・引継ぎ・改善を評価する。測定不能・悪化・比較不能を成果へ算入しない。
+5. QA活動5軸（追跡性・品質・効率・プロセス・再利用性。Plan Q08）を評価する。測定不能・悪化・比較不能を成果へ算入しない。（旧記載の「効果・効率・保守／再利用・引継ぎ・改善」は、効果→品質・追跡性、保守／再利用→再利用性、引継ぎ→プロセス、改善→改善の採用・実施・測定の追跡として扱う。2026-11-10にPlanの定義へ統一。）
 6. 採用・認可された改善をF/E/実行ownerの正本改版へ返し、実施と次回測定まで検証する。Skill構成そのものの開発時効率比較はAのEVALS評価に残す。
 
 ## 依存と引継ぎ
@@ -130,7 +130,7 @@ raw結果の正本を保持したまま、欠陥候補・外部Issue追跡、sou
 
 ### 契約
 
-- **source / artifact ref**：`candidate_ref`（`DEFC-`＋元owner・run・result・attempt・scope・正規化症状のhash）、`operation_id`（`DEFOP-`＋候補・操作・Issue ref・expected revision・対象targetのhash）、`snapshot_ref`（`RPT-`＋計画ref・revision・各source revision・取得件数のhash）。いずれも既存のTR / TCN / CI / TC / Issue IDと衝突しない接頭辞で、グローバルカウンターを持たない。入力の元refは各ownerの`ref`＋`revision`をそのまま保持する。
+- **source / artifact ref**：`candidate_ref`（`DEFC-`＋元owner・run・result・attempt・scope・正規化症状のhash）、`operation_id`（`DEFOP-`＋候補・操作・Issue ref・expected revision・対象targetのhash）、`snapshot_ref`（`RPT-`＋snapshot本体全体のcontent hash。2026-11-10に、計画・revision・件数のみのhashから変更）。いずれも既存のTR / TCN / CI / TC / Issue IDと衝突しない接頭辞で、グローバルカウンターを持たない。入力の元refは各ownerの`ref`＋`revision`をそのまま保持する。
 - **承認**：`source=trusted_approval_service`、`authentication_verified=true`、`authenticated_by`、`principal`、`role`、`policy_revision`、`issued_at` / `expires_at`、対象束縛。承認サービスの実体（認証・policy）は**案件側の決定がなく未接続**。helperは検証だけを行い、承認を作らない。
 - **保存**：helperは保存しない。保存が必要な場合は、案件のproviderのcreate-if-absent、expected revisionによる条件付き更新、保存後readbackを必要とし、能力がなければ保存をblockedにする。provider未選定のため**未接続**（仮のproviderを置いていない）。
 - **失敗／再開**：外部操作の結果不明は`unknown`とし、自動再試行せず外部サービスの現在状態とreadbackで照合する。報告は計画revisionまたはsource revisionが変わったら`check-currentness`でstaleとし、再集計する。
@@ -184,7 +184,7 @@ Jは共有ファイルを変更していない。このため、新3 Skillを加
 
 ### 担当Jが見つけた文書上の食い違い
 
-- 担当J文書の作業内容5と完了基準は「効果・効率・保守／再利用・引継ぎ・改善」の5軸としているが、正本のPlan（Q08）は「追跡性・品質・効率・プロセス・再利用性」。**Planを正本として実装**し、「効果→品質・追跡性」「保守／再利用→再利用性」「引継ぎ→プロセスと`handoff`」「改善→改善lifecycle」と対応付けた。担当J文書の元の記述は変更していない。
+- 担当J文書の作業内容5は「効果・効率・保守／再利用・引継ぎ・改善」の5軸としていたが、正本のPlan（Q08）は「追跡性・品質・効率・プロセス・再利用性」。**Planを正本として実装**し、2026-11-10に作業内容5をPlanの定義へ統一した（旧記載は対応付けとして残した：効果→品質・追跡性、保守／再利用→再利用性、引継ぎ→プロセスと`handoff`、改善→改善lifecycle）。
 - Plan 02・06は`test-management` / `test-architecture-design`を改善の改版ownerとするが、現branchに両Skillは存在しない。ownerの名称はdata contractの値として扱い、実成果物による接続はPR #22で行う。
 
 ### PR #22へ渡す横断検証項目
@@ -193,3 +193,81 @@ Jは共有ファイルを変更していない。このため、新3 Skillを加
 - 外部Issue実接続（権限・承認・CAS・readback・重複防止）と、修正通知→元owner再実行→結果参照の実run。
 - 改善の採用→`test-management`等の改版→次回活動での測定を、実ownerの成果物で通すこと。
 - 全current Skill同時利用のrouting、S4・S6・S7・S9・S10、詳細02／06の最終照合、Plan詳細07の効率比較。
+
+## レビュー指摘への対応と再検証（2026-11-10 第2回）
+
+[PR #32](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32)の再レビュー指摘6件を、既存実装・Plan・データ契約と照合した。**6件とも問題あり**で、いずれも変更前のコード（commit `0e373f5`）に対する回帰テストで再現し、担当Jの実装として修正した。最新HEADのGitHub Actionsは[PR #32のChecks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32/checks)を正本とする。過去の記録（上の「実装記録と引継ぎ」）は当時の判断・結果として残し、本節で更新した事項を示す。
+
+### 指摘ごとの結果
+
+| #                        | 確認結果 | 原因（根拠）                                                                                                                                                                                                                               | 修正                                                                                                                                                                                                                                                                                                                                                                                                                                                           | 回帰テスト                                                                                                                                 |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2.1 `snapshot_ref`       | 問題あり | 旧実装は計画ref・revision、source ID・revision・取得件数だけをhashし、取得完全性・判定・状態・取得内容が違っても同じrefになった（`reporting_runtime.py`の`snapshot_basis`）。保存契約のimmutable・create-if-absentでは別内容が同一視される | refをsnapshot本体全体（件数・完全性・終了判定・各sourceの`records_digest`・期間・計画現在性を含む）のcontent hashにした。入力の並び順には依存しない。validatorは独立にhashを再計算する（`RPT-D017`）                                                                                                                                                                                                                                                           | `SnapshotIdentityTests`：状態・result ref・cleanup・unit ref・現在性だけが異なる入力が別refになる、並び順で変わらない、refが本体hashと一致 |
+| 2.2 計画revisionの現在性 | 問題あり | `current_plan_revision`が未指定（`None`）だと`not in (None, revision)`で不一致扱いにならず、改版済みと確認不能が区別されなかった。承認済み・全sourceが完全なら`satisfied`になり得た                                                        | 未指定・空は`plan_currentness_unverified`、不一致は`plan_revision_superseded`、一致は`current`を`plan_currentness`で区別。未確認・改版済み・未承認（失効・取消を含む）・計画ref／revision欠落は終了判定を`undetermined`にする。`check-currentness`も`current` / `stale`（変化）/ `unverified`（現在値を取得できない）に分けた。validatorは承認状態と現在性から終了判定を独立導出（`RPT-D009`・`D019`）                                                         | `PlanCurrentnessTests`                                                                                                                     |
+| 2.3 計測単位の合算       | 問題あり | `_evaluate_criterion`が`source_ids`の`planned_total`とPASS件数を単位に関係なく合算していた。既存テストの基準（E2Eのlogical primaryと個別テストを合算）自体がPlanの分母・単位契約に反していた                                               | 基準は単一の計測単位かつ適用可能な方式のsourceだけを対象にし、それ以外は`unknown`（`mixed_units_or_kinds_not_summable` / `metric_not_applicable_to_source_kind`）。logical primaryとattempt、正式TCと個別テスト、補助testware、実行結果と静的レビューを区別。既存テストの基準を単位ごとに分割。validatorは基準の単位・方式を独立に検査（`RPT-D018`）。あわせて`executed_rate`がSKIP・blockedを実行済みに数えていた同種の問題を修正（PASS・FAIL・判定不能のみ） | `MeasurementUnitContractTests`                                                                                                             |
+| 2.4 重複source ID        | 問題あり | `retrievals`を辞書化する際、同じ`source_id`は最後の取得結果で上書きされ、並び順だけで完全性が変わった。同種の問題として、同じ`result_ref`で内容が異なるレコードも先勝ち、同じ単位refの衝突でも先のレコードが件数に残った                   | 同じ`source_id`は曖昧な取得として当該sourceを未完了にし（どれも採用しない）、`source_id`のない取得も報告。内容が異なる`result_ref`の再利用と同じ単位refの衝突は、どれも採用せず`conflicting_unit_refs`へ。すべて入力順に依存しない                                                                                                                                                                                                                             | `DuplicateAndConflictOrderTests`（全順列で同じ結果・同じref）                                                                              |
+| 2.5 評価軸全体の判定     | 問題あり | `evaluate_axes`は改善した指標が1つあり悪化がなければ、比較不能・未測定・無効な指標が混在していても軸全体を`improved`とし、`improved`の主張を採用した                                                                                       | 軸全体の傾向を全指標から導出（`improved` / `partially_improved` / `mixed` / `worsened` / `invalid` ほか）。軸全体の`improved`は、悪化・比較不能・未測定・無効がない場合だけ。指標単位の主張は`metric_improved`＋`metric_id`。5軸以外の指標は`invalid_metrics`で明示（黙って捨てない）、`invalid_metrics`がある評価は`final`にできない。軸の定義はPlan Q08のまま。validatorも独立に傾向と主張を導出（`EVL-D004`・`D005`・`D014`）                               | `AxisWideJudgementTests`                                                                                                                   |
+| 2.6 対象期間             | 問題あり | `period`は文書だけにあり、runtimeは期間を照合しなかった。Plan詳細02の「別build・別環境・別期間のrunは適合するものだけ集計」を満たしていなかった。取得時の`query_filter`は文字列で機械検証できず、保証にならない                            | 計画（またはsource）の`period{from, to}`と、レコードの`executed_at`を照合。期間外は`period_mismatch`、時刻がない・解釈できない場合は`period_unverified`で除外し、不正な期間定義は`plan_period_invalid`。期間未宣言なら絞り込まない。静的レビュー対象にも同じ規則                                                                                                                                                                                               | `PeriodTests`（境界は両端を含む、タイムゾーン、source単位の上書き）                                                                        |
+
+### 周辺・3 Skill全体の再レビューで追加修正した問題
+
+根拠のあるもの（コードとテストで再現）だけを修正した。
+
+- **承認の束縛（`defect-management`・`test-evaluation`）**：束縛値が`None`の項目は照合を飛ばしており、既存Issue向けの承認を新規登録（create）へ流用でき、scope欠落が無条件に通った。承認の対象は完全一致（`None`も一致）とし、候補のscope欠落・改善の提案revision／scope欠落・引継ぎ項目のrevision欠落は拒否する。
+- **修正確認と候補の紐付け**：closeが別候補の`fix_confirmed`を受け入れ得た。依頼・結果に`candidate_ref`を持たせ、close／reopenは同一候補の確認だけに限定。依頼した**すべての**TC / testwareを指定revisionで実行した結果（`executed_targets`）がなければ`pending`にし、一部のTCのPASSで修正確認済みにしない。
+- **結果の記録**：更新系の成功は、計画したIssueの更新であることと`issue_ref`のreadbackを要求（別Issueの成功を採用しない）。呼出し結果が不正でも例外にならず`unknown`。
+- **評価入力**：content hashのない入力は元実績が未改変であることを確認できないため未検証とした。
+- **標準入力**：stdinはUTF-8固定で、読取りを上限＋1バイトで打切る。OSロケール（cp932）で日本語を誤デコードして`成功`をcleanup未確認と判定する不具合は第1回で修正済み。
+- **状態値**：実行系と静的レビューの状態値域を分け、相互の値を受け入れない。`attempt`単位には整数の`attempt_no`を要求。
+
+指摘どおりで修正不要だった項目はない。「指摘に誤りがある」と判断した項目もない。
+
+### 追加・変更した検証データとテスト
+
+- 追加output ケース：`DEF-OUT-006`・`007`、`RPT-OUT-006`〜`009`、`EVL-OUT-005`・`006`（計22件）。semantic：各Skillに案件境界の追加ケース（`DEF-SEM-007`、`RPT-SEM-007`・`008`、`EVL-SEM-007`、計187 case）。独立validatorに`RPT-D017`〜`D021`、`EVL-D014`、`DEF-D009`・`D013`の強化を追加。
+- テストは`test_pr32_*`の4ファイルで合計169件（runtime 124件、output contract 45件）。validatorの負例（突然変異）テストを追加。
+
+### 再検証の記録
+
+固定版のruff 0.16.8・dprint 0.55.2を使用。各コマンドは個別に判定した。
+
+| 検証                                                                               | 結果                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 変更前コード（`0e373f5`）に対する新規回帰テスト                                    | 報告：50件中、失敗38・error4（subTest含む）／評価：34件中、失敗10・error1／欠陥：40件中、失敗7・error2。いずれも修正後は全件PASS（指摘6件すべて再現）                                                                                                                                                                                          |
+| 担当Jのテスト（`test_pr32_*` 4ファイル）                                           | 169件、全件PASS                                                                                                                                                                                                                                                                                                                                |
+| `ruff check` / `ruff format --check`、`dprint check`（変更・新規のpy / md / json） | PASS                                                                                                                                                                                                                                                                                                                                           |
+| `skills-ref validate`（3 Skill）                                                   | 成功                                                                                                                                                                                                                                                                                                                                           |
+| `python scripts/skills/evals/semantic/validate.py`                                 | 26 Skill・187 case                                                                                                                                                                                                                                                                                                                             |
+| semantic・trigger・`scripts/skills/evals/*/tests`                                  | PASS（semanticは skip 1・2件）                                                                                                                                                                                                                                                                                                                 |
+| 既存`tests/skills/runtime`（620件）                                                | 失敗6・error14・skip6。**すべて`test_ci_handoff`・`test_sqlite_workflow_history`（担当A所有）で、第1回と同じWindows固有の失敗**                                                                                                                                                                                                                |
+| 既存`tests/skills/evals/deterministic`（335件）                                    | 失敗1（`test_pre_start_claim_and_resource_reservation_serialize_mutable_work`、担当A所有）。第1回と同じ                                                                                                                                                                                                                                        |
+| 最新base（`0e99617`）に担当Jを重ねたクリーンコピー                                 | README登録なしでは`Validate Agent Skills`のREADME記載チェックが失敗（新3 Skillが未記載）。**README行だけを共有ownerが登録した状態を模した一時コピー**では、repository structure、semantic（28 Skill・191 case）、trigger、`scripts/*/tests`、担当Jのテスト、既存`test_repository_integration`・`test_workflow_non_e2e_skills`を含む171件がPASS |
+
+Windows固有の既存失敗は、変更前のbase（`git archive`のクリーンコピー）で同数が再現することを第1回に確認済み。今回の変更はこれらのテストに触れていない。
+
+### 実Agent・実providerの局所再受入
+
+修正後の3 Skillで、今回の指摘に直結する課題を独立したfixtureで実Agent（サブエージェント。`SKILL.md`と参照文書だけを与え、evals・テスト・helper実装は読ませない）に実施させ、独立validatorと独立期待基準で判定した。
+
+- `test-reporting`：(A) 異なる単位を合算した終了基準と現在の計画revisionの未確認 → 基準は`unknown`、`plan_currentness=unverified`、終了判定`undetermined`。(B) 期間外のレコードと重複したsource取得 → API・E2Eとも未完了。期待基準と一致。
+- `test-evaluation`：品質軸で改善・比較不能・未測定が混在 → 軸の傾向は`partially_improved`、軸全体の「改善」主張は棄却、指標単位の改善だけを`metric_improved`として採用、`final`にしない。一致。
+- `defect-management`：依頼した2TCのうち1TCだけのPASS → `pending`（`verification_targets_not_all_executed_at_requested_revision`）で修正確認にもcloseにもしない。一致。
+- **実provider（GitHub Issues）**：第1回の読取り専用接続の結果（書込み権限なしでcreateは`read_only`）は、承認束縛・修正確認の変更後も同じ契約で有効。書込み・CAS・readbackは引き続き**未実施**。
+
+### 未解決・blocked
+
+- **README等の共有登録が未適用**：`Validate Agent Skills`のREADME記載チェックは、共有ownerによる登録（担当A／PR #22）が適用されるまで失敗する。**これは担当Jの実装不具合ではない**（共有登録を適用した状態を模した検証で担当Jの検査はすべてPASS）。登録内容は「共有ファイルの登録依頼」のとおり。共有ファイルは変更していない。
+- 外部Issueの書込み・CAS・readback、承認主体の実認証、保存providerへのsnapshot保存は、案件側の決定がなく未接続のまま（再開条件は上表のとおり）。
+- `test-evaluation`の「計画改版の影響を再確認する」依頼のrouting（`test-management` Skill未実装）と、`test-reporting`と`e2e-test-reporting`の近接した依頼の発火（第1回に記録した2件）は、PR #22の全Skill同時利用評価で再確認する。
+
+### PR #22への追加の引継ぎ
+
+- 計画の`period`と、各ownerの結果の`executed_at`、`current_plan_revision`の取得経路（F／各実行ownerが提供）をPR #22の実成果物で接続する。担当Jのrunnerは、取得できない場合に未確認として扱う。
+- 実成果物の終了基準（F）は、計測単位ごとに分割された`source_ids`で書かれている必要がある。単位をまたぐ基準は担当Jでは`unknown`になる。
+- 評価入力の`content_hash`、承認の`candidate_ref` / `issue_ref` / `artifact_revision`の束縛を、Aの承認・保存契約の実装で提供する。
+- 共有登録（README・EVALS・`ASSERTIONS.md`・`common.py`・`qa-workflow`）に、新設の評価ID（`RPT-D017`〜`D021`、`EVL-D014`、`DEF-OUT-006`・`007`、`RPT-OUT-006`〜`009`、`EVL-OUT-005`・`006`、`DEF-SEM-007`、`RPT-SEM-007`・`008`、`EVL-SEM-007`）を含める。
+
+### 判定
+
+- **担当Jの局所実装**：指摘6件と周辺の同種の問題を修正し、回帰テスト・独立validator・実Agent再受入で確認済み。担当J所有の既知の実装不具合は残っていない。未接続の外部要素（実provider・承認主体・保存先）は、blockedとして上に記録した。
+- **PR #32全体のCI・レビュー**：共有ownerによるREADME登録が未適用のため、`Validate Agent Skills`は失敗する状態。登録の適用後に再確認が必要で、現時点では完了と判定しない。PR #22の横断統合・最終受入は担当Jの範囲外。

@@ -37,8 +37,7 @@
       "metric": "pass_rate",
       "reason": "population_incomplete",
       "source_ids": [
-        "e2e",
-        "api"
+        "e2e"
       ],
       "status": "unknown"
     },
@@ -47,7 +46,25 @@
       "metric": "fail_count",
       "reason": "population_incomplete",
       "source_ids": [
-        "e2e",
+        "e2e"
+      ],
+      "status": "unknown",
+      "value": 0
+    },
+    {
+      "criterion_id": "EX-3",
+      "metric": "pass_rate",
+      "reason": "population_incomplete",
+      "source_ids": [
+        "api"
+      ],
+      "status": "unknown"
+    },
+    {
+      "criterion_id": "EX-4",
+      "metric": "fail_count",
+      "reason": "population_incomplete",
+      "source_ids": [
         "api"
       ],
       "status": "unknown",
@@ -62,14 +79,16 @@
     "pass_rate_note": "units_are_never_summed_see_by_unit",
     "population_known": true
   },
+  "period": null,
   "plan_approval_state": "approved",
+  "plan_currentness": "current",
   "plan_ref": "plan:qa-1",
   "plan_revision": "p3",
   "population_basis": "planned",
   "release_decision": "not_determined_by_this_skill",
   "schema_version": "1",
   "scope_ref": "scope:checkout",
-  "snapshot_ref": "RPT-4560a2ff870c9279f90a9866256642821479e6f8",
+  "snapshot_ref": "RPT-c729a1c7aa833d96c1da8e9fabc09c65918e5970",
   "sources": [
     {
       "closure": {
@@ -79,6 +98,7 @@
         "source_current": true
       },
       "complete": false,
+      "conflicting_unit_refs": [],
       "counts": {
         "PASS": 1
       },
@@ -101,6 +121,7 @@
       "pass_rate": null,
       "pass_rate_basis": "undetermined_incomplete_or_empty",
       "planned_total": 2,
+      "records_digest": "eb096b1f1efd6e349256cd415daae37c3cd56c74809ac1fb59ddcb79f0da6f43",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 1.0,
       "retrieved_total": 1,
@@ -119,6 +140,7 @@
         "source_current": false
       },
       "complete": false,
+      "conflicting_unit_refs": [],
       "counts": {
         "PASS": 3
       },
@@ -134,6 +156,7 @@
       "pass_rate": null,
       "pass_rate_basis": "undetermined_incomplete_or_empty",
       "planned_total": 3,
+      "records_digest": "568d6d90e22b9dae49722e4736c6dd3186769e603d7b3cbb543c865e1e3b9b2a",
       "retrieved_at": "2026-11-10T00:00:00+00:00",
       "retrieved_only_pass_rate": 1.0,
       "retrieved_total": 3,

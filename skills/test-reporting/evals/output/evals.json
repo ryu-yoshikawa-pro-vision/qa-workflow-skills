@@ -26,6 +26,26 @@
       "id": "RPT-OUT-005",
       "input": "cases/rpt-out-005/input.md",
       "expected": "cases/rpt-out-005/expected.json"
+    },
+    {
+      "id": "RPT-OUT-006",
+      "input": "cases/rpt-out-006/input.md",
+      "expected": "cases/rpt-out-006/expected.json"
+    },
+    {
+      "id": "RPT-OUT-007",
+      "input": "cases/rpt-out-007/input.md",
+      "expected": "cases/rpt-out-007/expected.json"
+    },
+    {
+      "id": "RPT-OUT-008",
+      "input": "cases/rpt-out-008/input.md",
+      "expected": "cases/rpt-out-008/expected.json"
+    },
+    {
+      "id": "RPT-OUT-009",
+      "input": "cases/rpt-out-009/input.md",
+      "expected": "cases/rpt-out-009/expected.json"
     }
   ]
 }

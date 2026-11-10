@@ -48,6 +48,14 @@
       "criteria": [
         "EVL-SEM-006"
       ]
+    },
+    {
+      "id": "EVL-SEM-007",
+      "input": "cases/evl-sem-007/input.md",
+      "reference": "cases/evl-sem-007/reference.md",
+      "criteria": [
+        "EVL-SEM-007"
+      ]
     }
   ]
 }

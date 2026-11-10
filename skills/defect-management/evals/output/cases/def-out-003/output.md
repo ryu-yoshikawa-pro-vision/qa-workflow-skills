@@ -34,7 +34,9 @@
   },
   "plan": {
     "auto_retry_allowed": false,
+    "candidate_ref": "DEFC-b0f7216bf8e36a23ab85eab518f0f7aac8154c31",
     "decision": "blocked",
+    "issue_ref": "ISSUE-9",
     "operation": "close",
     "operation_id": "DEFOP-2191ade46c00a2a8d9f1194b408e8f5c406ae21a",
     "reasons": [

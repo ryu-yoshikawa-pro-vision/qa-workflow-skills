@@ -48,6 +48,22 @@
       "criteria": [
         "RPT-SEM-006"
       ]
+    },
+    {
+      "id": "RPT-SEM-007",
+      "input": "cases/rpt-sem-007/input.md",
+      "reference": "cases/rpt-sem-007/reference.md",
+      "criteria": [
+        "RPT-SEM-007"
+      ]
+    },
+    {
+      "id": "RPT-SEM-008",
+      "input": "cases/rpt-sem-008/input.md",
+      "reference": "cases/rpt-sem-008/reference.md",
+      "criteria": [
+        "RPT-SEM-007"
+      ]
     }
   ]
 }
