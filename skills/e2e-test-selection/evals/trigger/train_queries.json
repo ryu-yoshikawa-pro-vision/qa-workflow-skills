@@ -9,5 +9,21 @@
   {
     "query": "利用者が初回登録して主要操作を完了する経路のE2E候補を、保守性を含めて選んでください。",
     "should_trigger": true
+  },
+  {
+    "query": "会員登録から商品検索、注文確定までを通る経路のうち、反復確認する価値が高いE2E候補を選んでください。",
+    "should_trigger": true
+  },
+  {
+    "query": "利用者の申請から承認、完了通知までを結ぶ業務フローについて、自動化対象として優先する候補を選定してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "TC-021の期待結果をcurrentなAuthorityと照合し、ケース仕様を更新してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "既存のcheckout経路をPlaywrightで実装できるかだけ調べてください。E2E対象の価値選定は不要です。",
+    "should_trigger": false
   }
 ]

@@ -1121,6 +1121,8 @@ class E2ESelectionDeterministicContractTests(unittest.TestCase):
         analysis_queries = json.loads(
             (analysis_root / "train_queries.json").read_text(encoding="utf-8")
         )
+        self.assertEqual(len(selection_queries), 12)
+        self.assertEqual(len(validation_queries), 8)
         self.assertTrue(any(row["should_trigger"] for row in selection_queries))
         self.assertTrue(
             any(
@@ -1131,8 +1133,10 @@ class E2ESelectionDeterministicContractTests(unittest.TestCase):
         for dataset in (selection_queries, validation_queries):
             positives = sum(row["should_trigger"] is True for row in dataset)
             negatives = sum(row["should_trigger"] is False for row in dataset)
-            self.assertGreater(positives, 0)
-            self.assertEqual(positives, negatives)
+            expected_size = 12 if dataset is selection_queries else 8
+            self.assertEqual(positives, expected_size // 2)
+            self.assertEqual(negatives, expected_size // 2)
+            self.assertEqual(len({row["query"] for row in dataset}), expected_size)
         self.assertTrue(
             {row["query"] for row in selection_queries}.isdisjoint(
                 row["query"] for row in validation_queries

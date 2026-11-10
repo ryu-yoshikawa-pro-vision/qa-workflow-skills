@@ -4,5 +4,13 @@
   { "query": "テストケースの期待結果をAuthorityへ結び付けてください。", "should_trigger": false },
   { "query": "既存E2E実装のlocatorが壊れたので調査してください。", "should_trigger": false },
   { "query": "管理者と一般利用者のどちらのフローをE2E化するか選び、根拠と保留事項を残して。", "should_trigger": true },
-  { "query": "決済失敗から再試行までの経路について、技術を決める前にE2E候補を評価したい。", "should_trigger": true }
+  { "query": "決済失敗から再試行までの経路について、技術を決める前にE2E候補を評価したい。", "should_trigger": true },
+  {
+    "query": "複数の利用者シナリオから、UIを通して反復確認する価値が高いE2E候補を技術選択前に順位付けしてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "注文APIの変更によるProduct Riskと必要なテスト深度だけを分析してください。E2E候補の選定はしないでください。",
+    "should_trigger": false
+  }
 ]

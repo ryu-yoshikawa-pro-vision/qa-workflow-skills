@@ -661,3 +661,53 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - 対象HEADに紐づくPR Actions：Code Quality run 888 PASS、Validate Deterministic Output Evals run 2193 PASS、Validate Semantic Output Evals run 2158 PASS、Codex Harness run 888 PASS（`codex-contract`／`windows-launcher`）、Validate Agent Skills run 2195 FAIL。
 - Validate Agent Skillsは`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。job logの実checkoutはsynthetic merge `763a899989296439bb3c88f970c4c0bc43c0b93e`で、READMEのcanonical一覧に`e2e-test-selection`がないという同じ原因を確認した。
 - この追記を含む次のPlan-only commitのCI状態は、push後に別途確認して最終報告へ記録する。GitHub PR本文は変更しない。PR #27はDraft／受入未完了を維持する。
+
+## 実Agent・semantic評価の再実施（2026-11-10、進行中）
+
+### 対象状態とE2E trigger dataset
+
+- 開始時のPR #27 branch HEADは`bda79aabad951dc5a1550b64685c92b5a03aed4b`。PR #27はopen／Draft、baseは`feat/development-qa-traceability`。PR本文は「実装コード未追加」とする古い本文のままで、この作業では変更しない。
+- `EVALS.md`の通常Skill件数に対し、`e2e-test-selection`のtrainは8件（4 positive／4 negative）、validationは6件（3／3）だった。既存queryと既存期待値を変更せず、trainへ2 positive（技術非依存の価値選定）と2 negative（TC直接指定、Playwright実装可否だけの依頼）、validationへ1 positive（候補の価値順位付け）と1 negative（`test-analysis`のProduct Riskだけの依頼）を追加した。current selection再利用と既存E2E実行は既存queryで維持する。
+- `tests/skills/evals/deterministic/test_new_skill_contracts.py`の`test_e2e_selection_trigger_examples_are_well_formed_and_disjoint`はtrain 12件／6:6、validation 8件／4:4、各分割内一意性・train/validation非重複を固定する。Agent trigger評価より前にdatasetを確定した。query／期待値はAgent結果を見て変更していない。
+- `python3 -m unittest tests.skills.evals.deterministic.test_new_skill_contracts -v` — 43 tests PASS。datasetを最終確定した後のrepository-wide deterministic runでも本moduleのE2E trigger contractはPASSした。`python3 -m unittest tests.skills.evals.deterministic.test_new_skill_contracts.E2ESelectionDeterministicContractTests.test_e2e_selection_trigger_examples_are_well_formed_and_disjoint -v` — 最終datasetでPASS。`python3 -m unittest discover -s tests/skills/evals/trigger -v` — 1 test PASS。
+
+### 非対話Codexの実行とtrigger評価のblocker
+
+- `codex --version` — `codex-cli 0.167.0`。`codex exec --help`で`--json`、`--sandbox`、`--ephemeral`、`--output-schema`を確認。`codex login --help`と`codex login status`を実行し、状態表示は`Logged in using ChatGPT`。credential file、token、API keyは読んでいない。
+- 次のread-only smokeを実行した：`codex --no-daemon --strict-config exec --json --sandbox read-only --ephemeral -C <repository> "このリポジトリの構成を確認し、利用可能なSkillを説明してください。ファイルは変更しないでください。"`。exit 0、JSONL 42 events、`turn.completed`あり、`command_execution` 36件。イベント型に明示的なSkill load eventはなく、10件のSkill文書参照commandも`e2e-test-selection/SKILL.md`を読んでいない。これはCLI起動確認であり、trigger評価結果ではない。生JSONLは`/tmp/pr27-agent-smoke.HN1gmt/events.jsonl`に保存した。
+- repositoryには`skills/*/SKILL.md`でcurrent Skillが24件ある一方、実行rootの`.agents/skills/`は`code-review`、`feature-plan`、`repair-loop`の3件だけで、QA Skill 24件すべてが未登録。全current Skillを置く評価worktreeを作るため`git worktree add --detach /tmp/pr27-e-formal-agent-eval-bda79a HEAD`を試したが、PreToolUseが`approval required by policy, but AskForApproval is set to Never`で拒否した。承認要求、Hook、sandbox、execpolicyの迂回はしていない。
+- そのため、元query・全Skill同時登録・queryごとの独立session・3回反復・Skill load観測を満たす正規trigger測定は未実施。train／validation発火率、未使用holdout、legacy selection参照の測定をPASS／FAILと扱わない。再開には承認可能な環境で同branch HEADの一時worktreeを作り、24 current Skillを`.agents/skills/`へ複製し、fresh `codex --no-daemon --strict-config` sessionでHook dispatchとSkill load traceを観測してから、各queryを3回ずつ実行する必要がある。
+
+### semantic candidate生成・Judgeの進捗
+
+- 対象manifestは6 Skill、31 cases（E2E selection 3、test-analysis 7、test-requirement-design 3、test-condition-design 14、test-case-design 2、coverage-analysis 2）。候補生成は`codex-cli 0.167.0`のfresh `codex exec --json --sandbox read-only --ephemeral`をcaseごとに起動し、各caseの`SKILL.md`、guidance、output template、`input.md`だけを入力した。`reference.md`、`rubric.json`、採点結果は生成側へ渡していない。生成中の出力・event JSONLは`/tmp/pr27-semantic-20261110/`へ保存している。
+- このPlan追記時点で13／31 casesの実candidateが生成済み。13件すべてCLI exit 0、`turn.completed`あり、candidateファイルあり。これはsemantic Judge結果ではなく、全case完了にも達していない。CLI JSONLはmodel名を返さないため、model識別子は未確認。生成・Judgeで同じ既定Codex設定を使う場合は同一modelの可能性と限界を評価結果に記録する。
+- Judgeは未実行。既存`run.py`の`--judge-command`を使う一時Codex CLI adapterを用意し、Judgeごとに別のread-only `codex exec` sessionを起動する。rubric responseは`--output-schema`でJSON構造化し、最終判定は既存`normalize_judge_response()`に通す。候補生成が31件完了後、31件の実判定とcriterion evidenceを保存し、終了・失敗・timeoutを個別に集計する。
+
+### 現在HEADでの関連検証
+
+- E担当runtime: E2E selection 32 PASS、formal design 22 PASS、test-condition 16 PASS、coverage analysis 28 PASS、test-requirement 11 PASS、test-case 11 PASS、case runtime v1 cutover 2 PASS。deterministic new-skill contracts 43 PASS。計165 PASS。
+- semantic dataset validator: 24 Skills／168 cases PASS（dataset構造のみ）。semantic runtime tests 27 PASS、repository semantic tests 13 PASS。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — 299 tests中295 PASS／4 FAIL。失敗は`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`。前三件はSQLite/WCAG providerが`blocked`を返す既知共有経路、最後はProject Contextのstate-root source欠落。E担当の変更箇所とは独立した共有条件で、修正していない。
+- Formatterはdprint 0.55.2で最終datasetを整形後に実行し、`python3 scripts/format_tracked.py check` — 221 files PASS。変更したPython testはRuff 0.16.8 `check`／`format --check`ともPASS。
+
+### PR #22とproviderの現行確認
+
+- PR #22はopen、head `feat/development-qa-traceability`／`0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。このheadのREADMEに`e2e-test-selection`登録はなく、`scripts/skills/evals/deterministic/ASSERTIONS.md`（blob `6f2e078ae548bcaac4c51c11a8f87aec33419bbf`）にはlegacy `RISK-D016`／`RISK-D017`がある一方、`E2E-SEL-D001`〜`D006`の登録はない。共有ファイルは変更せずPR #22統合ownerへ引き継ぐ。
+- 同headの`docs/implementation/pr22/A_runtime-integration.md`（blob `9a09ff37980a7f12ebc83f4c506299c9fe2b5401`）はworkflow verifier対象を6 Skillとし、未登録Skillを`unsupported_skill_verifier`でblockingにする。ローカルSQLiteのCAS／履歴／readbackは記載されるが、remote provider、承認主体、新設E Skillの正式登録・owner結果は未接続。E成果物の実provider保存・承認・CAS・historical read・independent readback・stale伝播・別session再開は実施できず、PR #22/A ownerの契約・provider接続後に再開する。
+- bda79aabに対応する既存ActionsはCode Quality 890 PASS、Validate Deterministic Output Evals 2195 PASS、Validate Semantic Output Evals 2160 PASS、Codex Harness 890 PASS、Validate Agent Skills 2197 FAIL（README canonical listに`e2e-test-selection`がない）。今回の未commit dataset／test変更を含むCI結果ではない。pushできた場合は新HEADごとに再取得する。
+
+### 受入状態
+
+- E担当の局所受入は未完了。dataset件数、関連runtime、dataset validator、formatterはPASS。実trigger評価、31件のJudge評価、実provider保存・approval/CAS/readback、全runtime suite、今回変更後のGitHub Actionsは未完了または実行中のため完了扱いしない。
+- 既知のPR #22引継ぎ（README／ASSERTIONS登録、E owner verifier／artifact registration、remote provider、横断source freshness・失敗後再開、実成果物、S1〜S17／人間編集8／15＋10条件）を維持する。PR #27はDraft、GitHub PR本文は変更しない。
+
+### 2026-11-10 評価データ修正と実生成の追記
+
+- E2E semantic case 001の最初のruntime-enabled candidateは、入力にTI-001／TI-002・TC-001・E2E-01のsource revision/currentnessがなく、両候補をblockedにした。referenceだけがcurrent sourceを要求していたため、`EVALS.md`のhidden requirement禁止に照らし、reference／rubricを変えずinputへfixtureのcurrent source・revisionとcomplete populationを追加した。
+- E2E semantic case 002のinputへ「owner未割当」を追加した。依頼の不完全状態は維持し、ownerを架空の人物へ割り当てず、再開条件でowner割当を明示できるようにした。
+- E2E semantic case 003のinputへrevision 1のcandidate ID/key・decision・rationale・source currentness・scope・population・retirementなし・runtime算出digestを追加した。digestはfixture整合性用で、provider真正性の証明としていない。reference／rubricは変更していない。これら3件は変更後inputで実Agent再生成とJudge再評価が必要で、まだ結果を付けていない。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS、24 Skill／168 cases。変更後のcase入力を含むdataset構造検証である。
+- runtimeを実際に許可した候補生成で、現行inputのRISK-SEM-001、003、004、005、006、RISK-SEM-002、007、およびTR-SEM-001の8/31件がCLI exit 0・`turn.completed`・candidate fileありで生成済み。以前の禁止runtime生成はdiagnostic扱いで、ここへ数えていない。`RISK-SEM-002`は739.2秒／15 command events、`RISK-SEM-007`は603.0秒／12 command events。候補は一時保存先`/tmp/pr27-semantic-20261110/agent-v{2,4}/`にあり、Judgeはまだ実行していない。model IDはCodex JSONLに出ず未確認。
+- 現在は`TR-SEM-002`のruntime-enabled Codex turnを実行中であり、完了扱いしていない。生成timeoutの再試行を継続する。生成AgentとJudgeのCodex sessionは同時起動せず、後続Judgeは生成終了後に独立sessionで実行する。
+- 次の作業：変更後E2E semantic 3件を再生成し、完了candidateへ既存`run.py`＋独立Codex Judge adapterを順次実行する。全31件を完了できない場合も、各caseをgenerated／timeout／Judge error／not evaluatedに区別して証拠を残す。
