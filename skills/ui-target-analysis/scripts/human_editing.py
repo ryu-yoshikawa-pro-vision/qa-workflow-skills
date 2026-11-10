@@ -32,6 +32,10 @@ UI_TABLES = (
     ("00_scope_and_context.md", "分析対象機能scope一覧"),
 )
 UI_PROSE = ("01_ui_structure_and_navigation.md", "Navigation / Entry / Exit")
+STRUCTURE_TABLE = UI_TABLES[0]
+OPERATION_TABLE = UI_TABLES[1]
+SCOPE_TABLE = UI_TABLES[2]
+VERSION_HEADING = re.compile(r"(?m)^## (v[0-9]{2,})\s*$")
 
 
 class HumanEditError(Exception):
@@ -233,15 +237,18 @@ def _rows_by_id(
     return result
 
 
-def _cell_values(writer: Any, spec: Any, row: dict[str, str]) -> dict[str, Any]:
+def _generated_fields(spec: Any) -> set[str]:
+    """Columns the existing writer derives; humans and agents never write them."""
     derived = {spec.id_column} if spec.id_column else set()
     if spec.status_column:
         derived.add(spec.status_column)
-    if (spec.file, spec.section) == (
-        "00_scope_and_context.md",
-        "分析対象機能scope一覧",
-    ):
+    if (spec.file, spec.section) == SCOPE_TABLE:
         derived.add("Behavior Decomposition")
+    return derived
+
+
+def _cell_values(writer: Any, spec: Any, row: dict[str, str]) -> dict[str, Any]:
+    derived = _generated_fields(spec)
     cells: dict[str, Any] = {}
     for field in spec.headers:
         if field in derived:
@@ -274,8 +281,19 @@ def _row_dependencies(writer: Any, spec: Any, row: dict[str, str]) -> set[str]:
 
 
 def _table_diff(
-    writer: Any, base: dict[str, str], candidate: dict[str, str]
+    writer: Any,
+    base: dict[str, str],
+    candidate: dict[str, str],
+    *,
+    from_current: bool = False,
 ) -> dict[str, Any]:
+    """Diff UI-owned tables.
+
+    A human edit copy (``from_current=False``) may not number IDs or write
+    generated columns. The current package (``from_current=True``) was written
+    by the formal writer, so rows with IDs absent from the base are formal
+    additions and generated-only differences are not changes.
+    """
     rows: list[dict[str, Any]] = []
     retired: set[str] = set()
     identities: set[str] = set()
@@ -309,13 +327,15 @@ def _table_diff(
                 retired.add(stable_id)
                 identities.add(stable_id)
                 dependencies.update(_row_dependencies(writer, spec, old))
+        generated = _generated_fields(spec) - {id_column}
         for stable_id, row in new_rows.items():
-            if stable_id.startswith("@draft:"):
+            if stable_id.startswith("@draft:") and not from_current:
                 draft_key = stable_id[len("@draft:") :]
                 if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", draft_key):
                     _fail("invalid_draft_key", f"draft keyが不正です: {stable_id}")
                 if stable_id in old_rows:
                     _fail("invalid_draft_key", "draft keyが既存IDと一致します")
+                _reject_generated_values(row, generated, stable_id)
                 action = "new"
                 reuse_id = None
                 key = stable_id
@@ -325,16 +345,26 @@ def _table_diff(
                         "manual_id_not_allowed",
                         f"stable IDを手入力できません: {stable_id}",
                     )
-                if stable_id not in old_rows:
+                if stable_id in old_rows:
+                    old = old_rows[stable_id]
+                    if not from_current:
+                        _reject_generated_changes(old, row, generated, stable_id)
+                    if all(
+                        row[field] == old[field]
+                        for field in spec.headers
+                        if field not in generated
+                    ):
+                        continue
+                    action = "reuse"
+                elif from_current:
+                    action = "added"
+                else:
                     _fail(
                         "manual_id_not_allowed",
                         f"新規IDには@draft:<key>を使ってください: {stable_id}",
                     )
-                action = "reuse"
                 reuse_id = stable_id
                 key = stable_id
-            if stable_id in old_rows and row == old_rows[stable_id]:
-                continue
             cells = _cell_values(writer, spec, row)
             item = {
                 "key": key,
@@ -362,6 +392,28 @@ def _table_diff(
     }
 
 
+def _reject_generated_changes(
+    old: dict[str, str], new: dict[str, str], generated: set[str], stable_id: str
+) -> None:
+    changed = sorted(field for field in generated if new[field] != old[field])
+    if changed:
+        _fail(
+            "generated_column_edit",
+            f"writerが導出する列は編集できません: {stable_id} {', '.join(changed)}",
+        )
+
+
+def _reject_generated_values(
+    row: dict[str, str], generated: set[str], stable_id: str
+) -> None:
+    filled = sorted(field for field in generated if row[field].strip())
+    if filled:
+        _fail(
+            "generated_column_edit",
+            f"新規行のwriter導出列は空にしてください: {stable_id} {', '.join(filled)}",
+        )
+
+
 def _section_body(writer: Any, text: str, heading: str) -> str:
     try:
         lines, start, end = writer._heading_span(text, heading)
@@ -378,9 +430,9 @@ def _extract_diff(
     base_files: dict[str, str],
     candidate_files: dict[str, str],
     *,
-    allow_generated_differences: bool = False,
+    from_current: bool = False,
 ) -> dict[str, Any]:
-    tables = _table_diff(writer, base_files, candidate_files)
+    tables = _table_diff(writer, base_files, candidate_files, from_current=from_current)
     base_prose = _section_body(writer, base_files[UI_PROSE[0]], UI_PROSE[1])
     candidate_prose = _section_body(writer, candidate_files[UI_PROSE[0]], UI_PROSE[1])
     prose = None if base_prose == candidate_prose else candidate_prose
@@ -390,7 +442,7 @@ def _extract_diff(
             _fail(
                 "package_file_set_mismatch", "candidateのpackage file setが異なります"
             )
-        if allow_generated_differences and file in {
+        if from_current and file in {
             "README.md",
             "CHANGELOG.md",
             "MANIFEST.md",
@@ -428,7 +480,7 @@ def _extract_diff(
                 str(getattr(exc, "message", "prose updateが不正です")),
             )
     for file in rebuilt:
-        if allow_generated_differences and file in {
+        if from_current and file in {
             "README.md",
             "CHANGELOG.md",
             "MANIFEST.md",
@@ -729,17 +781,9 @@ def _prepare(request: dict[str, Any]) -> dict[str, Any]:
                 "review_evidence": retry_review,
                 "reason": "同一materialize requestのreceiptがcurrent packageにあります",
             }
-        try:
-            current_diff = _extract_diff(
-                writer, base_files, current_files, allow_generated_differences=True
-            )
-        except HumanEditError as exc:
-            if exc.code == "manual_id_not_allowed":
-                _fail(
-                    "concurrent_edit_blocked",
-                    "current packageに元copyから対応付けられない採番済み行があります",
-                )
-            raise
+        current_diff = _extract_diff(
+            writer, base_files, current_files, from_current=True
+        )
         _check_concurrent(base_files, current_files, candidate_diff, current_diff)
         if _same_diff(candidate_diff, current_diff):
             return {
@@ -806,6 +850,91 @@ def _row_locations(writer: Any, model: Any) -> dict[str, dict[str, Any]]:
     return locations
 
 
+def _scope_targets(
+    writer: Any, model: Any, scope_id: str
+) -> tuple[set[str], set[str], set[str]]:
+    """Return the UI operations, structures and references owned by one Scope."""
+    operation_spec = writer.TABLE_BY_KEY[OPERATION_TABLE]
+    structures = {row["構造ID"]: row for row in writer._rows(model, *STRUCTURE_TABLE)}
+    operation_rows = [
+        row
+        for row in writer._rows(model, *OPERATION_TABLE)
+        if scope_id in writer._refs(row, "Scope ID")
+    ]
+    operation_ids = {row["操作ID"] for row in operation_rows}
+    dependencies = {
+        ref
+        for row in operation_rows
+        for ref in _row_dependencies(writer, operation_spec, row)
+    }
+    structure_ids: set[str] = set()
+    for row in operation_rows:
+        for structure_id in writer._refs(row, "対象構造ID"):
+            cursor = structure_id
+            while cursor:
+                if cursor in structure_ids:
+                    break
+                structure_ids.add(cursor)
+                structure = structures.get(cursor)
+                if structure is None:
+                    _fail("reference_not_found", f"UI構造がありません: {cursor}")
+                cursor = structure["親構造ID"]
+    return operation_ids, structure_ids, dependencies
+
+
+def _changelog_entries(changelog: str) -> dict[str, str]:
+    """Return CHANGELOG entries by version, newest first."""
+    matches = list(VERSION_HEADING.finditer(changelog))
+    ends = [match.start() for match in matches[1:]] + [len(changelog)]
+    return {
+        match.group(1): changelog[match.start() : end].rstrip()
+        for match, end in zip(matches, ends)
+    }
+
+
+def _retired_versions(writer: Any, model: Any) -> dict[str, str]:
+    """Return stable ID -> version whose newest CHANGELOG event is ``retired``."""
+    newest: dict[str, tuple[str, str]] = {}
+    for version, entry in _changelog_entries(model.files["CHANGELOG.md"]).items():
+        try:
+            rows = writer.parse_table(
+                entry, "Stable ID changes", writer.CHANGELOG_HEADER
+            )
+        except Exception:
+            _fail("package_schema_mismatch", "CHANGELOGを解析できません")
+        for row in rows:
+            newest.setdefault(row["Stable ID"], (version, row["Change"]))
+    return {
+        stable_id: version
+        for stable_id, (version, change) in newest.items()
+        if change == "retired"
+    }
+
+
+def _previous_model(writer: Any, current: Any, value: Any):
+    """Validate an earlier snapshot of the current package.
+
+    The package keeps no cumulative history, so lineage beyond version order
+    cannot be proven here; the provider revision history owns that proof.
+    """
+    root = _root(value, "previous_package_root")
+    inspected = _run_inspect(root)
+    model = _read_model(writer, root)
+    if writer._read_update_snapshot(model) != inspected["update_snapshot"]:
+        _fail("concurrent_edit_blocked", "inspect後に前snapshotが変更されました")
+    previous_number = int(inspected["package_version"][1:])
+    current_number = int(current.metadata["Package Version"][1:])
+    if previous_number > current_number or (
+        previous_number == current_number
+        and inspected["update_snapshot"] != writer._read_update_snapshot(current)
+    ):
+        _fail(
+            "previous_snapshot_mismatch",
+            "前snapshotはcurrent packageより前のversionである必要があります",
+        )
+    return model, inspected
+
+
 def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
     writer = _writer_module()
     package_root = _root(request.get("package_root"), "package_root")
@@ -825,20 +954,6 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
     mapping = request.get("feature_scope_refs")
     if not isinstance(mapping, list):
         _fail("invalid_input", "feature_scope_refsはarrayが必要です")
-    scopes = {
-        row["Scope ID"]
-        for row in writer._rows(
-            model, "00_scope_and_context.md", "分析対象機能scope一覧"
-        )
-    }
-    uiops = writer._rows(model, "02_behavior_and_business_rules.md", "UI操作一覧")
-    structures = {
-        row["構造ID"]: row
-        for row in writer._rows(
-            model, "01_ui_structure_and_navigation.md", "UI構造一覧"
-        )
-    }
-    locations = _row_locations(writer, model)
     changed_ids = request.get("changed_ids", [])
     if not isinstance(changed_ids, list) or any(
         not isinstance(item, str) or not item for item in changed_ids
@@ -846,8 +961,44 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
         _fail("invalid_input", "changed_idsは空でないstable IDのarrayが必要です")
     if len(changed_ids) != len(set(changed_ids)):
         _fail("duplicate_id", "changed_idsが重複しています")
+    previous = previous_inspected = None
+    if "previous_package_root" in request:
+        previous, previous_inspected = _previous_model(
+            writer, model, request["previous_package_root"]
+        )
+
+    # A changed ID without a current row is a retirement: the writer never
+    # removes a row otherwise. Its Scope is recovered from the earlier snapshot.
+    locations = _row_locations(writer, model)
+    known = set(model.by_id) | set(model.current_authorities)
+    retired_versions = _retired_versions(writer, model)
+    retired_ids: dict[str, str | None] = {}
+    for stable_id in changed_ids:
+        if stable_id in known:
+            continue
+        if previous is None:
+            _fail(
+                "previous_snapshot_required",
+                f"currentにないIDの追跡には廃止前の検証済みsnapshot（previous_package_root）が必要です: {stable_id}",
+            )
+        if stable_id not in previous.by_id:
+            _fail(
+                "reference_not_found",
+                f"currentにも前snapshotにもないIDです: {stable_id}",
+            )
+        retired_ids[stable_id] = retired_versions.get(stable_id)
+    previous_locations: dict[str, dict[str, Any]] = {}
+    previous_scopes: set[str] = set()
+    if previous is not None:
+        previous_locations = _row_locations(writer, previous)
+        previous_scopes = {
+            row["Scope ID"] for row in writer._rows(previous, *SCOPE_TABLE)
+        }
+    scopes = {row["Scope ID"] for row in writer._rows(model, *SCOPE_TABLE)}
+
     result = []
     seen: set[tuple[str, str]] = set()
+    matched: set[str] = set()
     for item in mapping:
         if not isinstance(item, dict) or set(item) != {"feature_id", "scope_id"}:
             _fail("invalid_input", "feature scope mapping schemaが不正です")
@@ -856,43 +1007,47 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
             not isinstance(feature_id, str)
             or not feature_id.strip()
             or not isinstance(scope_id, str)
-            or scope_id not in scopes
+            or (scope_id not in scopes and scope_id not in previous_scopes)
         ):
             _fail("reference_not_found", "feature IDまたはUI Scope参照がありません")
         key = (feature_id, scope_id)
         if key in seen:
             _fail("duplicate_id", "featureとScopeのmappingが重複しています")
         seen.add(key)
-        operation_rows = [
-            row for row in uiops if scope_id in writer._refs(row, "Scope ID")
-        ]
-        operation_ids = {row["操作ID"] for row in operation_rows}
-        operation_dependencies = {
-            ref
-            for row in operation_rows
-            for ref in _row_dependencies(
-                writer,
-                writer.TABLE_BY_KEY[
-                    ("02_behavior_and_business_rules.md", "UI操作一覧")
-                ],
-                row,
-            )
-        }
+        operation_ids: set[str] = set()
         structure_ids: set[str] = set()
-        for row in operation_rows:
-            for structure_id in writer._refs(row, "対象構造ID"):
-                cursor = structure_id
-                while cursor:
-                    if cursor in structure_ids:
-                        break
-                    structure_ids.add(cursor)
-                    structure = structures.get(cursor)
-                    if structure is None:
-                        _fail("reference_not_found", f"UI構造がありません: {cursor}")
-                    cursor = structure["親構造ID"]
-        target_ids = sorted(operation_ids | structure_ids)
-        target_ids.append(scope_id)
-        target_ids = sorted(set(target_ids))
+        dependencies: set[str] = set()
+        if scope_id in scopes:
+            operation_ids, structure_ids, dependencies = _scope_targets(
+                writer, model, scope_id
+            )
+        target_ids = sorted(operation_ids | structure_ids | {scope_id})
+        changed = set(changed_ids)
+        changed_rows = [
+            locations[stable_id]
+            for stable_id in target_ids
+            if stable_id in changed and stable_id in locations
+        ]
+        retired_rows = []
+        if previous is not None and scope_id in previous_scopes:
+            previous_ops, previous_structures, _ = _scope_targets(
+                writer, previous, scope_id
+            )
+            previous_ids = previous_ops | previous_structures | {scope_id}
+            retired_rows = [
+                {
+                    **previous_locations[stable_id],
+                    "previous_package_version": previous_inspected["package_version"],
+                    "retired_in_version": retired_ids[stable_id],
+                    "retirement_evidence": "current_changelog"
+                    if retired_ids[stable_id]
+                    else "snapshot_absence",
+                }
+                for stable_id in sorted(retired_ids)
+                if stable_id in previous_ids and stable_id in previous_locations
+            ]
+        matched.update(row["id"] for row in changed_rows)
+        matched.update(row["id"] for row in retired_rows)
         result.append(
             {
                 "feature_id": feature_id,
@@ -903,22 +1058,15 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
                     for stable_id in target_ids
                     if stable_id in locations
                 ],
-                "changed_ui_rows": [
-                    locations[stable_id]
-                    for stable_id in target_ids
-                    if stable_id in set(changed_ids) and stable_id in locations
-                ],
-                "changed_ids_without_current_row": sorted(
-                    set(changed_ids)
-                    & (operation_ids | structure_ids | {scope_id}) - set(locations)
-                ),
+                "changed_ui_rows": changed_rows,
+                "retired_ui_rows": retired_rows,
+                "changed_ids_without_current_row": [row["id"] for row in retired_rows],
                 "related_ids": sorted(
-                    (operation_dependencies - operation_ids - {scope_id})
-                    | structure_ids
+                    (dependencies - operation_ids - {scope_id}) | structure_ids
                 ),
             }
         )
-    return {
+    response = {
         "status": "ok",
         "feature_artifact_ref": artifact_ref,
         "feature_artifact_revision": revision,
@@ -926,13 +1074,20 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
         "ui_package_version": inspected["package_version"],
         "ui_package_snapshot": inspected["update_snapshot"],
         "feature_scope_index": result,
+        "changed_ids_not_in_mapped_scopes": sorted(set(changed_ids) - matched),
     }
+    if previous_inspected is not None:
+        response["previous_package_version"] = previous_inspected["package_version"]
+        response["previous_package_snapshot"] = previous_inspected["update_snapshot"]
+    return response
 
 
 def run(request: Any) -> dict[str, Any]:
     if not isinstance(request, dict):
         _fail("invalid_input", "top-level JSONはobjectである必要があります")
     operation = request.get("operation")
+    if not isinstance(operation, str):
+        _fail("invalid_input", "operationは文字列で指定してください")
     allowed = {
         "prepare": {
             "operation",
@@ -949,12 +1104,13 @@ def run(request: Any) -> dict[str, Any]:
             "feature_artifact_revision",
             "feature_scope_refs",
             "changed_ids",
+            "previous_package_root",
         },
     }
     required = allowed.get(operation)
     if (
         required is None
-        or not required - {"changed_ids"} <= set(request)
+        or not required - {"changed_ids", "previous_package_root"} <= set(request)
         or set(request) - required
     ):
         _fail("invalid_input", "operationまたはtop-level field集合が不正です")
@@ -989,7 +1145,7 @@ def main() -> int:
         )
         response = run(request)
         exit_code = 0
-    except (UnicodeDecodeError, ValueError):
+    except (UnicodeDecodeError, ValueError, RecursionError):
         response = {
             "status": "blocked",
             "issues": [

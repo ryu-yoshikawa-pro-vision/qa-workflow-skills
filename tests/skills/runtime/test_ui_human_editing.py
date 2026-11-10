@@ -686,6 +686,525 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             self.assertNotEqual(code, 0)
             self.assertEqual(response["issues"][0]["code"], "symlink_not_allowed")
 
+    # --- review follow-up: retired IDs, concurrent additions, generated columns ---
+
+    def test_11_feature_index_tracks_retired_ids_from_previous_snapshot(self) -> None:
+        canonical, _base, _edit, _snapshot = self.make_fixture()
+        self._apply_changes(
+            canonical,
+            [
+                self._row_change(
+                    canonical, "UIOP-001", 対象構造ID=["PAGE-001", "PAGE-002"]
+                )
+            ],
+        )
+        previous = canonical.parent / "previous"
+        shutil.copytree(canonical, previous)
+        self._apply_changes(
+            canonical,
+            [self._row_change(canonical, "UIOP-001", 対象構造ID=["PAGE-001"])],
+            retire_ids=["PAGE-002"],
+        )
+        request = {
+            "operation": "feature-index",
+            "package_root": str(canonical),
+            "feature_artifact_ref": "fixture://feature-analysis/features-v1",
+            "feature_artifact_revision": "fixture-revision-01",
+            "feature_scope_refs": [
+                {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
+            ],
+            "changed_ids": ["PAGE-002", "UIOP-001"],
+        }
+        code, response = cli(
+            HUMAN_EDIT_SCRIPT, {**request, "previous_package_root": str(previous)}
+        )
+        self.assertEqual(code, 0, response)
+        entry = response["feature_scope_index"][0]
+        retired = {row["id"]: row for row in entry["retired_ui_rows"]}
+        self.assertEqual(set(retired), {"PAGE-002"})
+        self.assertEqual(retired["PAGE-002"]["previous_package_version"], "v01")
+        self.assertEqual(retired["PAGE-002"]["retired_in_version"], "v02")
+        self.assertEqual(
+            retired["PAGE-002"]["retirement_evidence"], "current_changelog"
+        )
+        self.assertEqual(response["changed_ids_not_in_mapped_scopes"], [])
+        previous_line = (
+            (previous / retired["PAGE-002"]["file"])
+            .read_text(encoding="utf-8")
+            .splitlines()[retired["PAGE-002"]["line"] - 1]
+        )
+        self.assertIn("PAGE-002", previous_line)
+        self.assertEqual({row["id"] for row in entry["changed_ui_rows"]}, {"UIOP-001"})
+        self.assertEqual(entry["changed_ids_without_current_row"], ["PAGE-002"])
+        self.assertNotIn("PAGE-002", {row["id"] for row in entry["ui_rows"]})
+        self.assertEqual(response["ui_package_version"], "v02")
+        self.assertEqual(response["previous_package_version"], "v01")
+
+        # Fail closed instead of silently dropping a retired ID.
+        blocked_code, blocked = cli(HUMAN_EDIT_SCRIPT, request)
+        self.assertNotEqual(blocked_code, 0)
+        self.assertEqual(blocked["issues"][0]["code"], "previous_snapshot_required")
+        unknown_code, unknown = cli(
+            HUMAN_EDIT_SCRIPT,
+            {
+                **request,
+                "changed_ids": ["PAGE-999"],
+                "previous_package_root": str(previous),
+            },
+        )
+        self.assertNotEqual(unknown_code, 0)
+        self.assertEqual(unknown["issues"][0]["code"], "reference_not_found")
+
+    def test_12_feature_index_rejects_previous_snapshot_not_before_current(
+        self,
+    ) -> None:
+        canonical, _base, _edit, _snapshot = self.make_fixture()
+        fork = canonical.parent / "fork"
+        shutil.copytree(canonical, fork)
+        widen = self._row_change(
+            canonical, "UIOP-001", 対象構造ID=["PAGE-001", "PAGE-002"]
+        )
+        narrow = self._row_change(canonical, "UIOP-001", 対象構造ID=["PAGE-001"])
+        self._apply_changes(canonical, [widen])
+        self._apply_changes(canonical, [narrow], retire_ids=["PAGE-002"])
+        request = {
+            "operation": "feature-index",
+            "package_root": str(canonical),
+            "feature_artifact_ref": "fixture://feature-analysis/features-v1",
+            "feature_artifact_revision": "fixture-revision-01",
+            "feature_scope_refs": [
+                {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
+            ],
+            "changed_ids": ["PAGE-002"],
+        }
+        # Same version number with different content, then a newer version.
+        self._apply_changes(fork, [widen], summary="Different history")
+        self._apply_changes(fork, [narrow], summary="Different history 2")
+        code, response = cli(
+            HUMAN_EDIT_SCRIPT, {**request, "previous_package_root": str(fork)}
+        )
+        self.assertNotEqual(code, 0)
+        self.assertEqual(response["issues"][0]["code"], "previous_snapshot_mismatch")
+        self._apply_changes(fork, [widen], summary="Different history 3")
+        code, response = cli(
+            HUMAN_EDIT_SCRIPT, {**request, "previous_package_root": str(fork)}
+        )
+        self.assertNotEqual(code, 0)
+        self.assertEqual(response["issues"][0]["code"], "previous_snapshot_mismatch")
+
+    def test_13_concurrently_added_row_is_independent_and_rebases(self) -> None:
+        canonical, base, edit, snapshot = self.make_fixture()
+        edit_table(
+            edit,
+            "01_ui_structure_and_navigation.md",
+            "UI構造一覧",
+            lambda rows: [
+                copy_page_row(row, 名称="Human rename")
+                if row["構造ID"] == "PAGE-002"
+                else row
+                for row in rows
+            ],
+        )
+        self._apply_changes(
+            canonical,
+            [self._new_page_change("agent-added-page", "Agent added page")],
+        )
+        self.assertIn("PAGE-003", package._read_package(canonical).by_id)
+        current_snapshot = inspect(canonical)["update_snapshot"]
+        # Review is still required against the newest snapshot.
+        stale_code, stale = prepare(
+            canonical, base, edit, snapshot, review(["PAGE-002"])
+        )
+        self.assertNotEqual(stale_code, 0)
+        self.assertEqual(stale["issues"][0]["code"], "review_required")
+        code, prepared = prepare(
+            canonical,
+            base,
+            edit,
+            snapshot,
+            review(["PAGE-002"], current_snapshot=current_snapshot),
+        )
+        self.assertEqual(code, 0, prepared)
+        self.assertTrue(prepared["rebased"])
+        self.assertEqual(prepared["previous_snapshot"], current_snapshot)
+        apply(prepared["materialize_request"])
+        final = package._read_package(canonical)
+        self.assertEqual(final.by_id["PAGE-002"][1]["名称"], "Human rename")
+        self.assertEqual(final.by_id["PAGE-003"][1]["名称"], "Agent added page")
+
+    def test_14_concurrent_addition_conflicts_still_block(self) -> None:
+        def draft_page(name: str, draft_key: str) -> dict[str, str]:
+            return {
+                "構造ID": f"@draft:{draft_key}" if draft_key else name,
+                "種別": "PAGE",
+                "名称": name,
+                "状態軸": "",
+                "Path / 識別子": f"/{draft_key or 'manual'}",
+                "親構造ID": "",
+                "関連仕様項目ID": "",
+                "関連構造ID": "",
+                "備考": "Human proposed row.",
+            }
+
+        def rename_page_002(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+            return [
+                copy_page_row(row, 名称="Human rename")
+                if row["構造ID"] == "PAGE-002"
+                else row
+                for row in rows
+            ]
+
+        def link_page_002(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+            return [
+                copy_page_row(row, 関連構造ID="PAGE-003")
+                if row["構造ID"] == "PAGE-002"
+                else row
+                for row in rows
+            ]
+
+        cases = [
+            (
+                "manual ID equal to a concurrently allocated ID",
+                lambda rows: rows + [draft_page("PAGE-003", "")],
+                {},
+                ["PAGE-003"],
+                "manual_id_not_allowed",
+            ),
+            (
+                "human edit depends on a concurrently added row",
+                link_page_002,
+                {},
+                ["PAGE-002"],
+                "concurrent_edit_blocked",
+            ),
+            (
+                "concurrently added row depends on an edited row",
+                rename_page_002,
+                {"関連構造ID": ["PAGE-002"]},
+                ["PAGE-002"],
+                "concurrent_edit_blocked",
+            ),
+        ]
+        for label, update, agent_cells, keys, expected in cases:
+            with self.subTest(label):
+                canonical, base, edit, snapshot = self.make_fixture()
+                edit_table(
+                    edit, "01_ui_structure_and_navigation.md", "UI構造一覧", update
+                )
+                self._apply_changes(
+                    canonical,
+                    [
+                        self._new_page_change(
+                            "agent-added-page", "Agent added page", **agent_cells
+                        )
+                    ],
+                )
+                before = package_bytes(canonical)
+                code, response = prepare(
+                    canonical,
+                    base,
+                    edit,
+                    snapshot,
+                    review(
+                        keys, current_snapshot=inspect(canonical)["update_snapshot"]
+                    ),
+                )
+                self.assertNotEqual(code, 0, response)
+                self.assertEqual(response["issues"][0]["code"], expected)
+                self.assertEqual(package_bytes(canonical), before)
+
+        # A human draft next to a concurrent addition gets its own distinct ID.
+        canonical, base, edit, snapshot = self.make_fixture()
+        edit_table(
+            edit,
+            "01_ui_structure_and_navigation.md",
+            "UI構造一覧",
+            lambda rows: rows + [draft_page("Human added page", "human-added-page")],
+        )
+        self._apply_changes(
+            canonical,
+            [self._new_page_change("agent-added-page", "Agent added page")],
+        )
+        code, prepared = prepare(
+            canonical,
+            base,
+            edit,
+            snapshot,
+            review(
+                ["@draft:human-added-page"],
+                current_snapshot=inspect(canonical)["update_snapshot"],
+            ),
+        )
+        self.assertEqual(code, 0, prepared)
+        applied = apply(prepared["materialize_request"])
+        self.assertEqual(
+            applied["allocated_ids"],
+            [{"draft_key": "human-added-page", "stable_id": "PAGE-004"}],
+        )
+
+    def test_15_generated_column_edits_are_rejected_not_discarded(self) -> None:
+        uiop = ("02_behavior_and_business_rules.md", "UI操作一覧")
+        scope = ("00_scope_and_context.md", "分析対象機能scope一覧")
+        cases = [
+            ("状態 only", uiop, "操作ID", "UIOP-001", {"状態": "mapped"}),
+            (
+                "Behavior Decomposition only",
+                scope,
+                "Scope ID",
+                "SCOPE-001",
+                {"Behavior Decomposition": "not-applicable"},
+            ),
+            (
+                "状態 mixed with a valid edit",
+                uiop,
+                "操作ID",
+                "UIOP-001",
+                {"状態": "mapped", "操作": "Submit changed sign-in information."},
+            ),
+            (
+                "Behavior Decomposition mixed with a valid edit",
+                scope,
+                "Scope ID",
+                "SCOPE-001",
+                {"Behavior Decomposition": "blocked", "備考": "Changed note."},
+            ),
+        ]
+        for label, (file, section), id_column, stable_id, changes in cases:
+            with self.subTest(label):
+                canonical, base, edit, snapshot = self.make_fixture()
+                edit_table(
+                    edit,
+                    file,
+                    section,
+                    lambda rows: [
+                        copy_page_row(row, **changes)
+                        if row[id_column] == stable_id
+                        else row
+                        for row in rows
+                    ],
+                )
+                before = package_bytes(canonical)
+                code, response = prepare(
+                    canonical, base, edit, snapshot, review([stable_id])
+                )
+                self.assertNotEqual(code, 0, response)
+                self.assertEqual(response["status"], "blocked")
+                self.assertEqual(response["issues"][0]["code"], "generated_column_edit")
+                self.assertEqual(package_bytes(canonical), before)
+
+        # A new draft row must leave generated columns empty.
+        canonical, base, edit, snapshot = self.make_fixture()
+        edit_table(
+            edit,
+            *uiop,
+            lambda rows: (
+                rows
+                + [
+                    {
+                        "操作ID": "@draft:new-op",
+                        "Scope ID": "SCOPE-001",
+                        "Actor / Role": "Member",
+                        "対象構造ID": "PAGE-001",
+                        "操作": "Open the page.",
+                        "関連仕様項目ID": "",
+                        "対応UC ID": "",
+                        "状態": "mapped",
+                        "関連UNKNOWN ID": "",
+                    }
+                ]
+            ),
+        )
+        code, response = prepare(
+            canonical, base, edit, snapshot, review(["@draft:new-op"])
+        )
+        self.assertNotEqual(code, 0, response)
+        self.assertEqual(response["issues"][0]["code"], "generated_column_edit")
+
+    def test_16_generated_columns_follow_writer_when_rebasing(self) -> None:
+        # The writer re-derives generated columns for another agent's edit; that is
+        # not a human edit and must not conflict with an unrelated human change.
+        canonical, base, edit, snapshot = self.make_fixture()
+        edit_table(
+            edit,
+            "01_ui_structure_and_navigation.md",
+            "UI構造一覧",
+            lambda rows: [
+                copy_page_row(row, 名称="Human rename")
+                if row["構造ID"] == "PAGE-002"
+                else row
+                for row in rows
+            ],
+        )
+        self._apply_changes(
+            canonical,
+            [self._row_change(canonical, "UIOP-001", 操作="Agent changed operation.")],
+        )
+        code, prepared = prepare(
+            canonical,
+            base,
+            edit,
+            snapshot,
+            review(
+                ["PAGE-002"], current_snapshot=inspect(canonical)["update_snapshot"]
+            ),
+        )
+        self.assertEqual(code, 0, prepared)
+        apply(prepared["materialize_request"])
+        final = package._read_package(canonical)
+        self.assertEqual(final.by_id["PAGE-002"][1]["名称"], "Human rename")
+        self.assertEqual(final.by_id["UIOP-001"][1]["操作"], "Agent changed operation.")
+
+    def test_17_invalid_operation_and_input_types_are_structured_errors(self) -> None:
+        canonical, base, edit, snapshot = self.make_fixture()
+        edit_table(
+            edit,
+            "01_ui_structure_and_navigation.md",
+            "UI構造一覧",
+            lambda rows: [
+                copy_page_row(row, 名称="Changed")
+                if row["構造ID"] == "PAGE-001"
+                else row
+                for row in rows
+            ],
+        )
+        for operation in (None, [], ["prepare"], {}, {"a": 1}, 1, 1.5, True, "unknown"):
+            with self.subTest(operation=operation):
+                code, response = cli(HUMAN_EDIT_SCRIPT, {"operation": operation})
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["status"], "blocked")
+                self.assertEqual(response["issues"][0]["code"], "invalid_input")
+        missing_code, missing = cli(HUMAN_EDIT_SCRIPT, {})
+        self.assertNotEqual(missing_code, 0)
+        self.assertEqual(missing["issues"][0]["code"], "invalid_input")
+        for payload in ("[]", "null", "1", '"prepare"', "[" * 100000):
+            with self.subTest(payload=payload[:10]):
+                code, response = raw_cli(HUMAN_EDIT_SCRIPT, payload)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["status"], "blocked")
+                self.assertEqual(response["issues"][0]["code"], "invalid_input")
+        # Wrong-typed fields reach the same structured error path.
+        for review_value in (None, [], "approved", 1):
+            with self.subTest(review=review_value):
+                code, response = cli(
+                    HUMAN_EDIT_SCRIPT,
+                    {
+                        "operation": "prepare",
+                        "package_root": str(canonical),
+                        "base_root": str(base),
+                        "edit_root": str(edit),
+                        "previous_snapshot": snapshot,
+                        "review": review_value,
+                    },
+                )
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["status"], "blocked")
+        for field, value in (
+            ("changed_ids", "PAGE-001"),
+            ("changed_ids", [1]),
+            ("changed_ids", {"a": 1}),
+            ("feature_scope_refs", {}),
+            ("feature_scope_refs", [[]]),
+            ("feature_scope_refs", [{"feature_id": [], "scope_id": "SCOPE-001"}]),
+            ("feature_artifact_ref", []),
+            ("previous_package_root", []),
+            ("previous_package_root", 1),
+        ):
+            with self.subTest(field=field, value=value):
+                request = {
+                    "operation": "feature-index",
+                    "package_root": str(canonical),
+                    "feature_artifact_ref": "fixture://feature-analysis/features-v1",
+                    "feature_artifact_revision": "fixture-revision-01",
+                    "feature_scope_refs": [],
+                    "changed_ids": [],
+                }
+                request[field] = value
+                code, response = cli(HUMAN_EDIT_SCRIPT, request)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["status"], "blocked")
+                self.assertIn(
+                    response["issues"][0]["code"],
+                    {"invalid_input", "source_ref_required", "reference_not_found"},
+                )
+
+    def _row_change(self, canonical: Path, stable_id: str, **overrides: Any) -> dict:
+        model = package._read_package(canonical)
+        spec, row = model.by_id[stable_id]
+        derived = {spec.id_column, spec.status_column}
+        cells = {
+            field: package._split_refs(row[field]) if field in spec.refs else row[field]
+            for field in spec.headers
+            if field not in derived
+        }
+        cells.update(overrides)
+        return {
+            "file": spec.file,
+            "section": spec.section,
+            "rows": [
+                {
+                    "draft_key": None,
+                    "identity_action": "reuse",
+                    "reuse_id": stable_id,
+                    "external_id": None,
+                    "cells": cells,
+                }
+            ],
+        }
+
+    def _new_page_change(self, draft_key: str, name: str, **overrides: Any) -> dict:
+        cells: dict[str, Any] = {
+            "種別": "PAGE",
+            "名称": name,
+            "状態軸": "",
+            "Path / 識別子": f"/{draft_key}",
+            "親構造ID": [],
+            "関連仕様項目ID": [],
+            "関連構造ID": [],
+            "備考": "Added through the formal writer by another agent.",
+        }
+        cells.update(overrides)
+        return {
+            "file": "01_ui_structure_and_navigation.md",
+            "section": "UI構造一覧",
+            "rows": [
+                {
+                    "draft_key": draft_key,
+                    "identity_action": "new",
+                    "reuse_id": None,
+                    "external_id": None,
+                    "cells": cells,
+                }
+            ],
+        }
+
+    def _apply_changes(
+        self,
+        canonical: Path,
+        table_changes: list[dict],
+        retire_ids: list[str] | None = None,
+        summary: str = "Independent agent fixture change",
+    ) -> dict[str, Any]:
+        model = package._read_package(canonical)
+        return apply(
+            {
+                "operation": "materialize",
+                "package_root": str(canonical),
+                "artifact_mode": "update",
+                "previous_snapshot": package._read_update_snapshot(model),
+                "change_mode": "normal",
+                "legacy_source_version": None,
+                "migration_retained_ids": [],
+                "legacy_lifecycle_events": [],
+                "change_summary": summary,
+                "retire_ids": retire_ids or [],
+                "table_changes": table_changes,
+                "keyed_table_updates": [],
+                "prose_updates": [],
+                "extension_file_updates": [],
+                "extension_file_retirements": [],
+            }
+        )
+
     def _update_page(self, canonical: Path, stable_id: str, name: str) -> None:
         model = package._read_package(canonical)
         snapshot = package._read_update_snapshot(model)

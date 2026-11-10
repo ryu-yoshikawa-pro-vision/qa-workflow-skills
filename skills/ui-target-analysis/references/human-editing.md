@@ -38,6 +38,7 @@
 例はhelperのlocal request shapeです。`review_ref`等の文字列は認証を意味せず、Aのruntimeが未登録の間は実承認・native CASの証拠になりません。helperは`status=ready`と既存writer向け`materialize_request`を返すだけで、writeを行いません。
 
 - 既存IDは同じ意味を継続する場合だけ再利用します。未使用IDを人間が採番した新規行は拒否し、`@draft:<draft_key>`を受け取ってwriterに割り当てさせます。
+- `状態`（UI操作一覧）や`Behavior Decomposition`（scope一覧）などwriterが導出する列は編集できません。既存行で値が変わった場合、新規行で値が入っている場合は、他の有効な編集と混在していても`generated_column_edit`で全体を拒否し、黙って破棄しません。値はwriterが再導出します。
 - 行削除はretireに変換しません。削除意図、理由、承認ref、根拠refをIDごとに明示した場合だけ`retire_ids[]`へ渡します。
 - `00`のUI操作判定、`01`のUI構造・Navigation、`02`のUI操作以外の変更、generated/control file、余分なfile、symlink、非canonical encodingは拒否します。
 - Authority、AC、UNKNOWN、業務ルール、期待挙動の変更はUI差分に混ぜず`spec-analysis`へ渡します。
@@ -48,11 +49,13 @@
 ## 競合・失敗・再開
 
 - canonical packageがMANIFEST不一致、invalid、symlink、currentness不明ならwriteを止めます。編集copyと元snapshotの証拠は保持し、自動修復・破棄をしません。復旧はowner/runtimeが権限と独立検証済みbaselineを確認して行います。復旧後はfresh `inspect` snapshotを取り、提案をそのsnapshotへ再準備してowner reviewを更新するまでmaterializeしません。独立の有効baselineと権限を確認できない場合はblockedです。
-- 同じstable ID、関連ref、Scope、proseの意味上の依存が別更新と重なる場合は競合として停止します。独立したIDで依存refも重ならない更新は、current snapshotに対する再レビューが記録された場合だけ再baseできます。
+- 同じstable ID、関連ref、Scope、proseの意味上の依存が別更新と重なる場合は競合として停止します。独立したIDで依存refも重ならない更新は、current snapshotに対する再レビューが記録された場合だけ再baseできます。別の更新が正式writerで採番した新規行は、元snapshotに無くても、人間の手入力IDとは区別してcurrent側の追加として扱います。人間側の手入力採番は引き続き拒否し、追加行のIDや参照が編集差分と重なる場合は競合として停止します。
 - 同じbaseから同一差分が既に保存されている場合はcurrentをno-opで返し、IDを再採番しません。
 - 保存または応答結果が不明な場合は、同一snapshot・同一request fingerprint・writer receiptを照合します。commit後の応答消失は既存writerの同一request再送と独立readbackで判定し、新しいdraft keyで再適用しません。保存先revisionが進んでいる、またはCAS conflictが返った場合は再送を止め、fresh snapshotに対するowner review後に再準備します。
 - writerのpackage-local lockは同一local packageのwriter競合だけを扱います。remote保存先・別workspace・複数hostのCASではありません。保存先native CAS、revision履歴、承認主体の認証、独立readbackを共有runtimeで検証できなければ外部正式保存をblockedにします。
 
 ## 機能別導出索引
 
-`feature-index`は実際の`feature-analysis` artifact ref・revision、明示的なfeature-to-Scope mapping、必要に応じてmaterialize後の`changed_ids`を受け取り、current UI package versionから正本path、section、line、stable ID、関連ref、今回変わったcurrent rowを導出します。mappingをpackageへ複製せず、feature名・path類似・画面名からscopeを推定しません。横断検証ではBの実成果物とmapping sourceを用い、独立fixtureを統合証拠に読み替えません。
+`feature-index`は実際の`feature-analysis` artifact ref・revision、明示的なfeature-to-Scope mapping、必要に応じてmaterialize後の`changed_ids`を受け取り、current UI package versionから正本path、section、line、stable ID、関連ref、今回変わったcurrent rowを導出します。
+
+廃止したIDはcurrent packageに行がないため、廃止前の検証済みsnapshot（`previous_package_root`）が必要です。currentにないIDが`changed_ids`にあるのに`previous_package_root`がなければ`previous_snapshot_required`、currentにも前snapshotにもなければ`reference_not_found`で停止します。前snapshotは有効なpackageで、current以前のversionでなければなりません。前snapshotから同じ導出でScope配下のIDを求め、`retired_ui_rows[]`（前snapshotでのfile・section・line、`previous_package_version`、currentのCHANGELOGに廃止が残っていれば`retired_in_version`、`retirement_evidence`）と`changed_ids_without_current_row[]`を機能・Scopeごとに返します。どの対象Scopeにも該当しない`changed_ids`は`changed_ids_not_in_mapped_scopes`に残します。二次索引や永続索引は作りません。packageは累積履歴を持たないため、前snapshotがcurrentの正規の祖先であることまでは証明できません。その連続性はprovider revision履歴で確認します（PR #22）。mappingをpackageへ複製せず、feature名・path類似・画面名からscopeを推定しません。横断検証ではBの実成果物とmapping sourceを用い、独立fixtureを統合証拠に読み替えません。
