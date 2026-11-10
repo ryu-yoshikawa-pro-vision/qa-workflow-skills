@@ -213,6 +213,13 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         for c in doc.get("rejected_claims", [])
         if isinstance(c, dict)
     }
+    # `metric_improved` rejections are identified per metric, so one supported and one
+    # unsupported metric claim on the same axis cannot mask each other.
+    rejected_metrics = {
+        (c.get("axis"), c.get("metric_id"))
+        for c in doc.get("rejected_claims", [])
+        if isinstance(c, dict) and c.get("assertion") == "metric_improved"
+    }
     claim_errors = []
     for claim in claims:
         if not isinstance(claim, dict):
@@ -224,12 +231,14 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             {m["status"] for m in by_axis.get(axis, [])} if axis in by_axis else set()
         )
         if assertion == "metric_improved":
-            by_id = {
-                m.get("metric_id"): m.get("status")
-                for ms in by_axis.values()
-                for m in ms
+            # The metric must belong to the claimed axis; another axis's improvement
+            # (e.g. efficiency) never supports a claim on this one (e.g. quality).
+            on_axis = {
+                m["status"]
+                for m in by_axis.get(axis, [])
+                if m.get("metric_id") == claim.get("metric_id")
             }
-            supported = by_id.get(claim.get("metric_id")) == "improved"
+            supported = entry is not None and on_axis == {"improved"}
         elif entry is None:
             supported = False
         elif assertion in {"improved", "partially_improved", "mixed", "worsened"}:
@@ -241,7 +250,12 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             supported = bool(statuses & MEASURED)
         else:
             supported = False
-        if supported == ((axis, assertion) in rejected):
+        was_rejected = (
+            (axis, claim.get("metric_id")) in rejected_metrics
+            if assertion == "metric_improved"
+            else (axis, assertion) in rejected
+        )
+        if supported == was_rejected:
             claim_errors.append(f"{axis}:{assertion}")
     result.add(
         "EVL-D005",

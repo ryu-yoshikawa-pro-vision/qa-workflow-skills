@@ -48,7 +48,7 @@
 | `invalid`                                                 | 無効な指標（値と分母の不一致など）があり悪化がない                       |
 | `no_change_or_baseline` / `not_comparable` / `unmeasured` | 改善なし・初回測定／比較不能のみ／測定なし                               |
 
-主張（`claims[]`）は次の場合だけ採用する。軸全体の`improved`は軸の傾向が`improved`のとき、`partially_improved` / `mixed` / `worsened`は同名の傾向のとき（`worsened`は`mixed`でも可）、`metric_improved`は`metric_id`の指標が改善したときに限る。作業時間の短縮（効率）だけで品質・追跡性の改善を主張しない。比較不能・未測定・悪化した指標を、改善した指標の成果へ算入しない。軸に属さない（`axis`が5軸以外の）指標は`invalid_metrics`として明示し、黙って捨てない。
+主張（`claims[]`）は次の場合だけ採用する。軸全体の`improved`は軸の傾向が`improved`のとき、`partially_improved` / `mixed` / `worsened`は同名の傾向のとき（`worsened`は`mixed`でも可）、`metric_improved`は、`metric_id`の指標が主張の`axis`に属し、かつ改善したときに限る（効率軸の指標の改善を品質軸の根拠にしない）。作業時間の短縮（効率）だけで品質・追跡性の改善を主張しない。比較不能・未測定・悪化した指標を、改善した指標の成果へ算入しない。軸に属さない（`axis`が5軸以外の）指標は`invalid_metrics`として明示し、黙って捨てない。
 
 ## 3. 改善のlifecycle
 

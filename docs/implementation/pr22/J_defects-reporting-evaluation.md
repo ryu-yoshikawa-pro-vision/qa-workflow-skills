@@ -271,3 +271,45 @@ Windows固有の既存失敗は、変更前のbase（`git archive`のクリー�
 
 - **担当Jの局所実装**：指摘6件と周辺の同種の問題を修正し、回帰テスト・独立validator・実Agent再受入で確認済み。担当J所有の既知の実装不具合は残っていない。未接続の外部要素（実provider・承認主体・保存先）は、blockedとして上に記録した。
 - **PR #32全体のCI・レビュー**：共有ownerによるREADME登録が未適用のため、`Validate Agent Skills`は失敗する状態。登録の適用後に再確認が必要で、現時点では完了と判定しない。PR #22の横断統合・最終受入は担当Jの範囲外。
+
+## 残指摘への対応と再検証（2026-11-10 第3回）
+
+[PR #32](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32)の残指摘（評価軸の誤判定）と、CI失敗の扱いを確認した。最新HEADのGitHub Actionsは[PR #32のChecks](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/32/checks)を正本とする。
+
+### 評価軸の誤判定（`metric_improved`）
+
+- **確認結果：問題あり**。`evaluate_axes`は`metric_improved`を`metric_id`の状態だけで判定し、主張の`axis`と指標の`axis`の一致を見なかった。効率軸の指標`E-time`が改善していれば、`{axis: quality, assertion: metric_improved, metric_id: E-time}`が採用された。同じ`metric_id`が複数の軸にあると、後の指標が先の指標を上書きした。
+- **同種の問題（validator）**：独立validatorの`EVL-D005`も`metric_id`だけで判定していた。さらに棄却の突合せが`(axis, assertion)`だけで、同じ軸の支持される指標主張と支持されない指標主張が互いを隠した。
+- **修正**：
+  - runtime（`evaluation_runtime.py`）：指標を`(axis, metric_id)`で引き、主張の軸に属し、かつその指標のstatusがすべて`improved`のときだけ採用する。
+  - validator（`validator.py`）：同じ規則で独立に導出し、指標主張の棄却は`(axis, metric_id)`で突合せる。
+  - 文書（`references/data-contract.md`・`guidance.md`）：軸の一致を明記した。
+- **回帰テスト**：
+  - `AxisWideJudgementTests`に2件。別の軸の指標、軸と指標の取り違え、5軸以外の軸の拒否、正常な主張の維持、同じ`metric_id`が複数の軸にある場合の軸ごとの判定。
+  - `ReviewDrivenEvaluationValidatorTests`に1件。不当な採用の検出、正しい棄却と同軸の正常な主張を誤検出しないこと。
+  - 変更前のコードでは3件とも失敗し、修正後に全件PASS。既存の正常系（`EVL-OUT-001`〜`006`）は変更なし。
+
+### 検証の記録
+
+固定版のruff 0.16.8・dprint 0.55.2を使用。各コマンドは個別に判定した。
+
+| 検証                                                                           | 結果                                                                                                                                                   |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 担当Jのテスト（`test_pr32_*` 4ファイル）                                       | 172件、全件PASS（第2回の169件＋3件）                                                                                                                   |
+| `ruff check` / `ruff format --check`、`python scripts/format_tracked.py check` | PASS（227ファイル）                                                                                                                                    |
+| `git diff --check`                                                             | PASS                                                                                                                                                   |
+| `skills-ref validate skills/test-evaluation`                                   | 成功                                                                                                                                                   |
+| `python scripts/skills/evals/semantic/validate.py`                             | 26 Skill・187 case                                                                                                                                     |
+| `tests/skills/evals/semantic`・`scripts/skills/evals/semantic/tests`           | PASS（27件、skip 2）                                                                                                                                   |
+| 既存`tests/skills/evals/deterministic`（336件）                                | 失敗1（`test_pre_start_claim_and_resource_reservation_serialize_mutable_work`、担当A所有、Windowsの短縮パス表記による既知の失敗）                      |
+| 既存`tests/skills/runtime`                                                     | 622件中、失敗6・error14。第2回と同じ、担当A所有の`test_ci_handoff`・`test_sqlite_workflow_history`のWindows固有の失敗だけ（担当Jのテストの失敗はない） |
+
+### 共有登録の扱い（変更なし）
+
+README・EVALS・`ASSERTIONS.md`・`common.py`・`qa-workflow`は変更していない。`Validate Agent Skills`の失敗は、README記載チェックが新3 Skillを見つけられないことだけが原因で、担当Jの実装不具合ではない。登録内容と新設の評価IDは「共有ファイルの登録依頼」と第2回の「PR #22への追加の引継ぎ」のとおり。今回新設の評価IDはない（`EVL-D005`の強化のみ）。
+
+### 判定
+
+- **担当Jの局所実装**：残指摘を修正し、回帰テストと独立validatorで確認済み。担当J所有の既知の実装不具合は残っていない。
+- **PR #32全体のCI**：共有登録が未適用のため`Validate Agent Skills`は失敗する状態で、完了と判定しない。
+- **PR #22の横断受入**：担当Jの範囲外で、未実施。

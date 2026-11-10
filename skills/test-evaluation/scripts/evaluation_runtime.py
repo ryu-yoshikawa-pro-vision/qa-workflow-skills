@@ -252,13 +252,19 @@ def evaluate_axes(
             for m in entry["metrics"]
             if m["status"] in UNRESOLVED
         )
-    by_metric = {m.get("metric_id"): m["status"] for m in evaluated}
+    # A metric improvement only supports a claim on the axis the metric belongs to.
+    by_axis_metric: dict[tuple[Any, Any], list[str]] = {}
+    for item in evaluated:
+        by_axis_metric.setdefault((item.get("axis"), item.get("metric_id")), []).append(
+            item["status"]
+        )
     rejected: list[dict[str, str]] = []
     for claim in claims or []:
         axis, assertion = claim.get("axis"), claim.get("assertion")
         entry = axes.get(axis)
         if assertion == "metric_improved":
-            supported = by_metric.get(claim.get("metric_id")) == "improved"
+            statuses_for_metric = by_axis_metric.get((axis, claim.get("metric_id")), [])
+            supported = entry is not None and set(statuses_for_metric) == {"improved"}
         elif entry is None:
             supported = False
         elif assertion in {"improved", "partially_improved", "mixed", "worsened"}:

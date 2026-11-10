@@ -4,7 +4,7 @@
 
 - `inputs[]`：`ref`、`revision`、`content_hash`（必須。ないものは未検証）、`kind`（`report` / `plan` / `defect` / `coverage` / `effort` / `history` / `handoff`）。
 - `metrics[]`：`metric_id`、`axis`（`traceability` / `quality` / `efficiency` / `process` / `reusability`）、`definition_version`、`unit`、`numerator`、`denominator`、`value`、`direction`（`higher_is_better` / `lower_is_better`）、`source_refs[]`（`ref`・`revision`）、`conditions{scope_ref, environment_ref, population_ref}`、`previous{value, definition_version, unit, conditions}`、`unmeasured_reason`。
-- `claims[]`：`axis`、`assertion`（`improved` / `partially_improved` / `mixed` / `worsened` / `measured` / `metric_improved`）。`metric_improved`は`metric_id`を伴う。
+- `claims[]`：`axis`、`assertion`（`improved` / `partially_improved` / `mixed` / `worsened` / `measured` / `metric_improved`）。`metric_improved`は`metric_id`を伴い、その指標が主張の`axis`に属し、かつ改善している場合だけ採用する（別の軸の指標の改善は根拠にならない。同じ`metric_id`が複数の軸にある場合は軸ごとに判定する）。
 - `improvements[]`：`improvement_ref`、`state`、`change_kind`（`plan` / `architecture` / `design`）、`scope_ref`、`proposal_revision`、`baseline_activity_ref`、`knowledge_candidate_ref`。
 - 承認（`approval`）：`source=trusted_approval_service`、`authentication_verified`、`authenticated_by`、`principal`、`role`、`policy_revision`、`issued_at`、`expires_at`、`revoked`、`operation`（`adopt_improvement` / `confirm_handoff`）、`improvement_ref`または`item_ref`、`artifact_revision`、`scope_ref`、`approval_ref`。
 - `handoffs[]`：`item_ref`、`receiver`、`artifact_revision`、`confirmation`（上記の承認形式）。

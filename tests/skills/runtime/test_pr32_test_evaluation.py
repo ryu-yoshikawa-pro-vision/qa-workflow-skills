@@ -667,6 +667,68 @@ class AxisWideJudgementTests(unittest.TestCase):
         )
         self.assertEqual(len(result["rejected_claims"]), 4)
 
+    def test_metric_improved_claim_must_match_the_axis_of_the_metric(self):
+        # An improved efficiency metric is not evidence for an improved quality axis.
+        efficiency = metric("efficiency", metric_id="E-time")
+        quality = metric("quality", metric_id="Q-improved")
+        metrics = [efficiency, quality]
+        result = evaluation.evaluate_axes(
+            metrics,
+            claims=[
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "E-time",
+                },
+                {
+                    "axis": "efficiency",
+                    "assertion": "metric_improved",
+                    "metric_id": "Q-improved",
+                },
+                {
+                    "axis": "speed",
+                    "assertion": "metric_improved",
+                    "metric_id": "E-time",
+                },
+                {
+                    "axis": "efficiency",
+                    "assertion": "metric_improved",
+                    "metric_id": "E-time",
+                },
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "Q-improved",
+                },
+            ],
+        )
+        self.assertEqual(
+            [(c["axis"], c["metric_id"]) for c in result["rejected_claims"]],
+            [("quality", "E-time"), ("efficiency", "Q-improved"), ("speed", "E-time")],
+        )
+
+    def test_the_same_metric_id_on_two_axes_is_judged_per_axis(self):
+        worse = metric(
+            "quality", metric_id="SAME", value=0.4, numerator=4, previous=0.6
+        )
+        better = metric("efficiency", metric_id="SAME")
+        result = evaluation.evaluate_axes(
+            [worse, better],
+            claims=[
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "SAME",
+                },
+                {
+                    "axis": "efficiency",
+                    "assertion": "metric_improved",
+                    "metric_id": "SAME",
+                },
+            ],
+        )
+        self.assertEqual([c["axis"] for c in result["rejected_claims"]], ["quality"])
+
     def test_improvement_effect_still_comes_from_a_single_comparable_metric(self):
         # lifecycle measurement uses one metric; an axis-level mixed result cannot be injected
         applied = TestImprovementLifecycleHelpers.implemented()

@@ -665,6 +665,50 @@ class ReviewDrivenEvaluationValidatorTests(unittest.TestCase):
 
         self.assertIn("EVL-D005", self.failing("EVL-OUT-005", wrong_metric))
 
+    def test_metric_level_claims_must_match_the_axis_of_the_metric(self):
+        def efficiency_for_quality(a):
+            a["axes"]["efficiency"]["metrics"] = [
+                {
+                    "axis": "efficiency",
+                    "delta": -5.0,
+                    "metric_id": "E-time",
+                    "reasons": [],
+                    "status": "improved",
+                    "value": 10.0,
+                }
+            ]
+            a["metrics"].append(a["axes"]["efficiency"]["metrics"][0])
+            a["axes"]["efficiency"].update(status="measured", trend="improved")
+            a["claims"].append(
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "E-time",
+                }
+            )
+
+        # accepted although E-time belongs to the efficiency axis -> invalid
+        self.assertIn("EVL-D005", self.failing("EVL-OUT-005", efficiency_for_quality))
+
+        def rejected_correctly(a):
+            efficiency_for_quality(a)
+            a["rejected_claims"].append(
+                {
+                    "axis": "quality",
+                    "assertion": "metric_improved",
+                    "metric_id": "E-time",
+                    "reason": "claim_not_supported_by_axis_metrics",
+                }
+            )
+
+        self.assertNotIn("EVL-D005", self.failing("EVL-OUT-005", rejected_correctly))
+
+        def same_axis_claim(a):
+            efficiency_for_quality(a)
+            a["claims"][-1]["axis"] = "efficiency"
+
+        self.assertNotIn("EVL-D005", self.failing("EVL-OUT-005", same_axis_claim))
+
     def test_inputs_need_a_content_hash_and_invalid_metrics_block_final(self):
         def drop_hash(a):
             a["inputs"][0].pop("content_hash")
