@@ -640,3 +640,10 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - A／共有runtime owner：formal-design recordとE2E selection recordのsource/artifact ref、revision、scope、currentness、Machine Entity登録、承認、native create-if-absent／CAS、exact historical readback契約を公開し、認証済み保存先を接続する。共有README／providerはE branchで変更しない。
 - PR #22統合後：B/C/D/F正規成果物を用いたID／revision／Authority／scope照合、stale伝播と別session再開、E formal→coverageおよびE2E selection→G/H/J接続を行う。S1〜S17、人間編集8ケース、開発連動QA15条件、QA全工程10条件は全体統合で判定し、今回のfixture/local PASSで代替しない。
 - PR #27全体はREADME失敗、実Agent/Judge/provider、横断接続が残るため受入未完了。PRはDraftのままとし、この作業でGitHub PR本文を変更しない。
+
+### push後の最新commit・Actions
+
+- 2026-11-10に担当Planのみをcommit `37a4f63d6f621b683cc44a3529433b2bd65b3175`（`docs: record PR #27 remaining acceptance blockers`）へ記録し、branch `feat/pr22-e-formal-design-e2e-selection`へ通常pushした。push後のlocal HEAD、`git ls-remote`のremote HEADは同一SHAで、worktreeはclean。実装コードは変更していない。
+- 対象commitに紐づく最新PR Actions：Code Quality run 885 PASS、Validate Deterministic Output Evals run 2190 PASS、Validate Semantic Output Evals run 2155 PASS、Codex Harness run 885 PASS（Linux `codex-contract`／Windows `windows-launcher`ともPASS）、Validate Agent Skills run 2192 FAIL。
+- Validate Agent Skillsのjob `validate`では`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。実行logはPR synthetic merge `2822986b98fb229f6d6eed1a954e5f95e0fb954c`をcheckoutし、READMEのcanonical一覧に`e2e-test-selection`がないため停止した。PR ActionsのPASSは実Agent発火・semantic Judge・実providerの受入を示さない。
+- PR APIで再確認：PR #27はopen／Draft、base `feat/development-qa-traceability`、head `37a4f63d6f621b683cc44a3529433b2bd65b3175`。PR本文は旧状態のままで、この作業では変更していない。次回はREADMEをPR #22統合ownerが修正した後にValidate Agent Skillsを再実行し、本Plan記載の実Agent／Judge／provider条件は別途owner-approved環境が接続した後に再開する。
