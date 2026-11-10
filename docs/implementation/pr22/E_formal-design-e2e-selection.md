@@ -496,3 +496,9 @@ PR #27レビュー時点の`30289c915bcc64e6cdc4479c34189ab2c7740eee` Actionsは
 - A担当：READMEのcanonical Skill登録・routing、共有ASSERTIONS更新、formal/E2E artifact registrationとMachine Entity保存・承認・CAS・readback契約を引き続き担当する。追加で、`test_ci_handoff`のnesting error契約、およびSQLite history suiteの9 failures／9 errorsとprovider unreadable状態を安全なreadback境界を維持して調査し、Linux／Windows両環境で再検証する。README変更後はValidate Agent Skillsを再実行する。
 - PR #22統合：B/C/D/Fの実成果物を用いたformal design／E2E selectionのID・revision・Authority・scope・currentness照合、source変更時stale伝播、G/H/J下流consumerとの接続、実provider save／approval／CAS／readback、別session再開、全Skill routing、S1〜S17と人間編集8ケース、開発連動QA15条件／QA全工程10条件の最終判定を行う。
 - 本追記時点の対象commit SHAとpush後Actionsは未確定のため、push後に別記する。PR #27本文は更新しない。README未登録、共有runtime、実provider、実Agent／Judge、PR #22統合が残るためPR #27全体の受入完了とはしない。
+
+### commit・push・Actions結果（2026-11-10）
+
+- 上記12ファイルをcommit `c0e7b801123ef590d3f25c5beaad67ff38153e81`（`fix: preserve formal design state and align selection contracts`）として記録し、対象branchへ通常pushした。push直前に`git fetch origin`と`git merge-base --is-ancestor origin/feat/pr22-e-formal-design-e2e-selection HEAD`を実行し、ancestor判定は終了code 0。push後のlocal HEADと`git ls-remote`のremote HEADは同じ`c0e7b801123ef590d3f25c5beaad67ff38153e81`、worktreeはclean。
+- このcommitのGitHub Actions：Code Quality run 869 PASS、Validate Deterministic Output Evals run 2174 PASS、Validate Semantic Output Evals run 2139 PASS、Codex Harness run 869 PASS、Validate Agent Skills run 2176 FAIL。失敗jobは`validate`、失敗stepは`Validate repository eval structure`。`Validate Agent Skills specification`はPASSしており、repository eval structure failureは共有`README.md`のcanonical Skill一覧に`e2e-test-selection`がないため。owner A。過去HEADのActions結果と区別し、他4 workflowのPASSはこのcommit SHAに紐づく。
+- このActions確認とcommit SHAを記録するPlan更新はdocumentation-only follow-upとして別commit／pushする。PR #27はopen／Draftを維持し、GitHub上のPR本文は変更していない。PR本文には「実装コードの追加と担当内の実受入は未実施」と古い状態が残っているため更新が必要だが、本作業では更新しない。
