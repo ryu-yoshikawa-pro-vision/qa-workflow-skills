@@ -1363,8 +1363,14 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
                 "only confirmed candidate conditions may be a proposed pair",
             )
 
+        # Resolve both sides before deciding to continue so that one pair reports
+        # every unresolved reason: an item that is stale/unknown/retired/missing
+        # and a condition that is unregistered or, while still a candidate,
+        # stale/unknown.
         item_reason = item_reference_reason(item_id)
         condition_reason = condition_reference_reason(condition_id)
+        if condition_reason is None and registered_condition is not None:
+            condition_reason = condition_currentness_reason(registered_condition)
         if item_reason is not None:
             unresolved_item_refs.append(
                 {
@@ -1406,29 +1412,6 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
 
         item = item_by_id[item_id]
         condition = condition_by_id[condition_id]
-        # A condition that is still a candidate but whose evidence went
-        # stale/unknown is an ordinary owner-side recheck, reported like the
-        # unresolved item references above.
-        currentness_reason = condition_currentness_reason(condition)
-        if currentness_reason is not None:
-            unresolved_condition_refs.append(
-                {
-                    "origin": "candidate_pairs",
-                    "condition_id": condition_id,
-                    "item_id": item_id,
-                    "reason": currentness_reason,
-                    "state": "unconfirmed",
-                    "candidate_pair": {
-                        "status": status,
-                        "rationale": rationale,
-                        "evidence_refs": evidence,
-                    },
-                }
-            )
-            recheck_condition_ids.add(condition_id)
-            recheck_item_ids.add(item_id)
-            continue
-
         machine_issues: list[str] = []
         if item["kind"] not in condition["applicable_item_kinds"]:
             machine_issues.append("item_kind_not_in_condition_applicability")

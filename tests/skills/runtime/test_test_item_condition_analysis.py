@@ -2299,6 +2299,192 @@ class TestReviewRegressionFindings(unittest.TestCase):
                         ),
                     )
 
+    def test_pair_reports_both_item_and_condition_unresolved_reasons(self):
+        changed_spec = spec_ref(revision="spec-r2", content_hash="c" * 64)
+        stale_sources = [feature_ref(), changed_spec]
+        unknown_sources = [feature_ref()]
+        initial_item = _materialize_item(
+            item_request(
+                candidates=[
+                    item_candidate(
+                        "pair-item", evidence_refs=[feature_ref(), spec_ref()]
+                    )
+                ]
+            )
+        )["candidate"]
+        initial_condition = _materialize_condition(
+            condition_request(candidates=[condition_candidate("pair-condition")])
+        )["candidate"]
+
+        def moved_item(sources, candidates=None):
+            return _materialize_item(
+                item_request(
+                    candidates=candidates or [],
+                    sources=sources,
+                    previous=initial_item,
+                    expected="storage-r1",
+                    current="storage-r1",
+                )
+            )["candidate"]
+
+        def lagging_condition(sources):
+            return _materialize_condition(
+                condition_request(
+                    candidates=[],
+                    sources=sources,
+                    previous=initial_condition,
+                    expected="storage-r1",
+                    current="storage-r1",
+                )
+            )["candidate"]
+
+        stale_item = moved_item(stale_sources)
+        unknown_item = moved_item(unknown_sources)
+        current_item = moved_item(
+            stale_sources,
+            [
+                item_candidate(
+                    "pair-item",
+                    action="reuse",
+                    item_id="ITEM-001",
+                    evidence_refs=[feature_ref(), changed_spec],
+                )
+            ],
+        )
+        stale_condition = lagging_condition(stale_sources)
+        unknown_condition = lagging_condition(unknown_sources)
+        current_condition = _materialize_condition(
+            condition_request(
+                candidates=[
+                    condition_candidate(
+                        "pair-condition",
+                        evidence_refs=stale_sources,
+                        authorities=[
+                            {"source_ref": changed_spec, "entity_ref": "AUTH-001"}
+                        ],
+                    )
+                ],
+                sources=stale_sources,
+            )
+        )["candidate"]
+        for artifact, key, expected in (
+            (stale_item, "items", "stale"),
+            (unknown_item, "items", "unknown"),
+            (current_item, "items", "current"),
+            (stale_condition, "conditions", "stale"),
+            (unknown_condition, "conditions", "unknown"),
+            (current_condition, "conditions", "current"),
+        ):
+            self.assertEqual(artifact[key][0]["currentness"], expected)
+            self.assertEqual(
+                artifact[key][0].get("candidate_state", "candidate"), "candidate"
+            )
+
+        item_reason = {
+            "stale": "item_stale",
+            "unknown": "item_currentness_unknown",
+            "current": None,
+            "not found": "item_not_found",
+        }
+        condition_reason = {
+            "stale": "condition_stale",
+            "unknown": "condition_currentness_unknown",
+            "current": None,
+            "not found": "condition_not_found",
+        }
+        items = {"stale": stale_item, "unknown": unknown_item, "current": current_item}
+        conditions = {
+            "stale": stale_condition,
+            "unknown": unknown_condition,
+            "current": current_condition,
+        }
+        # (item, condition, pair status). "not found" uses an unregistered ID.
+        cases = [
+            ("stale", "stale", "proposed"),
+            ("unknown", "unknown", "proposed"),
+            ("stale", "unknown", "unconfirmed"),
+            ("unknown", "stale", "blocked"),
+            ("current", "stale", "proposed"),
+            ("stale", "current", "proposed"),
+            ("not found", "stale", "proposed"),
+            ("current", "not found", "proposed"),
+        ]
+        for item_state, condition_state, status in cases:
+            with self.subTest(
+                item=item_state, condition=condition_state, status=status
+            ):
+                item_id = "ITEM-999" if item_state == "not found" else "ITEM-001"
+                condition_id = (
+                    "COND-009" if condition_state == "not found" else "COND-001"
+                )
+                item_artifact = items.get(item_state, current_item)
+                condition_artifact = conditions.get(condition_state, stale_condition)
+                pair = {
+                    "item_id": item_id,
+                    "condition_id": condition_id,
+                    "status": status,
+                    "rationale": f"{item_state} item with {condition_state} condition",
+                    "evidence_refs": [feature_ref()],
+                }
+                result = self.crosscheck(item_artifact, condition_artifact, [pair])
+                self.assertTrue(result["valid"])
+                self.assertEqual(result["status"], "incomplete")
+                self.assertEqual(result["candidate_pairs"], [])
+                for field, reason in (
+                    ("unresolved_item_references", item_reason[item_state]),
+                    (
+                        "unresolved_condition_references",
+                        condition_reason[condition_state],
+                    ),
+                ):
+                    rows = result[field]
+                    self.assertEqual(
+                        [row["reason"] for row in rows], [reason] if reason else []
+                    )
+                    for row in rows:
+                        self.assertEqual(row["origin"], "candidate_pairs")
+                        self.assertEqual(row["item_id"], item_id)
+                        self.assertEqual(row["condition_id"], condition_id)
+                        self.assertEqual(row["state"], "unconfirmed")
+                        self.assertEqual(
+                            row["candidate_pair"],
+                            {
+                                "status": status,
+                                "rationale": pair["rationale"],
+                                "evidence_refs": [feature_ref()],
+                            },
+                        )
+                self.assertEqual(result["recheck_item_ids"], [item_id])
+                self.assertEqual(result["recheck_condition_ids"], [condition_id])
+                # Existing per-artifact diagnostics are not lost.
+                self.assertEqual(
+                    result["stale_item_ids"],
+                    [
+                        r["item_id"]
+                        for r in item_artifact["items"]
+                        if r["currentness"] == "stale"
+                    ],
+                )
+                self.assertEqual(
+                    result["stale_condition_ids"],
+                    [
+                        r["condition_id"]
+                        for r in condition_artifact["conditions"]
+                        if r["currentness"] == "stale"
+                    ],
+                )
+                self.assertEqual(
+                    result["unknown_condition_ids"],
+                    [
+                        r["condition_id"]
+                        for r in condition_artifact["conditions"]
+                        if r["currentness"] == "unknown"
+                    ],
+                )
+                codes = {row["code"] for row in result["issues"]}
+                self.assertIn("unresolved_candidate_references", codes)
+                self.assertFalse(result["cartesian_product_generated"])
+
     def test_proposed_pair_on_unconfirmed_or_blocked_condition_is_rejected_for_any_item(
         self,
     ):
