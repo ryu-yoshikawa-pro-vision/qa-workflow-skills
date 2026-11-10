@@ -23,6 +23,37 @@ REQUIREMENT_STATES = {
 }
 CURRENTNESS = {"current", "stale", "unknown"}
 ACQUISITION = {"取得済", "部分取得", "未取得", "取得不能", "0件確認済み", "不明"}
+APPROVAL_STATES = {"承認済み", "未承認", "失効", "不要", "未設定", "未取得", "unknown"}
+UNRESOLVED_ITEM_STATES = {"未取得", "確認待ち", "未解決", "要再確認", "blocked"}
+PURPOSE_FIELDS = ("QA目的", "品質目標", "対象・対象外", "活動の成功条件", "根拠")
+CONTENT_PLACEHOLDERS = {"", "-", "—", "n/a", "na"}
+VALUE_PLACEHOLDERS = CONTENT_PLACEHOLDERS | {
+    "unknown",
+    "未取得",
+    "未設定",
+    "未確定",
+    "未確認",
+    "取得不能",
+    "失効",
+    "expired",
+    "未承認",
+    "unapproved",
+    "不要",
+    "not required",
+    "not retrieved",
+}
+UNRESOLVED_PURPOSE_MARKERS = (
+    "unknown",
+    "未取得",
+    "未設定",
+    "未確定",
+    "未確認",
+    "取得不能",
+    "stale",
+    "blocked",
+    "expired",
+    "失効",
+)
 
 
 def _metadata(table) -> dict[str, str]:
@@ -37,7 +68,27 @@ def _table(tables, section: str, headers: tuple[str, ...]):
 
 
 def _has_value(value: str) -> bool:
-    return clean(value) not in {"", "-", "—", "N/A", "n/a"}
+    return clean(value).casefold() not in VALUE_PLACEHOLDERS
+
+
+def _has_content(value: str) -> bool:
+    return clean(value).casefold() not in CONTENT_PLACEHOLDERS
+
+
+def _contains_unresolved_marker(value: str) -> bool:
+    normalized = clean(value).casefold()
+    for marker in UNRESOLVED_PURPOSE_MARKERS:
+        marker = marker.casefold()
+        if normalized == marker or re.fullmatch(
+            re.escape(marker) + r"\s*[:：;；(（—–-].*", normalized
+        ):
+            return True
+    return False
+
+
+def _scope_covers(scope_value: str, target_scope: str) -> bool:
+    scopes = {clean(value) for value in re.split(r"[,、;]", clean(scope_value))}
+    return bool(clean(target_scope)) and clean(target_scope) in scopes
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -57,6 +108,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             "状態",
         ),
     )
+    purpose_table = _table(tables, "QA目的・成功条件", PURPOSE_FIELDS)
     source_table = _table(
         tables,
         "情報源・取得範囲",
@@ -82,20 +134,52 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         for name, table in (
             ("成果物メタデータ", metadata_table),
             ("QA要求", requirements_table),
+            ("QA目的・成功条件", purpose_table),
             ("情報源・取得範囲", source_table),
             ("確認・承認", approval_table),
             ("未決事項", unresolved_table),
         )
         if table is None
     ]
+    metadata = _metadata(metadata_table)
+    purpose_errors = []
+    if purpose_table is not None:
+        if not purpose_table.rows:
+            purpose_errors.append({"reason": "QA目的・成功条件 row is missing"})
+        for index, row in enumerate(purpose_table.rows, start=1):
+            missing_fields = [
+                field
+                for field in PURPOSE_FIELDS
+                if not _has_content(row.get(field, ""))
+            ]
+            unresolved_fields = (
+                [
+                    field
+                    for field in PURPOSE_FIELDS
+                    if _contains_unresolved_marker(row.get(field, ""))
+                ]
+                if metadata.get("状態") == "承認済み"
+                else []
+            )
+            if missing_fields or unresolved_fields:
+                purpose_errors.append(
+                    {
+                        "row": index,
+                        "missing_fields": missing_fields,
+                        "unresolved_fields": unresolved_fields,
+                    }
+                )
     result.add(
         "QRA-D001",
-        not missing_tables,
-        "QA要求の正規テーブルが存在すること",
-        evidence=missing_tables or None,
+        not missing_tables and not purpose_errors,
+        "正規テーブルとQA目的・成功条件の必須項目が存在し、承認済みでは未確定表示がないこと",
+        evidence=(
+            {"missing_tables": missing_tables, "purpose_errors": purpose_errors}
+            if missing_tables or purpose_errors
+            else None
+        ),
     )
 
-    metadata = _metadata(metadata_table)
     required_metadata = ("owner", "artifact_ref", "revision", "scope", "状態")
     missing_metadata = [key for key in required_metadata if not metadata.get(key)]
     result.add(
@@ -277,26 +361,57 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
 
     unresolved = nonempty_rows(unresolved_table, "項目")
     open_rows = [row for row in requirements if clean(row.get("状態", "")) == "未解決"]
-    uncovered = [
-        row.get("QA要求ID", "")
-        for row in open_rows
-        if not any(
-            clean(item.get("項目", "")) == clean(row.get("QA要求ID", ""))
-            for item in unresolved
-        )
-    ]
+    uncovered = []
+    for requirement in open_rows:
+        requirement_id = clean(requirement.get("QA要求ID", ""))
+        matching_items = [
+            item for item in unresolved if clean(item.get("項目", "")) == requirement_id
+        ]
+        if len(matching_items) != 1:
+            uncovered.append(
+                {
+                    "id": requirement_id,
+                    "reason": "matching unresolved item must exist exactly once",
+                    "matching_rows": len(matching_items),
+                }
+            )
+            continue
+        item = matching_items[0]
+        scope = clean(item.get("影響scope", ""))
+        state = clean(item.get("状態", ""))
+        missing_fields = [
+            field
+            for field in ("影響scope", "担当", "再開条件")
+            if not _has_value(item.get(field, ""))
+        ]
+        invalid = {
+            "id": requirement_id,
+            "missing_fields": missing_fields,
+            "scope_mismatch": not _scope_covers(
+                scope, clean(requirement.get("scope", ""))
+            ),
+            "invalid_state": state not in UNRESOLVED_ITEM_STATES,
+        }
+        if missing_fields or invalid["scope_mismatch"] or invalid["invalid_state"]:
+            uncovered.append(invalid)
     result.add(
         "QRA-D012",
         not uncovered,
-        "未解決QA要求が担当・再開条件を持つ未決事項へ閉じること",
+        "未解決QA要求がscope・担当・許可状態・再開条件を持つ一意な未決事項へ閉じること",
         evidence=uncovered or None,
     )
 
-    approvals = nonempty_rows(approval_table, "状態")
+    approval_rows = nonempty_rows(approval_table)
+    invalid_approval_states = [
+        row
+        for row in approval_rows
+        if clean(row.get("状態", "")) not in APPROVAL_STATES
+    ]
+    approvals = approval_rows
     approved_rows = [
         row for row in approvals if clean(row.get("状態", "")) == "承認済み"
     ]
-    approval_mismatch = []
+    approval_mismatch = list(invalid_approval_states)
     for row in approved_rows:
         if (
             clean(row.get("artifact_ref", "")) != metadata.get("artifact_ref")

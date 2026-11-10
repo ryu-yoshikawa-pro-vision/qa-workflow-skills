@@ -316,3 +316,61 @@ PR #22の担当Fとして、QA要求・テストアーキテクチャ・計画�
 ```
 
 この案はPR本文の更新依頼ではなく、現在はGitHub上の本文を変更していない。
+
+## 追加レビュー4件の修正・回帰確認（2026-11-10）
+
+レビュー基準`aa16455ad95971f9a99fbb29363fa5e7fa5d0564`から、対象branch `feat/pr22-f-qa-planning-architecture`で作業した。作業開始時はworktree cleanで、`origin/feat/pr22-f-qa-planning-architecture`とのahead／behindはいずれも0。今回の差分はF担当のQRA／TMG validator、QRA data-contract／guidance、F回帰テスト、本節に限定した。README、共通runtime、qa-workflow routingは変更していない。
+
+### 指摘別の修正
+
+1. **QRA承認placeholder** — `skills/test-requirements-analysis/evals/deterministic/validator.py`の`_has_value()`で大小文字を正規化し、未取得／unknown／未設定／失効／未承認／不要や空値記号を証拠として扱わない。`QRA-D013`は承認行の状態、主体・role、証拠ref、artifact ref、revision、scopeを照合し、確定artifactとsourceのcurrentnessも確認する。検証できるのは記録されたrefと状態の整合までであり、主体認証は行わない。provider未接続は承認完了の証明にならない。
+2. **TMG承認主体placeholder** — `skills/test-management/evals/deterministic/validator.py`で既存の`_is_present()`を大小文字非依存にし、`TMG-D023`の承認行内容検査と、同一ref／revision／scopeの有効行検索の両方に使用した。`-`、`unknown`、`未取得`等では有効な承認行を成立させない。草案／blockedは従来どおり許容する。
+3. **QA目的・成功条件の欠落** — QRA validatorの`QRA-D001`で正規テーブル、必須5列、各値を検証する。草案／blockedは未取得等の明示状態と理由を保持できる。承認済みでは未確定状態を許容しない。再レビューで、説明文中に`stale`等の単語があるだけで誤拒否することを避け、値全体が状態placeholder、または状態markerと理由区切りで始まる場合だけ未確定と判定するよう修正した。`data-contract.md`と`guidance.md`にも同じ境界を記録した。
+4. **未決事項のclosure情報不足** — `QRA-D012`で未解決QA要求ごとに同じQAR IDの未決事項が一意に存在すること、影響scopeが要求scopeを含むこと、担当・許可状態・再開条件が記録されることを検証する。未取得／blocked状態も担当と再開条件があれば保持できる。無関係IDの未決事項は対象判定へ混入させない。未確定の担当者や条件を生成しない契約をdata-contract／guidanceへ反映した。
+
+修正ファイルは上記2 validator、QRA `references/data-contract.md`／`references/guidance.md`、`tests/skills/evals/deterministic/test_f_planning_contracts.py`、本書。templateや共有ownerファイルは変更していない。
+
+### 回帰テスト
+
+既存の30テストを維持し、今回の独立したテスト3件を追加してF回帰を33件にした。承認ref／主体の`unknown`・`未取得`・`-`、artifact／revision／scope mismatch、有効な承認、草案／blocked、目的テーブル欠落・列／値不足、承認済みの未確定値、未決事項行／scope／担当／状態／再開条件の不備と無関係scopeを確認する。承認検索経路も汚染された行で拒否されることをassertion evidenceで確認した。Markdown表編集helperは既存のsection/table構造を利用する。
+
+### 実行した検証
+
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -p 'test_f_planning_contracts.py' -v` — PASS 33／0 FAIL／0 ERROR。正常な6 output reference fixtureを含む。これは実Agent出力ではない。
+- `.github/workflows/deterministic-output-evals.yml`の`Validate output eval datasets`と同じ検査 — PASS、25 Skill／52 case。QRA／TAD／TMG各2件の6 fixtureは既存deterministic runnerでPASS（各manifestのreference出力を使用）。
+- `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS 12。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — 323件中319 PASS、4 FAIL。失敗は共有WCAG／qa-workflowのSQLite providerがsandbox内Project Context state-rootを拒否し`blocked`を返すもの。F変更から独立したA範囲で、`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`。安全ガードは変更していない。
+- `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — 今回のvalidator編集前に同じbranchで実行した全496件は477 PASS、10 FAIL、9 ERROR。SQLite workflow-historyのsandbox cleanup／state-root拒否、およびPython 3.12.3のJSON nesting error message差異。共有runtime owner Aへ引継ぎ、Linux CI結果とWindows既知の5 FAIL／14 ERROR／6 SKIPを混同しない。今回TMG／QRA変更はruntime packageを変更していない。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS、26 Skill／168 case。`python3 -m unittest discover -s scripts/skills/evals/semantic/tests -v` — PASS 27。`python3 -m unittest discover -s tests/skills/evals/semantic -v` — PASS 13。`python3 -m unittest discover -s tests/skills/evals/trigger -v` — PASS 1。実Agent／Judge評価は未実施。
+- `python3 -m compileall -q skills/test-requirements-analysis skills/test-management tests/skills/evals/deterministic` — PASS。
+- `uv run --with ruff==0.16.8 python scripts/format_tracked.py ruff-check`、`uv run --with ruff==0.16.8 python scripts/format_tracked.py check` — PASS。後者は221 tracked files。dprint 0.55.2も同じtracked check内でPASS。
+- CI固定revision `skills-ref@69ef37e9424c0a7ea9dd2293b559e43ec8176379`で3 Skillの`skills-ref validate` — PASS。取得・実行環境は一時領域を使用しrepository依存へ追加していない。
+- `git diff --check` — 文書追記後の現在差分でPASS。秘密情報検査、path範囲、stage内容はcommit直前にも再確認する。
+
+### CI、共有登録、受入判定
+
+レビュー基準HEAD `aa16455a`のActionsはDeterministic Output Evals、Semantic Output Evals、Code Quality、Codex HarnessがPASS、Validate Agent SkillsはREADMEにFの3 Skill (`test-requirements-analysis`、`test-architecture-design`、`test-management`)が未登録でFAILした。今回の修正HEADに対するGitHub Actionsはpush後に確認する。ローカルPASSをActions成功とは扱わない。
+
+PR #22統合先`feat/development-qa-traceability`の現行ファイルを読み取り確認した。READMEのSkill roster、`scripts/skills/evals/deterministic/common.py::CANONICAL_SKILLS`、`skills/qa-workflow/scripts/workflow_runtime.py::RUNTIME_V2_SKILL_ROOTS`のいずれにもFの3 Skillは未登録で、今回も共有ファイルは変更していない。担当Aへ、Skill名／責務、validator入口、owner・scope・ref・revision、currentness／approval、正常・拒否fixture、未検証scopeの扱い、routing／trigger条件、登録後CIとPR #22実成果物接続を引き継ぐ。既存の詳細依頼は本書の前節に記載したとおり。
+
+- 4件の今回レビュー指摘 — validatorとfixtureで拒否／保持条件を確認し、F回帰33件はPASS。
+- 担当Fローカルの対象修正 — **完了**。承認・目的・未決事項の4契約はPlan/data-contractと整合し、再レビューではsubstring誤検知も修正した。
+- 担当Fの全局所受入 — **未完了**。repository deterministic 4件FAILと共有runtime 10 FAIL／9 ERRORが残るため、PR #22の隔離Linux CIで共有state-root／SQLite／Python-version原因を再確認する。
+- AのREADME／registry／routing登録 — 未完了、担当A。3 Skill登録後に5 CI workflowと後続deterministic／runtime testsを新HEADで再確認する。
+- 実Agent、semantic Judge、認証済みapproval、実保存provider CAS／history／readback、保存失敗後復旧、E／J成果物横断接続、S1〜S17 — PR #22／外部provider・認証主体の選定待ち。fixtureを実接続証拠にしない。
+- PR本文は更新していない。Draftを維持する。push後のActions結果を反映したPR本文案は最終報告に示す。
+
+### PR #28本文更新案（GitHub未更新）
+
+```markdown
+## 目的
+
+PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidatorを実装し、レビュー指摘と決定論的評価条件を満たす。
+
+## 現在の状態
+
+- Draft。今回の承認placeholder、QA目的・成功条件、未決事項の担当・scope・状態・再開条件を修正し、担当F回帰33件、6 output reference fixture、25 Skill／52 caseのdataset検査はPASS。
+- 全repository deterministicは共有runtime sandboxに起因する4 FAIL、runtime suiteは10 FAIL／9 ERRORが残る。push後のGitHub Actions結果は担当F文書に記録する。
+- README・共通runtime登録は担当Aへ引継ぎ中。実Agent・認証済み承認・実provider・PR #22横断接続は未実施。
+- 詳細と検証証拠は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
+```

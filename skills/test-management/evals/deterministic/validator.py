@@ -114,7 +114,8 @@ def _integer(value: str) -> int | None:
 
 
 def _is_present(value: str) -> bool:
-    return clean(value) not in PLACEHOLDERS
+    normalized = clean(value).casefold()
+    return normalized not in {placeholder.casefold() for placeholder in PLACEHOLDERS}
 
 
 def _scope_includes(scope_value: str, target_scope: str) -> bool:
@@ -1267,20 +1268,20 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if clean(row.get("artifact_ref", "")) != metadata.get("artifact_ref")
         or clean(row.get("revision", "")) != metadata.get("revision")
         or clean(row.get("対象scope", "")) != metadata.get("scope")
-        or not clean(row.get("承認主体・role", ""))
+        or not _is_present(row.get("承認主体・role", ""))
         or not _is_present(row.get("承認証拠ref", ""))
         or metadata.get("状態") not in {"承認済み", "進行中", "完了"}
     ]
     invalid_approval_states = [
         row
         for row in approval_rows
-        if clean(row.get("状態", "")) not in {"承認済み", "未承認", "失効", "unknown"}
+        if clean(row.get("状態", "")) not in APPROVAL_STATES
     ]
     if metadata.get("状態") in {"承認済み", "進行中", "完了"} and not any(
         clean(row.get("artifact_ref", "")) == metadata.get("artifact_ref")
         and clean(row.get("revision", "")) == metadata.get("revision")
         and clean(row.get("対象scope", "")) == metadata.get("scope")
-        and clean(row.get("承認主体・role", ""))
+        and _is_present(row.get("承認主体・role", ""))
         and _is_present(row.get("承認証拠ref", ""))
         for row in approvals
     ):

@@ -192,6 +192,52 @@ def remove_markdown_row(text: str, row_id: str, section: str | None = None) -> s
     return "\n".join(retained) + ("\n" if text.endswith("\n") else "")
 
 
+def remove_markdown_section(text: str, section: str) -> str:
+    lines = text.splitlines()
+    section_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == section), None
+    )
+    if section_index is None:
+        raise AssertionError(f"could not find section {section}")
+    section_end = next(
+        (
+            index
+            for index in range(section_index + 1, len(lines))
+            if lines[index].strip().startswith("## ")
+        ),
+        len(lines),
+    )
+    retained = lines[:section_index] + lines[section_end:]
+    return "\n".join(retained) + ("\n" if text.endswith("\n") else "")
+
+
+def update_table_header(text: str, section: str, header: str, replacement: str) -> str:
+    lines = text.splitlines()
+    section_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == section), None
+    )
+    if section_index is None:
+        raise AssertionError(f"could not find section {section}")
+    section_end = next(
+        (
+            index
+            for index in range(section_index + 1, len(lines))
+            if lines[index].strip().startswith("## ")
+        ),
+        len(lines),
+    )
+    for index in range(section_index + 1, section_end):
+        if not lines[index].strip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in lines[index].strip().strip("|").split("|")]
+        if header not in cells:
+            continue
+        cells[cells.index(header)] = replacement
+        lines[index] = "| " + " | ".join(cells) + " |"
+        return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    raise AssertionError(f"could not find header {header} in {section}")
+
+
 class QaPlanningContractTests(unittest.TestCase):
     def test_all_output_fixtures_pass(self):
         for skill, eval_ids in (
@@ -286,6 +332,230 @@ class QaPlanningContractTests(unittest.TestCase):
                 "QRA-D013",
             ),
             "fail",
+        )
+
+    def test_qa_approval_placeholders_and_nonapproved_states_are_rejected(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        approval_section = "## 確認・承認"
+
+        for field, placeholder in (
+            ("承認証拠ref", "unknown"),
+            ("承認証拠ref", "未取得"),
+            ("承認証拠ref", "-"),
+            ("承認主体・role", "-"),
+            ("承認主体・role", "unknown"),
+            ("承認主体・role", "未取得"),
+        ):
+            with self.subTest(field=field, placeholder=placeholder):
+                broken = update_markdown_row(
+                    text,
+                    "orders-release-q4",
+                    {field: placeholder},
+                    approval_section,
+                )
+                result = validate(broken, expected, "QRA-OUT-001")
+                self.assertEqual(assertion_status(result, "QRA-D013"), "fail")
+                evidence = next(
+                    item.evidence for item in result.assertions if item.id == "QRA-D013"
+                )
+                self.assertIn(placeholder, json.dumps(evidence, ensure_ascii=False))
+
+        for field, value in (
+            ("revision", "req-r2"),
+            ("対象scope", "orders-release-q3"),
+            ("artifact_ref", "fixture://qa/requirements/other"),
+        ):
+            with self.subTest(field=field, value=value):
+                broken = update_markdown_row(
+                    text,
+                    "orders-release-q4",
+                    {field: value},
+                    approval_section,
+                )
+                self.assertEqual(
+                    assertion_status(
+                        validate(broken, expected, "QRA-OUT-001"), "QRA-D013"
+                    ),
+                    "fail",
+                )
+
+        self.assertEqual(
+            assertion_status(validate(text, expected, "QRA-OUT-001"), "QRA-D013"),
+            "pass",
+        )
+
+        blocked, blocked_expected = eval_case(
+            "test-requirements-analysis", "QRA-OUT-002"
+        )
+        blocked_result = validate(blocked, blocked_expected, "QRA-OUT-002")
+        self.assertEqual(assertion_status(blocked_result, "QRA-D013"), "pass")
+
+    def test_qa_purpose_success_conditions_are_required_and_finalized(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-001")
+        purpose_section = "## QA目的・成功条件"
+
+        missing_table = remove_markdown_section(text, purpose_section)
+        self.assertEqual(
+            assertion_status(
+                validate(missing_table, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        missing_column = update_table_header(text, purpose_section, "品質目標", "目標")
+        self.assertEqual(
+            assertion_status(
+                validate(missing_column, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        missing_purpose = update_markdown_row(
+            text,
+            "Ordersの品質ゲートを準備する",
+            {"QA目的": ""},
+            purpose_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_purpose, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        missing_success = update_markdown_row(
+            text,
+            "Ordersの品質ゲートを準備する",
+            {"活動の成功条件": ""},
+            purpose_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_success, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        missing_basis = update_markdown_row(
+            text,
+            "Ordersの品質ゲートを準備する",
+            {"根拠": ""},
+            purpose_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_basis, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        unresolved_approved = update_markdown_row(
+            text,
+            "Ordersの品質ゲートを準備する",
+            {"品質目標": "未確定"},
+            purpose_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(unresolved_approved, expected, "QRA-OUT-001"), "QRA-D001"
+            ),
+            "fail",
+        )
+
+        descriptive_state_word = update_markdown_row(
+            text,
+            "Ordersの品質ゲートを準備する",
+            {"QA目的": "Prevent stale input from being accepted"},
+            purpose_section,
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(descriptive_state_word, expected, "QRA-OUT-001"),
+                "QRA-D001",
+            ),
+            "pass",
+        )
+
+        missing_requirement_basis = update_markdown_row(
+            text, "QAR-001", {"根拠・成功条件": ""}
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(missing_requirement_basis, expected, "QRA-OUT-001"),
+                "QRA-D006",
+            ),
+            "fail",
+        )
+
+        blocked, blocked_expected = eval_case(
+            "test-requirements-analysis", "QRA-OUT-002"
+        )
+        blocked_result = validate(blocked, blocked_expected, "QRA-OUT-002")
+        self.assertEqual(assertion_status(blocked_result, "QRA-D001"), "pass")
+        self.assertEqual(assertion_status(blocked_result, "QRA-D013"), "pass")
+
+    def test_unresolved_qa_items_require_scope_owner_state_and_reopen_condition(self):
+        validate = load_validator("test-requirements-analysis")
+        text, expected = eval_case("test-requirements-analysis", "QRA-OUT-002")
+        unresolved_section = "## 未決事項"
+        self.assertEqual(
+            assertion_status(validate(text, expected, "QRA-OUT-002"), "QRA-D012"),
+            "pass",
+        )
+
+        malformed_items = (
+            remove_markdown_row(text, "QAR-003", unresolved_section),
+            update_markdown_row(text, "QAR-003", {"担当": ""}, unresolved_section),
+            update_markdown_row(text, "QAR-003", {"担当": "-"}, unresolved_section),
+            update_markdown_row(
+                text, "QAR-003", {"担当": "unknown"}, unresolved_section
+            ),
+            update_markdown_row(
+                text, "QAR-003", {"担当": "未取得"}, unresolved_section
+            ),
+            update_markdown_row(text, "QAR-003", {"影響scope": ""}, unresolved_section),
+            update_markdown_row(
+                text, "QAR-003", {"影響scope": "unknown"}, unresolved_section
+            ),
+            update_markdown_row(
+                text, "QAR-003", {"影響scope": "payments"}, unresolved_section
+            ),
+            update_markdown_row(text, "QAR-003", {"状態": ""}, unresolved_section),
+            update_markdown_row(
+                text, "QAR-003", {"状態": "not-a-state"}, unresolved_section
+            ),
+            update_markdown_row(text, "QAR-003", {"再開条件": ""}, unresolved_section),
+            update_markdown_row(text, "QAR-003", {"再開条件": "-"}, unresolved_section),
+        )
+        for index, broken in enumerate(malformed_items):
+            with self.subTest(case=index):
+                self.assertEqual(
+                    assertion_status(
+                        validate(broken, expected, "QRA-OUT-002"), "QRA-D012"
+                    ),
+                    "fail",
+                )
+
+        unacquired = update_markdown_row(
+            text, "QAR-003", {"状態": "未取得"}, unresolved_section
+        )
+        self.assertEqual(
+            assertion_status(validate(unacquired, expected, "QRA-OUT-002"), "QRA-D012"),
+            "pass",
+        )
+
+        unrelated_item = insert_table_row(
+            text,
+            unresolved_section,
+            "| QAR-999 | payments | payments QA owner | blocked | PAYMENT-SOURCEのscopeとrevisionを取得する |",
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(unrelated_item, expected, "QRA-OUT-002"), "QRA-D012"
+            ),
+            "pass",
         )
 
     def test_unapproved_qa_requirements_cannot_become_approved(self):
@@ -850,8 +1120,49 @@ class QaPlanningContractTests(unittest.TestCase):
         result = validate(no_approval, expected, "TMG-OUT-001")
         self.assertEqual(assertion_status(result, "TMG-D023"), "fail")
 
+        for field, placeholder in (
+            ("承認主体・role", "-"),
+            ("承認主体・role", "unknown"),
+            ("承認主体・role", "未取得"),
+            ("承認証拠ref", "-"),
+            ("承認証拠ref", "unknown"),
+            ("承認証拠ref", "未取得"),
+        ):
+            with self.subTest(field=field, placeholder=placeholder):
+                broken = update_markdown_row(
+                    text, "orders-release-q4", {field: placeholder}, "## 承認"
+                )
+                result = validate(broken, expected, "TMG-OUT-001")
+                self.assertEqual(
+                    assertion_status(result, "TMG-D023"),
+                    "fail",
+                )
+                approval_errors = next(
+                    item.evidence for item in result.assertions if item.id == "TMG-D023"
+                )["approval_errors"]
+                self.assertTrue(
+                    any(
+                        error.get("reason")
+                        == "active plan requires approval for this scope, artifact ref, and revision"
+                        for error in approval_errors
+                    )
+                )
+
+        old_revision = update_markdown_row(
+            text, "orders-release-q4", {"revision": "plan-r7"}, "## 承認"
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(old_revision, expected, "TMG-OUT-001"), "TMG-D023"
+            ),
+            "fail",
+        )
+
         wrong_scope = update_markdown_row(
-            text, "orders-release-q4", {"対象scope": "orders-release-q3"}
+            text,
+            "orders-release-q4",
+            {"対象scope": "orders-release-q3"},
+            "## 承認",
         )
         result = validate(wrong_scope, expected, "TMG-OUT-001")
         self.assertEqual(assertion_status(result, "TMG-D023"), "fail")
@@ -862,6 +1173,16 @@ class QaPlanningContractTests(unittest.TestCase):
         draft, draft_expected = eval_case("test-management", "TMG-OUT-002")
         draft_result = validate(draft, draft_expected, "TMG-OUT-002")
         self.assertEqual(assertion_status(draft_result, "TMG-D023"), "pass")
+
+        blocked = update_markdown_row(
+            draft, "状態", {"値": "blocked"}, "## 成果物メタデータ"
+        )
+        self.assertEqual(
+            assertion_status(
+                validate(blocked, draft_expected, "TMG-OUT-002"), "TMG-D023"
+            ),
+            "pass",
+        )
 
     def test_closure_allows_test_fail_and_formal_unmet_criterion(self):
         validate = load_validator("test-management")
