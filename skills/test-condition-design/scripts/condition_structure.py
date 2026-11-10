@@ -116,12 +116,12 @@ def resolve_item_test_levels(
     by_item: dict[str, dict[str, str]] = {}
     for index, row in enumerate(rows):
         if set(row) != {"item_ref", "evidence"}:
-            raise FormalDesignError(
-                f"test_level_evidence[{index}] schemaが不正です"
-            )
+            raise FormalDesignError(f"test_level_evidence[{index}] schemaが不正です")
         item_ref = _require_text(row["item_ref"], "test_level_evidence.item_ref")
         if item_ref not in item_refs or item_ref in by_item:
-            raise FormalDesignError("item別test_level_evidenceが未知または重複しています")
+            raise FormalDesignError(
+                "item別test_level_evidenceが未知または重複しています"
+            )
         resolved = resolve_test_level(row["evidence"])
         if resolved["source_ref"] not in source_by_ref:
             raise FormalDesignError("test level source_refがsource_refsにありません")
@@ -613,9 +613,11 @@ def validate_formal_design(
             "削除された過去expected-result candidateにはretirement reasonが必要です"
         )
     pair_stale_sources: dict[tuple[str, str], list[str]] = {}
-    mapped_source_refs = set(items.values()) | set(conditions.values()) | {
-        assignment["source_ref"] for assignment in resolved_levels.values()
-    }
+    mapped_source_refs = (
+        set(items.values())
+        | set(conditions.values())
+        | {assignment["source_ref"] for assignment in resolved_levels.values()}
+    )
     for pair, row in assessments.items():
         source_refs = {
             items[pair[0]],
@@ -639,9 +641,7 @@ def validate_formal_design(
             mapped_source_refs.update(authority_refs)
             source_refs.update(authority_refs)
         pair_stale_sources[pair] = sorted(
-            ref
-            for ref in source_refs
-            if source_by_ref[ref][1] != "current"
+            ref for ref in source_refs if source_by_ref[ref][1] != "current"
         )
     unmapped_stale_sources = {
         ref
@@ -770,7 +770,9 @@ def validate_formal_design(
                     for key, value in row["evidence"].items()
                 },
             }
-            for row in sorted(packet["test_level_evidence"], key=lambda row: row["item_ref"])
+            for row in sorted(
+                packet["test_level_evidence"], key=lambda row: row["item_ref"]
+            )
         ]
     projection["__blocked_draft_keys__"] = sorted(blocked_draft_keys)
     projection["__formal_design_record__"] = formal_design_record
@@ -1429,8 +1431,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                     continue
                 if (
                     tr_row.get("test_level") != draft["test_level"]
-                    or tr_row.get("test_level_source")
-                    != draft["test_level_source"]
+                    or tr_row.get("test_level_source") != draft["test_level_source"]
                     or tr_row.get("test_level_source_ref")
                     != draft["test_level_source_ref"]
                 ):

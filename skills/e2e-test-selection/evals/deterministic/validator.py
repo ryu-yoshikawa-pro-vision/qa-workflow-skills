@@ -156,10 +156,9 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         if _clean(row["change reason"]) != expected_row.get("change_reason"):
             details["change_reason"] = _clean(row["change reason"])
         actual_digest = _clean(row["revision digest"])
-        if (
-            not REVISION_DIGEST_RE.fullmatch(actual_digest)
-            or actual_digest != expected_row.get("revision_digest")
-        ):
+        if not REVISION_DIGEST_RE.fullmatch(
+            actual_digest
+        ) or actual_digest != expected_row.get("revision_digest"):
             details["revision_digest"] = actual_digest
         if details:
             history_errors.append({"row": index + 1, **details})

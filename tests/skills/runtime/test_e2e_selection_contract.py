@@ -178,9 +178,7 @@ class E2ESelectionContractTests(unittest.TestCase):
     def test_candidate_id_cannot_be_reassigned_to_new_key(self) -> None:
         value = selection()
         value["revision"] = 2
-        value["history"] = [
-            history_row(selection(), 1, "rename attempt")
-        ]
+        value["history"] = [history_row(selection(), 1, "rename attempt")]
         value["candidates"][0]["candidate_key"] = "different-candidate"
         with self.assertRaises(contract.ContractError):
             contract.validate(value)
@@ -188,9 +186,7 @@ class E2ESelectionContractTests(unittest.TestCase):
     def test_removed_candidate_requires_explicit_retirement_reason(self) -> None:
         value = selection()
         value["revision"] = 2
-        value["history"] = [
-            history_row(selection(), 1, "candidate population review")
-        ]
+        value["history"] = [history_row(selection(), 1, "candidate population review")]
         value["candidates"] = value["candidates"][:1]
         with self.assertRaises(contract.ContractError):
             contract.validate(value)
@@ -267,21 +263,17 @@ class E2ESelectionContractTests(unittest.TestCase):
         history = result["selection_record"]["history"]
         first_snapshot = history[0]["selection_snapshot"]
         second_snapshot = history[1]["selection_snapshot"]
-        self.assertEqual(
-            first_snapshot["candidates"][0]["decision"], "selected"
-        )
-        self.assertEqual(
-            first_snapshot["source_refs"][0]["revision"], "s8"
-        )
-        self.assertEqual(
-            second_snapshot["candidates"][0]["decision"], "not_selected"
-        )
+        self.assertEqual(first_snapshot["candidates"][0]["decision"], "selected")
+        self.assertEqual(first_snapshot["source_refs"][0]["revision"], "s8")
+        self.assertEqual(second_snapshot["candidates"][0]["decision"], "not_selected")
         self.assertEqual(
             second_snapshot["candidates"][0]["rationale"],
             "改訂仕様ではcurrentな既存E2Eによる確認が優先される",
         )
         self.assertEqual(second_snapshot["source_refs"][0]["revision"], "s9")
-        self.assertEqual(history[1]["retired_candidates"][0]["reason"], retirement["reason"])
+        self.assertEqual(
+            history[1]["retired_candidates"][0]["reason"], retirement["reason"]
+        )
 
     def test_legacy_history_remains_readable_but_is_blocked_without_snapshots(
         self,
@@ -292,7 +284,10 @@ class E2ESelectionContractTests(unittest.TestCase):
             {
                 "revision": 1,
                 "candidate_ids": [
-                    {"candidate_id": "E2E-CAND-001", "candidate_key": "checkout-primary"},
+                    {
+                        "candidate_id": "E2E-CAND-001",
+                        "candidate_key": "checkout-primary",
+                    },
                     {"candidate_id": "E2E-CAND-002", "candidate_key": "non-payment"},
                 ],
                 "change_reason": "legacy row without decision and source snapshots",
@@ -319,7 +314,9 @@ class E2ESelectionContractTests(unittest.TestCase):
         self.assertEqual(result["unresolved_history_revisions"], [1])
         self.assertNotIn("revision_digest", result["selection_record"]["history"][0])
 
-    def test_history_snapshot_decision_rationale_and_source_revision_are_bound(self) -> None:
+    def test_history_snapshot_decision_rationale_and_source_revision_are_bound(
+        self,
+    ) -> None:
         mutations = {
             "decision": lambda snapshot: snapshot["candidates"][0].update(
                 {"decision": "not_selected"}
@@ -337,9 +334,7 @@ class E2ESelectionContractTests(unittest.TestCase):
                 value["revision"] = 2
                 value["history"] = [history_row(selection(), 1, "spec update")]
                 mutate(value["history"][0]["selection_snapshot"])
-                with self.assertRaisesRegex(
-                    contract.ContractError, "改変されています"
-                ):
+                with self.assertRaisesRegex(contract.ContractError, "改変されています"):
                     contract.validate(value)
 
     def test_history_cannot_drop_a_previously_recorded_retirement(self) -> None:
@@ -413,7 +408,7 @@ class E2ESelectionContractTests(unittest.TestCase):
     def test_cli_rejects_duplicate_keys_with_structured_output(self) -> None:
         encoded = json.dumps(selection()).encode()
         encoded = encoded.replace(b'"revision": 1', b'"revision": 1, "revision": 1', 1)
-        result = run_cli_bytes(b'{"input":' + encoded + b'}')
+        result = run_cli_bytes(b'{"input":' + encoded + b"}")
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stderr, b"")
         envelope = json.loads(result.stdout)
@@ -427,17 +422,21 @@ class E2ESelectionContractTests(unittest.TestCase):
 
     def test_cli_enforces_shared_per_string_and_numeric_limits(self) -> None:
         large_string = selection()
-        large_string["automation_goal"] = "x" * (
-            contract.MAX_JSON_STRING_BYTES + 1
-        )
+        large_string["automation_goal"] = "x" * (contract.MAX_JSON_STRING_BYTES + 1)
         large_string_request = json.dumps({"input": large_string}).encode()
-        oversized_integer = json.dumps({"input": selection()}).encode().replace(
-            b'"revision": 1',
-            b'"revision": ' + b"9" * (contract.MAX_JSON_NUMBER_CHARS + 1),
-            1,
+        oversized_integer = (
+            json.dumps({"input": selection()})
+            .encode()
+            .replace(
+                b'"revision": 1',
+                b'"revision": ' + b"9" * (contract.MAX_JSON_NUMBER_CHARS + 1),
+                1,
+            )
         )
-        oversized_expansion = json.dumps({"input": selection()}).encode().replace(
-            b'"revision": 1', b'"revision": 1e4096', 1
+        oversized_expansion = (
+            json.dumps({"input": selection()})
+            .encode()
+            .replace(b'"revision": 1', b'"revision": 1e4096', 1)
         )
 
         for raw in (
@@ -466,21 +465,27 @@ class E2ESelectionContractTests(unittest.TestCase):
                 result = run_cli_bytes(raw)
                 self.assertEqual(result.returncode, 0)
                 self.assertEqual(result.stderr, b"")
-                self.assertEqual(json.loads(result.stdout)["runtime_status"], "invalid_input")
+                self.assertEqual(
+                    json.loads(result.stdout)["runtime_status"], "invalid_input"
+                )
 
     def test_cli_rejects_non_finite_number_and_unpaired_surrogate(self) -> None:
-        non_finite = json.dumps(selection()).encode().replace(
-            b'"revision": 1', b'"revision": NaN', 1
+        non_finite = (
+            json.dumps(selection())
+            .encode()
+            .replace(b'"revision": 1', b'"revision": NaN', 1)
         )
         surrogate_value = selection()
         surrogate_value["automation_goal"] = "\ud800"
         surrogate = json.dumps(surrogate_value).encode()
-        for raw in (b'{"input":' + non_finite + b'}', b'{"input":' + surrogate + b'}'):
+        for raw in (b'{"input":' + non_finite + b"}", b'{"input":' + surrogate + b"}"):
             with self.subTest(raw=raw[:80]):
                 result = run_cli_bytes(raw)
                 self.assertEqual(result.returncode, 0)
                 self.assertEqual(result.stderr, b"")
-                self.assertEqual(json.loads(result.stdout)["runtime_status"], "invalid_input")
+                self.assertEqual(
+                    json.loads(result.stdout)["runtime_status"], "invalid_input"
+                )
 
     def test_cli_rejects_invalid_top_level_schema(self) -> None:
         result = run_cli_bytes(b'{"input":[]}')

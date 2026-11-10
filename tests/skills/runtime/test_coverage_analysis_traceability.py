@@ -42,12 +42,16 @@ class CoverageAnalysisTraceabilityTests(unittest.TestCase):
         self.assertEqual(
             result["payload"]["formal_design_metrics"][0]["pair_coverage"], "1/1"
         )
-        self.assertTrue(result["payload"]["formal_design_metrics"][0]["record_verified"])
+        self.assertTrue(
+            result["payload"]["formal_design_metrics"][0]["record_verified"]
+        )
         self.assertFalse(
             any(node["node_type"] == "COND" for node in result["payload"]["nodes"])
         )
 
-    def test_self_consistent_summary_without_formal_record_cannot_complete(self) -> None:
+    def test_self_consistent_summary_without_formal_record_cannot_complete(
+        self,
+    ) -> None:
         request = base_request()
         request["input"]["formal_design_summaries"] = [
             {
@@ -69,7 +73,9 @@ class CoverageAnalysisTraceabilityTests(unittest.TestCase):
         self.assertFalse(metric["record_verified"])
         self.assertIsNone(metric["pair_coverage"])
 
-    def test_forged_two_of_two_summary_cannot_hide_unconfirmed_record_pair(self) -> None:
+    def test_forged_two_of_two_summary_cannot_hide_unconfirmed_record_pair(
+        self,
+    ) -> None:
         value = formal_packet()
         value["items"].append({"item_ref": "TI-002", "source_ref": "TI-001"})
         unresolved = {

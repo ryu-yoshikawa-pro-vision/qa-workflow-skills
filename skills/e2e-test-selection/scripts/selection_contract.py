@@ -181,7 +181,9 @@ def _encode_output(output: dict[str, Any]) -> bytes:
     if len(encoded) > MAX_OUTPUT_BYTES:
         encoded = (
             json.dumps(
-                _error_envelope("limit_exceeded", "runtime stdoutのbyte上限を超えました"),
+                _error_envelope(
+                    "limit_exceeded", "runtime stdoutのbyte上限を超えました"
+                ),
                 ensure_ascii=False,
                 sort_keys=True,
             )
@@ -565,7 +567,9 @@ def validate(packet: Any) -> dict:
             history_complete = False
             unresolved_history_revisions.append(old_revision)
             if "revision_digest" in row:
-                raise ContractError("snapshotのないhistory rowにrevision_digestがあります")
+                raise ContractError(
+                    "snapshotのないhistory rowにrevision_digestがあります"
+                )
         else:
             snapshot = _selection_snapshot(
                 row["selection_snapshot"], f"history[{index}].selection_snapshot"
@@ -603,7 +607,9 @@ def validate(packet: Any) -> dict:
                 if not re.fullmatch(r"sha256:[0-9a-f]{64}", supplied_digest):
                     raise ContractError("history revision_digestの形式が不正です")
                 if supplied_digest != expected_digest:
-                    raise ContractError("history snapshotまたはrevision metadataが改変されています")
+                    raise ContractError(
+                        "history snapshotまたはrevision metadataが改変されています"
+                    )
                 history_digests[old_revision] = supplied_digest
         historical_retirements = old_retirements
         previous_history_ids = set(candidate_id_order)
@@ -772,9 +778,7 @@ def validate(packet: Any) -> dict:
             cid
             for cid, (_key, decision) in candidates.items()
             if decision == "selected"
-            and all(
-                sources[ref] == "current" for ref in candidate_source_refs[cid]
-            )
+            and all(sources[ref] == "current" for ref in candidate_source_refs[cid])
         ),
         "unresolved_source_refs": unresolved_sources,
         "unresolved_candidate_ids": unresolved_candidates,
@@ -803,7 +807,9 @@ def main() -> int:
     except Exception:
         sys.stdout.buffer.write(
             _encode_output(
-                _error_envelope("internal_error", "runtimeで予期しないエラーが発生しました")
+                _error_envelope(
+                    "internal_error", "runtimeで予期しないエラーが発生しました"
+                )
             )
         )
         return 1

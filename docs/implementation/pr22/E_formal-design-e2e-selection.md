@@ -424,6 +424,12 @@ PR #23の最新公開head `2c2dcab1968c32ae59f3919a04d7176d10737e0c`では、A�
 - Code Quality run 860では最初の修正で`test_e2e_selection_contract.py`のI001は解消したが、`test_coverage_analysis_traceability.py`でalias付きimportを同じ括弧内にまとめた形がRuff I001として残った。Ruffの自動修正提案に合わせ、`contract`／`drafts`／`packet`をそれぞれ独立した`from` importに変更した。local Ruff executableは未導入のため直接lintは未実施。追修正後、coverage suite 22件とE2E selection suite 26件はPASSし、対象compileall、dprint check、`git diff --check`もPASS。
 - Validate Agent Skills run 2167の失敗はREADME canonical listに`e2e-test-selection`がないこと。Skill specification validationはPASS。共有READMEはA ownerであり未変更。新しい追修正のCode Quality再判定は次のpush後に確認する。
 
+## Ruff format追修正とe3 Actions（2026-11-10）
+
+- `2172b8a1ee1aa012c8a1fe39a97a703e86b00847`は通常push済みでremoteと一致。Code Quality run 861はRuff formatにより8ファイルが未整形と判定されFAILした。CI固定版`ruff 0.16.8`を`uv tool run`で使って以下を整形した：`skills/coverage-analysis/scripts/traceability.py`、`skills/e2e-test-selection/evals/deterministic/validator.py`、`skills/e2e-test-selection/scripts/selection_contract.py`、`skills/test-condition-design/scripts/condition_structure.py`、`tests/skills/runtime/test_coverage_analysis_traceability.py`、`tests/skills/runtime/test_e2e_selection_contract.py`、`tests/skills/runtime/test_formal_design_contract.py`、`tests/skills/runtime/test_test_condition_structure.py`。
+- この8ファイルに対する`ruff format --check`と`ruff check`はPASS。coverage suite 22件、E2E selection suite 26件、compileall、dprint check、`git diff --check`もPASS。新しい整形差分とこのPlan記録を次のcommit／通常pushに含め、Code Qualityを再確認する。
+- e3 ActionsはValidate Deterministic Output Evals run 2166 PASS、Validate Semantic Output Evals run 2131 PASS、Code Quality run 861 FAIL（上記format）、Validate Agent Skills run 2168 FAIL（READMEの新Skill登録漏れ、A owner）。Codex Harness run 861は最後の確認時点で実行中であり、PASS扱いしない。
+
 ## 進捗保存（2026-11-10）
 
 - 上記レビュー修正23ファイルをcommit `9c663401c932b803651cc4fbddc33a69c8611a75`（`fix: address PR #27 follow-up review findings`）として記録した。commit前にremoteをfetchし、branchはremoteと一致していた。commit直後はlocalが1 commit aheadで、pushとActions確認は未実施。

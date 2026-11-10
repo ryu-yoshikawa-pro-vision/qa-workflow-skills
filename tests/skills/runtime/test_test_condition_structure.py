@@ -401,11 +401,11 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
         }
         self.assertEqual(tcns["TI-001"]["content"]["test_level"], "integration")
         self.assertEqual(tcns["TI-002"]["content"]["test_level"], "system")
-        self.assertEqual(
-            tcns["TI-002"]["content"]["test_level_source_ref"], "SPEC-001"
-        )
+        self.assertEqual(tcns["TI-002"]["content"]["test_level_source_ref"], "SPEC-001")
 
-    def test_formal_stale_pair_partial_rerun_preserves_unrelated_artifacts(self) -> None:
+    def test_formal_stale_pair_partial_rerun_preserves_unrelated_artifacts(
+        self,
+    ) -> None:
         initial = condition_input()
         initial["test_requirements"][0].update(
             {
@@ -493,9 +493,7 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
                 "reuse_model_key": "ep-002",
             }
         ]
-        revised_formal_design = formal_design_packet(
-            ("TI-001", "TI-002"), revision=2
-        )
+        revised_formal_design = formal_design_packet(("TI-001", "TI-002"), revision=2)
         revised_formal_design["change_reason"] = "TI-001 source revision changed"
         revised_formal_design["history"] = [
             {
@@ -560,10 +558,7 @@ class ConditionStructureRuntimeTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            {
-                row["tcn_id"]: row["status"]
-                for row in second["payload"]["tcn_id_state"]
-            },
+            {row["tcn_id"]: row["status"] for row in second["payload"]["tcn_id_state"]},
             {"TCN-001": "active", "TCN-002": "active"},
         )
         self.assertEqual(

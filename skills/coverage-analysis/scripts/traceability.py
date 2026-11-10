@@ -694,7 +694,9 @@ def _formal_level_assignment(evidence: Any) -> dict[str, str]:
             or set(architecture) != {"level", "source_ref", "approved"}
             or not isinstance(architecture["approved"], bool)
         ):
-            raise InvalidInput("formal design architecture test level evidenceが不正です")
+            raise InvalidInput(
+                "formal design architecture test level evidenceが不正です"
+            )
         if architecture["approved"]:
             return {
                 "level": ensure_nonempty_string(
@@ -739,7 +741,9 @@ def _formal_record_metrics(
     }
     if not isinstance(record, dict) or set(record) != record_fields:
         raise InvalidInput("formal_design_record schemaが不正です")
-    design_ref = ensure_nonempty_string(record["design_ref"], "formal record design_ref")
+    design_ref = ensure_nonempty_string(
+        record["design_ref"], "formal record design_ref"
+    )
     revision = record["revision"]
     if (
         record["schema_version"] != "formal-design-v1"
@@ -755,9 +759,13 @@ def _formal_record_metrics(
     sources: dict[str, tuple[str, str]] = {}
     for index, row in enumerate(raw_sources):
         if not isinstance(row, dict) or set(row) != {"ref", "revision", "currentness"}:
-            raise InvalidInput(f"formal_design_record.source_refs[{index}] schemaが不正です")
+            raise InvalidInput(
+                f"formal_design_record.source_refs[{index}] schemaが不正です"
+            )
         ref = ensure_nonempty_string(row["ref"], "formal source ref")
-        source_revision = ensure_nonempty_string(row["revision"], "formal source revision")
+        source_revision = ensure_nonempty_string(
+            row["revision"], "formal source revision"
+        )
         currentness = row["currentness"]
         if (
             not isinstance(currentness, str)
@@ -774,7 +782,11 @@ def _formal_record_metrics(
             raise InvalidInput(f"formal_design_record.items[{index}] schemaが不正です")
         item_ref = ensure_nonempty_string(row["item_ref"], "formal item_ref")
         source_ref = ensure_nonempty_string(row["source_ref"], "formal item source_ref")
-        if not FORMAL_ITEM_RE.fullmatch(item_ref) or item_ref in items or source_ref not in sources:
+        if (
+            not FORMAL_ITEM_RE.fullmatch(item_ref)
+            or item_ref in items
+            or source_ref not in sources
+        ):
             raise InvalidInput("formal item scope is invalid")
         items[item_ref] = source_ref
 
@@ -806,7 +818,9 @@ def _formal_record_metrics(
     ):
         raise InvalidInput("formal candidate population completeness is invalid")
     authorities: dict[str, str] = {}
-    for index, row in enumerate(ensure_list(record["authorities"], "formal authorities")):
+    for index, row in enumerate(
+        ensure_list(record["authorities"], "formal authorities")
+    ):
         if not isinstance(row, dict) or set(row) != {
             "authority_ref",
             "revision",
@@ -824,7 +838,9 @@ def _formal_record_metrics(
             or currentness not in {"current", "stale", "unknown"}
             or sources.get(ref) != (authority_revision, currentness)
         ):
-            raise InvalidInput("formal Authority/source revision or currentness mismatch")
+            raise InvalidInput(
+                "formal Authority/source revision or currentness mismatch"
+            )
         authorities[ref] = currentness
 
     item_refs = set(items)
@@ -832,9 +848,7 @@ def _formal_record_metrics(
     level_assignment_by_item: dict[str, dict[str, str]] = {}
     if isinstance(level_evidence, dict):
         assignment = _formal_level_assignment(level_evidence)
-        level_assignment_by_item = {
-            item_ref: assignment for item_ref in item_refs
-        }
+        level_assignment_by_item = {item_ref: assignment for item_ref in item_refs}
     else:
         rows = ensure_list(level_evidence, "formal test_level_evidence")
         for index, row in enumerate(rows):
@@ -844,25 +858,33 @@ def _formal_record_metrics(
                 )
             item_ref = ensure_nonempty_string(row["item_ref"], "formal level item_ref")
             if item_ref not in item_refs or item_ref in level_assignment_by_item:
-                raise InvalidInput("formal item test_level_evidence is duplicate or unknown")
+                raise InvalidInput(
+                    "formal item test_level_evidence is duplicate or unknown"
+                )
             level_assignment_by_item[item_ref] = _formal_level_assignment(
                 row["evidence"]
             )
         if set(level_assignment_by_item) != item_refs:
-            raise InvalidInput("formal item test_level_evidence population is incomplete")
+            raise InvalidInput(
+                "formal item test_level_evidence population is incomplete"
+            )
     if any(
         assignment["source_ref"] not in sources
         for assignment in level_assignment_by_item.values()
     ):
         raise InvalidInput("formal test level source_ref is unknown")
 
-    expected_pairs = {(item_ref, condition_ref) for item_ref in items for condition_ref in conditions}
+    expected_pairs = {
+        (item_ref, condition_ref) for item_ref in items for condition_ref in conditions
+    }
     assessments: dict[tuple[str, str], dict[str, Any]] = {}
     pair_sources: dict[tuple[str, str], set[str]] = {}
     candidate_ids: set[str] = set()
     current_candidate_pairs: dict[str, tuple[str, str]] = {}
     current_tcn_draft_keys: set[str] = set()
-    for index, row in enumerate(ensure_list(record["pair_assessments"], "formal pair_assessments")):
+    for index, row in enumerate(
+        ensure_list(record["pair_assessments"], "formal pair_assessments")
+    ):
         if not isinstance(row, dict) or set(row) != {
             "item_ref",
             "condition_ref",
@@ -923,12 +945,19 @@ def _formal_record_metrics(
                 candidate_ref = ensure_nonempty_string(
                     candidate["candidate_ref"], "formal candidate_ref"
                 )
-                if not FORMAL_CANDIDATE_RE.fullmatch(candidate_ref) or candidate_ref in candidate_ids:
-                    raise InvalidInput("formal expected result candidate identity is invalid")
+                if (
+                    not FORMAL_CANDIDATE_RE.fullmatch(candidate_ref)
+                    or candidate_ref in candidate_ids
+                ):
+                    raise InvalidInput(
+                        "formal expected result candidate identity is invalid"
+                    )
                 candidate_ids.add(candidate_ref)
                 current_candidate_pairs[candidate_ref] = pair
                 for field in ("text", "observation_method", "side_effects", "revision"):
-                    ensure_nonempty_string(candidate[field], f"formal candidate {field}")
+                    ensure_nonempty_string(
+                        candidate[field], f"formal candidate {field}"
+                    )
                 refs = candidate["authority_refs"]
                 if (
                     not isinstance(refs, list)
@@ -937,14 +966,18 @@ def _formal_record_metrics(
                     or refs != sorted(set(refs))
                     or set(refs) - set(authorities)
                 ):
-                    raise InvalidInput("formal expected result Authority refs are invalid")
+                    raise InvalidInput(
+                        "formal expected result Authority refs are invalid"
+                    )
                 pair_sources[pair].update(refs)
             if [candidate["candidate_ref"] for candidate in candidates] != sorted(
                 candidate["candidate_ref"] for candidate in candidates
             ):
                 raise InvalidInput("formal expected result candidates are not ordered")
         elif row["tcn_draft_key"] is not None or candidates:
-            raise InvalidInput("non-adopted formal pair has an unexpected TCN or candidate")
+            raise InvalidInput(
+                "non-adopted formal pair has an unexpected TCN or candidate"
+            )
         if decision == "duplicate":
             covered = row["covered_by_pair"]
             if not isinstance(covered, dict) or set(covered) != {
@@ -1039,7 +1072,9 @@ def _formal_record_metrics(
                 "item_ref",
                 "condition_ref",
             }:
-                raise InvalidInput("formal history candidate assignment schema is invalid")
+                raise InvalidInput(
+                    "formal history candidate assignment schema is invalid"
+                )
             candidate_ref = ensure_nonempty_string(
                 assignment["candidate_ref"], "history candidate_ref"
             )
@@ -1060,12 +1095,9 @@ def _formal_record_metrics(
             if previous_pair is not None and previous_pair != pair:
                 raise InvalidInput("formal history candidate ID was reassigned")
             historical_candidate_pairs[candidate_ref] = pair
-        if (
-            history_candidate_ids != sorted(set(history_candidate_ids))
-            or any(
-                decision == "adopted" and pair not in assigned_pairs
-                for pair, decision in old_decisions.items()
-            )
+        if history_candidate_ids != sorted(set(history_candidate_ids)) or any(
+            decision == "adopted" and pair not in assigned_pairs
+            for pair, decision in old_decisions.items()
         ):
             raise InvalidInput("formal history candidate assignments are incomplete")
         if set(history_candidate_ids) & set(historical_retirements):
@@ -1107,11 +1139,15 @@ def _formal_record_metrics(
                 for candidate_ref, reason in historical_retirements.items()
             )
         ):
-            raise InvalidInput("formal history retirement lineage is incomplete or changed")
+            raise InvalidInput(
+                "formal history retirement lineage is incomplete or changed"
+            )
         historical_retirements = row_retirements
         previous_history_candidate_ids = set(history_candidate_ids)
     history_complete = history_revisions == list(range(1, revision))
-    identity_matches = design_ref == expected_design_ref and revision == expected_revision
+    identity_matches = (
+        design_ref == expected_design_ref and revision == expected_revision
+    )
     matrix_complete = set(assessments) == expected_pairs
     for pair, row in assessments.items():
         if row["decision"] == "duplicate":
@@ -1171,13 +1207,12 @@ def _formal_record_metrics(
         )
         for pair, refs in pair_sources.items()
     }
-    mapped_source_refs = set(items.values()) | set(conditions.values()) | {
-        assignment["source_ref"]
-        for assignment in level_assignment_by_item.values()
-    }
-    mapped_source_refs.update(
-        ref for refs in pair_sources.values() for ref in refs
+    mapped_source_refs = (
+        set(items.values())
+        | set(conditions.values())
+        | {assignment["source_ref"] for assignment in level_assignment_by_item.values()}
     )
+    mapped_source_refs.update(ref for refs in pair_sources.values() for ref in refs)
     unmapped_stale_sources = {
         ref
         for ref, (_source_revision, currentness) in sources.items()
@@ -1189,16 +1224,20 @@ def _formal_record_metrics(
             pair_stale_sources[pair] = sorted(
                 set(pair_stale_sources[pair]) | unmapped_stale_sources
             )
-    stale_pairs = {
-        pair for pair, refs in pair_stale_sources.items() if refs
-    }
+    stale_pairs = {pair for pair, refs in pair_stale_sources.items() if refs}
     for pair, row in assessments.items():
         if row["decision"] == "duplicate":
             covered = row["covered_by_pair"]
-            if not isinstance(covered, dict) or set(covered) != {"item_ref", "condition_ref"}:
+            if not isinstance(covered, dict) or set(covered) != {
+                "item_ref",
+                "condition_ref",
+            }:
                 raise InvalidInput("formal duplicate pair target is invalid")
             target = (covered["item_ref"], covered["condition_ref"])
-            if target not in assessments or assessments[target]["decision"] != "adopted":
+            if (
+                target not in assessments
+                or assessments[target]["decision"] != "adopted"
+            ):
                 raise InvalidInput("formal duplicate pair target is not adopted")
             if target in stale_pairs:
                 stale_pairs.add(pair)
@@ -1218,8 +1257,7 @@ def _formal_record_metrics(
     closed = sum(
         1
         for pair, row in assessments.items()
-        if row["decision"] not in {"unconfirmed", "blocked"}
-        and pair not in stale_pairs
+        if row["decision"] not in {"unconfirmed", "blocked"} and pair not in stale_pairs
     )
     items_complete = record["items_complete"]
     conditions_complete = record["conditions_complete"]
@@ -1393,9 +1431,7 @@ def _formal_design_summary_rows(
             row["formal_design_record"], design_ref, revision
         )
         mismatched_fields = [
-            field
-            for field in required
-            if metrics[field] != row[field]
+            field for field in required if metrics[field] != row[field]
         ]
         if mismatched_fields:
             issues.append(
@@ -1416,10 +1452,7 @@ def _formal_design_summary_rows(
                     "revision": revision,
                 }
             )
-            if (
-                metrics["design_ref"] != design_ref
-                or metrics["revision"] != revision
-            ):
+            if metrics["design_ref"] != design_ref or metrics["revision"] != revision:
                 metrics = {
                     "design_ref": design_ref,
                     "revision": revision,

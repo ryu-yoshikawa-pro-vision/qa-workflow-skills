@@ -182,11 +182,16 @@ class FormalDesignContractTests(unittest.TestCase):
         )
         summary = result["__formal_design_summary__"]
         self.assertEqual(summary["pair_coverage"], "1/2")
-        self.assertEqual(summary["unresolved_pairs"], [{
-            "item_ref": "TI-001",
-            "condition_ref": "COND-001",
-            "decision": "blocked",
-        }])
+        self.assertEqual(
+            summary["unresolved_pairs"],
+            [
+                {
+                    "item_ref": "TI-001",
+                    "condition_ref": "COND-001",
+                    "decision": "blocked",
+                }
+            ],
+        )
         self.assertNotIn("formal-ti1-cond1", result)
         self.assertEqual(result["formal-ti2-cond1"]["item_ref"], "TI-002")
 
@@ -196,12 +201,8 @@ class FormalDesignContractTests(unittest.TestCase):
                 {"ref": "TI-002", "revision": "i2", "currentness": "current"},
             ]
         )
-        shared_condition["items"].append(
-            {"item_ref": "TI-002", "source_ref": "TI-002"}
-        )
-        shared_assessment = copy.deepcopy(
-            shared_condition["pair_assessments"][0]
-        )
+        shared_condition["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        shared_assessment = copy.deepcopy(shared_condition["pair_assessments"][0])
         shared_assessment.update(
             {
                 "item_ref": "TI-002",
@@ -330,9 +331,7 @@ class FormalDesignContractTests(unittest.TestCase):
 
         self.assertEqual(result["formal-ti1-cond1"]["test_level"], "integration")
         self.assertEqual(result["formal-ti2-cond1"]["test_level"], "system")
-        self.assertEqual(
-            result["formal-ti2-cond1"]["test_level_source"], "default"
-        )
+        self.assertEqual(result["formal-ti2-cond1"]["test_level_source"], "default")
         self.assertEqual(result["__formal_design_summary__"]["pair_coverage"], "2/2")
 
     def test_authority_revision_must_match_its_source_revision(self) -> None:
