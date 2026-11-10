@@ -1,13 +1,14 @@
-# Semantic評価証拠（2026-11-10、latest v4）
+# Semantic評価証拠 v5
 
-- Skill/input source baseline: `6c3e9f1e8c1e848fdec716e7f17395a75d42bda6`; evidence packaging HEAD: `7c76ed379b3d7210585d29e8a72956302f38faf5`
-- manifest: 31 cases; actual candidate generation and independent-session Judge completed: 19/31
-- verdicts: pass 15, needs_review 4, fail 0, not_evaluable 0, Judge errors 0
-- criterion statuses: pass 64, needs_review 4
-- Generator and Judge used independent Codex sessions per case, using the same default configured model family; model ID was not exposed, so model independence is not established.
-- v4 adds current-input `TCN-SEM-006`; its actual candidate, Agent JSONL, Judge raw response/events, normalized result, and source hashes are in the v4 archive. The v4 archive also corrects a prior packaging error in v2/v3 for the normalized `TCN-SEM-002` Judge result.
-- Some earlier generated cases used packages that contained eval files. Their command traces were audited for reference/rubric reads, but filesystem isolation was weaker; v5/v6/v7/v8/v9 excluded eval files, tests, and pycache.
-- Evaluation evidence is not repository-wide acceptance and does not cover real Agent trigger rates, a real artifact provider, or the remaining 12 semantic cases.
+- source HEAD: `f91f40b68cb01136b48fe953e315f418ff54547e`
+- manifest: 31 cases; candidates generated and judged: 20/31
+- verdicts: pass 16, needs_review 4, fail 0, Judge error 0
+- criterion statuses: {"pass": 68, "needs_review": 4}
+- Candidate generation and Judge used independent Codex sessions per case; both used the same default configured model family, whose identifier was not exposed.
+- Source heads: agent-v2 was generated before commit 6c3 on the bda-based worktree; its included non-E2E inputs and Skill docs were hash-checked against current sources. agent-v4/v5/v6/v7 used the 6c3 Skill/input source; agent-v8 used 69ab, agent-v9 used d5, and agent-v10 used f91. Later commits after each case source did not change that case’s Skill or input files.
+- E2E cases and TCN-SEM-002 were generated with a Skill copy excluding evaluation files. Earlier v2/v4 packages contained evaluation files; command traces were audited and no command targeting reference/rubric content was observed. This is a weaker isolation boundary and is called out for reviewer consideration.
+- v5 adds current-input `TCN-SEM-007` from source HEAD `f91f40b`; the Judge returned pass for all four requested criteria.
+- Compressed evidence archive contains input, actual candidate, raw Agent response, Agent JSONL/stderr, generation metadata, normalized Judge result, raw Judge response, Judge JSONL/stderr, and source Skill file hashes.
 
 | Skill                     | Eval ID           |    Agent | Judge        |
 | ------------------------- | ----------------- | -------: | ------------ |
@@ -30,5 +31,8 @@
 | `test-condition-design`   | `TCN-SEM-004`     | 1102.4 s | pass         |
 | `test-condition-design`   | `TCN-SEM-005`     |  744.4 s | pass         |
 | `test-condition-design`   | `TCN-SEM-006`     |  897.8 s | pass         |
+| `test-condition-design`   | `TCN-SEM-007`     | 1017.7 s | pass         |
 
-Current detail index: `evidence-index-v4.json`. Full v4 archive: `semantic-evidence-v4.tar.gz`. The v2/v3 archives have an incorrect normalized `TCN-SEM-002/judge-result.json` copied from a later case; their raw Judge data remains, and v4 contains the correct normalization from the TCN-002 runner output. The v1 archive has the correct 16-case TCN-002 record; prior versions are preserved with this limitation recorded in `README-v2.md` and `README-v3.md`.
+The full evaluator status, criterion reasoning, exact input/output, and traces are in `semantic-evidence-v5.tar.gz` and `evidence-index-v5.json`.
+
+Earlier v2/v3 archives contain an incorrect normalized `TCN-SEM-002/judge-result.json` copied from a later case; their raw Judge data is retained. v4 and v5 contain the correct normalized TCN-002 result, and v1 also contains the correct 16-case TCN-002 record. Prior archives are preserved.
