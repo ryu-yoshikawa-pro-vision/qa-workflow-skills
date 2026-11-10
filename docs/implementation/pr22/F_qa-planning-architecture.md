@@ -451,3 +451,9 @@ PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidato
 - README・共通runtime登録は担当A／PR #22へ引継ぎ中。実Agent・認証済み承認・実provider・PR #22横断接続は未実施。
 - 詳細と検証証拠は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
 ```
+
+### PR #22共有登録の最新確認（2026-11-10）
+
+PR #22のhead `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`を読み取り確認した。変更ファイル一覧には`README.md`、`scripts/skills/evals/deterministic/common.py`、`skills/qa-workflow/scripts/workflow_runtime.py`が含まれるが、このheadでもFの`test-requirements-analysis`、`test-architecture-design`、`test-management`はREADMEのSkill roster、`CANONICAL_SKILLS`、`RUNTIME_V2_SKILL_ROOTS`に未登録。PR #22の`tests/skills/runtime/test_owner_verifier_gate.py`も、`test-management`を未登録scopeとして完了不可にする契約を確認する。従って、PR #22で共有ファイルが更新されたこととF Skill登録の完了は区別する。
+
+担当A／PR #22への引継ぎは継続する。3 SkillをREADMEとdeterministic registryへ登録し、validator契約に対応する正式なowner verifier入口・loaderとruntime root／routingを接続する。未検証scopeを`unverified_scopes`として残し、未検証のまま完了可能にしない。登録後はAgent Skills、Deterministic Output Evals、Semantic Output Evals、Code Quality、Codex Harnessを新HEADで実行し、PR #22で実成果物のowner・ref・revision・scope・currentness・approval接続を確認する。PR #28から共有ファイルは変更していない。
