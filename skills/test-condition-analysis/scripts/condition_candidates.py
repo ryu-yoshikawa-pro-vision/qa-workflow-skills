@@ -9,16 +9,19 @@ from typing import Any
 
 from candidate_support import (
     EVENT_ID,
+    STORAGE_CONTENT_ENCODING,
     ContractError,
     active_source_refs,
     canonical_bytes,
     feature_inventory,
     fingerprint,
+    identification_coverage,
     make_result,
     operation_claim_details,
     source_key,
     source_ref,
     source_refs,
+    storage_content_sha256,
     strict_loads,
     string_list,
     text,
@@ -1024,6 +1027,8 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "resume_owner": OWNER,
             "requires_provider_native_cas": True,
             "requires_independent_readback": True,
+            "storage_content_encoding": STORAGE_CONTENT_ENCODING,
+            "storage_content_sha256": storage_content_sha256(candidate),
             "provider_selected": False,
             "approval_state": "not_resolved_by_candidate_helper",
             "operation_claim_details": operation_claim_details(
@@ -1058,11 +1063,18 @@ def validate(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_readback(request: dict[str, Any]) -> dict[str, Any]:
-    expected = {"operation", "candidate_artifact", "readback"}
-    if set(request) != expected or request.get("operation") != "validate_readback":
+    required = {"operation", "candidate_artifact", "readback"}
+    if (
+        not required.issubset(request)
+        or set(request) - required - {"expected_revision"}
+        or request.get("operation") != "validate_readback"
+    ):
         raise ContractError(
             "request_schema", "validate_readback request fields do not match v1"
         )
+    expected_revision = request.get("expected_revision")
+    if expected_revision is not None:
+        expected_revision = text(expected_revision, "expected_revision")
     artifact = validate_artifact(request["candidate_artifact"])
     readback = request["readback"]
     fields = {"owner", "scope", "artifact_ref", "revision", "content_hash"}
@@ -1084,18 +1096,32 @@ def validate_readback(request: dict[str, Any]) -> dict[str, Any]:
         raise ContractError(
             "readback_hash_invalid", "provider content_hash must be SHA-256 hex"
         )
-    matches = normalized["content_hash"] == artifact["content_fingerprint"]
+    # content_hash is the provider's hash of the stored bytes (the complete
+    # canonical artifact), not the candidate fingerprint or the provider revision.
+    storage_hash = storage_content_sha256(artifact)
+    issues = []
+    if normalized["content_hash"] != storage_hash:
+        issues.append(
+            _issue(
+                "readback_hash_mismatch",
+                "saved content hash does not match the canonical stored artifact",
+            )
+        )
+    if expected_revision is not None and normalized["revision"] != expected_revision:
+        issues.append(
+            _issue(
+                "readback_revision_mismatch",
+                "provider readback revision differs from the expected saved revision",
+            )
+        )
+    matches = not issues
     return make_result(
         "readback_matches" if matches else "blocked",
         valid=matches,
-        issues=[]
-        if matches
-        else [
-            _issue(
-                "readback_hash_mismatch",
-                "saved content does not match candidate fingerprint",
-            )
-        ],
+        issues=issues,
+        candidate_fingerprint=artifact["content_fingerprint"],
+        storage_content_sha256=storage_hash,
+        storage_content_encoding=STORAGE_CONTENT_ENCODING,
         readback={**normalized, "revision_is_provider_owned": True},
         provider_authenticity="not_established_by_this_validator",
         provider_cas="not_established_by_this_validator",
@@ -1459,7 +1485,6 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
     )
     item_features = {feature for row in active_items for feature in row["feature_refs"]}
     unrepresented = sorted(active_feature_ids - item_features)
-    active_feature_count = len(active_feature_ids)
     context_available = item_context is not None and condition_context is not None
     item_context = item_context or {}
     condition_context = condition_context or {}
@@ -1481,7 +1506,13 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
     )
     no_unresolved_pairs = all(row["status"] == "proposed" for row in pair_rows)
     no_machine_conflicts = not candidate_pair_inconsistencies
-    zero_denominator = active_feature_count == 0
+    coverage = identification_coverage(
+        feature_population,
+        item_features,
+        population_complete=source_population_complete,
+        items_current=all_items_current,
+    )
+    zero_denominator = coverage["zero_denominator"]
     complete = (
         source_population_complete
         and all_items_current
@@ -1492,22 +1523,6 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
         and not unknown_feature_ids
         and not zero_denominator
     )
-
-    measurable = (
-        source_population_complete
-        and all_items_current
-        and not unknown_feature_ids
-        and active_feature_count > 0
-    )
-    if active_feature_count == 0:
-        coverage_status = "not_measurable_zero_denominator"
-    elif not source_population_complete or unknown_feature_ids:
-        coverage_status = "not_measurable_incomplete_or_unknown_population"
-    elif not all_items_current:
-        coverage_status = "not_measurable_stale_or_unknown_items"
-    else:
-        coverage_status = "measured"
-    represented_count = len(active_feature_ids.intersection(item_features))
 
     issues = []
     if not source_population_complete:
@@ -1620,14 +1635,7 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
         unrepresented_feature_refs=unrepresented,
         items_without_pair_proposal=items_without_pair,
         conditions_without_pair_proposal=conditions_without_pair,
-        candidate_identification_coverage={
-            "status": coverage_status,
-            "basis": "confirmed active feature inventory only",
-            "numerator": represented_count,
-            "denominator": active_feature_count if measurable else None,
-            "rate": represented_count / active_feature_count if measurable else None,
-            "zero_denominator": zero_denominator,
-        },
+        candidate_identification_coverage=coverage,
         metrics={
             "candidate_item_count": sum(
                 row["status"] != "retired" for row in item_rows

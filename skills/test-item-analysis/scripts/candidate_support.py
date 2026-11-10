@@ -97,6 +97,61 @@ def fingerprint(value: Any) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+STORAGE_CONTENT_ENCODING = "canonical-json-utf8"
+
+
+def storage_content_sha256(artifact: dict[str, Any]) -> str:
+    """SHA-256 of the complete artifact (including content_fingerprint) as stored.
+
+    This is the hash a provider reports for content saved as the canonical UTF-8
+    JSON bytes of the whole candidate artifact. It is distinct from the candidate
+    ``content_fingerprint`` (which excludes that field) and from provider revisions.
+    """
+    return hashlib.sha256(canonical_bytes(artifact)).hexdigest()
+
+
+def identification_coverage(
+    feature_population: list[dict[str, str]],
+    represented_feature_ids: set[str],
+    *,
+    population_complete: bool,
+    items_current: bool,
+) -> dict[str, Any]:
+    """Feature-to-item candidate identification over confirmed active features only.
+
+    Confirmed active features are non-retired and not ``unknown``. Unknown-status
+    features are never part of the numerator or denominator; when the population
+    cannot be confirmed, numerator, denominator, and rate are all null.
+    """
+    non_retired = {
+        row["feature_id"] for row in feature_population if row["status"] != "retired"
+    }
+    unknown = {
+        row["feature_id"] for row in feature_population if row["status"] == "unknown"
+    }
+    confirmed = non_retired - unknown
+    if not non_retired:
+        status = "not_measurable_zero_denominator"
+    elif not population_complete:
+        status = "not_measurable_incomplete_population"
+    elif unknown:
+        status = "not_measurable_unknown_feature_status"
+    elif not items_current:
+        status = "not_measurable_stale_or_unknown_items"
+    else:
+        status = "measured"
+    measured = status == "measured"
+    numerator = len(confirmed & represented_feature_ids)
+    return {
+        "status": status,
+        "basis": "confirmed active feature inventory only",
+        "numerator": numerator if measured else None,
+        "denominator": len(confirmed) if measured else None,
+        "rate": numerator / len(confirmed) if measured else None,
+        "zero_denominator": not confirmed,
+    }
+
+
 def validate_history_event_ids(events: list[dict[str, Any]]) -> None:
     """Accept legacy event hashes, then require linked IDs for new appended events."""
     previous_event_id = None

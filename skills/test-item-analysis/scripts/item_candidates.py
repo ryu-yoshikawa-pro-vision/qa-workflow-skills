@@ -11,16 +11,19 @@ from candidate_support import (
     ITEM_ID,
     ITEM_KINDS,
     ITEM_STATUSES,
+    STORAGE_CONTENT_ENCODING,
     ContractError,
     active_source_refs,
     canonical_bytes,
     feature_inventory,
     fingerprint,
+    identification_coverage,
     make_result,
     operation_claim_details,
     source_key,
     source_ref,
     source_refs,
+    storage_content_sha256,
     strict_loads,
     string_list,
     text,
@@ -631,27 +634,13 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         if status == "candidate_ready_unpersisted" and not gap_ids
         else "incomplete"
     )
-    metric_status = "measured"
-    metric_rate = None
-    metric_denominator = None
-    if not inventory["source_boundary_complete"] or not inventory["analysis_complete"]:
-        metric_status = "not_measurable_incomplete_population"
-    elif unknown_feature_ids:
-        metric_status = "not_measurable_unknown_feature_status"
-    elif stale or unknown:
-        metric_status = "not_measurable_stale_or_unknown_items"
-    elif active_features:
-        metric_rate = len(active_features & represented) / len(active_features)
-        metric_denominator = len(active_features)
-    else:
-        metric_status = "not_measurable_zero_denominator"
-    item_candidate_coverage = {
-        "status": metric_status,
-        "basis": "confirmed active feature inventory only",
-        "numerator": len(active_features & represented),
-        "denominator": metric_denominator,
-        "rate": metric_rate,
-    }
+    item_candidate_coverage = identification_coverage(
+        feature_population,
+        represented,
+        population_complete=inventory["source_boundary_complete"]
+        and inventory["analysis_complete"],
+        items_current=not stale and not unknown,
+    )
     if no_change:
         return make_result(
             "no_change",
@@ -696,6 +685,8 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             "resume_owner": OWNER,
             "requires_provider_native_cas": True,
             "requires_independent_readback": True,
+            "storage_content_encoding": STORAGE_CONTENT_ENCODING,
+            "storage_content_sha256": storage_content_sha256(candidate),
             "provider_selected": False,
             "approval_state": "not_resolved_by_candidate_helper",
             "operation_claim_details": operation_claim_details(
@@ -785,11 +776,18 @@ def impact(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_readback(request: dict[str, Any]) -> dict[str, Any]:
-    expected = {"operation", "candidate_artifact", "readback"}
-    if set(request) != expected or request.get("operation") != "validate_readback":
+    required = {"operation", "candidate_artifact", "readback"}
+    if (
+        not required.issubset(request)
+        or set(request) - required - {"expected_revision"}
+        or request.get("operation") != "validate_readback"
+    ):
         raise ContractError(
             "request_schema", "validate_readback request fields do not match v1"
         )
+    expected_revision = request.get("expected_revision")
+    if expected_revision is not None:
+        expected_revision = text(expected_revision, "expected_revision")
     artifact = validate_artifact(request["candidate_artifact"])
     readback = request["readback"]
     fields = {"owner", "scope", "artifact_ref", "revision", "content_hash"}
@@ -811,18 +809,32 @@ def validate_readback(request: dict[str, Any]) -> dict[str, Any]:
         raise ContractError(
             "readback_hash_invalid", "provider content_hash must be SHA-256 hex"
         )
-    matches = normalized["content_hash"] == artifact["content_fingerprint"]
+    # content_hash is the provider's hash of the stored bytes (the complete
+    # canonical artifact), not the candidate fingerprint or the provider revision.
+    storage_hash = storage_content_sha256(artifact)
+    issues = []
+    if normalized["content_hash"] != storage_hash:
+        issues.append(
+            _issue(
+                "readback_hash_mismatch",
+                "saved content hash does not match the canonical stored artifact",
+            )
+        )
+    if expected_revision is not None and normalized["revision"] != expected_revision:
+        issues.append(
+            _issue(
+                "readback_revision_mismatch",
+                "provider readback revision differs from the expected saved revision",
+            )
+        )
+    matches = not issues
     return make_result(
         "readback_matches" if matches else "blocked",
         valid=matches,
-        issues=[]
-        if matches
-        else [
-            _issue(
-                "readback_hash_mismatch",
-                "saved content does not match candidate fingerprint",
-            )
-        ],
+        issues=issues,
+        candidate_fingerprint=artifact["content_fingerprint"],
+        storage_content_sha256=storage_hash,
+        storage_content_encoding=STORAGE_CONTENT_ENCODING,
         readback={**normalized, "revision_is_provider_owned": True},
         provider_authenticity="not_established_by_this_validator",
         provider_cas="not_established_by_this_validator",

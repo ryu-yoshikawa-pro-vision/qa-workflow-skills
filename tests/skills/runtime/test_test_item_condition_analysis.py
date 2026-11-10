@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -45,6 +46,29 @@ def _refresh_artifact_fingerprint(artifact):
         {key: value for key, value in artifact.items() if key != "content_fingerprint"}
     )
     return artifact
+
+
+def _stored_readback(artifact, *, owner, artifact_ref, revision=None):
+    """Simulate a provider that stores bytes and reports the hash of what it reads back.
+
+    Mirrors A's local baseline: content_hash is the SHA-256 of the stored bytes and
+    the provider revision is a separate "sha256:"-prefixed provider-owned value.
+    """
+    stored = json.dumps(
+        artifact, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "artifact.json"
+        path.write_bytes(stored)
+        read_back = path.read_bytes()
+    digest = hashlib.sha256(read_back).hexdigest()
+    return {
+        "owner": owner,
+        "scope": artifact["scope"],
+        "artifact_ref": artifact_ref,
+        "revision": revision or f"sha256:{digest}",
+        "content_hash": digest,
+    }
 
 
 def _feature_analysis(snapshot, status):
@@ -1297,6 +1321,8 @@ class TestItemAnalysisContract(unittest.TestCase):
         self.assertEqual(coverage["status"], "not_measurable_unknown_feature_status")
         self.assertIsNone(coverage["rate"])
         self.assertIsNone(coverage["denominator"])
+        # Non-measurable: the unknown feature must not leak into the numerator either.
+        self.assertIsNone(coverage["numerator"])
 
         replay = _materialize_item(
             item_request(
@@ -1336,39 +1362,109 @@ class TestItemAnalysisContract(unittest.TestCase):
         self.assertEqual(confirmed["unknown_feature_ids"], [])
         self.assertEqual(confirmed["item_candidate_coverage"]["status"], "measured")
         self.assertEqual(confirmed["item_candidate_coverage"]["rate"], 1.0)
+        self.assertEqual(confirmed["item_candidate_coverage"]["numerator"], 2)
+        self.assertEqual(confirmed["item_candidate_coverage"]["denominator"], 2)
 
-    def test_readback_checks_hash_and_does_not_claim_authenticity(self):
-        candidate = _materialize_item(
-            item_request(candidates=[item_candidate("item")])
-        )["candidate"]
-        readback = {
-            "owner": "test-item-analysis",
-            "scope": "project:shop",
-            "artifact_ref": "item-candidates:shop",
-            "revision": "provider-r1",
-            "content_hash": candidate["content_fingerprint"],
-        }
+    def test_readback_accepts_hash_of_stored_content_not_candidate_fingerprint(self):
+        result = _materialize_item(item_request(candidates=[item_candidate("item")]))
+        candidate = result["candidate"]
+        readback = _stored_readback(
+            candidate, owner="test-item-analysis", artifact_ref="item-candidates:shop"
+        )
+        # The provider hash covers the whole stored artifact, so it can never equal
+        # the fingerprint that excludes content_fingerprint, nor the provider revision.
+        self.assertNotEqual(readback["content_hash"], candidate["content_fingerprint"])
+        self.assertNotEqual(readback["revision"], candidate["content_fingerprint"])
+        self.assertEqual(
+            readback["content_hash"],
+            result["write_precondition"]["storage_content_sha256"],
+        )
+        self.assertEqual(
+            result["write_precondition"]["storage_content_encoding"],
+            "canonical-json-utf8",
+        )
         good = run_items(
             {
                 "operation": "validate_readback",
                 "candidate_artifact": candidate,
                 "readback": readback,
+                "expected_revision": readback["revision"],
             }
         )
         self.assertTrue(good["valid"])
+        self.assertEqual(good["issues"], [])
+        self.assertEqual(
+            good["candidate_fingerprint"], candidate["content_fingerprint"]
+        )
+        self.assertEqual(good["storage_content_sha256"], readback["content_hash"])
         self.assertEqual(
             good["provider_authenticity"], "not_established_by_this_validator"
         )
-        readback["content_hash"] = "0" * 64
-        self.assertEqual(
-            run_items(
+        self.assertEqual(good["provider_cas"], "not_established_by_this_validator")
+
+    def test_readback_rejects_fingerprint_tamper_and_revision_mismatch(self):
+        candidate = _materialize_item(
+            item_request(candidates=[item_candidate("item")])
+        )["candidate"]
+        readback = _stored_readback(
+            candidate, owner="test-item-analysis", artifact_ref="item-candidates:shop"
+        )
+
+        def check(rb, **extra):
+            return run_items(
                 {
                     "operation": "validate_readback",
                     "candidate_artifact": candidate,
-                    "readback": readback,
+                    "readback": rb,
+                    **extra,
                 }
-            )["issues"][0]["code"],
-            "readback_hash_mismatch",
+            )
+
+        # Reporting the candidate fingerprint as the stored hash is the old confusion.
+        confused = check({**readback, "content_hash": candidate["content_fingerprint"]})
+        self.assertFalse(confused["valid"])
+        self.assertEqual(confused["issues"][0]["code"], "readback_hash_mismatch")
+
+        tampered = copy.deepcopy(candidate)
+        tampered["items"][0]["description"] = "tampered after save"
+        tampered_rb = _stored_readback(
+            tampered, owner="test-item-analysis", artifact_ref="item-candidates:shop"
+        )
+        self.assertEqual(
+            check(tampered_rb)["issues"][0]["code"], "readback_hash_mismatch"
+        )
+        _assert_contract_code(
+            self,
+            "item_fingerprint_mismatch",
+            lambda: run_items(
+                {
+                    "operation": "validate_readback",
+                    "candidate_artifact": tampered,
+                    "readback": tampered_rb,
+                }
+            ),
+        )
+
+        wrong_revision = check(readback, expected_revision="sha256:" + "0" * 64)
+        self.assertFalse(wrong_revision["valid"])
+        self.assertEqual(
+            [row["code"] for row in wrong_revision["issues"]],
+            ["readback_revision_mismatch"],
+        )
+        # Without an expected revision the provider revision stays opaque.
+        self.assertTrue(check({**readback, "revision": "provider-r9"})["valid"])
+        _assert_contract_code(
+            self,
+            "readback_identity_mismatch",
+            lambda: check({**readback, "scope": "project:other"}),
+        )
+        _assert_contract_code(
+            self,
+            "readback_hash_invalid",
+            lambda: check({**readback, "content_hash": "ABC"}),
+        )
+        _assert_contract_code(
+            self, "request_schema", lambda: check(readback, unexpected=True)
         )
 
 
@@ -1775,26 +1871,57 @@ class TestConditionAnalysisContract(unittest.TestCase):
         self.assertIsNone(result["metrics"]["formal_tcn_ci_design"]["count"])
         self.assertIsNone(result["metrics"]["execution"]["count"])
 
-    def test_provider_readback_is_structural_not_authenticated(self):
-        candidate = _materialize_condition(
+    def test_provider_readback_uses_stored_content_hash_not_fingerprint(self):
+        result = _materialize_condition(
             condition_request(candidates=[condition_candidate("one")])
-        )["candidate"]
-        readback = {
-            "owner": "test-condition-analysis",
-            "scope": "project:shop",
-            "artifact_ref": "condition-candidates:shop",
-            "revision": "provider-r1",
-            "content_hash": candidate["content_fingerprint"],
-        }
-        result = run_conditions(
-            {
-                "operation": "validate_readback",
-                "candidate_artifact": candidate,
-                "readback": readback,
-            }
         )
-        self.assertTrue(result["valid"])
-        self.assertEqual(result["provider_cas"], "not_established_by_this_validator")
+        candidate = result["candidate"]
+        readback = _stored_readback(
+            candidate,
+            owner="test-condition-analysis",
+            artifact_ref="condition-candidates:shop",
+        )
+        self.assertNotEqual(readback["content_hash"], candidate["content_fingerprint"])
+        self.assertEqual(
+            readback["content_hash"],
+            result["write_precondition"]["storage_content_sha256"],
+        )
+
+        def check(rb, **extra):
+            return run_conditions(
+                {
+                    "operation": "validate_readback",
+                    "candidate_artifact": candidate,
+                    "readback": rb,
+                    **extra,
+                }
+            )
+
+        good = check(readback, expected_revision=readback["revision"])
+        self.assertTrue(good["valid"])
+        self.assertEqual(
+            good["candidate_fingerprint"], candidate["content_fingerprint"]
+        )
+        self.assertEqual(good["provider_cas"], "not_established_by_this_validator")
+        confused = check({**readback, "content_hash": candidate["content_fingerprint"]})
+        self.assertEqual(confused["issues"][0]["code"], "readback_hash_mismatch")
+        tampered = copy.deepcopy(candidate)
+        tampered["conditions"][0]["intent"] = "tampered after save"
+        tampered_rb = _stored_readback(
+            tampered,
+            owner="test-condition-analysis",
+            artifact_ref="condition-candidates:shop",
+        )
+        self.assertEqual(
+            check(tampered_rb)["issues"][0]["code"], "readback_hash_mismatch"
+        )
+        self.assertEqual(
+            [
+                row["code"]
+                for row in check(readback, expected_revision="provider-r9")["issues"]
+            ],
+            ["readback_revision_mismatch"],
+        )
 
     def test_cli_is_self_contained_for_isolated_skill_package(self):
         item_request_json = item_request(candidates=[item_candidate("cli-item")])
@@ -1931,6 +2058,95 @@ class TestReviewRegressionFindings(unittest.TestCase):
                 "candidate_pairs": candidate_pairs or [],
             }
         )
+
+    def test_identification_metric_uses_confirmed_active_features_in_item_and_condition(
+        self,
+    ):
+        def scenario(snapshot, covered):
+            item_result = _materialize_item(
+                item_request(
+                    feature_snapshot=snapshot,
+                    candidates=[
+                        item_candidate(
+                            "covers",
+                            feature_refs=covered,
+                            evidence_refs=[_feature_ref_for(snapshot)],
+                        )
+                    ]
+                    if covered
+                    else [],
+                )
+            )
+            condition_artifact = _materialize_condition(
+                condition_request(feature_snapshot=snapshot, candidates=[])
+            )["candidate"]
+            crosscheck = self.crosscheck(item_result["candidate"], condition_artifact)
+            item_metric = item_result["item_candidate_coverage"]
+            # One shared rule: item and condition report the identical metric.
+            self.assertEqual(
+                item_metric, crosscheck["candidate_identification_coverage"]
+            )
+            return item_metric
+
+        impl = {"id": "FEAT-001", "status": "implemented"}
+        planned = {"id": "FEAT-002", "status": "planned"}
+
+        measured = scenario(feature_inventory(features=[impl, planned]), ["FEAT-001"])
+        self.assertEqual(measured["status"], "measured")
+        self.assertEqual(
+            (measured["numerator"], measured["denominator"], measured["rate"]),
+            (1, 2, 0.5),
+        )
+
+        # A retired feature is outside the population, not an unrepresented gap.
+        retired = scenario(
+            feature_inventory(features=[impl, {"id": "FEAT-002", "status": "retired"}]),
+            ["FEAT-001"],
+        )
+        self.assertEqual(
+            (retired["status"], retired["numerator"], retired["denominator"]),
+            ("measured", 1, 1),
+        )
+
+        # An unknown-status feature is not confirmed active: even when an item
+        # represents it, it is in neither numerator nor denominator, and the metric
+        # is not presented as measured or 100%.
+        unknown = scenario(
+            feature_inventory(features=[impl, {"id": "FEAT-002", "status": "unknown"}]),
+            ["FEAT-001", "FEAT-002"],
+        )
+        self.assertEqual(unknown["status"], "not_measurable_unknown_feature_status")
+        self.assertEqual(
+            (unknown["numerator"], unknown["denominator"], unknown["rate"]),
+            (None, None, None),
+        )
+        self.assertFalse(unknown["zero_denominator"])
+        only_unknown = scenario(
+            feature_inventory(features=[{"id": "FEAT-001", "status": "unknown"}]),
+            ["FEAT-001"],
+        )
+        self.assertEqual(
+            only_unknown["status"], "not_measurable_unknown_feature_status"
+        )
+        self.assertIsNone(only_unknown["numerator"])
+        self.assertTrue(only_unknown["zero_denominator"])
+
+        partial = scenario(
+            unresolved_feature_inventory(unknown_areas=["payments"]), ["FEAT-001"]
+        )
+        self.assertEqual(partial["status"], "not_measurable_incomplete_population")
+        self.assertEqual(
+            (partial["numerator"], partial["denominator"], partial["rate"]),
+            (None, None, None),
+        )
+
+        empty = scenario(feature_inventory(features=[]), [])
+        self.assertEqual(empty["status"], "not_measurable_zero_denominator")
+        self.assertEqual(
+            (empty["numerator"], empty["denominator"], empty["rate"]),
+            (None, None, None),
+        )
+        self.assertTrue(empty["zero_denominator"])
 
     def test_b_snapshot_and_analysis_are_separate_and_bound(self):
         source = feature_inventory()
