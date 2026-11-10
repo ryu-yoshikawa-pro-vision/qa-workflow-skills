@@ -812,3 +812,40 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - runtimeを実際に許可した候補生成で、現行inputのRISK-SEM-001、003、004、005、006、RISK-SEM-002、007、およびTR-SEM-001の8/31件がCLI exit 0・`turn.completed`・candidate fileありで生成済み。以前の禁止runtime生成はdiagnostic扱いで、ここへ数えていない。`RISK-SEM-002`は739.2秒／15 command events、`RISK-SEM-007`は603.0秒／12 command events。候補は一時保存先`/tmp/pr27-semantic-20261110/agent-v{2,4}/`にあり、Judgeはまだ実行していない。model IDはCodex JSONLに出ず未確認。
 - 現在は`TR-SEM-002`のruntime-enabled Codex turnを実行中であり、完了扱いしていない。生成timeoutの再試行を継続する。生成AgentとJudgeのCodex sessionは同時起動せず、後続Judgeは生成終了後に独立sessionで実行する。
 - 次の作業：変更後E2E semantic 3件を再生成し、完了candidateへ既存`run.py`＋独立Codex Judge adapterを順次実行する。全31件を完了できない場合も、各caseをgenerated／timeout／Judge error／not evaluatedに区別して証拠を残す。
+
+## 2026-11-10 現在状態の最終同期（以前の同日記録を更新）
+
+この節を担当Eの現在状態として読む。上記の同日進捗は実行時点の履歴であり、件数・実行中状態・commit／CIは以下の最新結果で更新する。
+
+### 受入状態
+
+- E担当局所受入は未完了。E2E trigger dataset規定件数、関連runtime、semantic dataset validation、formatter、実際に可能な18件のcandidate/Judgeは確認済み。全semantic 31件、実trigger発火率とholdout、実provider保存／readback、PR #22横断受入は未完了。
+- PR #27はopen／Draft。GitHub本文は古い記載のままで、この作業では変更していない。最新PR headは`cd61b1aed64c31b2673a06eda92ceb290d121efd`。
+
+### 実Agent発火とsemantic Judge
+
+- 非対話CLI `codex-cli 0.167.0`のread-only smokeはexit 0、42 JSONL events、`turn.completed`、36 command eventsだったが、QA Skill load eventはなく、評価queryも使用していない。実trigger試験には数えない。
+- 全current Skillを置くため、正規canonical root形式`cd '<repo>' && git worktree add --detach /tmp/pr27-e-formal-agent-eval-69ab HEAD`で評価worktree作成を再試行した。PreToolUseは`approval required by policy, but AskForApproval is set to Never`で拒否。Hook／execpolicy／sandboxを回避しない。したがってtrain／validationの独立3反復、発火率、holdout、legacy route評価は未実施であり、trigger PASS／FAILを付けない。
+- Semantic manifest 31件中18件を実candidate生成＋別Judge sessionで評価。pass 14、needs_review 4、fail 0、not_evaluable 0、Judge errors 0。criteriaはpass 59／needs_review 4。TCN-SEM-004と005も4/4 criteria pass。全候補とJudge traceはv3 evidence archive/indexに保存。生成とJudgeは別sessionだが同一既定model familyを使用し、model IDは未取得のためmodel独立性を主張しない。
+- needs_reviewは`RISK-SEM-002`、`RISK-SEM-005`、`TCN-SEM-001`、`E2E-SEL-SEM-003`。実装不具合として未確認。特にE2E-SEL-SEM-003はTI-003自身のimmutable revision/currentness tokenが入力にない一方referenceは候補追加を期待し、上流source identityの判断が必要。referenceや期待値を後付けで変更していない。
+- 残り13 semantic casesは未評価で実行可能。`agent-v9`は現在TCN-SEM-006の実生成中。完了candidateのみ別Judgeへ渡し、timeout・errorはPASSとして集計しない。
+
+### 現在のHEADでの局所検証・formatter
+
+- E担当runtime 7 suitesおよびdeterministic contractsは合計165 tests PASS（formal design 22、test-condition 16、coverage 28、E2E selection 32、requirement 11、case 11、case runtime cutover 2、new skill deterministic 43）。semantic dataset validator 24 Skills／168 cases PASS、repository semantic tests 13 PASS、trigger dataset contract 1 PASS、Python 3.11 isolated Skill-copy test 1 PASS。
+- repository deterministic testsは299件中295 PASS／4 FAIL。失敗はSQLite/WCAG provider/CAS/readbackとProject Context state-root sourceの4件。repository runtime suiteは579件中560 PASS／10 FAIL／9 ERROR。shared `ci_handoff` nesting error 1 FAILとSQLite history/providerのFAIL／ERRORが確認され、E担当変更に起因する回帰を示す差分はないため共有コードを変更しない。実行ログと失敗名は前掲の検証記録に保持。
+- deterministic eval script suite 12 PASS、semantic script tests 27 PASS、Ruff 0.16.8 test checks PASS。`python3 scripts/format_tracked.py check`はdprint 0.55.2で221 files PASS。新しい証拠README／JSONにもdprint check PASS、v3 tarball 231 filesのcredential-pattern scanは0 hit、`git diff --check` PASS。
+
+### provider／PR #22の現行契約と共有ownerへの引継ぎ
+
+- PR #22はopen、head `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。現行READMEに`e2e-test-selection`のcanonical登録がなく、ASSERTIONSはlegacy RISK-D016／D017まででE2E-SEL-D001〜D006がない。A runtime planはローカルSQLite履歴/CASを記載するが、remote provider、承認主体、新設E Skillの正式registrationと実成果物契約は未接続。
+- E担当だけで確認できるlocal runtime／fixture testsはPASS範囲を維持。E artifactの承認済み実provider、provider-native create-if-absent／CAS、historical readback、独立readback、stale propagation、別session resumeは未実施。実providerやauthを捏造・転用しない。
+- PR #22統合ownerへ：README canonical Skill一覧/routingへ`e2e-test-selection`を追加し、Skill一覧と一致させる。ASSERTIONSでRISK-D016/D017とE2E-SEL-D001〜D006を整理し、legacy `test-analysis`の互換routeを保持する。`Validate Agent Skills`の全step、特にrepository eval structureを再実行しPASSを確認する。
+- A/shared runtime ownerへ：正式設計とE2E selectionのsource/artifact registration、Machine Entity、scope/revision/currentness、承認、native CAS、historical readback契約を公開・接続する。PR #22統合ownerへ：B/C/D/F正規成果物の照合、E formal→coverage・E2E selection→G/H/J、source stale伝播・別session再開、実Agent/Judge、S1〜S17、人間編集8、15＋10条件を横断検証する。
+
+### commit・push・Actions
+
+- commit `cd61b1aed64c31b2673a06eda92ceb290d121efd`（`eval: add TCN semantic case evidence`）を担当branchへ通常pushした。push後のlocal／remote HEADは一致、`git status -sb`はclean。
+- commit cd61b1aeのPR Actionsはsynthetic merge `0cac6ba8d0d0f93cb8291a526e2dd9d39c827674`。Code Quality run 909 PASS、Validate Deterministic Output Evals run 2214 PASS、Validate Semantic Output Evals run 2179 PASS、Codex Harness run 909 PASS、Validate Agent Skills run 2216 FAIL。
+- Validate Agent Skills jobは`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。logは有効Skill `skills/e2e-test-selection`を列挙した後、README.mdに同名がないため失敗した。共有READMEは担当外のため変更しない。
+- この節の追加後に生じるPlan-only commit自身のActionsはpush後に取得して最終報告する。PR #27はDraft維持、受入未完了。
