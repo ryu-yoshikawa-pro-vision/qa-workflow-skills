@@ -747,6 +747,13 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - 次の独立semantic generation run `agent-v8`を開始し、TCN-SEM-005を生成中。TCN-SEM-004を含め17件のみがJudge完了済みで、残り14件は未評価。起動中Agentが完了またはtimeoutした各caseを記録し、candidate完了後に別Judge sessionで判定してから継続する。
 - GitHub Actions結果、remote一致、worktree拒否の証拠は2026-11-10の実行結果。新たなcommit後は、そのcommitに紐づくActionsを改めて取得する。
 
+### 2026-11-10 commit bca5e9aeのCI
+
+- PlanのCI追記commit `bca5e9ae9ced61a22ecaeca6ed027ced73e9083f`は担当branchへ通常push済み。local／remote head一致、working tree clean。PR #27はopen／Draft。
+- このHEADのworkflowはsynthetic merge commit `858fbf1916c4c1e2d5f244f1d5bf3372f7c14f18`をcheckout。Code Quality run 907 PASS、Validate Deterministic Output Evals run 2212 PASS、Validate Semantic Output Evals run 2177 PASS、Codex Harness run 907 PASS、Validate Agent Skills run 2214 FAIL。
+- Agent Skillsのvalidator jobでは`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。失敗点はPR #22のREADME canonical Skill catalogに`e2e-test-selection`が欠けていること。共有README／ASSERTIONSは変更せず、PR #22統合ownerへ引き継ぐ。
+- semantic Agent-v8はこのPlan追記前からTCN-SEM-005を生成中。生成完了／timeoutと別Judgeを確認後、次の結果を証拠化して保存する。今は17／31件が実生成・Judge済みで、残14件は未完了。
+
 ## 実Agent・semantic評価の再実施（2026-11-10、進行中）
 
 ### 対象状態とE2E trigger dataset
