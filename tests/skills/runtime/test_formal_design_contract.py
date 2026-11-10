@@ -93,7 +93,13 @@ def packet() -> dict:
 
 
 def drafts() -> list[dict]:
-    return [{"draft_key": "formal-ti1-cond1", "tr_refs": ["TR-001"]}]
+    return [
+        {
+            "draft_key": "formal-ti1-cond1",
+            "tr_refs": ["TR-001"],
+            "authority_refs": [],
+        }
+    ]
 
 
 class FormalDesignContractTests(unittest.TestCase):
@@ -177,7 +183,11 @@ class FormalDesignContractTests(unittest.TestCase):
             value,
             [
                 *drafts(),
-                {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]},
+                {
+                    "draft_key": "formal-ti2-cond1",
+                    "tr_refs": ["TR-002"],
+                    "authority_refs": [],
+                },
             ],
         )
         summary = result["__formal_design_summary__"]
@@ -221,7 +231,11 @@ class FormalDesignContractTests(unittest.TestCase):
             shared_condition,
             [
                 *drafts(),
-                {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]},
+                {
+                    "draft_key": "formal-ti2-cond1",
+                    "tr_refs": ["TR-002"],
+                    "authority_refs": [],
+                },
             ],
         )
         self.assertEqual(
@@ -238,6 +252,174 @@ class FormalDesignContractTests(unittest.TestCase):
                     "decision": "blocked",
                 },
             ],
+        )
+
+    def test_tcn_draft_authorities_are_preserved_in_pair_record_and_scope_staleness(
+        self,
+    ) -> None:
+        value = packet()
+        value["source_refs"].extend(
+            [
+                {"ref": "SPEC-002", "revision": "s3", "currentness": "stale"},
+                {"ref": "TI-002", "revision": "i2", "currentness": "current"},
+            ]
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        value["authorities"].append(
+            {
+                "authority_ref": "SPEC-002",
+                "revision": "s3",
+                "currentness": "stale",
+            }
+        )
+        second_assessment = copy.deepcopy(value["pair_assessments"][0])
+        second_assessment.update(
+            {
+                "item_ref": "TI-002",
+                "tcn_draft_key": "formal-ti2-cond1",
+                "expected_result_candidates": [
+                    {
+                        **second_assessment["expected_result_candidates"][0],
+                        "candidate_ref": "ER-003",
+                    }
+                ],
+            }
+        )
+        value["pair_assessments"].append(second_assessment)
+        tcn_drafts = [
+            {**drafts()[0], "authority_refs": ["SPEC-002"]},
+            {
+                "draft_key": "formal-ti2-cond1",
+                "tr_refs": ["TR-002"],
+                "authority_refs": [],
+            },
+        ]
+
+        result = contract.validate_formal_design(value, tcn_drafts)
+
+        summary = result["__formal_design_summary__"]
+        self.assertEqual(summary["pair_coverage"], "1/2")
+        self.assertEqual(summary["pair_coverage_status"], "incomplete")
+        self.assertEqual(
+            summary["unresolved_pairs"],
+            [
+                {
+                    "item_ref": "TI-001",
+                    "condition_ref": "COND-001",
+                    "decision": "blocked",
+                }
+            ],
+        )
+        record_rows = result["__formal_design_record__"]["pair_assessments"]
+        self.assertEqual(record_rows[0]["tcn_authority_refs"], ["SPEC-002"])
+        self.assertEqual(record_rows[1]["tcn_authority_refs"], [])
+
+    def test_tcn_authority_must_match_input_and_registered_currentness(self) -> None:
+        value = packet()
+        value["source_refs"].append(
+            {"ref": "SPEC-002", "revision": "s3", "currentness": "current"}
+        )
+        value["authorities"].append(
+            {
+                "authority_ref": "SPEC-002",
+                "revision": "s3",
+                "currentness": "current",
+            }
+        )
+        value["pair_assessments"][0]["tcn_authority_refs"] = ["SPEC-002"]
+        matching_draft = {**drafts()[0], "authority_refs": ["SPEC-002"]}
+        result = contract.validate_formal_design(value, [matching_draft])
+        self.assertEqual(
+            result["__formal_design_record__"]["pair_assessments"][0][
+                "tcn_authority_refs"
+            ],
+            ["SPEC-002"],
+        )
+
+        value["pair_assessments"][0]["tcn_authority_refs"] = ["SPEC-001"]
+        with self.assertRaises(contract.FormalDesignError):
+            contract.validate_formal_design(value, [matching_draft])
+
+        value["pair_assessments"][0].pop("tcn_authority_refs")
+        value["pair_assessments"][0]["tcn_authority_refs"] = ["UNKNOWN-001"]
+        with self.assertRaises(contract.FormalDesignError):
+            contract.validate_formal_design(value, [matching_draft])
+
+        value["pair_assessments"][0]["tcn_authority_refs"] = ["SPEC-002"]
+        value["authorities"][1]["revision"] = "s4"
+        with self.assertRaises(contract.FormalDesignError):
+            contract.validate_formal_design(value, [matching_draft])
+
+        invalid_refs = [None, [""], ["SPEC-002", "SPEC-002"], ["SPEC-002", "SPEC-001"]]
+        for refs in invalid_refs:
+            with self.subTest(tcn_authority_refs=refs):
+                invalid = packet()
+                invalid["source_refs"].append(
+                    {"ref": "SPEC-002", "revision": "s3", "currentness": "current"}
+                )
+                invalid["authorities"].append(
+                    {
+                        "authority_ref": "SPEC-002",
+                        "revision": "s3",
+                        "currentness": "current",
+                    }
+                )
+                invalid["pair_assessments"][0]["tcn_authority_refs"] = refs
+                with self.assertRaises(contract.FormalDesignError):
+                    contract.validate_formal_design(
+                        invalid,
+                        [{**drafts()[0], "authority_refs": ["SPEC-002"]}],
+                    )
+
+    def test_unknown_tcn_authority_blocks_only_its_adopted_pair(self) -> None:
+        value = packet()
+        value["source_refs"].append(
+            {"ref": "SPEC-002", "revision": "s3", "currentness": "unknown"}
+        )
+        value["authorities"].append(
+            {
+                "authority_ref": "SPEC-002",
+                "revision": "s3",
+                "currentness": "unknown",
+            }
+        )
+
+        result = contract.validate_formal_design(
+            value,
+            [{**drafts()[0], "authority_refs": ["SPEC-002"]}],
+        )
+
+        summary = result["__formal_design_summary__"]
+        self.assertEqual(summary["pair_coverage"], "0/1")
+        self.assertEqual(summary["unresolved_pairs"][0]["decision"], "blocked")
+
+    def test_adopted_pair_without_draft_or_explicit_tcn_authorities_stays_blocked(
+        self,
+    ) -> None:
+        value = packet()
+
+        result = contract.validate_formal_design(value, [])
+
+        summary = result["__formal_design_summary__"]
+        self.assertEqual(summary["pair_coverage_status"], "incomplete")
+        self.assertEqual(summary["unresolved_pairs"][0]["decision"], "blocked")
+        assessment = result["__formal_design_record__"]["pair_assessments"][0]
+        self.assertNotIn("tcn_authority_refs", assessment)
+
+    def test_explicit_tcn_authorities_are_retained_when_partial_rerun_has_no_draft(
+        self,
+    ) -> None:
+        value = packet()
+        value["pair_assessments"][0]["tcn_authority_refs"] = ["SPEC-001"]
+
+        result = contract.validate_formal_design(value, [])
+
+        self.assertEqual(result["__formal_design_summary__"]["pair_coverage"], "1/1")
+        self.assertEqual(
+            result["__formal_design_record__"]["pair_assessments"][0][
+                "tcn_authority_refs"
+            ],
+            ["SPEC-001"],
         )
 
     def test_unmapped_stale_source_blocks_all_pairs_safely(self) -> None:
@@ -266,7 +448,14 @@ class FormalDesignContractTests(unittest.TestCase):
 
         result = contract.validate_formal_design(
             value,
-            [*drafts(), {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]}],
+            [
+                *drafts(),
+                {
+                    "draft_key": "formal-ti2-cond1",
+                    "tr_refs": ["TR-002"],
+                    "authority_refs": [],
+                },
+            ],
         )
 
         summary = result["__formal_design_summary__"]
@@ -326,7 +515,14 @@ class FormalDesignContractTests(unittest.TestCase):
 
         result = contract.validate_formal_design(
             value,
-            [*drafts(), {"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-002"]}],
+            [
+                *drafts(),
+                {
+                    "draft_key": "formal-ti2-cond1",
+                    "tr_refs": ["TR-002"],
+                    "authority_refs": [],
+                },
+            ],
         )
 
         self.assertEqual(result["formal-ti1-cond1"]["test_level"], "integration")
@@ -359,6 +555,10 @@ class FormalDesignContractTests(unittest.TestCase):
         result = contract.validate_formal_design(value, drafts())
         self.assertEqual(result["__formal_design_summary__"]["pair_denominator"], 2)
         self.assertEqual(result["__formal_design_summary__"]["pair_closed"], 2)
+        invalid_non_adopted = copy.deepcopy(value)
+        invalid_non_adopted["pair_assessments"][1]["tcn_authority_refs"] = []
+        with self.assertRaises(contract.FormalDesignError):
+            contract.validate_formal_design(invalid_non_adopted, drafts())
         self.assertEqual(
             {key for key in result if not key.startswith("__")},
             {"formal-ti1-cond1"},
@@ -580,7 +780,14 @@ class FormalDesignContractTests(unittest.TestCase):
         with self.assertRaises(contract.FormalDesignError):
             contract.validate_formal_design(
                 value,
-                drafts() + [{"draft_key": "formal-ti2-cond1", "tr_refs": ["TR-001"]}],
+                drafts()
+                + [
+                    {
+                        "draft_key": "formal-ti2-cond1",
+                        "tr_refs": ["TR-001"],
+                        "authority_refs": [],
+                    }
+                ],
             )
 
     def test_zero_pair_denominator_is_unknown_not_complete(self) -> None:

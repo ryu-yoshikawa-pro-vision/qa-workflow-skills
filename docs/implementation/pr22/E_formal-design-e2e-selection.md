@@ -502,3 +502,53 @@ PR #27レビュー時点の`30289c915bcc64e6cdc4479c34189ab2c7740eee` Actionsは
 - 上記12ファイルをcommit `c0e7b801123ef590d3f25c5beaad67ff38153e81`（`fix: preserve formal design state and align selection contracts`）として記録し、対象branchへ通常pushした。push直前に`git fetch origin`と`git merge-base --is-ancestor origin/feat/pr22-e-formal-design-e2e-selection HEAD`を実行し、ancestor判定は終了code 0。push後のlocal HEADと`git ls-remote`のremote HEADは同じ`c0e7b801123ef590d3f25c5beaad67ff38153e81`、worktreeはclean。
 - このcommitのGitHub Actions：Code Quality run 869 PASS、Validate Deterministic Output Evals run 2174 PASS、Validate Semantic Output Evals run 2139 PASS、Codex Harness run 869 PASS、Validate Agent Skills run 2176 FAIL。失敗jobは`validate`、失敗stepは`Validate repository eval structure`。`Validate Agent Skills specification`はPASSしており、repository eval structure failureは共有`README.md`のcanonical Skill一覧に`e2e-test-selection`がないため。owner A。過去HEADのActions結果と区別し、他4 workflowのPASSはこのcommit SHAに紐づく。
 - このActions確認とcommit SHAを記録するPlan更新はdocumentation-only follow-upとして別commit／pushする。PR #27はopen／Draftを維持し、GitHub上のPR本文は変更していない。PR本文には「実装コードの追加と担当内の実受入は未実施」と古い状態が残っているため更新が必要だが、本作業では更新しない。
+
+## 追加レビュー2件の修正・検証（2026-11-10）
+
+### 対象HEADと修正前の再現
+
+- レビュー対象・作業開始HEADは`eb1bd2a47a3aaaf44071099bab5d580145c293bc`。対象branchは`feat/pr22-e-formal-design-e2e-selection`で、開始時のworktreeはclean。`git fetch origin`後にlocal／remote HEADは一致し、remote先行commitはなかった。
+- TCN Authority依存：TI-001だけのTCN draftが追加参照するSPEC-002をstaleにしたformal packetを`validate_formal_design()`へ渡し、返却された実`formal_design_record`／`formal_design_summary`をcoverageへ接続した。修正前はrecordにpair固有参照がなく、coverageの未割当stale source fail-closed処理がTI-002も止め、formalとcoverageのclosed pair数が一致しなかった。
+- E2E過去snapshot：revision 1に`population_complete=false`、候補1件、blockerなしのsnapshotを置き、既存`_revision_digest()`で履歴digestを再計算したrevision 2 fixtureを作成した。修正前は現行revisionと異なり、過去snapshotの検証がblocker欠落を拒否しなかった。
+
+### 原因と修正
+
+- `skills/test-condition-design/scripts/condition_structure.py::validate_formal_design()`はadopted pairの`tcn_authority_refs`を検証し、対応draftの`authority_refs`がある場合は集合一致を要求する。packetに値がなければ検証済みdraftからcanonicalに導出し、入力・draft双方がなければ依存不明として該当pairをblockedにする。登録Authority／source、revision、currentness検証を通った参照をpair stale dependencyとformal recordの両方に同じく反映する。非採用pairはこのfieldを受理しない。
+- `skills/coverage-analysis/scripts/traceability.py::_formal_record_metrics()`はpair別TCN Authority参照をsource dependencyに含め、formal validatorと同様に影響pairだけをblockedにする。unknown／不正参照は拒否し、古いrecordで参照集合が欠落しているadopted pairはunresolved・`record_verified=false`としてcompleteへ昇格させない。既存のunmapped stale sourceの全pair fail-closedは維持し、formal candidate coverageとCI graphを混同しない。
+- `skills/e2e-test-selection/scripts/selection_contract.py::_selection_snapshot()`に、現行revisionと同じ`population_complete=false`かつblocker必須条件を加えた。候補数にかかわらず、過去snapshotの入力契約違反をdigest再計算で通せない。schema version、history形式、digest方式は変更していない。digestは内容整合性確認であり、保存先の真正性証明ではない。
+- 旧形式formal packetは読める状態を保つが、adopted pairの依存関係を復元できない旧recordは完了扱いしない。partial rerunでdraftがない場合も明示されたpair参照だけを使い、ない依存は推測しない。CI graph、scope外artifact、ID／revision履歴を変更せず、共通runtime／providerにも変更を加えていない。
+- 仕様を`skills/test-condition-design/SKILL.md`、同output template、`skills/coverage-analysis/references/guidance.md`、`skills/e2e-test-selection/references/guidance.md`および同output templateへ反映した。E担当deterministic fixtureに新契約を必要とする更新はなかった。
+
+### 回帰テストとローカル検証
+
+修正前の再現テストは両方とも期待した不具合を検出し、修正後は次の対象テストがすべてPASSした。
+
+- `python3 -m unittest tests.skills.runtime.test_test_condition_structure -v` — PASS 16 tests。
+- `python3 -m unittest tests.skills.runtime.test_formal_design_contract -v` — PASS 22 tests。draft由来Authorityのrecord保持、TI-001だけのstale、draftとの不一致、unknown/currentness不正、draftなしの未解決を含む。
+- `python3 -m unittest tests.skills.runtime.test_coverage_analysis_traceability -v` — PASS 28 tests。formal runtimeの実record／summaryをそのままcoverageへ渡すケースで、SPEC-002 stale時は1/2・TI-001だけunresolved、current回復後は2/2となる。
+- `python3 -m unittest tests.skills.runtime.test_e2e_selection_contract -v` — PASS 32 tests。不完全母集団・候補あり・blockerなしのdigest整合過去snapshotを拒否し、blocker追加時は受理する。
+- `python3 -m unittest tests.skills.runtime.test_test_requirement_structure -v` — PASS 11 tests。
+- `python3 -m unittest tests.skills.runtime.test_case_structure -v` — PASS 11 tests。
+- `python3 -m unittest tests.skills.runtime.test_case_runtime_v1_cutover -v` — PASS 2 tests。
+- `python3 -m unittest tests.skills.evals.deterministic.test_new_skill_contracts -v` — PASS 43 tests。
+- `python3 -m unittest tests.skills.runtime.test_runtime_portability -v` — PASS 3 tests。E2E selectionのSkill単独copy実行は対象runtimeでも確認済み。
+- `python3 -m unittest discover -s scripts/skills/evals/deterministic/tests -v` — PASS 12 tests。
+- `python3 -m unittest discover -s tests/skills/evals/deterministic -v` — FAIL 299 tests中4 failures。WCAGの`test_sqlite_provider_uses_atomic_revision_compare_and_reread`、`test_wcag_canonical_plan_is_immutable_per_revision_and_context`、`test_wcag_report_requires_persisted_owner_runtime_result`はproviderが`blocked`を返し、`test_saved_current_wcag_plan_closes_only_after_qa_workflow_cas_and_reread`はcurrent Project Context state-root source不足でblocked。これらは変更差分外。
+- `python3 -m unittest discover -s tests/skills/runtime -p 'test_*.py' -v` — FAIL 579 tests中10 failures／9 errors。直前の記録済みruntime全体（569 tests、同10 failures／9 errors）から10 tests増え、今回の対象テストはすべてPASS。失敗集合はA担当`test_ci_handoff`の`test_json_nesting_failure_is_a_structured_input_error` 1件と、A担当`test_sqlite_workflow_history`の9 failures／9 errorsで、修正前に記録した同じ失敗群が継続する。
+- `python3 -m unittest tests.skills.runtime.test_ci_handoff -v` — FAIL 27 tests中1 failure／26 PASS。JSON nesting不正時に期待する`nesting`ではなく`JSON document must be an object`が返る。E差分外のA担当契約。
+- `python3 -m unittest tests.skills.runtime.test_sqlite_workflow_history -v` — FAIL 20 tests中9 failures／9 errors／2 PASS。failuresは作成／CAS、競合、legacy履歴readback等がprovider-unavailable／unreadableまたはblockedになるもの。errorsはSQLite DB作成時の`sqlite3.OperationalError: unable to open database file`。この実行では原因の追加特定に至らず、E差分外のA担当調査事項。
+- `python3 scripts/skills/evals/semantic/validate.py` — PASS 24 Skills／168 dataset cases。dataset検証のみであり、実LLM Judge評価は未実施。
+- `python3 -m unittest discover -s scripts/skills/evals/semantic/tests -v` — PASS 27 tests。
+- `python3 -m unittest discover -s tests/skills/evals/semantic -v` — PASS 13 tests。
+- `python3 -m unittest discover -s tests/skills/evals/trigger -v` — PASS 1 test。dataset契約検証のみであり、実Agent発火評価は未実施。
+- `uv run --no-project --with ruff==0.16.8 python3 scripts/format_tracked.py check` — PASS、221 tracked files。最初はoutput templateのtable alignment 1件を検出したためdprintで整形し、再実行PASS。
+- `uv tool run --from ruff==0.16.8 ruff check <変更6 Python files>`と`ruff format --check <変更6 Python files>` — PASS。6 files。
+- `python3 -m compileall -q <変更6 Python files>` — PASS。
+- `git diff --check` — PASS。
+
+### 残件・引継ぎ・CI
+
+- E担当の2件は再現・局所修正・回帰検証済み。変更後のprovider保存／承認／CAS／readback、source変更時の別session stale propagation、実Agent／実Judge、PR #22横断実成果物確認は未実施。
+- A担当／PR #22統合owner：共有README・ASSERTIONSとcanonical Skill routingの更新、正式設計／E2E artifact registrationおよびprovider保存・承認・CAS・readbackの公開契約を担当する。加えて既存`test_ci_handoff` nesting errorとSQLite historyの9 failures／9 errorsを、安全なreadback境界を維持した状態で調査する。
+- PR #22では、実TCN draft／Machine Entity／Authorityを用いてpair依存を照合し、正式設計recordとcoverage再計算が一致すること、旧recordとpartial rerunがunresolvedを保つこと、source変更時のstale伝播を別sessionまで検証する。E2E過去snapshotの実保存readbackもproviderで検証する。
+- この更新時点の修正は未commit。push後のcommit SHAとActionsは後続記録する。PR #27はDraftを維持し、GitHub上のPR本文は変更しない。PR本文に古い「実装コードの追加と担当内の実受入は未実施」という記載が残るため、実装状況・局所test PASS・残存するActions／provider／横断受入を反映する更新案を最終報告へ示す。

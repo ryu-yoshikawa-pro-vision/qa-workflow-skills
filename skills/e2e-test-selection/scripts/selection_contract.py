@@ -255,6 +255,8 @@ def _selection_snapshot(value: Any, name: str) -> dict[str, Any]:
         not isinstance(item, str) or not item.strip() for item in snapshot["blockers"]
     ):
         raise ContractError(f"{name}.blockersが不正です")
+    if not snapshot["population_complete"] and not snapshot["blockers"]:
+        raise ContractError("不完全な候補母集団にはblockerまたは再開条件が必要です")
 
     if not isinstance(snapshot["source_refs"], list) or not snapshot["source_refs"]:
         raise ContractError(f"{name}.source_refsが不正です")

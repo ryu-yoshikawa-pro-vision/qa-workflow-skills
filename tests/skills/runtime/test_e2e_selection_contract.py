@@ -213,6 +213,63 @@ class E2ESelectionContractTests(unittest.TestCase):
         self.assertFalse(snapshot["population_complete"])
         self.assertEqual(snapshot["blockers"], first["blockers"])
 
+    def test_historical_incomplete_population_with_candidates_requires_blocker(
+        self,
+    ) -> None:
+        prior = selection()
+        snapshot = history_snapshot(prior)
+        snapshot["population_complete"] = False
+        snapshot["blockers"] = []
+        candidate_ids = [
+            {
+                "candidate_id": row["candidate_id"],
+                "candidate_key": row["candidate_key"],
+            }
+            for row in prior["candidates"]
+        ]
+        historical = {
+            "revision": 1,
+            "candidate_ids": candidate_ids,
+            "change_reason": prior["change_reason"],
+            "retired_candidates": [],
+            "selection_snapshot": snapshot,
+            "revision_digest": contract._revision_digest(
+                prior["selection_ref"],
+                1,
+                prior["change_reason"],
+                candidate_ids,
+                [],
+                snapshot,
+            ),
+        }
+        current = selection()
+        current["revision"] = 2
+        current["change_reason"] = "候補母集団の再確認"
+        current["history"] = [historical]
+
+        with self.assertRaisesRegex(contract.ContractError, "blockerまたは再開条件"):
+            contract.validate(current)
+
+    def test_historical_incomplete_population_with_candidates_accepts_blocker(
+        self,
+    ) -> None:
+        prior = selection()
+        prior["population_complete"] = False
+        prior["blockers"] = ["候補母集団の残りをownerへ確認する"]
+        historical = history_row(prior, 1, prior["change_reason"])
+        current = selection()
+        current["revision"] = 2
+        current["change_reason"] = "候補母集団の確認を継続"
+        current["history"] = [historical]
+
+        result = contract.validate(current)
+
+        self.assertTrue(result["history_complete"])
+        self.assertEqual(
+            result["selection_record"]["history"][0]["selection_snapshot"]["blockers"],
+            prior["blockers"],
+        )
+
     def test_revision_history_preserves_candidate_id_and_key(self) -> None:
         value = selection()
         value["revision"] = 2

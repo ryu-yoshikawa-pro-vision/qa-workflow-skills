@@ -879,13 +879,14 @@ def _formal_record_metrics(
     }
     assessments: dict[tuple[str, str], dict[str, Any]] = {}
     pair_sources: dict[tuple[str, str], set[str]] = {}
+    unverified_tcn_authority_pairs: set[tuple[str, str]] = set()
     candidate_ids: set[str] = set()
     current_candidate_pairs: dict[str, tuple[str, str]] = {}
     current_tcn_draft_keys: set[str] = set()
     for index, row in enumerate(
         ensure_list(record["pair_assessments"], "formal pair_assessments")
     ):
-        if not isinstance(row, dict) or set(row) != {
+        pair_fields = {
             "item_ref",
             "condition_ref",
             "decision",
@@ -895,7 +896,12 @@ def _formal_record_metrics(
             "expected_result_candidates",
             "covered_by_pair",
             "reopen_condition",
-        }:
+        }
+        if (
+            not isinstance(row, dict)
+            or not pair_fields <= set(row)
+            or set(row) - (pair_fields | {"tcn_authority_refs"})
+        ):
             raise InvalidInput(f"formal pair_assessments[{index}] schemaが不正です")
         pair = (
             ensure_nonempty_string(row["item_ref"], "formal pair item_ref"),
@@ -979,10 +985,30 @@ def _formal_record_metrics(
                 candidate["candidate_ref"] for candidate in candidates
             ):
                 raise InvalidInput("formal expected result candidates are not ordered")
+            if "tcn_authority_refs" not in row:
+                # Legacy records cannot prove that the TCN draft has no extra
+                # Authority dependency. Keep the pair scoped and unresolved.
+                unverified_tcn_authority_pairs.add(pair)
+            else:
+                tcn_authority_refs = ensure_list(
+                    row["tcn_authority_refs"], "formal tcn_authority_refs"
+                )
+                if (
+                    any(
+                        not isinstance(ref, str) or not ref or ref != ref.strip()
+                        for ref in tcn_authority_refs
+                    )
+                    or tcn_authority_refs != sorted(set(tcn_authority_refs))
+                    or set(tcn_authority_refs) - set(authorities)
+                ):
+                    raise InvalidInput("formal TCN Authority refs are invalid")
+                pair_sources[pair].update(tcn_authority_refs)
         elif row["tcn_draft_key"] is not None or candidates:
             raise InvalidInput(
                 "non-adopted formal pair has an unexpected TCN or candidate"
             )
+        elif "tcn_authority_refs" in row:
+            raise InvalidInput("non-adopted formal pair has TCN Authority refs")
         if decision == "duplicate":
             covered = row["covered_by_pair"]
             if not isinstance(covered, dict) or set(covered) != {
@@ -1225,6 +1251,7 @@ def _formal_record_metrics(
                 set(pair_stale_sources[pair]) | unmapped_stale_sources
             )
     stale_pairs = {pair for pair, refs in pair_stale_sources.items() if refs}
+    blocked_pairs = stale_pairs | unverified_tcn_authority_pairs
     for pair, row in assessments.items():
         if row["decision"] == "duplicate":
             covered = row["covered_by_pair"]
@@ -1239,17 +1266,21 @@ def _formal_record_metrics(
                 or assessments[target]["decision"] != "adopted"
             ):
                 raise InvalidInput("formal duplicate pair target is not adopted")
-            if target in stale_pairs:
-                stale_pairs.add(pair)
-                pair_stale_sources[pair] = sorted(
-                    set(pair_stale_sources[pair]) | set(pair_stale_sources[target])
-                )
+            if target in blocked_pairs:
+                blocked_pairs.add(pair)
+                if target in stale_pairs:
+                    stale_pairs.add(pair)
+                    pair_stale_sources[pair] = sorted(
+                        set(pair_stale_sources[pair]) | set(pair_stale_sources[target])
+                    )
+                if target in unverified_tcn_authority_pairs:
+                    unverified_tcn_authority_pairs.add(pair)
 
     unresolved_by_pair: dict[tuple[str, str], str] = {}
     for pair, row in assessments.items():
         if row["decision"] in {"unconfirmed", "blocked"}:
             unresolved_by_pair[pair] = row["decision"]
-        elif pair in stale_pairs:
+        elif pair in blocked_pairs:
             unresolved_by_pair[pair] = "blocked"
     for pair in expected_pairs - set(assessments):
         unresolved_by_pair[pair] = "blocked"
@@ -1257,12 +1288,14 @@ def _formal_record_metrics(
     closed = sum(
         1
         for pair, row in assessments.items()
-        if row["decision"] not in {"unconfirmed", "blocked"} and pair not in stale_pairs
+        if row["decision"] not in {"unconfirmed", "blocked"}
+        and pair not in blocked_pairs
     )
     items_complete = record["items_complete"]
     conditions_complete = record["conditions_complete"]
-    verified = identity_matches and history_complete and matrix_complete
-    if not verified:
+    population_verified = identity_matches and history_complete and matrix_complete
+    verified = population_verified and not unverified_tcn_authority_pairs
+    if not population_verified:
         items_complete = False
         conditions_complete = False
     if denominator == 0:
@@ -1273,7 +1306,7 @@ def _formal_record_metrics(
         status = "incomplete_population"
     else:
         coverage = f"{closed}/{denominator}"
-        status = "incomplete" if unresolved_by_pair else "complete"
+        status = "incomplete" if unresolved_by_pair or not verified else "complete"
     return {
         "design_ref": design_ref,
         "revision": revision,

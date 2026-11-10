@@ -29,7 +29,7 @@
 | -------- | ----------------- | -------------------- | --------------------- | ------------------------------------- | ------------------------------ | ------------- | --------------- |
 |          |                   |                      |                       |                                       |                                |               |                 |
 
-各履歴行はそのrevisionの候補判断・理由と、candidateが参照したsourceのrevision/currentnessを復元できる完全snapshotです。`revision digest`には、そのrevisionのdecision・rationale・source・retirement・change reasonを含みます。digestが欠けている、またはsnapshotと一致しない場合は推測せず、history incomplete／改変としてblockedを記録します。digestは保存先の真正性を証明しないため、実readbackを確認します。
+各履歴行はそのrevisionの候補判断・理由と、candidateが参照したsourceのrevision/currentnessを復元できる完全snapshotです。過去snapshotにも現行入力と同じ候補母集団・blocker条件を適用し、母集団が不完全なのにblockerがないsnapshotは、digestを再計算した場合も拒否します。`revision digest`には、そのrevisionのdecision・rationale・source・retirement・change reasonを含みます。digestが欠けている、またはsnapshotと一致しない場合は推測せず、history incomplete／改変としてblockedを記録します。digestは整合性確認であり、保存先の真正性を証明しないため、実readbackを確認します。
 
 ## 下流への受渡し
 
