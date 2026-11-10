@@ -83,6 +83,20 @@ def eval_case(skill: str, eval_id: str, *, compact_table_spacing: bool = True):
 
 
 class NewSkillDeterministicContractTests(unittest.TestCase):
+    def test_classification_adapter_without_existing_child_identity_fails_closed(self):
+        guidance = (
+            SKILLS_ROOT
+            / "test-condition-design"
+            / "references"
+            / "coverage-techniques.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "current Machine Entityまたは取得可能なsourceからstable model keyを確認できない場合は、"
+            "既存のblocked／unresolved契約でchild生成を保留する。keyを推測した"
+            "`identity_action=new`や仮IDの生成で既存childを置き換えない",
+            guidance,
+        )
+
     def test_test_target_inspection_fixtures_pass(self):
         validate = load_validator("test-target-inspection")
         for eval_id in ("TTI-OUT-001", "TTI-OUT-002"):
