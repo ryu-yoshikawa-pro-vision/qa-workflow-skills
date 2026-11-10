@@ -145,6 +145,74 @@ class E2ESelectionContractTests(unittest.TestCase):
         result = contract.validate(value)
         self.assertEqual(result["selection_status"], "blocked")
 
+    def test_empty_incomplete_population_with_blocker_is_recordable(self) -> None:
+        value = selection()
+        value["population_complete"] = False
+        value["candidates"] = []
+        value["blockers"] = ["候補母集団を確定する仕様情報が不足"]
+
+        result = contract.validate(value)
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["selection_status"], "blocked")
+        self.assertEqual(result["candidate_count"], 0)
+        self.assertEqual(result["selected_candidate_ids"], [])
+        self.assertEqual(result["selection_record"]["blockers"], value["blockers"])
+
+        completed = run_cli_bytes(
+            json.dumps({"input": value}, ensure_ascii=False).encode("utf-8")
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stderr, b"")
+        envelope = json.loads(completed.stdout)
+        self.assertEqual(envelope["runtime_status"], "ok")
+        self.assertEqual(envelope["result_status"], "blocked")
+        self.assertEqual(envelope["payload"]["candidate_count"], 0)
+
+    def test_empty_population_without_blocker_is_rejected(self) -> None:
+        value = selection()
+        value["population_complete"] = False
+        value["candidates"] = []
+        value["blockers"] = []
+
+        with self.assertRaises(contract.ContractError):
+            contract.validate(value)
+
+    def test_complete_empty_population_is_not_ready(self) -> None:
+        value = selection()
+        value["candidates"] = []
+        value["blockers"] = []
+
+        with self.assertRaises(contract.ContractError):
+            contract.validate(value)
+
+    def test_empty_population_snapshot_is_retained_when_candidates_are_added(
+        self,
+    ) -> None:
+        first = selection()
+        first["population_complete"] = False
+        first["candidates"] = []
+        first["blockers"] = ["候補母集団を確定する仕様情報が不足"]
+        first_result = contract.validate(first)
+
+        second = selection()
+        second["revision"] = 2
+        second["change_reason"] = "source追加後に候補母集団を確定"
+        second["history"] = [history_row(first, 1, first["change_reason"])]
+        result = contract.validate(second)
+
+        self.assertEqual(result["selection_status"], "ready")
+        self.assertTrue(result["history_complete"])
+        self.assertEqual(result["selected_candidate_ids"], ["E2E-CAND-001"])
+        self.assertEqual(
+            result["selection_record"]["history"][0]["revision_digest"],
+            first_result["current_revision_digest"],
+        )
+        snapshot = result["selection_record"]["history"][0]["selection_snapshot"]
+        self.assertEqual(snapshot["candidates"], [])
+        self.assertFalse(snapshot["population_complete"])
+        self.assertEqual(snapshot["blockers"], first["blockers"])
+
     def test_revision_history_preserves_candidate_id_and_key(self) -> None:
         value = selection()
         value["revision"] = 2

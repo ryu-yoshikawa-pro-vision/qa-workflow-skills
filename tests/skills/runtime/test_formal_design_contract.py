@@ -359,6 +359,15 @@ class FormalDesignContractTests(unittest.TestCase):
         result = contract.validate_formal_design(value, drafts())
         self.assertEqual(result["__formal_design_summary__"]["pair_denominator"], 2)
         self.assertEqual(result["__formal_design_summary__"]["pair_closed"], 2)
+        self.assertEqual(
+            {key for key in result if not key.startswith("__")},
+            {"formal-ti1-cond1"},
+        )
+
+        invalid = copy.deepcopy(value)
+        invalid["pair_assessments"][1]["test_level"] = "integration"
+        with self.assertRaises(contract.FormalDesignError):
+            contract.validate_formal_design(invalid, drafts())
 
     def test_duplicate_pair_closes_only_with_adopted_cover_target(self) -> None:
         value = packet()

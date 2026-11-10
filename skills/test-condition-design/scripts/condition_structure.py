@@ -1407,6 +1407,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     }
     tcn_drafts = _validate_tcn_drafts(input_value["test_conditions"])
     formal_projection = {}
+    blocked_tcn_draft_keys: set[str] = set()
+    blocked_tcn_drafts: dict[str, dict[str, Any]] = {}
     formal_design_summary = None
     formal_design_record = None
     if "formal_design" in input_value:
@@ -1423,6 +1425,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         )
         for draft in tcn_drafts:
             if draft["draft_key"] in blocked_tcn_draft_keys:
+                blocked_tcn_drafts[draft["draft_key"]] = draft
                 continue
             draft.update(formal_projection[draft["draft_key"]])
             for tr_ref in draft["tr_refs"]:
@@ -1444,6 +1447,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             if draft["draft_key"] not in blocked_tcn_draft_keys
         ]
     model_drafts = _validate_model_drafts(input_value["models"])
+    blocked_model_drafts = [
+        draft
+        for draft in model_drafts
+        if draft["parent_tcn_draft_key"] in blocked_tcn_draft_keys
+    ]
     if "formal_design" in input_value:
         model_drafts = [
             draft
@@ -1523,6 +1531,56 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 "update_scope_model_keysがactive previous stateを参照していません"
             )
 
+    # A stale formal pair defers generation. Its reused stable identity is not
+    # an explicit removal from the update scope, so retain its previous
+    # lifecycle row while omitting the unverified entity from current output.
+    blocked_tcn_ids: set[str] = set()
+    for draft in blocked_tcn_drafts.values():
+        if draft["identity_action"] != "reuse":
+            continue
+        ref = draft["reuse_id"]
+        if (
+            ref not in update_tcn
+            or ref in blocked_tcn_ids
+            or previous_tcn_map.get(ref, {}).get("status") not in {"active", "inactive"}
+        ):
+            raise InvalidInput("stale TCN reuse対象がscope内activeではありません")
+        blocked_tcn_ids.add(ref)
+
+    blocked_model_keys: set[str] = set()
+    for draft in blocked_model_drafts:
+        if draft["identity_action"] != "reuse":
+            continue
+        ref = draft["reuse_model_key"]
+        parent_draft = blocked_tcn_drafts.get(draft["parent_tcn_draft_key"])
+        if parent_draft is None:
+            raise InvalidInput("stale model draft parent TCN draftが不明です")
+        parent_tcn_id = (
+            parent_draft["reuse_id"]
+            if parent_draft["identity_action"] == "reuse"
+            else None
+        )
+        previous = previous_model_map.get(ref)
+        if (
+            ref not in update_model
+            or ref in blocked_model_keys
+            or previous is None
+            or previous["status"] not in {"active", "inactive"}
+            or parent_tcn_id is None
+            or previous["parent_tcn_id"] != parent_tcn_id
+            or any(
+                previous[field] != draft[field]
+                for field in (
+                    "model_type",
+                    "technique_slug",
+                    "selection_source",
+                    "selection_key",
+                )
+            )
+        ):
+            raise InvalidInput("stale model reuse対象がprevious stateと不一致です")
+        blocked_model_keys.add(ref)
+
     if inactive_tcn_ids & update_tcn or any(
         previous_tcn_map.get(ref, {}).get("status") != "active"
         for ref in inactive_tcn_ids
@@ -1579,16 +1637,18 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     used_tcn = set(previous_tcn_map)
     tcn_mapping: dict[str, str] = {}
     reused_tcn: set[str] = set()
+    seen_tcn_reuse_ids = set(blocked_tcn_ids)
     for draft in sorted(tcn_drafts, key=lambda row: row["draft_key"]):
         if draft["identity_action"] == "reuse":
             ref = draft["reuse_id"]
             if (
                 ref not in update_tcn
-                or ref in reused_tcn
+                or ref in seen_tcn_reuse_ids
                 or previous_tcn_map.get(ref, {}).get("status")
                 not in {"active", "inactive"}
             ):
                 raise InvalidInput("TCN reuse対象がscope内activeではありません")
+            seen_tcn_reuse_ids.add(ref)
             reused_tcn.add(ref)
         else:
             previous_numbers = [
@@ -1614,6 +1674,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     model_metadata: dict[str, dict[str, Any]] = {}
     used_models = set(previous_model_map)
     reused_models: set[str] = set()
+    seen_model_reuse_keys = set(blocked_model_keys)
     for draft in sorted(
         model_drafts,
         key=lambda row: (
@@ -1632,7 +1693,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             ref = draft["reuse_model_key"]
             if (
                 ref not in update_model
-                or ref in reused_models
+                or ref in seen_model_reuse_keys
                 or previous_model_map.get(ref, {}).get("status")
                 not in {"active", "inactive"}
             ):
@@ -1652,6 +1713,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                 raise InvalidInput(
                     "reuse modelのparent TCNがprevious stateと不一致です"
                 )
+            seen_model_reuse_keys.add(ref)
             reused_models.add(ref)
         else:
             numbers = [
@@ -1921,11 +1983,12 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         status = row["status"]
         scope_refs = row["scope_refs"]
         if row["tcn_id"] in update_tcn:
-            status = "active" if row["tcn_id"] in reused_tcn else "deleted"
-            if status == "active":
-                scope_refs = current_scope_by_tcn[row["tcn_id"]]
-            elif zero_scope_terminal:
-                scope_refs = []
+            if zero_scope_terminal or row["tcn_id"] not in blocked_tcn_ids:
+                status = "active" if row["tcn_id"] in reused_tcn else "deleted"
+                if status == "active":
+                    scope_refs = current_scope_by_tcn[row["tcn_id"]]
+                elif zero_scope_terminal:
+                    scope_refs = []
         elif row["tcn_id"] in inactive_tcn_ids:
             status = "inactive"
         tcn_state.append(
@@ -1945,11 +2008,12 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         status = row["status"]
         scope_refs = row["scope_refs"]
         if row["model_key"] in update_model:
-            status = "active" if row["model_key"] in reused_models else "deleted"
-            if status == "active":
-                scope_refs = model_metadata[row["model_key"]]["scope_refs"]
-            elif zero_scope_terminal:
-                scope_refs = []
+            if zero_scope_terminal or row["model_key"] not in blocked_model_keys:
+                status = "active" if row["model_key"] in reused_models else "deleted"
+                if status == "active":
+                    scope_refs = model_metadata[row["model_key"]]["scope_refs"]
+                elif zero_scope_terminal:
+                    scope_refs = []
         elif row["model_key"] in inactive_model_keys:
             status = "inactive"
         model_state.append({**row, "scope_refs": scope_refs, "status": status})

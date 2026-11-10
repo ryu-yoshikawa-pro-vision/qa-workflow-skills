@@ -916,8 +916,13 @@ def _formal_record_metrics(
             conditions[pair[1]],
             level_assignment_by_item[pair[0]]["source_ref"],
         }
-        if row["test_level"] != level_assignment_by_item[pair[0]]["level"]:
-            raise InvalidInput("formal pair test_level differs from item assignment")
+        assigned_level = level_assignment_by_item[pair[0]]["level"]
+        if decision == "adopted" and row["test_level"] != assigned_level:
+            raise InvalidInput(
+                "adopted formal pair test_level differs from item assignment"
+            )
+        if decision == "other_test_level" and row["test_level"] == assigned_level:
+            raise InvalidInput("formal other_test_level matches the assigned level")
         candidates = ensure_list(
             row["expected_result_candidates"], "formal expected_result_candidates"
         )
@@ -999,11 +1004,6 @@ def _formal_record_metrics(
             ensure_nonempty_string(row["reopen_condition"], "formal reopen_condition")
         elif row["reopen_condition"] is not None:
             raise InvalidInput("closed formal pair has a reopen condition")
-        if (
-            decision == "other_test_level"
-            and row["test_level"] == level_assignment_by_item[pair[0]]["level"]
-        ):
-            raise InvalidInput("formal other_test_level matches the assigned level")
         assessments[pair] = row
 
     history_revisions: list[int] = []

@@ -61,7 +61,7 @@ TCなしの明示E2E対象 / 既存E2Eから開始する経路へ、存在しな
 
 ### 正式設計候補のcoverage
 
-正式設計summaryを受け取った場合、自己申告の分子・分母は採用せず、`formal_design_record`から候補母集団とitem×condition pairの判断を再計算します。`design_ref`／`revision`、source currentnessとAuthority revisionの整合、履歴の連続性、candidate assignment／retirement、全pair matrixを検証します。recordなし、0 denominator、不完全な母集団、stale dependency、unconfirmed／blocked pair、summaryとrecordの不一致は完了を止めます。このrecordの局所検証はprovider上の登録・保存・承認・CAS・readbackを証明しません。正式設計coverageは既存CI／QA artifact graphのnode・edgeやclosure件数と混ぜません。summaryがない既存CI coverage経路は従来どおり評価します。
+正式設計summaryを受け取った場合、自己申告の分子・分母は採用せず、`formal_design_record`から候補母集団とitem×condition pairの判断を再計算します。`design_ref`／`revision`、source currentnessとAuthority revisionの整合、履歴の連続性、candidate assignment／retirement、全pair matrixを検証します。adopted pairのtest levelはitemの解決済み割当と一致させ、`other_test_level`は割当と異なる別levelを記録します。別level pairだけでTCNやCIを生成しません。recordなし、0 denominator、不完全な母集団、stale dependency、unconfirmed／blocked pair、summaryとrecordの不一致は完了を止めます。このrecordの局所検証はprovider上の登録・保存・承認・CAS・readbackを証明しません。正式設計coverageは既存CI／QA artifact graphのnode・edgeやclosure件数と混ぜません。summaryがない既存CI coverage経路は従来どおり評価します。
 
 ### 現在有効な仕様根拠のカバレッジ
 

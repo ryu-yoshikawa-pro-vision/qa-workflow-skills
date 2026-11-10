@@ -279,8 +279,14 @@ def _selection_snapshot(value: Any, name: str) -> dict[str, Any]:
         raise ContractError(f"{name}.source_refsまたはscope_refsが不正です")
 
     raw_candidates = snapshot["candidates"]
-    if not isinstance(raw_candidates, list) or not raw_candidates:
+    if not isinstance(raw_candidates, list):
         raise ContractError(f"{name}.candidatesが不正です")
+    if not raw_candidates and (
+        snapshot["population_complete"] or not snapshot["blockers"]
+    ):
+        raise ContractError(
+            f"{name}で候補0件を記録するには不完全な母集団とblockerが必要です"
+        )
     candidate_ids: list[str] = []
     candidate_keys: set[str] = set()
     candidates: list[dict[str, Any]] = []
@@ -475,6 +481,8 @@ def validate(packet: Any) -> dict:
         not isinstance(item, str) or not item.strip() for item in blockers
     ):
         raise ContractError("blockersは非空文字列の配列が必要です")
+    if not candidates and (data["population_complete"] or not blockers):
+        raise ContractError("候補0件を記録するには不完全な母集団とblockerが必要です")
 
     history = data["history"]
     if not isinstance(history, list):

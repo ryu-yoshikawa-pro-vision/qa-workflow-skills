@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import unittest
 
 from tests.skills.runtime.test_formal_design_contract import (
@@ -48,6 +49,82 @@ class CoverageAnalysisTraceabilityTests(unittest.TestCase):
         self.assertFalse(
             any(node["node_type"] == "COND" for node in result["payload"]["nodes"])
         )
+
+    def test_other_test_level_pair_is_closed_by_formal_and_coverage_validators(
+        self,
+    ) -> None:
+        value = formal_packet()
+        value["source_refs"].append(
+            {"ref": "TI-002", "revision": "i5", "currentness": "current"}
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        other_level = copy.deepcopy(value["pair_assessments"][0])
+        other_level.update(
+            {
+                "item_ref": "TI-002",
+                "decision": "other_test_level",
+                "rationale": "TI-002はsystem levelで確認する",
+                "test_level": "system",
+                "tcn_draft_key": None,
+                "expected_result_candidates": [],
+            }
+        )
+        value["pair_assessments"].append(other_level)
+        summary = verified_formal_design(value)
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertTrue(result["payload"]["can_complete"], result["issues"])
+        metric = result["payload"]["formal_design_metrics"][0]
+        self.assertTrue(metric["record_verified"])
+        self.assertEqual(metric["pair_denominator"], 2)
+        self.assertEqual(metric["pair_closed"], 2)
+        self.assertEqual(metric["pair_coverage"], "2/2")
+        self.assertFalse(
+            any(node["node_type"] == "COND" for node in result["payload"]["nodes"])
+        )
+
+    def test_coverage_rejects_decision_level_mismatch(self) -> None:
+        summary = verified_formal_design()
+        summary["formal_design_record"]["pair_assessments"][0]["test_level"] = "system"
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+
+    def test_coverage_rejects_other_test_level_that_matches_assignment(self) -> None:
+        value = formal_packet()
+        value["source_refs"].append(
+            {"ref": "TI-002", "revision": "i5", "currentness": "current"}
+        )
+        value["items"].append({"item_ref": "TI-002", "source_ref": "TI-002"})
+        other_level = copy.deepcopy(value["pair_assessments"][0])
+        other_level.update(
+            {
+                "item_ref": "TI-002",
+                "decision": "other_test_level",
+                "rationale": "invalid matching level",
+                "test_level": "system",
+                "tcn_draft_key": None,
+                "expected_result_candidates": [],
+            }
+        )
+        value["pair_assessments"].append(other_level)
+        summary = verified_formal_design(value)
+        summary["formal_design_record"]["pair_assessments"][1]["test_level"] = (
+            "integration"
+        )
+        request = base_request()
+        request["input"]["formal_design_summaries"] = [summary]
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
 
     def test_self_consistent_summary_without_formal_record_cannot_complete(
         self,
