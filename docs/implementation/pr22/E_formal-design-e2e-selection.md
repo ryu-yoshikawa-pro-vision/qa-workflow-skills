@@ -738,6 +738,15 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - 6c3に対応するGitHub ActionsはCode Quality PASS、Validate Deterministic Output Evals PASS、Validate Semantic Output Evals PASS、Codex Harness PASS、Validate Agent Skills FAIL（repository eval structureがREADME canonical listのE2E登録不足で失敗）。PR #27はopen／Draft。PR本文は未変更。
 - 今回の文書・証拠のcommit／pushは未完了。作業環境からの直接Git branch確認がHookに拒否されたため状態を再確認中。変更は担当Planとsemantic evidenceのみで、追加コード変更はない。次はformatter／差分・secret scan、branch/remote再確認、許可された場合の明示ファイルstage・commit・通常push、push後Actions再取得を行う。
 
+### 2026-11-10 commit・push後の状態（69ab542）
+
+- Planとsemantic evidence v1/v2をcommit `69ab5429a274e93c5e9648de1489f6fb3247eb89`（`eval: record PR #27 agent and judge evidence`）として担当branchへ通常pushした。push前に`git fetch origin`と`git merge-base --is-ancestor origin/feat/pr22-e-formal-design-e2e-selection HEAD`が成功。localとremote branch headは同SHA、`git status -sb`はclean。
+- commit 69ab542に対するActionsはCode Quality PASS（run 906）、Validate Deterministic Output Evals PASS（run 2211）、Validate Semantic Output Evals PASS（run 2176）、Codex Harness PASS（run 906）、Validate Agent Skills FAIL（run 2213）。これらPR workflowはsynthetic merge commit `32300054c722c76abbb28fbb8bf67dd920f86e2c`をcheckoutした。Agent Skillsの`Validate Agent Skills specification`はPASS、`Validate repository eval structure`はFAIL。job logはREADME.mdに`e2e-test-selection`が欠けると明記。共有README/ASSERTIONSは変更しない。
+- PR #27はopen／Draftで維持、GitHub本文は未変更。commit 69ab542時点のsemantic実評価は17／31、pass 13、needs_review 4、fail/not_evaluable/Judge error 0。trigger実評価は未実施、provider・保存・承認・CAS・readbackも未実施。
+- 全current Skillのtrigger環境用worktree作成を、canonical quoted root形式の`git worktree add --detach /tmp/pr27-e-formal-agent-eval-69ab HEAD`で再試行した。Hookは`approval required by policy, but AskForApproval is set to Never`で拒否。Hook/execpolicy回避はしない。read-only Codex smokeはskill load traceを持たず、trigger評価の代替にはならない。
+- 次の独立semantic generation run `agent-v8`を開始し、TCN-SEM-005を生成中。TCN-SEM-004を含め17件のみがJudge完了済みで、残り14件は未評価。起動中Agentが完了またはtimeoutした各caseを記録し、candidate完了後に別Judge sessionで判定してから継続する。
+- GitHub Actions結果、remote一致、worktree拒否の証拠は2026-11-10の実行結果。新たなcommit後は、そのcommitに紐づくActionsを改めて取得する。
+
 ## 実Agent・semantic評価の再実施（2026-11-10、進行中）
 
 ### 対象状態とE2E trigger dataset
