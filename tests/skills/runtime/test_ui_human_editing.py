@@ -660,10 +660,20 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             )
 
     def test_10_symlink_root_and_duplicate_json_keys_are_rejected(self) -> None:
+        duplicate_code, duplicate = raw_cli(
+            HUMAN_EDIT_SCRIPT,
+            '{"operation":"feature-index","operation":"prepare"}',
+        )
+        self.assertNotEqual(duplicate_code, 0)
+        self.assertEqual(duplicate["issues"][0]["code"], "invalid_input")
+
         canonical, base, edit, snapshot = self.make_fixture()
         with tempfile.TemporaryDirectory() as temp_dir:
             base_link = Path(temp_dir) / "base-link"
-            base_link.symlink_to(base, target_is_directory=True)
+            try:
+                base_link.symlink_to(base, target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"directory symlink is unavailable: {exc}")
             request = {
                 "operation": "prepare",
                 "package_root": str(canonical),
@@ -675,13 +685,6 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             code, response = cli(HUMAN_EDIT_SCRIPT, request)
             self.assertNotEqual(code, 0)
             self.assertEqual(response["issues"][0]["code"], "symlink_not_allowed")
-
-        duplicate_code, duplicate = raw_cli(
-            HUMAN_EDIT_SCRIPT,
-            '{"operation":"feature-index","operation":"prepare"}',
-        )
-        self.assertNotEqual(duplicate_code, 0)
-        self.assertEqual(duplicate["issues"][0]["code"], "invalid_input")
 
     def _update_page(self, canonical: Path, stable_id: str, name: str) -> None:
         model = package._read_package(canonical)
