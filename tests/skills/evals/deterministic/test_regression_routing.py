@@ -2537,8 +2537,8 @@ class RunArtifactTypeVerificationTests(unittest.TestCase):
         self.assertEqual(check_with_run(legacy, "REG-D018"), "pass")
 
 
-class LegacyAuxiliaryResolutionInputTests(unittest.TestCase):
-    """不正な旧Runの補助宣言を黙って除外せず、再解決を`blocked`にする。"""
+class ResolveObligationsHelpers:
+    """`resolve_auxiliary_obligations()`の入力を作る共有helper（テストは持たない）。"""
 
     DETAILS = {
         "A": {"executor_owner": "testware-execution", "implementation_revision": REV}
@@ -2563,6 +2563,10 @@ class LegacyAuxiliaryResolutionInputTests(unittest.TestCase):
         kwargs.setdefault("policy_refs", [])
         kwargs.setdefault("testware_details", self.DETAILS)
         return regression.resolve_auxiliary_obligations(run, **kwargs)
+
+
+class LegacyAuxiliaryResolutionInputTests(ResolveObligationsHelpers, unittest.TestCase):
+    """不正な旧Runの補助宣言を黙って除外せず、再解決を`blocked`にする。"""
 
     def test_valid_legacy_run_still_resolves_to_a_new_revision(self):
         run = self.legacy()
@@ -2645,6 +2649,72 @@ class LegacyAuxiliaryResolutionInputTests(unittest.TestCase):
         no_detail = self.resolve(self.legacy(), testware_details={})
         self.assertEqual(no_detail["status"], "blocked")
         self.assertEqual(no_detail["missing_detail_refs"], ["A"])
+
+
+class UnsupportedContractVersionResolutionTests(
+    ResolveObligationsHelpers, unittest.TestCase
+):
+    """未対応の`route_contract_version`を旧形式として再解決しない（既存helperを共有）。"""
+
+    BAD_VERSIONS = ("3", "1", 2, 2.0, None, "", " 2", [], ["2"], {}, True, False)
+
+    def test_unsupported_version_is_blocked_without_a_new_run(self):
+        for version in self.BAD_VERSIONS:
+            with self.subTest(version=version):
+                run = self.legacy(route_contract_version=version)
+                snapshot = copy.deepcopy(run)
+                result = self.resolve(run)
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["reason"], "unsupported_route_contract_version")
+                self.assertEqual(
+                    result["invalid_inputs"], ["unsupported_route_contract_version"]
+                )
+                self.assertIsNone(result["run"])
+                self.assertTrue(result["new_revision_required"])
+                self.assertEqual(run, snapshot)
+
+    def test_complete_obligation_evidence_does_not_bypass_the_version_check(self):
+        # 選定根拠・owner・revisionが揃った補助でも、未対応versionならreadyにしない。
+        run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        for version in ("3", 2, None, ""):
+            with self.subTest(version=version):
+                run["route_contract_version"] = version
+                result = self.resolve(
+                    run, user_explicit_refs=["A"], testware_details=self.DETAILS
+                )
+                self.assertEqual(result["status"], "blocked")
+                self.assertIsNone(result["run"])
+
+    def test_omitted_and_current_versions_are_still_resolved(self):
+        omitted = self.resolve(self.legacy())
+        self.assertEqual(omitted["status"], "ready")
+        self.assertEqual(omitted["run"]["route_contract_version"], "2")
+        v2 = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+        ready = self.resolve(v2)
+        self.assertEqual(ready["status"], "ready")
+        self.assertEqual(ready["run"]["auxiliary_routes"], v2["auxiliary_routes"])
+        self.assertEqual(ready["run"]["route_contract_version"], "2")
+
+    def test_other_entry_points_reject_the_same_versions(self):
+        source = {"M-1": started("PASS"), "E-A": aux_started("PASS")}
+        for version in self.BAD_VERSIONS:
+            with self.subTest(version=version):
+                run = mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")])
+                run["route_contract_version"] = version
+                self.assertEqual(check_with_run(run, "REG-D009"), "fail")
+                projected = regression.project_activity(run, source)
+                self.assertNotEqual(projected["activity_state"], "完了")
+                self.assertIn(
+                    "unsupported_route_contract_version", projected["unresolved"]
+                )
+                doc = activity_doc(
+                    mk_run([tc_route("TC-1", "M-1", "manual")], [aux("A", "E-A")]),
+                    source,
+                )
+                self.assertFalse(
+                    regression.verify_activity_against_run(run, doc)["valid"]
+                )
+                self.assertEqual(check_with_run(doc, "REG-D018", run), "fail")
 
 
 class V2CompletionRequiredTests(unittest.TestCase):

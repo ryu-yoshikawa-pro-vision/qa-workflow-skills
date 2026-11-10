@@ -927,12 +927,29 @@ def resolve_auxiliary_obligations(
     `blocked`のまま残し、完了済みActivityを書き換えず新revisionで復旧する。
     補助routeや参照一覧が不正な型・要素を含むRunは、正常な要素だけを拾って続けず
     `blocked`（`reason: "auxiliary_declaration_invalid"`、`invalid_inputs`に理由）にする。
+    `route_contract_version`が存在して`"2"`以外のRunも未対応versionとして`blocked`
+    （`reason: "unsupported_route_contract_version"`）にし、新しいv2 Runを作らない。
     """
     if not isinstance(run, dict):
         return {
             "status": "blocked",
             "reason": "auxiliary_declaration_invalid",
             "invalid_inputs": ["run_not_object"],
+            "unresolved_refs": [],
+            "missing_detail_refs": [],
+            "run": None,
+            "new_revision_required": True,
+        }
+    # 旧形式として扱えるのは`route_contract_version`が無いRunだけ。存在して`"2"`以外なら
+    # 未対応versionであり、旧Runとして再解決して新しいv2 Runへ置換しない。
+    if (
+        "route_contract_version" in run
+        and run["route_contract_version"] != ROUTE_CONTRACT_VERSION
+    ):
+        return {
+            "status": "blocked",
+            "reason": "unsupported_route_contract_version",
+            "invalid_inputs": ["unsupported_route_contract_version"],
             "unresolved_refs": [],
             "missing_detail_refs": [],
             "run": None,
