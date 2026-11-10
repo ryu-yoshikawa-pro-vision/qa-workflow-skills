@@ -347,15 +347,25 @@ PR #22の担当Fとして、QA要求・テストアーキテクチャ・計画�
 - CI固定revision `skills-ref@69ef37e9424c0a7ea9dd2293b559e43ec8176379`で3 Skillの`skills-ref validate` — PASS。取得・実行環境は一時領域を使用しrepository依存へ追加していない。
 - `git diff --check` — 文書追記後の現在差分でPASS。秘密情報検査、path範囲、stage内容はcommit直前にも再確認する。
 
+### Push後のGitHub Actions（HEAD `08a5a666e92fac8181662588440c0f237138ae76`）
+
+- [Validate Agent Skills #2180](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42743257116) — FAIL。公式`skills-ref` validationは3 SkillすべてPASS。`Validate repository eval structure`だけがREADME未登録のF 3 Skillを検出し、後続stepをSKIPした。担当Aの共有範囲。
+- [Validate Deterministic Output Evals #2178](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42743258305) — PASS。dataset、compile、shared deterministic runtime、repository deterministic、runtime unit／integration、semantic dataset/runtimeの全stepがPASS。
+- [Validate Semantic Output Evals #2143](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42743257564) — PASS。
+- [Code Quality #873](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42743257353) — PASS。
+- [Codex Harness #873](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/42743257090) — PASS。`codex-contract`と`windows-launcher`の両jobが完了。
+
+Ubuntu CIではrepository deterministic／runtime testsがPASSしたため、ローカルで失敗した共有providerのstate-root／SQLiteケースはこの環境固有の制約として切り分けられた。Windowsで既知のruntime失敗・skipが解消した証拠にはしない。
+
 ### CI、共有登録、受入判定
 
-レビュー基準HEAD `aa16455a`のActionsはDeterministic Output Evals、Semantic Output Evals、Code Quality、Codex HarnessがPASS、Validate Agent SkillsはREADMEにFの3 Skill (`test-requirements-analysis`、`test-architecture-design`、`test-management`)が未登録でFAILした。今回の修正HEADに対するGitHub Actionsはpush後に確認する。ローカルPASSをActions成功とは扱わない。
+レビュー基準HEAD `aa16455a`ではDeterministic Output Evals、Semantic Output Evals、Code Quality、Codex HarnessがPASS、Validate Agent SkillsはREADME未登録でFAILだった。修正後HEAD `08a5a666e92fac8181662588440c0f237138ae76`でも同じ共有README不備が継続し、他4 workflowはPASSした。ローカル結果とActions結果は分けて記録した。
 
 PR #22統合先`feat/development-qa-traceability`の現行ファイルを読み取り確認した。READMEのSkill roster、`scripts/skills/evals/deterministic/common.py::CANONICAL_SKILLS`、`skills/qa-workflow/scripts/workflow_runtime.py::RUNTIME_V2_SKILL_ROOTS`のいずれにもFの3 Skillは未登録で、今回も共有ファイルは変更していない。担当Aへ、Skill名／責務、validator入口、owner・scope・ref・revision、currentness／approval、正常・拒否fixture、未検証scopeの扱い、routing／trigger条件、登録後CIとPR #22実成果物接続を引き継ぐ。既存の詳細依頼は本書の前節に記載したとおり。
 
 - 4件の今回レビュー指摘 — validatorとfixtureで拒否／保持条件を確認し、F回帰33件はPASS。
 - 担当Fローカルの対象修正 — **完了**。承認・目的・未決事項の4契約はPlan/data-contractと整合し、再レビューではsubstring誤検知も修正した。
-- 担当Fの全局所受入 — **未完了**。repository deterministic 4件FAILと共有runtime 10 FAIL／9 ERRORが残るため、PR #22の隔離Linux CIで共有state-root／SQLite／Python-version原因を再確認する。
+- 担当Fの局所受入 — **F回帰・対象validator・Ubuntu repository deterministic／runtime CIはPASS**。Windowsを含む実行環境全体の受入は未完了で、ローカルsandboxは4 deterministic FAIL、runtime 10 FAIL／9 ERROR。これらはPR #22でOS別に原因を記録し、Windows既知制約を別途確認する。
 - AのREADME／registry／routing登録 — 未完了、担当A。3 Skill登録後に5 CI workflowと後続deterministic／runtime testsを新HEADで再確認する。
 - 実Agent、semantic Judge、認証済みapproval、実保存provider CAS／history／readback、保存失敗後復旧、E／J成果物横断接続、S1〜S17 — PR #22／外部provider・認証主体の選定待ち。fixtureを実接続証拠にしない。
 - PR本文は更新していない。Draftを維持する。push後のActions結果を反映したPR本文案は最終報告に示す。
@@ -370,7 +380,7 @@ PR #22の担当Fとして、QA要求・architecture・計画の契約とvalidato
 ## 現在の状態
 
 - Draft。今回の承認placeholder、QA目的・成功条件、未決事項の担当・scope・状態・再開条件を修正し、担当F回帰33件、6 output reference fixture、25 Skill／52 caseのdataset検査はPASS。
-- 全repository deterministicは共有runtime sandboxに起因する4 FAIL、runtime suiteは10 FAIL／9 ERRORが残る。push後のGitHub Actions結果は担当F文書に記録する。
+- 新HEADのDeterministic Output Evals、Semantic Output Evals、Code Quality、Codex HarnessはPASS。Agent Skills workflowは公式仕様検証PASS後、担当A範囲のREADME登録不足でFAIL。ローカル全suiteにはsandbox由来の失敗が残る。
 - README・共通runtime登録は担当Aへ引継ぎ中。実Agent・認証済み承認・実provider・PR #22横断接続は未実施。
 - 詳細と検証証拠は[担当F文書](docs/implementation/pr22/F_qa-planning-architecture.md)を参照。
 ```
