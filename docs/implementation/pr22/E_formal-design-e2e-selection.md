@@ -754,6 +754,15 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - Agent Skillsのvalidator jobでは`Validate Agent Skills specification` PASS、`Validate repository eval structure` FAIL。失敗点はPR #22のREADME canonical Skill catalogに`e2e-test-selection`が欠けていること。共有README／ASSERTIONSは変更せず、PR #22統合ownerへ引き継ぐ。
 - semantic Agent-v8はこのPlan追記前からTCN-SEM-005を生成中。生成完了／timeoutと別Judgeを確認後、次の結果を証拠化して保存する。今は17／31件が実生成・Judge済みで、残14件は未完了。
 
+### 2026-11-10 semantic evidence v3追記
+
+- `agent-v8`が`TCN-SEM-005`を生成し、exit 0／`turn.completed`／candidateありを確認。elapsed 744.4秒、115 JSONL events、54 command events。eval packageから`evals/`、tests、pycacheは除外した。実行時のbranch source HEADは`69ab5429a274e93c5e9648de1489f6fb3247eb89`。後続の文書だけのcommitでSkill/input内容は変わっていない。
+- 既存`run.py --judge-command`と独立Codex Judge sessionで判定し、`normalize_judge_response()`を通した結果はpass、4／4 criteria、Judge errorなし。raw Judge応答・JSONL・stderrと正規化結果を保存した。
+- semanticの実生成・Judge累計は18／31件、pass 14、needs_review 4、fail／not_evaluable／Judge error 0、criterion statusはpass 59／needs_review 4。新しいarchive/indexは`evidence/semantic-2026-11-10/semantic-evidence-v3.tar.gz`、`evidence-index-v3.json`、`README.md`。v1・v2のbundleとindexは変更せず保持。
+- `agent-v8`はTCN-SEM-005判定後に停止。remaining 13 casesは未評価で、実施可能なため引き続き生成・Judgeを続ける。4 needs_reviewとE2E-SEL-SEM-003のTI-003 revision/currentness確認事項は未解決。
+- commit `d5a91582563d2784a9f68888bfeef55448e890c7`に紐づく最新ActionsはCode Quality run 908 PASS、Validate Deterministic Output Evals run 2213 PASS、Validate Semantic Output Evals run 2178 PASS、Codex Harness run 908 PASS、Validate Agent Skills run 2215 FAIL。PR jobはsynthetic merge `227fd6ae2e505b76aa7b6785c710b6288a380cd4`をcheckout。失敗job `validate`の`Validate repository eval structure`はREADME canonical listに`e2e-test-selection`がないと報告し、`Validate Agent Skills specification`はPASS。
+- このPlan更新とv3 evidence fileは未commit。次は明示したPlan／README／v3 index／archiveだけをstageし、差分・formatter・秘密情報scan後にcommit・通常pushする。local/remote一致とそのcommitに紐づくActionsを再確認する。
+
 ## 実Agent・semantic評価の再実施（2026-11-10、進行中）
 
 ### 対象状態とE2E trigger dataset
