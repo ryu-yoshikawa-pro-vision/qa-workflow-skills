@@ -152,6 +152,8 @@ Codex CLI `0.167.0`と`--no-daemon --strict-config --ask-for-approval never exec
 - 全runtime suite（598件）は6 failures／17 errors、deterministic全suite（292件）は1 failure。失敗は前回記録と同じ他担当module（`test_ci_handoff`、`test_sqlite_workflow_history`、`test_git_source_inventory`、`test_pr24_artifact_store`、`test_pr24_git_artifact_store`、`test_qa_artifact_graph_skills`、deterministicのclaim直列化test）に限られ、UI human editing・ui-target・migration由来の失敗はない。PASSへ読み替えない。
 - trigger dataset、semantic dataset（26 Skills／173 cases）、semantic repository／shared runtime tests、`compileall`はPASS。担当fileのRuff 0.16.8（隔離venv）の`check`・`format --check`はPASS。`scripts/format_tracked.py check`はローカルRuff 0.15.21とdprint未導入のため未検証。
 
+GitHub Actions（修正commit `0fe9fa309e26e7577d956affe50831a129307b97`、Linux／Python 3.11）：code-quality、codex-contract、windows-launcher、validate（Validate Agent Skills）、deterministic-output-evals、semantic-output-evalsがすべてPASS。CodeRabbitはskipping。このcommitでローカルでskipしたsymlink root拒否testもCI上で実行された。PR本文の更新は、実行アカウントにUpdatePullRequest権限がなく拒否されたため未実施（権限のあるownerによる更新が必要）。
+
 PR #22への追加の引継ぎ：(1) `feature-index`の廃止ID追跡は、実際のfeature artifactと、provider revision履歴で連続性を確認した前snapshotを用いて再検証する。(2) 前snapshotの正規の祖先性の証明は共有runtime／履歴ownerの責務。(3) 生成列の拒否と並行追加行の再baseは独立fixtureの結果であり、実provider上の並行更新は統合時に確認する。
 
 ### GitHub Actionsの記録
