@@ -332,6 +332,8 @@ class HookTests(unittest.TestCase):
                 rewritten = self.assert_fetch_rewritten(
                     command, cwd=other, session_cwd=session_dir
                 )
+                if command.startswith("git.exe") and os.name != "nt":
+                    continue
                 if os.name == "nt":
                     result = subprocess.run(
                         [
