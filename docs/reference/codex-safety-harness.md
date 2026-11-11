@@ -38,7 +38,7 @@ PR #18では`Ask for approval`への切替、ユーザー本人による承認�
 
 ## Hookが受け付けるcommand形式
 
-Codexの`PreToolUse`では、`cwd`がセッションの作業ディレクトリを表し、個別の`exec_command.workdir`と異なる場合があります。そのため、実行先が曖昧な`git fetch origin`はdenyし、別repositoryに自動的に振り替えません。
+Codexの`PreToolUse`では、Hookプロセスはセッションの作業ディレクトリで起動されますが、イベントの`cwd`には個別の`exec_command.workdir`が入る場合があります。Hookは操作の許可範囲を**Hookプロセスの作業ディレクトリ**から特定し、イベントの`cwd`をセッションのリポジトリとみなしません。そのため、実行先が曖昧な`git fetch origin`はdenyし、別repositoryに自動的に振り替えません。
 
 通常のfetchでは、**実行先をコマンドに含む**次の形式を使用します。Windows PowerShell・Git Bash・POSIX shellで同じ`git -C`形式を使えます。
 
@@ -48,7 +48,7 @@ git -C '/absolute/repository/root' fetch origin
 
 WindowsでPowerShellとGit Bashの両方から同じcommandを使う場合、drive letterを含むパスは`C:/Users/example/repository`のように区切りを`/`で記述します。`\\repo`など現在のdriveに依存するパスは拒否します。
 
-この形式では、`-C`に指定されたliteralな絶対パスから実際のGit repositoryを特定し、セッションのリポジトリと`git rev-parse --git-common-dir`の実体が一致することを確認します。同一リポジトリのlinked worktreeは許可候補ですが、remote URLやfetch設定が同じでも、無関係なGit repositoryへのfetchは拒否します。対象の確認ができない場合も拒否します。そのうえで対象repositoryのrefspec・remote・設定を検証し、安全なfetchだけを許可します。`updatedInput`で実行先は変更しません。`--force`、保護されたrefsの更新、`--refmap`、複数command、パイプ、リダイレクト、shell展開はdenyします。`git -C`の例外は`fetch`に限り、他のGit subcommandに一般化しません。
+この形式では、`-C`に指定されたliteralな絶対パスから実際のGit repositoryを特定し、Hookプロセスの作業ディレクトリから得たセッションのリポジトリと`git rev-parse --git-common-dir`の実体が一致することを確認します。同一リポジトリのlinked worktreeは許可候補ですが、remote URLやfetch設定が同じでも、無関係なGit repositoryへのfetchは拒否します。対象の確認ができない場合も拒否します。そのうえで対象repositoryのrefspec・remote・設定を検証し、安全なfetchだけを許可します。`updatedInput`で実行先は変更しません。`--force`、保護されたrefsの更新、`--refmap`、複数command、パイプ、リダイレクト、shell展開はdenyします。`git -C`の例外は`fetch`に限り、他のGit subcommandに一般化しません。
 
 既存のstate-changing Gitでは、次のliteralなcanonical repository root移動と直後のdirect Git commandも使用できます。
 
