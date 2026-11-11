@@ -387,6 +387,15 @@ class HookTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_denied(command)
 
+        if os.name == "nt":
+            # On Windows these paths are rooted but depend on the current drive.
+            for target in (r"\root-relative", "/root-relative"):
+                with self.subTest(target=target):
+                    self.assert_denied(
+                        f"git -C '{target}' fetch origin",
+                        "fully qualified absolute repository path",
+                    )
+
         malformed = self.run_hook("git fetch origin", session_cwd=Path("relative"))
         self.assertEqual(malformed.returncode, 2)
         self.assertIn("cwd must be an absolute path", malformed.stderr)
