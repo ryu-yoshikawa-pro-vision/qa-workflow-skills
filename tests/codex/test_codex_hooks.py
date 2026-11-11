@@ -169,7 +169,8 @@ class HookTests(unittest.TestCase):
         root = str(self.repo)
         if os.name == "nt":
             self.assertEqual(
-                rewritten, f"Set-Location -LiteralPath '{root}' -ErrorAction Stop; {command}"
+                rewritten,
+                f"Set-Location -LiteralPath '{root}' -ErrorAction Stop; {command}",
             )
         else:
             self.assertEqual(rewritten, f"cd '{root}' && {command}")
