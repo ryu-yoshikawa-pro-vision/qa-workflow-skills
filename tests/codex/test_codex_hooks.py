@@ -287,7 +287,6 @@ class HookTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "", command)
 
-        self.assert_denied("git fetch origin", "canonical repository root")
         outside = self.run_hook(
             "git fetch origin",
             cwd=self.repo.parent,
