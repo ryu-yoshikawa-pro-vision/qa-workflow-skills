@@ -1024,13 +1024,14 @@ function opaqueShell(tokens) {
 function evaluateCommand(command, cwd, sessionCwdKnown = true) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
-  // Hook cwd may describe the session, not the pending tool's workdir.
-  // The -C path is in the executed command, so the verified and actual Git repositories match.
+  // The hook process cwd is the session scope. PreToolUse input cwd can be the
+  // pending exec_command workdir and must not authorize another repository.
+  // The literal -C path determines the Git execution target.
   const explicitFetch =
     /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
   if (explicitFetch) {
     if (!sessionCwdKnown) {
-      return deny("Explicit Git -C fetch requires the session repository cwd from PreToolUse.");
+      return deny("Explicit Git -C fetch requires the local tool cwd from PreToolUse.");
     }
     const target = explicitFetch[1];
     // Windows accepts drive-relative roots (\dir) as "absolute" even though
@@ -1121,7 +1122,7 @@ async function main() {
     process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) raw += chunk;
     const p = validate(raw),
-      decision = evaluateCommand(p.tool_input.command, p.cwd ?? process.cwd(), p.cwd !== undefined);
+      decision = evaluateCommand(p.tool_input.command, process.cwd(), p.cwd !== undefined);
     if (decision) process.stdout.write(JSON.stringify(decision));
   } catch (error) {
     process.stderr.write(
