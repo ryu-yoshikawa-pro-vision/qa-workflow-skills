@@ -1007,7 +1007,7 @@ function evaluateCommand(command, cwd) {
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
   // The hook cwd may differ from the Bash tool's effective workdir. Rewrite a
   // literal fetch to make the checked repository the command's actual target.
-  if (!canonical && /^[ \\t]*git(?:\\.exe)?[ \\t]+fetch(?:[ \\t]+[A-Za-z0-9_.:/=-]+)+[ \\t]*$/i.test(command)) {
+  if (!canonical && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.test(command)) {
     if (!root || root.includes("'")) {
       return deny("Fetch requires a repository root representable as a literal shell path.");
     }
