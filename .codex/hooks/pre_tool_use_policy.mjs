@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 
 const EVENT = "PreToolUse";
@@ -258,6 +259,21 @@ function remoteDefaultBranchError(status) {
 function repoRoot(cwd) {
   const root = gitOutput(cwd, ["rev-parse", "--show-toplevel"]);
   return root ? path.resolve(root) : null;
+}
+function gitCommonDir(root) {
+  if (!root) return null;
+  const commonDir = gitOutput(root, ["rev-parse", "--git-common-dir"]);
+  if (!commonDir) return null;
+  try {
+    return realpathSync.native(path.resolve(root, commonDir));
+  } catch {
+    return null;
+  }
+}
+function sameGitRepository(leftRoot, rightRoot) {
+  const left = gitCommonDir(leftRoot), right = gitCommonDir(rightRoot);
+  if (!left || !right) return false;
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 function samePath(a, b) {
   const left = path.resolve(a), right = path.resolve(b);
@@ -1023,6 +1039,11 @@ function evaluateCommand(command, cwd) {
     }
     const targetRoot = repoRoot(target);
     if (!targetRoot) return deny("Explicit Git -C fetch requires an existing Git repository.");
+    // Checking the requested repository configuration is not authorization to
+    // modify an unrelated repository. Linked worktrees share a common Git directory.
+    if (!sameGitRepository(root, targetRoot)) {
+      return deny("Explicit Git -C fetch must target the session repository or one of its linked worktrees.");
+    }
     const fetched = splitCommands(command, "posix");
     if (fetched.parseError || fetched.segments.length !== 1) {
       return deny("Explicit Git -C fetch must be one literal command.");
