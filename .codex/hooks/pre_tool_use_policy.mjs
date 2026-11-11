@@ -299,7 +299,8 @@ function validBranch(root, name) {
 function canonicalCommand(command, root) {
   const posix = /^\s*cd\s+'([^']+)'\s*&&\s*([\s\S]+)$/.exec(command);
   if (posix) return { command: posix[2], valid: Boolean(root) && samePath(posix[1], root), shell: "posix" };
-  const ps = /^\s*Set-Location\s+-LiteralPath\s+'([^']+)'\s+-ErrorAction\s+Stop\s*;\s*([\s\S]+)$/i.exec(command);
+  // An unguarded semicolon can execute Git even if Set-Location fails.
+  const ps = /^[ \t]*Set-Location[ \t]+-LiteralPath[ \t]+'([^']+)'[ \t]+-ErrorAction[ \t]+Stop[ \t]*;[ \t]*if[ \t]*\(\$\?\)[ \t]*\{[ \t]*([\s\S]*?)[ \t]*\}[ \t]*$/i.exec(command);
   if (ps) return { command: ps[2], valid: Boolean(root) && samePath(ps[1], root), shell: "powershell" };
   return null;
 }
@@ -1005,31 +1006,29 @@ function opaqueShell(tokens) {
 function evaluateCommand(command, cwd) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
-  // The hook cwd may differ from the Bash tool's effective workdir. Rewrite a
-  // literal fetch to make the checked repository the command's actual target.
-  if (!canonical && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.test(command)) {
-    if (!root || root.includes("'")) {
-      return deny("Fetch requires a repository root representable as a literal shell path.");
+  // Hook cwd may describe the session, not the pending tool's workdir.
+  // The -C path is in the executed command, so the verified and actual Git repositories match.
+  const explicitFetch = /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
+  if (explicitFetch) {
+    const target = explicitFetch[1];
+    if (!path.isAbsolute(target)) {
+      return deny("Explicit Git -C fetch requires an absolute repository path.");
     }
-    const fetch = command.trim();
-    const anchored = process.platform === "win32"
-      ? `Set-Location -LiteralPath '${root}' -ErrorAction Stop; ${fetch}`
-      : `cd '${root}' && ${fetch}`;
-    // Reuse all existing canonical, refspec, remote and configuration checks.
-    const decision = evaluateCommand(anchored, cwd);
-    if (decision) return decision;
-    // A different shell may be selected for the actual tool call. In particular,
-    // a POSIX shell must never run fetch after an unsupported Set-Location.
-    const rewritten = process.platform === "win32"
-      ? `Set-Location -LiteralPath '${root}' -ErrorAction Stop; if ($?) { ${fetch} }`
-      : anchored;
-    return {
-      hookSpecificOutput: {
-        hookEventName: EVENT,
-        permissionDecision: "allow",
-        updatedInput: { command: rewritten },
-      },
-    };
+    const targetRoot = repoRoot(target);
+    if (!targetRoot) return deny("Explicit Git -C fetch requires an existing Git repository.");
+    const fetched = splitCommands(command, "posix");
+    if (fetched.parseError || fetched.segments.length !== 1) {
+      return deny("Explicit Git -C fetch must be one literal command.");
+    }
+    const args = fetched.segments[0];
+    if (args.length < 5 || args[1].value !== "-C" || args[2].value !== target || args[3].value.toLowerCase() !== "fetch") {
+      return deny("Explicit Git -C fetch has an unsupported argument form.");
+    }
+    const result = evaluateGit([args[0], ...args.slice(3)], { valid: true }, targetRoot);
+    return result.decision;
+  }
+  if (!canonical && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]|$)/i.test(command)) {
+    return deny("Fetch without an explicit repository may target a different workdir. Use git -C '<absolute repository path>' fetch origin.");
   }
   if (parsed.segments.some(opaqueShell)) return deny("Nested shell wrappers are unsupported.");
   if (parsed.parseError) {
