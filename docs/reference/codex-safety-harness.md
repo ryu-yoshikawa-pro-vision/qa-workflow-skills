@@ -46,6 +46,8 @@ Codexの`PreToolUse`では、`cwd`がセッションの作業ディレクトリ�
 git -C '/absolute/repository/root' fetch origin
 ```
 
+WindowsでPowerShellとGit Bashの両方から同じcommandを使う場合、drive letterを含むパスは`C:/Users/example/repository`のように区切りを`/`で記述します。`\\repo`など現在のdriveに依存するパスは拒否します。
+
 この形式では、`-C`に指定されたliteralな絶対パスから実際のGit repositoryを特定し、そのrepositoryのrefspec・remote・設定を検証します。安全なfetchの場合のみ許可し、`updatedInput`で実行先を変更しません。`--force`、保護されたrefsの更新、`--refmap`、複数command、パイプ、リダイレクト、shell展開はdenyします。`git -C`の例外は`fetch`に限り、他のGit subcommandに一般化しません。
 
 既存のstate-changing Gitでは、次のliteralなcanonical repository root移動と直後のdirect Git commandも使用できます。
