@@ -166,14 +166,16 @@ class HookTests(unittest.TestCase):
         self.assertEqual(response["hookEventName"], "PreToolUse")
         self.assertEqual(response["permissionDecision"], "allow")
         rewritten = response["updatedInput"]["command"]
-        root = str(self.repo)
         if os.name == "nt":
-            self.assertEqual(
-                rewritten,
-                f"Set-Location -LiteralPath '{root}' -ErrorAction Stop; {command}",
-            )
+            prefix = "Set-Location -LiteralPath '"
+            suffix = f"' -ErrorAction Stop; {command}"
         else:
-            self.assertEqual(rewritten, f"cd '{root}' && {command}")
+            prefix = "cd '"
+            suffix = f"' && {command}"
+        self.assertTrue(rewritten.startswith(prefix), rewritten)
+        self.assertTrue(rewritten.endswith(suffix), rewritten)
+        rewritten_root = rewritten[len(prefix) : -len(suffix)]
+        self.assertTrue(os.path.samefile(rewritten_root, self.repo), rewritten)
         return rewritten
 
     def add_remote(self, name: str, *, default_branch: str | None = None) -> None:
