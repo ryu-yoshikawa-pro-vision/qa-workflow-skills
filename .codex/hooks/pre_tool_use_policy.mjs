@@ -1021,7 +1021,7 @@ function opaqueShell(tokens) {
   }
   return executable === "invoke-expression";
 }
-function evaluateCommand(command, cwd) {
+function evaluateCommand(command, cwd, sessionCwdKnown = true) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
   // Hook cwd may describe the session, not the pending tool's workdir.
@@ -1029,6 +1029,9 @@ function evaluateCommand(command, cwd) {
   const explicitFetch =
     /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
   if (explicitFetch) {
+    if (!sessionCwdKnown) {
+      return deny("Explicit Git -C fetch requires the session repository cwd from PreToolUse.");
+    }
     const target = explicitFetch[1];
     // Windows accepts drive-relative roots (\dir) as "absolute" even though
     // their drive depends on the pending command's (possibly hidden) workdir.
@@ -1117,7 +1120,7 @@ async function main() {
     let raw = "";
     process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) raw += chunk;
-    const p = validate(raw), decision = evaluateCommand(p.tool_input.command, p.cwd ?? process.cwd());
+    const p = validate(raw), decision = evaluateCommand(p.tool_input.command, p.cwd ?? process.cwd(), p.cwd !== undefined);
     if (decision) process.stdout.write(JSON.stringify(decision));
   } catch (error) {
     process.stderr.write(
