@@ -1009,7 +1009,7 @@ function evaluateCommand(command, cwd) {
   // Reject shell control, redirection, expansion and quoting before applying fetch refspec/config checks.
   const directFetch = Boolean(
     root && !canonical && parsed.segments.length === 1
-    && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.test(command)
+      && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.test(command),
   );
   if (parsed.segments.some(opaqueShell)) return deny("Nested shell wrappers are unsupported.");
   if (parsed.parseError) {
@@ -1037,7 +1037,10 @@ function evaluateCommand(command, cwd) {
     }
     if (isDelete(tokens)) return deny("Direct command-based deletion is forbidden.");
   }
-  if (mutationCount && (((!canonical || !canonical.valid) && !directFetch) || git.length !== 1 || parsed.segments.length !== 1)) {
+  if (
+    mutationCount
+    && (((!canonical || !canonical.valid) && !directFetch) || git.length !== 1 || parsed.segments.length !== 1)
+  ) {
     return deny("State-changing Git requires one direct command after the literal canonical repository root.");
   }
   if (canonical && git.length === 0) return deny("Canonical Git form must end in one direct Git command.");
