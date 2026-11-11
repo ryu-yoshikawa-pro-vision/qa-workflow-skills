@@ -308,7 +308,9 @@ class HookTests(unittest.TestCase):
                     cwd=other,
                     check=True,
                 )
-                self.assert_denied(command, "session repository or one of its linked worktrees")
+                self.assert_denied(
+                    command, "session repository or one of its linked worktrees"
+                )
                 self.assert_denied(
                     f"git.exe -C '{other.as_posix()}' fetch origin",
                     "session repository or one of its linked worktrees",
@@ -324,7 +326,16 @@ class HookTests(unittest.TestCase):
     def test_explicit_fetch_allows_linked_worktree(self) -> None:
         linked = Path(self.temp.name) / "linked worktree with spaces"
         subprocess.run(
-            ["git", "worktree", "add", "-q", "-b", "feature/linked", str(linked), "main"],
+            [
+                "git",
+                "worktree",
+                "add",
+                "-q",
+                "-b",
+                "feature/linked",
+                str(linked),
+                "main",
+            ],
             cwd=self.repo,
             check=True,
         )
@@ -361,7 +372,9 @@ class HookTests(unittest.TestCase):
             shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
         else:
             shell = ["/bin/sh", "-c"]
-        subprocess.run([*shell, command], cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(
+            [*shell, command], cwd=self.repo, check=True, capture_output=True
+        )
 
         if os.name == "nt":
             git_bash = (
