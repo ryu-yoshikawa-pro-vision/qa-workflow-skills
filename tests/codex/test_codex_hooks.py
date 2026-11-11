@@ -156,27 +156,8 @@ class HookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", command)
 
-    def assert_fetch_rewritten(
-        self, command: str, *, cwd: Path | None = None, session_cwd: Path | None = None
-    ) -> str:
-        result = self.run_hook(command, cwd=cwd, session_cwd=session_cwd)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(result.stdout, command)
-        response = json.loads(result.stdout)["hookSpecificOutput"]
-        self.assertEqual(response["hookEventName"], "PreToolUse")
-        self.assertEqual(response["permissionDecision"], "allow")
-        rewritten = response["updatedInput"]["command"]
-        if os.name == "nt":
-            prefix = "Set-Location -LiteralPath '"
-            suffix = f"' -ErrorAction Stop; if ($?) {{ {command} }}"
-        else:
-            prefix = "cd '"
-            suffix = f"' && {command}"
-        self.assertTrue(rewritten.startswith(prefix), rewritten)
-        self.assertTrue(rewritten.endswith(suffix), rewritten)
-        rewritten_root = rewritten[len(prefix) : -len(suffix)]
-        self.assertTrue(os.path.samefile(rewritten_root, self.repo), rewritten)
-        return rewritten
+    def ps_command(self, command: str) -> str:
+        return f"{self.ps_prefix}if ($?) {{ {command} }}"
 
     def add_remote(self, name: str, *, default_branch: str | None = None) -> None:
         subprocess.run(
@@ -212,7 +193,7 @@ class HookTests(unittest.TestCase):
     ) -> None:
         for command in (
             self.posix_prefix + 'git commit -m "normal commit"',
-            self.ps_prefix + 'git.exe commit --message "normal commit"',
+            self.ps_command('git.exe commit --message "normal commit"'),
             self.posix_prefix + 'git commit -a -m "normal commit"',
         ):
             with self.subTest(command=command):
@@ -222,7 +203,7 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + 'git commit --amend -m "rewrite"',
             self.posix_prefix + 'git commit -m "rewrite" --amend',
             self.posix_prefix + "git commit --message=rewrite --amend=HEAD",
-            self.ps_prefix + 'git.exe commit --message "rewrite" --Amend',
+            self.ps_command('git.exe commit --message "rewrite" --Amend'),
             self.posix_prefix + 'git commit --ame -m "rewrite"',
             self.posix_prefix + 'git commit -m "$MESSAGE"',
             self.posix_prefix + "git commit --no-verify -m message",
@@ -249,23 +230,24 @@ class HookTests(unittest.TestCase):
         subprocess.run(["git", "branch", "develop"], cwd=self.repo, check=True)
         subprocess.run(["git", "switch", "develop"], cwd=self.repo, check=True)
         self.assert_denied(
-            self.ps_prefix + 'git.exe commit -m "protected default"', "protected branch"
+            self.ps_command('git.exe commit -m "protected default"'), "protected branch"
         )
 
     def test_normal_fetch_is_allowed_but_unsafe_ref_updates_are_denied(self) -> None:
-        for command in (
-            "git fetch origin",
-            "git.exe fetch origin",
-            "git fetch --dry-run origin",
-            "git fetch origin --no-recurse-submodules",
-        ):
+        explicit = (
+            f"git -C '{self.posix_root}' fetch origin",
+            f"git.exe -C '{self.posix_root}' fetch origin",
+            f"git -C '{self.posix_root}' fetch --dry-run origin",
+            f"git -C '{self.posix_root}' fetch origin --no-recurse-submodules",
+        )
+        for command in explicit:
             with self.subTest(command=command):
-                self.assert_fetch_rewritten(command)
+                self.assert_hook_allows(command)
 
         for command in (
             self.posix_prefix + "git fetch",
             self.posix_prefix + "git fetch origin",
-            self.ps_prefix + "git.exe fetch origin",
+            self.ps_command("git.exe fetch origin"),
             self.posix_prefix + "git fetch origin feature/existing",
             self.posix_prefix + "git fetch --dry-run origin",
             self.posix_prefix + "git fetch --prune origin",
@@ -278,14 +260,14 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git fetch origin develop:refs/heads/develop",
             self.posix_prefix + "git fetch origin +main:refs/remotes/origin/main",
             self.posix_prefix + "git fetch origin --force",
-            self.ps_prefix + "git.exe fetch -f origin",
+            self.ps_command("git.exe fetch -f origin"),
             self.posix_prefix
             + "git fetch --refmap=refs/heads/main:refs/heads/main origin main",
             self.posix_prefix
             + "git fetch --refmap refs/heads/main:refs/heads/main origin main",
             self.posix_prefix + "git fetch origin --stdin",
             self.posix_prefix + "git fetch origin --prune-tags",
-            self.ps_prefix + "git.exe fetch -P origin",
+            self.ps_command("git.exe fetch -P origin"),
             self.posix_prefix + "git fetch --all",
             self.posix_prefix + "git fetch --multiple origin",
             self.posix_prefix + "git fetch origin --upload-pack=custom",
@@ -297,100 +279,90 @@ class HookTests(unittest.TestCase):
         subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
         self.assert_hook_allows(self.posix_prefix + "git fetch origin")
 
-    def test_direct_fetch_anchors_the_actual_git_command(self) -> None:
-        nested = self.repo / "nested"
-        nested.mkdir()
+    def test_explicit_fetch_preserves_the_requested_repository(self) -> None:
         other = Path(self.temp.name) / "unrelated-repository"
         other.mkdir()
-        subprocess.run(
-            ["git", "init", "-q", "-b", "main"],
-            cwd=other,
-            check=True,
-        )
-        # An unsafe remote mapping in the tool workdir must not be consulted.
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=other, check=True)
         subprocess.run(
             ["git", "remote", "add", "origin", str(self.remote)],
             cwd=other,
             check=True,
         )
         subprocess.run(
-            [
-                "git",
-                "config",
-                "--replace-all",
-                "remote.origin.fetch",
-                "+refs/heads/*:refs/heads/*",
-            ],
+            ["git", "config", "--replace-all", "remote.origin.fetch",
+             "+refs/heads/*:refs/heads/*"],
             cwd=other,
             check=True,
         )
+        command = f"git -C '{other}' fetch origin"
+        # Session cwd points at a safe repository, but the command targets the
+        # unsafe other repository. The hook must validate that other repository.
+        result = self.run_hook(command, cwd=self.repo, session_cwd=self.repo)
+        self.assertIn("remote-tracking namespace", result.stdout)
 
-        # The hook process and effective tool working directories differ.
-        for command, session_dir in (
-            ("git fetch origin", self.repo),
-            ("git fetch origin", nested),
-            ("git.exe fetch origin", self.repo),
-        ):
-            with self.subTest(command=command, session_dir=session_dir):
-                rewritten = self.assert_fetch_rewritten(
-                    command, cwd=other, session_cwd=session_dir
-                )
-                if command.startswith("git.exe") and os.name != "nt":
-                    continue
-                if os.name == "nt":
-                    result = subprocess.run(
-                        [
-                            "powershell.exe",
-                            "-NoProfile",
-                            "-NonInteractive",
-                            "-Command",
-                            rewritten,
-                        ],
-                        cwd=other,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                else:
-                    result = subprocess.run(
-                        ["/bin/sh", "-c", rewritten],
-                        cwd=other,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                self.assertEqual(result.returncode, 0, result.stderr)
-                if os.name == "nt" and shutil.which("bash"):
-                    alternate_shell = subprocess.run(
-                        ["bash", "-c", rewritten],
-                        cwd=other,
-                        text=True,
-                        capture_output=True,
-                        check=False,
-                    )
-                    self.assertNotEqual(alternate_shell.returncode, 0)
-
-        outside = self.run_hook(
-            "git fetch origin",
+        subprocess.run(
+            ["git", "config", "--replace-all", "remote.origin.fetch",
+             "+refs/heads/*:refs/remotes/origin/*"],
             cwd=other,
-            session_cwd=Path(self.temp.name),
+            check=True,
         )
-        self.assertEqual(outside.returncode, 0, outside.stderr)
-        self.assertIn("Fetch requires a repository root", outside.stdout)
+        self.assert_hook_allows(command)
+        self.assert_hook_allows(f"git.exe -C '{other}' fetch origin")
+        self.assert_hook_allows(f"git -C '{self.posix_root}' fetch origin")
 
-    def test_direct_fetch_keeps_shell_and_ref_update_guards(self) -> None:
+        # No hook rewrite: Git executes in the user-specified repository.
+        for args in (["git", "-C", str(other), "fetch", "origin"],):
+            subprocess.run(args, cwd=self.repo, check=True, capture_output=True)
+        git_path = subprocess.check_output(
+            ["git", "-C", str(other), "rev-parse", "--git-path", "FETCH_HEAD"],
+            text=True,
+        ).strip()
+        self.assertTrue(Path(git_path).exists())
+        self.assertFalse((self.repo / ".git" / "FETCH_HEAD").exists())
+
+        for shell in (
+            (["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["/bin/sh", "-c"]),
+        ):
+            subprocess.run([*shell, command], cwd=self.repo, check=True, capture_output=True)
+        if os.name == "nt" and shutil.which("bash"):
+            subprocess.run(
+                ["bash", "-c", command], cwd=self.repo, check=True, capture_output=True
+            )
+
+    def test_ambiguous_fetch_and_unsafe_explicit_fetch_are_denied(self) -> None:
+        root = self.posix_root
+        for command in (
+            "git fetch origin",
+            "git.exe fetch origin",
+            "git fetch --dry-run origin",
+            "git fetch origin --no-recurse-submodules",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command, "explicit repository")
+
         for command in (
             "git fetch origin && echo done",
             "git fetch origin; echo done",
             "git fetch origin | cat",
             "git fetch origin > fetched.log",
             "git fetch origin 2> fetched.log",
-            "git fetch origin\necho done",
+            "git fetch origin\\necho done",
             "git fetch origin --force",
             "git fetch origin --prune-tags",
             "git fetch origin main:refs/heads/main",
             "git fetch origin +main:refs/remotes/origin/main",
             "git fetch --all",
+            f"git -C '{root}' fetch origin && echo done",
+            f"git -C '{root}' fetch origin; git status",
+            f"git -C '{root}' fetch origin > fetched.log",
+            f"git -C '{root}' fetch origin --force",
+            f"git -C '{root}' fetch origin --prune-tags",
+            f"git -C '{root}' fetch origin main:refs/heads/main",
+            f"git -C '{root}' fetch origin +main:refs/remotes/origin/main",
+            f"git -C '{root}' fetch --refmap=refs/heads/main:refs/heads/main origin main",
+            f"git -C '{root}' push origin HEAD:feature/existing",
+            "git -C './relative' fetch origin",
+            "git -C /unquoted/path fetch origin",
             "git push origin HEAD:feature/existing",
             "git commit -m normal",
             "git pull --ff-only origin",
@@ -473,7 +445,7 @@ class HookTests(unittest.TestCase):
         for command in (
             self.posix_prefix + "git pull --ff-only",
             self.posix_prefix + "git pull --ff-only origin",
-            self.ps_prefix + "git.exe pull --ff-only origin feature/existing",
+            self.ps_command("git.exe pull --ff-only origin feature/existing"),
         ):
             with self.subTest(command=command):
                 self.assert_hook_allows(command)
@@ -520,7 +492,7 @@ class HookTests(unittest.TestCase):
         for command in (
             self.posix_prefix + "git pull --rebase",
             self.posix_prefix + "git pull --rebase=merges",
-            self.ps_prefix + "git.exe pull -r",
+            self.ps_command("git.exe pull -r"),
             self.posix_prefix + "git pull --no-rebase",
             self.posix_prefix + "git pull --no-ff",
             self.posix_prefix + "git pull --squash",
@@ -599,8 +571,8 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git push origin HEAD:feature/existing",
             self.posix_prefix + "git push -u origin feature/existing",
             self.posix_prefix + "git commit -m test",
-            self.ps_prefix + "git.exe push origin feature/existing",
-            self.ps_prefix + "git.exe push --set-upstream origin feature/existing",
+            self.ps_command("git.exe push origin feature/existing"),
+            self.ps_command("git.exe push --set-upstream origin feature/existing"),
             "gh pr merge 123 -R owner/repo",
             "gh.exe pr merge 123 -R owner/repo",
             "gh pr view 123 -R owner/repo",
@@ -623,7 +595,7 @@ class HookTests(unittest.TestCase):
         for command in (
             self.posix_prefix + "git commit -m test",
             self.posix_prefix + "git reset 'HEAD~1'",
-            self.ps_prefix + "git.exe push origin feature",
+            self.ps_command("git.exe push origin feature"),
             self.posix_prefix + "git branch -v -D feature/foo",
             self.posix_prefix + "git branch -d feature/foo",
             self.posix_prefix + "git branch -vv -m main renamed-main",
@@ -645,7 +617,7 @@ class HookTests(unittest.TestCase):
         self.assert_hook_allows(
             self.posix_prefix + "git switch -c feature/new-from-main"
         )
-        self.assert_hook_allows(self.ps_prefix + "git.exe switch feature/existing")
+        self.assert_hook_allows(self.ps_command("git.exe switch feature/existing"))
         for command in (
             self.posix_prefix + "git switch -c main",
             self.posix_prefix + "git switch master",
@@ -654,7 +626,7 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git switch --discard-changes feature/existing",
             self.posix_prefix + "git switch -c feature/new origin/main",
             self.posix_prefix + "git switch feature/existing --track",
-            self.ps_prefix + "git.exe switch -c feature/new --track",
+            self.ps_command("git.exe switch -c feature/new --track"),
         ):
             with self.subTest(command=command):
                 self.assert_denied(command)
@@ -728,7 +700,7 @@ class HookTests(unittest.TestCase):
         self,
     ) -> None:
         self.assert_hook_allows(self.posix_prefix + "git push origin feature/existing")
-        self.assert_hook_allows(self.ps_prefix + "git.exe push origin feature/existing")
+        self.assert_hook_allows(self.ps_command("git.exe push origin feature/existing"))
         for command in (
             "git push origin feature/existing",
             f'cd "{self.posix_root}" && git push origin feature/existing',
@@ -751,14 +723,14 @@ class HookTests(unittest.TestCase):
         for command in (
             self.posix_prefix + "git -c user.name=test push origin feature/existing",
             self.posix_prefix + "git.exe --no-pager reset --hard",
-            self.ps_prefix + "git.exe -C . push origin feature/existing",
-            self.ps_prefix + "git.exe --no-pager reset --hard",
-            self.ps_prefix + "git.exe reset HEAD~1",
-            self.ps_prefix + "git.exe rm *.md",
+            self.ps_command("git.exe -C . push origin feature/existing"),
+            self.ps_command("git.exe --no-pager reset --hard"),
+            self.ps_command("git.exe reset HEAD~1"),
+            self.ps_command("git.exe rm *.md"),
             self.posix_prefix + "git reset HEAD~1",
             self.posix_prefix + "git rm *.md",
             self.posix_prefix + 'git "$GIT_SUBCOMMAND" origin feature/existing',
-            self.ps_prefix + 'git.exe "$env:GIT_SUBCOMMAND" origin feature/existing',
+            self.ps_command('git.exe "$env:GIT_SUBCOMMAND" origin feature/existing'),
             self.posix_prefix + 'gh pr create --body "$BODY"',
             'gh.exe pr create --body "$BODY"',
         ):
@@ -769,8 +741,8 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git reset 'HEAD~1'",
             self.posix_prefix + "git rm '*.md'",
             "gh pr create --body-file body.md",
-            self.ps_prefix + "git.exe reset 'HEAD~1'",
-            self.ps_prefix + "git.exe rm '*.md'",
+            self.ps_command("git.exe reset 'HEAD~1'"),
+            self.ps_command("git.exe rm '*.md'"),
             "gh.exe pr create --body-file body.md",
         ):
             with self.subTest(command=command):
@@ -787,11 +759,10 @@ class HookTests(unittest.TestCase):
             "master",
             "HEAD:master",
         ):
-            for prefix in (
-                self.posix_prefix + "git push origin ",
-                self.ps_prefix + "git.exe push origin ",
+            for command in (
+                self.posix_prefix + "git push origin " + target,
+                self.ps_command("git.exe push origin " + target),
             ):
-                command = prefix + target
                 with self.subTest(command=command):
                     self.assert_denied(command, "protected branch")
         for target in (
@@ -800,11 +771,10 @@ class HookTests(unittest.TestCase):
             "+HEAD:main",
             "feature/existing HEAD:refs/heads/main",
         ):
-            for prefix in (
-                self.posix_prefix + "git push origin ",
-                self.ps_prefix + "git.exe push origin ",
+            for command in (
+                self.posix_prefix + "git push origin " + target,
+                self.ps_command("git.exe push origin " + target),
             ):
-                command = prefix + target
                 with self.subTest(command=command):
                     self.assert_denied(command)
         self.assert_hook_allows(self.posix_prefix + "git push origin feature/existing")
@@ -926,7 +896,7 @@ class HookTests(unittest.TestCase):
             self.posix_prefix + "git push origin feature/existing --force",
             self.posix_prefix + "git push origin feature/existing -u",
             self.posix_prefix + "git push origin --delete feature/target",
-            self.ps_prefix + "git.exe push origin feature/existing --mirror",
+            self.ps_command("git.exe push origin feature/existing --mirror"),
         ):
             with self.subTest(command=command):
                 self.assert_denied(command)
@@ -955,11 +925,10 @@ class HookTests(unittest.TestCase):
             "--follow-tags",
         )
         for option in unsafe_options:
-            for prefix in (
-                self.posix_prefix + "git push ",
-                self.ps_prefix + "git.exe push ",
+            for command in (
+                self.posix_prefix + "git push " + option + " origin feature/existing",
+                self.ps_command("git.exe push " + option + " origin feature/existing"),
             ):
-                command = prefix + option + " origin feature/existing"
                 with self.subTest(command=command):
                     self.assert_denied(command)
 
