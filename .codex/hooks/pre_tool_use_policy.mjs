@@ -852,7 +852,7 @@ function branchTargetMutation(args, context) {
   const branch = args.find(x => !x.dynamic && !x.value.startsWith("-"));
   return Boolean(branch && context.protectedBranches.has(branch.value.replace(/^refs\/heads\//, "")));
 }
-function evaluateGit(tokens, canonical, root, directFetch = false) {
+function evaluateGit(tokens, canonical, root) {
   if (tokens.length < 2) return { decision: null, mutation: false };
   const exe = tokens[0].value.toLowerCase();
   if (exe !== "git" && exe !== "git.exe") return { decision: null, mutation: false };
@@ -865,7 +865,7 @@ function evaluateGit(tokens, canonical, root, directFetch = false) {
   }
   const sub = subToken.value.toLowerCase(), args = tokens.slice(2);
   if (readOnlyGit(sub, args)) return { decision: null, mutation: false };
-  if ((!canonical || !canonical.valid || !root) && !(directFetch && sub === "fetch" && root)) {
+  if (!canonical || !canonical.valid || !root) {
     return {
       decision: deny("State-changing Git requires the literal canonical repository root and one direct Git command."),
       mutation: true,
@@ -1005,12 +1005,27 @@ function opaqueShell(tokens) {
 function evaluateCommand(command, cwd) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
-  // A single literal fetch is safe without a shell-level cd; all other mutations still require the canonical form.
-  // Reject shell control, redirection, expansion and quoting before applying fetch refspec/config checks.
-  const directFetch = Boolean(
-    root && !canonical && parsed.segments.length === 1
-      && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.test(command),
-  );
+  // The hook cwd may differ from the Bash tool's effective workdir. Rewrite a
+  // literal fetch to make the checked repository the command's actual target.
+  if (!canonical && /^[ \\t]*git(?:\\.exe)?[ \\t]+fetch(?:[ \\t]+[A-Za-z0-9_.:/=-]+)+[ \\t]*$/i.test(command)) {
+    if (!root || root.includes("'")) {
+      return deny("Fetch requires a repository root representable as a literal shell path.");
+    }
+    const fetch = command.trim();
+    const anchored = process.platform === "win32"
+      ? `Set-Location -LiteralPath '${root}' -ErrorAction Stop; ${fetch}`
+      : `cd '${root}' && ${fetch}`;
+    // Reuse all existing canonical, refspec, remote and configuration checks.
+    const decision = evaluateCommand(anchored, cwd);
+    if (decision) return decision;
+    return {
+      hookSpecificOutput: {
+        hookEventName: EVENT,
+        permissionDecision: "allow",
+        updatedInput: { command: anchored },
+      },
+    };
+  }
   if (parsed.segments.some(opaqueShell)) return deny("Nested shell wrappers are unsupported.");
   if (parsed.parseError) {
     return /(?:^|[\s;&|])(?:git(?:\.exe)?|gh(?:\.exe)?)(?=\s|$)/i.test(command)
@@ -1031,16 +1046,13 @@ function evaluateCommand(command, cwd) {
     }
     if (first === "git" || first === "git.exe") {
       git.push(tokens);
-      const result = evaluateGit(tokens, canonical, root, directFetch);
+      const result = evaluateGit(tokens, canonical, root);
       if (result.decision) return result.decision;
       if (result.mutation) mutationCount += 1;
     }
     if (isDelete(tokens)) return deny("Direct command-based deletion is forbidden.");
   }
-  if (
-    mutationCount
-    && (((!canonical || !canonical.valid) && !directFetch) || git.length !== 1 || parsed.segments.length !== 1)
-  ) {
+  if (mutationCount && (!canonical || !canonical.valid || git.length !== 1 || parsed.segments.length !== 1)) {
     return deny("State-changing Git requires one direct command after the literal canonical repository root.");
   }
   if (canonical && git.length === 0) return deny("Canonical Git form must end in one direct Git command.");
