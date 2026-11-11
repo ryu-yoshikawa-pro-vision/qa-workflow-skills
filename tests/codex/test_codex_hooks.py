@@ -360,6 +360,17 @@ class HookTests(unittest.TestCase):
                         check=False,
                     )
                 self.assertEqual(result.returncode, 0, result.stderr)
+                if os.name == "nt" and shutil.which("bash"):
+                    alternate_shell = subprocess.run(
+                        ["bash", "-c", rewritten],
+                        cwd=other,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertNotEqual(
+                        alternate_shell.returncode, 0, alternate_shell.stdout
+                    )
 
         outside = self.run_hook(
             "git fetch origin",
