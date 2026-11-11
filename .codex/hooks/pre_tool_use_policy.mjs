@@ -333,7 +333,7 @@ function splitCommands(input, shell) {
         started = true;
         continue;
       }
-      if (shell === "posix" && c === "\\" && n !== undefined) {
+      if (shell === "posix" && quote !== "'" && c === "\\" && n !== undefined) {
         value += n;
         started = true;
         i += 1;
