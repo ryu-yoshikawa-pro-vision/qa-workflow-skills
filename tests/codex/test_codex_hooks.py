@@ -168,7 +168,7 @@ class HookTests(unittest.TestCase):
         rewritten = response["updatedInput"]["command"]
         if os.name == "nt":
             prefix = "Set-Location -LiteralPath '"
-            suffix = f"' -ErrorAction Stop; {command}"
+            suffix = f"' -ErrorAction Stop; if ($?) {{ {command} }}"
         else:
             prefix = "cd '"
             suffix = f"' && {command}"
