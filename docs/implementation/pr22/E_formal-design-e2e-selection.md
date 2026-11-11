@@ -1246,7 +1246,7 @@ PR #27の変更113 filesは、担当Plan 1、実装スクリプト5、Skill仕�
 
 - GitHub PR #27はopen／Draft、head `33cb96b07004759578a4b9aef6989542255908bc`、base `feat/development-qa-traceability`。local HEADと`origin/feat/pr22-e-formal-design-e2e-selection`は一致し、PR #35のmain merge commit `78d8d394dc0d985b2b7aa60c656851fa07947398`はPR #22 head `a1a0d69bee1fbd16a431549ab94a34c3ecb7473c`経由で含まれる。remote fetch後のbranch ahead／behindは0／0。今回のPlan追記前に存在した未commit差分はこのPlanだけで、他の変更・untracked fileはなかった。
 - PR #22はopen／non-Draft、branch `feat/development-qa-traceability`、head `a1a0d69bee1fbd16a431549ab94a34c3ecb7473c`。統合ownerによる取り込みやPR状態変更は今回行っていない。
-- PR #27のPR本文は「文書のみ、実装・局所受入未実施」と記したまま古い。今回の同期作業後、実装・局所証拠・未完了評価・CIを反映する内容へ置き換える。PR本文には試行履歴を重ねず、担当Planとevidenceへの参照を置く。
+- PR #27のPR本文は当初「文書のみ、実装・局所受入未実施」と記したままで古かった。この同期作業後、現在の実装・局所証拠・未完了評価・CIを反映する内容へ置き換える。PR本文には試行履歴を重ねず、担当Planとevidenceへの参照を置く。
 
 ### 現行HEADのActions
 
@@ -1278,3 +1278,9 @@ PR #22の実ファイルをbranch `feat/development-qa-traceability`から取得
 - 実Agent評価の残り、semantic未解決11件、認証済み実providerの保存・承認・CAS・readback・stale／別session再開、共有README反映後の再検証、PR #22横断受入は未完了。今回、ユーザーの停止指示に従い長時間評価を開始していない。再開条件はE実装をPR #22へ統合して共有routing／catalogを整えた後に、timeout経路を先に調査すること。
 - PR #27の最新headではActions 4 PASS／1 FAIL（上表）。このFAILはE実装や評価datasetの変更によるものではなく、共有READMEへのcanonical Skill登録不足で再現している。README ownerはA／PR #22統合ownerであり、E branchでは修正しない。
 - この追記は前節の`fb1e87b...`時点の履歴を消さずに残し、現在の`33cb96b...`と区別する。今回のPR #27本文更新後もPRはDraftであり、E局所受入完了またはPR #22最終受入完了を意味しない。
+
+### 同期commit後の確認
+
+- 上記記録を含む担当Planをcommit `a729fcf34faf3e99aab1e1ac885c83f19bba7394`（`docs: refresh PR #27 integration handoff`）としてPR #27 branchへ通常pushした。local HEADとremote branch HEADは一致し、push後のworking treeはclean。
+- commit `a729fcf...`に関連付く最新5 workflowは、Code Quality run `43037077132` PASS、Validate Deterministic Output Evals `43037077570` PASS、Validate Semantic Output Evals `43037077313` PASS、Codex Harness `43037077162` PASS、Validate Agent Skills `43037077379` FAIL。失敗はREADME missing `e2e-test-selection`; specification validationはPASS、後続のform／semantic-count／trigger stepsはSKIP。PR #27はopen／Draftのまま。
+- PR #27本文はこのheadで、目的と現在の状態・担当Plan参照に絞って更新した。実Agent trigger全件、semantic needs_review 8／FAIL 3、実provider、横断受入、共有README反映後の再検証は未完了と明記。PR #22への共有catalog／ASSERTIONS／routing引継ぎもPR #22 conversationに残した。
