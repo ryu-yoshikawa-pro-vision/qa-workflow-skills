@@ -38,7 +38,9 @@ PR #18では`Ask for approval`への切替、ユーザー本人による承認�
 
 ## Hookが受け付けるcommand形式
 
-State-changing Gitでprotected branchを判定するとき、Hookが受け付けるのは次のliteralなcanonical repository root移動と、直後のdirect Git commandだけです。
+通常の`git fetch origin`は、Codexの`PreToolUse`イベントが提供する`cwd`からGit repositoryを特定でき、fetchのrefspec・remote・設定が既存の安全条件を満たす場合、明示的な`cd`なしで実行できます。単独のliteralな`git fetch`コマンドに限定し、パイプ、リダイレクト、複数コマンド、shell展開や危険なref更新は引き続き拒否します。Hookのprocess cwdとsession cwdが異なる場合も、イベントの`cwd`を使用します。
+
+それ以外のstate-changing Gitでは、protected branchや対象repositoryを判定するために、次のliteralなcanonical repository root移動と直後のdirect Git commandを要求します。
 
 ```sh
 cd '/literal/repository/root' && git push origin feature
