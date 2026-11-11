@@ -1014,8 +1014,12 @@ function evaluateCommand(command, cwd) {
     /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
   if (explicitFetch) {
     const target = explicitFetch[1];
-    if (!path.isAbsolute(target)) {
-      return deny("Explicit Git -C fetch requires an absolute repository path.");
+    // Windows accepts drive-relative roots (\dir) as "absolute" even though
+    // their drive depends on the pending command's (possibly hidden) workdir.
+    const fullyQualifiedWindowsPath = /^[A-Za-z]:[\\/]/.test(target)
+      || /^[/\\]{2}[^/\\]+[/\\][^/\\]+(?:[/\\]|$)/.test(target);
+    if (!path.isAbsolute(target) || process.platform === "win32" && !fullyQualifiedWindowsPath) {
+      return deny("Explicit Git -C fetch requires a fully qualified absolute repository path.");
     }
     const targetRoot = repoRoot(target);
     if (!targetRoot) return deny("Explicit Git -C fetch requires an existing Git repository.");
