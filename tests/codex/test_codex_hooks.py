@@ -725,6 +725,8 @@ class HookTests(unittest.TestCase):
             'cd "$(git rev-parse --show-toplevel)" && git push origin feature/existing',
             f"Set-Location -LiteralPath '{self.ps_root}'; git.exe push origin feature/existing",
             f"Set-Location -LiteralPath '{self.ps_root}' -ErrorAction Continue; git.exe push origin feature/existing",
+            f"Set-Location -LiteralPath '{self.ps_root}' -ErrorAction Stop; git.exe push origin feature/existing",
+            f"Set-Location -LiteralPath '{self.ps_root}' -ErrorAction Stop; git.exe fetch origin",
             f"cd '{self.posix_root}' && git -C . push origin feature/existing",
             f"cd '{self.posix_root}' && git --git-dir=.git push origin feature/existing",
             f"cd '{self.posix_root}' && git --work-tree=. push origin feature/existing",
