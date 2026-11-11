@@ -300,7 +300,9 @@ function canonicalCommand(command, root) {
   const posix = /^\s*cd\s+'([^']+)'\s*&&\s*([\s\S]+)$/.exec(command);
   if (posix) return { command: posix[2], valid: Boolean(root) && samePath(posix[1], root), shell: "posix" };
   // An unguarded semicolon can execute Git even if Set-Location fails.
-  const ps = /^[ \t]*Set-Location[ \t]+-LiteralPath[ \t]+'([^']+)'[ \t]+-ErrorAction[ \t]+Stop[ \t]*;[ \t]*if[ \t]*\(\$\?\)[ \t]*\{[ \t]*([\s\S]*?)[ \t]*\}[ \t]*$/i.exec(command);
+  const ps =
+    /^[ \t]*Set-Location[ \t]+-LiteralPath[ \t]+'([^']+)'[ \t]+-ErrorAction[ \t]+Stop[ \t]*;[ \t]*if[ \t]*\(\$\?\)[ \t]*\{[ \t]*([\s\S]*?)[ \t]*\}[ \t]*$/i
+      .exec(command);
   if (ps) return { command: ps[2], valid: Boolean(root) && samePath(ps[1], root), shell: "powershell" };
   return null;
 }
@@ -1008,7 +1010,8 @@ function evaluateCommand(command, cwd) {
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
   // Hook cwd may describe the session, not the pending tool's workdir.
   // The -C path is in the executed command, so the verified and actual Git repositories match.
-  const explicitFetch = /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
+  const explicitFetch =
+    /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
   if (explicitFetch) {
     const target = explicitFetch[1];
     if (!path.isAbsolute(target)) {
@@ -1021,14 +1024,18 @@ function evaluateCommand(command, cwd) {
       return deny("Explicit Git -C fetch must be one literal command.");
     }
     const args = fetched.segments[0];
-    if (args.length < 5 || args[1].value !== "-C" || args[2].value !== target || args[3].value.toLowerCase() !== "fetch") {
+    if (
+      args.length < 5 || args[1].value !== "-C" || args[2].value !== target || args[3].value.toLowerCase() !== "fetch"
+    ) {
       return deny("Explicit Git -C fetch has an unsupported argument form.");
     }
     const result = evaluateGit([args[0], ...args.slice(3)], { valid: true }, targetRoot);
     return result.decision;
   }
   if (!canonical && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]|$)/i.test(command)) {
-    return deny("Fetch without an explicit repository may target a different workdir. Use git -C '<absolute repository path>' fetch origin.");
+    return deny(
+      "Fetch without an explicit repository may target a different workdir. Use git -C '<absolute repository path>' fetch origin.",
+    );
   }
   if (parsed.segments.some(opaqueShell)) return deny("Nested shell wrappers are unsupported.");
   if (parsed.parseError) {
