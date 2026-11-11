@@ -119,8 +119,18 @@ class HookTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def run_hook(self, command: str, *, cwd: Path | None = None):
-        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+    def run_hook(
+        self,
+        command: str,
+        *,
+        cwd: Path | None = None,
+        session_cwd: Path | None = None,
+    ):
+        payload = {
+            "cwd": str(session_cwd or cwd or self.repo),
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+        }
         return subprocess.run(
             [NODE, str(HOOK)],
             cwd=cwd or self.repo,
@@ -222,6 +232,10 @@ class HookTests(unittest.TestCase):
 
     def test_normal_fetch_is_allowed_but_unsafe_ref_updates_are_denied(self) -> None:
         for command in (
+            "git fetch origin",
+            "git.exe fetch origin",
+            "git fetch --dry-run origin",
+            "git fetch origin --no-recurse-submodules",
             self.posix_prefix + "git fetch",
             self.posix_prefix + "git fetch origin",
             self.ps_prefix + "git.exe fetch origin",
@@ -255,6 +269,57 @@ class HookTests(unittest.TestCase):
 
         subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
         self.assert_hook_allows(self.posix_prefix + "git fetch origin")
+
+    def test_direct_fetch_uses_session_cwd_without_an_explicit_cd(self) -> None:
+        nested = self.repo / "nested"
+        nested.mkdir()
+
+        # Codex reports the session cwd in the event; the hook process cwd can differ.
+        for command, session_dir in (
+            ("git fetch origin", self.repo),
+            ("git fetch origin", nested),
+            ("git.exe fetch origin", self.repo),
+        ):
+            with self.subTest(command=command, session_dir=session_dir):
+                result = self.run_hook(
+                    command, cwd=self.repo.parent, session_cwd=session_dir
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "", command)
+
+        self.assert_denied("git fetch origin", "canonical repository root")
+        outside = self.run_hook(
+            "git fetch origin",
+            cwd=self.repo.parent,
+            session_cwd=self.repo.parent,
+        )
+        self.assertEqual(outside.returncode, 0, outside.stderr)
+        self.assertIn("canonical repository root", outside.stdout)
+
+    def test_direct_fetch_keeps_shell_and_ref_update_guards(self) -> None:
+        for command in (
+            "git fetch origin && echo done",
+            "git fetch origin; echo done",
+            "git fetch origin | cat",
+            "git fetch origin > fetched.log",
+            "git fetch origin 2> fetched.log",
+            "git fetch origin\\necho done",
+            "git fetch origin --force",
+            "git fetch origin --prune-tags",
+            "git fetch origin main:refs/heads/main",
+            "git fetch origin +main:refs/remotes/origin/main",
+            "git fetch --all",
+            "git push origin HEAD:feature/existing",
+            "git commit -m normal",
+            "git pull --ff-only origin",
+            "git add tracked.txt",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(command)
+
+        malformed = self.run_hook("git fetch origin", session_cwd=Path("relative"))
+        self.assertEqual(malformed.returncode, 2)
+        self.assertIn("cwd must be an absolute path", malformed.stderr)
 
     def test_fetch_pruning_and_effective_configuration_are_scoped_safely(self) -> None:
         subprocess.run(
