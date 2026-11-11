@@ -2,7 +2,9 @@
 
 正式評価は、current tracked repository全体と24 current Skill packageを含めた一時snapshotから実施します。`trigger-evidence-v1.tar.gz`／`v2`はSkill packageだけのreduced snapshotによる予備証拠であり、最終発火率には含めません。元のtraceとarchiveは履歴として維持します。
 
-最新checkpointの[README-v5.md](README-v5.md)／[evidence-index-v5.json](evidence-index-v5.json)／[trigger-evidence-v5.tar.gz](trigger-evidence-v5.tar.gz)には、full repository snapshotから実行したE2E train query 3の3独立試行を保存しています。対象Skillの読込は0/3で、期待falseのthresholdをこのqueryに限り満たしました。
+最新checkpointの[README-v6.md](README-v6.md)／[evidence-index-v6.json](evidence-index-v6.json)／[trigger-evidence-v6.tar.gz](trigger-evidence-v6.tar.gz)には、Product Risk近接negative queryのtimeoutを保存しています。900秒でAgent turnが未完了のため、発火率へ算入していません。
+
+[README-v5.md](README-v5.md)／[evidence-index-v5.json](evidence-index-v5.json)／[trigger-evidence-v5.tar.gz](trigger-evidence-v5.tar.gz)には、E2E train query 3の3試行を保存しています。対象読込0/3でした。
 
 [README-v4.md](README-v4.md)／[evidence-index-v4.json](evidence-index-v4.json)／[trigger-evidence-v4.tar.gz](trigger-evidence-v4.tar.gz)には、E2E train query 2の3試行を保存しています。対象0/3、`e2e-test-execution`3/3でした。
 
