@@ -124,7 +124,7 @@ class HookTests(unittest.TestCase):
         command: str,
         *,
         cwd: Path | None = None,
-        session_cwd: Path | None = None,
+        tool_cwd: Path | None = None,
         include_event_cwd: bool = True,
     ):
         payload = {
@@ -132,7 +132,7 @@ class HookTests(unittest.TestCase):
             "tool_input": {"command": command},
         }
         if include_event_cwd:
-            payload["cwd"] = str(session_cwd or cwd or self.repo)
+            payload["cwd"] = str(tool_cwd or cwd or self.repo)
         return subprocess.run(
             [NODE, str(HOOK)],
             cwd=cwd or self.repo,
@@ -319,18 +319,42 @@ class HookTests(unittest.TestCase):
                 )
         self.assertFalse((other / ".git" / "FETCH_HEAD").exists())
 
-        # The effective session scope, rather than the Hook process cwd,
-        # controls which repository is authorized.
-        result = self.run_hook(command, cwd=self.repo, session_cwd=other)
+        # The Hook process cwd determines session scope, even when the
+        # PreToolUse event cwd points at an unrelated repository.
+        result = self.run_hook(command, cwd=self.repo, tool_cwd=other)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "")
+        self.assertIn("session repository or one of its linked worktrees", result.stdout)
+
+        # A command targeting the session repository remains allowed when the
+        # pending tool uses an unrelated working directory.
+        session_command = f"git -C '{self.posix_root}' fetch origin"
+        allowed = self.run_hook(session_command, cwd=self.repo, tool_cwd=other)
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        self.assertEqual(allowed.stdout, "")
+
+        canonical = self.run_hook(
+            self.posix_prefix + "git fetch origin",
+            cwd=self.repo,
+            tool_cwd=other,
+        )
+        self.assertEqual(canonical.returncode, 0, canonical.stderr)
+        self.assertEqual(canonical.stdout, "")
+
+        # Reversing the process and event working directories must reverse
+        # authorization; the tool event cannot widen the session scope.
+        refused = self.run_hook(session_command, cwd=other, tool_cwd=self.repo)
+        self.assertEqual(refused.returncode, 0, refused.stderr)
+        self.assertIn("session repository or one of its linked worktrees", refused.stdout)
+        own_session = self.run_hook(command, cwd=other, tool_cwd=self.repo)
+        self.assertEqual(own_session.returncode, 0, own_session.stderr)
+        self.assertEqual(own_session.stdout, "")
 
         missing_cwd = self.run_hook(
             f"git -C '{self.posix_root}' fetch origin",
             include_event_cwd=False,
         )
         self.assertEqual(missing_cwd.returncode, 0, missing_cwd.stderr)
-        self.assertIn("requires the session repository cwd", missing_cwd.stdout)
+        self.assertIn("requires the local tool cwd", missing_cwd.stdout)
 
     def test_explicit_fetch_allows_linked_worktree(self) -> None:
         linked = Path(self.temp.name) / "linked worktree with spaces"
@@ -351,6 +375,9 @@ class HookTests(unittest.TestCase):
         command = f"git -C '{linked.as_posix()}' fetch origin"
         self.assert_hook_allows(command)
         self.assert_hook_allows(f"git.exe -C '{linked.as_posix()}' fetch origin")
+        linked_event = self.run_hook(command, cwd=self.repo, tool_cwd=linked)
+        self.assertEqual(linked_event.returncode, 0, linked_event.stderr)
+        self.assertEqual(linked_event.stdout, "")
 
         # A nested directory is also within the same worktree and common Git directory.
         nested = linked / "nested"
@@ -457,7 +484,7 @@ class HookTests(unittest.TestCase):
                         "fully qualified absolute repository path",
                     )
 
-        malformed = self.run_hook("git fetch origin", session_cwd=Path("relative"))
+        malformed = self.run_hook("git fetch origin", tool_cwd=Path("relative"))
         self.assertEqual(malformed.returncode, 2)
         self.assertIn("cwd must be an absolute path", malformed.stderr)
 
