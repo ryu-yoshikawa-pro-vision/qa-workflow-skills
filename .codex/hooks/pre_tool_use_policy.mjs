@@ -1018,11 +1018,16 @@ function evaluateCommand(command, cwd) {
     // Reuse all existing canonical, refspec, remote and configuration checks.
     const decision = evaluateCommand(anchored, cwd);
     if (decision) return decision;
+    // A different shell may be selected for the actual tool call. In particular,
+    // a POSIX shell must never run fetch after an unsupported Set-Location.
+    const rewritten = process.platform === "win32"
+      ? `Set-Location -LiteralPath '${root}' -ErrorAction Stop; if ($?) { ${fetch} }`
+      : anchored;
     return {
       hookSpecificOutput: {
         hookEventName: EVENT,
         permissionDecision: "allow",
-        updatedInput: { command: anchored },
+        updatedInput: { command: rewritten },
       },
     };
   }
