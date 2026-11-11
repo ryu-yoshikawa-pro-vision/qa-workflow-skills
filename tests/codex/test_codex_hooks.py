@@ -368,9 +368,7 @@ class HookTests(unittest.TestCase):
                         capture_output=True,
                         check=False,
                     )
-                    self.assertNotEqual(
-                        alternate_shell.returncode, 0, alternate_shell.stdout
-                    )
+                    self.assertNotEqual(alternate_shell.returncode, 0)
 
         outside = self.run_hook(
             "git fetch origin",
