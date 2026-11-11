@@ -38,19 +38,27 @@ PR #18では`Ask for approval`への切替、ユーザー本人による承認�
 
 ## Hookが受け付けるcommand形式
 
-単独のliteralな`git fetch origin`は、Codexの`PreToolUse`イベントの`cwd`からGit repositoryを特定し、refspec・remote・設定を既存の安全条件で検証します。検証に成功した場合、`PreToolUse`の`updatedInput`で、POSIXは`cd '<canonical repository root>' && git fetch origin`、Windowsは`Set-Location -LiteralPath '<canonical repository root>' -ErrorAction Stop; if ($?) { git fetch origin }`に書き換えてから実行します。Windowsでは移動成功時だけfetchを実行し、選択されたshellがPowerShellでない場合にも、移動失敗後にfetchだけが実行されない形式を使用します。Codexのversion／tool modeによってはHookの`cwd`が実際のGit commandの作業ディレクトリと異なり得るため、**`cwd`だけを実行先の保証に使用しません**。単独のliteralな`fetch`以外は書換え対象外で、複数command、パイプ、リダイレクト、shell展開、危険なref更新は引き続き拒否します。検証対象のrootを取得できない場合や、rootに単一引用符が含まれて安全なcanonical commandを組み立てられない場合は拒否します。
+Codexの`PreToolUse`では、`cwd`がセッションの作業ディレクトリを表し、個別の`exec_command.workdir`と異なる場合があります。そのため、実行先が曖昧な`git fetch origin`はdenyし、別repositoryに自動的に振り替えません。
 
-それ以外のstate-changing Gitでは、protected branchや対象repositoryを判定するために、次のliteralなcanonical repository root移動と直後のdirect Git commandを要求します。
+通常のfetchでは、**実行先をコマンドに含む**次の形式を使用します。Windows PowerShell・Git Bash・POSIX shellで同じ`git -C`形式を使えます。
+
+```sh
+git -C '/absolute/repository/root' fetch origin
+```
+
+この形式では、`-C`に指定されたliteralな絶対パスから実際のGit repositoryを特定し、そのrepositoryのrefspec・remote・設定を検証します。安全なfetchの場合のみ許可し、`updatedInput`で実行先を変更しません。`--force`、保護されたrefsの更新、`--refmap`、複数command、パイプ、リダイレクト、shell展開はdenyします。`git -C`の例外は`fetch`に限り、他のGit subcommandに一般化しません。
+
+既存のstate-changing Gitでは、次のliteralなcanonical repository root移動と直後のdirect Git commandも使用できます。
 
 ```sh
 cd '/literal/repository/root' && git push origin feature
 ```
 
 ```powershell
-Set-Location -LiteralPath 'C:\literal\repository root' -ErrorAction Stop; git.exe push origin feature
+Set-Location -LiteralPath 'C:\literal\repository root' -ErrorAction Stop; if ($?) { git.exe push origin feature }
 ```
 
-Windowsでroot移動が失敗した場合は、`-ErrorAction Stop`により後続Gitを起動しません。`git -C`、`--git-dir`、`--work-tree`、動的なroot解決、wrapper、複数のmutation command、command-local environment overrideはこのcontext判定形式として扱わず、Hookがdenyします。異なる quoting や shell 記法について安全性を推測しません。
+Windowsでは移動成功を明示的に確認します。以前の`Set-Location ... -ErrorAction Stop; git.exe ...`形式は、選択されたshellや移動失敗時に意図せずGitだけが実行されるおそれがあるためdenyします。`--git-dir`、`--work-tree`、動的なroot解決、wrapper、複数のmutation command、command-local environment overrideは引き続き非対応です。
 
 既知のshell解析失敗形式として、POSIXの未引用`git reset HEAD~1` / `git rm *.md` / `gh pr create --body "$BODY"`と、Windows PowerShellの対応する変数・wildcard展開を含む形式は実行前denyします。意味が同じliteral引数は既存execpolicyへ送ります。例: `git reset 'HEAD~1'`、`git rm '*.md'`、`gh pr create --body-file body.md`。この対応は汎用shell parserを意味しません。nested `bash -c`、`sh -c`、PowerShell command wrapper、`cmd /c`、`Invoke-Expression`等のopaque wrapperはdenyします。
 
