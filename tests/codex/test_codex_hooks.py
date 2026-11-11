@@ -302,7 +302,7 @@ class HookTests(unittest.TestCase):
             "git fetch origin | cat",
             "git fetch origin > fetched.log",
             "git fetch origin 2> fetched.log",
-            "git fetch origin\\necho done",
+            "git fetch origin\necho done",
             "git fetch origin --force",
             "git fetch origin --prune-tags",
             "git fetch origin main:refs/heads/main",
