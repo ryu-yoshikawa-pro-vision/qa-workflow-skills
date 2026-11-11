@@ -1021,7 +1021,7 @@ function opaqueShell(tokens) {
   }
   return executable === "invoke-expression";
 }
-function evaluateCommand(command, cwd, sessionCwdKnown = true) {
+function evaluateCommand(command, cwd, toolCwdKnown = true) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
   // The hook process cwd is the session scope. PreToolUse input cwd can be the
@@ -1030,7 +1030,7 @@ function evaluateCommand(command, cwd, sessionCwdKnown = true) {
   const explicitFetch =
     /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
   if (explicitFetch) {
-    if (!sessionCwdKnown) {
+    if (!toolCwdKnown) {
       return deny("Explicit Git -C fetch requires the local tool cwd from PreToolUse.");
     }
     const target = explicitFetch[1];
