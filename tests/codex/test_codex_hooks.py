@@ -125,12 +125,14 @@ class HookTests(unittest.TestCase):
         *,
         cwd: Path | None = None,
         session_cwd: Path | None = None,
+        include_event_cwd: bool = True,
     ):
         payload = {
-            "cwd": str(session_cwd or cwd or self.repo),
             "tool_name": "Bash",
             "tool_input": {"command": command},
         }
+        if include_event_cwd:
+            payload["cwd"] = str(session_cwd or cwd or self.repo)
         return subprocess.run(
             [NODE, str(HOOK)],
             cwd=cwd or self.repo,
@@ -322,6 +324,13 @@ class HookTests(unittest.TestCase):
         result = self.run_hook(command, cwd=self.repo, session_cwd=other)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
+
+        missing_cwd = self.run_hook(
+            f"git -C '{self.posix_root}' fetch origin",
+            include_event_cwd=False,
+        )
+        self.assertEqual(missing_cwd.returncode, 0, missing_cwd.stderr)
+        self.assertIn("requires the session repository cwd", missing_cwd.stdout)
 
     def test_explicit_fetch_allows_linked_worktree(self) -> None:
         linked = Path(self.temp.name) / "linked worktree with spaces"
