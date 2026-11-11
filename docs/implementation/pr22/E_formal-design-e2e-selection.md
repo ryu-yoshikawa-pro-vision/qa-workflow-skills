@@ -1143,3 +1143,138 @@ runはPR head `870c911...`に関連付いているが、Validate Agent Skillsの
 - `a1a3fbc7...`時点の最新5 ActionsはCode Quality `42930732911` PASS、Validate Deterministic Output Evals `42930732890` PASS、Validate Semantic Output Evals `42930732917` PASS、Codex Harness `42930732952` PASS、Validate Agent Skills `42930732964` FAIL（`README.md`に`e2e-test-selection` canonical registrationなし）。この結果は今回作るcommitのCI結果ではない。今回commit後のrunを別途確認する。
 - 再開時は最新branch HEADのfull tracked treeからsnapshotを作り直すか、既存snapshotを使う場合は全Skill package hashが一致することを再確認する。E2E train query 4に対する有効な独立完了試行を3回そろえるところから再開し、timeout／中断は発火率から除外する。残りのtrain／validationおよびholdoutは各query 3回を継続する。現行tmp driverはresult.jsonのある試行をskipするが、`/tmp`は永続保存ではないため、再開時にsnapshot・driver・resultを再検証する。
 - この停止はユーザーの今回の指示に基づく。担当E局所受入は未完了のまま。semantic 31件（PASS 20／needs_review 8／FAIL 3）、実Agent trigger matrix、Validate Agent Skills、実provider／承認／CAS／readback、PR #22横断受入はそれぞれ未完了またはowner依存であり、完了扱いにしない。
+
+## PR #22統合引継ぎ確定（2026-11-11）
+
+### 現在のhead・差分・Actions
+
+- PR #27はopen／Draft、head `fb1e87b7617af2cef2237bee235d6c3c6551c152`。作業branchは`feat/pr22-e-formal-design-e2e-selection`で、local worktreeはclean、origin追跡branchと一致する。今回この節を追加する前の状態。
+- PR #22はopen、統合branch `feat/development-qa-traceability`、head `0e996171918cd9b2b7b0e0bc2b2de5bc3f98066c`。GitHub compareでは共通祖先 `d38b775e43f7f0a86a834fef4a122f04d30ef724`に対しPR #27が53 commits ahead、PR #22が14 commits ahead。PR #27は53 commits／113 changed files、PR #22の14 commitsが共通祖先から変更したファイルとのpath重複は0件。GitHubはPR #27をmergeableと報告するが、実際の統合・merge simulationは行っていない。
+- PR #27 head `fb1e87b...`に紐づくActions：Code Quality run `42932984566` PASS、Validate Deterministic Output Evals `42932985821` PASS、Validate Semantic Output Evals `42932984437` PASS、Codex Harness `42932984806` PASS、Validate Agent Skills `42932984367` FAIL。後者は`validate` jobの`Validate repository eval structure`でREADMEの`e2e-test-selection`未登録が原因。公式Skill specificationはPASS、後続form／semantic-count／trigger stepsはSKIP。
+- PR #22 head `0e996171...`に紐づく同じ5 workflowはすべてsuccess（Codex Harness `42637649031`、Validate Agent Skills `42637648700`、Code Quality `42637648761`、Validate Semantic Output Evals `42637648772`、Validate Deterministic Output Evals `42637648789`）。これはE変更統合前のheadであり、Eの受入結果ではない。
+- 今回確認したGitHub上のPR #27本文、PR #22本文、PR #22統合管理README、および統合計画には「Eは文書のみ／実装なし」とする古い状態が残る。PR本文・他owner文書は今回変更せず、統合ownerが更新する項目として引き継ぐ。
+
+### PR #27で実装済みの局所成果と統合対象
+
+PR #27の変更113 filesは、担当Plan 1、実装スクリプト5、Skill仕様6、Skill文書・template 8、Skill評価データ25、テスト9、semantic／trigger証拠59に分類できる。共有README・ASSERTIONS・qa-workflow共有routing・providerはE branchで変更していない。
+
+- 正式設計／coverage：pair単位のsource・Authority currentness、複数itemのtest level、unconfirmed／blockedと候補coverageの分離、stale pairのpartial rerun、TCN/model stable IDとlifecycle、TCN draft固有の`tcn_authority_refs`を含むrecord／summary／coverage再計算を実装。対応は`condition_structure.py`、`traceability.py`、`requirement_structure.py`と関連fixture・runtime tests。
+- test case／既存coverage：`case_structure.py`でformal design record、Authority、stable ref、freshnessの消費・不一致拒否を実装し、既存CI coverage graphを維持。E2E候補を既存TC／CI実行coverageへ誤生成しない。
+- `e2e-test-selection`：selection-v1、candidate ID/key、decision／rationale／source currentnessのrevision snapshotとdigest、retirement、legacy読み取り、候補0件blocked状態、stdin JSON保護を実装。既存E2E直接指定・inspection・implementation・executionの入口は維持。
+- `test-analysis`：新規自動化価値選定は`e2e-test-selection`へroutingし、legacyのE2E選定表は既存記録として読み取り・保持する契約を追加。
+- deterministic／局所回帰：最新runtime codeを検証した基準head `a1a3fbc7dc28478a8219fb3cb03df4317dd1234b`で、E担当runtime 7 suites合計122 tests PASS、new Skill deterministic contract 44 PASS、trigger dataset contract 1 PASS、formatter／dprint／diff check PASSを記録。`a1a3fbc7...`から現在の`fb1e87b...`の差分は担当Planとtrigger evidence v7の5文書・証拠ファイルだけで、Skill実装／test code／evaluation datasetの変更はない。従って既存の局所テスト根拠は現行コードに適用できる。今回の引継ぎ文書変更後もruntime suiteは再実行していない。
+- repository-wide既存suiteの直近結果（`a1a3fbc7...`）：deterministic 300 tests中296 PASS／4 FAIL、runtime 579 tests中560 PASS／10 FAIL／9 ERROR。記録済みfailureはA/shared WCAG・SQLite provider、Project Context state-root、`ci_handoff` JSON nesting、SQLite history provider／Windows temp-file群で、E担当差分はそのhead以降文書・証拠のみ。今回はこれらsuiteを再実行していない。
+
+### semantic evidence v12：31件と未解決11件
+
+証拠は`evidence/semantic-2026-11-10/README.md`、`evidence-index-v12.json`、`semantic-evidence-v12.tar.gz`に保存され、31/31 actual candidate generation／Judge完了、PASS 20、needs_review 8、FAIL 3、not_evaluable 0、Judge error 0。CandidateとJudgeは別fresh `codex exec` sessionだが同じ既定model familyであり、異なるmodelによる独立評価とは主張しない。v12 source current headは`fc1478d2920e19daad749d305023bb16017bfe10`。そのheadから現PR #27 headまでは文書・証拠だけの差分で、E Skill package／datasetは変わっていない。v12 indexにはcaseごとのsource headとrunner別headを保持する。
+
+| Eval ID           | Skill／Judge結果                    | 既存証拠にある具体的な観測                                                                                                                                                          | 未確定事項・統合後の対応                                                                                                                                                                                       |
+| ----------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TCN-SEM-004`     | test-condition-design／FAIL         | active CRUD cellは出力したが、指定sequence後のpostcondition CIを作らず、inputにないread `R`を理由にblocked。inputのsequenceは`place → amend → cancel`。                             | sequenceの条件化とCRUD runtimeの必須operation条件を照合し、E ownerが原因を決めた後に対象caseを再評価する。                                                                                                     |
+| `TC-SEM-001`      | test-case-design／FAIL              | candidateに実行可能TC行・操作手順がなく、正常保存と一覧反映の条件をケース化しなかった。                                                                                             | Eval inputにある自然言語上のAuthority／条件と、current Machine Entity・正式入力を要求するruntime gateのどちらが欠けたかは確定していない。実成果物接続後にfixture・Skill指示・runtime契約を照合して再評価する。 |
+| `TC-SEM-002`      | test-case-design／FAIL              | 51文字データ、保存手順、非保存と既存名維持のoracleを出さず、current Authority Entity不足を理由にblockedとした。                                                                     | ReferenceにあるAuthorityをformal Machine Entityへ変換してよい条件と、inputにないEntityを要求する境界をownerが確認してから再評価する。                                                                          |
+| `RISK-SEM-002`    | test-analysis／needs_review         | 主要な注文履歴経路は挙げたが、表示・主要遷移と観測可能な利用者価値への展開が弱い。likelihood=2の根拠もinputから特定できないとJudgeは指摘。                                          | risk尺度・入力根拠と、仕様不足下で記述できるtest focusをproduct/risk ownerと照合する。                                                                                                                         |
+| `RISK-SEM-005`    | test-analysis／needs_review         | 希少組合せへの技法選択はReferenceに沿うが、likelihood=3／mediumの定量根拠と採用尺度が示されていない。                                                                               | 案件の発生率・評価尺度が未提供のときに数値を保留すべきか、基準ownerの判断後に必要caseだけ再評価する。                                                                                                          |
+| `E2E-SEL-SEM-003` | e2e-test-selection／needs_review    | revision 2でID・key・過去snapshotを維持した一方、inputがcurrent REQ revisionと明記するTI-003を、そのitem自身のrevision/currentness不足としてblockedにした。                         | 入力根拠とCandidateの不必要なblockのどちらが原因かをcurrent packageで再確認し、case単位で再評価する。                                                                                                          |
+| `TCN-SEM-008`     | test-condition-design／needs_review | 3-wise tupleのprojectionで同一3因子内のpairwiseを覆えると認識しながら、両者を独立coverage itemとして追跡。                                                                          | 明示された複数strengthを別criterionとして保持する契約と、意味上重複の削減条件を仕様ownerが決める。                                                                                                             |
+| `TCN-SEM-012`     | test-condition-design／needs_review | candidate runtime inputのtarget fingerprintがnullで、inputが指定するoperator `=`を`version_range`へ変えた。Reference/inputが保証するcurrent target参照を使わずinvalid_inputにした。 | candidate生成時の参照・operator転記違反は確認済み。対応する正式Machine Entityを含む実入力で同じ逸脱が起きるかは、統合後のcase再評価で確認する。                                                                |
+| `TCN-SEM-013`     | test-condition-design／needs_review | Cを含むgroup/model差とA/B groupingを閉じず、空requirement intersection後のhandlingをblockedとした。JudgeはReferenceがconflict拒否を明示すると指摘。criterion `SEM-TCN-006`はfail。  | Candidateの契約逸脱は確認済み。group modelとmerge後のrequirement unionを正式入力・runtime resultへ反映する条件を確認し、caseのみ再評価する。                                                                   |
+| `TCN-SEM-014`     | test-condition-design／needs_review | target/model closureを説明したがtest condition／CIを作らず、重複targetがcurrent content/generationと一致する条件も欠けた。                                                          | current upstream entityがそろう入力で、正式設計の対象と必要CIの境界を照合する。                                                                                                                                |
+| `COV-SEM-002`     | coverage-analysis／needs_review     | order detailが未実行という実gapは正しく残した。一方、inputにないTR／QA graph／CI edgeを欠落扱いし、実在するTCからE2Eへの関係を評価しなかった。                                      | E2E参照を既存QA ID graphとは分離する契約と、入力で与えたTC→E2E根拠だけを使う条件を照合し、対象caseを再評価する。                                                                                               |
+
+上表のCandidate出力とJudge判定は確認済みだが、Judge findingだけでSkill/runtime defectと断定していない。明示されたcurrentness・operator・expected inputと矛盾する候補出力は観測事実として記録し、Machine Entity欠落時の正しいblock条件、coverage strengthの重複、testability／risk尺度は仕様・owner判断として残す。31件すべての再生成・再Judgeは行わず、PR #22統合後に上記11件を優先し、必要な実装修正後に影響caseだけを再評価する。
+
+### trigger evidence v7：full-tree部分結果と再開位置
+
+- 最新正規証拠は`evidence/trigger-2026-11-11/README-v7.md`／`evidence-index-v7.json`／`trigger-evidence-v7.tar.gz`。datasetはtrain 12／validation 8。現行train SHA-256 `1a3d7e7236d2c865bbe6cf2477b78fd4bbcdbfc12f6cd84318fa54fdf945ee01`、validation SHA-256 `b1041e262836625de2534c6cce550ba28aea57d2385caaa46cd18cc1f7f52e84`。query 4 SHA-256 `af7e4b7ab5e44cdd552a93ee5647d7a11a9e98143fb8a30a595a98ca228521ea`。
+- v3〜v7はsource Skill package head `d63b5588956b767c4ffac300c34ab0f30798c70a`のfull tracked tree、24 current Skills、1,051 package filesを同時に利用可能にしたsnapshot。v1／v2は228-file reduced Skill snapshotで参考履歴のみ、正規発火rateに算入しない。current `fb1e87b...`までの比較でSkill／eval packageの変更はなく、追加差分はPlan／evidenceのみ。
+- valid complete trialsはtrain query 1 positive 3/3 target trigger、query 2 negative 0/3（`e2e-test-execution` 3/3）、query 3 negative 0/3 target trigger。Product Risk近接negativeのquery 4はattempt 1・2が各900秒timeout、turn未完了。attempt 2でtarget Skill readを観測したが、率には算入しない。attempt 3は開始直後に中断され、trace/resultなし。query 4の有効完了は0/3で発火率未判定。
+- 次の正規評価はPR #22へ統合した後に、query 4のtimeout経路を調査してから開始する。v7のtimeout／中断試行を使い回さず、query 4の有効完了3試行をそろえる。その後、残るE2E train／validation、関連5 Skillのtrain／validation、未使用holdoutをEVALS.mdの3反復・full-tree・独立session・load trace条件で継続する。
+- v7 archiveは696,013 bytes、SHA-256 `08f15eb7e1c4617a6750e185a3b299b0672bb73731727bbecea269a0081ee01c`。raw JSONL、応答、stderr、query、dataset pointer、Skill manifestを含み、attempt 3にresponse/traceはない。archive integrityとcredential-shaped pattern scan 0件を確認した。
+
+### 保存済み証拠archiveの照合
+
+各archiveを再生成せず、19ファイルすべてを読取可能とし、SHA-256を再計算した。同一hashのarchiveはなかった。過去版は履歴として保持し、移動・削除・上書きしない。各indexは元source headとcase別情報を記録する。v12のcase別source headはindexの`source_head_by_runner`／各case欄を正本とする。
+
+| bundle   | version | index上のsource head                                           | archive SHA-256                                                    |
+| -------- | ------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| semantic | v1      | `6c3e9f1e8c1e848fdec716e7f17395a75d42bda6`                     | `ccb8761d7cf8e0bb488af2c3170dfddd05f122d54a785ab5bc23f759e70947e6` |
+| semantic | v2      | `6c3e9f1e8c1e848fdec716e7f17395a75d42bda6`                     | `91edc8d6e915137d740e4b0eb3d557ae4bac36d03491e47d09e1ac80c418bdeb` |
+| semantic | v3      | `d5a91582563d2784a9f68888bfeef55448e890c7`                     | `ac46dc5f3cbf25b6e1c9a509ba8542df409e35ef1419de7f4b9f5da2f62f0e01` |
+| semantic | v4      | `7c76ed379b3d7210585d29e8a72956302f38faf5`                     | `178064939eb72224263bcb30d33c02025024088f51a2609ceb6c0abea8fa597d` |
+| semantic | v5      | `f91f40b68cb01136b48fe953e315f418ff54547e`                     | `ce0eda2e1e64988e648a8197f8e48e97004876aae9d5fbba3b1605742535dade` |
+| semantic | v6      | `f91f40b68cb01136b48fe953e315f418ff54547e`                     | `eac3d3dd1f571903b4518c5c2f00a29a164c76774cdfa4c62cee40a86d19da4d` |
+| semantic | v7      | `02dbf36357e787d251effb2ff81ab731e0dd7624`                     | `bec895916d7918681e94c652a17352bd2784ff8f0262a0f946b041308ce87c2d` |
+| semantic | v8      | `b191c6ea111588b86f9030dc18275b9b4c594d83`                     | `0d426c2bc420c56039347100f5384afcc3a06744ff1829fa6aad1d489eb14384` |
+| semantic | v9      | `d37532086d59fb0253b0058d2c78fc6301fa33ea`                     | `10563adebc60cbbf851d62787d1374243657b52eb71abea85a49e6c52ad1704e` |
+| semantic | v10     | `ef3fe230044148721957e13c70e56b12e7f03313`                     | `6fcdb44058d8271caf400715a1f97cfbe990025ba63984db9ff0dd1d1c82bb34` |
+| semantic | v11     | `5015cc4c8f9e4412d25c0829b7f18311326d092e`                     | `3945ae71615adf77f79a2107fe6390ec3ee777fbac4412b84b4f26d78b4869ae` |
+| semantic | v12     | `fc1478d2920e19daad749d305023bb16017bfe10`                     | `0a28166dbf47e7379343769edaec8228991db7a4fecc639602708a179290d5e9` |
+| trigger  | v1      | `fc1478d2920e19daad749d305023bb16017bfe10`（reduced snapshot） | `1a0331035f13b081b49ec3c3ae8885aa6903bcd0c7e515bffca9491164dee314` |
+| trigger  | v2      | `fc1478d2920e19daad749d305023bb16017bfe10`（reduced snapshot） | `6f0573e7f28948a2a65ef290ed0da7928fe94a352472c2eab5c463b04b21b9d7` |
+| trigger  | v3      | `d63b5588956b767c4ffac300c34ab0f30798c70a`                     | `2af2def2484a1c1a32c0ffb672ccaeae350a65c8775ca33d127abcb63970d21a` |
+| trigger  | v4      | `d63b5588956b767c4ffac300c34ab0f30798c70a`                     | `29d7ca8d66fa08369087226a930de675c04745d5a57ff1c344296acba3262292` |
+| trigger  | v5      | `d63b5588956b767c4ffac300c34ab0f30798c70a`                     | `6d7964ed4749c7ee0c3bca5dfae9cd5d3075979c4818af40fbb30335ec80225b` |
+| trigger  | v6      | `d63b5588956b767c4ffac300c34ab0f30798c70a`                     | `9dfe4886df9f03f9008b61def5a670f2ac4dfebe1971aed7346a801a410ba64b` |
+| trigger  | v7      | `d63b5588956b767c4ffac300c34ab0f30798c70a`                     | `08f15eb7e1c4617a6750e185a3b299b0672bb73731727bbecea269a0081ee01c` |
+
+19 archiveはすべてPR #27のGitHub上のchanged filesとして参照可能。各versionのREADME／indexは現行snapshotと履歴snapshotを区別し、過去archiveは削除しない。
+
+### PR #22統合前の契約照合・owner引継ぎ
+
+- **共有README canonical catalog**：PR #22最新READMEの一覧に`e2e-test-selection`がない。期待変更はcanonical Skill tree／responsibility一覧への登録と、legacy `test-analysis`の既存表を壊さない説明。Validate Agent Skills失敗の直接原因。
+- **共有ASSERTIONS**：現行`ASSERTIONS.md`に`RISK-D016`／`RISK-D017`はあるが、E2E-SEL-D001〜D006の登録はない。新selectionのdeterministic契約を追加し、既存test-analysis表の旧assertionを現行Skillの新規選定契約と混同しないよう統合ownerが整理する。
+- **qa-workflow／routing**：PR #22の`qa-workflow/SKILL.md`とguidanceはE2E inspection／implementation／executionの既存経路を記載するが、新selection Skillをrouting先に持たない。新規選定要求かつcurrent selectionなしの場合だけ`e2e-test-selection`へrouteし、TC直接指定・current selection再利用・既存E2E実行・Playwright実装可否だけの調査では再選定しない。Product Risk分析は`test-analysis`のままにする。
+- **test-analysis legacy経路**：PR #22側の旧Skillは選定表を出す場合があり、templateにもE2E selection tableが残る。E branchでは新規選定を新Skillへrouteし、旧表を既存記録として読む契約へ更新済み。統合時は旧tableの読取・保持を維持し、同じ新規選定を二重生成しない。
+- **formal design／coverage**：E branch owner filesは`condition_structure.py`、`traceability.py`、関連Skill文書・tests。PR #22の14後続commitsはこれらE filesを変更しておらずpath conflictは0。`formal-design-v1`、pairのsource／Authority refs、revision／scope／currentness、record／summary一致、stale／partial-rerunをそのまま統合後に再検証し、E fixtureだけでB/C/D実artifact接続済みとしない。
+- **共有runtime／provider**：PR #22のA文書では共通workflow verifierが既存6 Skillに限られ、未登録Skillは`unsupported_skill_verifier`／unverified scopeとして止める。E2E selectionのowner verifier／artifact registrationは未登録。Aのworkflow SQLiteはlocal single-hostの既存state契約であり、E formal design／selectionの共有保存provider、認証済み承認、native CAS、historical readbackを証明しない。E owner resultの登録／scope／source／artifact refsと保存契約をA／PR #22へ引き継ぐ。
+- **他owner実成果物**：PR #22本文ではBが統合済み、C／Dは別Draftのまま。Eの固定fixtureはB/C/Dの正規ID・revision・Authority Machine Entityに置き換わっていない。B→D→Eの実成果物接続、freshness伝播、G/H/Jへの下流接続はPR #22で実refを使う。
+- **PR #22文書の状態**：統合管理READMEと`2026-11-09_134934_pr22-current-integration.md`のE行は「docs only／実装なし」と記録しており、PR #27の現head・113 filesと不一致。これらの書換え、PR本文の更新、統合／mergeはPR #22 ownerが行う。E担当はPR #27本文、PR #22本文、共有README／ASSERTIONS／qa-workflowを変更しない。
+
+### 統合後の再開条件
+
+1. 統合ownerがE担当実装をPR #22 branchへ取り込み、shared README／ASSERTIONS／routing／owner verifier registrationを更新する。PR #22 latest HEADを固定し、全5 workflowと後続のValidate Agent Skills stepsを再確認する。
+2. semantic 31件は再生成せず、上のFAIL 3／needs_review 8から原因ownerが契約判断したcaseのみ再生成・再Judgeする。Judge findingとruntime defectを区別し、rubric／ReferenceをPASSに合わせて緩めない。
+3. triggerはquery 4のtimeout原因を先に調べ、full-tree 24 Skill snapshotで有効3 trialから再開する。その後train／validation／holdoutを元データ・3反復・trace基準で継続する。
+4. 実provider登録、formal design／E2E selection保存、承認、CAS、historical readback、source stale伝播、別session再開、B/C/D実成果物、下流G/H/J接続、S1〜S17・15＋10・human editing 8の全体受入を実施する。provider未接続条件はblockedのまま残す。
+5. PR #27単独の長時間評価は再開しない。この引継ぎはE局所受入、PR #27全体、PR #22横断受入のいずれも完了判定しない。
+
+## 2026-11-11 最新GitHub同期確認
+
+### head・working tree・PR状態
+
+- GitHub PR #27はopen／Draft、head `33cb96b07004759578a4b9aef6989542255908bc`、base `feat/development-qa-traceability`。local HEADと`origin/feat/pr22-e-formal-design-e2e-selection`は一致し、PR #35のmain merge commit `78d8d394dc0d985b2b7aa60c656851fa07947398`はPR #22 head `a1a0d69bee1fbd16a431549ab94a34c3ecb7473c`経由で含まれる。remote fetch後のbranch ahead／behindは0／0。今回のPlan追記前に存在した未commit差分はこのPlanだけで、他の変更・untracked fileはなかった。
+- PR #22はopen／non-Draft、branch `feat/development-qa-traceability`、head `a1a0d69bee1fbd16a431549ab94a34c3ecb7473c`。統合ownerによる取り込みやPR状態変更は今回行っていない。
+- PR #27のPR本文は「文書のみ、実装・局所受入未実施」と記したまま古い。今回の同期作業後、実装・局所証拠・未完了評価・CIを反映する内容へ置き換える。PR本文には試行履歴を重ねず、担当Planとevidenceへの参照を置く。
+
+### 現行HEADのActions
+
+GitHub ActionsはPR #27 head `33cb96b...`に関連付いたrun。Validate Agent Skills job logではcheckout対象がsynthetic merge commit `e5123fb52cbe281e9d9379a2f009d0e64691ee54`（head `33cb96b...`をbase `a1a0d69...`へmergeしたtree）であることを確認した。公式Skill specification validationは成功し、`Validate repository eval structure`が`README.md`のmissing list `['e2e-test-selection']`で失敗した。semantic-count、trigger-datasetなど後続stepはSKIPであり、成功として数えない。Actions結果はbranch単独headの実行結果とは区別する。
+
+| Workflow                            |           Run | 結果                                                              |
+| ----------------------------------- | ------------: | ----------------------------------------------------------------- |
+| Code Quality                        | `43029934414` | PASS                                                              |
+| Validate Agent Skills               | `43029934666` | FAIL（README canonical Skill登録不足。後続step SKIP）             |
+| Validate Deterministic Output Evals | `43029934993` | PASS                                                              |
+| Validate Semantic Output Evals      | `43029934370` | PASS（dataset構造・件数検査であり、Judge 31件のPASSを意味しない） |
+| Codex Harness                       | `43029934436` | PASS                                                              |
+
+PR #22 head `a1a0d69...`では5 workflowがsuccess（Code Quality `43029880021`、Validate Agent Skills `43029880103`、Validate Deterministic Output Evals `43029880180`、Validate Semantic Output Evals `43029880009`、Codex Harness `43029880338`）。このPR #22 treeにE Skill packageがまだ含まれないため、Validate Agent Skills successはE Skillのcanonical登録・routingを検証した証拠ではない。
+
+### PR #22共有treeの再照合と担当
+
+PR #22の実ファイルをbranch `feat/development-qa-traceability`から取得して確認した。README canonical Skill treeに`e2e-test-selection`がなく、`scripts/skills/evals/deterministic/ASSERTIONS.md`には旧`RISK-D016`／`RISK-D017`はあるが、新しい`E2E-SEL-D001`〜`D006`がない。`qa-workflow/SKILL.md`には既存E2E inspection／implementation／execution経路があるが、新selection Skillへのrouteがない。`test-analysis/SKILL.md`はE2E対象選定について技術非依存の責務を説明する一方、新Skill名によるroute登録は確認できない。従って、PR #22の現状はcanonical catalog／assertion／routingいずれも未反映であり、PR #22 Actionsの成功だけではその不足を解消しない。
+
+- **A／PR #22統合owner**：共有READMEのcanonical Skill登録と責務表、E2E routingを更新する。新規selectionのみ新Skillへ進め、既存E2E inspection／implementation／execution、明示TC利用、current selection再利用を保つ。旧`RISK-D016`／`D017`をlegacy互換として扱い、新`E2E-SEL-D001`〜`D006`との対応をASSERTIONSへ登録する。`EVALS.md`・共有routing・既存テストの影響を確認し、統合branchでcommit／通常push後、Validate Agent Skillsを再実行して以前SKIPされた後続stepを含め確認する。
+- **共有runtime owner／PR #22**：E formal designとselectionのartifact registration、共有保存先、認証済み承認、CAS／競合、readback／historical read、source currentnessの公開接続契約を確認・実装する。E branchは共通runtime・providerを変更していない。
+- **PR #22統合owner**：B/C/D/Fの実成果物を用いたID／revision／Authority照合、freshness伝播、E成果物からG/H/Jへの下流接続を統合後に実施する。PR #27の固定fixtureや成功Actionsを実provider・他owner成果物の証明に置き換えない。
+
+### E担当の証拠と未完了状態
+
+- 正式設計、coverage、E2E selectionの実装・局所テスト・deterministic contract、legacy／partial rerun回帰の既存証拠は本Planの2026-11-09実装記録およびPR #27差分を参照する。今回新たなコード不具合は確認していないため、共有ファイルや実装は変更しない。今回のローカル変更対象は本Planだけで、runtime testは再実行していない。
+- Semantic証拠は`evidence/semantic-2026-11-10/`の31件（PASS 20、needs_review 8、FAIL 3、Judge error 0）。FAIL 3件およびneeds_review 8件のeval ID・観測・未確定事項は上のv12表を正本とする。今回再生成・再Judgeは行わず、いずれもPASSへ変更しない。統合後、ownerによる仕様照合後に影響caseのみ再評価する。
+- Trigger証拠は`evidence/trigger-2026-11-11/` v7。full-tree snapshotは24 current Skill、1,051 package files。train query 1はpositive 3/3、query 2と3はnegative target trigger 0/3、query 4は2回900秒timeoutと1回の開始直後中断で、有効完了0/3。未完了query位置・dataset hash・raw JSONL・stderr・archive hashは上のtrigger v7節を正本とする。timeout／中断を発火判定へ加えない。
+- 実Agent評価の残り、semantic未解決11件、認証済み実providerの保存・承認・CAS・readback・stale／別session再開、共有README反映後の再検証、PR #22横断受入は未完了。今回、ユーザーの停止指示に従い長時間評価を開始していない。再開条件はE実装をPR #22へ統合して共有routing／catalogを整えた後に、timeout経路を先に調査すること。
+- PR #27の最新headではActions 4 PASS／1 FAIL（上表）。このFAILはE実装や評価datasetの変更によるものではなく、共有READMEへのcanonical Skill登録不足で再現している。README ownerはA／PR #22統合ownerであり、E branchでは修正しない。
+- この追記は前節の`fb1e87b...`時点の履歴を消さずに残し、現在の`33cb96b...`と区別する。今回のPR #27本文更新後もPRはDraftであり、E局所受入完了またはPR #22最終受入完了を意味しない。
