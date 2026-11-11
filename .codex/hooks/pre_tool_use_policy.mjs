@@ -1120,7 +1120,8 @@ async function main() {
     let raw = "";
     process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) raw += chunk;
-    const p = validate(raw), decision = evaluateCommand(p.tool_input.command, p.cwd ?? process.cwd(), p.cwd !== undefined);
+    const p = validate(raw),
+      decision = evaluateCommand(p.tool_input.command, p.cwd ?? process.cwd(), p.cwd !== undefined);
     if (decision) process.stdout.write(JSON.stringify(decision));
   } catch (error) {
     process.stderr.write(
