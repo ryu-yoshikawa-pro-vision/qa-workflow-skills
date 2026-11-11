@@ -323,7 +323,9 @@ class HookTests(unittest.TestCase):
         # PreToolUse event cwd points at an unrelated repository.
         result = self.run_hook(command, cwd=self.repo, tool_cwd=other)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("session repository or one of its linked worktrees", result.stdout)
+        self.assertIn(
+            "session repository or one of its linked worktrees", result.stdout
+        )
 
         # A command targeting the session repository remains allowed when the
         # pending tool uses an unrelated working directory.
@@ -344,7 +346,9 @@ class HookTests(unittest.TestCase):
         # authorization; the tool event cannot widen the session scope.
         refused = self.run_hook(session_command, cwd=other, tool_cwd=self.repo)
         self.assertEqual(refused.returncode, 0, refused.stderr)
-        self.assertIn("session repository or one of its linked worktrees", refused.stdout)
+        self.assertIn(
+            "session repository or one of its linked worktrees", refused.stdout
+        )
         own_session = self.run_hook(command, cwd=other, tool_cwd=self.repo)
         self.assertEqual(own_session.returncode, 0, own_session.stderr)
         self.assertEqual(own_session.stdout, "")
