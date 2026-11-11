@@ -279,7 +279,7 @@ class HookTests(unittest.TestCase):
         subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
         self.assert_hook_allows(self.posix_prefix + "git fetch origin")
 
-    def test_explicit_fetch_preserves_the_requested_repository(self) -> None:
+    def test_explicit_fetch_rejects_unrelated_repository(self) -> None:
         other = Path(self.temp.name) / "unrelated-repository"
         other.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=other, check=True)
@@ -288,60 +288,82 @@ class HookTests(unittest.TestCase):
             cwd=other,
             check=True,
         )
-        subprocess.run(
-            [
-                "git",
-                "config",
-                "--replace-all",
-                "remote.origin.fetch",
-                "+refs/heads/*:refs/heads/*",
-            ],
-            cwd=other,
-            check=True,
-        )
-        command = f"git -C '{other}' fetch origin"
-        # Session cwd points at a safe repository, but the command targets the
-        # unsafe other repository. The hook must validate that other repository.
-        result = self.run_hook(command, cwd=self.repo, session_cwd=self.repo)
-        self.assertIn("remote-tracking namespace", result.stdout)
+        command = f"git -C '{other.as_posix()}' fetch origin"
 
+        # The remote is identical, but the Git repository is independent.
+        # A safe refspec must not grant permission to modify its FETCH_HEAD.
+        for mapping in (
+            "+refs/heads/*:refs/heads/*",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ):
+            with self.subTest(mapping=mapping):
+                subprocess.run(
+                    [
+                        "git",
+                        "config",
+                        "--replace-all",
+                        "remote.origin.fetch",
+                        mapping,
+                    ],
+                    cwd=other,
+                    check=True,
+                )
+                self.assert_denied(command, "session repository or one of its linked worktrees")
+                self.assert_denied(
+                    f"git.exe -C '{other.as_posix()}' fetch origin",
+                    "session repository or one of its linked worktrees",
+                )
+        self.assertFalse((other / ".git" / "FETCH_HEAD").exists())
+
+        # The effective session scope, rather than the Hook process cwd,
+        # controls which repository is authorized.
+        result = self.run_hook(command, cwd=self.repo, session_cwd=other)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_explicit_fetch_allows_linked_worktree(self) -> None:
+        linked = Path(self.temp.name) / "linked worktree with spaces"
         subprocess.run(
-            [
-                "git",
-                "config",
-                "--replace-all",
-                "remote.origin.fetch",
-                "+refs/heads/*:refs/remotes/origin/*",
-            ],
-            cwd=other,
+            ["git", "worktree", "add", "-q", "-b", "feature/linked", str(linked), "main"],
+            cwd=self.repo,
             check=True,
         )
+        command = f"git -C '{linked.as_posix()}' fetch origin"
         self.assert_hook_allows(command)
-        self.assert_hook_allows(f"git.exe -C '{other}' fetch origin")
-        self.assert_hook_allows(f"git -C '{self.posix_root}' fetch origin")
+        self.assert_hook_allows(f"git.exe -C '{linked.as_posix()}' fetch origin")
 
-        # No hook rewrite: Git executes in the user-specified repository.
+        # A nested directory is also within the same worktree and common Git directory.
+        nested = linked / "nested"
+        nested.mkdir()
+        self.assert_hook_allows(f"git -C '{nested.as_posix()}' fetch origin")
+
+        # Execute from the primary worktree and ensure Git updates the linked
+        # worktree's FETCH_HEAD rather than the session worktree's FETCH_HEAD.
         subprocess.run(
-            ["git", "-C", str(other), "fetch", "origin"],
+            ["git", "-C", str(linked), "fetch", "origin"],
             cwd=self.repo,
             check=True,
             capture_output=True,
         )
-        self.assertTrue((other / ".git" / "FETCH_HEAD").exists())
+        fetch_head = subprocess.check_output(
+            ["git", "-C", str(linked), "rev-parse", "--git-path", "FETCH_HEAD"],
+            cwd=self.repo,
+            text=True,
+        ).strip()
+        fetch_head_path = Path(fetch_head)
+        if not fetch_head_path.is_absolute():
+            fetch_head_path = linked / fetch_head_path
+        self.assertTrue(fetch_head_path.exists())
         self.assertFalse((self.repo / ".git" / "FETCH_HEAD").exists())
 
-        for shell in (
-            (
-                ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
-                if os.name == "nt"
-                else ["/bin/sh", "-c"]
-            ),
-        ):
-            subprocess.run(
-                [*shell, command], cwd=self.repo, check=True, capture_output=True
-            )
+        # The same command is interpreted consistently by available shells.
         if os.name == "nt":
-            # Use Git for Windows Bash, not an unrelated bash on PATH (e.g. WSL).
+            shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
+        else:
+            shell = ["/bin/sh", "-c"]
+        subprocess.run([*shell, command], cwd=self.repo, check=True, capture_output=True)
+
+        if os.name == "nt":
             git_bash = (
                 Path(os.environ.get("ProgramFiles", "C:/Program Files"))
                 / "Git"
@@ -349,10 +371,8 @@ class HookTests(unittest.TestCase):
                 / "bash.exe"
             )
             self.assertTrue(git_bash.is_file(), git_bash)
-            bash_command = f"git -C '{other.as_posix()}' fetch origin"
-            self.assert_hook_allows(bash_command)
             result = subprocess.run(
-                [str(git_bash), "-c", bash_command],
+                [str(git_bash), "-c", command],
                 cwd=self.repo,
                 capture_output=True,
                 text=True,
