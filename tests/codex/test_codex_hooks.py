@@ -156,6 +156,25 @@ class HookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", command)
 
+    def assert_fetch_rewritten(
+        self, command: str, *, cwd: Path | None = None, session_cwd: Path | None = None
+    ) -> str:
+        result = self.run_hook(command, cwd=cwd, session_cwd=session_cwd)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout, command)
+        response = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(response["hookEventName"], "PreToolUse")
+        self.assertEqual(response["permissionDecision"], "allow")
+        rewritten = response["updatedInput"]["command"]
+        root = str(self.repo)
+        if os.name == "nt":
+            self.assertEqual(
+                rewritten, f"Set-Location -LiteralPath '{root}' -ErrorAction Stop; {command}"
+            )
+        else:
+            self.assertEqual(rewritten, f"cd '{root}' && {command}")
+        return rewritten
+
     def add_remote(self, name: str, *, default_branch: str | None = None) -> None:
         subprocess.run(
             ["git", "remote", "add", name, str(self.remote)],
@@ -236,6 +255,11 @@ class HookTests(unittest.TestCase):
             "git.exe fetch origin",
             "git fetch --dry-run origin",
             "git fetch origin --no-recurse-submodules",
+        ):
+            with self.subTest(command=command):
+                self.assert_fetch_rewritten(command)
+
+        for command in (
             self.posix_prefix + "git fetch",
             self.posix_prefix + "git fetch origin",
             self.ps_prefix + "git.exe fetch origin",
@@ -270,30 +294,75 @@ class HookTests(unittest.TestCase):
         subprocess.run(["git", "switch", "main"], cwd=self.repo, check=True)
         self.assert_hook_allows(self.posix_prefix + "git fetch origin")
 
-    def test_direct_fetch_uses_session_cwd_without_an_explicit_cd(self) -> None:
+    def test_direct_fetch_anchors_the_actual_git_command(self) -> None:
         nested = self.repo / "nested"
         nested.mkdir()
+        other = Path(self.temp.name) / "unrelated-repository"
+        other.mkdir()
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main"],
+            cwd=other,
+            check=True,
+        )
+        # An unsafe remote mapping in the tool workdir must not be consulted.
+        subprocess.run(
+            ["git", "remote", "add", "origin", str(self.remote)],
+            cwd=other,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/heads/*",
+            ],
+            cwd=other,
+            check=True,
+        )
 
-        # Codex reports the session cwd in the event; the hook process cwd can differ.
+        # The hook process and effective tool working directories differ.
         for command, session_dir in (
             ("git fetch origin", self.repo),
             ("git fetch origin", nested),
             ("git.exe fetch origin", self.repo),
         ):
             with self.subTest(command=command, session_dir=session_dir):
-                result = self.run_hook(
-                    command, cwd=self.repo.parent, session_cwd=session_dir
+                rewritten = self.assert_fetch_rewritten(
+                    command, cwd=other, session_cwd=session_dir
                 )
+                if os.name == "nt":
+                    result = subprocess.run(
+                        [
+                            "powershell.exe",
+                            "-NoProfile",
+                            "-NonInteractive",
+                            "-Command",
+                            rewritten,
+                        ],
+                        cwd=other,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                else:
+                    result = subprocess.run(
+                        ["/bin/sh", "-c", rewritten],
+                        cwd=other,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, "", command)
 
         outside = self.run_hook(
             "git fetch origin",
-            cwd=self.repo.parent,
-            session_cwd=self.repo.parent,
+            cwd=other,
+            session_cwd=Path(self.temp.name),
         )
         self.assertEqual(outside.returncode, 0, outside.stderr)
-        self.assertIn("canonical repository root", outside.stdout)
+        self.assertIn("Fetch requires a repository root", outside.stdout)
 
     def test_direct_fetch_keeps_shell_and_ref_update_guards(self) -> None:
         for command in (
