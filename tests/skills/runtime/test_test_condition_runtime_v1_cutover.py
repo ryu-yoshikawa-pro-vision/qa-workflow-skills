@@ -969,7 +969,7 @@ class TestTestConditionRuntimeV1Cutover(unittest.TestCase):
         materialize_pair = _current_pair(
             "artifact:materialize_coverage:TCN-001",
             "materialize_coverage",
-            "materialize-coverage-v2",
+            "materialize-coverage-v3",
             materialize["normalized_input"],
             {},
             scope_key="TCN-001",
@@ -1047,7 +1047,7 @@ class TestTestConditionRuntimeV1Cutover(unittest.TestCase):
         future_only = _current_pair(
             "artifact:materialize_coverage:TCN-001",
             "materialize_coverage",
-            "materialize-coverage-v2",
+            "materialize-coverage-v3",
             {},
             {},
             scope_key="TCN-001",

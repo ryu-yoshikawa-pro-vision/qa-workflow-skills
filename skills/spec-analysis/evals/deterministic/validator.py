@@ -62,10 +62,34 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     )
 
     required_files = expected.get("required_package_files", [])
+
+    def package_file_present(relative: str) -> bool:
+        if f"<!-- FILE: {relative} -->" in text:
+            return True
+        match = re.search(rf"(?m)^### Package file: {re.escape(relative)}\s*$", text)
+        if match is None:
+            match = re.search(rf"(?m)^### {re.escape(relative)}\s*$", text)
+        if match is None:
+            match = re.search(rf"(?m)^## {re.escape(relative)}\s*$", text)
+        if match is None:
+            match = re.search(rf"(?m)^## File: {re.escape(relative)}\s*$", text)
+        if match is None:
+            match = re.search(rf"(?m)^## File: `{re.escape(relative)}`\s*$", text)
+        if match is None:
+            return False
+        next_file = re.search(
+            r"(?m)^(?:"
+            r"### Package file: .+|### [A-Za-z0-9_./-]+\.md|"
+            r"## File: `[^`]+`|## File: [A-Za-z0-9_./-]+\.md|"
+            r"## [A-Za-z0-9_./-]+\.md"
+            r")\s*$",
+            text[match.end() :],
+        )
+        body_end = match.end() + next_file.start() if next_file else len(text)
+        return bool(text[match.end() : body_end].strip())
+
     missing_files = [
-        relative
-        for relative in required_files
-        if f"<!-- FILE: {relative} -->" not in text
+        relative for relative in required_files if not package_file_present(relative)
     ]
     result.add(
         "SPEC-D020",

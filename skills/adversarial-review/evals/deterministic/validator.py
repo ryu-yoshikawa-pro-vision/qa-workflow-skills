@@ -232,6 +232,36 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=missed or None,
     )
 
+    if "expected_finding_count" in expected:
+        expected_count = expected["expected_finding_count"]
+        valid_count = (
+            type(expected_count) is int
+            and expected_count >= 0
+            and len(findings) == expected_count
+        )
+        result.add(
+            "REV-D017",
+            valid_count,
+            "フィクスチャで固定した指摘件数と一致すること",
+            evidence={"expected": expected_count, "actual": len(findings)},
+        )
+    if "required_tokens" in expected:
+        tokens = expected["required_tokens"]
+        valid_tokens = isinstance(tokens, list) and all(
+            isinstance(token, str) and token for token in tokens
+        )
+        missing_tokens = (
+            [token for token in tokens if token not in text]
+            if valid_tokens
+            else ["required_tokens must be a list of non-empty strings"]
+        )
+        result.add(
+            "REV-D018",
+            not missing_tokens,
+            "フィクスチャで必須のレビュー制約が成果物に含まれること",
+            evidence=missing_tokens or None,
+        )
+
     e2e_table = find_table(
         tables,
         section_contains="E2E実装参照一覧",

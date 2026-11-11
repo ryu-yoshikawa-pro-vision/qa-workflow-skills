@@ -3,10 +3,9 @@
   "known_authorities": ["SPEC-001"],
   "known_product_risks": ["RISK-001"],
   "required_test_conditions": ["TCN-001"],
-  "required_coverage_items": ["TCN-001-CI01"],
-  "bva": [{ "required_values": [100, 101] }],
+  "bva": [{ "required_values": [100, 101], "blocked_candidate_disposition": "ブロック中" }],
   "required_transitions": [
-    { "from": "draft", "event": "publish", "to": "published" },
-    { "from": "published", "event": "archive", "to": "archived" }
+    { "from": "draft", "event": "publish", "to": "published", "disposition": "ブロック中" },
+    { "from": "published", "event": "archive", "to": "archived", "disposition": "ブロック中" }
   ]
 }

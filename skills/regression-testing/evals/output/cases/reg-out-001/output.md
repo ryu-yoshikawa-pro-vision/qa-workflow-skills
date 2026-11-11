@@ -4,7 +4,7 @@
 {
   "artifact_type": "baseline",
   "schema_version": "1",
-  "baseline_ref": "BASE-2026-09",
+  "baseline_ref": "fixture:qa/regression/baseline/settings-auth-v1",
   "discovery_snapshot_ref": "DS-001",
   "source_revisions": [
     {

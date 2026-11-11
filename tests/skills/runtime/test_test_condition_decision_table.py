@@ -133,6 +133,21 @@ def base_rules() -> dict:
 
 
 class DecisionTableRuntimeTests(unittest.TestCase):
+    def test_runtime_rejects_raw_scalar_instead_of_coercing_to_typed_value(
+        self,
+    ) -> None:
+        value = base_rules()
+        value["conditions"][0]["values"][0] = False
+
+        result = run(value)
+
+        self.assertEqual(result["runtime_status"], "invalid_input")
+        self.assertEqual(result["result_status"], "blocked")
+        self.assertIn(
+            "typed valueはtype/valueだけを持つobject",
+            result["issues"][0]["message"],
+        )
+
     def test_cartesian_rules_are_stable_and_generate_non_destructive_dont_care_candidate(
         self,
     ) -> None:

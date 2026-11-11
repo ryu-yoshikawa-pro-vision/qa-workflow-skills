@@ -1,6 +1,10 @@
 {
   "skill": "test-condition-design",
   "canonical_output": true,
+  "skill_runtime_verification": {
+    "runtime_unit_key": "artifact:condition_structure:all",
+    "partial_rerun": false
+  },
   "cases": [
     { "id": "TCN-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json" },
     { "id": "TCN-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" }

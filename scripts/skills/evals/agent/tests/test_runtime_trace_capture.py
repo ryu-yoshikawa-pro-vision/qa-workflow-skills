@@ -1,0 +1,1010 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from scripts.skills.evals.agent import common_runtime_checks
+from scripts.skills.evals.agent.common import (
+    capture_codex_jsonl_trace,
+    capture_codex_judge_output,
+    trace_confirms_capture_invocation,
+)
+from scripts.skills.evals.agent.verifier_capture import capture_invocation
+
+
+class RuntimeTraceCaptureTests(unittest.TestCase):
+    def _require_isolation_or_skip(self) -> None:
+        probe = common_runtime_checks.isolated_verifier.probe_isolation()
+        if probe.get("status") != "verified":
+            if os.environ.get("PR17_REQUIRE_VERIFIER_ISOLATION") == "1":
+                self.fail(f"Dockerless verifier isolation is required: {probe}")
+            self.skipTest(f"isolation boundary unverified: {probe.get('reason')}")
+
+    def _copy_runtime_tree(self, package_root: Path, skill: str) -> Path:
+        repo_root = Path(__file__).resolve().parents[5]
+        source = repo_root / "skills" / skill / "scripts"
+        destination = package_root / "skills" / skill / "scripts"
+        if any(path.is_symlink() for path in source.rglob("*")):
+            raise AssertionError(
+                "runtime fixture source unexpectedly contains a symlink"
+            )
+        shutil.copytree(
+            source,
+            destination,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+        return destination
+
+    def _write_synthetic_invocation(
+        self,
+        root: Path,
+        *,
+        skill: str,
+        operation: str,
+        artifact_path: str,
+        request_bytes: bytes,
+        result_bytes: bytes,
+    ) -> Path:
+        artifact_id = hashlib.sha256(artifact_path.encode("utf-8")).hexdigest()
+        output_root = root / ".qa-eval-output"
+        capture_root = output_root / ".runtime-evidence"
+        record = capture_root / skill / artifact_id / "synthetic-001"
+        record.mkdir(parents=True)
+        (record / "request.json").write_bytes(request_bytes)
+        (record / "result.json").write_bytes(result_bytes)
+        relative_record = f".runtime-evidence/{skill}/{artifact_id}/synthetic-001"
+        invocation = {
+            "schema_version": 1,
+            "skill": skill,
+            "operation": operation,
+            "artifact_id": artifact_id,
+            "invocation_id": "synthetic-001",
+            "request_relative_path": f"{relative_record}/request.json",
+            "record_relative_path": relative_record,
+            "result_relative_path": f"{relative_record}/result.json",
+            "command": ["python", "-B", "<synthetic-fixture>"],
+            "exit_code": 0,
+            "timed_out": False,
+            "duration_seconds": 0.0,
+            "request_sha256": common_runtime_checks.sha256_bytes(request_bytes),
+            "result_sha256": common_runtime_checks.sha256_bytes(result_bytes),
+            "stderr_status": "empty",
+            "stderr": "",
+            "evidence_status": "captured",
+        }
+        (record / "invocation.json").write_text(
+            json.dumps(invocation, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        return capture_root
+
+    def test_isolated_execution_evidence_keeps_hashes_and_bounds_diagnostics(
+        self,
+    ) -> None:
+        raw = {
+            "status": "verified",
+            "exit_code": 0,
+            "source_fingerprint_before": "sha256:" + "a" * 64,
+            "bwrap_user_namespace_disable_assertion_passed": True,
+            "request_sha256": "sha256:" + "b" * 64,
+            "stdout_sha256": "sha256:" + "c" * 64,
+            "stderr_sha256": "sha256:" + "d" * 64,
+            "stdout": "x" * (common_runtime_checks._MAX_REPLAY_DIAGNOSTIC_BYTES + 20),
+            "stderr": "",
+        }
+
+        saved = common_runtime_checks._isolated_execution_evidence(raw)
+
+        self.assertEqual(saved["exit_code"], 0)
+        self.assertTrue(saved["bwrap_user_namespace_disable_assertion_passed"])
+        self.assertEqual(saved["request_sha256"], raw["request_sha256"])
+        self.assertEqual(saved["stdout_sha256"], raw["stdout_sha256"])
+        self.assertLessEqual(
+            len(saved["stdout"]), common_runtime_checks._MAX_REPLAY_DIAGNOSTIC_BYTES
+        )
+
+    def test_runtime_replay_aggregation_preserves_execution_failure_classes(
+        self,
+    ) -> None:
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "timeout"}, {"status": "pass"}]
+            ),
+            "timeout",
+        )
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "execution_error"}, {"status": "pass"}]
+            ),
+            "execution_error",
+        )
+        self.assertEqual(
+            common_runtime_checks._aggregate_capture_status(
+                [{"status": "environment_error"}, {"status": "pass"}]
+            ),
+            "environment_error",
+        )
+
+    def test_isolated_verify_and_workflow_runtime_replay_contracts(self) -> None:
+        """Exercise both replay paths only after the real boundary probe passes."""
+        self._require_isolation_or_skip()
+        isolated = common_runtime_checks.isolated_verifier
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate_root = root / ".agents"
+            fixed_root = root / "fixed-evaluator"
+            verify_scripts = self._copy_runtime_tree(
+                candidate_root, "test-condition-design"
+            )
+            self._copy_runtime_tree(fixed_root, "test-condition-design")
+            from tests.skills.runtime.test_runtime_contract import (
+                EntityAndEvidenceTests,
+            )
+
+            normalized_input, artifact_markdown = EntityAndEvidenceTests()._artifact()
+            verify_request = {
+                "operation": "verify_runtime_evidence",
+                "skill": "test-condition-design",
+                "normalized_skill_input": normalized_input,
+                "artifact_markdown": artifact_markdown,
+                "previous_artifact_markdown": None,
+                "partial_rerun": False,
+            }
+            verify_request_bytes = (
+                json.dumps(verify_request, ensure_ascii=False, separators=(",", ":"))
+                + "\n"
+            ).encode("utf-8")
+            fixed_verify_script = (
+                fixed_root
+                / "skills"
+                / "test-condition-design"
+                / "scripts"
+                / "runtime_contract.py"
+            )
+            fixed_verify = isolated.run_isolated_python(
+                source_dir=fixed_verify_script.parent,
+                script_name=fixed_verify_script.name,
+                request_bytes=verify_request_bytes,
+            )
+            self.assertEqual(fixed_verify["status"], "verified", fixed_verify)
+            self.assertTrue(fixed_verify["result"]["valid"])
+            verify_candidate_fingerprint = isolated.source_tree_fingerprint(
+                verify_scripts
+            )
+
+            def verify_capture(
+                result_bytes: bytes,
+                capture_root: Path,
+                *,
+                source_fingerprint: str = verify_candidate_fingerprint,
+            ) -> dict:
+                saved_capture_root = self._write_synthetic_invocation(
+                    capture_root,
+                    skill="test-condition-design",
+                    operation="verify",
+                    artifact_path="docs/synthetic-runtime.md",
+                    request_bytes=verify_request_bytes,
+                    result_bytes=result_bytes,
+                )
+                return common_runtime_checks.evaluate_runtime_captures(
+                    capture_root=saved_capture_root,
+                    candidate_package_root=candidate_root,
+                    verifier_image=None,
+                    fixed_evaluator_root=fixed_root,
+                    expected_artifacts=[
+                        {
+                            "skill": "test-condition-design",
+                            "path": "docs/synthetic-runtime.md",
+                        }
+                    ],
+                    trace_commands=None,
+                    require_tool_trace=False,
+                    expected_candidate_source_fingerprints={
+                        "test-condition-design": source_fingerprint
+                    },
+                )
+
+            verify_pass = verify_capture(
+                fixed_verify["stdout"].encode("utf-8"), root / "verify-pass"
+            )
+            self.assertEqual(verify_pass["status"], "pass", verify_pass)
+            self.assertTrue(
+                verify_pass["captures"][0]["candidate_execution"]["verifier_executed"]
+            )
+            mismatched_verify = dict(fixed_verify["result"], valid=False)
+            verify_mismatch = verify_capture(
+                (json.dumps(mismatched_verify, sort_keys=True) + "\n").encode(),
+                root / "verify-mismatch",
+            )
+            self.assertEqual(verify_mismatch["status"], "fail", verify_mismatch)
+            self.assertIn(
+                "valid", verify_mismatch["captures"][0]["captured_mismatched_fields"]
+            )
+
+            (verify_scripts / "runtime_contract.py").write_text(
+                "raise SystemExit(7)\n", encoding="utf-8"
+            )
+            failed_verify_fingerprint = isolated.source_tree_fingerprint(verify_scripts)
+            failed_verify = verify_capture(
+                fixed_verify["stdout"].encode("utf-8"),
+                root / "verify-failure",
+                source_fingerprint=failed_verify_fingerprint,
+            )
+            self.assertEqual(failed_verify["status"], "execution_error", failed_verify)
+            self.assertIsNone(failed_verify["captures"][0].get("candidate_executed"))
+            self.assertNotEqual(verify_candidate_fingerprint, failed_verify_fingerprint)
+
+            workflow_scripts = self._copy_runtime_tree(candidate_root, "qa-workflow")
+            self._copy_runtime_tree(fixed_root, "qa-workflow")
+            from tests.skills.runtime.test_workflow_runtime import WorkflowRuntimeTests
+
+            workflow_request = WorkflowRuntimeTests()._request()
+            workflow_request_bytes = (
+                json.dumps(workflow_request, ensure_ascii=False, separators=(",", ":"))
+                + "\n"
+            ).encode("utf-8")
+            fixed_workflow_script = (
+                fixed_root
+                / "skills"
+                / "qa-workflow"
+                / "scripts"
+                / "workflow_runtime.py"
+            )
+            fixed_workflow = isolated.run_isolated_python(
+                source_dir=fixed_workflow_script.parent,
+                script_name=fixed_workflow_script.name,
+                request_bytes=workflow_request_bytes,
+            )
+            self.assertEqual(fixed_workflow["status"], "verified", fixed_workflow)
+            self.assertTrue(fixed_workflow["result"]["payload"]["can_complete"])
+            workflow_fingerprint = isolated.source_tree_fingerprint(workflow_scripts)
+            replay_args = {
+                "request_bytes": workflow_request_bytes,
+                "captured_bytes": fixed_workflow["stdout"].encode("utf-8"),
+                "candidate_package_root": candidate_root,
+                "verifier_image": None,
+                "fixed_evaluator_root": fixed_root,
+                "expected_candidate_source_fingerprint": workflow_fingerprint,
+            }
+            workflow_pass = common_runtime_checks._workflow_replay(**replay_args)
+            self.assertEqual(workflow_pass["status"], "pass", workflow_pass)
+            self.assertTrue(workflow_pass["workflow_runtime_can_complete"])
+            mismatched_workflow = dict(fixed_workflow["result"])
+            mismatched_workflow["payload"] = dict(mismatched_workflow["payload"])
+            mismatched_workflow["payload"]["can_complete"] = False
+            workflow_mismatch = common_runtime_checks._workflow_replay(
+                **{
+                    **replay_args,
+                    "captured_bytes": (
+                        json.dumps(mismatched_workflow, sort_keys=True) + "\n"
+                    ).encode("utf-8"),
+                }
+            )
+            self.assertEqual(workflow_mismatch["status"], "fail", workflow_mismatch)
+            self.assertIn(
+                "payload.can_complete",
+                workflow_mismatch["captured_mismatched_fields"],
+            )
+            (workflow_scripts / "workflow_runtime.py").write_text(
+                "raise SystemExit(7)\n", encoding="utf-8"
+            )
+            failed_workflow = common_runtime_checks._workflow_replay(
+                **{
+                    **replay_args,
+                    "expected_candidate_source_fingerprint": isolated.source_tree_fingerprint(
+                        workflow_scripts
+                    ),
+                }
+            )
+            self.assertEqual(failed_workflow["status"], "execution_error")
+            self.assertIsNone(failed_workflow["candidate_executed"])
+
+            print(
+                "PR17_DOCKERLESS_REPLAY_EVIDENCE="
+                + json.dumps(
+                    {
+                        "fixture": "synthetic-runtime-contracts",
+                        "verify": {
+                            "pass": verify_pass["status"],
+                            "mismatch": verify_mismatch["status"],
+                            "failure": failed_verify["status"],
+                        },
+                        "workflow_runtime": {
+                            "pass": workflow_pass["status"],
+                            "mismatch": workflow_mismatch["status"],
+                            "failure": failed_workflow["status"],
+                            "can_complete": workflow_pass[
+                                "workflow_runtime_can_complete"
+                            ],
+                        },
+                        "qts_agent_capture": False,
+                    },
+                    sort_keys=True,
+                )
+            )
+
+    def test_dockerless_workflow_replay_keeps_unavailable_boundary_unverified(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text(
+                "raise RuntimeError('must not execute')\n", encoding="utf-8"
+            )
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                return_value={
+                    "status": "evidence_unverified",
+                    "reason": "required_bubblewrap_capabilities_unavailable",
+                    "verifier_executed": False,
+                    "sandbox_process_started": False,
+                },
+            ) as replay:
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=b"{}\n",
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertFalse(result["candidate_executed"])
+        replay.assert_called_once()
+
+    def test_nonzero_candidate_sandbox_exit_does_not_claim_verifier_execution(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "test-case-design" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "runtime_contract.py").write_text(
+                "print('{}')\n", encoding="utf-8"
+            )
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                return_value={
+                    "status": "execution_error",
+                    "exit_code": 1,
+                    "sandbox_process_started": True,
+                    "verifier_executed": None,
+                },
+            ):
+                result = common_runtime_checks.run_candidate_verifier_isolated(
+                    candidate_package_root=root / ".agents",
+                    skill="test-case-design",
+                    request_bytes=b"{}\n",
+                )
+
+        self.assertEqual(result["status"], "execution_error")
+        self.assertIsNone(result["candidate_executed"])
+
+    def test_dockerless_workflow_replay_compares_can_complete_and_preserves_false(
+        self,
+    ) -> None:
+        valid_result = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [{"issue_type": "runtime_not_complete"}],
+            "payload": {"can_complete": False},
+        }
+        candidate_result = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "ready",
+            "issues": [],
+            "payload": {"can_complete": True},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
+            results = [
+                {
+                    "status": "verified",
+                    "result": candidate_result,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "verifier_executed": True,
+                },
+                {
+                    "status": "verified",
+                    "result": valid_result,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "verifier_executed": True,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(valid_result).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("payload.can_complete", result["mismatched_semantic_fields"])
+
+    def test_dockerless_replay_pass_is_parity_only_when_workflow_incomplete(
+        self,
+    ) -> None:
+        incomplete = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [{"issue_type": "runtime_not_complete"}],
+            "payload": {"can_complete": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
+            candidate_source_fingerprint = (
+                common_runtime_checks.isolated_verifier.source_tree_fingerprint(scripts)
+            )
+            results = [
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "source_fingerprint_before": "sha256:" + "d" * 64,
+                    "source_unchanged": True,
+                    "exit_code": 0,
+                    "stdout_sha256": "sha256:" + "e" * 64,
+                    "stderr_sha256": "sha256:" + "f" * 64,
+                    "stdout": "candidate-output",
+                    "stderr": "",
+                    "verifier_executed": True,
+                    "network_enforcement": "seccomp-deny-socket-and-io-uring",
+                    "network_policy_sha256": "sha256:" + "9" * 64,
+                },
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "source_fingerprint_before": "sha256:" + "1" * 64,
+                    "source_unchanged": True,
+                    "exit_code": 0,
+                    "stdout_sha256": "sha256:" + "2" * 64,
+                    "stderr_sha256": "sha256:" + "3" * 64,
+                    "stdout": "fixed-output",
+                    "stderr": "",
+                    "verifier_executed": True,
+                    "network_enforcement": "seccomp-deny-socket-and-io-uring",
+                    "network_policy_sha256": "sha256:" + "8" * 64,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(incomplete).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "pass")
+        self.assertFalse(result["workflow_runtime_can_complete"])
+        self.assertEqual(
+            result["candidate_source_fingerprint"], candidate_source_fingerprint
+        )
+        self.assertEqual(result["fixed_source_fingerprint"], "sha256:" + "1" * 64)
+        self.assertEqual(result["candidate_execution"]["exit_code"], 0)
+        self.assertEqual(
+            result["fixed_execution"]["stdout_sha256"], "sha256:" + "2" * 64
+        )
+        self.assertEqual(result["candidate_execution"]["stdout"], "candidate-output")
+        self.assertEqual(result["network"], "blocked_by_seccomp")
+        self.assertEqual(
+            result["network_enforcement"], "seccomp-deny-socket-and-io-uring"
+        )
+        self.assertEqual(result["network_policy_sha256"], "sha256:" + "9" * 64)
+        self.assertEqual(result["fixed_network_policy_sha256"], "sha256:" + "8" * 64)
+        self.assertEqual(
+            result["candidate_execution"]["network_policy_sha256"],
+            result["network_policy_sha256"],
+        )
+
+    def test_dockerless_workflow_replay_requires_boolean_can_complete(self) -> None:
+        incomplete = {
+            "runtime_status": "ok",
+            "support_status": "supported",
+            "result_status": "unresolved",
+            "issues": [],
+            "payload": {},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            scripts.mkdir(parents=True)
+            (scripts / "workflow_runtime.py").write_text("pass\n", encoding="utf-8")
+            results = [
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "b" * 64,
+                    "verifier_executed": True,
+                },
+                {
+                    "status": "verified",
+                    "result": incomplete,
+                    "request_sha256": "sha256:" + "a" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                    "verifier_executed": True,
+                },
+            ]
+            with patch.object(
+                common_runtime_checks.isolated_verifier,
+                "run_isolated_python",
+                side_effect=results,
+            ):
+                result = common_runtime_checks._workflow_replay(
+                    request_bytes=b"{}\n",
+                    captured_bytes=json.dumps(incomplete).encode("utf-8"),
+                    candidate_package_root=root / ".agents",
+                    verifier_image=None,
+                    fixed_evaluator_root=root,
+                )
+        self.assertEqual(result["status"], "evidence_unverified")
+        self.assertEqual(result["reason"], "workflow_runtime_result_contract_invalid")
+
+    def test_codex_jsonl_extracts_final_message_and_successful_skill_read(self) -> None:
+        events = [
+            {"type": "thread.started", "thread_id": "thread-001"},
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "item-read",
+                    "type": "command_execution",
+                    "command": "cat /workspace/.agents/skills/qa-workflow/SKILL.md",
+                    "exit_code": 0,
+                },
+            },
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "item-final",
+                    "type": "agent_message",
+                    "text": "Final output.",
+                },
+            },
+            {"type": "turn.completed"},
+        ]
+        captured = capture_codex_jsonl_trace(
+            "\n".join(json.dumps(event) for event in events) + "\n",
+            skill_names=["qa-workflow"],
+        )
+        self.assertEqual(captured["format"], "codex_exec_jsonl")
+        self.assertEqual(captured["status"], "captured")
+        self.assertEqual(captured["final_message"], "Final output.")
+        self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
+        self.assertTrue(captured["commands"][0]["successful"])
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertNotIn(
+            "cat /workspace/.agents/skills/qa-workflow/SKILL.md",
+            json.dumps(captured["trace_summary"]),
+        )
+
+    def test_launcher_envelope_keeps_only_safe_jsonl_observations(self) -> None:
+        envelope = {
+            "protocol": "codex_docker_launcher_v1",
+            "exit_code": 0,
+            "final_message": "Final output.",
+            "observations": {
+                "status": "completed",
+                "auth_mode": "temporary_auth_file",
+                "image": {
+                    "image_id": "sha256:" + "a" * 64,
+                    "codex_cli_version": "codex-cli 0.163.0",
+                    "python_version": "Python 3.11.17",
+                },
+                "jsonl": {
+                    "status": "captured",
+                    "event_count": 2,
+                    "event_types": {"item.completed": 1, "turn.completed": 1},
+                    "command_count": 1,
+                    "turn_completed": True,
+                    "turn_failed": False,
+                    "commands": [
+                        {
+                            "exit_code": 0,
+                            "successful": True,
+                            "skill_files_read": ["qa-workflow"],
+                            "verifier_capture_invocations": [],
+                        }
+                    ],
+                },
+            },
+        }
+        captured = capture_codex_jsonl_trace(
+            json.dumps(envelope), skill_names=["qa-workflow"]
+        )
+        self.assertEqual(captured["format"], "codex_docker_launcher_v1")
+        self.assertEqual(captured["execution_status"], "completed")
+        self.assertEqual(
+            captured["launcher_observations"]["image"]["codex_cli_version"],
+            "codex-cli 0.163.0",
+        )
+        self.assertEqual(captured["skill_use_observation"]["qa-workflow"], "observed")
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertNotIn('"command":', json.dumps(captured["trace_summary"]))
+
+    def test_wsl2_redaction_flag_makes_trace_and_judge_evidence_unverified(
+        self,
+    ) -> None:
+        observations = {
+            "protocol": "codex_wsl2_bwrap_launcher_v1",
+            "mode": "agent",
+            "status": "evidence_unverified",
+            "final_message_redacted": True,
+            "response_sha256": None,
+            "jsonl": {
+                "status": "captured",
+                "event_count": 2,
+                "event_types": {"item.completed": 1, "turn.completed": 1},
+                "tool_event_count": 0,
+                "command_count": 0,
+                "turn_completed": True,
+                "turn_failed": False,
+                "commands": [],
+            },
+        }
+        envelope = {
+            "protocol": "codex_wsl2_bwrap_launcher_v1",
+            "exit_code": 0,
+            "final_message": "Answer [redacted]",
+            "observations": observations,
+        }
+        trace = capture_codex_jsonl_trace(json.dumps(envelope))
+        self.assertTrue(trace["redacted"])
+        self.assertEqual(trace["status"], "evidence_unverified")
+        self.assertEqual(trace["execution_status"], "evidence_unverified")
+        self.assertEqual(trace["trace_summary"]["status"], "evidence_unverified")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            sidecar = Path(temporary) / "launcher-observations.json"
+            sidecar.write_text(
+                json.dumps({**observations, "mode": "judge"}), encoding="utf-8"
+            )
+            judge = capture_codex_judge_output(
+                "Answer [redacted]", observations_path=sidecar
+            )
+        self.assertTrue(judge["redacted"])
+        self.assertEqual(judge["status"], "evidence_unverified")
+        self.assertEqual(
+            judge["launcher_observations"]["status"], "evidence_unverified"
+        )
+
+    def test_jsonl_with_unknown_event_type_is_not_saved_as_candidate_output(
+        self,
+    ) -> None:
+        raw = json.dumps({"type": "future.event", "payload": "sensitive"})
+        captured = capture_codex_jsonl_trace(raw, skill_names=["qa-workflow"])
+        self.assertEqual(captured["final_message"], "")
+        self.assertIsNone(captured["trace_jsonl"])
+        self.assertEqual(captured["status"], "unverified")
+
+    def test_final_message_after_failed_or_incomplete_turn_is_unverified(self) -> None:
+        final_message = {
+            "type": "item.completed",
+            "item": {"type": "agent_message", "text": "Partial output."},
+        }
+        cases = (
+            [final_message],
+            [final_message, {"type": "turn.failed"}],
+            [final_message, {"type": "error", "message": "request failed"}],
+        )
+        for events in cases:
+            with self.subTest(event_types=[event["type"] for event in events]):
+                captured = capture_codex_jsonl_trace(
+                    "\n".join(json.dumps(event) for event in events),
+                    skill_names=["qa-workflow"],
+                )
+                self.assertEqual(captured["final_message"], "Partial output.")
+                self.assertEqual(captured["status"], "evidence_unverified")
+                self.assertEqual(
+                    captured["trace_summary"]["status"], "evidence_unverified"
+                )
+
+    def test_nonzero_or_missing_command_exit_code_does_not_confirm_skill_use(
+        self,
+    ) -> None:
+        for exit_code in (None, 1):
+            with self.subTest(exit_code=exit_code):
+                item = {
+                    "id": "item-read",
+                    "type": "command_execution",
+                    "command": "cat /workspace/.agents/skills/qa-workflow/SKILL.md",
+                }
+                if exit_code is not None:
+                    item["exit_code"] = exit_code
+                raw = json.dumps({"type": "item.completed", "item": item})
+                captured = capture_codex_jsonl_trace(raw, skill_names=["qa-workflow"])
+                self.assertEqual(
+                    captured["skill_use_observation"]["qa-workflow"], "unverified"
+                )
+
+    def test_trace_confirms_exact_completed_wrapper_request_and_record(self) -> None:
+        invocation = {
+            "skill": "qa-workflow",
+            "operation": "verify",
+            "request_relative_path": ".runtime-evidence/qa-workflow/"
+            + "a" * 64
+            + "/attempt-01/request.json",
+            "record_relative_path": ".runtime-evidence/qa-workflow/"
+            + "a" * 64
+            + "/attempt-01",
+        }
+        good = {
+            "successful": True,
+            "command": (
+                "python .qa-eval-tools/verifier_capture.py --skill qa-workflow --operation verify "
+                "--request .qa-eval-output/"
+                + invocation["request_relative_path"]
+                + " --record .qa-eval-output/"
+                + invocation["record_relative_path"]
+            ),
+        }
+        self.assertTrue(trace_confirms_capture_invocation([good], invocation))
+        self.assertFalse(
+            trace_confirms_capture_invocation(
+                [{**good, "successful": False}], invocation
+            )
+        )
+        self.assertFalse(
+            trace_confirms_capture_invocation(
+                [
+                    {
+                        **good,
+                        "command": good["command"].replace("attempt-01", "attempt-02"),
+                    }
+                ],
+                invocation,
+            )
+        )
+
+    def test_standalone_wrapper_captures_verify_result_without_turning_valid_false_into_success(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            skill_root.mkdir(parents=True)
+            script = skill_root / "runtime_contract.py"
+            script.write_text(
+                "import json, sys\n"
+                "import local_helper\n"
+                "json.loads(sys.stdin.buffer.read())\n"
+                "print(json.dumps({'valid': False, 'current_structure_state': [], "
+                "'helper': local_helper.VALUE}))\n",
+                encoding="utf-8",
+            )
+            (skill_root / "local_helper.py").write_text(
+                "VALUE = 'loaded'\n", encoding="utf-8"
+            )
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / ("b" * 64)
+                / "attempt-01"
+            )
+            record.mkdir(parents=True)
+            request = record / "request.json"
+            request_bytes = (
+                b'{ "operation": "verify_runtime_evidence", "partial_rerun": false }\n'
+            )
+            request.write_bytes(request_bytes)
+            with patch.object(Path, "cwd", return_value=root):
+                result = capture_invocation(
+                    skill="qa-workflow",
+                    operation="verify",
+                    request_path=request,
+                    record_path=record,
+                )
+            saved_result = json.loads(
+                (record / "result.json").read_text(encoding="utf-8")
+            )
+            saved_request = (record / "request.json").read_bytes()
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
+        self.assertEqual(result["evidence_status"], "captured")
+        self.assertFalse(saved_result["valid"])
+        self.assertEqual(saved_result["helper"], "loaded")
+        self.assertFalse((skill_root / "__pycache__").exists())
+        self.assertEqual(saved_request, request_bytes)
+        self.assertEqual(
+            invocation["command"],
+            [
+                "python",
+                "-B",
+                ".agents/skills/qa-workflow/scripts/runtime_contract.py",
+            ],
+        )
+        self.assertEqual(
+            invocation["request_sha256"],
+            "sha256:" + hashlib.sha256(request_bytes).hexdigest(),
+        )
+        self.assertEqual(
+            invocation["result_relative_path"].split("/")[-1], "result.json"
+        )
+
+    def test_nested_runtime_capture_is_replayed_only_when_trace_confirms_it(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            skill_root.mkdir(parents=True)
+            (skill_root / "runtime_contract.py").write_text(
+                "import json, sys\njson.loads(sys.stdin.buffer.read())\nprint(json.dumps({'valid': False}))\n",
+                encoding="utf-8",
+            )
+            artifact_path = "docs/checkout-analysis.md"
+            artifact_id = hashlib.sha256(artifact_path.encode("utf-8")).hexdigest()
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / artifact_id
+                / "attempt-01"
+            )
+            record.mkdir(parents=True)
+            request = record / "request.json"
+            request.write_text(
+                '{"operation":"verify_runtime_evidence"}\n', encoding="utf-8"
+            )
+            with patch.object(Path, "cwd", return_value=root):
+                invocation = capture_invocation(
+                    skill="qa-workflow",
+                    operation="verify",
+                    request_path=request,
+                    record_path=record,
+                )
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
+            trace_command = {
+                "successful": True,
+                "command": (
+                    "python .qa-eval-tools/verifier_capture.py --skill qa-workflow --operation verify "
+                    f"--request .qa-eval-output/{invocation['request_relative_path']} "
+                    f"--record .qa-eval-output/{invocation['record_relative_path']}"
+                ),
+            }
+            with (
+                patch.object(
+                    common_runtime_checks,
+                    "run_candidate_verifier_offline",
+                    return_value={
+                        "status": "verified",
+                        "result": {"valid": False},
+                        "result_sha256": "sha256:" + "0" * 64,
+                    },
+                ),
+                patch.object(
+                    common_runtime_checks,
+                    "_run",
+                    return_value=subprocess.CompletedProcess(
+                        [], 0, b'{"valid":false}', b""
+                    ),
+                ),
+            ):
+                checked = common_runtime_checks.evaluate_runtime_captures(
+                    capture_root=root / ".qa-eval-output" / ".runtime-evidence",
+                    candidate_package_root=root,
+                    verifier_image="sha256:" + "b" * 64,
+                    fixed_evaluator_root=root,
+                    expected_artifacts=[
+                        {"skill": "qa-workflow", "path": artifact_path}
+                    ],
+                    trace_commands=[trace_command],
+                )
+        self.assertEqual(invocation["evidence_status"], "captured")
+        self.assertEqual(checked["status"], "fail")
+        self.assertTrue(checked["captures"][0]["tool_trace_confirmed"])
+
+    def test_nested_workflow_runtime_capture_requires_trace_and_can_replay(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill_root = root / ".agents" / "skills" / "qa-workflow" / "scripts"
+            skill_root.mkdir(parents=True)
+            (skill_root / "workflow_runtime.py").write_text(
+                "import json, sys\njson.loads(sys.stdin.buffer.read())\nprint(json.dumps({'payload': {'can_complete': False}}))\n",
+                encoding="utf-8",
+            )
+            artifact_path = "docs/checkout-analysis.md"
+            artifact_id = hashlib.sha256(artifact_path.encode("utf-8")).hexdigest()
+            record = (
+                root
+                / ".qa-eval-output"
+                / ".runtime-evidence"
+                / "qa-workflow"
+                / artifact_id
+                / "workflow-01"
+            )
+            record.mkdir(parents=True)
+            request = record / "request.json"
+            request.write_text('{"payload":{"runtime_units":[]}}\n', encoding="utf-8")
+            with patch.object(Path, "cwd", return_value=root):
+                invocation = capture_invocation(
+                    skill="qa-workflow",
+                    operation="workflow-runtime",
+                    request_path=request,
+                    record_path=record,
+                )
+            invocation = json.loads(
+                (record / "invocation.json").read_text(encoding="utf-8")
+            )
+            trace_command = {
+                "successful": True,
+                "command": (
+                    "python .qa-eval-tools/verifier_capture.py --skill qa-workflow --operation workflow-runtime "
+                    f"--request .qa-eval-output/{invocation['request_relative_path']} "
+                    f"--record .qa-eval-output/{invocation['record_relative_path']}"
+                ),
+            }
+            with patch.object(
+                common_runtime_checks,
+                "_workflow_replay",
+                return_value={"status": "pass", "workflow_runtime_can_complete": False},
+            ):
+                checked = common_runtime_checks.evaluate_workflow_runtime_capture(
+                    capture_root=root / ".qa-eval-output" / ".runtime-evidence",
+                    candidate_package_root=root,
+                    verifier_image="sha256:" + "b" * 64,
+                    fixed_evaluator_root=root,
+                    expected_artifacts=[
+                        {"skill": "qa-workflow", "path": artifact_path}
+                    ],
+                    trace_commands=[trace_command],
+                )
+        self.assertEqual(invocation["evidence_status"], "captured")
+        self.assertEqual(checked["status"], "pass")
+        self.assertTrue(checked["captures"][0]["tool_trace_confirmed"])
+
+    def test_wrapper_rejects_non_allowlisted_skill_and_workflow_operation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.object(Path, "cwd", return_value=root):
+                with self.assertRaises(ValueError):
+                    capture_invocation(
+                        skill="adversarial-review",
+                        operation="verify",
+                        request_path=Path("missing.json"),
+                        record_path=Path("missing"),
+                    )
+
+
+if __name__ == "__main__":
+    unittest.main()

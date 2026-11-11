@@ -63,6 +63,22 @@ class QuestionAnalysisEvalContractTests(unittest.TestCase):
         assertion = next(row for row in result.assertions if row.id == "QUESTION-D021")
         self.assertEqual(assertion.status, "fail")
 
+    def test_approved_assumption_does_not_require_a_restart_skill(self) -> None:
+        text = output()
+        q1 = "| Q-001 | 遷移先が不明 | SPEC | 要確認 | login | UNK-001 | | | | | | 確認まで保留 | SPEC | spec-analysis | |"
+        q2 = "| Q-002 | JST仮定を適用 | ASM-001が承認済み | 仮定可能 | ASM-001の適用範囲 | | | | | | | 既存承認済みASM-001の範囲で利用 | ASM | 不要（承認済みASM-001） | |"
+        text = text.replace(q1, q1 + "\n" + q2)
+        text = text.replace("| Q-001 |\n", "| Q-001 |\n| Q-002 |\n")
+        text = text.replace(
+            "| --- | --- | --- | --- | --- |\n\n## ブロック中範囲",
+            "| --- | --- | --- | --- | --- |\n| JSTを適用 | 承認済み | ステークホルダー承認済み | ASM-001の適用範囲 | ASM-001 |\n\n## ブロック中範囲",
+        )
+        result = validator.validate(text, {}, "QUESTION-APPROVED-ASM").to_dict()
+        assertions = {row["id"]: row for row in result["assertions"]}
+        self.assertEqual(assertions["QUESTION-D012"]["status"], "pass")
+        self.assertEqual(assertions["QUESTION-D005"]["status"], "pass")
+        self.assertEqual(assertions["QUESTION-D017"]["status"], "pass")
+
 
 if __name__ == "__main__":
     unittest.main()

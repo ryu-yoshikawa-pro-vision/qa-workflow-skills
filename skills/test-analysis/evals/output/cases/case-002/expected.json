@@ -1,4 +1,39 @@
 {
+  "runtime_contract": {
+    "expected_runtime_units": [
+      "test-analysis::artifact:risk_matrix:all",
+      "test-analysis::artifact:technique_candidates:selection-001",
+      "test-analysis::artifact:analysis_entities:all"
+    ],
+    "expected_generators": {
+      "test-analysis::artifact:risk_matrix:all": "risk_matrix",
+      "test-analysis::artifact:technique_candidates:selection-001": "technique_candidates",
+      "test-analysis::artifact:analysis_entities:all": "analysis_entities"
+    },
+    "expected_status": {
+      "test-analysis::artifact:risk_matrix:all": {
+        "runtime_status": "ok",
+        "result_status": "ready",
+        "support_status": "supported",
+        "runtime_required": true,
+        "deterministic_generated": true
+      },
+      "test-analysis::artifact:technique_candidates:selection-001": {
+        "runtime_status": "ok",
+        "result_status": "ready",
+        "support_status": "supported",
+        "runtime_required": true,
+        "deterministic_generated": true
+      },
+      "test-analysis::artifact:analysis_entities:all": {
+        "runtime_status": "invalid_input",
+        "result_status": "blocked",
+        "support_status": "unknown",
+        "runtime_required": true,
+        "deterministic_generated": false
+      }
+    }
+  },
   "known_authorities": ["SPEC-001", "SPEC-002"],
   "required_risks": {
     "RISK-001": { "impact": 2, "likelihood": 2, "risk_level": "中" },

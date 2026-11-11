@@ -1,0 +1,11 @@
+{
+  "new_artifact": false,
+  "required_target_keys": ["target-001"],
+  "deleted_target_keys": ["target-002"],
+  "required_element_keys": ["element-001"],
+  "required_state_keys": ["state-001"],
+  "expected_old_version": "build-17",
+  "expected_current_version": "build-18",
+  "conditional_update_required": true,
+  "forbidden_output_values": []
+}

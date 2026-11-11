@@ -76,6 +76,8 @@ canonical writeの前に、各current Behavior / ACについて、意味上依�
 1. `inspect`を呼び、そのresponseの`update_snapshot`をそのまま保持します。snapshotはpackage version、payload hash、MANIFEST hashだけを含むため、callerがderived indexを再構成しません。
 2. package全文をcurrent stateとして読み、既存stable identityを意味判断して`reuse`、新規を`new`、明示廃止を`retire_ids[]`へ分けます。package更新は差分fragmentではなく完全版です。
 3. `table_changes[]`、必要な`keyed_table_updates[]`、`prose_updates[]`、extension更新を一度の`materialize` requestへ渡します。新旧IDの対応や未確認のrepository evidenceを落としません。
+   - `table_changes[]`の各tableは、該当する`assets/ui-test-target-analysis/*.md`にある完全な固定header配列を順序も含めてそのまま指定します。一部の列だけをheadersとして送らず、各rowも全列分のcellを持たせ、値がない列は空cellにします。
+   - 同じrequestで作成するrow間のstable ID参照は、対象cellへ`@draft:<draft_key>`を使います。helperが割り当てるstable IDを推測・採番して参照しません。既存rowの参照はpackageに存在する正確なcanonical IDを使います。
 4. no-opならversionとpackage bytesを変えません。user-managed payloadまたはcurrent変更概要が変わる更新だけ`vNN`を1つ進めます。README controls、MANIFEST、generated lifecycle差分だけを変更原因にしません。
 5. stale snapshot、参照不整合、意味更新が必要な状態はhelperのblocked issueに従い、現在packageを壊しません。同じrequestのcommit後replayはMANIFEST receiptで二重適用を防ぎます。
 

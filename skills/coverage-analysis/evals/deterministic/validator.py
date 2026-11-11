@@ -7,6 +7,7 @@ from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     clean,
     compute_graph_gaps,
+    has_value,
     ids_in,
     nonempty_rows,
 )
@@ -20,6 +21,16 @@ E2E_HANDLING = {
     "E2E対象外",
     "ブロック中",
 }
+
+
+def _has_explicit_blocked_status(row: dict[str, str]) -> bool:
+    if any(
+        clean(row.get(field, "")) == "ブロック中"
+        for field in ("状態", "カバレッジ", "扱い")
+    ):
+        return True
+    downstream_disposition = clean(row.get("下流ID / 扱い", ""))
+    return downstream_disposition.rsplit("/", 1)[-1].strip() == "ブロック中"
 
 
 def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
@@ -96,7 +107,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
                 for t in ("未閉鎖", "未網羅", "未充足", "部分", "ギャップ", "Gap")
             ):
                 recognized.add(gap)
-            if "ブロック中" in status:
+            if _has_explicit_blocked_status(row):
                 blocked.append(gap)
     result.add(
         "COV-D002",
@@ -184,7 +195,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in matrix_rows + item_rows + orphan_rows:
         if (
             "Model Key" in row
-            and clean(row.get("Model Key", ""))
+            and has_value(row.get("Model Key", ""))
             and not re.fullmatch(
                 r"[a-z][a-z0-9-]*-\d{3,}", clean(row.get("Model Key", ""))
             )

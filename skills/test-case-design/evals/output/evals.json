@@ -1,8 +1,13 @@
 {
   "skill": "test-case-design",
   "canonical_output": true,
+  "skill_runtime_verification": {
+    "runtime_unit_key": "artifact:case_structure:all",
+    "partial_rerun": false
+  },
   "cases": [
     { "id": "TC-OUT-001", "input": "cases/case-001/input.md", "expected": "cases/case-001/expected.json" },
-    { "id": "TC-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" }
+    { "id": "TC-OUT-002", "input": "cases/case-002/input.md", "expected": "cases/case-002/expected.json" },
+    { "id": "TC-OUT-003", "input": "cases/case-003/input.md", "expected": "cases/case-003/expected.json" }
   ]
 }

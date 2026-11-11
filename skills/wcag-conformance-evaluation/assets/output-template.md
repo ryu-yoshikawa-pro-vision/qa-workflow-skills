@@ -1,5 +1,7 @@
 # WCAG-EM 2.0 Evaluation Report
 
+When required inputs are unresolved, preserve every section heading and table header below, leave unevaluated tables without data rows, and state the blocker in the relevant section. Include `Neither conformance nor nonconformance assessed.` when the evaluation did not begin.
+
 ## Evaluation Input
 
 | Field                                     | Value |

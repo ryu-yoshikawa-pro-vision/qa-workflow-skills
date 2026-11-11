@@ -4,23 +4,23 @@
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
-## WCAG-EM Step 1
+## Step 1: Define evaluation scope
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
-## WCAG-EM Step 2
+## Step 2: Explore the target Web product
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
-## WCAG-EM Step 3
+## Step 3: Select representative samples
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
-## WCAG-EM Step 4
+## Step 4: Audit the selected sample
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
-## WCAG-EM Step 5
+## Step 5: Report the evaluation findings
 
 Status: closed. This fixture is limited to the declared repository test scope.
 
@@ -29,9 +29,5 @@ Status: closed. This fixture is limited to the declared repository test scope.
 Status: closed. This fixture is limited to the declared repository test scope.
 
 ## Sample Evaluation Results
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Report Closure
 
 Status: closed. This fixture is limited to the declared repository test scope.

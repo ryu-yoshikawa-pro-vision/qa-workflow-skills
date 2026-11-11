@@ -36,7 +36,8 @@ COMPLETED_EXECUTION_PATTERNS = (
     ),
 )
 NEGATED_EXECUTION = re.compile(
-    r"(?:しない|しません|せず|行わない|行いません|ありません|禁止|してはいけ|不可)",
+    r"(?:しない|しません|せず|行わない|行いません|ありません|していない|"
+    r"していません|しておらず|しておりません|禁止|してはいけ|不可)",
     re.IGNORECASE,
 )
 EXTERNAL_EXECUTION_ACTOR = re.compile(r"e2e-test-execution", re.IGNORECASE)
@@ -45,6 +46,7 @@ EXTERNAL_EXECUTION_SUBJECT = re.compile(
 )
 EXECUTION_CLAUSE_SEPARATOR = re.compile(r"[。！？!?；;、,，]")
 ADDITIONAL_NEEDS = {"不要", "必要", "ブロック中"}
+UNAVAILABLE_REFERENCE_MARKERS = ("未提供", "参照なし", "確認不能", "未確認", "不明")
 
 
 def _reference_set(value: str) -> set[str]:
@@ -218,7 +220,15 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     for row in judgements:
         targets = _reference_set(row.get("対象参照", ""))
         unknown_targets = sorted(targets - declared_execution_refs)
-        if unknown_targets:
+        explicit_missing_target = bool(targets) and all(
+            any(marker in target for marker in UNAVAILABLE_REFERENCE_MARKERS)
+            for target in targets
+        )
+        explicit_missing_fact = any(
+            any(marker in ref for marker in UNAVAILABLE_REFERENCE_MARKERS)
+            for ref in declared_execution_refs
+        )
+        if unknown_targets and not (explicit_missing_target and explicit_missing_fact):
             judgement_reference_issues.append(
                 {
                     "targets": unknown_targets,
@@ -228,7 +238,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "E2E-AN-D015",
         not judgement_reference_issues,
-        "判定の対象参照が分析対象として宣言した実行結果参照集合に含まれること",
+        "判定対象参照が宣言済み集合に含まれるか、入力にない参照を双方で明示すること",
         evidence=judgement_reference_issues or None,
     )
     invalid_states = sorted(

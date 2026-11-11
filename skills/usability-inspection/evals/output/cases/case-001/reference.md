@@ -1,35 +1,3 @@
-# Safe fixture with a scoped, closed observation
+# Scope未初期化の基準結果
 
-## Inspection metadata
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Scope and closure
-
-| Scope ref | Aspect                                            | Decision     | Outcome  | Reason                | Evidence refs |
-| --------- | ------------------------------------------------- | ------------ | -------- | --------------------- | ------------- |
-| SCOPE-001 | visual-responsive — visual integrity / responsive | 今回確認する | 問題なし | fixture viewport only | EVID-001      |
-
-## Objective observations
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Accessibility requirement checks
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Supported test rule results
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Measurements
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Additional observation requests
-
-Status: closed. This fixture is limited to the declared repository test scope.
-
-## Summary and limitations
-
-Status: closed. This fixture is limited to the declared repository test scope.
+このcaseのEval Inputにはlive target、origin、要求aspectまたは具体的な観測scopeがありません。UI Skillの契約に従い、`Scope and closure`は見出しのみ、tableはheader-onlyとしてscope行を生成せず、初期化前に停止する結果を基準とします。画面状態、WCAG結果、Observation、Findingを推測しません。

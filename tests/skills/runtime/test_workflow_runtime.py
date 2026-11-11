@@ -287,6 +287,48 @@ class WorkflowRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_unresolved_model_runtime_blocks_workflow_despite_empty_materialization_closure(
+        self,
+    ) -> None:
+        request = self._request()
+        model_result = next(
+            row
+            for row in request["input"]["runtime_units"]
+            if row["runtime_unit_key"] == "model:ep-001"
+        )
+        model_result.pop("result_fingerprint")
+        model_result["result_status"] = "unresolved"
+        model_result["result_fingerprint"] = runtime.sha256_digest(model_result)
+        materialization = next(
+            row
+            for row in request["input"]["runtime_units"]
+            if row["runtime_unit_key"].startswith("artifact:materialize_coverage:")
+        )
+        materialization.pop("result_fingerprint")
+        materialization["model_completion"][0].update(
+            {
+                "required_target_refs": [],
+                "closed_target_refs": [],
+                "active_ci_ids": [],
+                "materialize_complete": True,
+            }
+        )
+        materialization["result_fingerprint"] = runtime.sha256_digest(materialization)
+
+        result = run(request)
+
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "unresolved", result)
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertTrue(
+            any(
+                issue["issue_type"] == "runtime_not_complete"
+                and issue.get("runtime_unit_key") == "model:ep-001"
+                for issue in result["issues"]
+            ),
+            result["issues"],
+        )
+
     def test_changed_entity_fingerprint_propagates_stale_to_runtime_completion(
         self,
     ) -> None:
