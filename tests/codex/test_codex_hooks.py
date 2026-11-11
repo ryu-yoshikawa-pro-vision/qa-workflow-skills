@@ -341,9 +341,18 @@ class HookTests(unittest.TestCase):
                 [*shell, command], cwd=self.repo, check=True, capture_output=True
             )
         if os.name == "nt" and shutil.which("bash"):
-            subprocess.run(
-                ["bash", "-c", command], cwd=self.repo, check=True, capture_output=True
+            # Forward slashes keep the drive-qualified path valid in both
+            # PowerShell and Git Bash without changing the target repository.
+            bash_command = f"git -C '{other.as_posix()}' fetch origin"
+            self.assert_hook_allows(bash_command)
+            result = subprocess.run(
+                ["bash", "-c", bash_command],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+                check=False,
             )
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_ambiguous_fetch_and_unsafe_explicit_fetch_are_denied(self) -> None:
         root = self.posix_root
