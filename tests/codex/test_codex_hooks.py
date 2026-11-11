@@ -289,8 +289,13 @@ class HookTests(unittest.TestCase):
             check=True,
         )
         subprocess.run(
-            ["git", "config", "--replace-all", "remote.origin.fetch",
-             "+refs/heads/*:refs/heads/*"],
+            [
+                "git",
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/heads/*",
+            ],
             cwd=other,
             check=True,
         )
@@ -301,8 +306,13 @@ class HookTests(unittest.TestCase):
         self.assertIn("remote-tracking namespace", result.stdout)
 
         subprocess.run(
-            ["git", "config", "--replace-all", "remote.origin.fetch",
-             "+refs/heads/*:refs/remotes/origin/*"],
+            [
+                "git",
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/remotes/origin/*",
+            ],
             cwd=other,
             check=True,
         )
@@ -311,19 +321,25 @@ class HookTests(unittest.TestCase):
         self.assert_hook_allows(f"git -C '{self.posix_root}' fetch origin")
 
         # No hook rewrite: Git executes in the user-specified repository.
-        for args in (["git", "-C", str(other), "fetch", "origin"],):
-            subprocess.run(args, cwd=self.repo, check=True, capture_output=True)
-        git_path = subprocess.check_output(
-            ["git", "-C", str(other), "rev-parse", "--git-path", "FETCH_HEAD"],
-            text=True,
-        ).strip()
-        self.assertTrue(Path(git_path).exists())
+        subprocess.run(
+            ["git", "-C", str(other), "fetch", "origin"],
+            cwd=self.repo,
+            check=True,
+            capture_output=True,
+        )
+        self.assertTrue((other / ".git" / "FETCH_HEAD").exists())
         self.assertFalse((self.repo / ".git" / "FETCH_HEAD").exists())
 
         for shell in (
-            (["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["/bin/sh", "-c"]),
+            (
+                ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
+                if os.name == "nt"
+                else ["/bin/sh", "-c"]
+            ),
         ):
-            subprocess.run([*shell, command], cwd=self.repo, check=True, capture_output=True)
+            subprocess.run(
+                [*shell, command], cwd=self.repo, check=True, capture_output=True
+            )
         if os.name == "nt" and shutil.which("bash"):
             subprocess.run(
                 ["bash", "-c", command], cwd=self.repo, check=True, capture_output=True
