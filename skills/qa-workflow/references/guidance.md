@@ -51,13 +51,18 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | 工程固有ロジック                                            | 担当Skill                  |
 | ----------------------------------------------------------- | -------------------------- |
 | 現在有効な仕様根拠の解決                                    | `spec-analysis`            |
+| UI構造・画面・操作・状態・遷移、human editing               | `ui-target-analysis`       |
 | 不明点分類 / 回答正規化                                     | `question-analysis`        |
 | プロダクトリスク / リスクマトリクス / 設計深度              | `test-analysis`            |
 | テスト要求粒度 / 上流閉鎖                                   | `test-requirement-design`  |
+| テストアイテム候補                                          | `test-item-analysis`       |
+| テスト条件候補                                              | `test-condition-analysis`  |
 | カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`    |
 | 詳細テストケース / 期待結果の根拠の具体化                   | `test-case-design`         |
 | 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`   |
 | AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`           |
+| 非E2E testware実装・静的 / 軽量検証                         | `testware-implementation`  |
+| 非E2E testware runner・実行結果・cleanup                    | `testware-execution`       |
 | カバレッジ / 閉鎖性 / ギャップ                              | `coverage-analysis`        |
 | 独立レビュー / 重大度                                       | `adversarial-review`       |
 | E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`      |
@@ -109,12 +114,14 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 プロダクトリスクは深度・優先度の横断入力です。反証レビューは各成果物層に適用できます。
 
-## E2E要求時の分岐
+## testware / E2E要求時の分岐
 
 すべてのSkillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
 
 - 生きたテスト対象の情報収集・更新・鮮度確認だけが必要 → `test-target-inspection`
 - 設計前にcurrentな対象情報が必要 → `test-target-inspection` → 必要な設計Skillへ戻る
+- `test-item-analysis` / `test-condition-analysis`は候補分析だけを担当し、正式な要求・条件設計は`test-requirement-design` / `test-condition-design`へrouting
+- 非E2Eのtestware implementation / runner execution → `testware-implementation` / `testware-execution`
 - 詳細TCをAIが今回runとして実行・観測 → `test-execution`
 - repoへ残すPlaywright E2Eのinspection / 実装 / 正式runner実行 → 既存の`e2e-test-inspection` / `e2e-test-implementation` / `e2e-test-execution`
 
@@ -201,11 +208,11 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 
 ### UIテスト対象分析
 
-今後のテスト設計で継続利用するUI仕様理解packageを作る要求は、`spec-analysis`のUIテスト対象分析modeから開始します。単一表に収まる小規模な対象でも、継続利用・更新する目的があればmodeを選びます。package作成や仕様理解だけが要求されている場合、`test-analysis`以降へ自動進行しません。
+UI構造・画面・操作・状態・遷移を分析し、継続利用する`ui-target-v1` packageを作成・更新する要求は`ui-target-analysis`から開始します。単一表に収まる小規模な対象でも、継続利用・更新する目的があれば独立packageを使います。package作成や構造理解だけが要求されている場合、`test-analysis`以降へ自動進行しません。`ui-target-analysis`は既存writerとhelperを利用し、single writer、history、migration、`ui-target-v1`互換性を維持します。期待仕様、Authority、US / UC / Behavior / AC、UNKNOWNの正本は`spec-analysis`です。UI構造、画面観測、repository factを期待仕様のAuthorityへ昇格しません。
 
 - packageに未解決事項があり回答整理も要求された場合は`question-analysis`へ進みます。正式回答は対応するUNKNOWN IDを保持して記録し、`spec-analysis`へ戻ってcurrent UNKNOWNとpackageを更新してから後続を再開します。暫定回答を正式なDECISIONへ昇格しません。
-- packageが既にあり、不明点への回答を反映する要求は、`question-analysis`の解消処理後に`spec-analysis` modeをresumeします。回答済み論点は根拠がcurrentな間は再質問しません。
-- repository調査は補助入力として`spec-analysis`のRepository確認へ記録します。repository factを仕様Authorityへ昇格したり、implementation gapを仕様変更として扱ったりしません。
+- packageが既にあり、不明点への回答を反映する要求は、`question-analysis`の解消処理後に`spec-analysis`で期待仕様を更新し、`ui-target-analysis`で必要なUI packageを再開します。回答済み論点は根拠がcurrentな間は再質問しません。
+- repository調査は補助入力として`spec-analysis`のRepository確認へ記録し、UI構造の分析は`ui-target-analysis`へ渡します。repository factを仕様Authorityへ昇格したり、implementation gapを仕様変更として扱ったりしません。
 - current live UIの表示・到達性・実画面状態を観測する要求は`test-target-inspection`へ進みます。repositoryを読むだけの調査はこのSkillへrouteしません。
 - 保存済みFigma / screenshot等の画面資料をbrowser操作なしでUI/UX評価する要求は`usability-evaluation`へ進みます。live browserで使用性、focus、responsiveを観測する要求は`usability-inspection`へ進みます。WCAG 2.xと適合レベルを指定したformal評価は`wcag-conformance-evaluation`へ進みます。
 - UI仕様理解packageが完成しても、テスト設計が不要ならそこで終了します。ready scopeとblocked scopeが混在する場合、packageの`scope_readiness[].blocking_unknown_ids[]`だけを`question-analysis`へ渡し、独立してreadyなscopeの進行をUNKNOWN総数だけで停止しません。

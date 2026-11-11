@@ -1,0 +1,17 @@
+{
+  "skill": "feature-analysis",
+  "criteria": [
+    {
+      "id": "FA-SEM-001",
+      "title": "製品機能の根拠と範囲",
+      "description": "API・バッチ・非UIを含め根拠とsemantic IDを示し、取得不能な情報源を対象外や発見済みと見なさない。",
+      "critical": true
+    },
+    {
+      "id": "FA-SEM-002",
+      "title": "旧HEAD・変更・履歴",
+      "description": "旧HEADをcurrentにせず、未分類・0分母・split・merge・retireを根拠と旧ID履歴で維持し、仕様AuthorityやRiskを独断で確定しない。",
+      "critical": true
+    }
+  ]
+}

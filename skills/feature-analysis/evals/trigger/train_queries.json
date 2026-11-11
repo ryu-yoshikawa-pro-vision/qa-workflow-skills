@@ -1,0 +1,34 @@
+[
+  {
+    "query": "製品全体のUI/API/バッチ機能をソースから列挙し、安定機能IDを整理して。",
+    "should_trigger": true
+  },
+  {
+    "query": "PRの更新で変わった機能と未分類差分を確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "releaseの直前に情報源の母集団と機能一覧の現在性を分析して。",
+    "should_trigger": true
+  },
+  {
+    "query": "削除された機能と分割・統合履歴を機能台帳で検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ログイン仕様の根拠をAuthorityで確定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "正式TCN・CIを生成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Regression対象を選択して実行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "製品の対象ブラウザのスクリーンショットだけを撮って。",
+    "should_trigger": false
+  }
+]

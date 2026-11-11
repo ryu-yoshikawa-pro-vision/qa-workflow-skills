@@ -38,17 +38,29 @@ PR #18では`Ask for approval`への切替、ユーザー本人による承認�
 
 ## Hookが受け付けるcommand形式
 
-State-changing Gitでprotected branchを判定するとき、Hookが受け付けるのは次のliteralなcanonical repository root移動と、直後のdirect Git commandだけです。
+Codexの`PreToolUse`では、Hookプロセスはセッションの作業ディレクトリで起動されますが、イベントの`cwd`には個別の`exec_command.workdir`が入る場合があります。Hookは操作の許可範囲を**Hookプロセスの作業ディレクトリ**から特定し、イベントの`cwd`をセッションのリポジトリとみなしません。そのため、実行先が曖昧な`git fetch origin`はdenyし、別repositoryに自動的に振り替えません。
+
+通常のfetchでは、**実行先をコマンドに含む**次の形式を使用します。Windows PowerShell・Git Bash・POSIX shellで同じ`git -C`形式を使えます。
+
+```sh
+git -C '/absolute/repository/root' fetch origin
+```
+
+WindowsでPowerShellとGit Bashの両方から同じcommandを使う場合、drive letterを含むパスは`C:/Users/example/repository`のように区切りを`/`で記述します。`\\repo`など現在のdriveに依存するパスは拒否します。
+
+この形式では、`-C`に指定されたliteralな絶対パスから実際のGit repositoryを特定し、Hookプロセスの作業ディレクトリから得たセッションのリポジトリと`git rev-parse --git-common-dir`の実体が一致することを確認します。同一リポジトリのlinked worktreeは許可候補ですが、remote URLやfetch設定が同じでも、無関係なGit repositoryへのfetchは拒否します。対象の確認ができない場合も拒否します。そのうえで対象repositoryのrefspec・remote・設定を検証し、安全なfetchだけを許可します。`updatedInput`で実行先は変更しません。`--force`、保護されたrefsの更新、`--refmap`、複数command、パイプ、リダイレクト、shell展開はdenyします。`git -C`の例外は`fetch`に限り、他のGit subcommandに一般化しません。
+
+既存のstate-changing Gitでは、次のliteralなcanonical repository root移動と直後のdirect Git commandも使用できます。
 
 ```sh
 cd '/literal/repository/root' && git push origin feature
 ```
 
 ```powershell
-Set-Location -LiteralPath 'C:\literal\repository root' -ErrorAction Stop; git.exe push origin feature
+Set-Location -LiteralPath 'C:\literal\repository root' -ErrorAction Stop; if ($?) { git.exe push origin feature }
 ```
 
-Windowsでroot移動が失敗した場合は、`-ErrorAction Stop`により後続Gitを起動しません。`git -C`、`--git-dir`、`--work-tree`、動的なroot解決、wrapper、複数のmutation command、command-local environment overrideはこのcontext判定形式として扱わず、Hookがdenyします。異なる quoting や shell 記法について安全性を推測しません。
+Windowsでは移動成功を明示的に確認します。以前の`Set-Location ... -ErrorAction Stop; git.exe ...`形式は、選択されたshellや移動失敗時に意図せずGitだけが実行されるおそれがあるためdenyします。`--git-dir`、`--work-tree`、動的なroot解決、wrapper、複数のmutation command、command-local environment overrideは引き続き非対応です。
 
 既知のshell解析失敗形式として、POSIXの未引用`git reset HEAD~1` / `git rm *.md` / `gh pr create --body "$BODY"`と、Windows PowerShellの対応する変数・wildcard展開を含む形式は実行前denyします。意味が同じliteral引数は既存execpolicyへ送ります。例: `git reset 'HEAD~1'`、`git rm '*.md'`、`gh pr create --body-file body.md`。この対応は汎用shell parserを意味しません。nested `bash -c`、`sh -c`、PowerShell command wrapper、`cmd /c`、`Invoke-Expression`等のopaque wrapperはdenyします。
 

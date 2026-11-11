@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 
 const EVENT = "PreToolUse";
@@ -259,6 +260,21 @@ function repoRoot(cwd) {
   const root = gitOutput(cwd, ["rev-parse", "--show-toplevel"]);
   return root ? path.resolve(root) : null;
 }
+function gitCommonDir(root) {
+  if (!root) return null;
+  const commonDir = gitOutput(root, ["rev-parse", "--git-common-dir"]);
+  if (!commonDir) return null;
+  try {
+    return realpathSync.native(path.resolve(root, commonDir));
+  } catch {
+    return null;
+  }
+}
+function sameGitRepository(leftRoot, rightRoot) {
+  const left = gitCommonDir(leftRoot), right = gitCommonDir(rightRoot);
+  if (!left || !right) return false;
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
 function samePath(a, b) {
   const left = path.resolve(a), right = path.resolve(b);
   if (a !== left) return false;
@@ -299,7 +315,10 @@ function validBranch(root, name) {
 function canonicalCommand(command, root) {
   const posix = /^\s*cd\s+'([^']+)'\s*&&\s*([\s\S]+)$/.exec(command);
   if (posix) return { command: posix[2], valid: Boolean(root) && samePath(posix[1], root), shell: "posix" };
-  const ps = /^\s*Set-Location\s+-LiteralPath\s+'([^']+)'\s+-ErrorAction\s+Stop\s*;\s*([\s\S]+)$/i.exec(command);
+  // An unguarded semicolon can execute Git even if Set-Location fails.
+  const ps =
+    /^[ \t]*Set-Location[ \t]+-LiteralPath[ \t]+'([^']+)'[ \t]+-ErrorAction[ \t]+Stop[ \t]*;[ \t]*if[ \t]*\(\$\?\)[ \t]*\{[ \t]*([\s\S]*?)[ \t]*\}[ \t]*$/i
+      .exec(command);
   if (ps) return { command: ps[2], valid: Boolean(root) && samePath(ps[1], root), shell: "powershell" };
   return null;
 }
@@ -330,7 +349,7 @@ function splitCommands(input, shell) {
         started = true;
         continue;
       }
-      if (shell === "posix" && c === "\\" && n !== undefined) {
+      if (shell === "posix" && quote !== "'" && c === "\\" && n !== undefined) {
         value += n;
         started = true;
         i += 1;
@@ -1002,9 +1021,51 @@ function opaqueShell(tokens) {
   }
   return executable === "invoke-expression";
 }
-function evaluateCommand(command, cwd) {
+function evaluateCommand(command, cwd, toolCwdKnown = true) {
   const root = repoRoot(cwd), canonical = canonicalCommand(command, root);
   const parsed = splitCommands(canonical ? canonical.command : command, canonical ? canonical.shell : "posix");
+  // The hook process cwd is the session scope. PreToolUse input cwd can be the
+  // pending exec_command workdir and must not authorize another repository.
+  // The literal -C path determines the Git execution target.
+  const explicitFetch =
+    /^[ \t]*git(?:\.exe)?[ \t]+-C[ \t]+'([^'\r\n]+)'[ \t]+fetch(?:[ \t]+[A-Za-z0-9_.:/=-]+)+[ \t]*$/i.exec(command);
+  if (explicitFetch) {
+    if (!toolCwdKnown) {
+      return deny("Explicit Git -C fetch requires the local tool cwd from PreToolUse.");
+    }
+    const target = explicitFetch[1];
+    // Windows accepts drive-relative roots (\dir) as "absolute" even though
+    // their drive depends on the pending command's (possibly hidden) workdir.
+    const fullyQualifiedWindowsPath = /^[A-Za-z]:[\\/]/.test(target)
+      || /^[/\\]{2}[^/\\]+[/\\][^/\\]+(?:[/\\]|$)/.test(target);
+    if (!path.isAbsolute(target) || process.platform === "win32" && !fullyQualifiedWindowsPath) {
+      return deny("Explicit Git -C fetch requires a fully qualified absolute repository path.");
+    }
+    const targetRoot = repoRoot(target);
+    if (!targetRoot) return deny("Explicit Git -C fetch requires an existing Git repository.");
+    // Checking the requested repository configuration is not authorization to
+    // modify an unrelated repository. Linked worktrees share a common Git directory.
+    if (!sameGitRepository(root, targetRoot)) {
+      return deny("Explicit Git -C fetch must target the session repository or one of its linked worktrees.");
+    }
+    const fetched = splitCommands(command, "posix");
+    if (fetched.parseError || fetched.segments.length !== 1) {
+      return deny("Explicit Git -C fetch must be one literal command.");
+    }
+    const args = fetched.segments[0];
+    if (
+      args.length < 5 || args[1].value !== "-C" || args[2].value !== target || args[3].value.toLowerCase() !== "fetch"
+    ) {
+      return deny("Explicit Git -C fetch has an unsupported argument form.");
+    }
+    const result = evaluateGit([args[0], ...args.slice(3)], { valid: true }, targetRoot);
+    return result.decision;
+  }
+  if (!canonical && /^[ \t]*git(?:\.exe)?[ \t]+fetch(?:[ \t]|$)/i.test(command)) {
+    return deny(
+      "Fetch without an explicit repository may target a different workdir. Use git -C '<absolute repository path>' fetch origin.",
+    );
+  }
   if (parsed.segments.some(opaqueShell)) return deny("Nested shell wrappers are unsupported.");
   if (parsed.parseError) {
     return /(?:^|[\s;&|])(?:git(?:\.exe)?|gh(?:\.exe)?)(?=\s|$)/i.test(command)
@@ -1050,6 +1111,9 @@ function validate(raw) {
     throw new Error("tool_input must be an object");
   }
   if (typeof p.tool_input.command !== "string") throw new Error("tool_input.command must be a string");
+  if (p.cwd !== undefined && (typeof p.cwd !== "string" || !path.isAbsolute(p.cwd))) {
+    throw new Error("cwd must be an absolute path");
+  }
   return p;
 }
 async function main() {
@@ -1057,7 +1121,8 @@ async function main() {
     let raw = "";
     process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) raw += chunk;
-    const p = validate(raw), decision = evaluateCommand(p.tool_input.command, process.cwd());
+    const p = validate(raw),
+      decision = evaluateCommand(p.tool_input.command, process.cwd(), p.cwd !== undefined);
     if (decision) process.stdout.write(JSON.stringify(decision));
   } catch (error) {
     process.stderr.write(
