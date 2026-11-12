@@ -51,6 +51,15 @@
         "KN-SEM-002",
         "KN-SEM-006"
       ]
+    },
+    {
+      "id": "KN-SEM-007",
+      "input": "cases/kn-sem-007/input.md",
+      "reference": "cases/kn-sem-007/reference.md",
+      "criteria": [
+        "KN-SEM-003",
+        "KN-SEM-004"
+      ]
     }
   ]
 }
