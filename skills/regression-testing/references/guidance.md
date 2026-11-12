@@ -37,14 +37,16 @@ Product Riskは新規採点しません。Runに関係する既存Riskごとに�
 
 ## Required routes / Activity
 
-- routeは`manual`または具体的E2E testware refで表し、`未実行` / `blocked` / `判定不能`をroute typeにしません。
+- routeは`manual`、具体的E2E testware ref、または非E2Eの`testware`（実行owner・実装revision・選択条件付き）で表し、`未実行` / `blocked` / `判定不能`をroute typeにしません。runnerの起動は`testware-execution` / `e2e-test-execution`の責務で、Regressionは選択Runの計画・要求route・実結果の集約だけを行います。
 - E2Eが存在するだけでmanual routeを不要と判断しません。必要時はmanual + E2Eを設定し、coverage判断は`coverage-analysis`へ依頼します。
 - PR #12 manual executionは最初の`scenario.when`操作開始、E2Eはsource contractでactual attempt開始を確認します。artifact作成やpreflight通過だけでは開始扱いにしません。
 - 全required routeのactual startが確認できた場合だけlogical TCをexecutedと数えます。FAIL / 判定不能でも開始済みならexecutedの事実と両立します。
 - owner execution contractからactual startとresult finalizationの事実を別々に受け取ります。resultの文字列・分類からfinalizationを推測しません。
 - source result / outcome / evidence / cleanupを再解釈せず参照し、履歴へ投影します。FAIL / 判定不能もownerのraw resultのまま保持します。
 - Activityを`完了`にできるのは、全required routeのactual startが確認され、各owner resultがfinalizedで、そのsource result / outcomeを投影でき、必要cleanupが閉じ、unresolvedがない場合だけです。開始済みでもresult未確定またはraw resultを投影できないrouteがあればActivityは`実行中`のまま更新可能です。
-- TCなしE2Eはuser / policyで指定された補助testwareだけを別枠集計します。TC IDを作りません。
+- TCなしtestware / E2Eはuser / policyで指定された補助testwareだけを別枠集計します。TC IDを作りません。今回実行する補助は`completion_required=true`、参照候補は`false`で記録し、根拠不明のまま値を推測しません。
+- Activityの`完了`は全required TC routeと`completion_required=true`の全補助routeが確定した場合だけです。必須補助が未開始・blockedなら`ブロック中` / `部分完了（ブロック中あり）`、補助のみのRunも実測に応じて状態へ反映します。補助の件数・結果はTCのexecution / coverage分子へ入れません。
+- 旧Run / Activityは読取互換で保持し、旧Runの補助義務が不明な範囲は`blocked`、解決後は新revision / 新Activityで再開します。完了済みActivityは書き換えません。詳細は`references/data-contract.md`です。
 - scope / snapshot不変のblockは同Activityでresumeできます。scope / snapshot変更は別Activity / versionです。完了Activityはimmutableです。
 
 ## Failure feedback
