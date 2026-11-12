@@ -1,0 +1,66 @@
+[
+  {
+    "query": "E2E・API・Regression・探索の結果を計画上の母集団と照合して横断報告を作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "計画に含まれるAPI実行が取得できていないとき、全体のPASS率を出してよいか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "retryを含むE2E結果で、logical primaryとattemptを別単位で集計して。",
+    "should_trigger": true
+  },
+  {
+    "query": "静的レビューの対象5件のうち3件だけ完了している状態で、指摘0件と報告できるか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "終了基準が満たされているか、取得完全性も含めて判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "異なるbuildの結果が混ざっていないか確認して、現在のbuildだけで報告snapshotを作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存済みの統合報告が最新のsource revisionに対して古くなっていないか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "計画なしで、指定したresultsディレクトリだけから現状を集計して。母集団が不明なら率は出さないで。",
+    "should_trigger": true
+  },
+  {
+    "query": "このPlaywright実行結果を人間向けのE2E報告にまとめて。",
+    "should_trigger": false
+  },
+  {
+    "query": "テスト計画の期間と担当を決めて承認用に整理して。",
+    "should_trigger": false
+  },
+  {
+    "query": "失敗したTCの根本原因を分析して。",
+    "should_trigger": false
+  },
+  {
+    "query": "欠陥候補を外部Issueへ登録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "QA活動を評価して改善案を提案して。",
+    "should_trigger": false
+  },
+  {
+    "query": "テストケースを新しく設計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "コードレビューをして問題点を挙げて。",
+    "should_trigger": false
+  },
+  {
+    "query": "探索テストのセッションを始めて。",
+    "should_trigger": false
+  }
+]

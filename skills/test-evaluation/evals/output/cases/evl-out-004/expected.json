@@ -1,0 +1,8 @@
+{
+  "expected_axis_status": {
+    "process": "measured",
+    "quality": "unmeasured"
+  },
+  "expected_achieved": 0,
+  "expected_rejected_claims": []
+}

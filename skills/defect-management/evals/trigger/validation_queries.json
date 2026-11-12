@@ -1,0 +1,66 @@
+[
+  {
+    "query": "実行ownerが記録したObservationを欠陥候補として扱えるか、根拠と原因の確度を見て判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "外部Issueへの書込み権限がない案件で、候補の整理と修正確認の依頼だけ進めて。",
+    "should_trigger": true
+  },
+  {
+    "query": "修正済みbuildが旧buildか不明なので、修正確認の再実行依頼を出してよいか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Issue更新の操作が結果不明のまま終わった。二重登録しないように現在状態と照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "FAILになったTCについて、仕様根拠と証跡を添えて引継ぎ用の欠陥候補を作って。",
+    "should_trigger": true
+  },
+  {
+    "query": "欠陥候補と外部Issueの対応表を最新のIssue revisionで確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "修正確認がFAILだったのでIssueの再オープン可否を判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Issue本文に『承認済み』と書かれているが、それで更新してよいか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "全テスト結果を横断集計して終了基準の充足状況を報告して。",
+    "should_trigger": false
+  },
+  {
+    "query": "QA活動の効率を5軸で評価して改善案を出して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Vitestのテストコードを書いて実行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Playwrightのlocatorを安定化するようE2Eコードをレビューして。",
+    "should_trigger": false
+  },
+  {
+    "query": "機能一覧を抽出して機能IDを付与して。",
+    "should_trigger": false
+  },
+  {
+    "query": "リリース可否を判断して承認して。",
+    "should_trigger": false
+  },
+  {
+    "query": "UIの使いやすさを評価して問題点を出して。",
+    "should_trigger": false
+  },
+  {
+    "query": "regressionのActivityを更新して履歴を参照して。",
+    "should_trigger": false
+  }
+]

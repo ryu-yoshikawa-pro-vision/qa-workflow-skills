@@ -1,0 +1,4 @@
+{
+  "artifact_type": "fix_verification",
+  "expected_request_status": "request_ready"
+}
