@@ -13,6 +13,23 @@
 | ------------ | ------------------------------------------------- | ----------- |
 |              | 別テストレベル / 残存リスク / 対象外 / ブロック中 |             |
 
+## item × 共通condition候補の正式適用（formal_design入力時）
+
+| item ref | item revision | condition ref | condition revision | 採否 / 扱い                                                                                    | 理由・Authority | test level / source | formal TCN draft key / ID / TCN Authority refs |
+| -------- | ------------- | ------------- | ------------------ | ---------------------------------------------------------------------------------------------- | --------------- | ------------------- | ---------------------------------------------- |
+|          |               |               |                    | adopted / not_applicable / out_of_scope / other_test_level / duplicate / unconfirmed / blocked |                 |                     |                                                |
+
+- item×condition pair denominator:
+- closed pair count:
+- coverage status (0件はunknown):
+- formal design current change reason:
+- expected result candidate refs / Authority / observation / side effects / revision:
+- adopted pairのTCN Authority参照をcanonical `tcn_authority_refs`としてrecordへ保持し、coverageと同じpair dependencyでcurrentnessを判定する:
+- partial rerunでdraftも明示参照もない場合は依存関係未検証としてblocked／unresolvedにし、旧recordも完全成果物へ昇格しない:
+- formal design ID・直前revisionまでの連続履歴・累積retired candidate refsと理由:
+- 検証済みformal design record: runtime result `payload.formal_design_record`
+- technique CI coverage is tracked separately from common condition candidates:
+
 ## テスト観点・条件一覧
 
 | 観点ID  | テスト要求ID | テスト観点 / 条件 | カテゴリ | テスト技法 / 根拠 | カバレッジ基準 | 関連仕様根拠 / プロダクトリスク | 優先度       | 備考 |

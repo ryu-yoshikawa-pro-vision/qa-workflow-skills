@@ -59,6 +59,10 @@ TCなしの明示E2E対象 / 既存E2Eから開始する経路へ、存在しな
 
 ## カバレッジの判断基準
 
+### 正式設計候補のcoverage
+
+正式設計summaryを受け取った場合、自己申告の分子・分母は採用せず、`formal_design_record`から候補母集団とitem×condition pairの判断を再計算します。`design_ref`／`revision`、source currentnessとAuthority revisionの整合、履歴の連続性、candidate assignment／retirement、全pair matrixを検証します。adopted pairのtest levelはitemの解決済み割当と一致させ、`other_test_level`は割当と異なる別levelを記録します。adopted pairの`tcn_authority_refs`もpair dependencyへ含め、condition validatorと同じsource revision／currentnessで判定します。旧recordなどで参照集合がなく、draftから依存関係を復元できないpairはunresolvedとし、recordを完全検証済みにしません。別level pairだけでTCNやCIを生成しません。recordなし、0 denominator、不完全な母集団、stale dependency、unconfirmed／blocked pair、summaryとrecordの不一致は完了を止めます。このrecordの局所検証はprovider上の登録・保存・承認・CAS・readbackを証明しません。正式設計coverageは既存CI／QA artifact graphのnode・edgeやclosure件数と混ぜません。summaryがない既存CI coverage経路は従来どおり評価します。
+
 ### 現在有効な仕様根拠のカバレッジ
 
 対象範囲内の現在有効な仕様根拠について、テスト要求へ意味上の対応があるか、または明示した扱いがあるか確認します。
@@ -95,6 +99,8 @@ IDがリンクされているだけで検証責務が意味を確認していな
 ### カバレッジ候補の扱いの妥当性
 
 各候補の扱いを、`qa-workflow`の共通の扱いと`test-condition-design`の工程固有条件に照らして確認します。
+
+item×共通conditionの適用候補は、正式なTCNや技法固有CIとは別の母集団・分母で評価します。common condition IDをCI IDとして数えず、条件適用行が一部未確認／blocked、候補母集団が不完全、または分母が0ならcomplete／100%にしません。正当な不採用は理由と対象pairを保って閉鎖し、CI技法coverageへ混ぜません。
 
 特に次をギャップ候補として扱います。
 

@@ -85,6 +85,7 @@ CRUDの**completeness**と**consistency**を別々に閉じます。
 ## Classification Tree / 組合せ
 
 - classification adapterはfactor / class skeletonとstable identityを採番済みcombinatorial childへ渡す。adapter自身をexecution CIにしない
+- 入力が既存／採番済みcombinatorial childの再利用を指定しているのに、current Machine Entityまたは取得可能なsourceからstable model keyを確認できない場合は、既存のblocked／unresolved契約でchild生成を保留する。keyを推測した`identity_action=new`や仮IDの生成で既存childを置き換えない
 - factor値、constraints、strength別subsetが不足する場合も判明済みskeletonを保持し、未確定parameterを明示してchild completionを保留する
 - constraintsを適用した後のfeasible tuple集合をstrengthごとに作り、その全件をcoverage基準とする。limitや不足値を理由にstrengthを下げない
 - 生成row、required tuple、covered tupleを区別し、重複する意味上の組合せを作らない

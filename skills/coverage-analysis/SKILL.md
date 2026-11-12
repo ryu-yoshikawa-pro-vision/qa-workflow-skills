@@ -25,6 +25,8 @@ description: 現在有効な仕様根拠、プロダクトリスク、テスト�
 
 `current`だけを有効な証拠として扱い、`stale` / `legacy` / `deleted` / `unknown`は未閉鎖または要再検証へ分類します。件数、リンク数、`can_complete`だけで閉鎖済みと判定せず、semantic coverage itemと期待根拠が揃わない場合は完全カバレッジへ昇格しません。
 
+`can_complete`は、提供されたanalysis scopeと関連するcoverage入力がこの局所runtimeの検証を通過したことを示します。正式設計の保存・承認済みcurrent artifactの存在を単独で証明する契約ではありません。`formal_design_summaries[]`はitem×共通condition候補の別分母を検証し、`formal_design_metrics[]`として返します。summaryの自己申告値だけでは完了にせず、`test-condition-design`の`formal_design_record`を受け取り、design ref／revision、source currentness、候補母集団、全pair判断、Authority参照、履歴からcoverageを再計算します。recordがない、履歴／pair母集団が不完全、集計値とrecordが異なる場合は完了しません。この局所検証は保存済みMachine Entity、承認、CAS、readbackの証明ではありません。これらのprovider証拠が必要な受入は共通runtimeの登録済みartifact契約を使います。この候補表をAuthority／Risk／TR／TCN／CI／TCのnode・edgeへ混ぜません。0 denominator、不完全なitem/condition discovery、stale dependency、unconfirmed／blocked pairはcompleteにしません。正式設計summaryを渡さない既存のCI coverage経路は従来どおり分析します。
+
 ### 最終runtime evidence gate
 
 最終成果物の直前にSkill-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`partial_rerun=false`かつ`previous_artifact_markdown=null`に固定します。coverage-analysisは自Skill Entityをcarry-forwardしません。各`analysis_scopes[]`には担当Skill verifierの`valid=true`で返った`current_structure_state`を変更せず転記し、`runtime_results[]`や`carry_forward_entities[]`を組み立てません。`valid=false`なら既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。
