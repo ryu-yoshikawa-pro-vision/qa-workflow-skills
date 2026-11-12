@@ -46,7 +46,7 @@ Haiku 5.5による読取専用レビューの指摘と対応：
 | Validate Semantic Output Evals | 全step rc=0                                                                                                                                                                                                                                                                           |
 | Codex Harness（Linux job）     | 全step rc=0。Windows jobは未実行                                                                                                                                                                                                                                                      |
 
-GitHub Actionsの最終HEAD結果は、pushが権限不足（下記7）で未実施のため**未取得**。
+push後のHEAD `822b19f5`では、GitHub Actionsの[Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/43219591978)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/43219592035)、[Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/43219592180)、[Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/43219592124)、[Codex Harness（Linux・Windows）](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/43219592380)がすべてPASSした。Validate Agent Skillsは全stepがsuccessで、SKIPは無い。Deterministic Output Evals（Python 3.11）では`test_ci_handoff`もPASSしており、ローカルの1件が環境起因であることと整合する。
 
 ## 4. 実runner受入（qa-training-store `2a8bcf57ff091e84a8b3bf7b123568e967000d88`）
 
@@ -92,30 +92,30 @@ Haiku 5.5の静的調査と、メインAgentの原文確認を組み合わせた
 
 ## 7. GitHub操作
 
-- commit `5d5cf409`（共有登録・routing）と、本記録を含むcommitはローカルにある。
-- `git push`は、WSLのgitに認証情報が無く、Windowsの`gh`（account `ryu-yoshikawa`）経由ではHTTP 403で拒否された。権限拒否は迂回していない。**push、GitHub Actionsの再実行、PR本文の更新は未実施**。
+- commit `5d5cf409`（共有登録・routing）と`822b19f5`（G→H投影・本記録）を、利用者の指示によりrepository ownerのアカウント`ryu-yoshikawa-pro-vision`（`gh`に保存済みの認証）で通常pushした。最初に試した`ryu-yoshikawa`（pull権限のみ）ではHTTP 403だった。force pushはしていない。
+- PR #22の本文を、運用規則に従って目的と現在の状態へ置き換えた。
 
 ## 8. 完了条件の判定
 
 ### 開発連動QA Plan（15条件）
 
-| #  | 確認済み範囲                                                                                | 判定    | 再開条件                                          |
-| -- | ------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------- |
-| 1  | feature-analysisの契約・runtime・差分分類のローカルテスト                                   | blocked | 実案件sourceと保存provider                        |
-| 2  | revision照合のローカル契約                                                                  | blocked | 実PR／merge／release入力と製品CI受渡し方式        |
-| 3  | `ci_handoff.py`のローカル契約                                                               | blocked | 製品CI受渡し方式の決定                            |
-| 4  | 分類率等を分けて計算するローカル契約                                                        | blocked | 実案件データでの算出                              |
-| 5  | 既存成果物の参照は、B→D、D→Eで欠落                                                          | FAIL    | B→D組み立てとD→E adapterの契約決定・実装（B/D/E） |
-| 6  | 機能ID・履歴は維持。下流への局所再検証伝播はD→Eで切断                                       | FAIL    | 同上                                              |
-| 7  | ローカルSQLite／Git fixtureのCAS                                                            | blocked | 遠隔providerのnative CAS・履歴・readback          |
-| 8  | UI package・migration・legacy（RISK-D016/D017）・routing fixtureの回帰がローカルでPASS      | PASS    | —                                                 |
-| 9  | project-contextの判定・配置提案のローカル契約                                               | blocked | 承認済み保存先と承認主体                          |
-| 10 | Project Context 16節・stable key・DEC／ASMの互換テストPASS                                  | PASS    | —                                                 |
-| 11 | 文書・CI登録を更新し、ローカルCI相当はPASS（環境起因1件を除く）。実製品相当の統合受入は未完 | blocked | push後のGitHub Actions、実製品相当の統合受入      |
-| 12 | 4 Skillは存在し、局所テスト・routingはPASS。機能別参照から正本へ辿る経路はB実成果物が無い   | blocked | B実成果物とprovider                               |
-| 13 | itemとconditionの別ID・履歴はPASS。正式設計への採用経路はD→Eで切断                          | FAIL    | D→E adapter                                       |
-| 14 | 正式設計の意味評価に未解決FAIL／needs_reviewが残り、D→Eも切断                               | FAIL    | Semantic 11件のowner判断と再評価、D→E adapter     |
-| 15 | 不足時にblockedへ倒す契約、CIが意味判断をしないことはローカルで確認                         | PASS    | —                                                 |
+| #  | 確認済み範囲                                                                                        | 判定    | 再開条件                                          |
+| -- | --------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------- |
+| 1  | feature-analysisの契約・runtime・差分分類のローカルテスト                                           | blocked | 実案件sourceと保存provider                        |
+| 2  | revision照合のローカル契約                                                                          | blocked | 実PR／merge／release入力と製品CI受渡し方式        |
+| 3  | `ci_handoff.py`のローカル契約                                                                       | blocked | 製品CI受渡し方式の決定                            |
+| 4  | 分類率等を分けて計算するローカル契約                                                                | blocked | 実案件データでの算出                              |
+| 5  | 既存成果物の参照は、B→D、D→Eで欠落                                                                  | FAIL    | B→D組み立てとD→E adapterの契約決定・実装（B/D/E） |
+| 6  | 機能ID・履歴は維持。下流への局所再検証伝播はD→Eで切断                                               | FAIL    | 同上                                              |
+| 7  | ローカルSQLite／Git fixtureのCAS                                                                    | blocked | 遠隔providerのnative CAS・履歴・readback          |
+| 8  | UI package・migration・legacy（RISK-D016/D017）・routing fixtureの回帰がローカルでPASS              | PASS    | —                                                 |
+| 9  | project-contextの判定・配置提案のローカル契約                                                       | blocked | 承認済み保存先と承認主体                          |
+| 10 | Project Context 16節・stable key・DEC／ASMの互換テストPASS                                          | PASS    | —                                                 |
+| 11 | 文書・CI登録を更新し、`822b19f5`のGitHub Actions 5 workflowはすべてPASS。実製品相当の統合受入は未完 | blocked | 実製品相当の統合受入                              |
+| 12 | 4 Skillは存在し、局所テスト・routingはPASS。機能別参照から正本へ辿る経路はB実成果物が無い           | blocked | B実成果物とprovider                               |
+| 13 | itemとconditionの別ID・履歴はPASS。正式設計への採用経路はD→Eで切断                                  | FAIL    | D→E adapter                                       |
+| 14 | 正式設計の意味評価に未解決FAIL／needs_reviewが残り、D→Eも切断                                       | FAIL    | Semantic 11件のowner判断と再評価、D→E adapter     |
+| 15 | 不足時にblockedへ倒す契約、CIが意味判断をしないことはローカルで確認                                 | PASS    | —                                                 |
 
 ### QA全工程Plan（10条件）
 

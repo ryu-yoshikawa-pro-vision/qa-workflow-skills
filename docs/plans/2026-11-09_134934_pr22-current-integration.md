@@ -8,7 +8,7 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 2026-11-12時点でPR #22はopen、base `main`。担当PR #23〜#32（A〜J）とPR #34（Bの追加修正）は、すべて`feat/development-qa-traceability`へsquash統合済み。統合HEAD `21cbdc5aea30b5748b33913f643b3f36cef60352`のGitHub Actionsは、Validate Agent Skillsだけが失敗していた。原因はREADMEに7 Skillが未登録だったことで、後続stepもSKIPされていた。Code Quality、Deterministic Output Evals、Semantic Output Evals、Codex HarnessはPASS。
 
-この失敗は、共有登録とqa-workflow routingの修正commit `5d5cf409`で解消した。G→Hの返却項目の投影と最終受入の記録は後続commitに含む。ローカルのCI相当結果、実runnerの証拠、横断接続、15＋10条件・詳細01〜08・S1〜S17・人間編集8ケース・効率5シナリオの判定は、[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。pushは権限不足（HTTP 403）で未実施のため、修正後HEADのGitHub Actions結果は未取得。
+この失敗は、共有登録とqa-workflow routingの修正commit `5d5cf409`で解消した。G→Hの返却項目の投影と最終受入の記録は後続commitに含む。ローカルのCI相当結果、実runnerの証拠、横断接続、15＋10条件・詳細01〜08・S1〜S17・人間編集8ケース・効率5シナリオの判定は、[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。push後のHEAD `822b19f5`では、GitHub Actionsの5 workflowがすべてPASSした（Validate Agent Skillsは全stepを実行）。
 
 総合判定は**未完了**。FAILは横断接続の欠落とPlan 04の単独完了経路。blockedは、provider・承認主体・外部Issue・製品CI・実案件sourceが未選定であること。
 
