@@ -458,7 +458,7 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-69件のrouting fixture（PR #14後の61件へUI対象分析modeの8件を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、UI仕様理解・回答後resume・実対象観測・保存画面評価・live usability・formal WCAGの開始Skillと停止境界を固定します。
+83件のrouting fixture（PR #14後の61件へUI対象分析modeの8件、PR #22の新設Skill routing 14件`WF-PROCESS-001`〜`014`を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、UI仕様理解・回答後resume・実対象観測・保存画面評価・live usability・formal WCAGの開始Skillと停止境界を固定します。UI構造packageの作成・更新は`ui-target-analysis`から開始し、回答後は`question-analysis`→`spec-analysis`→`ui-target-analysis`へ戻します。`WF-PROCESS-*`は案件配置、機能ID、item / condition候補、QA要求→方式→計画、E2E選定→inspection→実装、欠陥、統合報告、活動評価、非E2E testwareの開始・停止境界を固定し、旧`test-analysis`のE2E選定routeや方式設計の省略を拒否します。routing登録はowner verifier登録とは別で、`workflow_runtime.py`の`RUNTIME_V2_SKILL_ROOTS`外のscopeは`unverified_scopes`として完了不可のままです。
 
 PR #16では決定論的output evalを44件から46件へ、semantic evalを155件から163件へ増やします。`SPEC-OUT-003`はrepository専用[`scripts/skills/evals/ui_target_projection.py`](scripts/skills/evals/ui_target_projection.py)で複数Markdown packageを一fileへ投影し、canonical file marker / stable ID / tableを検証します。`TR-OUT-003`はcurrent Acceptance Criteria、Authority、Product Riskの各closureを独立して検証します。raw SHA-256の再計算はprojectionで行わず、production validatorとrepository unit testで確認します。
 

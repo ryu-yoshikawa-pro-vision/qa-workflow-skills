@@ -16,9 +16,10 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 7. 案件固有情報を新規整理する場合は必要に応じて`assets/project-context-template.md`を利用できます。
 8. ワークフロー状態を明示する必要がある場合だけ`assets/workflow-state-template.md`を使用します。
 9. 同一Skillを複数用途で使う場合は、状態を`Skill + 対象 / 実行範囲`で識別し、開始・最終・再開の対象も正規値で保持します。
-10. E2E固有のlocator、Playwrightコード、実行command、原因分析、報告再解釈は担当E2E Skillへ委譲します。本SkillはE2Eを要求しない既存経路も維持します。
-11. ワークフロー完了と全E2EテストPASSを同一視しません。必要な実行・分析・報告・cleanup確認・再検証が完了しているかで判定します。
-12. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成したオーケストレーション成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい工程固有の判断を必要としないオーケストレーション契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。仕様根拠不足、上流判断不足、他Skillの工程固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身のオーケストレーション契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証でも他Skillの工程固有ロジックを再判定・再設計せず、自己検証の経緯や修正回数は出力しません。
+10. 案件配置・機能ID・QA要求・方式・計画・欠陥・統合報告・活動評価は各担当Skillへroutingし、本Skillで判断しません。`workflow_runtime.py`にowner verifierが登録されていないSkillのscopeは`unverified_scopes`として残し、Skill名がroutingに載っていることや担当Skillの自己申告だけで完了扱いしません。
+11. E2E固有のlocator、Playwrightコード、実行command、原因分析、報告再解釈は担当E2E Skillへ委譲します。本SkillはE2Eを要求しない既存経路も維持します。
+12. ワークフロー完了と全E2EテストPASSを同一視しません。必要な実行・分析・報告・cleanup確認・再検証が完了しているかで判定します。
+13. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成したオーケストレーション成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい工程固有の判断を必要としないオーケストレーション契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。仕様根拠不足、上流判断不足、他Skillの工程固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身のオーケストレーション契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証でも他Skillの工程固有ロジックを再判定・再設計せず、自己検証の経緯や修正回数は出力しません。
 
 ## 決定論的runtime統合
 
@@ -68,34 +69,43 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 
 ## 工程固有ロジックの担当
 
-| 工程固有ロジック                                    | 担当Skill                     |
-| --------------------------------------------------- | ----------------------------- |
-| 現在有効な仕様根拠                                  | `spec-analysis`               |
-| UI構造・画面・操作・状態・遷移、human editing       | `ui-target-analysis`          |
-| 不明点・矛盾 / 仮定                                 | `question-analysis`           |
-| プロダクトリスク / テスト重点                       | `test-analysis`               |
-| テスト要求                                          | `test-requirement-design`     |
-| テストアイテム候補                                  | `test-item-analysis`          |
-| テスト条件候補                                      | `test-condition-analysis`     |
-| テスト条件 / カバレッジ基準 / カバレッジ項目        | `test-condition-design`       |
-| 詳細テストケース / 期待結果の根拠の具体化           | `test-case-design`            |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理       | `test-target-inspection`      |
-| AIによる詳細TCの実行・期待結果比較・結果記録        | `test-execution`              |
-| 非E2E testware実装・静的 / 軽量検証                 | `testware-implementation`     |
-| 非E2E testware runner・実行結果・cleanup            | `testware-execution`          |
-| カバレッジ / ギャップ                               | `coverage-analysis`           |
-| 独立レビュー / 重大度                               | `adversarial-review`          |
-| E2E対象・実装可能性・安全条件                       | `e2e-test-inspection`         |
-| Playwright E2E実装・静的 / 軽量検証                 | `e2e-test-implementation`     |
-| E2E安全確認・実行・構造化結果・cleanup              | `e2e-test-execution`          |
-| E2E実行結果の原因分析・修正routing                  | `e2e-test-result-analysis`    |
-| 検証済みE2E結果の報告                               | `e2e-test-reporting`          |
-| Regression baseline / membership / Run / Activity   | `regression-testing`          |
-| Charterに沿ったExploration / Investigation          | `exploratory-testing`         |
-| 継続QA knowledgeのtriage / lifecycle / lookup       | `qa-knowledge`                |
-| referenceや既存evidenceに基づくUI / UX評価          | `usability-evaluation`        |
-| live Web UIの操作・観測・ユーザビリティ検査         | `usability-inspection`        |
-| WCAG-EM 2.0によるformal WCAG conformance evaluation | `wcag-conformance-evaluation` |
+| 工程固有ロジック                                          | 担当Skill                     |
+| --------------------------------------------------------- | ----------------------------- |
+| 案件Project Context / 成果物配置・編集方針の合意          | `project-context`             |
+| 製品機能ID / 情報源母集団 / 開発差分分類                  | `feature-analysis`            |
+| 現在有効な仕様根拠                                        | `spec-analysis`               |
+| UI構造・画面・操作・状態・遷移、human editing             | `ui-target-analysis`          |
+| 不明点・矛盾 / 仮定                                       | `question-analysis`           |
+| QA要求 / 品質目標 / 合意状態                              | `test-requirements-analysis`  |
+| テストレベル・タイプ・方式・環境の全体設計                | `test-architecture-design`    |
+| QA計画 / 開始・終了基準 / 進捗・差異 / プロジェクトリスク | `test-management`             |
+| プロダクトリスク / テスト重点                             | `test-analysis`               |
+| テスト要求                                                | `test-requirement-design`     |
+| テストアイテム候補                                        | `test-item-analysis`          |
+| テスト条件候補                                            | `test-condition-analysis`     |
+| テスト条件 / カバレッジ基準 / カバレッジ項目              | `test-condition-design`       |
+| 詳細テストケース / 期待結果の根拠の具体化                 | `test-case-design`            |
+| E2E自動化対象の選定・理由・履歴                           | `e2e-test-selection`          |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理             | `test-target-inspection`      |
+| AIによる詳細TCの実行・期待結果比較・結果記録              | `test-execution`              |
+| 非E2E testware実装・静的 / 軽量検証                       | `testware-implementation`     |
+| 非E2E testware runner・実行結果・cleanup                  | `testware-execution`          |
+| カバレッジ / ギャップ                                     | `coverage-analysis`           |
+| 独立レビュー / 重大度                                     | `adversarial-review`          |
+| E2E対象・実装可能性・安全条件                             | `e2e-test-inspection`         |
+| Playwright E2E実装・静的 / 軽量検証                       | `e2e-test-implementation`     |
+| E2E安全確認・実行・構造化結果・cleanup                    | `e2e-test-execution`          |
+| E2E実行結果の原因分析・修正routing                        | `e2e-test-result-analysis`    |
+| 検証済みE2E結果の報告                                     | `e2e-test-reporting`          |
+| Regression baseline / membership / Run / Activity         | `regression-testing`          |
+| Charterに沿ったExploration / Investigation                | `exploratory-testing`         |
+| 継続QA knowledgeのtriage / lifecycle / lookup             | `qa-knowledge`                |
+| 欠陥候補 / 外部Issue引継ぎ / 修正確認依頼                 | `defect-management`           |
+| 計画母集団に基づく統合報告snapshot                        | `test-reporting`              |
+| QA活動の評価・改善の効果測定                              | `test-evaluation`             |
+| referenceや既存evidenceに基づくUI / UX評価                | `usability-evaluation`        |
+| live Web UIの操作・観測・ユーザビリティ検査               | `usability-inspection`        |
+| WCAG-EM 2.0によるformal WCAG conformance evaluation       | `wcag-conformance-evaluation` |
 
 ## ランタイム前提
 

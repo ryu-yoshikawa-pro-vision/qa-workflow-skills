@@ -46,14 +46,23 @@
 
 | Skill                       | 対象 / 実行範囲                                                       | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
 | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
+| project-context             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| feature-analysis            |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | spec-analysis               |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| ui-target-analysis          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | question-analysis           |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-requirements-analysis  |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-architecture-design    |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-management             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-analysis               | テスト分析 / E2E対象選定のいずれか                                    | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-item-analysis          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-condition-analysis     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-requirement-design     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-condition-design       |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-case-design            |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | coverage-analysis           | テスト設計 / TC → E2E実装 / E2E実装 → 実行結果のいずれか              | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | adversarial-review          | テスト設計成果物 / E2E実装のいずれか                                  | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| e2e-test-selection          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | e2e-test-inspection         |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | e2e-test-implementation     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | e2e-test-execution          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
@@ -61,10 +70,15 @@
 | e2e-test-reporting          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-target-inspection      |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | test-execution              |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| testware-implementation     |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| testware-execution          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | qa-workflow                 |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | regression-testing          | baseline / membership / Run計画 / Run結果更新 / 履歴参照のいずれか    | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | exploratory-testing         | exploration / investigation のいずれか                                | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | qa-knowledge                | triage / create / update / revalidation / lookup / history のいずれか | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| defect-management           |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-reporting              |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| test-evaluation             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | usability-evaluation        |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | usability-inspection        | general / scoped / formal-handoff のいずれか                          | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | wcag-conformance-evaluation |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |

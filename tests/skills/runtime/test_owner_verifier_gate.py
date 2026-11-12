@@ -1,14 +1,31 @@
 from __future__ import annotations
 
+import ast
 import unittest
 
 from tests.skills.runtime.test_workflow_runtime import (
+    SCRIPT,
     WorkflowRuntimeTests,
     run,
     runtime,
 )
 
 WORKFLOW_REF = "00000000-0000-4000-8000-000000000023"
+
+
+def runtime_v2_skill_roots() -> set[str]:
+    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "RUNTIME_V2_SKILL_ROOTS"
+        ):
+            call = node.value
+            assert isinstance(call, ast.Call) and len(call.args) == 1
+            return set(ast.literal_eval(call.args[0]))
+    raise AssertionError("RUNTIME_V2_SKILL_ROOTS is not declared")
 
 
 def unregistered_scope(skill: str = "test-management") -> dict:
@@ -124,6 +141,47 @@ class OwnerVerifierGateTests(unittest.TestCase):
             ["test-management", "artifact:fake:all"],
             result["payload"]["extra_runtime_units"],
         )
+
+    def test_runtime_v2_roots_are_not_extended_by_routing_registration(self) -> None:
+        # routingやCANONICAL_SKILLSへの名前追加は完了検証の登録ではない。
+        self.assertEqual(
+            runtime_v2_skill_roots(),
+            {
+                "test-analysis",
+                "test-requirement-design",
+                "test-condition-design",
+                "test-case-design",
+                "coverage-analysis",
+                "qa-workflow",
+            },
+        )
+
+    def test_every_routed_skill_without_owner_verifier_blocks_completion(
+        self,
+    ) -> None:
+        from scripts.skills.evals.deterministic.common import CANONICAL_SKILLS
+
+        unregistered = sorted(CANONICAL_SKILLS - runtime_v2_skill_roots())
+        self.assertIn("test-management", unregistered)
+        self.assertIn("defect-management", unregistered)
+        for skill in unregistered:
+            with self.subTest(skill=skill):
+                request = WorkflowRuntimeTests()._request()
+                request["input"].update(
+                    workflow_ref=WORKFLOW_REF,
+                    workflow_scopes=[unregistered_scope(skill)],
+                    runtime_units=[],
+                    current_runtime_units=[],
+                    current_entities=[],
+                )
+                result = run(request)
+                self.assertEqual(result["runtime_status"], "ok", result)
+                self.assertFalse(result["payload"]["can_complete"])
+                self.assertEqual(result["result_status"], "unresolved")
+                self.assertEqual(
+                    [row["skill"] for row in result["payload"]["unverified_scopes"]],
+                    [skill],
+                )
 
 
 if __name__ == "__main__":

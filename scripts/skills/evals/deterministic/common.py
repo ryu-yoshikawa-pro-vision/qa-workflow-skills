@@ -8,14 +8,25 @@ from typing import Iterable, Mapping, Sequence
 from .markdown_parser import MarkdownTable
 from .result import EvalResult
 
+# qa-workflowの状態行・修正先・再開先に使えるworkflow Skill。
+# agent-answer-formは回答フォーム生成の補助Skillで、workflow状態の担当Skillにはしない。
 CANONICAL_SKILLS = {
     "qa-workflow",
+    "project-context",
+    "feature-analysis",
     "spec-analysis",
+    "ui-target-analysis",
     "question-analysis",
+    "test-requirements-analysis",
+    "test-architecture-design",
+    "test-management",
     "test-analysis",
+    "test-item-analysis",
+    "test-condition-analysis",
     "test-requirement-design",
     "test-condition-design",
     "test-case-design",
+    "e2e-test-selection",
     "test-target-inspection",
     "test-execution",
     "testware-implementation",
@@ -33,6 +44,9 @@ CANONICAL_SKILLS = {
     "e2e-test-execution",
     "e2e-test-result-analysis",
     "e2e-test-reporting",
+    "defect-management",
+    "test-reporting",
+    "test-evaluation",
 }
 
 # 同一Skillを異なる責務へ適用する場合にだけ対象値を必須にする。

@@ -2726,8 +2726,8 @@ class E2EContractTests(unittest.TestCase):
         )
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-        self.assertEqual(len(cases), 69)
-        self.assertEqual(len(candidates), 69)
+        self.assertEqual(len(cases), 83)
+        self.assertEqual(len(candidates), 83)
         self.assertEqual(
             {case["id"] for case in cases},
             {candidate["id"] for candidate in candidates},
@@ -2799,23 +2799,31 @@ class E2EContractTests(unittest.TestCase):
             expected_test_routes,
         )
         expected_ui_target_routes = {
-            "WF-UI-TARGET-001": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-001": (
+                "ui-target-analysis",
+                "ui-target-analysis",
+                ["ui-target-analysis"],
+            ),
             "WF-UI-TARGET-002": (
-                "spec-analysis",
+                "ui-target-analysis",
                 "question-analysis",
-                ["spec-analysis", "question-analysis"],
+                ["ui-target-analysis", "question-analysis"],
             ),
             "WF-UI-TARGET-003": (
                 "question-analysis",
-                "spec-analysis",
-                ["question-analysis", "spec-analysis"],
+                "ui-target-analysis",
+                ["question-analysis", "spec-analysis", "ui-target-analysis"],
             ),
             "WF-UI-TARGET-004": (
                 "test-target-inspection",
                 "test-target-inspection",
                 ["test-target-inspection"],
             ),
-            "WF-UI-TARGET-005": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-005": (
+                "ui-target-analysis",
+                "ui-target-analysis",
+                ["ui-target-analysis"],
+            ),
             "WF-UI-TARGET-006": (
                 "usability-evaluation",
                 "usability-evaluation",

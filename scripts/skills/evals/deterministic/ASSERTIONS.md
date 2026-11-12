@@ -88,6 +88,8 @@
 - `RISK-D016` E2E対象選定テーブル必須
 - `RISK-D017` E2E対象選定の技術非依存フィールド
 
+`RISK-D016` / `RISK-D017`は旧`test-analysis`出力の「E2E対象選定」表に適用するlegacy互換Assertionです。削除・無効化せず、既存成果物の検証に使います。新規のE2E選定成果物は`e2e-test-selection`の`E2E-SEL-D001`〜`E2E-SEL-D006`で検証します。
+
 ## test-requirement-design
 
 - `TR-D001` TR ID形式
@@ -195,6 +197,15 @@
 - `REV-D018` 非E2E・静的レビューの根拠表必須
 - `REV-D019` 対象source refとrevision、その他必須欄
 - `REV-D020` フィクスチャで指定したsource／revisionの保持
+
+## e2e-test-selection
+
+- `E2E-SEL-D001` selection ref/revision、current change reason、連続履歴とretirementを保持する
+- `E2E-SEL-D002` 候補と判断の表がある
+- `E2E-SEL-D003` candidate ID、decision、理由、source revisionが有効
+- `E2E-SEL-D004` 候補集合、stable candidate key、fixtureのdecisionを保つ
+- `E2E-SEL-D005` fixtureのsource ref、revision、currentnessを個別に追跡する
+- `E2E-SEL-D006` source、候補母集団、候補判断、blockerから選定状態を導出する
 
 ## e2e-test-inspection
 
@@ -417,3 +428,202 @@
 - `TEX-D012` TC結果と集計一致
 - `TEX-D013` secret実値の非漏えい
 - `TEX-D014` fixtureで固定したsnapshot参照集合
+
+## project-context
+
+- `PC-D001` 判断状態と正規出力の見出しがあること
+- `PC-D002` 対象案件と許可された探索範囲を明示すること
+- `PC-D003` 既存候補ref／revision／確認状態を明示すること
+- `PC-D004` 既存16節・DEC/ASMと必要stable keyの検証結果を明示すること
+- `PC-D005` blockedの操作・理由・再開条件を明示すること
+- `PC-D006` fixtureと判断状態が一致すること
+- `PC-D007` currentな既存文書には正本ref／revisionが必要
+- `PC-D008` 未保存のdraftと実provider readbackを混同しないこと
+
+## feature-analysis
+
+- `FA-D001` 機能分析の判定状態と正規見出しがあること
+- `FA-D002` 案件・イベント・sourceと成果物revisionが明示されること
+- `FA-D003` 取得範囲と未取得領域が別々に記載されること
+- `FA-D004` 指標・ID母集団・未解決を明示すること
+- `FA-D005` 情報源を完全取得しても製品全体の発見を保証しないこと
+- `FA-D006` fixtureと判断状態が一致すること
+- `FA-D007` 期待された機能IDが人間向け出力から追跡できること
+- `FA-D008` 未分類差分のIDが欠落しないこと
+- `FA-D009` 未検証の保存・承認を成功としないこと
+
+## test-item-analysis
+
+- `ITEM-D001` item IDs use the stable ITEM namespace
+- `ITEM-D002` item IDs are unique within scope
+- `ITEM-D003` item feature refs resolve to the known population
+- `ITEM-D004` item lifecycle status is distinct from feature status and matches the fixture
+- `ITEM-D005` fixture-required item candidates are present
+- `ITEM-D006` parent-child references resolve and match the fixture
+- `ITEM-D007` each current item has retained history
+- `ITEM-D008` unknown or zero-denominator scope is not reported as 100%
+- `ITEM-D009` applicability, formal design, and execution stay with their owners
+- `ITEM-D010` candidate artifact, history, metrics, and owner boundaries are present
+
+## test-condition-analysis
+
+- `COND-D001` condition candidates use the stable COND namespace
+- `COND-D002` condition IDs are unique within scope
+- `COND-D003` fixture-required independent condition candidates are present
+- `COND-D004` condition feature refs resolve to the fixed source inventory
+- `COND-D005` candidate Authority refs are retained
+- `COND-D006` every condition candidate has source evidence
+- `COND-D007` candidate state preserves uncertainty and is not a formal disposition
+- `COND-D008` crosscheck rows are advisory and do not decide applicability
+- `COND-D009` candidate, applicability, formal design, and execution metrics remain separate
+- `COND-D010` condition candidates, advisory pair crosscheck, and owner-separated metrics are present
+- `COND-D011` no full Cartesian product or automatic adoption is claimed
+
+## test-requirements-analysis
+
+- `QRA-D001` 正規テーブルとQA目的・成功条件の必須項目が存在し、承認済みでは未確定表示がないこと
+- `QRA-D002` owner・artifact ref・revision・scope・状態が明示されること
+- `QRA-D003` artifact状態が許可値であること
+- `QRA-D004` QA要求ID
+- `QRA-D005` QA要求IDがartifact-local QAR-001形式であること
+- `QRA-D006` QA要求の要求元・revision・scope・根拠を保持すること
+- `QRA-D007` QA要求状態が許可値であること
+- `QRA-D008` fixtureで必要なQA要求が存在すること
+- `QRA-D009` 製品テスト要求のTR IDをQA要求IDとして使わないこと
+- `QRA-D010` source owner・revision・scope・currentness・取得状態が区別されること
+- `QRA-D011` QA要求のsource refがfixtureの既知sourceに存在すること
+- `QRA-D012` 未解決QA要求がscope・担当・許可状態・再開条件を持つ一意な未決事項へ閉じること
+- `QRA-D013` 承認済み表示が同一scope・artifact ref・revisionの証拠に結び付くこと
+- `QRA-D014` fixtureの未承認要求を承認済みと扱わないこと
+- `QRA-D015` 確定QA要求のsource owner・ref・revision・scope・currentness・取得状態が一致すること
+
+## test-architecture-design
+
+- `TAD-D001` architectureの正規テーブルが存在すること
+- `TAD-D002` owner・artifact ref・revision・scope・状態が明示されること
+- `TAD-D003` artifact状態が許可値であること
+- `TAD-D004` 割当ID
+- `TAD-D005` 割当IDがartifact-local ARCH-001形式であること
+- `TAD-D006` 割当に対象・方式・環境・根拠・ownerがあること
+- `TAD-D007` level・割当根拠が許可され、既定値はsystem testであること
+- `TAD-D008` 同じtarget・level・type・責務を重複登録しないこと
+- `TAD-D009` source owner・revision・scope・currentness・取得状態・承認状態を記録すること
+- `TAD-D010` assignment根拠refが利用可能なsource inventoryに存在すること
+- `TAD-D011` 明示指定＞承認済み割当＞既定system testの優先を守ること
+- `TAD-D012` fixtureで指定された複数levelを維持すること
+- `TAD-D013` 承認が同一scope・artifact ref・revisionへ結び付くこと
+- `TAD-D014` 変更影響・保持するcurrent成果物・resume ownerを記録すること
+- `TAD-D015` 確定割当がcurrent・取得済み・必要承認済みの依存sourceだけを使用すること
+- `TAD-D016` QA要求refのartifact local ID・owner・scope・revisionを確認すること
+
+## test-management
+
+- `TMG-D001` 計画母集団・readback ledger・monitoringの正規テーブルが存在すること
+- `TMG-D002` owner・artifact ref・revision・scope・version・状態が明示されること
+- `TMG-D003` plan状態が許可値であること
+- `TMG-D004` 計画ID
+- `TMG-D005` plan IDがartifact-local PLAN-001形式であること
+- `TMG-D006` 計画scope・担当・見積が分かること
+- `TMG-D007` planned population ID
+- `TMG-D008` planned population IDがartifact-local POP-001形式であること
+- `TMG-D009` fixtureで必要なsource／実行母集団を列挙すること
+- `TMG-D010` 予定source inventoryがowner・revision・scope・range・unit・build・environmentを保持すること
+- `TMG-D011` 同一source／revision／scope／unit／build／environmentを二重計上しないこと
+- `TMG-D012` actual population ID
+- `TMG-D013` 取得状態・readback・実行失敗・未実行・取消・0件と結果状態を混同しないこと
+- `TMG-D014` source取得状態をfixtureどおり区別すること
+- `TMG-D015` 計画revision・scope・build・environment単位のmonitoring件数が母集団に一致すること
+- `TMG-D016` 開始／終了基準にscope・evidence・明示状態があること
+- `TMG-D017` project riskの状態と、解決・正式受容に必要な根拠を記録すること
+- `TMG-D018` 必要source／実行結果／終了基準が欠落した計画・snapshotを完了扱いしないこと
+- `TMG-D019` 計画のQA要求・architecture refがowner・artifact・local ID・revision・scopeと利用可能なfixtureに一致すること
+- `TMG-D020` 対象計画のQA要求・architecture sourceがcurrent・取得済み・必要承認済みであること
+- `TMG-D021` source owner readbackのrevision・scope・range・unit・buildが予定値と一致すること
+- `TMG-D022` 是正処置のscope・状態・完了または正式判断の証拠を記録すること
+- `TMG-D023` 承認済み・進行中・完了の計画に同一scope・artifact ref・revisionの承認証拠があること
+- `TMG-D024` 差異をscope・根拠・状態と処理証拠へ結び付けること
+
+## testware-implementation
+
+- `TW-IMPL-D001` 対象・根拠の表があること
+- `TW-IMPL-D002` 前提と実績を区別する表があること
+- `TW-IMPL-D003` 対象・根拠の必須列を空欄にしないこと
+- `TW-IMPL-D004` 変更前・反映の必須列を空欄にしないこと
+- `TW-IMPL-D005` testwareと検証の表があること
+- `TW-IMPL-D006` testwareと検証の必須欄を空欄にしないこと
+- `TW-IMPL-D007` 引継ぎのrunner owner・条件・再開・実run状況を明示すること
+
+## testware-execution
+
+- `TW-EXEC-D001` 対象・根拠の表があること
+- `TW-EXEC-D002` 前提と実績を区別する表があること
+- `TW-EXEC-D003` run固定条件の必須列を空欄にしないこと
+- `TW-EXEC-D004` 選択集合と収集の必須列を空欄にしないこと
+- `TW-EXEC-D005` 開始・直接観測の表があること
+- `TW-EXEC-D006` 開始状態と根拠の必須欄を空欄にしないこと
+- `TW-EXEC-D007` cleanupと残存副作用の表があること
+- `TW-EXEC-D008` cleanupと再開条件の必須欄を空欄にしないこと
+- `TW-EXEC-D009` 元runの診断と再実行先の表があること
+- `TW-EXEC-D010` 元run参照と診断根拠の必須欄を空欄にしないこと
+
+## defect-management
+
+- `DEF-D001` 正規JSON artifactが一つだけ整形式で存在すること
+- `DEF-D002` artifact typeがdata contractの種別であり、fixtureの期待種別と一致すること
+- `DEF-D003` 原因確定・期待結果根拠・証拠・元結果の確定が揃う場合だけ外部引継ぎ可能な候補にすること
+- `DEF-D004` FAIL / Finding / Observationを自動的に正式Defectへ登録せず、候補refを持つこと
+- `DEF-D005` 未成熟な候補は理由と戻し先（元の実行ownerまたはspec-analysis）を持つこと
+- `DEF-D006` 外部操作が既知のoperation・decisionとoperation identityを持つこと
+- `DEF-D007` 外部更新のallowは、信頼できるサービスで認証・対象束縛・有効期間内の承認、書込み権限、成熟した候補、readback要件が揃う場合だけであること
+- `DEF-D008` 登録は完全な重複照合の結果が重複なし、更新はexpected revisionが最新の条件付き更新でだけ許可すること
+- `DEF-D009` closeは元ownerが修正対象buildで確定したfix_confirmedとcleanup確認がある場合だけ許可すること
+- `DEF-D010` 原子的な重複防止がない登録・コメントを自動再試行させないこと
+- `DEF-D011` 外部更新の成功表示は独立readbackとallowを伴い、許可のない操作を実施済みと報告しないこと
+- `DEF-D012` 修正確認依頼は、観測時と異なる特定済みの修正対象と変更refを持ち、元の実行ownerへ向け、通知を確認扱いにしないこと
+- `DEF-D013` fix_confirmedは依頼対象のbuildで、依頼した全testwareを指定revisionで、ownerが開始・確定・cleanup確認した結果だけであること
+- `DEF-D014` 追跡の閉鎖は、保留の理由・決定者、または登録済みIssueの参照・現在性・修正確認から導出され、未完了項目を列挙すること
+- `DEF-D015` secret・cookie・token等の実値を成果物へ転載しないこと
+- `DEF-D016` fixtureが期待するdecisionと一致すること
+- `DEF-D017` fixtureが期待する候補stateと一致すること
+- `DEF-D018` fixtureが期待する修正確認依頼のstatusと一致すること
+
+## test-reporting
+
+- `RPT-D001` 正規JSON artifactが一つだけ整形式で存在すること
+- `RPT-D002` 報告snapshotのtype・schema・snapshot ref・母集団の根拠（計画ref / revision）を持つこと
+- `RPT-D003` sourceのcompleteが、母集団・source現在性・元結果の確定・cleanupの独立した閉鎖判定から導出されること
+- `RPT-D004` 全体completeが全planned sourceの完了から導出され、異なる単位をまたぐ全体PASS率を出さないこと
+- `RPT-D005` PASS率は完全取得済みの計画母集団に対してだけ出し、未取得・部分取得・旧revisionで見かけの率を出さないこと
+- `RPT-D006` logical primary・attempt・test等の集計単位を混ぜず、単位別の分母が各sourceの計画母集団と一致すること
+- `RPT-D007` 元のraw state値を保ち、集計件数が取得件数と一致し、未完了sourceは理由と不足を示すこと
+- `RPT-D008` 計画上の対象なし（正当な空集合）と、取得できず0件に見える状態を区別すること
+- `RPT-D009` 終了判定は、承認済みで現在の計画、完全な母集団、各終了基準の充足から導出し、不完全な母集団でsatisfiedにしないこと
+- `RPT-D010` 静的レビューは計画対象すべてのレビュー完了と完全取得がなければ「指摘0件・完了」を主張しないこと
+- `RPT-D011` 欠陥は読取りprojectionに留め、リリース可否を判断しないこと
+- `RPT-D012` secret・cookie・token等の実値を成果物へ転載しないこと
+- `RPT-D013` 独立した期待基準が示す全体完了状態と一致すること
+- `RPT-D014` 独立した期待基準が示す終了判定と一致すること
+- `RPT-D015` 独立した期待母集団（source IDと計画件数）が報告から欠落・増減していないこと
+- `RPT-D016` 独立した期待基準が示す取得未完了sourceを検出していること
+- `RPT-D017` snapshot refが内容全体（件数・完全性・判定・取得内容）から決定され、異なる内容が同じrefにならないこと
+- `RPT-D018` 終了基準は単一の計測単位・適用可能な方式のsourceだけを対象とし、異なる単位（logical primary / attempt / test / TC / 補助testware / 静的レビュー）を合算した率・件数で判定しないこと
+- `RPT-D019` 計画revisionの現在性を、未確認（unverified）・改版済み（superseded）・現在（current）で区別し、確認できない場合に現在扱いしないこと
+- `RPT-D020` 独立した期待基準が示す計画revisionの現在性（current / unverified / superseded）と一致すること
+- `RPT-D021` 独立した期待基準が示す終了基準ごとの判定（satisfied / unsatisfied / unknown）と一致すること
+
+## test-evaluation
+
+- `EVL-D001` 正規JSON artifactが一つだけ整形式で存在すること
+- `EVL-D002` 評価reportのtype・状態を持ち、元実績を改変せず、リリース・終了の判断を行わないこと
+- `EVL-D003` 追跡性・品質・効率・プロセス・再利用性の5軸を個別に示し、根拠のない総合点を出さないこと
+- `EVL-D004` 各指標が測定値と測定元、または未測定・比較不能の区別を持ち、軸のstatusと傾向が指標から導出されること
+- `EVL-D005` 改善等の主張はその軸の比較可能な指標で支えられる場合だけ採用し、時間短縮だけで品質改善を主張しないこと
+- `EVL-D006` 改善は採用→正本ownerへの引継ぎ→新revisionでの実施→後続活動での測定の証拠を満たす状態にだけ進むこと
+- `EVL-D007` 達成した改善の件数は、比較可能な効果が測定された改善だけから数え、未承認・未実施・未測定・悪化・比較不能を含めないこと
+- `EVL-D008` 評価入力をref・revision・content hashで固定し、旧版・未検証の入力や無効な指標がある評価をfinalにしないこと
+- `EVL-D009` 保管・引継ぎは、各項目の受領者の認証済み確認がある場合だけ完了とすること
+- `EVL-D010` secret・cookie・token等の実値を成果物へ転載しないこと
+- `EVL-D011` 独立した期待基準が示す軸ごとの測定状態と一致すること
+- `EVL-D012` 独立した期待基準が示す達成した改善件数と一致すること
+- `EVL-D013` 独立した期待基準が示す、根拠のない主張の棄却と一致すること
+- `EVL-D014` 独立した期待基準が示す軸全体の傾向（指標単位の改善と軸全体の判定の区別）と一致すること
