@@ -44,3 +44,7 @@ JSON keyの値は英小文字のenumとし、人間向け説明は日本語で�
 
 - 実行ownerの結果・Machine Entity・`entity-state-v2`を再定義・再採番しない。
 - `candidate_ref` / `operation_id`はこのSkill内の識別子で、既存TR / TC / Issue IDと衝突しない`DEFC-` / `DEFOP-`接頭辞を持つ。
+
+## 探索Findingの入力（PR #22）
+
+`exploratory-testing`の`defect_candidate_source()`が、`defect-management`宛の検証済みhandoffから欠陥候補の入力を作ります（`source_kind=Finding`、`owner_skill=exploratory-testing`、`run_ref=<session_ref>@<session_revision>`、`result_ref=<finding_ref>`）。対象buildと環境はCharter＋対象snapshot＋環境条件のhashを再現した値だけを使います。原因と期待結果の根拠は渡されない限り空で、本Skillの既存規則（`cause_unconfirmed`、`expected_result_basis_missing`）で元ownerまたは`spec-analysis`へ戻します。

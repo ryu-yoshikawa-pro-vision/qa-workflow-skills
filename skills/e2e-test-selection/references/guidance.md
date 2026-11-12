@@ -52,3 +52,7 @@ selection IDは同じ選定対象を改訂する間維持し、revisionは単調
 - 再利用selectionのcurrentnessやrevision履歴を確認できず、選定の再実行が安全でない
 
 対象を分離できる場合は全体を止めず、該当candidateのみblocked／deferredとして残します。
+
+## inspectionへの引継ぎ（PR #22）
+
+`scripts/selection_contract.py`の`inspection_handoff()`は、検証済みの選定から`e2e-test-inspection`が対象にできる候補を返します。`selected`でsourceがすべて`current`の候補だけが`targets`になり、`deferred`・`not_selected`・`blocked`は含めません。選定が`ready`でない（stale・source不明・母集団不完全・blocker・履歴欠落）場合は`usable=false`で`targets`は空になり、inspectionはその選定を根拠に実装対象にしません。inspectionは決定根拠に選定refとrevisionを記録します（`E2E-INSP-D017`）。

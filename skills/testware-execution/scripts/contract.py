@@ -7,6 +7,7 @@ projection. Callers must retain the raw reporter and proof of its provenance.
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -909,4 +910,84 @@ def regression_source_execution(result: dict[str, Any]) -> dict[str, Any]:
             # 保存先readbackは実行結果の確定とは別のgate。未接続のまま転記する。
             "provider_readback": result.get("provider_readback"),
         },
+    }
+
+
+# test-reportingのrecord契約へ渡すための読み取り専用の投影。元のrun結果は変えない。
+_REPORT_STATE = {
+    "passed": "PASS",
+    "failed": "FAIL",
+    "pending": "SKIP",
+    "skipped": "SKIP",
+    "todo": "SKIP",
+    "not_collected": "未実行",
+}
+
+
+def reporting_records(result: dict[str, Any]) -> dict[str, Any]:
+    """Project individual test results of one runner manifest to report records.
+
+    ``unit_ref`` is ``<path>::<title > path>``. A result is reported as finalized
+    only when the same conditions as ``regression_source_execution`` hold
+    (verified start, complete raw collection, closed process tree, a final
+    outcome, not fixture evidence); otherwise the test stays "判定不能" /
+    non-final so it can never raise a pass rate. Ambiguous or unknown runner
+    statuses are "判定不能", never PASS.
+    """
+    projected = regression_source_execution(result)["source_execution"]
+    attempts = result["attempts"]
+    last = attempts[-1]
+    reconciliation = last.get("reconciliation")
+    if isinstance(reconciliation, dict) and isinstance(
+        reconciliation.get("results"), list
+    ):
+        rows = reconciliation["results"]
+    else:
+        # reporterを回収できなかった（timeout・中断等）。選択済みtestを、開始済みなら
+        # 「判定不能」、未開始なら「未実行」として残し、PASS／FAILにはしない。
+        declared = result.get("declared_selected")
+        if not isinstance(declared, list) or not declared:
+            raise ContractError("individual_results_required")
+        rows = [
+            {
+                "path": item["path"],
+                "title_path": item["title_path"],
+                "runner_status": "uncollected",
+            }
+            for item in declared
+        ]
+    started_at = last.get("started_at")
+    executed_at = (
+        datetime.fromtimestamp(started_at, timezone.utc).isoformat()
+        if isinstance(started_at, (int, float)) and not isinstance(started_at, bool)
+        else None
+    )
+    final = projected["result_finalized"] is True
+    records = []
+    for row in rows:
+        title = " > ".join(row["title_path"])
+        unit_ref = f"{row['path']}::{title}"
+        state = _REPORT_STATE.get(row["runner_status"], "判定不能")
+        if not projected["actual_start_confirmed"]:
+            state = "未実行"
+        elif not final and state in {"PASS", "FAIL"}:
+            state = "判定不能"
+        records.append(
+            {
+                "unit": "test",
+                "unit_ref": unit_ref,
+                "result_ref": f"{result['run_ref']}#attempt-{last['number']}::{unit_ref}",
+                "state": state,
+                "build_ref": result["build_revision"],
+                "environment_ref": result["environment_ref"],
+                "source_revision": result["source_revision"],
+                "executed_at": executed_at,
+                "result_finalized": final,
+                "cleanup_status": projected["cleanup_status"],
+            }
+        )
+    return {
+        "records": records,
+        "source_revision": result["source_revision"],
+        "run_ref": result["run_ref"],
     }

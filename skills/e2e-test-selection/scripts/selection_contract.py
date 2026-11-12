@@ -796,6 +796,49 @@ def validate(packet: Any) -> dict:
     }
 
 
+def inspection_handoff(packet: Any) -> dict:
+    """Derive the targets that ``e2e-test-inspection`` may take from a selection.
+
+    Only ``selected`` candidates whose sources are all current are handed over.
+    Deferred, not-selected and blocked candidates are never targets, and a
+    selection that is not ``ready`` (stale or unknown source, incomplete
+    population, blockers, incomplete history) hands over nothing: inspection
+    must stop as blocked for the affected targets instead of using it.
+    """
+    result = validate(packet)
+    data = packet
+    source_revisions = {row["ref"]: row["revision"] for row in data["source_refs"]}
+    selected = set(result["selected_candidate_ids"])
+    targets = [
+        {
+            "candidate_id": row["candidate_id"],
+            "candidate_key": row["candidate_key"],
+            "rationale": row["rationale"],
+            "sources": [
+                {"ref": ref, "revision": source_revisions[ref]}
+                for ref in row["source_refs"]
+            ],
+        }
+        for row in sorted(data["candidates"], key=lambda row: row["candidate_id"])
+        if row["candidate_id"] in selected
+    ]
+    ready = result["selection_status"] == "ready"
+    return {
+        "selection_ref": result["selection_ref"],
+        "selection_revision": result["revision"],
+        "selection_status": result["selection_status"],
+        "usable": ready,
+        "targets": targets if ready else [],
+        "withheld_reason": None
+        if ready
+        else {
+            "selection_status": result["selection_status"],
+            "unresolved_source_refs": result["unresolved_source_refs"],
+            "unresolved_candidate_ids": result["unresolved_candidate_ids"],
+        },
+    }
+
+
 def main() -> int:
     try:
         raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)

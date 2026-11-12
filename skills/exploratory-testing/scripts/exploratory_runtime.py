@@ -522,6 +522,156 @@ def source_set_problem(session: dict[str, Any]) -> str | None:
     return "source_refs_invalid"
 
 
+def _bound_target_and_environment(
+    session: dict[str, Any], target_snapshot: Any, environment_conditions: Any
+) -> dict[str, Any]:
+    """Return the target and environment ref only if they reproduce the Session hash."""
+    charter = session.get("charter")
+    if not isinstance(charter, dict) or not isinstance(target_snapshot, dict):
+        return {"reason": "charter_or_target_missing"}
+    if charter_identity(
+        charter, target_snapshot, environment_conditions
+    ) != session.get("charter_snapshot_identity"):
+        return {"reason": "charter_snapshot_identity_mismatch"}
+    build = target_snapshot.get("build_ref")
+    source_revision = target_snapshot.get("source_revision")
+    if isinstance(build, str) and build.strip():
+        target = {"kind": "build", "ref": build}
+    elif isinstance(source_revision, str) and source_revision.strip():
+        target = {"kind": "source_revision", "ref": source_revision}
+    else:
+        return {"reason": "target_build_or_revision_missing"}
+    return {
+        "target": target,
+        "environment_ref": "env:"
+        + hashlib.sha256(_canonical(environment_conditions)).hexdigest(),
+    }
+
+
+def reporting_records(
+    session: dict[str, Any],
+    *,
+    session_revision: str,
+    target_snapshot: dict[str, Any],
+    environment_conditions: Any,
+    executed_at: str | None = None,
+) -> dict[str, Any]:
+    """Project one Session to a test-reporting record (unit ``session``).
+
+    Exploration has no PASS / FAIL method, so the Session is "判定不能" and is
+    never counted in a pass rate. Findings are not records of this unit; they
+    flow through ``defect_candidate_source``. Target and environment must
+    reproduce the Session's Charter identity hash.
+    """
+    if not isinstance(session_revision, str) or not session_revision.strip():
+        return {"status": "blocked", "reason": "session_revision_required"}
+    bound = _bound_target_and_environment(
+        session, target_snapshot, environment_conditions
+    )
+    if "reason" in bound:
+        return {"status": "blocked", "reason": bound["reason"]}
+    cleanup = session.get("cleanup")
+    cleanup_status = cleanup.get("status") if isinstance(cleanup, dict) else None
+    return {
+        "status": "ready",
+        "records": [
+            {
+                "unit": "session",
+                "unit_ref": session["session_ref"],
+                "result_ref": f"{session['session_ref']}@{session_revision}",
+                "state": "判定不能",
+                "build_ref": bound["target"]["ref"],
+                "environment_ref": bound["environment_ref"],
+                "source_revision": None,
+                "executed_at": executed_at,
+                "result_finalized": session.get("state") == "完了",
+                "cleanup_status": cleanup_status,
+            }
+        ],
+    }
+
+
+def defect_candidate_source(
+    handoff: dict[str, Any],
+    session: dict[str, Any],
+    *,
+    target_snapshot: dict[str, Any],
+    environment_conditions: Any,
+    cause: dict[str, Any] | None = None,
+    expected_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project a ready ``defect-management`` hand-off to a defect-candidate source.
+
+    The Session stores neither the target build nor the environment, only the hash
+    of Charter + target snapshot + environment conditions. The caller supplies
+    the latter two and they are used only when they reproduce that hash, so a
+    different build or environment can never be attached to the Finding. Cause
+    and expected-result basis are never inferred: without them the defect owner
+    returns the candidate to the owner or to ``spec-analysis`` by its own rules.
+    """
+    if (
+        not isinstance(handoff, dict)
+        or handoff.get("kind") != "exploratory_finding_reference"
+        or handoff.get("follow_up_owner_skill") != "defect-management"
+    ):
+        return {"status": "blocked", "reason": "not_a_defect_management_handoff"}
+    if (
+        handoff.get("session_ref") != session.get("session_ref")
+        or handoff.get("charter_snapshot_identity")
+        != session.get("charter_snapshot_identity")
+        or handoff.get("state") != "current"
+        or handoff.get("unresolved")
+    ):
+        return {"status": "blocked", "reason": "handoff_does_not_match_session"}
+    bound = _bound_target_and_environment(
+        session, target_snapshot, environment_conditions
+    )
+    if "reason" in bound:
+        return {"status": "blocked", "reason": bound["reason"]}
+    charter = session["charter"]
+    target = bound["target"]
+    environment_ref = bound["environment_ref"]
+    finding = next(
+        (
+            row
+            for row in session.get("findings", [])
+            if isinstance(row, dict)
+            and row.get("finding_ref") == handoff["finding_ref"]
+        ),
+        None,
+    )
+    if finding is None:
+        return {"status": "blocked", "reason": "finding_not_in_session"}
+    facts = {
+        row.get("observation_ref"): row.get("observed_fact")
+        for row in session.get("observations", [])
+        if isinstance(row, dict)
+    }
+    symptoms = [
+        facts[ref]
+        for ref in finding["source_observation_refs"]
+        if isinstance(facts.get(ref), str) and facts[ref].strip()
+    ]
+    if not symptoms:
+        return {"status": "blocked", "reason": "observed_fact_missing"}
+    candidate: dict[str, Any] = {
+        "source_kind": "Finding",
+        "owner_skill": "exploratory-testing",
+        "run_ref": f"{session['session_ref']}@{handoff['session_revision']}",
+        "result_ref": handoff["finding_ref"],
+        "scope_ref": "charter:" + "+".join(sorted(charter["in_scope"])),
+        "environment_ref": environment_ref,
+        "target": target,
+        "symptom": "; ".join(symptoms),
+        "result_finalized": session.get("state") == "完了",
+        "cause": cause if cause is not None else {"status": "unknown"},
+        "evidence": [{"ref": ref} for ref in handoff["evidence_refs"]],
+    }
+    if expected_result is not None:
+        candidate["expected_result"] = expected_result
+    return {"status": "ready", "candidate": candidate}
+
+
 def build_follow_up_handoff(
     session: dict[str, Any], finding_ref: str, *, session_revision: str | None
 ) -> dict[str, Any]:

@@ -225,6 +225,7 @@
 - `E2E-INSP-D014` 実装可否 / 未確認 / block状態と理由・次の担当
 - `E2E-INSP-D015` 対象決定の識別子・根拠・扱い
 - `E2E-INSP-D016` 実装 / 実行に影響する事実・確認元・影響
+- `E2E-INSP-D017` E2E選定の結果（selected・current）だけを対象にし、選定refとrevisionを記録すること（fixtureがselection_handoffを指定する場合）
 
 ## e2e-test-implementation
 

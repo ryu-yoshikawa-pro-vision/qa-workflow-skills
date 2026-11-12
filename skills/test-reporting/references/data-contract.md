@@ -19,3 +19,11 @@
 ## 保存・履歴
 
 報告snapshotは、source revisionに紐づくimmutableなsnapshotとして案件の保存先へ保存する。新規はprovider-nativeなcreate-if-absent、保存後に独立readbackを必要とする。同じ`snapshot_ref`の再保存は同一内容の確認とし、上書きしない。保存provider・承認が未選定の場合は保存をblockedにし、集計結果の提示までは続行できる。他ownerの正本（計画、元結果、欠陥）を複製して第二の正本にしない。
+
+## 各ownerの結果の投影（PR #22）
+
+recordは各ownerの`reporting_records()`で作ります。元の結果は変えず、集計用の読み取り投影だけを行います。
+
+- `testware-execution`（`scripts/contract.py`）：runner manifestの個別test結果を`unit=test`、`unit_ref=<path>::<title > path>`のrecordにします。`passed`→PASS、`failed`→FAIL、`pending`／`skipped`／`todo`→SKIP、未収集→未実行。実開始・raw収集・process終了・fixtureでない証拠のどれかが確認できなければ、PASS／FAILにせず`判定不能`・非確定とし、合格率を上げません。reporterを回収できなかった場合（timeout等）は、選択済みtestを`判定不能`（開始済み）または`未実行`で残します。
+- `regression-testing`（`scripts/regression_runtime.py`）：Activityのroute結果を`unit=tc_route`と`auxiliary_route`のrecordにします。実行済みで結果確定のsource result（`PASS`／`runner_pass`→PASS、`FAIL`／`runner_fail`／`observed_FAIL`／`measurement_FAIL`→FAIL）だけが結果になり、Activity状態（`完了`等）は結果にしません。未実行・blockedはそのまま、写像できないsource resultは`判定不能`です。build・環境はRunの計画から呼出し側が渡します。
+- `exploratory-testing`（`scripts/exploratory_runtime.py`）：検証済みSessionを`unit=session`・`判定不能`のrecordにします。探索はPASS／FAILの方式ではないため、合格率にしません。Findingは欠陥候補の経路で扱い、このunitのrecordにはしません。

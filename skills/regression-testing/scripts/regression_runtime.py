@@ -1137,6 +1137,75 @@ def _route_done(item: dict[str, Any]) -> bool:
     return bool(done)
 
 
+_REPORT_PASS = {"PASS", "runner_pass"}
+_REPORT_FAIL = {"FAIL", "runner_fail", "observed_FAIL", "measurement_FAIL"}
+
+
+def reporting_records(
+    activity: dict[str, Any],
+    *,
+    build_ref: str,
+    environment_ref: str,
+    source_revision: str | None,
+    executed_at: str | None = None,
+) -> dict[str, Any]:
+    """Project an Activity's route results to test-reporting records.
+
+    This is a read-only aggregation projection; the Activity and the source
+    results are not changed. Unit ``tc_route`` is a required TC route and
+    ``auxiliary_route`` a TC-less testware route. Not-started routes are
+    "未実行" (or "blocked"), a started route with a non-final or unknown source
+    result is "判定不能", and the Activity state ("完了" etc.) is never a result.
+    Build and environment come from the Run's plan, because an Activity does not
+    carry them.
+    """
+    if not isinstance(activity, dict) or activity.get("artifact_type") not in (
+        "activity",
+        None,
+    ):
+        return {"status": "blocked", "reason": "activity_required"}
+    if not _text(build_ref) or not _text(environment_ref):
+        return {"status": "blocked", "reason": "build_and_environment_required"}
+
+    def record(unit: str, unit_ref: str, item: dict[str, Any]) -> dict[str, Any]:
+        source_result = item.get("source_result")
+        if not item.get("executed"):
+            state = "blocked" if item.get("blocked") else "未実行"
+        elif item.get("result_finalized") is not True:
+            state = "判定不能"
+        elif source_result in _REPORT_PASS:
+            state = "PASS"
+        elif source_result in _REPORT_FAIL:
+            state = "FAIL"
+        else:
+            state = "判定不能"
+        return {
+            "unit": unit,
+            "unit_ref": unit_ref,
+            "result_ref": f"{item.get('execution_ref') or 'unexecuted'}::{unit_ref}",
+            "state": state,
+            "build_ref": build_ref,
+            "environment_ref": environment_ref,
+            "source_revision": source_revision,
+            "executed_at": executed_at,
+            "result_finalized": item.get("result_finalized") is True
+            and bool(item.get("executed")),
+            "cleanup_status": item.get("cleanup_status"),
+        }
+
+    records = [
+        record("tc_route", str(item.get("route_ref")), item)
+        for item in activity.get("route_results", [])
+        if isinstance(item, dict)
+    ]
+    records.extend(
+        record("auxiliary_route", str(item.get("testware_ref")), item)
+        for item in activity.get("auxiliary_route_results", [])
+        if isinstance(item, dict)
+    )
+    return {"status": "ready", "records": records}
+
+
 def project_activity(
     run: dict[str, Any],
     source_executions: dict[str, dict[str, Any]],
