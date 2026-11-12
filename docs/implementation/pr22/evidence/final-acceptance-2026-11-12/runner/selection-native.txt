@@ -1,0 +1,4 @@
+recovers from an initial load error after retry
+disables every cart mutation button while one mutation is pending
+disables quantity increase and preserves the quantity at the maximum
+exposes a hydration boundary, badge count, and stable product variant IDs

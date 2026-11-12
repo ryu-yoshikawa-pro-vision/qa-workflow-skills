@@ -62,7 +62,7 @@ TCに対応する非E2Eの自動／runner実行は、`required_routes`へ`route_
 - `cleanup_status`が無い・`未確認` / `失敗` / `一部失敗` / `進行中`などの未終了状態: 未確認として扱い、`対象なし`へ読み替えません。完了に使えるのは`成功` / `対象なし` / `意図的に残した状態`だけです。
 - `attempt_ref`が空、または`raw_capture_complete`が`true`でない: `実行中`のままです。
 
-`manual` / `e2e` routeのcleanup既定値は旧形式の互換のため変更しません。`testware-execution`の正式な返却項目は担当G（PR #29）の成果物で確定し、PR #22でこの契約と照合します。
+`manual` / `e2e` routeのcleanup既定値は旧形式の互換のため変更しません。`testware-execution`のrunner manifestは項目名が異なるため（`testware_revision`・`run_ref`・`collection_verified`・`cleanup_state`等）、PR #22で照合し、`skills/testware-execution/scripts/contract.py::regression_source_execution()`がこの契約へ投影します。投影しないmanifestをsource executionとして渡した場合は実開始・結果確定を確認できず、routeを実行済みにしません（`tests/skills/runtime/test_testware_regression_handoff.py`）。
 
 ## TCなし補助testwareの実施義務
 

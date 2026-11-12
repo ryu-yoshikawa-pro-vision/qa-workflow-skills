@@ -32,7 +32,7 @@
 
 ## 下流の引継ぎ
 
-H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/title、任意の元TC ref、実効選択条件、attempt、raw evidence、取得完全性、cleanup、診断とする。保存providerのreadback revisionや承認はAの正式公開契約に従い、未接続ならblockedとする。A〜J成果物の実参照をつないだ全体受入はPR #22で行う。
+H/Jが読む単位はrun ref＋source/build/testware revision、個別test path/title、任意の元TC ref、実効選択条件、attempt、raw evidence、取得完全性、cleanup、診断とする。`regression-testing`のtestware route／補助routeへ渡すときは、runner manifestをそのまま渡さず`scripts/contract.py::regression_source_execution()`でRegressionのsource execution契約（`start_state`・`actual_start_confirmed`・`result_finalized`・`source_result`・`implementation_revision`・`attempt_ref`・`raw_capture_complete`・`cleanup_status`）へ投影する。投影は証拠を格上げせず、実開始・raw取得・プロセス終了・clean workspaceのいずれかが確認できなければ未確定・`未確認`のまま残し、`source_result`はrunnerの`outcome`文字列を変換しない。保存providerのreadback revisionや承認はAの正式公開契約に従い、未接続ならblockedとする。A〜J成果物の実参照をつないだ全体受入はPR #22で行う。
 
 ## 実行CLIと独立検証の範囲
 

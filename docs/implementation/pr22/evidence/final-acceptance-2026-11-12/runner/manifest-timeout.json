@@ -1,0 +1,77 @@
+{
+  "runner_kind": "vitest",
+  "reporter_format": "vitest-json",
+  "result_collection": "missing",
+  "collection_verified": false,
+  "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "environment_ref": "local-wsl2-linux:6.6.87.2;node-v24.22.2;pnpm-10.34.5;vitest-4.1.11;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
+  "runner_ref": "vitest@4.1.11",
+  "runner_version": "4.1.11",
+  "testware_ref": "qa-training-store:tests/unit/pricing.test.ts",
+  "testware_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "tc_ref": null,
+  "tc_revision": null,
+  "planned_scope_ref": "qa-training-store:tests/unit/pricing.test.ts@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "selection_evidence_ref": "local://pr22-acceptance/qts-evidence/selection.json (vitest list --json, 3 tests, 2026-11-12)",
+  "selection_filter": null,
+  "selection_evidence_is_caller_declared": true,
+  "declared_selection_matched_report": false,
+  "declared_selected": [
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "applies a sale only within the half-open sale interval"
+      ]
+    },
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "floors the gold discount for each SKU unit before multiplying quantity"
+      ]
+    },
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "uses the same subtotal shipping rule for every membership rank"
+      ]
+    }
+  ],
+  "run_ref": "pr22-acceptance-vitest-pricing-timeout-20261112T205800",
+  "artifact_directory": "<scratchpad>/qts-artifacts/non-e2e-72f5ruez",
+  "attempts": [
+    {
+      "started": true,
+      "pid": 19614,
+      "return_code": -9,
+      "timeout": true,
+      "interrupted": false,
+      "launch_error": null,
+      "started_at": 1794484708.8071237,
+      "finished_at": 1794484709.8154418,
+      "number": 1,
+      "executed_argv_sha256": "5a4c63f2edb9480eb7ef34a0bc58c765c1903e30824b8162e8d240d4f48d929a",
+      "stdout_ref": "<scratchpad>/qts-artifacts/non-e2e-72f5ruez/attempt-1/stdout.log",
+      "stderr_ref": "<scratchpad>/qts-artifacts/non-e2e-72f5ruez/attempt-1/stderr.log",
+      "raw_report_ref": null,
+      "result_collection": "missing",
+      "cleanup_state": "not_required",
+      "process_tree_state": "terminated",
+      "workspace_head_after_cleanup": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "workspace_state_after_cleanup": "clean"
+    }
+  ],
+  "outcome": "blocked_cleanup_or_timeout",
+  "direct_observation_verdict": null,
+  "tc_verdict": null,
+  "expected_authority_ref": null,
+  "direct_tc_authority_evidence": null,
+  "quality_verdict": null,
+  "evidence_is_fixture": false,
+  "provider_readback": "not_connected"
+}

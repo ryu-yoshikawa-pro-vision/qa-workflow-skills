@@ -1,5 +1,9 @@
 # PR #22 並行実装の統合管理
 
+## 現在の状態（2026-11-12）
+
+担当A〜J（PR #23〜#32）とPR #34はPR #22へ統合済み。共有登録とqa-workflow routingを修正し、G→Hの返却項目を接続した。最終受入は**未完了**で、詳細と残件は[最終受入の検証記録](./evidence/final-acceptance-2026-11-12/README.md)を正本とする。
+
 ## 方針
 
 **PR本文は作業メモではない。** 親PR #22・担当PR #23〜#32とも、本文は「目的」と「現在の状態」に限定して更新する。作業履歴、コマンド、受入証拠、未検証理由、引継ぎ詳細は担当Markdownまたは検証レポートへ残し、PR本文から正本へリンクする。運用規則は[PR #33](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/33)で文書化する。

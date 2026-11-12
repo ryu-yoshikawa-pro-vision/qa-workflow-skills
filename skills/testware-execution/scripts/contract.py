@@ -824,3 +824,89 @@ def compare_metrics(
         "authority_ref": authority_ref,
         "results": results,
     }
+
+
+# regression-testingのtestware route / 補助routeが読むsource execution契約
+# （skills/regression-testing/references/data-contract.md）。runnerの結果名を
+# そのまま渡すとRegression側では未開始・未確認として扱われるため、ここで投影する。
+_FINAL_RUNNER_OUTCOMES = {
+    "runner_pass",
+    "runner_fail",
+    "observed_FAIL",
+    "measurement_FAIL",
+}
+_CLEANUP_STATUS = {"not_required": "対象なし", "success": "成功"}
+
+
+def regression_source_execution(result: dict[str, Any]) -> dict[str, Any]:
+    """Project a runner manifest to the Regression source execution contract.
+
+    The projection never upgrades evidence: an unverified start, incomplete raw
+    capture, a non-terminated process tree, a dirty workspace or fixture-only
+    evidence stays open. The revision is the checkout the runner verified
+    (``repo_revision``), not the caller-declared ``testware_revision``.
+    """
+    if not isinstance(result, dict):
+        raise ContractError("invalid_runner_result")
+    run_ref = _required_str(result.get("run_ref"), "run_ref")
+    revision = _required_str(result.get("repo_revision"), "repo_revision")
+    outcome = _required_str(result.get("outcome"), "outcome")
+    attempts = result.get("attempts")
+    if not isinstance(attempts, list) or not attempts:
+        raise ContractError("runner_attempts_required")
+    last = attempts[-1]
+    if not isinstance(last, dict) or type(last.get("number")) is not int:
+        raise ContractError("invalid_runner_attempt")
+    started = last.get("started") is True and type(last.get("pid")) is int
+    process_closed = last.get("process_tree_state") == "terminated"
+    workspace_clean = last.get("workspace_state_after_cleanup") == "clean"
+    raw_ref = last.get("raw_report_ref")
+    raw_complete = (
+        started
+        and result.get("collection_verified") is True
+        and last.get("result_collection") == "complete"
+        and isinstance(raw_ref, str)
+        and bool(raw_ref)
+    )
+    cleanup = _CLEANUP_STATUS.get(str(last.get("cleanup_state")))
+    if cleanup is None or not (process_closed and workspace_clean):
+        cleanup = "未確認"
+    artifact_directory = result.get("artifact_directory")
+    # 生の証拠を辿れる試行単位の保存場所。run_ref単独は一意性を保証しない。
+    attempt_ref = (
+        f"{artifact_directory}/attempt-{last['number']}"
+        if isinstance(artifact_directory, str) and artifact_directory
+        else None
+    )
+    fixture_only = result.get("evidence_is_fixture") is not False
+    evidence_refs = [
+        ref
+        for ref in (raw_ref, last.get("stdout_ref"), last.get("stderr_ref"))
+        if isinstance(ref, str) and ref
+    ]
+    return {
+        "execution_ref": run_ref,
+        "executor_owner": "testware-execution",
+        "testware_ref": result.get("testware_ref"),
+        "source_execution": {
+            "start_state": "開始済み" if started else "未開始",
+            "actual_start_confirmed": started,
+            "result_finalized": raw_complete
+            and process_closed
+            and not fixture_only
+            and attempt_ref is not None
+            and outcome in _FINAL_RUNNER_OUTCOMES,
+            # Regressionは元のsource result文字列を変換せずに保持する。
+            "source_result": outcome,
+            "implementation_revision": revision,
+            "declared_testware_revision": result.get("testware_revision"),
+            "attempt_ref": attempt_ref if started else None,
+            "raw_capture_complete": raw_complete,
+            "cleanup_status": cleanup,
+            "evidence_refs": evidence_refs,
+            "blocked": outcome.startswith("blocked"),
+            "evidence_is_fixture": fixture_only,
+            # 保存先readbackは実行結果の確定とは別のgate。未接続のまま転記する。
+            "provider_readback": result.get("provider_readback"),
+        },
+    }
