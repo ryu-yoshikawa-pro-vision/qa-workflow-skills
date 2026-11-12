@@ -3,6 +3,7 @@ from __future__ import annotations
 from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     MULTI_USE_SKILL_TARGETS,
+    WORKFLOW_VERIFIED_SKILLS,
     add_allowed_assertion,
     add_duplicate_assertion,
     clean,
@@ -328,7 +329,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         runtime_status = clean(row.get("Runtime Status", ""))
         required = clean(row.get("Runtime Required", ""))
         deterministic = clean(row.get("Deterministic Generated", ""))
-        if key[0] not in CANONICAL_SKILLS or not key[1]:
+        if key[0] not in WORKFLOW_VERIFIED_SKILLS or not key[1]:
             runtime_issues.append({"row": key, "reason": "identity"})
         if (
             support not in SUPPORT_STATUSES

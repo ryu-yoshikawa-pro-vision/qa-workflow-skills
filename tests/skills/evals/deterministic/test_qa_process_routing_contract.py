@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import ast
 import json
 import unittest
 from pathlib import Path
 
-from scripts.skills.evals.deterministic.common import CANONICAL_SKILLS
+from scripts.skills.evals.deterministic.common import (
+    CANONICAL_SKILLS,
+    RUNTIME_UNIT_SKILLS,
+    WORKFLOW_VERIFIED_SKILLS,
+)
 from scripts.skills.evals.deterministic.loader import load_validators
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -185,6 +190,113 @@ class QaProcessRoutingContractTests(unittest.TestCase):
         result = self.validate(candidate, self.cases["WF-PROCESS-010"])
         failed = {row["id"] for row in result["assertions"] if row["status"] == "fail"}
         self.assertIn("WF-D002", failed, result)
+
+
+def workflow_runtime_v2_roots() -> set[str]:
+    source = (REPO_ROOT / "skills/qa-workflow/scripts/workflow_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    for node in ast.parse(source).body:
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "RUNTIME_V2_SKILL_ROOTS"
+        ):
+            return set(ast.literal_eval(node.value.args[0]))
+    raise AssertionError("RUNTIME_V2_SKILL_ROOTS is not declared")
+
+
+def workflow_runtime_doc(skill: str) -> str:
+    return f"""# Workflow
+
+- ワークフロー全体状態: 実行中
+- 開始Skill: {skill}
+- 開始対象 / 実行範囲:
+- 最終Skill: {skill}
+- 最終対象 / 実行範囲:
+
+## ワークフロー状態
+
+| Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
+| --- | --- | --- | --- | --- |
+| {skill} | | 実行中 | WF-RUNTIME | |
+
+## runtime状態
+
+| Skill | Runtime Unit Key | Support Status | Result Status | Freshness | Runtime Status | Runtime Required | Deterministic Generated |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| {skill} | artifact:fake:all | supported | ready | current | ok | Yes | Yes |
+"""
+
+
+def question_doc(runtime_skill: str) -> str:
+    return f"""# 不明点・矛盾分析
+
+## 不明点 / 質問一覧
+
+| ID | 問題 / 質問 | 根拠 | 分類 | 影響範囲 / 成果物 | 関連UNKNOWN ID | Runtime Skill | Runtime Unit Key | Model Key | Target Key | Generation Fingerprint | 回答なしの場合の扱い | 回答後の正規化先 | 再開Skill | 再開対象 / 実行範囲 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Q-001 | 計画の承認者が不明 | SPEC | 要確認 | plan | | {runtime_skill} | artifact:x:all | | | sha256:{"0" * 64} | 確認まで保留 | SPEC | spec-analysis | |
+
+## 質問ID履歴
+
+| ID |
+| --- |
+| Q-001 |
+
+## 仮定候補
+
+| 仮定候補 | 状態 | 根拠 / 理由 | 影響範囲 | 正式ASM ID |
+| --- | --- | --- | --- | --- |
+
+## ブロック中範囲
+
+| ブロッカーID | ブロック中成果物 / 範囲 | 必要な決定 / 情報源 | Runtime Skill | Runtime Unit Key | Model Key | Target Key | Generation Fingerprint | 再開Skill | 再開対象 / 実行範囲 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+"""
+
+
+class RuntimeSkillNameContractTests(unittest.TestCase):
+    def test_runtime_unit_skills_match_skills_with_runtime_contract(self) -> None:
+        actual = {
+            path.parents[1].name
+            for path in (REPO_ROOT / "skills").glob("*/scripts/runtime_contract.py")
+        }
+        self.assertEqual(set(RUNTIME_UNIT_SKILLS), actual)
+
+    def test_workflow_verified_skills_match_runtime_v2_roots(self) -> None:
+        self.assertEqual(set(WORKFLOW_VERIFIED_SKILLS), workflow_runtime_v2_roots())
+
+    def test_workflow_runtime_row_rejects_unverified_skill(self) -> None:
+        def d019(skill: str) -> str:
+            result = VALIDATORS["qa-workflow"](
+                workflow_runtime_doc(skill), {}, "WF-RUNTIME-UNIT"
+            ).to_dict()
+            return next(
+                row["status"] for row in result["assertions"] if row["id"] == "WF-D019"
+            )
+
+        self.assertEqual(d019("test-case-design"), "pass")
+        for skill in ("defect-management", "test-management", "spec-analysis"):
+            with self.subTest(skill=skill):
+                self.assertEqual(d019(skill), "fail")
+
+    def test_question_runtime_skill_rejects_skill_without_runtime(self) -> None:
+        def runtime_issue(skill: str) -> bool:
+            result = VALIDATORS["question-analysis"](
+                question_doc(skill), {}, "QUESTION-RUNTIME-UNIT"
+            ).to_dict()
+            return any(
+                row["status"] == "fail"
+                and "Runtime Skill"
+                in json.dumps(row.get("evidence"), ensure_ascii=False)
+                for row in result["assertions"]
+            )
+
+        self.assertFalse(runtime_issue("spec-analysis"))
+        for skill in ("test-management", "defect-management", "feature-analysis"):
+            with self.subTest(skill=skill):
+                self.assertTrue(runtime_issue(skill))
 
 
 if __name__ == "__main__":

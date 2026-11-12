@@ -46,6 +46,16 @@ Providerを案件別の選択肢に放置しない。実装時に使用する保
 - **実行・監査**：許可済みの接続方式と最小権限で更新し、呼び出した操作、結果ref、取得したsource revision、失敗／競合、再試行・引継ぎを記録する。認証情報は本文や公開artifactに書かない。
 - **未認可**：承認者が未設定、認証できない、対象が一致しない、権限不明なら該当更新を停止する。読み取り・提案・承認依頼は可能な範囲で実施できる。
 
+### 本repositoryの既定承認方式（2026-11-12 利用者決定）
+
+Git providerへ保存する案件では、次の手順を既定の承認方式とする。案件のProject Contextで別方式を合意した場合はそれに従う。
+
+1. Agentは保存の前に、操作種別、scope、保存先ref／branch、期待する更新前revision、差分を利用者へ提示し、対話で明示的な同意を得る。
+2. 同意後、保存先repositoryへのwrite権限を持つ利用者のGitHub認証済みアカウントで、通常pushする（force pushはしない）。保存先が更新前revisionから動いていればpushが拒否されるため、これを遠隔側の条件付き更新として扱う。
+3. push後、GitHubのrepository activity API（`GET /repos/{owner}/{repo}/activity?ref=<ref>`）で、ref更新の実行者（`actor`）と前後SHA（`before`／`after`）を読み戻す。期待した更新前revision、保存したcommit、承認者として合意したアカウントがすべて一致した場合だけ、承認済み・保存済みとする。
+4. **承認主体は、GitHubが認証したpush実行アカウント**とする。commitのauthor／committerは利用者側で任意に設定できるため、承認の証拠にしない。対話の同意記録だけ、またはLLMが生成した`approved`表記だけでは承認にしない。
+5. activityの読み戻しに失敗した場合、実行者が一致しない場合、前後SHAが一致しない場合は、その保存を承認済みにせず、blockedとして再開条件を記録する。
+
 ### 欠陥管理との境界
 
 `defect-management`が保管するのはQA側の欠陥候補・引継ぎ・外部Issue参照・修正確認依頼と結果だけ。外部Issueの正式status、優先度、担当、更新履歴の正本は案件のサービスに置く。

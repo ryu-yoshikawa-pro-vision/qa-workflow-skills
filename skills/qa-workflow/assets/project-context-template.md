@@ -214,6 +214,14 @@
 
 <!-- qa-context-field:end -->
 
+<!-- qa-context-field:start key=qa.defect_issue_tracker_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
 feature-analysisは情報源参照・機能一覧のroot・基準branch/revision・承認方針refのみを保持し、source全文やsecret・認証情報・機能一覧そのものをProject Contextへ複製しません。
+
+`qa.defect_issue_tracker_ref`は、欠陥候補を引き継ぐ外部Issue管理先の参照（例：`github:owner/repo`）だけを保持します。未設定の案件では外部Issue連携を行わず、`defect-management`は欠陥候補の整理・修正確認依頼までで完了できます。認証情報やIssue本文は記録しません。
 
 root pathはproject-local fixed locationにし、同じ案件内のworkflowから一意に解決できる値を記録します。secret実値は追加しません。

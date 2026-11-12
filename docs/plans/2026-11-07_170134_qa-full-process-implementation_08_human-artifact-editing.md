@@ -44,6 +44,8 @@
 5. **衝突の判定**：元revision以降に別のAgent／人間の更新があれば、変更されたID・field・proseと依存参照を比較し、競合箇所または意味上の関連が未確認なら該当scopeの採用を止める。同じ入力revisionと同じ意味が確認できる無変更・独立編集は現在の正本を保持して再評価する。単にGitの行単位mergeが成功しただけで意味上の衝突解決・承認済みとはしない。
 6. **既存更新契約への変換**：採用する意味変更を`ui_target_package.py materialize`の既存`table_changes[]`、`keyed_table_updates[]`、`prose_updates[]`、`extension_file_updates[]`、`retire_ids[]`等の適切な入力へ写像する。変更前の正式packageを正本として扱い、編集案のpackage一式や改変Manifestをcopyして置換しない。`_validate_previous_model_transition()`と既存semantic／Machine Entity検証を通過させる。変換できない編集は承認済みとして黙って破棄せず、変更案と停止理由を保持する。
 
+**承認**：正本更新の承認は、[共通契約§2の既定承認方式](./2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md#本repositoryの既定承認方式2026-11-12-利用者決定)（対話での同意、認証済みアカウントによる通常push、activity APIによる実行者と前後SHAの読み戻し）に従う。人間が作業用branchへpushしたことは編集の提出であり、正本更新の承認とは区別する。
+
 **成果物の識別**：差分の受付・結果は既存の保存可能な編集／レビュー参照に、元versionとsnapshot、対象scope・ID、変更したfield／prose、source／承認ref、採否・未確認理由、正本更新後のversion／receipt・readbackを対応付ける。新しい共通台帳・独立した編集manifestを正本として増やさない。生のsecret、PII、cookie、tokenを新しい証拠へ複製しない。
 
 ## 正式保存・変更影響・再開
