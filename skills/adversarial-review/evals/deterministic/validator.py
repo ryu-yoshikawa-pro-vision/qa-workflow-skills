@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from scripts.skills.evals.deterministic.common import (
@@ -12,12 +13,20 @@ from scripts.skills.evals.deterministic.common import (
     ids_in,
     nonempty_rows,
 )
-from scripts.skills.evals.deterministic.markdown_parser import find_table, parse_tables
+from scripts.skills.evals.deterministic.markdown_parser import (
+    find_table,
+    parse_bullets,
+    parse_tables,
+)
 from scripts.skills.evals.deterministic.result import EvalResult
 
 SEVERITIES = {"致命的", "重大", "軽微", "提案"}
 TREATMENTS = {"未処置", "修正済み", "残存リスクとして受容", "ブロック中"}
-REPAIR_TARGETS = CANONICAL_SKILLS | {"案件コンテキスト / 仕様決定"}
+REPAIR_TARGETS = CANONICAL_SKILLS | {
+    "案件コンテキスト / 仕様決定",
+    "testware-implementation",
+    "testware-execution",
+}
 
 
 def _normalize_treatment(value: str) -> str:
@@ -47,6 +56,75 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         "反証レビューの正規テーブルが存在すること",
         evidence=missing_tables or None,
     )
+
+    # Fixture-provided intent is authoritative for evaluation applicability.
+    # The output cannot bypass checks by omitting its own review mode.
+    bullets = parse_bullets(text)
+    mode = clean(bullets.get("レビュー種別", ""))
+    target = clean(bullets.get("対象 / 実行範囲", ""))
+    expected_mode = expected.get("review_mode")
+    review_targets = {"非E2E testware", "要求・設計・コードの静的レビュー"}
+    check_non_e2e = (
+        expected_mode in {"non_e2e_testware", "static_review"}
+        or "非E2E" in mode
+        or "静的レビュー" in mode
+        or target in review_targets
+    )
+    if check_non_e2e:
+        if expected_mode == "non_e2e_testware":
+            expected_output_mode = "非E2E testware"
+        elif expected_mode == "static_review":
+            expected_output_mode = "要求・設計・コードの静的レビュー"
+        else:
+            expected_output_mode = None
+        result.add(
+            "REV-D017",
+            mode in review_targets
+            and (expected_output_mode is None or mode == expected_output_mode),
+            "非E2E・静的レビューの種別が明示され、評価入力と一致すること",
+        )
+        scope_table = find_table(
+            tables,
+            section_contains="非E2E testware／静的レビュー",
+            required_headers=(
+                "対象source／revision",
+                "TCまたは明示対象・仕様Authority",
+                "testware ref／assertion・fixture",
+                "適用基準／観測根拠",
+                "レビュー結果・誤検出候補",
+                "修正元owner",
+            ),
+        )
+        result.add(
+            "REV-D018",
+            scope_table is not None,
+            "非E2E・静的レビューに根拠表が存在すること",
+        )
+        if scope_table is not None:
+            rows = scope_table.rows
+            result.add(
+                "REV-D019",
+                bool(rows)
+                and all(
+                    all(str(value).strip() for value in row.values())
+                    and re.fullmatch(
+                        r"[^\s@]+@[^\s@]+",
+                        clean(row.get("対象source／revision", "")),
+                    )
+                    is not None
+                    for row in rows
+                ),
+                "source refとrevisionが分離可能な形式で記録されていること",
+            )
+            required_sources = expected.get("required_source_revisions", [])
+            actual_sources = {
+                clean(row.get("対象source／revision", "")) for row in rows
+            }
+            result.add(
+                "REV-D020",
+                all(item in actual_sources for item in required_sources),
+                "評価入力で指定されたsource／revisionが保持されていること",
+            )
 
     summary = nonempty_rows(summary_table)
     findings = nonempty_rows(findings_table)
