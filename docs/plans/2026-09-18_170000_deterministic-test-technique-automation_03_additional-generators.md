@@ -132,7 +132,7 @@ consistency:
 
 - `kind`は`lifecycle / negative`
 - 各stepがCRUD matrixに存在するoperationを参照することを検証
-- lifecycle sequenceでは、そのentityの適用対象operationを全体として1回以上Coverageすることを要求
+- lifecycle sequenceでは、そのentityの適用対象operationのうち**状態を変えるoperation（C／U／D）**を全体として1回以上Coverageすることを要求する。R（読み取り）はcompleteness criterionのmatrix cellで担保し、lifecycle sequenceへの追加を要求しない（2026-11-13 利用者決定。PR #22の意味評価TCN-SEM-004で、Authorityが指定したsequenceとの矛盾を解消）
 - `not_applicable` disposition済みoperationはlifecycle Coverage母集団から除外する
 - negative sequenceはAuthorityで明示された「未作成のR/U/D」「削除後のR/U/D」等だけを入力し、scriptが業務上の禁止操作を創作しない
 - sequence target keyは`crud:seq:<sequence_key>`

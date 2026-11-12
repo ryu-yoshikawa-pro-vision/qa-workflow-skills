@@ -45,7 +45,7 @@
 | `coverage-analysis`       | `COV-SEM-001`     |         627.2 | pass         |
 | `coverage-analysis`       | `COV-SEM-002`     |         694.4 | needs_review |
 
-TCN-SEM-012 candidateはEval Inputがcurrent target fingerprint一致を保証する一方、入力にfingerprint値がなく、candidateがnull digestをmaterializeしてblocked扱いにしたため、JudgeはSEM-TCN-002／004をneeds_reviewとした。契約違反を実runtime不具合と断定できず、Skill・rubric・referenceは変更していない。
+TCN-SEM-012 candidateはEval Inputがcurrent target fingerprint一致を保証する一方、入力にfingerprint値がなく、candidateがnull digestをmaterializeしてblocked扱いにしたため、JudgeはSEM-TCN-002をneeds_reviewとした（2026-11-13訂正：以前はSEM-TCN-004もneeds_reviewと記載していたが、保存された`judge-result.json`ではSEM-TCN-004はpass、rating 3）。契約違反を実runtime不具合と断定できず、Skill・rubric・referenceは変更していない。
 
 TCN-SEM-013の初回Agentは1200秒でtimeoutしcandidateを作らなかった。fresh retryはexit 0、turn.completed、178 JSONL events／82 command events、1240.3秒でcandidateを生成。独立Judgeは5 criterion中1 pass、3 needs_review、1 fail（SEM-TCN-006）で、case verdictはneeds_review。candidateはA/Bのgrouping predicateとrole intersectionを別TCN/modelに分離し、merge union conflict時にmerged CIを拒否する既存`coverage-techniques.md`規則を反映しなかった。同reference全文をAgent traceで読んだ記録がある。これをAgent出力の意味失敗として記録し、rubric／期待値やruntimeを変更しない。
 

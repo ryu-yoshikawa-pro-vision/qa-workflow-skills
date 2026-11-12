@@ -38,6 +38,6 @@
 }
 ```
 
-今回のsource revision更新はTI-002だけに関係し、TI-002はrevision `ti2-r2`でcurrentです。更新により、配送再試行の業務経路が追加されました。TI-001のsource・経路は変わっていません。新しいTI-003はcurrentな`REQ-ORDER-TRACKING` revision `req-track-r1`に基づく注文追跡経路で、selectionの候補母集団へ追加します。現時点の母集団はTI-001、TI-002、TI-003で完全です。
+今回のsource revision更新はTI-002だけに関係し、TI-002はrevision `ti2-r2`でcurrentです。更新により、配送再試行の業務経路が追加されました。TI-001のsource・経路は変わっていません。新しいTI-003はrevision `ti3-r1`でcurrentなtest itemで、currentな`REQ-ORDER-TRACKING` revision `req-track-r1`に基づく注文追跡経路です。selectionの候補母集団へ追加します。今回のsource行として、`{ "ref": "TI-003", "revision": "ti3-r1", "currentness": "current" }`と`{ "ref": "REQ-ORDER-TRACKING", "revision": "req-track-r1", "currentness": "current" }`を使用します。現時点の母集団はTI-001、TI-002、TI-003で完全です。
 
 revision 1のdigestはこの評価fixtureのrecord整合性値です。共有保存先の真正性やreadbackを証明する値として扱わないでください。今回の変更理由は「TI-002のsource revision更新とTI-003の候補追加」です。

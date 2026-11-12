@@ -23,6 +23,7 @@ GENERATOR = "crud_matrix"
 GENERATOR_CONTRACT_VERSION = "crud-matrix-v1"
 SCRIPT_PATH = Path(__file__).resolve()
 OPERATIONS = ("C", "R", "U", "D")
+STATE_CHANGING_OPERATIONS = frozenset({"C", "U", "D"})
 
 
 def _refs(value: Any, name: str) -> list[str]:
@@ -283,8 +284,12 @@ def generate(input_value: dict, metadata: dict) -> dict:
             for operation in OPERATIONS
             if (entity_key, operation) in disposition_map
         }
+        # lifecycle sequenceは状態の一貫性を確認するため、状態を変えるoperation
+        # （C／U／D）だけを必須にする。Rはcompleteness criterionのcellで担保する。
         missing_lifecycle = (
-            sorted(applicable - sequence_ops) if row["kind"] == "lifecycle" else []
+            sorted((applicable & STATE_CHANGING_OPERATIONS) - sequence_ops)
+            if row["kind"] == "lifecycle"
+            else []
         )
         complete = not missing_lifecycle
         if not complete:

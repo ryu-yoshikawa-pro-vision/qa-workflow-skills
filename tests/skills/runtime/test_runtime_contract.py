@@ -297,6 +297,57 @@ class CanonicalAndFingerprintTests(unittest.TestCase):
             )
         )
 
+    def test_version_range_accepts_one_open_bound(self) -> None:
+        def version(minimum, maximum, min_inc=True, max_inc=True):
+            return {
+                "operator": "version_range",
+                "minimum": minimum,
+                "maximum": maximum,
+                "minimum_inclusive": min_inc if minimum is not None else None,
+                "maximum_inclusive": max_inc if maximum is not None else None,
+            }
+
+        at_least_2 = version("2.0", None)
+        at_most_1_4 = version(None, "1.4")
+        exactly_1_3 = version("1.3", "1.3")
+        # 「2.0以上」と「1.4以下」は交差しない（TCN-SEM-012のtarget A）。
+        self.assertFalse(
+            runtime.constraint_intersection_compatible([at_least_2, at_most_1_4])
+        )
+        # 片側だけの制約同士は、もう一方へ開いているため交差する。
+        self.assertTrue(
+            runtime.constraint_intersection_compatible(
+                [at_least_2, version("2.5", None)]
+            )
+        )
+        self.assertTrue(
+            runtime.constraint_intersection_compatible([at_most_1_4, exactly_1_3])
+        )
+        self.assertFalse(
+            runtime.constraint_intersection_compatible([at_least_2, exactly_1_3])
+        )
+        # 境界一致は両側inclusiveの場合だけ交差する。
+        self.assertTrue(
+            runtime.constraint_intersection_compatible(
+                [version("1.4", None), at_most_1_4]
+            )
+        )
+        self.assertFalse(
+            runtime.constraint_intersection_compatible(
+                [version("1.4", None, min_inc=False), at_most_1_4]
+            )
+        )
+        # 両側とも開いた範囲、開いた側のinclusive指定、不正versionは拒否する。
+        for invalid in (
+            version(None, None),
+            {**at_least_2, "maximum_inclusive": True},
+            {**at_least_2, "minimum": "2.x"},
+            {**at_least_2, "minimum_inclusive": None},
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(runtime.InvalidInput):
+                    runtime.validate_version_range(invalid, "version_range")
+
     def test_fixed_offset_datetime_range_uses_absolute_instants_and_keeps_offsets(
         self,
     ) -> None:
