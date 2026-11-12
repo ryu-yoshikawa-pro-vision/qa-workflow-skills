@@ -1216,6 +1216,69 @@ def persist_snapshot(
         return {"status": "blocked", "reasons": [str(exc)], "metrics": None}
 
 
+def candidate_handoff(
+    store: LocalArtifactStore | GitArtifactStore,
+    *,
+    project_ref: str,
+    artifact_ref: str,
+    storage_revision: str,
+    previous_snapshot: dict[str, Any] | None,
+    observed_head_revision: str,
+) -> dict[str, Any]:
+    """Build the test-item / test-condition analysis input from a saved snapshot.
+
+    The snapshot is read back from the store and re-analysed; nothing is taken
+    from the caller's copy. The logical artifact revision and the storage
+    revision stay separate so D never confuses one with the other.
+    """
+    try:
+        record = store.read_revision(
+            "feature-inventory", project_ref, artifact_ref, storage_revision
+        )
+        if record is None:
+            raise ContractError("snapshot_not_found")
+        content = record["content"]
+        if hashlib.sha256(content.encode("utf-8")).hexdigest() != record["sha256"]:
+            raise ContractError("snapshot_readback_hash_mismatch")
+        snapshot = json.loads(content, object_pairs_hook=_pairs)
+        if not isinstance(snapshot, dict) or snapshot.get("project_ref") != project_ref:
+            raise ContractError("snapshot_project_mismatch")
+        analysis = analyze(
+            {
+                "snapshot": snapshot,
+                "previous_snapshot": previous_snapshot,
+                "observed_head_revision": observed_head_revision,
+            }
+        )
+        if analysis["status"] not in {"complete", "incomplete"}:
+            return {
+                "status": "blocked",
+                "reasons": [f"analysis_{analysis['status']}", *analysis["reasons"]],
+                "metrics": None,
+            }
+        snapshot_sha256 = analysis["handoff"]["snapshot_sha256"]
+        if snapshot_sha256 != record["sha256"]:
+            # 保存本文が正規化済みJSONと一致しない場合は、同一snapshotと断定しない。
+            raise ContractError("snapshot_not_canonical")
+        return {
+            "status": analysis["status"],
+            "feature_inventory": {"snapshot": snapshot, "analysis": analysis},
+            "feature_ref": {
+                "owner": "feature-analysis",
+                "scope": project_ref,
+                "artifact_ref": snapshot["artifact_ref"],
+                "revision": snapshot["artifact_revision"],
+                "content_hash": snapshot_sha256,
+            },
+            "storage": {
+                "storage_revision": record["revision"],
+                "sha256": record["sha256"],
+            },
+        }
+    except (ContractError, StoreError, KeyError, TypeError, ValueError) as exc:
+        return {"status": "blocked", "reasons": [str(exc)], "metrics": None}
+
+
 def handle(request: Any) -> dict[str, Any]:
     try:
         return analyze(request)

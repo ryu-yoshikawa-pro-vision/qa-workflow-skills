@@ -9,6 +9,7 @@ this helper does not authenticate people or storage providers.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -935,6 +936,61 @@ def _previous_model(writer: Any, current: Any, value: Any):
     return model, inspected
 
 
+FEATURE_ID = re.compile(r"FEAT-[0-9]{3,}")
+
+
+def _verified_feature_ids(
+    feature_ref: Any, snapshot: Any, artifact_ref: str, revision: str
+) -> set[str]:
+    """Return active feature IDs from feature-analysis's saved snapshot.
+
+    The reference must name the same artifact and logical revision as the request,
+    and its content hash must match the snapshot. IDs or names are never matched
+    by similarity.
+    """
+    if not isinstance(feature_ref, dict) or set(feature_ref) != {
+        "owner",
+        "scope",
+        "artifact_ref",
+        "revision",
+        "content_hash",
+    }:
+        _fail("source_ref_required", "feature-analysisのfeature_refが必要です")
+    if not isinstance(snapshot, dict) or snapshot.get("schema_version") != (
+        "feature-inventory-v1"
+    ):
+        _fail("source_ref_required", "feature-analysisのsnapshotが必要です")
+    digest = hashlib.sha256(
+        json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    if (
+        feature_ref["owner"] != "feature-analysis"
+        or feature_ref["artifact_ref"] != artifact_ref
+        or feature_ref["revision"] != revision
+        or feature_ref["content_hash"] != digest
+        or snapshot.get("artifact_ref") != artifact_ref
+        or snapshot.get("artifact_revision") != revision
+        or snapshot.get("project_ref") != feature_ref["scope"]
+    ):
+        _fail(
+            "source_ref_mismatch",
+            "feature_ref、snapshot、要求のartifact／revision／hashが一致しません",
+        )
+    features = snapshot.get("features")
+    if not isinstance(features, list):
+        _fail("source_ref_mismatch", "snapshotのfeaturesが不正です")
+    return {
+        row["id"]
+        for row in features
+        if isinstance(row, dict)
+        and isinstance(row.get("id"), str)
+        and FEATURE_ID.fullmatch(row["id"])
+        and row.get("status") != "retired"
+    }
+
+
 def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
     writer = _writer_module()
     package_root = _root(request.get("package_root"), "package_root")
@@ -951,6 +1007,12 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
         or not revision.strip()
     ):
         _fail("source_ref_required", "feature artifact refとrevisionが必要です")
+    feature_ids = _verified_feature_ids(
+        request.get("feature_ref"),
+        request.get("feature_snapshot"),
+        artifact_ref,
+        revision,
+    )
     mapping = request.get("feature_scope_refs")
     if not isinstance(mapping, list):
         _fail("invalid_input", "feature_scope_refsはarrayが必要です")
@@ -1007,6 +1069,7 @@ def _feature_index(request: dict[str, Any]) -> dict[str, Any]:
             not isinstance(feature_id, str)
             or not feature_id.strip()
             or not isinstance(scope_id, str)
+            or feature_id not in feature_ids
             or (scope_id not in scopes and scope_id not in previous_scopes)
         ):
             _fail("reference_not_found", "feature IDまたはUI Scope参照がありません")
@@ -1102,6 +1165,8 @@ def run(request: Any) -> dict[str, Any]:
             "package_root",
             "feature_artifact_ref",
             "feature_artifact_revision",
+            "feature_ref",
+            "feature_snapshot",
             "feature_scope_refs",
             "changed_ids",
             "previous_package_root",

@@ -1688,6 +1688,53 @@ def crosscheck(request: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def formal_design_sources(request: dict[str, Any]) -> dict[str, Any]:
+    """Project current condition candidates to formal-design-v1 rows.
+
+    ``COND-*`` IDs are shared with the formal design. Adoption, disposition and
+    TCN design stay with ``test-condition-design``.
+    """
+    if (
+        set(request) != {"operation", "artifact", "current_source_refs"}
+        or request.get("operation") != "formal_design_sources"
+    ):
+        raise ContractError(
+            "request_schema", "formal_design_sources request fields do not match v1"
+        )
+    artifact = validate_artifact(request["artifact"])
+    active = active_source_refs(request["current_source_refs"])
+    revision = artifact["content_fingerprint"]
+    source_refs = []
+    condition_candidates = []
+    for condition in sorted(
+        artifact["conditions"], key=lambda row: row["condition_id"]
+    ):
+        if condition["candidate_state"] == "retired":
+            continue
+        ref = f"{artifact['artifact_ref']}#{condition['condition_id']}"
+        source_refs.append(
+            {
+                "ref": ref,
+                "revision": revision,
+                "currentness": derive_currentness(condition["evidence_refs"], active),
+            }
+        )
+        condition_candidates.append(
+            {"condition_ref": condition["condition_id"], "source_ref": ref}
+        )
+    return make_result(
+        "current"
+        if all(row["currentness"] == "current" for row in source_refs)
+        else "incomplete",
+        valid=True,
+        issues=[],
+        artifact_ref=artifact["artifact_ref"],
+        candidate_revision=revision,
+        source_refs=source_refs,
+        condition_candidates=condition_candidates,
+    )
+
+
 def run(request: Any) -> dict[str, Any]:
     if not isinstance(request, dict):
         raise ContractError("request_invalid", "request must be a JSON object")
@@ -1702,6 +1749,8 @@ def run(request: Any) -> dict[str, Any]:
         return impact(request)
     if operation == "crosscheck":
         return crosscheck(request)
+    if operation == "formal_design_sources":
+        return formal_design_sources(request)
     raise ContractError(
         "operation_invalid",
         "operation must be materialize, validate, impact, or crosscheck",

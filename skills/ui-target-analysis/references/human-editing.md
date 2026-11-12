@@ -56,6 +56,6 @@
 
 ## 機能別導出索引
 
-`feature-index`は実際の`feature-analysis` artifact ref・revision、明示的なfeature-to-Scope mapping、必要に応じてmaterialize後の`changed_ids`を受け取り、current UI package versionから正本path、section、line、stable ID、関連ref、今回変わったcurrent rowを導出します。
+`feature-index`は実際の`feature-analysis` artifact ref・revision、その保存済みsnapshotと`feature_ref`（`feature-analysis`の`candidate_handoff()`が返す`owner`／`scope`／`artifact_ref`／`revision`／`content_hash`）、明示的なfeature-to-Scope mapping、必要に応じてmaterialize後の`changed_ids`を受け取り、current UI package versionから正本path、section、line、stable ID、関連ref、今回変わったcurrent rowを導出します。`feature_ref`とsnapshotのartifact・revision・内容hashが要求と一致しない場合は`source_ref_mismatch`、mappingの機能IDがsnapshotに無い・`FEAT-`形式でない・retired の場合は`reference_not_found`で停止します。
 
 廃止したIDはcurrent packageに行がないため、廃止前の検証済みsnapshot（`previous_package_root`）が必要です。currentにないIDが`changed_ids`にあるのに`previous_package_root`がなければ`previous_snapshot_required`、currentにも前snapshotにもなければ`reference_not_found`で停止します。前snapshotは有効なpackageで、current以前のversionでなければなりません。前snapshotから同じ導出でScope配下のIDを求め、`retired_ui_rows[]`（前snapshotでのfile・section・line、`previous_package_version`、currentのCHANGELOGに廃止が残っていれば`retired_in_version`、`retirement_evidence`）と`changed_ids_without_current_row[]`を機能・Scopeごとに返します。どの対象Scopeにも該当しない`changed_ids`は`changed_ids_not_in_mapped_scopes`に残します。二次索引や永続索引は作りません。packageは累積履歴を持たないため、前snapshotがcurrentの正規の祖先であることまでは証明できません。その連続性はprovider revision履歴で確認します（PR #22）。mappingをpackageへ複製せず、feature名・path類似・画面名からscopeを推定しません。横断検証ではBの実成果物とmapping sourceを用い、独立fixtureを統合証拠に読み替えません。

@@ -23,7 +23,7 @@ US、UC、Behavior、AC、業務ルール、仕様根拠、UNKNOWNの解決は`s
 2. 現行packageは`ui_target_package.py inspect`で読取り、有効な`update_snapshot`とpackage versionを保持します。旧形式は`spec-analysis`へ渡して既存migration contractを使います。
 3. UI sourceの確認範囲と未確認領域を記録し、PAGE、STATE、VIEW、STEP、MODAL、BROWSER-DIALOG、PANEL、POPOVER、GLOBAL UI、EXTERNAL、SHARED PAGEを意味に応じて分類します。分類不能な構造に仮IDを付けません。
 4. 操作、対象構造、関係するScope、Authority refを確認します。構造が同じであることだけからUCや期待結果を推測しません。
-5. 機能別参照が必要なら`feature-analysis`の実artifact ref／revisionと明示された`feature_id → scope_id`だけを使い、`human_editing.py feature-index`でcurrent packageから正本file・line・stable IDを導出します。
+5. 機能別参照が必要なら`feature-analysis`の実artifact ref／revision、保存済みsnapshotと`feature_ref`、明示された`feature_id → scope_id`だけを使い、`human_editing.py feature-index`でcurrent packageから正本file・line・stable IDを導出します。
 6. 変更後は`inspect`、`validate`、必要な`build-machine-evidence`を実行し、package version、Manifest、stable ID、参照、readiness、影響範囲を確認します。
 
 ## package互換性

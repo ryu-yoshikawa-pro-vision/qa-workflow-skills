@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -187,6 +188,40 @@ def copy_page_row(row: dict[str, str], **changes: str) -> dict[str, str]:
 
 def package_bytes(root: Path) -> dict[str, bytes]:
     return {path.name: path.read_bytes() for path in root.iterdir() if path.is_file()}
+
+
+def _feature_source() -> dict[str, Any]:
+    """feature-analysisが保存したsnapshotと同じ形の参照（FEAT-形式の機能ID）。"""
+    snapshot = {
+        "schema_version": "feature-inventory-v1",
+        "project_ref": "project:shop",
+        "artifact_ref": "qa/feature-inventory.json",
+        "artifact_revision": "feature-r1",
+        "features": [
+            {"id": "FEAT-001", "status": "implemented"},
+            {"id": "FEAT-002", "status": "retired"},
+        ],
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    return {
+        "feature_artifact_ref": snapshot["artifact_ref"],
+        "feature_artifact_revision": snapshot["artifact_revision"],
+        "feature_ref": {
+            "owner": "feature-analysis",
+            "scope": snapshot["project_ref"],
+            "artifact_ref": snapshot["artifact_ref"],
+            "revision": snapshot["artifact_revision"],
+            "content_hash": digest,
+        },
+        "feature_snapshot": snapshot,
+    }
+
+
+FEATURE_SOURCE = _feature_source()
 
 
 class UiHumanEditingAcceptanceTests(unittest.TestCase):
@@ -585,17 +620,16 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             {
                 "operation": "feature-index",
                 "package_root": str(canonical),
-                "feature_artifact_ref": "fixture://feature-analysis/features-v1",
-                "feature_artifact_revision": "fixture-revision-01",
+                **FEATURE_SOURCE,
                 "feature_scope_refs": [
-                    {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
+                    {"feature_id": "FEAT-001", "scope_id": "SCOPE-001"}
                 ],
                 "changed_ids": ["PAGE-001"],
             },
         )
         self.assertEqual(code, 0, response)
         entry = response["feature_scope_index"][0]
-        self.assertEqual(entry["feature_id"], "FEATURE-001")
+        self.assertEqual(entry["feature_id"], "FEAT-001")
         self.assertEqual(entry["package_version"], "v01")
         by_id = {row["id"]: row for row in entry["ui_rows"]}
         self.assertIn("PAGE-001", by_id)
@@ -620,6 +654,8 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
                 "package_root": str(canonical),
                 "feature_artifact_ref": "",
                 "feature_artifact_revision": "",
+                "feature_ref": None,
+                "feature_snapshot": None,
                 "feature_scope_refs": [],
             },
         )
@@ -630,13 +666,60 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
             {
                 "operation": "feature-index",
                 "package_root": str(canonical),
-                "feature_artifact_ref": "fixture://feature-analysis/features-v1",
-                "feature_artifact_revision": "fixture-revision-01",
-                "feature_scope_refs": [{"feature_id": "FEATURE-001", "scope_id": []}],
+                **FEATURE_SOURCE,
+                "feature_scope_refs": [{"feature_id": "FEAT-001", "scope_id": []}],
             },
         )
         self.assertNotEqual(invalid_code, 0)
         self.assertEqual(invalid["issues"][0]["code"], "reference_not_found")
+
+    def test_08b_feature_index_requires_feature_analysis_snapshot(self) -> None:
+        canonical, _base, _edit, _snapshot = self.make_fixture()
+
+        def request(**overrides: Any) -> dict:
+            value = {
+                "operation": "feature-index",
+                "package_root": str(canonical),
+                **json.loads(json.dumps(FEATURE_SOURCE)),
+                "feature_scope_refs": [
+                    {"feature_id": "FEAT-001", "scope_id": "SCOPE-001"}
+                ],
+            }
+            value.update(overrides)
+            return value
+
+        code, response = cli(HUMAN_EDIT_SCRIPT, request())
+        self.assertEqual(code, 0, response)
+        for feature_id in ("FEAT-999", "FEAT-002", "FEATURE-001"):
+            with self.subTest(feature_id=feature_id):
+                code, response = cli(
+                    HUMAN_EDIT_SCRIPT,
+                    request(
+                        feature_scope_refs=[
+                            {"feature_id": feature_id, "scope_id": "SCOPE-001"}
+                        ]
+                    ),
+                )
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["issues"][0]["code"], "reference_not_found")
+        tampered_hash = json.loads(json.dumps(FEATURE_SOURCE["feature_ref"]))
+        tampered_hash["content_hash"] = "0" * 64
+        changed_snapshot = json.loads(json.dumps(FEATURE_SOURCE["feature_snapshot"]))
+        changed_snapshot["features"].append({"id": "FEAT-003", "status": "planned"})
+        for overrides in (
+            {"feature_ref": tampered_hash},
+            {"feature_snapshot": changed_snapshot},
+            {"feature_artifact_revision": "feature-r0"},
+        ):
+            with self.subTest(overrides=list(overrides)):
+                code, response = cli(HUMAN_EDIT_SCRIPT, request(**overrides))
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["issues"][0]["code"], "source_ref_mismatch")
+        for missing in ("feature_ref", "feature_snapshot"):
+            with self.subTest(missing=missing):
+                code, response = cli(HUMAN_EDIT_SCRIPT, request(**{missing: None}))
+                self.assertNotEqual(code, 0)
+                self.assertEqual(response["issues"][0]["code"], "source_ref_required")
 
     def test_09_isolated_skill_copy_blocks_missing_shared_writer(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -649,6 +732,8 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
                     "package_root": str(Path(temp_dir) / "package"),
                     "feature_artifact_ref": "fixture://feature/001",
                     "feature_artifact_revision": "r1",
+                    "feature_ref": None,
+                    "feature_snapshot": None,
                     "feature_scope_refs": [],
                 },
             )
@@ -708,11 +793,8 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         request = {
             "operation": "feature-index",
             "package_root": str(canonical),
-            "feature_artifact_ref": "fixture://feature-analysis/features-v1",
-            "feature_artifact_revision": "fixture-revision-01",
-            "feature_scope_refs": [
-                {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
-            ],
+            **FEATURE_SOURCE,
+            "feature_scope_refs": [{"feature_id": "FEAT-001", "scope_id": "SCOPE-001"}],
             "changed_ids": ["PAGE-002", "UIOP-001"],
         }
         code, response = cli(
@@ -770,11 +852,8 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
         request = {
             "operation": "feature-index",
             "package_root": str(canonical),
-            "feature_artifact_ref": "fixture://feature-analysis/features-v1",
-            "feature_artifact_revision": "fixture-revision-01",
-            "feature_scope_refs": [
-                {"feature_id": "FEATURE-001", "scope_id": "SCOPE-001"}
-            ],
+            **FEATURE_SOURCE,
+            "feature_scope_refs": [{"feature_id": "FEAT-001", "scope_id": "SCOPE-001"}],
             "changed_ids": ["PAGE-002"],
         }
         # Same version number with different content, then a newer version.
@@ -1113,8 +1192,7 @@ class UiHumanEditingAcceptanceTests(unittest.TestCase):
                 request = {
                     "operation": "feature-index",
                     "package_root": str(canonical),
-                    "feature_artifact_ref": "fixture://feature-analysis/features-v1",
-                    "feature_artifact_revision": "fixture-revision-01",
+                    **FEATURE_SOURCE,
                     "feature_scope_refs": [],
                     "changed_ids": [],
                 }
