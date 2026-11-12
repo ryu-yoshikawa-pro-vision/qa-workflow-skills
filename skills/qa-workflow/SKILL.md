@@ -51,6 +51,12 @@ candidate qa-workflow artifactの`verify_runtime_evidence.valid=true`とruntime 
 
 最終成果物の直前にqa-workflow-local `scripts/runtime_contract.py`の`operation=verify_runtime_evidence`へ、実際に使用したcanonical normalized inputとcandidate成果物全文を渡し、`partial_rerun=false`かつ`previous_artifact_markdown=null`に固定します。qa-workflowは自Skill Entityをcarry-forwardしません。`workflow_runtime.py`の前に各scope担当Skill verifierを実行し、`valid=true`で返った`current_structure_state`を変更せず`workflow_scopes[]`へ転記します。stateやexpected Entityを組み立てません。最終gateの`valid=false`は既存の最大1回の局所修正・最終確認契約へ統合し、未解決なら完成扱いしません。`verify_runtime_evidence`は`workflow_runtime.py`のworkflow全体検証を置き換えず、両方を実行します。
 
+### 新設Skillのowner verifier
+
+runtime-v2 rootを持たないSkillのscopeは、`scripts/owner_verifiers.py`に登録されたownerの**本番CLI**が保存済み成果物を検証できた場合だけ、`workflow_runtime.py`が完了対象（`verified_owner_scopes`）にします。登録済みownerは`test-item-analysis`、`test-condition-analysis`（保存本文のhash、owner validator、source currentness）、`e2e-test-selection`（owner validator、保存本文のhash）、`test-reporting`（入力からの再計算との一致、完全性、currentness）です。
+
+証拠は`normalized_input.owner_verification`に、provider hashの対象になった**保存本文そのもの（JSON文字列）**で渡します。runtimeは構造化入力を並べ替えるため、構造化データではhashの元のbytesを保てません。本文のhash、ownerのvalidator、source currentnessのどれかが確認できない、ownerのscriptが無い・失敗する、scopeのtargetと成果物のrefが違う場合は未検証のままで、自己申告の`verified`や`can_complete`は証拠になりません。検証入口を持たないSkill（Markdownだけの`test-requirements-analysis`・`test-architecture-design`・`test-management`等）は登録せず、`unverified_scopes`として完了不可のままです。
+
 ## 継続管理workflowの決定論的処理
 
 persisted workflowのProject Context stable key parse / 必須key検証 / used-field currentness、workflow stateのcanonical path / 初回create、fixed-root scan、state CAS capability gate、mutable operation pre-start claim、shared resource reservationは、Resourcesに記載した`artifact_graph.py` production helperで実行します。これらの処理結果をAgentの意味判断や手計算で置き換えません。

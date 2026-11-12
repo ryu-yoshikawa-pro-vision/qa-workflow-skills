@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import artifact_graph
+import owner_verifiers
 from runtime_contract import (
     FULL_DIGEST_RE,
     InvalidInput,
@@ -671,15 +672,22 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     expected_units: list[dict[str, Any]] = []
     expected_entities: list[dict[str, str]] = []
     unverified_scopes: list[dict[str, Any]] = []
+    verified_owner_scopes: list[dict[str, Any]] = []
     for scope in scopes:
         scope_skill = scope["skill"]
         if scope_skill not in RUNTIME_V2_SKILL_ROOTS:
+            # runtime-v2 rootを持たないSkillは、ownerの本番CLIが保存済み成果物を
+            # 検証できた場合だけ完了対象にする。登録の有無・失敗は未検証のまま残す。
+            outcome = owner_verifiers.verify(scope_skill, scope)
+            if outcome["status"] == "verified":
+                verified_owner_scopes.append(outcome["record"])
+                continue
             unverified_scopes.append(
                 {
                     "skill": scope_skill,
                     "target": scope["target"],
                     "execution_range": scope["execution_range"],
-                    "reason": "owner_verifier_not_registered",
+                    "reason": outcome["reason"],
                 }
             )
             continue
@@ -782,7 +790,9 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     ]
     issues = [
         {
-            "issue_type": "unsupported_skill_verifier",
+            "issue_type": "unsupported_skill_verifier"
+            if scope["reason"] == owner_verifiers.NOT_REGISTERED
+            else "owner_verification_failed",
             "blocking": True,
             **scope,
         }
@@ -867,6 +877,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "payload": {
             "workflow_ref": workflow_ref,
             "unverified_scopes": unverified_scopes,
+            "verified_owner_scopes": verified_owner_scopes,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,

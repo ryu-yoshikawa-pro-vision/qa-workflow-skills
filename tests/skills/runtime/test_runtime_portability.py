@@ -126,7 +126,7 @@ class RuntimePortabilityTests(unittest.TestCase):
                     else:
                         continue
                     skill_allowed = allowed | (
-                        {"artifact_graph"}
+                        {"artifact_graph", "owner_verifiers"}
                         if skill == "qa-workflow" and path.name == "workflow_runtime.py"
                         else set()
                     )
