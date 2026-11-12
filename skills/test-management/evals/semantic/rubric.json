@@ -1,0 +1,29 @@
+{
+  "skill": "test-management",
+  "criteria": [
+    {
+      "id": "SEM-TMG-001",
+      "title": "計画と実績",
+      "description": "計画母集団・source取得範囲・実行状態・結果を分け、単位とrevisionを維持する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TMG-002",
+      "title": "未取得と0件",
+      "description": "未取得・部分取得・未実行・取消・unknownと確認済み0件を区別し、偽の完了を作らない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TMG-003",
+      "title": "承認と改版",
+      "description": "計画revisionに一致する承認だけを使い、旧revision承認を失効させる。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TMG-004",
+      "title": "risk・owner境界",
+      "description": "project riskとProduct Risk、qa-workflow state、Regression Run、raw result、統合reportを分離する。",
+      "critical": true
+    }
+  ]
+}

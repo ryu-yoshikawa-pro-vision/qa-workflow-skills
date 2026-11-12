@@ -1,0 +1,29 @@
+{
+  "skill": "test-architecture-design",
+  "criteria": [
+    {
+      "id": "SEM-TAD-001",
+      "title": "レベル優先",
+      "description": "明示指定＞承認済みarchitecture＞test-analysis既定system testを守り、競合を隠さない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TAD-002",
+      "title": "複数level・検証分担",
+      "description": "一つのtargetが複数levelを要する場合に個別分担として保持し、単一levelへ潰さない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TAD-003",
+      "title": "責務境界とreadiness",
+      "description": "Product Risk・E2E価値・正式設計を再実装せず、環境／dataの不足を準備済みと扱わない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-TAD-004",
+      "title": "局所影響",
+      "description": "architecture改版で影響する下流だけを再確認し、無関係なcurrent成果物を保持する。",
+      "critical": false
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+[
+  { "query": "承認済みQA要求をlevel、type、方式、環境、dataへ展開したい。", "should_trigger": true },
+  { "query": "system test既定の対象を、明示されたcomponent test指定に更新したい。", "should_trigger": true },
+  { "query": "APIとcomponentの担当境界、接続環境と観測方法を設計してください。", "should_trigger": true },
+  { "query": "性能閾値の根拠が未確認なので、未確定としてarchitectureを更新してください。", "should_trigger": true },
+  { "query": "この変更の影響度・発生可能性からProduct Riskを採点してください。", "should_trigger": false },
+  { "query": "今回の計画revision、実行分母、monitoring差異を管理してください。", "should_trigger": false },
+  { "query": "具体的なAPI test caseと入力、手順、期待結果を書いてください。", "should_trigger": false },
+  { "query": "既存E2EのlocatorとPlaywright fixtureが実装可能か調査してください。", "should_trigger": false }
+]
