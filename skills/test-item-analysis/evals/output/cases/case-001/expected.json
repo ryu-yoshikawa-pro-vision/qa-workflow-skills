@@ -1,0 +1,12 @@
+{
+  "known_features": ["FEAT-001", "FEAT-002"],
+  "required_item_ids": ["ITEM-001", "ITEM-002"],
+  "expected_parent": { "ITEM-002": ["ITEM-001"] },
+  "expected_status": { "ITEM-001": "implemented", "ITEM-002": "planned" },
+  "required_separate_metrics": [
+    "Item-condition applicability decision",
+    "Formal TCN / CI / expected-result design",
+    "Test execution"
+  ],
+  "candidate_rate": 1.0
+}
