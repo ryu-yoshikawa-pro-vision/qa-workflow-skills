@@ -1,0 +1,114 @@
+name: QA artifact handoff verification
+
+# Verification only. This workflow checks that QA artifacts saved on the
+# dedicated branch `qa/artifacts` can be handed over to the product CI: the
+# expected values are derived here from this repository's own Git objects, never
+# from the Agent's candidate manifest. It must not be merged into main.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/qa-artifact-handoff.yml
+      - ci/qa-artifact-handoff/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_HEAD: 2a8bcf57ff091e84a8b3bf7b123568e967000d88
+  QA_ARTIFACT_COMMIT: b93eda29d0f7b85353a26733088c0f0e1a2b71a0
+  QA_SKILLS_COMMIT: 20e9302800a1e6e911e2d707bbd2160fbd1ff6d4
+  APPROVERS: ryu-yoshikawa-pro-vision
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout product source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          path: product
+          fetch-depth: 0
+
+      - name: Checkout QA artifacts at the pinned commit
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ env.QA_ARTIFACT_COMMIT }}
+          path: qa-artifacts
+          fetch-depth: 0
+
+      - name: Checkout the handoff verifier at the pinned commit
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ryu-yoshikawa-pro-vision/qa-workflow-skills
+          ref: ${{ env.QA_SKILLS_COMMIT }}
+          path: qa-skills
+
+      - name: Build the trusted expected values from this repository
+        run: |
+          python3 product/ci/qa-artifact-handoff/build_expected.py \
+            --product product --artifacts qa-artifacts \
+            --repository "$GITHUB_REPOSITORY" --source-head "$SOURCE_HEAD" \
+            --out expected.json
+
+      - name: Verify the handoff
+        run: |
+          python3 qa-skills/skills/qa-workflow/scripts/ci_handoff.py \
+            --expected expected.json \
+            --manifest qa-artifacts/qa/handoff-manifest.json \
+            --artifacts-root qa-artifacts | tee handoff-result.json
+          python3 - <<'PY'
+          import json
+          result = json.load(open("handoff-result.json"))
+          assert result["status"] == "pass", result
+          assert result["verified_artifacts"], result
+          PY
+
+      - name: Verify the authenticated pusher of each artifact revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/activity?ref=refs/heads/qa/artifacts&per_page=100" > activity.json
+          python3 product/ci/qa-artifact-handoff/check_pushers.py \
+            --activity activity.json --expected expected.json --approvers "$APPROVERS"
+
+      - name: Negative control - tampered artifact is rejected
+        run: |
+          cp -r qa-artifacts tampered
+          printf 'tampered' >> tampered/qa/project-context.md
+          if python3 qa-skills/skills/qa-workflow/scripts/ci_handoff.py \
+              --expected expected.json \
+              --manifest qa-artifacts/qa/handoff-manifest.json \
+              --artifacts-root tampered > tampered-result.json; then
+            echo "tampered artifact was accepted"; exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          assert json.load(open("tampered-result.json"))["status"] == "fail"
+          PY
+
+      - name: Negative control - unclassified change is rejected
+        run: |
+          python3 - <<'PY'
+          import json
+          manifest = json.load(open("qa-artifacts/qa/handoff-manifest.json"))
+          manifest["changes"] = manifest["changes"][:-1]
+          json.dump(manifest, open("partial-manifest.json", "w"))
+          PY
+          if python3 qa-skills/skills/qa-workflow/scripts/ci_handoff.py \
+              --expected expected.json \
+              --manifest partial-manifest.json \
+              --artifacts-root qa-artifacts > partial-result.json; then
+            echo "partial classification was accepted"; exit 1
+          fi
+
+      - name: Negative control - an unapproved pusher is rejected
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python3 product/ci/qa-artifact-handoff/check_pushers.py \
+              --activity activity.json --expected expected.json \
+              --approvers "someone-else"; then
+            echo "unapproved pusher was accepted"; exit 1
+          fi

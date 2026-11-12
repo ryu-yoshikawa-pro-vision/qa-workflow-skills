@@ -1,0 +1,44 @@
+{
+  "artifacts": [
+    {
+      "artifact_ref": "qa/project-context.md",
+      "owner": "project-context",
+      "path": "qa/project-context.md",
+      "revision": "git:49248e0db8573bb085186e7635524f2f50a7156b",
+      "scope": "qa-training-store",
+      "sha256": "sha256:a95d60ec20d0954e3c8fb2d28dd2e38c68e6dd0e11d29e51fde9d061d3984509",
+      "source_refs": [
+        {
+          "ref": "repo-source",
+          "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+        }
+      ]
+    }
+  ],
+  "changes": [
+    {
+      "classification": "dependency",
+      "path": "package.json"
+    },
+    {
+      "classification": "dependency",
+      "path": "pnpm-lock.yaml"
+    }
+  ],
+  "schema_version": "qa-ci-handoff-v1",
+  "source": {
+    "base_sha": "d866f90961d73f738473b2c700780abe169ff79e",
+    "build_ref": "git:2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "head_sha": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "repository": "ryu-yoshikawa-pro-vision/qa-training-store"
+  },
+  "source_inventory": {
+    "complete": true,
+    "entries": [
+      {
+        "ref": "repo-source",
+        "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+      }
+    ]
+  }
+}

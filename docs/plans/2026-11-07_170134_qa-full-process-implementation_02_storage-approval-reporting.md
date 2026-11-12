@@ -54,7 +54,7 @@ Git providerへ保存する案件では、次の手順を既定の承認方式�
 2. 同意後、保存先repositoryへのwrite権限を持つ利用者のGitHub認証済みアカウントで、通常pushする（force pushはしない）。保存先が更新前revisionから動いていればpushが拒否されるため、これを遠隔側の条件付き更新として扱う。
 3. push後、GitHubのrepository activity API（`GET /repos/{owner}/{repo}/activity?ref=<ref>`）で、ref更新の実行者（`actor`）と前後SHA（`before`／`after`）を読み戻す。期待した更新前revision、保存したcommit、承認者として合意したアカウントがすべて一致した場合だけ、承認済み・保存済みとする。
 4. **承認主体は、GitHubが認証したpush実行アカウント**とする。commitのauthor／committerは利用者側で任意に設定できるため、承認の証拠にしない。対話の同意記録だけ、またはLLMが生成した`approved`表記だけでは承認にしない。
-5. activityの読み戻しに失敗した場合、実行者が一致しない場合、前後SHAが一致しない場合は、その保存を承認済みにせず、blockedとして再開条件を記録する。
+5. GitHubはactivityを**push直後ではなく遅れて**記録する（実測：push直後の取得は空で、後続のpush時には取得できた）。取得できない間は承認済みにせず、一定時間（数分）は再試行する。その間に取得できない、実行者が一致しない、前後SHAが一致しない場合は、その保存を承認済みにせず、blockedとして再開条件を記録する。
 
 ### 欠陥管理との境界
 
