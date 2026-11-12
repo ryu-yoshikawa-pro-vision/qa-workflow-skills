@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import subprocess
 import sys
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -186,11 +189,30 @@ def _candidates(
     return candidates, issues
 
 
+def _superseded_ids(row: dict[str, Any]) -> list[str]:
+    """Return explicit, mutually exclusive supersession references."""
+    one = row.get("supersedes_id")
+    many = row.get("supersedes_ids")
+    if one is not None and many is not None:
+        raise ContractError("change_supersession_schema_ambiguous")
+    if many is not None:
+        ids = _refs(many, "supersedes_ids", required=True)
+        if len(ids) < 2:
+            raise ContractError("change_supersession_group_too_small")
+        return ids
+    return [_text(one, "supersedes_id")] if one is not None else []
+
+
 def _changes(
-    snapshot: dict[str, Any], sources: dict, features: dict
+    snapshot: dict[str, Any],
+    sources: dict,
+    features: dict,
+    previous: dict | None,
 ) -> tuple[dict, list[str]]:
     changes = _rows(snapshot.get("changes"), "changes", "DIF")
+    old = _rows(previous.get("changes"), "previous_changes", "DIF") if previous else {}
     issues: list[str] = []
+    superseded = {parent for row in changes.values() for parent in _superseded_ids(row)}
     for did, row in changes.items():
         if row.get("source_id") not in sources:
             raise ContractError(f"{did}_unknown_source")
@@ -208,9 +230,130 @@ def _changes(
                 raise ContractError(f"{did}_impact_feature_missing")
             if cls in {"out_of_scope", "no_impact"}:
                 _text(row.get("approval_ref"), f"{did}_approval_ref")
-        else:
+        elif did not in superseded:
             issues.append(f"change_unclassified:{did}")
+    seen: dict[tuple[str, str, str, str], str] = {}
+    for did, row in changes.items():
+        if did in superseded:
+            continue
+        identity = (
+            row["source_id"],
+            row["before_revision"],
+            row["after_revision"],
+            row["locator"],
+        )
+        if identity in seen:
+            previous_id = seen[identity]
+            if (
+                did in old
+                and previous_id in old
+                and old[did] == row
+                and old[previous_id] == changes[previous_id]
+            ):
+                issues.append(f"legacy_duplicate_active_change:{previous_id}:{did}")
+                continue
+            raise ContractError(f"duplicate_active_change:{previous_id}:{did}")
+        seen[identity] = did
     return changes, issues
+
+
+def _primary_code_source_id(snapshot: dict[str, Any]) -> str | None:
+    """Identify the event's owning source, not just a shared Git SHA."""
+    if snapshot["event"] not in {"pr_update", "rebase", "merge", "release"}:
+        return None
+    matching = [
+        row
+        for row in snapshot["sources"]
+        if row["kind"] == "code" and row.get("revision") == snapshot["source_revision"]
+    ]
+    chosen = snapshot["event_basis"].get("primary_source_id")
+    if chosen is not None:
+        if not any(row.get("id") == chosen for row in matching):
+            raise ContractError("event_primary_source_invalid")
+        return chosen
+    if len(matching) != 1:
+        raise ContractError("event_primary_source_ambiguous")
+    return matching[0]["id"]
+
+
+def _current_changes(
+    snapshot: dict[str, Any],
+    previous: dict | None,
+    changes: dict[str, dict[str, Any]],
+    sources: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Scope current QA impact to this event, preserving append-only history."""
+    superseded = {parent for row in changes.values() for parent in _superseded_ids(row)}
+    previous_ids = (
+        set(_rows(previous.get("changes"), "previous_changes", "DIF"))
+        if previous is not None
+        else set()
+    )
+    current: dict[str, dict[str, Any]] = {}
+    for did, row in changes.items():
+        if did in superseded:
+            continue
+        # A correction of a saved DIF is not a new Git change. Only a
+        # same-revision analysis update can include it in current QA impact.
+        if _superseded_ids(row) and (
+            snapshot["event"] != "analysis_update"
+            or row["after_revision"] != sources[row["source_id"]]["revision"]
+        ):
+            continue
+        if previous is None or snapshot["event"] == "initial":
+            current[did] = row
+        elif did not in previous_ids:
+            current[did] = row
+        elif snapshot["event"] == "analysis_update" and row[
+            "after_revision"
+        ] == sources[row["source_id"]].get("revision"):
+            current[did] = row
+    return current
+
+
+def _change_revisions(
+    snapshot: dict[str, Any],
+    previous: dict | None,
+    sources: dict,
+    changes: dict,
+) -> list[str]:
+    """Check only newly observed differences against the current source revision.
+
+    Historical differences are append-only and retain their original revisions.
+    """
+    prior = (
+        _rows(previous.get("changes"), "previous_changes", "DIF")
+        if previous is not None
+        else {}
+    )
+    issues: list[str] = []
+    basis = snapshot.get("event_basis") or {}
+    primary = _primary_code_source_id(snapshot)
+    for did, row in changes.items():
+        if did in prior or _superseded_ids(row):
+            continue
+        source = sources[row["source_id"]]
+        if source["status"] != "complete":
+            issues.append(f"change_source_incomplete:{did}")
+            continue
+        if row["after_revision"] != source["revision"]:
+            raise ContractError(f"change_source_revision_mismatch:{did}")
+        if snapshot["event"] in {"pr_update", "rebase"} and source["kind"] == "code":
+            if row["source_id"] == primary:
+                permitted = {basis["base_sha"], basis["previous_head_sha"]}
+                if row["before_revision"] not in permitted:
+                    raise ContractError(f"change_before_revision_mismatch:{did}")
+            elif not COMMIT.fullmatch(row["before_revision"]):
+                # For a second repository the actual base/previous HEAD are
+                # validated against its own Git diff at persistence time.
+                raise ContractError(f"change_before_revision_not_sha:{did}")
+        elif (
+            snapshot["event"] == "external_revision"
+            and source["ref"] == basis["document_ref"]
+        ):
+            if row["before_revision"] != basis["before_revision"]:
+                raise ContractError(f"document_change_before_revision_mismatch:{did}")
+    return issues
 
 
 def _history(
@@ -242,6 +385,8 @@ def _history(
         if event["kind"] == "merged" and (len(from_ids) < 2 or not to_ids):
             raise ContractError("merge_requires_multiple_ancestors")
     if previous is None:
+        if any(_superseded_ids(row) for row in snapshot["changes"]):
+            raise ContractError("change_supersession_without_predecessor")
         if snapshot.get("previous_artifact_revision") is not None:
             raise ContractError("unexpected_previous_artifact_revision")
         new_features = set(features)
@@ -288,12 +433,44 @@ def _history(
             raise ContractError(f"candidate_identity_reused:{cid}")
     old_changes = _rows(previous.get("changes"), "previous_changes", "DIF")
     new_changes = _rows(snapshot.get("changes"), "changes", "DIF")
+    if set(old_changes) - set(new_changes):
+        raise ContractError("historical_changes_removed")
     for did in old_changes.keys() & new_changes.keys():
-        if any(
-            old_changes[did].get(field) != new_changes[did].get(field)
-            for field in ("source_id", "before_revision", "after_revision", "locator")
-        ):
-            raise ContractError(f"change_identity_reused:{did}")
+        if old_changes[did] != new_changes[did]:
+            raise ContractError(f"change_history_rewritten:{did}")
+    replaced = {
+        parent for row in old_changes.values() for parent in _superseded_ids(row)
+    }
+    for did in new_changes.keys() - old_changes.keys():
+        row = new_changes[did]
+        parents = _superseded_ids(row)
+        if not parents:
+            continue
+        if any(parent not in old_changes or parent in replaced for parent in parents):
+            raise ContractError(f"change_supersession_invalid:{did}")
+        fields = ("source_id", "before_revision", "after_revision", "locator")
+        for parent in parents:
+            prior = old_changes[parent]
+            if any(row.get(key) != prior.get(key) for key in fields):
+                raise ContractError(f"change_supersession_target_mismatch:{did}")
+            if row.get("evidence_ref") == prior.get("evidence_ref"):
+                raise ContractError(f"change_supersession_evidence_not_new:{did}")
+        if len(parents) > 1:
+            identity = tuple(row[key] for key in fields)
+            old_matching = {
+                oid
+                for oid, old_row in old_changes.items()
+                if oid not in replaced
+                and tuple(old_row.get(key) for key in fields) == identity
+            }
+            if set(parents) != old_matching:
+                raise ContractError(f"change_supersession_group_incomplete:{did}")
+        if row.get("classification") not in {"impact", "no_impact", "out_of_scope"}:
+            raise ContractError(f"change_supersession_classification_invalid:{did}")
+        _text(row.get("approval_ref"), f"{did}_approval_ref")
+        _text(row.get("approval_revision"), f"{did}_approval_revision")
+        _text(row.get("reason"), f"{did}_change_reason")
+        replaced.update(parents)
     old_features = _rows(previous.get("features"), "previous_features", "FEAT")
     old_history = _list(previous.get("history"), "previous_history")
     if events[: len(old_history)] != old_history:
@@ -376,7 +553,10 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             "evidence_ref",
         },
     }
-    if set(basis) != keys[event]:
+    allowed = keys[event].copy()
+    if event in {"pr_update", "rebase", "merge", "release"}:
+        allowed.add("primary_source_id")
+    if not keys[event] <= set(basis) or not set(basis) <= allowed:
         raise ContractError("event_basis_schema_invalid")
     for name, value in basis.items():
         _text(value, f"event_basis_{name}")
@@ -390,6 +570,13 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             or previous.get("source_revision") != snapshot["source_revision"]
         ):
             raise ContractError("analysis_update_source_revision_changed")
+        old_sources = _rows(previous["sources"], "previous_sources", "SRC")
+        new_sources = _rows(snapshot["sources"], "sources", "SRC")
+        if set(old_sources) != set(new_sources) or any(
+            old_sources[sid].get("revision") != new_sources[sid].get("revision")
+            for sid in old_sources
+        ):
+            raise ContractError("analysis_update_source_revisions_changed")
         return
     if event in {"pr_update", "rebase", "merge", "release"}:
         if previous is None:
@@ -403,10 +590,18 @@ def _event_basis(snapshot: dict[str, Any], previous: dict | None) -> None:
             if previous.get("source_revision") != basis["previous_head_sha"]:
                 raise ContractError("event_previous_head_mismatch")
         code_sources = [row for row in snapshot["sources"] if row.get("kind") == "code"]
-        if not code_sources or not all(
+        if not code_sources or not any(
             row.get("revision") == head for row in code_sources
         ):
             raise ContractError("event_code_source_revision_mismatch")
+        primary_id = _primary_code_source_id(snapshot)
+        if event in {"pr_update", "rebase", "merge"}:
+            old_sources = _rows(previous["sources"], "previous_sources", "SRC")
+            if (
+                primary_id not in old_sources
+                or old_sources[primary_id].get("revision") != basis["previous_head_sha"]
+            ):
+                raise ContractError("event_primary_previous_source_mismatch")
         if event == "rebase" and basis["base_sha"] == basis["previous_base_sha"]:
             raise ContractError("rebase_base_unchanged")
     else:
@@ -471,19 +666,21 @@ def analyze(request: Any) -> dict[str, Any]:
     issues.extend(more)
     candidates, more = _candidates(snapshot, sources, features)
     issues.extend(more)
-    changes, more = _changes(snapshot, sources, features)
+    changes, more = _changes(snapshot, sources, features, previous)
     issues.extend(more)
+    issues.extend(_change_revisions(snapshot, previous, sources, changes))
     _history(snapshot, previous, features, idempotent=idempotent)
     unknown = _refs(snapshot.get("unknown_areas"), "unknown_areas")
     if unknown:
         issues.append("unknown_areas_present")
+    current_changes = _current_changes(snapshot, previous, changes, sources)
     classified = sorted(
         did
-        for did, row in changes.items()
+        for did, row in current_changes.items()
         if row["classification"] in {"impact", "no_impact", "out_of_scope"}
     )
     mapped = sorted(cid for cid, row in candidates.items() if row["status"] == "mapped")
-    if not changes:
+    if not current_changes:
         issues.append("change_denominator_zero")
     if not candidates:
         issues.append("candidate_denominator_zero")
@@ -504,8 +701,10 @@ def analyze(request: Any) -> dict[str, Any]:
         "metrics": {
             "change_classification": {
                 "numerator_ids": classified,
-                "denominator_ids": sorted(changes),
-                "rate": len(classified) / len(changes) if changes else None,
+                "denominator_ids": sorted(current_changes),
+                "rate": (
+                    len(classified) / len(current_changes) if current_changes else None
+                ),
             },
             "observed_candidate_mapping": {
                 "numerator_ids": mapped,
@@ -552,21 +751,415 @@ def analyze(request: Any) -> dict[str, Any]:
             "impacted_feature_ids": sorted(
                 {
                     fid
-                    for row in changes.values()
+                    for row in current_changes.values()
                     if row["classification"] == "impact"
                     for fid in row["feature_ids"]
                 }
             ),
             "approval_required_change_ids": sorted(
                 did
-                for did, row in changes.items()
+                for did, row in current_changes.items()
                 if row["classification"] in {"no_impact", "out_of_scope"}
             ),
             "unknown_areas": unknown,
-            "unclassified_change_ids": sorted(set(changes) - set(classified)),
+            "unclassified_change_ids": sorted(set(current_changes) - set(classified)),
             "expected_source_ids": snapshot["expected_source_ids"],
         },
     }
+
+
+def _verify_git_evidence(
+    request: dict[str, Any],
+    report: dict[str, Any],
+    inputs: list[dict[str, Any]] | None,
+) -> None:
+    """Reread the authorized Git tree before accepting a code-backed write.
+
+    Paths in these requests must be chosen by the trusted caller, not the
+    feature inventory or an untrusted PR description.
+    """
+    snapshot = request["snapshot"]
+    code_sources = {
+        row["id"]: row for row in snapshot["sources"] if row.get("kind") == "code"
+    }
+    if not code_sources:
+        if inputs is not None:
+            raise ContractError("git_evidence_without_code_source")
+        return
+    if not isinstance(inputs, list) or len(inputs) != len(code_sources):
+        raise ContractError("git_coverage_required")
+    event = snapshot["event"]
+    primary_id = _primary_code_source_id(snapshot)
+    if event != "external_revision" and not any(
+        row["revision"] == snapshot["source_revision"] for row in code_sources.values()
+    ):
+        raise ContractError("event_primary_code_source_missing")
+    if event in {"pr_update", "rebase"}:
+        event_basis = snapshot["event_basis"]
+        if not any(
+            entry.get("source_id") == primary_id
+            and entry.get("head_sha") == snapshot["source_revision"]
+            and entry.get("base_sha") == event_basis["base_sha"]
+            and entry.get("previous_head_base_sha") == event_basis["previous_head_sha"]
+            for entry in inputs
+            if isinstance(entry, dict)
+        ):
+            raise ContractError("event_primary_git_evidence_missing")
+    from git_source_inventory import handle as read_git  # noqa: PLC0415
+    from reconcile_git_coverage import handle as reconcile  # noqa: PLC0415
+
+    previous_sources = {
+        row["id"]: row
+        for row in (request.get("previous_snapshot") or {}).get("sources", [])
+    }
+    previous_snapshot = request.get("previous_snapshot") or {}
+    verified: set[str] = set()
+    inventories: dict[str, dict[str, Any]] = {}
+    entries: dict[str, dict[str, Any]] = {}
+    for entry in inputs:
+        keys = {
+            "source_id",
+            "repository_root",
+            "authorized_root",
+            "base_sha",
+            "head_sha",
+        }
+        optional = {"previous_head_base_sha", "gitlink_sources"}
+        if (
+            not isinstance(entry, dict)
+            or not keys <= set(entry)
+            or not set(entry) <= keys | optional
+        ):
+            raise ContractError("git_evidence_schema_invalid")
+        sid = entry["source_id"]
+        if sid not in code_sources or sid in verified:
+            raise ContractError("git_source_evidence_duplicate_or_unknown")
+        verified.add(sid)
+        if sid not in snapshot["expected_source_ids"]:
+            raise ContractError("git_source_not_in_expected_inventory")
+        if (
+            code_sources[sid]["status"] != "complete"
+            or entry["head_sha"] != code_sources[sid]["revision"]
+        ):
+            raise ContractError("git_evidence_source_revision_mismatch")
+        tree_request = {key: entry[key] for key in keys if key != "source_id"}
+        tree = read_git(tree_request)
+        if tree["status"] == "blocked":
+            raise ContractError(
+                "git_source_listing_incomplete:" + tree.get("reason", "unknown")
+            )
+        if tree["status"] not in {"complete", "incomplete"}:
+            raise ContractError("git_source_listing_incomplete")
+        inventories[sid] = tree
+        entries[sid] = entry
+
+    def resolved_git_tree(tree: dict[str, Any], sid: str) -> dict[str, Any]:
+        if tree["status"] == "complete":
+            return tree
+        markers = tree.get("unretrieved")
+        associations = entries[sid].get("gitlink_sources", {})
+        if (
+            not isinstance(markers, list)
+            or not markers
+            or not isinstance(associations, dict)
+        ):
+            raise ContractError("gitlink_source_evidence_required")
+        for marker in markers:
+            if (
+                not isinstance(marker, str)
+                or not marker.startswith("gitlink:")
+                or "@" not in marker
+            ):
+                raise ContractError("git_source_listing_incomplete")
+            child_id = associations.get(marker)
+            if child_id == sid or child_id not in code_sources:
+                raise ContractError("gitlink_source_evidence_missing:" + marker)
+            child_revision = marker.rsplit("@", 1)[1]
+            current = inventories.get(child_id)
+            saved = previous_sources.get(child_id)
+            verified_current = (
+                current is not None
+                and current["status"] == "complete"
+                and entries[child_id]["head_sha"] == child_revision
+            )
+            verified_saved = (
+                saved is not None
+                and saved.get("kind") == "code"
+                and saved.get("revision") == child_revision
+                and saved.get("status") == "complete"
+                and saved.get("enumeration_complete") is True
+                and saved.get("unretrieved") == []
+            )
+            if not verified_current and not verified_saved:
+                raise ContractError("gitlink_source_revision_unverified:" + marker)
+        return {
+            **tree,
+            "status": "complete",
+            "complete_file_listing": True,
+            "unretrieved": [],
+            "resolved_gitlinks": sorted(markers),
+        }
+
+    # Resolve children first when another source points at a nested submodule.
+    unresolved = set(inventories)
+    for _ in inventories:
+        progress = False
+        for sid in sorted(unresolved):
+            try:
+                inventory = resolved_git_tree(inventories[sid], sid)
+            except ContractError as exc:
+                if str(exc).startswith("gitlink_source_revision_unverified:"):
+                    continue
+                raise
+            inventories[sid] = inventory
+            unresolved.remove(sid)
+            progress = True
+        if not unresolved or not progress:
+            break
+    if unresolved:
+        raise ContractError("gitlink_source_evidence_incomplete")
+
+    for entry in inputs:
+        sid = entry["source_id"]
+        tree = inventories[sid]
+        keys = {
+            "source_id",
+            "repository_root",
+            "authorized_root",
+            "base_sha",
+            "head_sha",
+        }
+        tree_request = {key: entry[key] for key in keys if key != "source_id"}
+        if entry["base_sha"] is None:
+            if any(row["source_id"] == sid for row in snapshot["changes"]):
+                raise ContractError("git_change_diff_not_enumerated")
+            if snapshot["event"] in {"pr_update", "rebase", "merge", "release"}:
+                if (
+                    sid == primary_id
+                    or sid in previous_sources
+                    or event in {"merge", "release"}
+                ):
+                    raise ContractError("event_git_base_required")
+            continue
+        coverage_request: dict[str, Any] = {
+            "git_inventory": tree,
+            "registry_request": request,
+            "source_id": sid,
+        }
+        previous_head: str | None = None
+        if event in {"pr_update", "rebase"}:
+            if sid == primary_id:
+                previous_head = snapshot["event_basis"]["previous_head_sha"]
+            elif sid in previous_sources:
+                previous_head = previous_sources[sid]["revision"]
+            if entry.get("previous_head_base_sha") != previous_head:
+                raise ContractError("previous_head_git_base_required")
+            if sid != primary_id:
+                coverage_request["source_event_basis"] = {
+                    "base_sha": entry["base_sha"],
+                    "head_sha": entry["head_sha"],
+                    "previous_head_sha": previous_head,
+                }
+        elif event == "analysis_update":
+            # A same-HEAD correction must re-verify every Git diff baseline
+            # represented in the last saved current-revision DIFs.
+            prior_changes = previous_snapshot.get("changes", [])
+            replaced = {
+                parent for row in prior_changes for parent in _superseded_ids(row)
+            }
+            baselines = {
+                row["before_revision"]
+                for row in prior_changes
+                if row["source_id"] == sid
+                and row["after_revision"] == entry["head_sha"]
+                and row["id"] not in replaced
+            }
+            if previous_snapshot.get("event") in {"pr_update", "rebase"}:
+                if sid == _primary_code_source_id(previous_snapshot):
+                    old_basis = previous_snapshot["event_basis"]
+                    baselines.update(
+                        (old_basis["base_sha"], old_basis["previous_head_sha"])
+                    )
+            supplied = {
+                value
+                for value in (entry["base_sha"], entry.get("previous_head_base_sha"))
+                if value is not None
+            }
+            if supplied != baselines or len(baselines) > 2:
+                raise ContractError("analysis_git_baselines_mismatch")
+            previous_head = entry.get("previous_head_base_sha")
+            if previous_head is not None:
+                coverage_request["source_event_basis"] = {
+                    "base_sha": entry["base_sha"],
+                    "head_sha": entry["head_sha"],
+                    "previous_head_sha": previous_head,
+                }
+        elif "previous_head_base_sha" in entry:
+            raise ContractError("previous_head_git_base_unexpected")
+        if previous_head is not None:
+            previous_request = dict(tree_request)
+            previous_request["base_sha"] = previous_head
+            previous_diff = read_git(previous_request)
+            if previous_diff["status"] == "blocked":
+                raise ContractError(
+                    "previous_head_git_listing_incomplete:"
+                    + previous_diff.get("reason", "unknown")
+                )
+            if previous_diff["status"] == "incomplete":
+                previous_diff = resolved_git_tree(previous_diff, sid)
+            coverage_request["previous_head_git_inventory"] = previous_diff
+        coverage = reconcile(coverage_request)
+        extra = set(coverage.get("reasons", [])) - set(report.get("reasons", []))
+        if coverage["coverage"] is None or extra:
+            raise ContractError("git_coverage_not_verified:" + ",".join(sorted(extra)))
+
+
+def _authorize_reclassifications(
+    store: LocalArtifactStore | GitArtifactStore,
+    request: dict[str, Any],
+    expected_revision: str | None,
+) -> None:
+    """Check each new classification override with the trusted approval owner."""
+    prior = request.get("previous_snapshot")
+    if prior is None:
+        if any(_superseded_ids(row) for row in request["snapshot"]["changes"]):
+            raise ContractError("change_supersession_without_predecessor")
+        return
+    old = _rows(prior.get("changes"), "previous_changes", "DIF")
+    snapshot = request["snapshot"]
+    for row in snapshot["changes"]:
+        if row["id"] in old or not _superseded_ids(row):
+            continue
+        for parent in _superseded_ids(row):
+            replaced = old[parent]
+            decision = {
+                "operation": "reclassify",
+                "kind": "feature-inventory",
+                "project_ref": snapshot["project_ref"],
+                "artifact_ref": snapshot["artifact_ref"],
+                "expected_revision": expected_revision,
+                "operation_id": snapshot["operation_id"],
+                "change_id": row["id"],
+                "supersedes_id": parent,
+                "old_classification": replaced["classification"],
+                "classification": row["classification"],
+                "source_id": row["source_id"],
+                "source_ref": next(
+                    source["ref"]
+                    for source in snapshot["sources"]
+                    if source["id"] == row["source_id"]
+                ),
+                "source_scope": next(
+                    source["scope"]
+                    for source in snapshot["sources"]
+                    if source["id"] == row["source_id"]
+                ),
+                "source_revision": row["after_revision"],
+                "before_revision": row["before_revision"],
+                "locator": row["locator"],
+                "old_feature_ids": list(replaced["feature_ids"]),
+                "feature_ids": list(row["feature_ids"]),
+                "old_evidence_ref": replaced["evidence_ref"],
+                "evidence_ref": row["evidence_ref"],
+                "approval_ref": row["approval_ref"],
+                "approval_revision": row["approval_revision"],
+                "reason": row["reason"],
+            }
+            try:
+                verified = store.authorize(decision)
+            except Exception as exc:
+                raise ContractError("change_approval_provider_unavailable") from exc
+            if verified is not True:
+                raise ContractError(
+                    f"change_reclassification_approval_unverified:{row['id']}"
+                )
+
+
+def _git_ref_output(root: Path, *args: str, optional: bool = False) -> str | None:
+    try:
+        command = subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ContractError("git_source_ref_unavailable") from exc
+    if command.returncode != 0:
+        if optional and command.returncode == 1:
+            return None
+        raise ContractError("git_source_ref_unavailable")
+    try:
+        return command.stdout.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ContractError("git_source_ref_invalid") from exc
+
+
+@contextmanager
+def _hold_git_source_refs(
+    inputs: list[dict[str, Any]] | None,
+):
+    """Hold Git's HEAD and checked-out branch ref locks across verification/write.
+
+    Normal Git checkout, commit and update-ref honor these lockfiles. A source
+    whose ref locks cannot be acquired fails closed, rather than racing CAS on
+    an unrelated artifact store.
+    """
+    roots: dict[str, str] = {}
+    for entry in inputs or []:
+        if not isinstance(entry, dict):
+            raise ContractError("git_evidence_schema_invalid")
+        try:
+            root = Path(entry["repository_root"]).resolve(strict=True)
+            allowed = Path(entry["authorized_root"]).resolve(strict=True)
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            raise ContractError("git_source_root_invalid") from exc
+        if root != allowed or not root.is_dir():
+            raise ContractError("git_source_root_invalid")
+        expected = entry.get("head_sha")
+        if not isinstance(expected, str) or not COMMIT.fullmatch(expected):
+            raise ContractError("git_evidence_source_revision_mismatch")
+        if str(root) in roots and roots[str(root)] != expected:
+            raise ContractError("git_source_root_revision_conflict")
+        roots[str(root)] = expected
+    with ExitStack() as stack:
+        for location, expected in sorted(roots.items()):
+            root = Path(location)
+            paths = [_git_ref_output(root, "rev-parse", "--git-path", "HEAD")]
+            branch = _git_ref_output(root, "symbolic-ref", "-q", "HEAD", optional=True)
+            if branch is not None:
+                paths.append(_git_ref_output(root, "rev-parse", "--git-path", branch))
+            for raw in sorted(set(paths)):
+                if not raw:
+                    raise ContractError("git_source_ref_unavailable")
+                target = Path(raw)
+                if not target.is_absolute():
+                    target = root / target
+                target = target.resolve(strict=False)
+                if not any(
+                    target.is_relative_to(Path(allowed_root)) for allowed_root in roots
+                ):
+                    raise ContractError("git_source_ref_outside_authorized_root")
+                lock = Path(str(target) + ".lock")
+                try:
+                    lock.parent.mkdir(parents=True, exist_ok=True)
+                    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                    if hasattr(os, "O_NOFOLLOW"):
+                        flags |= os.O_NOFOLLOW
+                    fd = os.open(lock, flags, 0o600)
+                    os.close(fd)
+                except OSError as exc:
+                    raise ContractError("git_source_ref_lock_unavailable") from exc
+                stack.callback(lock.unlink, missing_ok=True)
+            if _git_ref_output(root, "rev-parse", "--verify", "HEAD") != expected:
+                raise ContractError("git_head_changed")
+        yield
+        for location, expected in roots.items():
+            if (
+                _git_ref_output(Path(location), "rev-parse", "--verify", "HEAD")
+                != expected
+            ):
+                raise ContractError("git_head_changed_during_persistence")
 
 
 def persist_snapshot(
@@ -577,8 +1170,9 @@ def persist_snapshot(
     approval_ref: str,
     approval_revision: str,
     change_reason: str,
+    git_inventory_requests: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Persist a validated inventory using the actual saved predecessor."""
+    """Persist a validated inventory using actual saved and Git source revisions."""
     try:
         report = handle(request)
         if report["status"] not in {"complete", "incomplete"}:
@@ -596,22 +1190,25 @@ def persist_snapshot(
                 raise ContractError("previous_snapshot_not_current")
         elif request["previous_snapshot"] is not None:
             raise ContractError("previous_snapshot_without_expected_revision")
-        content = json.dumps(
-            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        )
-        written = store.write(
-            kind="feature-inventory",
-            project_ref=project_ref,
-            artifact_ref=artifact_ref,
-            content=content,
-            expected_revision=expected_revision,
-            operation_id=snapshot["operation_id"],
-            source_ref=project_ref,
-            source_revision=snapshot["source_revision"],
-            approval_ref=approval_ref,
-            approval_revision=approval_revision,
-            change_reason=change_reason,
-        )
+        with _hold_git_source_refs(git_inventory_requests):
+            _verify_git_evidence(request, report, git_inventory_requests)
+            _authorize_reclassifications(store, request, expected_revision)
+            content = json.dumps(
+                snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            written = store.write(
+                kind="feature-inventory",
+                project_ref=project_ref,
+                artifact_ref=artifact_ref,
+                content=content,
+                expected_revision=expected_revision,
+                operation_id=snapshot["operation_id"],
+                source_ref=project_ref,
+                source_revision=snapshot["source_revision"],
+                approval_ref=approval_ref,
+                approval_revision=approval_revision,
+                change_reason=change_reason,
+            )
         written["analysis_status"] = report["status"]
         written["snapshot_sha256"] = report["handoff"]["snapshot_sha256"]
         return written

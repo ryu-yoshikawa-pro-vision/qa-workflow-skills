@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,102 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertEqual(rename["after_path"], "api renamed.py")
         self.assertTrue(result["complete_change_listing"])
 
+    def test_submodule_is_unretrieved_not_complete(self) -> None:
+        git(
+            self.root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            self.first,
+            "vendor/submodule",
+        )
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "register gitlink",
+        )
+        head = git(self.root, "rev-parse", "HEAD")
+        report = handle(self.request(self.first, head))
+        self.assertEqual(report["status"], "incomplete", report)
+        self.assertFalse(report["complete_file_listing"])
+        self.assertTrue(report["complete_change_listing"])
+        self.assertEqual(
+            report["unretrieved"], [f"gitlink:vendor/submodule@{self.first}"]
+        )
+        self.assertEqual(
+            next(x for x in report["files"] if x["path"] == "vendor/submodule")["kind"],
+            "commit",
+        )
+        self.assertIn(
+            "vendor/submodule", [row["after_path"] for row in report["changes"]]
+        )
+
+    def test_deleted_and_replaced_gitlink_revision_is_unretrieved(self) -> None:
+        git(
+            self.root,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            self.first,
+            "vendor/submodule",
+        )
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "add submodule",
+        )
+        base = git(self.root, "rev-parse", "HEAD")
+        git(self.root, "rm", "-q", "--cached", "vendor/submodule")
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "remove submodule",
+        )
+        removed = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
+        self.assertEqual(removed["status"], "incomplete", removed)
+        self.assertEqual(
+            removed["unretrieved"], [f"gitlink:vendor/submodule@{self.first}"]
+        )
+        self.assertTrue(removed["complete_change_listing"])
+        # A normal file in place of the gitlink also needs the old revision.
+        git(self.root, "reset", "--hard", "-q", base)
+        shutil.rmtree(self.root / "vendor" / "submodule", ignore_errors=True)
+        (self.root / "vendor").mkdir(exist_ok=True)
+        (self.root / "vendor" / "submodule").write_text(
+            "ordinary file\n", encoding="utf-8"
+        )
+        git(self.root, "add", "vendor/submodule")
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "replace submodule",
+        )
+        replaced = handle(self.request(base, git(self.root, "rev-parse", "HEAD")))
+        self.assertEqual(replaced["status"], "incomplete", replaced)
+        self.assertIn(f"gitlink:vendor/submodule@{self.first}", replaced["unretrieved"])
+
     def test_path_with_newline_is_preserved_as_one_path(self) -> None:
         name = "line\nbreak.txt"
         (self.root / name).write_text("x", encoding="utf-8")
@@ -115,6 +212,23 @@ class GitSourceInventoryTests(unittest.TestCase):
         self.assertEqual(handle(request)["status"], "blocked")
         request["head_sha"] = "f" * 40
         self.assertEqual(handle(request)["status"], "blocked")
+
+    def test_stale_existing_commit_is_not_current_git_evidence(self) -> None:
+        (self.root / "new.py").write_text("print(1)\n", encoding="utf-8")
+        git(self.root, "add", "new.py")
+        git(
+            self.root,
+            "-c",
+            "user.email=qa@example.invalid",
+            "-c",
+            "user.name=QA",
+            "commit",
+            "-qm",
+            "advance checkout",
+        )
+        result = handle(self.request(None, self.first))
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertEqual(result["reason"], "git_head_changed")
 
     def test_cli_requires_trusted_root_from_host(self) -> None:
         request = self.request(None, self.first)

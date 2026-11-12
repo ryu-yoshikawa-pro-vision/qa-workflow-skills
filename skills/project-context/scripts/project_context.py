@@ -511,7 +511,7 @@ def _active_placement_decisions(markdown: str, scope: str) -> list[str]:
     return active
 
 
-def _placement_reference(markdown: str, scope: str) -> str | None:
+def _placement_reference(markdown: str, scope: str) -> list[str] | None:
     lines = markdown.splitlines()
     start = next(
         (i for i, line in enumerate(lines) if line.startswith("## 14. ")), None
@@ -527,9 +527,77 @@ def _placement_reference(markdown: str, scope: str) -> str | None:
     matching = [cells for cells in relevant if len(cells) == 5 and cells[2] == scope]
     if len(matching) > 1:
         raise Invalid("multiple_placement_references")
-    if not matching:
+    return matching[0] if matching else None
+
+
+def _policy_note(text: str) -> tuple[str | None, dict[str, str]]:
+    """Parse exactly the saved DEC/Section 14 fields, not a caller's policy."""
+    segments = text.split("; ")
+    identifier = segments[0] if segments and segments[0].startswith("DEC-") else None
+    fields: dict[str, str] = {}
+    for item in segments[1:] if identifier is not None else segments:
+        key, sep, value = item.partition("=")
+        if not sep or not key or not value or key in fields:
+            raise Invalid("saved_placement_note_invalid")
+        fields[key] = value
+    return identifier, fields
+
+
+def _saved_placement_policy(markdown: str, scope: str) -> dict[str, str] | None:
+    """Cross-check the active DEC and Section 14 before policy reuse."""
+    active = _active_placement_decisions(markdown, scope)
+    reference = _placement_reference(markdown, scope)
+    if bool(active) != bool(reference):
+        raise Invalid("placement_decision_reference_inconsistent")
+    if not active:
         return None
-    return matching[0][1] + "|" + matching[0][4]
+    did = active[0]
+    decision = next(
+        (
+            dict(zip(DEC_HEADERS, row))
+            for row in _table_rows(_identity_compat(markdown), DEC_HEADING, DEC_HEADERS)
+            if row[0] == did
+        ),
+        None,
+    )
+    if decision is None:
+        raise Invalid("saved_placement_decision_missing")
+    _, dec_fields = _policy_note(decision["備考"])
+    note_id, ref_fields = _policy_note(reference[4])
+    if note_id != did:
+        raise Invalid("saved_placement_decision_id_mismatch")
+    mandatory_dec = {"owner", "target", "policy", "editable", "index"}
+    mandatory_ref = {"owner", "edit", "index"}
+    if not mandatory_dec <= set(dec_fields) or not mandatory_ref <= set(ref_fields):
+        raise Invalid("saved_placement_policy_missing_fields")
+    if set(dec_fields) - (mandatory_dec | {"approval_revision"}):
+        raise Invalid("saved_placement_policy_unknown_fields")
+    if set(ref_fields) - (mandatory_ref | {"approval_revision"}):
+        raise Invalid("saved_placement_reference_unknown_fields")
+    expected = (
+        (dec_fields["target"], reference[1]),
+        (dec_fields["policy"], reference[3]),
+        (dec_fields["owner"], ref_fields["owner"]),
+        (dec_fields["editable"], ref_fields["edit"]),
+        (dec_fields["index"], ref_fields["index"]),
+        (
+            dec_fields.get("approval_revision"),
+            ref_fields.get("approval_revision"),
+        ),
+    )
+    if any(left != right for left, right in expected):
+        raise Invalid("saved_placement_policy_inconsistent")
+    return {
+        "decision_id": did,
+        "owner": dec_fields["owner"],
+        "scope": decision["影響範囲"],
+        "target_ref": dec_fields["target"],
+        "revision": dec_fields["policy"],
+        "approval_ref": decision["決定根拠"],
+        "approval_revision": dec_fields.get("approval_revision"),
+        "editable_scope": dec_fields["editable"],
+        "feature_index_ref": dec_fields["index"],
+    }
 
 
 def _verify_existing_id_rows(
@@ -583,41 +651,39 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
     safe: dict[str, str] = {}
     for key in required:
         value = _single_line(policy[key], key)
-        if "|" in value or "<!--" in value or "-->" in value:
+        if value != value.strip():
+            raise Invalid(f"placement_field_whitespace:{key}")
+        if any(mark in value for mark in ("|", ";", "<!--", "-->")):
             raise Invalid(f"unsafe_placement_field:{key}")
         safe[key] = value
     if safe["scope"] != _project_name(markdown):
         raise Invalid("placement_project_scope_mismatch")
-    active = _active_placement_decisions(markdown, safe["scope"])
-    original_reference = _placement_reference(markdown, safe["scope"])
+    recorded = _saved_placement_policy(markdown, safe["scope"])
     existing = request.get("existing_policy")
-    active_id = active[0] if active else None
-    if bool(active_id) != bool(original_reference):
-        raise Invalid("placement_decision_reference_inconsistent")
-    if active_id is not None:
-        if not isinstance(existing, dict) or existing.get("decision_id") != active_id:
+    active_id = recorded["decision_id"] if recorded is not None else None
+    if recorded is not None:
+        if not isinstance(existing, dict) or set(existing) != set(recorded):
             raise Invalid("existing_placement_policy_unconfirmed")
-        if not original_reference.endswith(";" + active_id):
-            # The Section 14 text contains the DEC ID before owner metadata.
-            if f"{active_id};" not in original_reference:
-                raise Invalid("existing_placement_reference_mismatch")
+        if existing != recorded and (
+            recorded["approval_revision"] is not None
+            or any(
+                existing[key] != value
+                for key, value in recorded.items()
+                if key != "approval_revision"
+            )
+        ):
+            raise Invalid("existing_placement_policy_not_saved")
+        if all(recorded.get(key) == safe[key] for key in required):
+            return {
+                "status": "reuse_candidate",
+                "decision_id": active_id,
+                "policy_revision": recorded["revision"],
+                "approval_ref": recorded["approval_ref"],
+                "approval_revision": recorded["approval_revision"],
+                "reason": "trusted_approval_and_current_scope_must_be_verified",
+            }
     elif existing is not None:
         raise Invalid("placement_reuse_not_backed_by_context")
-    if existing is not None:
-        reused = placement(
-            {
-                "owner": safe["owner"],
-                "scope": safe["scope"],
-                "target_ref": safe["target_ref"],
-                "existing_policy": existing,
-            }
-        )
-        if reused["status"] == "reuse_candidate" and all(
-            existing.get(key) == safe[key] for key in required
-        ):
-            if not original_reference.startswith(safe["target_ref"] + "|"):
-                raise Invalid("placement_reference_mismatch")
-            return reused
     mode = "update"
     revision = _text(request.get("expected_revision"), "expected_revision")
     decision = {
@@ -635,7 +701,8 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
             "備考": (
                 f"owner={safe['owner']}; target={safe['target_ref']}; "
                 f"policy={safe['revision']}; editable={safe['editable_scope']}; "
-                f"index={safe['feature_index_ref']}"
+                f"index={safe['feature_index_ref']}; "
+                f"approval_revision={safe['approval_revision']}"
             ),
         },
     }
@@ -717,7 +784,8 @@ def prepare_placement(request: dict[str, Any]) -> dict[str, Any]:
         f"| QA成果物配置 | {safe['target_ref']} | {safe['scope']} | "
         f"{safe['revision']} | {decision_id}; "
         f"owner={safe['owner']}; edit={safe['editable_scope']}; "
-        f"index={safe['feature_index_ref']} |"
+        f"index={safe['feature_index_ref']}; "
+        f"approval_revision={safe['approval_revision']} |"
     )
     matching = [
         i

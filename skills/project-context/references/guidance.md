@@ -17,3 +17,5 @@ Section 12/13がDEC/ASMの正本である案件では、`prepare-ids`で既存�
 Section 1〜11・15の既存の説明や環境資料を根拠付きで改版するときは`prepare-sections`を使います。Section 12/13は`prepare-ids`、14は`prepare-placement`、16は`prepare-update`を使い、互いの正本領域を無断で上書きしません。初回案件では`prepare-create`の`section_updates`に確認済み資料のみ指定できます。
 
 Section 12に既存の有効配置DECがあれば、`prepare-placement`は`existing_policy.decision_id`とSection 14の参照を照合します。変更は旧DECを置換済みにしたうえで新DECを追加し、置換先IDを記録します。旧DECを正本に残したまま新方針を同時に有効化しません。Git管理の既存Markdownは同一Git branch／pathを正本として`GitArtifactStore`で条件付き保存でき、SQLite正本への無断移行はしません。
+
+既存配置方針の再利用は、呼出し元が提示した`existing_policy`に依存せず、Section 12／14に保存済みのDEC ID、決定根拠、承認revision、保存先、編集可能範囲、機能別参照を相互照合して決定します。欠落・不一致はblockedとし、承認revisionのみの差し替えで既存合意を再利用しません。

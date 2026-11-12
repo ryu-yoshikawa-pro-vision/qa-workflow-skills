@@ -114,7 +114,7 @@ class GitChangeCoverageTests(unittest.TestCase):
 
     def test_stale_and_unconfirmed_git_are_not_complete(self) -> None:
         self.feature["snapshot"]["sources"][0]["revision"] = "other-revision"
-        self.assertEqual(reconcile(self.request())["status"], "stale")
+        self.assertEqual(reconcile(self.request())["status"], "blocked")
         self.feature["snapshot"]["sources"][0]["revision"] = self.inventory["head_sha"]
         self.inventory["complete_change_listing"] = False
         self.assertEqual(reconcile(self.request())["status"], "incomplete")
@@ -140,6 +140,11 @@ class GitChangeCoverageTests(unittest.TestCase):
         prior = copy.deepcopy(snapshot)
         prior["source_revision"] = self.base
         prior["sources"][0]["revision"] = self.base
+        prior["changes"][0].update(
+            before_revision="historical-base",
+            after_revision=self.base,
+        )
+        snapshot["changes"][0] = copy.deepcopy(prior["changes"][0])
         self.feature["previous_snapshot"] = prior
         snapshot["event"] = "pr_update"
         snapshot["event_basis"] = {
@@ -150,8 +155,14 @@ class GitChangeCoverageTests(unittest.TestCase):
         snapshot["artifact_revision"] = "art-v2"
         snapshot["previous_artifact_revision"] = "art-v1"
         snapshot["operation_id"] = "op-v2"
-        snapshot["changes"][0]["id"] = "DIF-002"
-        second = copy.deepcopy(snapshot["changes"][0])
+        current = copy.deepcopy(snapshot["changes"][0])
+        current.update(
+            id="DIF-002",
+            before_revision=self.base,
+            after_revision=self.inventory["head_sha"],
+        )
+        snapshot["changes"].append(current)
+        second = copy.deepcopy(current)
         second.update(
             id="DIF-003",
             locator="beta.py",
@@ -162,6 +173,17 @@ class GitChangeCoverageTests(unittest.TestCase):
         )
         snapshot["changes"].append(second)
         req = self.request()
+        forged = {
+            **req,
+            "source_event_basis": {
+                "base_sha": self.base,
+                "head_sha": self.inventory["head_sha"],
+                "previous_head_sha": self.base,
+            },
+        }
+        blocked = reconcile(forged)
+        self.assertEqual(blocked["status"], "blocked", blocked)
+        self.assertIn("primary_source_event_basis_override", blocked["reasons"])
         result = reconcile(req)
         self.assertEqual(result["status"], "incomplete", result)
         self.assertIn("previous_head_diff_not_enumerated", result["reasons"])
@@ -199,6 +221,11 @@ class GitChangeCoverageTests(unittest.TestCase):
         old = copy.deepcopy(data["snapshot"])
         old["source_revision"] = middle_sha
         old["sources"][0]["revision"] = middle_sha
+        old["changes"][0].update(
+            before_revision="historical-base",
+            after_revision=middle_sha,
+        )
+        data["snapshot"]["changes"][0] = copy.deepcopy(old["changes"][0])
         data["previous_snapshot"] = old
         snapshot = data["snapshot"]
         snapshot["event"] = "pr_update"
@@ -226,10 +253,7 @@ class GitChangeCoverageTests(unittest.TestCase):
                 after_revision=previous_head,
                 classification="impact",
             )
-            if i == 0:
-                snapshot["changes"] = [row]
-            else:
-                snapshot["changes"].append(row)
+            snapshot["changes"].append(row)
         result = reconcile(
             {
                 **self.request(),
@@ -251,6 +275,147 @@ class GitChangeCoverageTests(unittest.TestCase):
         self.assertIn(
             "git_change_revision_pairs_not_registered", missing_one["reasons"]
         )
+
+    def _assert_event_diff_uses_saved_revision(self, event: str) -> None:
+        previous = copy.deepcopy(self.feature["snapshot"])
+        previous["source_revision"] = self.base
+        previous["sources"][0]["revision"] = self.base
+        previous["changes"][0]["after_revision"] = self.base
+        self.feature["previous_snapshot"] = previous
+        old_head = self.inventory["head_sha"]
+        (self.root / "gamma.py").write_text("print('latest')\n", encoding="utf-8")
+        git(self.root, "add", "gamma.py")
+        self.commit("later change after previous snapshot")
+        head = git(self.root, "rev-parse", "HEAD")
+        snapshot = self.feature["snapshot"]
+        snapshot["event"] = event
+        snapshot["event_basis"] = (
+            {
+                "merge_commit_sha": head,
+                "target_ref": "refs/heads/main",
+                "previous_head_sha": self.base,
+            }
+            if event == "merge"
+            else {
+                "commit_sha": head,
+                "build_ref": "release/2",
+                "target_ref": "refs/tags/v2",
+            }
+        )
+        snapshot["source_revision"] = head
+        snapshot["sources"][0]["revision"] = head
+        snapshot["changes"][0] = copy.deepcopy(previous["changes"][0])
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["operation_id"] = "op-v2"
+        self.feature["observed_head_revision"] = head
+        latest = copy.deepcopy(snapshot["changes"][0])
+        latest.update(
+            id="DIF-002",
+            before_revision=old_head,
+            after_revision=head,
+            locator="gamma.py",
+        )
+        snapshot["changes"].append(latest)
+        self.inventory = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": old_head,
+                "head_sha": head,
+            }
+        )
+        self.assertEqual(self.inventory["status"], "complete", self.inventory)
+        report = reconcile(self.request())
+        self.assertEqual(report["status"], "stale", report)
+        self.assertIn("event_previous_git_revision_mismatch", report["reasons"])
+        self.inventory = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": self.base,
+                "head_sha": head,
+            }
+        )
+        for i, path in enumerate(("alpha.py", "beta.py", "gamma.py"), start=3):
+            row = copy.deepcopy(latest)
+            row.update(id=f"DIF-{i:03d}", before_revision=self.base, locator=path)
+            snapshot["changes"].append(row)
+        snapshot["changes"].remove(latest)
+        complete = reconcile(self.request())
+        self.assertEqual(complete["status"], "complete", complete)
+        self.assertEqual(complete["coverage"]["rate"], 1.0)
+
+    def test_merge_diff_requires_previous_saved_source_revision(self) -> None:
+        self._assert_event_diff_uses_saved_revision("merge")
+
+    def test_release_diff_requires_previous_saved_source_revision(self) -> None:
+        self._assert_event_diff_uses_saved_revision("release")
+
+    def test_consecutive_pr_updates_keep_historical_dif_revision(self) -> None:
+        first_head = self.inventory["head_sha"]
+        historical = copy.deepcopy(self.feature["snapshot"])
+        (self.root / "gamma.py").write_text("print('gamma')\n", encoding="utf-8")
+        git(self.root, "add", "gamma.py")
+        self.commit("second PR update")
+        new_head = git(self.root, "rev-parse", "HEAD")
+        self.inventory = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": self.base,
+                "head_sha": new_head,
+            }
+        )
+        previous_diff = git_inventory(
+            {
+                "repository_root": str(self.root),
+                "authorized_root": str(self.root),
+                "base_sha": first_head,
+                "head_sha": new_head,
+            }
+        )
+        snapshot = self.feature["snapshot"]
+        self.feature["previous_snapshot"] = historical
+        snapshot["event"] = "pr_update"
+        snapshot["event_basis"] = {
+            "base_sha": self.base,
+            "head_sha": new_head,
+            "previous_head_sha": first_head,
+        }
+        snapshot["source_revision"] = new_head
+        snapshot["sources"][0]["revision"] = new_head
+        self.feature["observed_head_revision"] = new_head
+        snapshot["operation_id"] = "op-v2"
+        snapshot["artifact_revision"] = "art-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        pairs = [
+            (self.base, "alpha.py"),
+            (self.base, "beta.py"),
+            (self.base, "gamma.py"),
+            (first_head, "gamma.py"),
+        ]
+        for i, (before, path) in enumerate(pairs, start=2):
+            row = copy.deepcopy(snapshot["changes"][0])
+            row.update(
+                id=f"DIF-{i:03d}",
+                locator=path,
+                before_revision=before,
+                after_revision=new_head,
+            )
+            snapshot["changes"].append(row)
+        result = reconcile(
+            {**self.request(), "previous_head_git_inventory": previous_diff}
+        )
+        self.assertEqual(result["status"], "complete", result)
+        self.assertEqual(result["coverage"]["rate"], 1.0)
+        self.assertEqual(snapshot["changes"][0]["after_revision"], first_head)
+        snapshot["changes"].pop()
+        report = reconcile(
+            {**self.request(), "previous_head_git_inventory": previous_diff}
+        )
+        self.assertEqual(report["status"], "incomplete", report)
+        self.assertEqual(report["coverage"]["rate"], 0.75)
 
     def test_malformed_git_manifest_rejected(self) -> None:
         self.inventory["changes"][0]["after_path"] = "missing-from-tree.py"

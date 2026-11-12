@@ -61,8 +61,8 @@
 
 ## 着手基準
 
-- [ ] Project Contextの既存parser、`artifact_graph.py`、`project_context_ids.py`、template、呼び出し元と回帰テストを確認した。
-- [ ] AとSection 12／14、source revision、機能ID、provider・承認refの契約と共有ファイルの編集ownerを確認した。
+- [x] Project Contextの既存parser、`artifact_graph.py`、`project_context_ids.py`、template、呼び出し元と回帰テストを確認した。
+- [x] AとSection 12／14、source revision、機能ID、provider・承認refの契約と共有ファイルの編集ownerを確認した。
 - [ ] 対象案件の探索範囲・認証・保存先を列挙し、未確認は明示的にblockedとした。
 
 ## 作業内容
@@ -85,18 +85,18 @@
 
 ## 完了基準
 
-- [ ] `project-context`が初回作成・有効既存文書再利用・差分更新・競合拒否・読戻し・履歴を扱う。既存16節・DEC/ASM・過去成果物が維持される。
-- [ ] 配置方針が必要時のみ合意され、未承認の正本移動・二重正本化がない。機能別の正本参照ができる。
-- [ ] `feature-analysis`が非UIを含む機能全体・安定ID・階層・差分・source inventoryを保持し、PR／merge／release／外部資料変更の現在性を判定できる。
-- [ ] 機能の分割／統合／削除・partial discovery・source取得不能・0分母・旧HEAD・競合・二重受付の負例を検証した。
+- [x] `project-context`が初回作成・有効既存文書再利用・差分更新・競合拒否・読戻し・履歴を扱う。既存16節・DEC/ASM・過去成果物が維持される。
+- [x] 配置方針が必要時のみ合意され、未承認の正本移動・二重正本化がない。機能別の正本参照ができる。
+- [x] `feature-analysis`が非UIを含む機能全体・安定ID・階層・差分・source inventoryを保持し、PR／merge／release／外部資料変更の現在性を判定できる。
+- [x] 機能の分割／統合／削除・partial discovery・source取得不能・0分母・旧HEAD・競合・二重受付の負例を検証した。
 - [ ] C・D・Eへ実際の機能参照とrevisionを渡し、AへCI照合用のinventory・hash・未分類を渡せる。
-- [ ] 新SkillのSKILL／契約／template・局所unit・意味・発火テスト、既存Project Context回帰を実行して証拠を記録した。
+- [x] 新SkillのSKILL／契約／template・局所unit・意味・発火テスト、既存Project Context回帰を実行して証拠を記録した。
 
-- [ ] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
+- [x] 変更したSkillの正式な`SKILL.md`・入力／出力・履歴／状態・運用文書と、必要なisolated packaging・決定論的テスト・意味評価・trigger評価を揃えた。
 - [ ] 対象Planの正常系と負例を独立基準・証拠で判定し、旧artifact／legacy・既存呼び出し元・下流consumer・CIへの回帰を確認した。
-- [ ] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
-- [ ] source ref・artifact ref・revision・承認・保存readback・失敗／再開の**コード上の接続契約と自動テスト**をAへ引き渡した。実providerの読戻し・実承認は本PRでは実施しない。
-- [ ] 担当branch内の実装・自動テストを完了し、実環境検証とPR #22の横断検証・15＋10条件の最終判定を**本PRの完了条件から除外して**引継ぎ項目として記録した。
+- [x] 関連unit／integration、repository既定のformat/lint/Skill validation、関連Actionsを個別に確認し、実行したコマンド・結果・未検証理由を担当Markdownまたは検証レポートへ記録し、PR本文は最新状態と参照先のみを示した。
+- [x] source ref・artifact ref・revision・承認・保存readback・失敗／再開の**コード上の接続契約と自動テスト**をAへ引き渡した。実providerの読戻し・実承認は本PRでは実施しない。
+- [x] 担当branch内の実装・自動テストを完了し、実環境検証とPR #22の横断検証・15＋10条件の最終判定を**本PRの完了条件から除外して**引継ぎ項目として記録した。
 
 ## PR #22へ取り込む前の確認
 
@@ -232,3 +232,70 @@
 6. **保存先の読取権限**：SQLiteの`read_current`／`read_revision`にも信頼済みhostの`authorize`callbackを必須とし、案件・成果物refと操作種別を渡す。writeのoperation ID再送時もアクセス権を再評価する。Git保存先も読取／書込で同じ認可境界を適用する。
 
 検証はB専用の独立テスト・一時Git repository・GitHub Actionsで実施する。新規fixtureには正本pathの維持、競合、旧revision保全、認可取消、複数revision基準、DEC置換・二重有効防止と未承認refの負例を含めた。**実案件の認証元、遠隔provider、実Agent／製品CIへの接続は今回の依頼から除外**し、隔離テスト成功を実環境受入済みとは扱わない。PR #22側の共通runtime／他owner統合とmergeも対象外。
+
+## 担当Bチェックリストの判定（PR #34再確認）
+
+上記のチェック項目は、担当Bのコード・契約・隔離テスト・GitHub Actionsで確認済みのものだけをチェック済みにした。次は未チェックのまま維持する。
+
+- **着手基準：実案件の探索範囲・認証・保存先の列挙**：案件固有の情報源・認証・保存先の選定は指示された実環境検証対象外。未選定の場合は未接続・保存拒否として扱う。
+- **C・D・Eへの実成果物接続、Aへの製品CI受渡し**：担当Bは構造・ID・revision・handoffを提供済み。別ownerの実成果物との照合・CI接続は親PR #22で確認する。
+- **旧artifact／legacy・既存consumer・全体CIの横断回帰**：担当B単独の既存回帰と局所fixtureは実施済み。担当外の統合後経路についてはPR #22の受入が必要。
+
+## PR #24 merge後の追加レビュー4件（2026-11-09、修正PR #34）
+
+PR #24は2026-11-09 14:01 JSTにPR #22へmergeされ、元branchも削除された。以後の追加修正はPR #22のbranchへ直接commitせず、担当Bだけの[PR #34](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/34)で行う。
+
+1. `prepare-placement`は保存済みSection 12の有効DECとSection 14の参照から、決定ID、owner、scope、保存先、方針revision、決定根拠、承認revision、編集可能範囲、機能別参照を復元・相互照合する。入力`existing_policy`を承認済みとみなさず、両入力の承認revisionだけを変えても再利用不可。旧記録に承認revisionがなければ推測しない。
+2. Gitの`GitArtifactStore.write`では`authorize`へ承認revision・source ref/revision・operation ID・理由・hashを渡し、信頼済み承認元が不一致を拒否できるようにした。承認refだけの検証では通さない。
+3. `git_source_inventory.py`はgitlink／submoduleの内部を未取得の場合に`incomplete`、`complete_file_listing=false`、`unretrieved=[gitlink:path@revision]`とする。親treeの列挙成功をsubmodule内部の取得成功として扱わず、別sourceとして検証する必要がある。
+4. `feature_registry.py`は今回新規のDIFの`after_revision`をsourceの現在revisionへ照合し、PR更新／rebaseの`before_revision`を正当な旧SHAへ制限する。過去に登録したDIFは旧revisionのまま保持する。`persist_snapshot`ではcode sourceごとに信頼済み呼出し元が指定したGit root・base/head refを`git_inventory_requests`で受け、保存前に実際のGit tree／diffを再列挙し、`reconcile_git_coverage`を再実行する。未登録差分・submodule未取得・HEAD不一致・必要な差分未列挙ならblocked。code sourceを含まない台帳は既存の保存経路を保持する。
+
+自動テストには保存済み方針と呼出し元の承認revision不一致、Git承認revision不一致、gitlinkの未取得、偽ったDIF revision、未登録Git差分、保存前のGit再列挙と旧DIF履歴維持を追加した。実案件の遠隔保存provider・承認認証元・実Agent・製品CIの実環境検証は利用者指示どおり実施しない。全工程・他owner横断の統合はPR #22で別に判定する。
+
+## PR #34 再レビュー指摘3件の修正（2026-11-09）
+
+担当Bの再レビューで確認した3件を追加修正した。
+
+1. **過去DIFと今回差分の分離**：保存済みDIF IDとその全フィールドをappend-onlyに維持する。PR更新・rebaseのGit差分照合では現在イベントで追加したDIFのみを計上し、過去行の`after_revision`を現HEADへ書き換えない。base→今回HEADと前回HEAD→今回HEADの両方の必要な差分は新IDで登録する。同一HEADの分析修正は既存の有効DIFを再利用する。
+2. **複数repositoryのrevision**：主イベントの`source_revision`と、個別`sources[].revision`を分離する。各code sourceに独立したGit root・base/head SHA・前回HEADがあり、独立してGit tree/diffを取得・照合する。主repoと異なるHEADであることを理由に拒否しない。
+3. **DIF分類変更の履歴・承認**：既存DIFの分類・理由・承認refなどの上書き・削除を拒否する。見直しでは新DIFに`supersedes_id`、別の根拠、承認ref・revisionを付け、保存前に信頼済み承認元で検証する。旧DIFは履歴として維持し、置換済みの旧分類を現在の未分類・分類率に重複計上しない。
+
+検証は単体・一時Git repository・GitHub Actionsで実施する。連続2回のPR更新、2つのGit repositoryでの異なるHEADとその更新、古いDIFの改変拒否、承認されない再分類、未分類から承認済み分類への変化を回帰テストに追加した。実環境provider・Agent・製品CIは利用者の従来指示どおり未実施。PR #22の横断統合とmergeは本PRの対象外。
+
+## PR #34追加レビューの対応（2026-11-09）
+
+前回レビューの4件をコードと回帰テストへ反映した。
+
+- **現在の影響と履歴の分離**：保存済みDIFを残しながら、今回イベントの変更分類率・影響機能ID・承認対象IDを新規有効DIFから算出する。初回・同一revisionの`analysis_update`は別の集計条件とした。連続PRで旧影響機能が混入しない回帰テストを追加した。
+- **再分類の承認範囲**：`persist_snapshot`が保存前認可へ旧・新feature IDs、source ID/ref/scope、旧・新revision、locator、旧・新根拠を渡す。承認revisionが同じでも機能IDを改変した場合は拒否し、旧正本を維持する。
+- **同一Git差分の矛盾分類**：source／旧SHA／新SHA／locatorが同じ複数の有効DIFを拒否する。正規の再分類は`supersedes_id`で旧DIFを履歴として保存する。
+- **主source IDの明示**：複数repositoryが同じHEADを共有するときは`event_basis.primary_source_id`を要求する。実Gitで同一コミット・異なるbaseを指定した2 repositoryの保存／拒否をテストした。既存の主sourceが一意な場合の入力は互換維持。
+
+担当範囲のGitHub Actions 5系統と決定論的テストを最新HEADで再確認する。実provider／実Agent／製品CIの受入は従来の利用者指示に従い対象外とし、PR #22の横断統合はここでは完了判定しない。
+
+## PR #34 再点検：checkoutのHEAD現在性
+
+`git_source_inventory.analyze`で`cat-file`による指定コミットの存在確認に加え、許可されたcheckoutの`git rev-parse HEAD`と`head_sha`が一致することを検証する。過去コミット自体が存在してもcheckoutが進んでいれば`git_head_changed`として保存を拒否する。`test_git_source_inventory.py`に古い実在SHAの列挙拒否、`test_pr24_git_artifact_store.py`に旧SHAを使った保存拒否と正本不変を追加した。現行SHAを信頼済み呼出し元で取り直すまで保存を再試行しない。GitHub Actionsの実行結果はPR #34の最新HEADに紐付くworkflowを正とする。
+
+## PR #34最終レビュー追加2件への対応（2026-11-09）
+
+担当Bの再点検で判明した次の2件を修正した。
+
+1. **merge／releaseのGit差分基準**：`reconcile_git_coverage`が各code sourceの保存済み`previous_snapshot.sources[].revision`と、今回Git列挙の`base_sha`を照合する。途中のcommit→今回HEADだけの差分では全変更を拾えないため`stale`にする。`persist_snapshot`もmerge／releaseに`base_sha`を必須とし、再列挙・照合で不一致なら書込みを拒否する。初回分析やPR更新の既存仕様は維持する。
+2. **過去DIF訂正と今回影響の分離**：`supersedes_id`で過去revisionのDIFを訂正しても、PR更新・rebase・merge・releaseなどのイベントの変更分類率・影響機能・承認対象へ計上しない。同一revisionの`analysis_update`では現行revisionの訂正のみ計上する。`reconcile_git_coverage`の差分照合でも同条件で過去訂正を除外する。訂正履歴・保存前承認の条件は維持する。
+
+回帰テストは`test_feature_registry.py`の旧DIF再分類2通り、`test_git_change_coverage.py`の実Git merge／releaseの途中commit base拒否、`test_pr24_git_artifact_store.py`の実Gitでの未列挙ファイルを含む途中commit base保存拒否・保存済み正本維持・正しい旧SHAからの正常保存を含む。検証はPR #34最新HEADのGitHub Actionsを正とする。
+
+実案件の外部provider・実承認サービス・実Agent・実製品CIおよびPR #22のA〜J統合受入は、従来の対象範囲どおり本PRの完了判定に含めない。外部レビューの依頼とPRのmergeは本対応では実施しない。
+
+## PR #34 履歴互換・多source・submoduleの再点検（2026-11-09）
+
+担当Bの保存・差分管理・Project Contextについて、レビューで確認した問題を修正した。
+
+- 旧重複DIFは変更せず履歴として保持し、未統合ならincompleteとする。新規重複はblockedとし、supersedes_idsに旧ID群を明示した訂正では旧行それぞれの承認を確認する。同分類の根拠・機能ID訂正を許可する。
+- analysis_updateはすべてのsourceのrevisionを比較し、直前PRの二つのGit差分基準を照合する。主sourceの旧SHAをsource IDで確認し、新規副次sourceは初回基準で処理する。
+- 削除・置換前のgitlinkも未取得として記録し、検証済みの子sourceのSHAと対応付けてから親sourceを保存する。Git取得失敗の理由も保存結果へ伝える。
+- Git検証と成果物保存の間はHEADとbranch refのGitロックを保持する。通常のGit ref更新との競合では保存しない。
+- 配置方針の参照URL内の=を許容し、前後空白を拒否する。承認revisionのない旧DECは再利用せず、新たな承認による置換を許可する。承認revisionだけを変更する場合も新DECを作成する。
+
+回帰テストは担当Bのテストへ追加し、最新コミットでGitHub Actionsを確認する。実案件provider・実Agent・製品CIやPR #22の他担当統合は従来どおり対象外とし、レビュー依頼とmergeは行わない。

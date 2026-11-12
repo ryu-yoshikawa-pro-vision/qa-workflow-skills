@@ -45,3 +45,7 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 読み取りにも信頼済みhostから注入された`authorize`による案件scopeの権限確認を行います。operation再送時も権限を再評価します。両保存providerは認証済み呼出し元を仮定し、権限を自己申告するJSON CLIからは呼び出しません。
 
 Git providerは許可済みrepository rootの外にGit metadataを保存するworktree／外部Git dirを拒否します。対象branchの履歴・objectが許可外rootへ暗黙に作成されないようにするためです。
+
+### 保存済み配置方針の再利用条件
+
+`prepare-placement`はSection 12の有効DECの備考・決定根拠とSection 14の同一scopeの行から方針を再構成し、owner、scope、target_ref、policy revision、approval_ref、approval_revision、editable_scope、feature_index_ref、DEC IDを照合します。入力`existing_policy`の値だけでは再利用と判定しません。承認revisionは新規記録時にDEC備考とSection 14備考の双方に保存します。旧文書に承認revisionがない場合、承認revisionを推測せず、同一方針の再利用は行いません。既存DECを置換するときは、記録済み内容を維持したまま旧DECを置換済みにします。
