@@ -1,0 +1,34 @@
+[
+  {
+    "query": "このFigmaと実画面を比べて、画面・領域・親子関係・操作・ナビゲーションだけをUI構造に記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "人が別copyで直したUIの承認者と証拠の所在だけを監査して。画面構造の分析や更新は不要です。",
+    "should_trigger": false
+  },
+  {
+    "query": "サインイン時にMFAを必須にするか、承認済みのAuthorityから確定してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "FEATURE-18の保存済みartifactと明示されたSCOPE-004から、編集可能な正本位置を特定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "プロダクトの使いやすさをユーザーテストで評価し、改善案をまとめて。",
+    "should_trigger": false
+  },
+  {
+    "query": "旧ui-target-v1を読み込む場合、条件付きfileと履歴を壊さずに扱えるか調べて。",
+    "should_trigger": true
+  },
+  {
+    "query": "テストケースを境界値・同値分割で設計して、期待結果を埋めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "このHTMLの見出し、入力欄、操作ボタンとリンク先を列挙し、未確認の挙動は推測しないで。",
+    "should_trigger": true
+  }
+]
