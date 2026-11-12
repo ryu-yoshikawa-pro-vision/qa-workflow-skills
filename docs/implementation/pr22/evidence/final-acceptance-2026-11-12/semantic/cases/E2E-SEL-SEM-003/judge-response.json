@@ -1,0 +1,28 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-E2E-SEL-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "TC直接指定ではないTCを伴わないE2E自動化候補として扱い、既存E2Eの実行だけの経路を含めないと明記している。TC、Product Risk、TR、CIの作成・複製を行わず、locator、fixture、Playwright設定を対象外としており、TCやPlaywright実装の捏造は見られない。候補はEval Inputのsource refsに基づいている。",
+      "evidence": [
+        "本選定は TC 直接指定ではなく、TCを伴わないE2E自動化候補の価値判断として扱う。既存E2Eの実行だけの経路は含まない",
+        "TC、Product Risk、TR、CIの作成・複製も行わない",
+        "対象外: locator、fixture、Playwright設定、実装可否、実装コスト、テスト実行（選定根拠に含めない）"
+      ]
+    },
+    {
+      "id": "SEM-E2E-SEL-005",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "変更されたTI-002に関する判断だけを再評価し、E2E-CAND-002は配送再試行の業務経路の追加を踏まえてdeferredを維持している。E2E-CAND-001はsource revisionが変わらず判断も維持され、candidate IDと履歴のrevision 1も保たれている。新規TI-003には未使用のE2E-CAND-003を割り当てている。軽微な改善点として、runtime検証済み、history_complete=true、digestの再計算一致、selection_contract.pyの出力といった主張はEval Inputに根拠がなく、再評価スコープの判断そのものには影響しないが、検証主張として過剰である。",
+      "evidence": [
+        "TI-002がti2-r2へ更新され配送再試行の業務経路が追加されたが、その反復確認価値は未評価のため保留を維持",
+        "E2E-CAND-001 / `checkout-primary` | REQ-CHECKOUT / TI-001 | 主要checkout完了経路 | selected",
+        "新規候補。判断情報の不足による保留。完了選定に数えない",
+        "| 1 | — | E2E-CAND-001 / `checkout-primary`; E2E-CAND-002 / `checkout-shipping` |",
+        "revision 1 の snapshot は runtime で検証済みで、履歴は連続しています（`history_complete=true`）。revision 1 の digest は runtime が revision 1 の入力から再計算した値と一致しました。"
+      ]
+    }
+  ]
+}

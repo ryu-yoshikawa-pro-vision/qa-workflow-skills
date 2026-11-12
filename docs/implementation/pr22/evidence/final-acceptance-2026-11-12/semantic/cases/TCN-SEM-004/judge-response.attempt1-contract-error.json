@@ -1,0 +1,15 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "matrixの12セルは、CRUD操作項目8件（Order C/R/U、InventoryReservation C/U/D、BillingBalance R/U）とAuthority付きnot_applicable 4件で漏れなく代表されており、操作名・entity・functionも具体的である。一方、Referenceは同一sequenceのpostcondition（Order=cancelled、InventoryReservation=全量release、BillingBalance=place前残高）を別基準・itemとして表すことを求めているが、Candidateはsequence全体を1件のcoverage item（crud:seq:order-place-amend-cancel）にまとめ、3つのpostconditionは備考欄に列挙するだけで個別のcoverage itemになっていない。このため一部のcriteriaが独立したカバレッジ項目として具体化されておらず、修正が必要。",
+      "evidence": [
+        "カバレッジ項目一覧に crud:op:order:order-lifecycle:C / R / U、crud:op:inventory-reservation:order-lifecycle:C / U / D、crud:op:billing-balance:order-lifecycle:R / U の8項目があり、カバレッジ候補の扱い表で4件のnot_applicableにAuthorityが付与されている",
+        "`crud:seq:order-place-amend-cancel` の行は「Order lifecycle `place → amend → cancel` と後状態」で、備考は「後状態はOrder / InventoryReservation / BillingBalanceの3件」のみ",
+        "観点表の consistency 行は「Orderの`place → amend → cancel`実行後、Order=cancelled、InventoryReservation=全量release済、BillingBalance=place前残高」を1行にまとめている"
+      ]
+    }
+  ]
+}

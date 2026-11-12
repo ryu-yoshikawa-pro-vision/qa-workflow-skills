@@ -1,0 +1,47 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "Eval Inputのentity × function × operation matrixとlifecycle sequenceを、completeness項目（操作項目8件・not_applicable 4件）とconsistency項目（sequence後の状態）の2件のTest Conditionへ意味的に展開している。TR IDが入力に無い点は候補自身が未解決事項として明示しており、展開の誤りではない。",
+      "evidence": [
+        "CRUD技法の条件は次の2件とする。",
+        "entity × function × operation の全12セルを、操作項目8件またはnot_applicable 4件で閉じる",
+        "Orderの`place → amend → cancel`実行後、Order=cancelled、InventoryReservation=全量release済、BillingBalance=place前残高"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "matrix cellの網羅にはCRUD Testing（completeness）、sequence後の状態確認にはCRUD Testing（consistency）を割り当てており、Eval Inputの構造（CRUD matrixとlifecycle sequence）に合致する。製品技法の不適切な付与は見当たらない。",
+      "evidence": [
+        "CRUD Testing（completeness）",
+        "CRUD Testing（consistency）",
+        "`crud:seq:order-place-amend-cancel` | 未採番 | Order lifecycle `place → amend → cancel` と後状態 | CRUD consistency"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "充足基準は、12セルの全件をcompleteness（操作項目8件・not_applicable 4件）で閉じること、およびsequence実行後の状態関係を確認することとして示されている。Referenceが求めるnot_applicableのAuthority保持もカバレッジ候補の表で扱われており、基準として十分に適切である。件数も入力matrixと一致する。",
+      "evidence": [
+        "entity × function × operation の全12セルを、操作項目8件またはnot_applicable 4件で閉じる",
+        "指定sequenceを実行した後の状態関係を確認する",
+        "| `crud:missing:order:D` | SPEC-CRUD-001 Order × delete | not_applicable（Authority付き） | matrixでOrder deleteは`not_applicable` | なし |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "matrix cellに対応するcompleteness項目8件は各操作を代表しているが、consistencyの3つのpostcondition（Order=cancelled、InventoryReservation=全量release、BillingBalance=place前残高）が1件のcoverage item `crud:seq:order-place-amend-cancel` に統合されている。Referenceはpostconditionを別基準・itemとして表すことを求めるため、個別のpostconditionが独立したcoverage itemとして代表されていない。後状態の具体的な期待値はcoverage item行に記載されず、備考欄の件数の説明にとどまる。",
+      "evidence": [
+        "| `crud:seq:order-place-amend-cancel` | 未採番 | Order lifecycle `place → amend → cancel` と後状態 | CRUD consistency | SPEC-CRUD-001のsequenceとpostcondition | 未決 | 後状態はOrder / InventoryReservation / BillingBalanceの3件 |",
+        "| `crud:op:order:order-lifecycle:U` | 未採番 | Order × update（`amend`, `cancel`） | CRUD completeness | SPEC-CRUD-001のcell（操作名のみ） | 未決 | |"
+      ]
+    }
+  ]
+}

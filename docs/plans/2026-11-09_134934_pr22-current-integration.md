@@ -6,11 +6,11 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 ## 現在の状態と根拠
 
-2026-11-12時点でPR #22はopen、base `main`。担当PR #23〜#32（A〜J）とPR #34（Bの追加修正）は、すべて`feat/development-qa-traceability`へsquash統合済み。統合HEAD `21cbdc5aea30b5748b33913f643b3f36cef60352`のGitHub Actionsは、Validate Agent Skillsだけが失敗していた。原因はREADMEに7 Skillが未登録だったことで、後続stepもSKIPされていた。Code Quality、Deterministic Output Evals、Semantic Output Evals、Codex HarnessはPASS。
+2026-11-13時点でPR #22はopen、base `main`。担当PR #23〜#32（A〜J）と#34は`feat/development-qa-traceability`へsquash統合済み。統合HEAD `21cbdc5a`ではValidate Agent Skillsだけが失敗していた（READMEの7 Skill未登録）。この失敗は共有登録とqa-workflow routingの修正で解消した。
 
-この失敗は、共有登録とqa-workflow routingの修正commit `5d5cf409`で解消した。G→Hの返却項目の投影と最終受入の記録は後続commitに含む。ローカルのCI相当結果、実runnerの証拠、横断接続、15＋10条件・詳細01〜08・S1〜S17・人間編集8ケース・効率5シナリオの判定は、[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。push後のHEAD `822b19f5`では、GitHub Actionsの5 workflowがすべてPASSした（Validate Agent Skillsは全stepを実行）。
+その後、利用者が決定した保存先（qa-training-storeの専用branch `qa/artifacts`）・承認方式（対話での同意＋認証済みpush＋activity API）・外部Issue（案件ごとにProject Contextで設定、未設定は対象外）・製品CI（保存先branchのref参照）に従い、担当間の接続6経路、owner verifier登録、実Git providerと製品CIの受入、実runner、意味評価の再実行、trigger runnerを実施した。条件ごとの判定、証拠、残件は[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。
 
-総合判定は**未完了**。FAILは横断接続の欠落とPlan 04の単独完了経路。blockedは、provider・承認主体・外部Issue・製品CI・実案件sourceが未選定であること。
+総合判定は**未完了**。残る条件は、意味評価のfail・needs_review、trigger評価の本実行と効率比較5シナリオ、owner verifier未登録Skillの完了経路、実案件での通し、未実行のrunner経路、Codexでの受入。
 
 ## 統合時に確認した文書・コード差異
 

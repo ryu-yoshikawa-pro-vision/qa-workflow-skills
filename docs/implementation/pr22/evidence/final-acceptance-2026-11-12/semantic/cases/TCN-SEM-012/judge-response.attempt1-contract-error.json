@@ -1,0 +1,42 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "Eval Inputは各requirementの適用先とtarget A上の衝突をderiveしてreportすることを求めている。Candidateは非runtimeの所見表でR-ROLEのA/B適用、R-A-LOW/R-A-HIGHのA限定、R-B-VERSIONのB限定、Aのみの衝突を概ね正しく挙げている一方、Test Conditionへの展開を一切行わず『未生成』としている。ブロック理由のうちtarget_refの導出については、Eval Inputが『runtime target-ref rule』で導出すると明示しているのに、導出不能としている点はReferenceの根拠と整合しない。展開の欠落は重大な不足である。",
+      "evidence": [
+        "テンプレート上の『テスト条件・カバレッジ項目』節: 『未生成（ブロック中のため）』",
+        "『結論』: 『テスト条件・カバレッジ項目は生成しません。状態は**ブロック中**です。』",
+        "『参考: 入力テキストからの非runtime所見』表: R-ROLE（A, B）、R-A-LOW（Aのみ）、R-A-HIGH（Aのみ）、R-B-VERSION（Bのみ）",
+        "『所見の衝突』: 『target A の version 次元で R-A-LOW（>= 2.0）と R-A-HIGH（<= 1.4）が同時成立しません。影響はtarget Aのみです。』",
+        "ブロック理由4: 『current target A／Bのtarget_ref値そのものは提供されていません』"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceは適用対象の導出と衝突判定の根拠のみを定めており、技法選択（状態遷移・境界値・同値分割・組合せ等）の期待は定めていない。Candidateは技法を一切選択しておらず、Referenceに基づいて判断できないためevaluable=falseとする。",
+      "evidence": []
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceはcoverage criteriaの十分性について何も定めていない。Candidateはcoverage criteriaを生成していないが、Reference外の一般知識で『十分』の基準を補うことはできないため、判断根拠がないとしてevaluable=falseとする。",
+      "evidence": [
+        "『カバレッジ候補の扱い』節: 『未生成（テスト要求未提供のため）』"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceはcoverage itemの代表性について定めていない。Candidateはcoverage itemを生成していないため、代表性を評価する対象が存在するが、Referenceに基づく判断基準がないためevaluable=falseとする。",
+      "evidence": [
+        "『テスト条件・カバレッジ項目』節: 『未生成（ブロック中のため）』"
+      ]
+    }
+  ]
+}
