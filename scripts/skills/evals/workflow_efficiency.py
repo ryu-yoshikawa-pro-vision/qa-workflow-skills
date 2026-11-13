@@ -37,6 +37,9 @@ COUNT_METRICS = frozenset(key for key in METRICS if key.endswith("_count"))
 TIME_METRICS = frozenset(
     {"wall_seconds", "human_review_seconds", "human_approval_seconds"}
 )
+# Human effort cannot be measured by an unattended Agent run. A scope decision may
+# exclude exactly these metrics; the decision must be referenced (``excluded_by``).
+EXCLUDABLE_METRICS = frozenset({"human_review_seconds", "human_approval_seconds"})
 REQUIRED_QUALITY = ("functional", "quality", "safety", "traceability")
 REQUIRED_MEASUREMENTS = frozenset(
     {
@@ -87,12 +90,30 @@ def _refs(value: Any, label: str) -> tuple[str, ...]:
     return tuple(sorted(rows))
 
 
+def _excluded(value: Any) -> bool:
+    return isinstance(value, dict) and "excluded_by" in value
+
+
 def _metric(value: Any, label: str) -> tuple[float | None, str]:
-    row = _obj(
-        value,
-        {"value", "unit", "source_ref", "unmeasured_reason"},
-        label,
-    )
+    fields = {"value", "unit", "source_ref", "unmeasured_reason"}
+    if _excluded(value):
+        fields = fields | {"excluded_by"}
+    row = _obj(value, fields, label)
+    if "excluded_by" in row:
+        # An approved scope exclusion is not a measurement and never a zero.
+        if (
+            label not in EXCLUDABLE_METRICS
+            or row["value"] is not None
+            or row["source_ref"] is not None
+            or not isinstance(row["unmeasured_reason"], str)
+            or not row["unmeasured_reason"].strip()
+            or not isinstance(row["excluded_by"], str)
+            or not row["excluded_by"].strip()
+        ):
+            raise ValueError(f"{label} scope exclusion invalid")
+        if row["unit"] != "seconds":
+            raise ValueError(f"{label} requires seconds")
+        return None, "seconds"
     unit = _nonempty(row["unit"], f"{label} unit")
     raw = row["value"]
     if label in TIME_METRICS and unit != "seconds":
@@ -289,6 +310,9 @@ def _basis(trial: dict[str, Any]) -> str:
 
 
 def _summary(rows: list[dict[str, Any]], key: str) -> dict[str, Any]:
+    if rows and all(_excluded(row["metrics"][key]) for row in rows):
+        refs = {row["metrics"][key]["excluded_by"] for row in rows}
+        return {"status": "excluded", "excluded_by": sorted(refs)}
     values = [_metric(row["metrics"][key], key) for row in rows]
     units = {unit for _, unit in values}
     if len(units) != 1 or any(value is None for value, _ in values):
@@ -387,7 +411,9 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
                 else {"status": "not_measured", "reason": "candidate_missing"}
             )
             change = "not_comparable"
-            if (
+            if before["status"] == "excluded" and after["status"] == "excluded":
+                change = "excluded"
+            elif (
                 before["status"] == "measured"
                 and after["status"] == "measured"
                 and before["unit"] == after["unit"]

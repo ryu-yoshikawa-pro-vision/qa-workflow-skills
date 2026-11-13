@@ -10,7 +10,7 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 その後、利用者が決定した保存先（qa-training-storeの専用branch `qa/artifacts`）・承認方式（対話での同意＋認証済みpush＋activity API）・外部Issue（案件ごとにProject Contextで設定、未設定は対象外）・製品CI（保存先branchのref参照）に従い、担当間の接続6経路、owner verifier登録、実Git providerと製品CIの受入、実runner、意味評価の再実行、trigger runnerを実施した。条件ごとの判定、証拠、残件は[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。
 
-総合判定は**未完了**。残る条件は、trigger評価の不合格（肯定8・否定1 query）、効率比較（実測済みだが人間時間が未測定で未実証、悪化範囲あり）、owner verifier未登録のF 3 Skill（完了不可のまま）、release・実Q06・Issue設定を含む実案件の残り、blockedのrunner経路（API-only・batch・非機能・直接TC、Windowsは設計上非対応）。意味評価は評価入力の補完で11件passした。Codexでの受入は利用者の指示で必須ではない。
+総合判定は**未完了**。利用者の承認（2026-11-13）により、次を対象外とし、阻害要因に含めない：API-only・batch・非機能・直接TCのrunner経路、releaseを含む通し・実Q06の配置合意・外部Issue管理先の設定、Codexでの受入、Windows実行、効率比較の人間のレビュー・承認時間。対象外を除いて残る条件は、trigger評価の不合格（肯定8・否定1 query）、効率比較の未実証（品質・安全がpassでない試行、token・費用の悪化、補助scriptの書込み先）、owner verifier未登録のF 3 Skill（完了不可のまま）。意味評価は評価入力の補完で11件passし、停止条件はSkillを変えず現状維持とする。
 
 ## 統合時に確認した文書・コード差異
 

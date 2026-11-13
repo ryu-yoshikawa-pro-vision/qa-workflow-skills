@@ -1,0 +1,1119 @@
+{
+  "scenarios": [
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.504739,
+            "median": 0.4630885,
+            "minimum": 0.421438,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.582908,
+            "median": 0.510139,
+            "minimum": 0.43737,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "human_review_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 6.0,
+            "median": 5.0,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 5.0,
+            "median": 4.0,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 7.0,
+            "median": 7.0,
+            "minimum": 7.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 8.0,
+            "median": 7.0,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 52.0,
+            "median": 48.5,
+            "minimum": 45.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 50.0,
+            "median": 47.0,
+            "minimum": 44.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 6.0,
+            "median": 4.5,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 6.0,
+            "median": 6.0,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 3647484.0,
+            "median": 3317313.5,
+            "minimum": 2987143.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 3970621.0,
+            "median": 3496455.5,
+            "minimum": 3022290.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 473.978505,
+            "median": 446.681365,
+            "minimum": 419.384225,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 516.02151,
+            "median": 450.63489450000003,
+            "minimum": 385.248279,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "regressed"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed"],
+      "scenario": "initial_qa",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-initial_qa-1", "baseline-initial_qa-2"],
+        "candidate": ["candidate-initial_qa-1", "candidate-initial_qa-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.113063,
+            "median": 0.086624,
+            "minimum": 0.060185,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.168865,
+            "median": 0.09518,
+            "minimum": 0.021495,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "human_review_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 13.0,
+            "median": 10.0,
+            "minimum": 7.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 2.0,
+            "median": 1.5,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 5.0,
+            "median": 5.0,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 36.0,
+            "median": 30.0,
+            "minimum": 24.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 31.0,
+            "median": 23.5,
+            "minimum": 16.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 2.0,
+            "median": 2.0,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 5.0,
+            "median": 3.5,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 956797.0,
+            "median": 853529.5,
+            "minimum": 750262.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1544540.0,
+            "median": 1049679.0,
+            "minimum": 554818.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 182.982924,
+            "median": 150.314187,
+            "minimum": 117.64545,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 96.258459,
+            "median": 68.4003105,
+            "minimum": 40.542162,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed"],
+      "scenario": "unchanged_request",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-unchanged_request-1", "baseline-unchanged_request-2"],
+        "candidate": ["candidate-unchanged_request-1", "candidate-unchanged_request-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.032679,
+            "median": 0.029067,
+            "minimum": 0.025455,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.043115,
+            "median": 0.036317,
+            "minimum": 0.029519,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "human_review_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 5.0,
+            "median": 4.5,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 12.0,
+            "median": 8.5,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 4.0,
+            "median": 3.5,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 5.0,
+            "median": 4.0,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 26.0,
+            "median": 23.0,
+            "minimum": 20.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 34.0,
+            "median": 29.5,
+            "minimum": 25.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 0.5,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 0.5,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 949776.0,
+            "median": 809796.5,
+            "minimum": 669817.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1921352.0,
+            "median": 1424589.0,
+            "minimum": 927826.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 171.624308,
+            "median": 140.31733100000002,
+            "minimum": 109.010354,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 113.053133,
+            "median": 99.4710285,
+            "minimum": 85.888924,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed"],
+      "scenario": "local_code_change",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-local_code_change-1", "baseline-local_code_change-2"],
+        "candidate": ["candidate-local_code_change-1", "candidate-local_code_change-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.224625,
+            "median": 0.181663,
+            "minimum": 0.138701,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.213003,
+            "median": 0.2118245,
+            "minimum": 0.210646,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "human_review_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 26.0,
+            "median": 25.0,
+            "minimum": 24.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 23.0,
+            "median": 23.0,
+            "minimum": 23.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 8.0,
+            "median": 8.0,
+            "minimum": 8.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 9.0,
+            "median": 7.5,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 46.0,
+            "median": 45.5,
+            "minimum": 45.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 49.0,
+            "median": 48.0,
+            "minimum": 47.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 1506782.0,
+            "median": 1395706.0,
+            "minimum": 1284630.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 2045462.0,
+            "median": 1964138.0,
+            "minimum": 1882814.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 564.24351,
+            "median": 557.3890240000001,
+            "minimum": 550.534538,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 173.267902,
+            "median": 163.730823,
+            "minimum": 154.193744,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed"],
+      "scenario": "external_spec_revision",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-external_spec_revision-1", "baseline-external_spec_revision-2"],
+        "candidate": ["candidate-external_spec_revision-1", "candidate-external_spec_revision-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_approval_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "human_review_seconds": {
+          "baseline": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "candidate": {
+            "excluded_by": [
+              "scope-decision:pr22-final-acceptance-2026-11-13\uff08\u5229\u7528\u8005\u627f\u8a8d\uff09"
+            ],
+            "status": "excluded"
+          },
+          "change": "excluded"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 3.0,
+            "median": 3.0,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 6.0,
+            "median": 4.0,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 7.0,
+            "median": 6.5,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 8.0,
+            "median": 7.5,
+            "minimum": 7.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "request_count": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 10.0,
+            "median": 10.0,
+            "minimum": 10.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 12.0,
+            "median": 9.0,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 4.0,
+            "median": 4.0,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 6.0,
+            "median": 3.5,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "token_count": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 953.136518,
+            "median": 909.8235784999999,
+            "minimum": 866.510639,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 748.528256,
+            "median": 551.1923005,
+            "minimum": 353.856345,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed"],
+      "scenario": "interrupted_resume",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-interrupted_resume-1", "baseline-interrupted_resume-2"],
+        "candidate": ["candidate-interrupted_resume-1", "candidate-interrupted_resume-2"]
+      }
+    }
+  ],
+  "schema_version": "qa-workflow-efficiency-result-v1",
+  "status": "unproven"
+}

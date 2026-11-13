@@ -7,6 +7,9 @@
 - 開始対象 / 実行範囲: 複数用途Skillの場合は正規値
 - 最終Skill:
 - 最終対象 / 実行範囲: 複数用途Skillの場合は正規値
+- 入力revision（製品commit、仕様書・コードの版、Authority refなど）:
+- 開始時の確認: 新規 / 再利用（入力revision同一） / 一部再実行（変更範囲を列挙） / 中断からの再開（再開した工程）
+- 中断・再開の記録: 中断した工程、再開した工程、引き継いだ成果物
 
 ## persisted workflow state record
 

@@ -1,0 +1,181 @@
+{
+  "workflow_ref": "4bffab0d-196a-495c-8c71-f03ed1519ca1",
+  "schema": "qa-workflow-state/v1-manual",
+  "target": "カート機能（product/docs/spec/features/cart.md）",
+  "requested_scope": "テスト分析からテスト観点（条件）設計まで",
+  "product_commit_reported_by_user": "2a8bcf57（初回分析時点の申告値）",
+  "product_commit_verified": false,
+  "product_commit_note": "workspace内に.gitが無く、commitとの一致は検証できていない。改版後の製品commitは未申告のため、入力はsha256で管理する",
+  "created_at_utc": "2026-11-13T13:35:53Z",
+  "last_updated_utc": "2026-11-13",
+  "progress_mode": "continuous",
+  "input_revisions": {
+    "SRC-001": {
+      "path": "product/docs/spec/features/cart.md",
+      "sha256": "sha256:19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25",
+      "revision_note": "改版（product-change-spec.diff）: BR-CART-001の上限 99→50 のみ"
+    },
+    "SRC-002": {
+      "path": "product/docs/spec/roles-and-permissions.md",
+      "sha256": "sha256:519731749c55d9e01602017f9041d7ac9cc7e94e9ea0f86f16fd003dff12224e"
+    },
+    "SRC-003": {
+      "path": "product/docs/spec/state-and-scenarios.md",
+      "sha256": "sha256:ccd0cab4b0bd156ea611c0bfad331b16f023d49acec4d95118d7fab70b8b4b90"
+    },
+    "SRC-004": {
+      "path": "product/docs/spec/features/storefront.md",
+      "sha256": "sha256:3f77926ad16369ea5091672cf1c165ddf2f7f7f12f01512596d1e2a907c58c4a"
+    },
+    "SRC-005": {
+      "path": "product/docs/spec/README.md",
+      "sha256": "sha256:c63c81266b8c131a78d5a4048231e7c6dafceb433802bc18f0164903e220c854"
+    },
+    "SRC-101": {
+      "path": "product/docs/03_domain/business_rules.md",
+      "sha256": "sha256:8fe29aa8a481408bfb5aa05665e283a4af45ac54ec2c16856697bd48342f3735",
+      "note": "補助文書。改版されていない。旧値「上限値99」を含む（Q-CART-01）"
+    },
+    "SRC-102": {
+      "path": "product/docs/01_requirements/functional_requirements.md",
+      "sha256": "sha256:e6b5cd9a685c70e5296683cb386d0eb15c21d662e8fef1907e209d1851e0fe9b"
+    },
+    "SRC-103": {
+      "path": "product/docs/12_quality/acceptance_criteria.md",
+      "sha256": "sha256:cb057739f87894749eab42eb3102afa6c749456e3837c290ab3d393981537343"
+    },
+    "SRC-104": {
+      "path": "product/docs/03_domain/state_transitions.md",
+      "sha256": "sha256:8a557652831c03a7b50d3b463acfc5d89b32dad3ad07741e89512baa8329d659"
+    },
+    "SRC-105": {
+      "path": "product/docs/08_testing/test_strategy.md",
+      "sha256": "sha256:a9073065c1c44f3f038f5d1be86f60c43257df939b2c20c5aa38122aad0080e5"
+    },
+    "SRC-106": {
+      "path": "product/docs/12_quality/requirements_traceability.md",
+      "sha256": "sha256:3ad9acafa315210e1872db0f40d42ce4f7ad35327d0ffec572788fcd4e5c3e1a"
+    },
+    "SRC-107a": {
+      "path": "product/docs/spec/unresolved-specifications.md",
+      "sha256": "sha256:c3ac09d0f145d97380ee1cf0e59180a53dcf0806aff20a5af6dde4d72fe056aa"
+    },
+    "SRC-107b": {
+      "path": "product/docs/spec/known-deviations.md",
+      "sha256": "sha256:518d110c069d82bb20303dee57feb968633f98b9223c38d879a211e205c89edd"
+    }
+  },
+  "revision_history": [
+    {
+      "date": "2026-11-13",
+      "event": "初回作成",
+      "changed_inputs": [],
+      "SRC-001_sha256": "sha256:385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+    },
+    {
+      "date": "2026-11-13",
+      "event": "改版対応（product-change-spec.diff）",
+      "changed_inputs": ["SRC-001"],
+      "verification": "改版前のcart.mdを、差分の1行を逆適用して再構成すると初回記録のsha256と一致。SRC-002〜107は記録と一致",
+      "SRC-001_sha256": "sha256:19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25",
+      "change_summary": "BR-CART-001の上限 99→50",
+      "impact": {
+        "updated": [
+          "01-spec-analysis.md: SPEC-CART-001、016、INF-CART-002、§5.3、§8（改版）",
+          "02-question-analysis.md: Q-CART-01（補助文書の旧値）、Q-CART-11（a）、Q-CART-13（新規）",
+          "03-test-analysis.md: §1、§2（変更行）、RISK-001、§4、§6",
+          "04-test-requirements.md: TR-001、§7（改版）",
+          "05-test-conditions.md: §3、§5.1（CI-001-01/04/07〜09、CI-002-07〜09、前提）、§1",
+          "pending-approvals.md: Q-13"
+        ],
+        "reused_unchanged": [
+          "TR-002〜007、TR-010〜011、TR-013、TR-015〜016、TR-018、TR-020、TR-022〜023、TR-027（有効）",
+          "TCN-003〜018（上限値に依存しない）",
+          "RISK-001以外のリスクとレベル、保留TR-008・009・012・014・017・019・021・024〜026（ブロック中）、対象外"
+        ],
+        "not_applicable": "test-case-design、coverage-analysis、adversarial-review は今回の範囲外のため未実施"
+      }
+    }
+  ],
+  "stages": [
+    {
+      "skill": "spec-analysis",
+      "target": "",
+      "status": "完了（改版反映 2026-11-13）",
+      "artifact": "qa-state/01-spec-analysis.md"
+    },
+    {
+      "skill": "question-analysis",
+      "target": "",
+      "status": "完了（回答待ちあり。Q-CART-13を追加）",
+      "artifact": "qa-state/02-question-analysis.md"
+    },
+    {
+      "skill": "test-analysis",
+      "target": "テスト分析",
+      "status": "完了（改版反映 2026-11-13）",
+      "artifact": "qa-state/03-test-analysis.md"
+    },
+    {
+      "skill": "test-requirement-design",
+      "target": "",
+      "status": "部分完了（保留10件。改版反映 2026-11-13）",
+      "artifact": "qa-state/04-test-requirements.md"
+    },
+    {
+      "skill": "test-condition-design",
+      "target": "テスト設計",
+      "status": "部分完了（保留TRは未展開。改版反映 2026-11-13）",
+      "artifact": "qa-state/05-test-conditions.md"
+    }
+  ],
+  "blocked": {
+    "scope": "TR-008, 009, 012, 014, 017, 019, 021, 024, 025, 026",
+    "reasons": [
+      "Q-CART-01",
+      "Q-CART-02",
+      "Q-CART-03",
+      "Q-CART-04",
+      "Q-CART-05",
+      "Q-CART-06",
+      "Q-CART-07",
+      "Q-CART-08",
+      "Q-CART-09",
+      "Q-CART-10"
+    ],
+    "approval_pending": [
+      "Q-CART-11（仮定）"
+    ],
+    "confirmation_pending_not_blocking": [
+      "Q-CART-13（AC-CART-001の旧表記。TR-001の上限50はBR-CART-001を根拠に保持。PASS/FAILの最終判定前に確認）"
+    ]
+  },
+  "reuse_decision": {
+    "status": "改版対応: 入力SRC-001のみ変更。上限値に依存する成果物（TR-001、CI-001/002の上限行、RISK-001文言）だけを更新し、それ以外は再利用"
+  },
+  "runtime_evidence": {
+    "runtime_v2_dispatch": "未実施",
+    "verify_runtime_evidence": "未実施",
+    "reason": "runtime-v2の正規化入力（Machine Entity連鎖）を組み立てる工程を今回のセッションで完了できていない。成果物はMarkdownの手作業分析である",
+    "owner_verifiers": "test-analysis / test-requirement-design / test-condition-design はowner_verifiersに未登録。unverified_scopesとして残る"
+  },
+  "completion": {
+    "status": "部分完了（ブロック中あり）",
+    "unverified_scopes": [
+      "test-analysis",
+      "test-requirement-design",
+      "test-condition-design"
+    ],
+    "not_done": [
+      "test-case-design",
+      "coverage-analysis",
+      "adversarial-review"
+    ]
+  },
+  "resume_point": {
+    "skill": "question-analysis",
+    "target": "Q-CART-01〜10（回答後にspec-analysisへ正規化）、Q-CART-11（承認）、Q-CART-13（AC-CART-001表記の確認。spec-analysisへ）"
+  },
+  "last_completed_stage": "test-condition-design（有効TR 17件。改版反映済み）",
+  "product_modified": false
+}

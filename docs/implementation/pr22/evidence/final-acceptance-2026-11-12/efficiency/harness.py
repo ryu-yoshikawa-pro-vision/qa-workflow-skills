@@ -48,7 +48,15 @@ PRODUCT_COMMIT = "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
 SESSION_TIMEOUT = 1800
 MAX_TURNS = 120
 INTERRUPT_AFTER_STATE_WRITES = 3
-TOOLS = ["Skill", "Read", "Write", "Edit", "Glob", "Grep", "Bash(python3:*)"]
+TOOLS = [
+    "Skill",
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(python3:*)",
+]
 SCENARIOS = (
     "initial_qa",
     "unchanged_request",
@@ -609,6 +617,17 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def excluded_metric() -> dict[str, Any]:
+    """Human effort is out of scope for unattended Agent trials (user decision)."""
+    return {
+        "value": None,
+        "unit": "seconds",
+        "source_ref": None,
+        "unmeasured_reason": "無人のAgent実行のため人間の作業時間は対象外",
+        "excluded_by": "scope-decision:pr22-final-acceptance-2026-11-13（利用者承認）",
+    }
+
+
 def metric(
     value: float | None, unit: str, source: str, reason: str | None = None
 ) -> dict[str, Any]:
@@ -671,18 +690,8 @@ def cmd_assemble(args: argparse.Namespace) -> int:
                                 len(f["skill_runs"]), "count", src
                             ),
                             "skill_restart_count": metric(f["restarts"], "count", src),
-                            "human_review_seconds": metric(
-                                None,
-                                "seconds",
-                                "",
-                                "人間のレビュー時間は無人のAgent実行では測定していない",
-                            ),
-                            "human_approval_seconds": metric(
-                                None,
-                                "seconds",
-                                "",
-                                "人間の承認時間は無人のAgent実行では測定していない",
-                            ),
+                            "human_review_seconds": excluded_metric(),
+                            "human_approval_seconds": excluded_metric(),
                             "reanalyze_count": metric(f["rewrites"], "count", src),
                             "retry_count": metric(len(sess) - 1, "count", src),
                             "reused_artifact_count": metric(

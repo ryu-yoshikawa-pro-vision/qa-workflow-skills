@@ -26,6 +26,16 @@ def metric(value: float | None, unit: str = "count") -> dict:
     }
 
 
+def excluded() -> dict:
+    return {
+        "value": None,
+        "unit": "seconds",
+        "source_ref": None,
+        "unmeasured_reason": "unattended Agent run; human time is out of scope",
+        "excluded_by": "scope-decision:pr22-final-acceptance-2026-11-13",
+    }
+
+
 def trial(scenario: str, group: str, index: int) -> dict:
     baseline = group == "baseline"
     calls = 10 if baseline else 5
@@ -316,6 +326,46 @@ class WorkflowEfficiencyTests(unittest.TestCase):
             result["scenarios"][0]["metrics"]["wall_seconds"]["candidate"]["status"],
             "not_measured",
         )
+
+    def test_approved_scope_exclusion_of_human_time_is_not_a_missing_measurement(
+        self,
+    ) -> None:
+        data = dataset()
+        for row in data["scenarios"]:
+            for group in ("baseline", "candidate"):
+                for item in row[group]:
+                    for key in ("human_review_seconds", "human_approval_seconds"):
+                        item["metrics"][key] = excluded()
+        result = mod.evaluate(data)
+        first = result["scenarios"][0]
+        self.assertEqual(first["metrics"]["human_review_seconds"]["change"], "excluded")
+        self.assertNotIn("required_measurement_unavailable", first["reasons"])
+        self.assertEqual(result["status"], "efficiency_evidenced")
+
+    def test_scope_exclusion_is_limited_to_human_time_and_needs_a_reference(
+        self,
+    ) -> None:
+        for key, bad in (
+            ("wall_seconds", excluded()),
+            ("human_review_seconds", {**excluded(), "excluded_by": " "}),
+            ("human_review_seconds", {**excluded(), "value": 0}),
+            ("human_review_seconds", {**excluded(), "unit": "count"}),
+        ):
+            data = dataset()
+            data["scenarios"][0]["candidate"][0]["metrics"][key] = bad
+            with self.assertRaises(ValueError):
+                mod.evaluate(data)
+
+    def test_mixed_exclusion_and_measurement_is_not_comparable(self) -> None:
+        data = dataset()
+        for item in data["scenarios"][0]["candidate"]:
+            item["metrics"]["human_review_seconds"] = excluded()
+        result = mod.evaluate(data)
+        first = result["scenarios"][0]
+        self.assertEqual(
+            first["metrics"]["human_review_seconds"]["change"], "not_comparable"
+        )
+        self.assertIn("required_measurement_unavailable", first["reasons"])
 
     def test_missing_required_metric_prevents_efficiency_claim(self) -> None:
         data = dataset()
