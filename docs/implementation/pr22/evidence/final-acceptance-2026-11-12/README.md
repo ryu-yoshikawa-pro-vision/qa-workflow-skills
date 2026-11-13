@@ -118,9 +118,12 @@ pass 4／needs_review 2／fail 5。failの共通点は、**候補（Haiku 5.5）
 ### 7.2 trigger評価
 
 - 停止指示（E記録「切りのよいところで中断」）は、長時間評価について維持している。
-- repo管理のrunnerを作成し、動作確認（1 Skill、各class 1 query、2回、4実行、約27秒）を行った。37 Skillを同時に利用可能にし、`Skill`ツール呼出しを観測できた。`defect-management`の肯定queryは2回とも発火せず（原因は未調査）、否定queryは`test-reporting`を2回読み込んだ（想定外発火）。
-- **本実行は未実施**。新14 Skillのvalidation queryを各Skillの肯定・否定2件ずつ、3回、並列3で実行すると、56 query・168実行・約9分の見積もり。実行には利用者の承認を待つ。
-- 以前の900秒timeoutの原因は未検証のまま。新runnerはquery単位のtimeoutを持ち、timeoutした試行を無効として記録し、発火率の集計から除外する（「発火しなかった」とは数えない）。
+- repo管理のrunner（`scripts/skills/evals/trigger/run.py`）で、新14 Skillのvalidation queryを各Skillの肯定・否定2件ずつ、3回、並列3、Haiku 5.5、`--max-turns 6`で実行した（56 query・168実行、結果は`trigger/result.json`）。`Skill`ツール呼出しを観測し、最初のSkill呼出しで停止する。実行時間は平均14.8秒／回。
+- 有効167／無効1（timeout。発火率の集計から除外）。**否定query 28／28がpass**（対象Skillの誤発火は84試行中1回）。**肯定queryは10／28がpass、18がfail**（対象Skillを読み込んだ試行は83試行中28回）。
+- 肯定queryのfail 18件はすべて、**他のSkillも読み込まず、Skillなしで直接回答**した（失敗試行の55／56が「Skillを1つも読み込まない」）。別Skillへの誤誘導ではない。Skillのdescriptionが、headlessのHaiku 5.5に対して肯定queryで発火するほど強くない、または実Agentが直接回答を選ぶ、のいずれかを示すが、どちらかはこの測定だけでは区別できない。Skill別のpass数は`trigger/result.json`の`summary`を参照。
+- 判定は**fail（肯定query 18件）**。Skillのdescription・queryの修正は、各ownerの判断事項として残し、今回は変更していない。単一モデル（Haiku 5.5）・各Skill肯定2件・各query3回の部分評価で、全37 Skillの網羅ではない。
+- 最初の実行（`--max-turns 1`、`trigger/superseded-maxturns1.json`）は、Skill呼出し前に打ち切られるため肯定queryが過少に見える方法の偏りがあった（肯定7／28 pass）。**この結果は採用せず、記録として残す**。
+- 以前の900秒timeoutの原因は未検証のまま。新runnerはquery単位のtimeoutを持ち、timeoutした試行を無効として記録する。
 
 ## 8. 完了条件の判定
 
@@ -204,7 +207,7 @@ pass 4／needs_review 2／fail 5。failの共通点は、**候補（Haiku 5.5）
 **PR #22の最終受入は未完了**。mainへのmerge条件は満たさない。残る主な条件は次のとおり。
 
 1. 意味評価のfail 5件・needs_review 2件（Skillの停止条件と部分成果物の期待の関係をEのownerが判断）。
-2. trigger評価の本実行（承認待ち）と効率比較5シナリオ。
+2. trigger評価の肯定query 18件のfail（descriptionまたはqueryのowner判断）と、効率比較5シナリオ。
 3. F 3 Skillを含む、owner verifier未登録Skillの完了経路。
 4. 実案件（実PR・merge・release、実Q06の配置合意、実Issue管理先の設定）での通し。
 5. API-only・batch・静的解析・非機能・直接TC・Windowsの実行保証。

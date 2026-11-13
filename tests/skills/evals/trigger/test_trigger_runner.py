@@ -179,5 +179,21 @@ class SelectionAndIsolationTests(unittest.TestCase):
             self.assertEqual([p.name for p in config.iterdir()], [".credentials.json"])
 
 
+class EarlyStopTests(unittest.TestCase):
+    def test_decision_is_the_first_skill_call_in_a_line(self) -> None:
+        called = assistant(
+            {"type": "text", "text": "ok"},
+            skill_call("defect-management"),
+            skill_call("other"),
+        )
+        self.assertEqual(run.skill_call_in_line(called), "defect-management")
+
+    def test_lines_without_a_skill_call_do_not_stop_the_run(self) -> None:
+        bash = assistant({"type": "tool_use", "name": "Bash", "input": {}})
+        text = assistant({"type": "text", "text": "Skill defect-management"})
+        for line in (INIT, bash, text, result(), "not json"):
+            self.assertIsNone(run.skill_call_in_line(line))
+
+
 if __name__ == "__main__":
     unittest.main()

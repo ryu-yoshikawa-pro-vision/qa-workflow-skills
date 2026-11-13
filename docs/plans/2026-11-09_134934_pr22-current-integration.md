@@ -10,7 +10,7 @@ PR #22を、既存の開発連動QA Plan、QA全工程Plan、詳細01〜08、統
 
 その後、利用者が決定した保存先（qa-training-storeの専用branch `qa/artifacts`）・承認方式（対話での同意＋認証済みpush＋activity API）・外部Issue（案件ごとにProject Contextで設定、未設定は対象外）・製品CI（保存先branchのref参照）に従い、担当間の接続6経路、owner verifier登録、実Git providerと製品CIの受入、実runner、意味評価の再実行、trigger runnerを実施した。条件ごとの判定、証拠、残件は[最終受入の検証記録](../implementation/pr22/evidence/final-acceptance-2026-11-12/README.md)を正本とする。
 
-総合判定は**未完了**。残る条件は、意味評価のfail・needs_review、trigger評価の本実行と効率比較5シナリオ、owner verifier未登録Skillの完了経路、実案件での通し、未実行のrunner経路、Codexでの受入。
+総合判定は**未完了**。残る条件は、意味評価のfail・needs_review、trigger評価の肯定query 18件のfailと効率比較5シナリオ、owner verifier未登録Skillの完了経路、実案件での通し、未実行のrunner経路、Codexでの受入。
 
 ## 統合時に確認した文書・コード差異
 
@@ -45,7 +45,7 @@ PR #25 Cの実装ではUI構造分析と期待仕様Authorityが別ownerだが�
 
 - 横断接続の多くはowner間のスキーマ決定を要する（B→D、D→E、E2E選定→下流、I→J、G/H/I→J）。PR #22で一方的に決めず、各owner契約の改訂として扱う。
 - provider、権限者、実案件データ、製品CI接続が無い条件は、権威ある入力が揃うまでblocked。
-- 長時間trigger評価は利用者の停止指示を維持している。再開には、repo管理のrunnerと利用者の再承認が必要。
+- 長時間trigger評価は利用者の停止指示を維持している。利用者の承認後にrepo管理のrunnerで新14 Skillの部分評価を実施した（結果は最終受入の検証記録7.2）。
 
 ## 実施順序
 

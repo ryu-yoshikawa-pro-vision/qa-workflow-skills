@@ -29,6 +29,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -37,8 +38,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
 DEFAULT_MODEL = "claude-haiku-5-5"
-DEFAULT_TIMEOUT_SECONDS = 120
-OBSERVED_SECONDS_PER_RUN = 10  # measured ~9.3 s per run (Haiku 5.5, 37 Skills)
+DEFAULT_TIMEOUT_SECONDS = 180
+DEFAULT_MAX_TURNS = 6
+OBSERVED_SECONDS_PER_RUN = 15  # measured: mean 14.8 s per run (2026-11-13, early stop)
 PARENT_SESSION_ENV = (
     "CLAUDECODE",
     "CLAUDE_CODE_CHILD_SESSION",
@@ -143,6 +145,12 @@ def invoked_skills(stream: str) -> list[str]:
     return found
 
 
+def skill_call_in_line(line: str) -> str | None:
+    """The Skill named by a ``Skill`` tool call in one stream-json line, if any."""
+    skills = invoked_skills(line)
+    return skills[0] if skills else None
+
+
 def observed_result(stream: str) -> dict[str, Any] | None:
     for line in reversed(stream.splitlines()):
         try:
@@ -178,7 +186,15 @@ def run_attempt(
     config_dir: Path,
     model: str,
     timeout: int,
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> dict[str, Any]:
+    """Run one query. The decision is observed at the first ``Skill`` tool call.
+
+    The process is stopped as soon as a Skill is loaded (the decision is made).
+    Without a Skill call it runs until the turn limit, so a model that first
+    explores the workspace is not cut off before it chooses. A run that does not
+    finish within ``timeout`` is invalid and never counted as "not triggered".
+    """
     command = [
         "claude",
         "-p",
@@ -194,32 +210,62 @@ def run_attempt(
         "--allowedTools",
         "Skill",
         "--max-turns",
-        "1",
+        str(max_turns),
     ]
     started = time.monotonic()
-    timed_out = False
     process = subprocess.Popen(
         command,
         cwd=workdir,
         env=clean_environment(config_dir),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         text=True,
         encoding="utf-8",
         errors="replace",
         start_new_session=True,
     )
+    timed_out = threading.Event()
+
+    def kill() -> None:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def on_timeout() -> None:
+        timed_out.set()
+        kill()
+
+    timer = threading.Timer(timeout, on_timeout)
+    timer.start()
+    lines: list[str] = []
+    early_skill: str | None = None
     try:
-        stdout, stderr = process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        os.killpg(process.pid, signal.SIGKILL)
-        stdout, stderr = process.communicate()
-    status = classify_attempt(
-        stdout, timed_out=timed_out, returncode=process.returncode
-    )
-    loaded = invoked_skills(stdout) if status == "valid" else []
+        assert process.stdout is not None
+        for line in process.stdout:
+            lines.append(line)
+            early_skill = skill_call_in_line(line)
+            if early_skill is not None:
+                kill()
+                break
+    finally:
+        timer.cancel()
+        process.wait()
+    stream = "".join(lines)
+    if timed_out.is_set():
+        status = "invalid_timeout"
+    elif early_skill is not None:
+        status = (
+            "valid"
+            if '"subtype":"init"' in stream.replace(" ", "")
+            else ("invalid_no_result")
+        )
+    else:
+        status = classify_attempt(
+            stream, timed_out=False, returncode=process.returncode
+        )
+    loaded = invoked_skills(stream) if status == "valid" else []
     return {
         "query_id": entry["query_id"],
         "skill": entry["skill"],
@@ -228,8 +274,9 @@ def run_attempt(
         "status": status,
         "invoked_skills": loaded,
         "target_triggered": entry["skill"] in loaded,
+        "stopped_at_first_skill_call": early_skill is not None,
         "seconds": round(time.monotonic() - started, 1),
-        "stderr_tail": stderr[-300:] if status != "valid" else "",
+        "stream_tail": stream[-300:] if status != "valid" else "",
     }
 
 
@@ -300,6 +347,12 @@ def main() -> int:
     cli.add_argument("--repeat", type=int, default=3)
     cli.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     cli.add_argument("--model", default=DEFAULT_MODEL)
+    cli.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS)
+    cli.add_argument(
+        "--product-archive",
+        type=Path,
+        help="tar archive of the product source placed in the workspace",
+    )
     cli.add_argument("--concurrency", type=int, default=3)
     cli.add_argument(
         "--credentials",
@@ -329,6 +382,13 @@ def main() -> int:
         workdir = base / "workspace"
         workdir.mkdir()
         loaded = build_workspace(workdir)
+        if args.product_archive is not None:
+            product = workdir / "product"
+            product.mkdir()
+            subprocess.run(
+                ["tar", "-xf", str(args.product_archive), "-C", str(product)],
+                check=True,
+            )
         config = make_config_dir(base, args.credentials)
         jobs = [(entry, n) for entry in entries for n in range(1, args.repeat + 1)]
         with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
@@ -341,6 +401,7 @@ def main() -> int:
                         config_dir=config,
                         model=args.model,
                         timeout=args.timeout,
+                        max_turns=args.max_turns,
                     ),
                     jobs,
                 )
@@ -350,6 +411,10 @@ def main() -> int:
         json.dumps(
             {
                 "model": args.model,
+                "max_turns": args.max_turns,
+                "product_archive": str(args.product_archive)
+                if args.product_archive
+                else None,
                 "skills_available": loaded,
                 "plan": plan,
                 "attempts": attempts,
