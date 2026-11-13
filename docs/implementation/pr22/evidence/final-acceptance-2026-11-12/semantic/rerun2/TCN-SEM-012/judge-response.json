@@ -1,1 +1,48 @@
-{"criteria":[{"id":"SEM-TCN-001","evaluable":true,"rating":3,"reason":"model-wide R-ROLE を A・B へ、R-A-LOW/R-A-HIGH を A のみへ、R-B-VERSION を B のみへ展開しており、Reference の適用ルールと一致する。A の version conflict を対象別に報告し、B とのcross-intersectionを避けている。一方で TCN-012-05 の「unresolved」という集約ステータスは入力・Reference のどこにもなく、根拠なく追加されている。","evidence":["| R-ROLE | role | enum `{admin, guest}` | target A・B（model-wide） | 入力: model-wide requirement |","| R-A-LOW | version | `>= 2.0`（片側範囲） | target A のみ | 入力: target A の exact source target version を参照 |","| R-B-VERSION | version | `= 1.3`（exact） | target B のみ | 入力: target B の exact source target version を参照 |","| TCN-012-05 | TR-DATA-012 | 全体 result は target A の conflict により unresolved とし、target B が互換であることで A の conflict を打ち消さない |"]},{"id":"SEM-TCN-002","evaluable":true,"rating":3,"reason":"問題構造は範囲の交差判定と対象別の分離であるが、全行が「Test Data Requirements / Materialization」や「矛盾検出」等の汎用的な分類になっており、version の一方向範囲に対する境界値・同値分割としての技法選択が明示されていない。構造には概ね合っているため、軽微な改善余地として扱う。","evidence":["| TCN-012-03 | TR-DATA-012 | target A の version dimension で `R-A-LOW`（>= 2.0）と `R-A-HIGH`（<= 1.4）の intersection を評価し、conflict を target A に対して報告する | 異常系 / 矛盾検出 | 同上（互換性のない要求を隠さない） |","| target A の version から具体的なテストデータ値を導出する | `R-A-LOW` / `R-A-HIGH` | ブロック中 |"]},{"id":"SEM-TCN-003","evaluable":true,"rating":3,"reason":"target A/B の適用集合の導出、A の version conflict の報告、target 分離、全 target にわたる conflict 件数・対象の一致という判定基準は、Reference の判定根拠の主要点を覆う。ただし、保存された applicable target refs と再導出結果の照合や typed value の保持を判定する基準が欠けており、target_ref は「未導出」のままである。","evidence":["| TCN-012-04 | TR-DATA-012 | target-specific requirement を参照先 target 以外へ適用しない（R-A-* を B へ、R-B-VERSION を A へ適用しない。B に version conflict を報告しない） |","| conflict 件数と対象 target が全 target について一致すること |","| A | sha256:1111111111111111111111111111111111111111111111111111111111111111 | sha256:2222222222222222222222222222222222222222222222222222222222222222 | 未導出 |"]},{"id":"SEM-TCN-004","evaluable":true,"rating":4,"reason":"各カバレッジ項目が具体的な target・dimension・requirement key に紐づいており、A の version conflict（R-A-HIGH, R-A-LOW）、B の互換 version（= 1.3）、target 分離を代表している。具体的な version 値を創作せず入力に基づいている点も確認できる。","evidence":["| TCN-012-CI02 | TCN-012-03 | target A × version: `R-A-LOW ∩ R-A-HIGH` = 空 → target A の version conflict（requirement_keys: `R-A-HIGH`, `R-A-LOW`）を blocking として報告 |","| TCN-012-CI04 | TCN-012-02 | target B × version: `R-B-VERSION`（`= 1.3`）のみで、conflict なし |","| TCN-012-CI05 | TCN-012-04 | target 分離: target A の適用集合に `R-B-VERSION` を含めず、target B の適用集合に `R-A-LOW` / `R-A-HIGH` を含めない |"]}]}
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "model-wide R-ROLE を A・B へ、R-A-LOW/R-A-HIGH を A のみへ、R-B-VERSION を B のみへ展開しており、Reference の適用ルールと一致する。A の version conflict を対象別に報告し、B とのcross-intersectionを避けている。一方で TCN-012-05 の「unresolved」という集約ステータスは入力・Reference のどこにもなく、根拠なく追加されている。",
+      "evidence": [
+        "| R-ROLE | role | enum `{admin, guest}` | target A・B（model-wide） | 入力: model-wide requirement |",
+        "| R-A-LOW | version | `>= 2.0`（片側範囲） | target A のみ | 入力: target A の exact source target version を参照 |",
+        "| R-B-VERSION | version | `= 1.3`（exact） | target B のみ | 入力: target B の exact source target version を参照 |",
+        "| TCN-012-05 | TR-DATA-012 | 全体 result は target A の conflict により unresolved とし、target B が互換であることで A の conflict を打ち消さない |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "問題構造は範囲の交差判定と対象別の分離であるが、全行が「Test Data Requirements / Materialization」や「矛盾検出」等の汎用的な分類になっており、version の一方向範囲に対する境界値・同値分割としての技法選択が明示されていない。構造には概ね合っているため、軽微な改善余地として扱う。",
+      "evidence": [
+        "| TCN-012-03 | TR-DATA-012 | target A の version dimension で `R-A-LOW`（>= 2.0）と `R-A-HIGH`（<= 1.4）の intersection を評価し、conflict を target A に対して報告する | 異常系 / 矛盾検出 | 同上（互換性のない要求を隠さない） |",
+        "| target A の version から具体的なテストデータ値を導出する | `R-A-LOW` / `R-A-HIGH` | ブロック中 |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "target A/B の適用集合の導出、A の version conflict の報告、target 分離、全 target にわたる conflict 件数・対象の一致という判定基準は、Reference の判定根拠の主要点を覆う。ただし、保存された applicable target refs と再導出結果の照合や typed value の保持を判定する基準が欠けており、target_ref は「未導出」のままである。",
+      "evidence": [
+        "| TCN-012-04 | TR-DATA-012 | target-specific requirement を参照先 target 以外へ適用しない（R-A-* を B へ、R-B-VERSION を A へ適用しない。B に version conflict を報告しない） |",
+        "| conflict 件数と対象 target が全 target について一致すること |",
+        "| A | sha256:1111111111111111111111111111111111111111111111111111111111111111 | sha256:2222222222222222222222222222222222222222222222222222222222222222 | 未導出 |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "各カバレッジ項目が具体的な target・dimension・requirement key に紐づいており、A の version conflict（R-A-HIGH, R-A-LOW）、B の互換 version（= 1.3）、target 分離を代表している。具体的な version 値を創作せず入力に基づいている点も確認できる。",
+      "evidence": [
+        "| TCN-012-CI02 | TCN-012-03 | target A × version: `R-A-LOW ∩ R-A-HIGH` = 空 → target A の version conflict（requirement_keys: `R-A-HIGH`, `R-A-LOW`）を blocking として報告 |",
+        "| TCN-012-CI04 | TCN-012-02 | target B × version: `R-B-VERSION`（`= 1.3`）のみで、conflict なし |",
+        "| TCN-012-CI05 | TCN-012-04 | target 分離: target A の適用集合に `R-B-VERSION` を含めず、target B の適用集合に `R-A-LOW` / `R-A-HIGH` を含めない |"
+      ]
+    }
+  ]
+}

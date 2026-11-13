@@ -1,1 +1,56 @@
-{"criteria":[{"id":"SEM-TCN-001","evaluable":true,"rating":4,"reason":"TR-CTD-008の「browser・os・authの組合せを制約付きで確認すること」が、TCN-008として分類木→組合せの条件に展開されている。全factor pairwiseとsubset {browser, os, auth} 3-wiseという意味のあるテスト条件になっており、採用理由もSPEC-CTD-008の記述に結び付けられている。","evidence":["| TR-CTD-008   | テスト条件へ展開（TCN-008） | 「browser・os・authの組合せを制約付きで確認すること」を、分類木 → 組合せ（pairwise＋3-wise）で展開。","| TCN-008        | TR-CTD-008   | browser（Chrome/Firefox）・os（Windows/Linux/macOS）・auth（password/SAML）の制約付き組合せが設定依存の欠陥を起こさないこと | 組合せ   | 分類木 → 組合せ（mixed-strength: global_strength=2、subset {auth, browser, os} strength=3）"]},{"id":"SEM-TCN-002","evaluable":true,"rating":4,"reason":"製品behaviorの組合せ問題であり、factor数と制約から見て全factor pairwiseとsubset 3-wiseのmixed-strength組合せは問題構造に合っている。技法の根拠として入力のSPEC-CTD-008記述を引いている。","evidence":["| TCN-008        | TR-CTD-008   | ... | 組合せ   | 分類木 → 組合せ（mixed-strength: global_strength=2、subset {auth, browser, os} strength=3）","| 観点ID (draft) | ... | テスト技法 / 根拠 ... 分類木 → 組合せ（mixed-strength ...）"]},{"id":"SEM-TCN-003","evaluable":true,"rating":4,"reason":"十分性の基準として、CI01は成立可能な全値ペア、CI02は制約適用後に成立する3因子tupleの全件を要求しており、入力のSPEC-CTD-008の記述と意味的に一致する。成立不能tupleを除外する扱いも明示されている。ただし生成結果による確認は未実施である。","evidence":["| TCN-008-CI01 | ... | 全factor pairwise：成立可能な全値ペア16件を、少なくとも1つの生成行で覆う ...","| TCN-008-CI02 | ... | subset {browser, os, auth} 3-wise：制約適用後に成立するtuple 11件を、少なくとも1つの生成行で覆う ...","| 候補 ... | browser=Firefox × os=macOS × auth=SAML（12組合せ中の1件） | 制約 `ff-macos-saml-infeasible` | 成立不能 | 入力がSPEC-CTD-008を根拠に成立不能と指定。3-wise criterionの母集団から除外する。"]},{"id":"SEM-TCN-004","evaluable":true,"rating":3,"reason":"CI01とCI02はそれぞれのcriterionを具体的な母集団（16ペア、11 tuple）として列挙しており、件数も入力の因子・制約から正しく導出されている。一方で、生成行・targetへの対応付けは未実施のため、coverage itemが実際の生成行で代表された状態にはなっていない。","evidence":["CI02の母集団（制約適用後11件、browser / os / auth の順）: 1. Chrome / Windows / password ... 11. Firefox / macOS / password","| TCN-008-CI01 | ... | 全factor pairwise：成立可能な全値ペア16件 ... (browser×os 6件、browser×auth 4件、os×auth 6件) ...","生成行は未生成（組合せruntime未実行）。runtime結果が得られるまで、行ID・行番号・witnessは割り当てない。"]},{"id":"SEM-TCN-005","evaluable":true,"rating":4,"reason":"CI01とCI02は別criterionとして保持され、統合しない理由が明示されている。CI02の射影がCI01を含むことを認識したうえで重複を避けており、同一意味の条件を不要に重複させていない。","evidence":["| CI01 と CI02 の統合 | なし。CI02の射影がCI01を満たすが、入力で明示された2つのcriterionであるため統合しない。 |","制約 `Firefox+macOS+SAML` は成立不能として除外。CI01とCI02は別criterionとして保持し統合しない。"]}]}
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "TR-CTD-008の「browser・os・authの組合せを制約付きで確認すること」が、TCN-008として分類木→組合せの条件に展開されている。全factor pairwiseとsubset {browser, os, auth} 3-wiseという意味のあるテスト条件になっており、採用理由もSPEC-CTD-008の記述に結び付けられている。",
+      "evidence": [
+        "| TR-CTD-008   | テスト条件へ展開（TCN-008） | 「browser・os・authの組合せを制約付きで確認すること」を、分類木 → 組合せ（pairwise＋3-wise）で展開。",
+        "| TCN-008        | TR-CTD-008   | browser（Chrome/Firefox）・os（Windows/Linux/macOS）・auth（password/SAML）の制約付き組合せが設定依存の欠陥を起こさないこと | 組合せ   | 分類木 → 組合せ（mixed-strength: global_strength=2、subset {auth, browser, os} strength=3）"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "製品behaviorの組合せ問題であり、factor数と制約から見て全factor pairwiseとsubset 3-wiseのmixed-strength組合せは問題構造に合っている。技法の根拠として入力のSPEC-CTD-008記述を引いている。",
+      "evidence": [
+        "| TCN-008        | TR-CTD-008   | ... | 組合せ   | 分類木 → 組合せ（mixed-strength: global_strength=2、subset {auth, browser, os} strength=3）",
+        "| 観点ID (draft) | ... | テスト技法 / 根拠 ... 分類木 → 組合せ（mixed-strength ...）"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "十分性の基準として、CI01は成立可能な全値ペア、CI02は制約適用後に成立する3因子tupleの全件を要求しており、入力のSPEC-CTD-008の記述と意味的に一致する。成立不能tupleを除外する扱いも明示されている。ただし生成結果による確認は未実施である。",
+      "evidence": [
+        "| TCN-008-CI01 | ... | 全factor pairwise：成立可能な全値ペア16件を、少なくとも1つの生成行で覆う ...",
+        "| TCN-008-CI02 | ... | subset {browser, os, auth} 3-wise：制約適用後に成立するtuple 11件を、少なくとも1つの生成行で覆う ...",
+        "| 候補 ... | browser=Firefox × os=macOS × auth=SAML（12組合せ中の1件） | 制約 `ff-macos-saml-infeasible` | 成立不能 | 入力がSPEC-CTD-008を根拠に成立不能と指定。3-wise criterionの母集団から除外する。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "CI01とCI02はそれぞれのcriterionを具体的な母集団（16ペア、11 tuple）として列挙しており、件数も入力の因子・制約から正しく導出されている。一方で、生成行・targetへの対応付けは未実施のため、coverage itemが実際の生成行で代表された状態にはなっていない。",
+      "evidence": [
+        "CI02の母集団（制約適用後11件、browser / os / auth の順）: 1. Chrome / Windows / password ... 11. Firefox / macOS / password",
+        "| TCN-008-CI01 | ... | 全factor pairwise：成立可能な全値ペア16件 ... (browser×os 6件、browser×auth 4件、os×auth 6件) ...",
+        "生成行は未生成（組合せruntime未実行）。runtime結果が得られるまで、行ID・行番号・witnessは割り当てない。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-005",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "CI01とCI02は別criterionとして保持され、統合しない理由が明示されている。CI02の射影がCI01を含むことを認識したうえで重複を避けており、同一意味の条件を不要に重複させていない。",
+      "evidence": [
+        "| CI01 と CI02 の統合 | なし。CI02の射影がCI01を満たすが、入力で明示された2つのcriterionであるため統合しない。 |",
+        "制約 `Firefox+macOS+SAML` は成立不能として除外。CI01とCI02は別criterionとして保持し統合しない。"
+      ]
+    }
+  ]
+}

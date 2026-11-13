@@ -1,1 +1,49 @@
-{"criteria":[{"id":"SEM-TCN-001","evaluable":true,"rating":4,"reason":"Test Requirementの「SPEC-CRUD-001のCRUD matrix・sequence・postconditionに基づくCRUD Coverage Itemを作る」を、観点（TCN-001〜004）とカバレッジ項目に展開している。matrixの埋まり8セルと4つのnot_applicableを、業務操作11件、sequence1件、postcondition3件に具体化しており、件数も入力と一致する。テスト要求IDが未付与である点は、意味展開の評価には影響しない。","evidence":["| TCN-001 | 未付与 | Order × order-lifecycle のC／R／U セルの各業務操作が定義どおり存在し、検証対象になる |","定義済みcell 8（Order: C／R／U、InventoryReservation: C／U／D、BillingBalance: R／U）と not_applicable 4 で、12枠すべてが閉じている。業務操作単位では11件（TCN-001〜003の各CI）を定義した。","| TCN-004-CI04 | TCN-004 | postcondition: BillingBalance が place 前の残高へ戻る"]},{"id":"SEM-TCN-002","evaluable":true,"rating":4,"reason":"matrix cellのcompleteness coverageにはCRUD Testingを、Order sequenceのpostcondition確認にはSPEC-CRUD-001のsequence定義を根拠とした技法を選んでおり、問題構造に合っている。not_applicable cellにはAuthorityを付けて保持している。技法名がcompletenessとconsistencyで分けて明記されており、誤った製品技法の付与は見当たらない。","evidence":["テスト技法: CRUD Testing（completenessとconsistencyを別々に閉じる）。","| TCN-004 | 未付与 | Order のlifecycle sequence `place → amend → cancel` を実行し、その後の状態関係を確認する | CRUD consistency | CRUD / SPEC-CRUD-001 sequence |","| Order × D（delete） | CRUD matrix completeness | not_applicable（Authority: SPEC-CRUD-001 matrix）"]},{"id":"SEM-TCN-003","evaluable":true,"rating":3,"reason":"sequence 1件とpostcondition 3件の確認、およびmatrix上の全セルを対象とする方針は、Authorityの範囲で妥当である。一方、completeness項目のカバレッジ基準は「当該セルに配置された業務操作を全件カバー」であり、各CIは「セルの存在のみ」と明記されている。個別操作の期待結果が未定義のため、セルが存在するだけで何を満たせば十分かが実際の挙動検証として閉じていない。これは候補自身が確認事項1で明記している限界である。","evidence":["| TCN-001 | 未付与 | ... | CRUD completeness | CRUD / SPEC-CRUD-001 matrix | 当該セルに配置された業務操作を全件カバー |","セルの存在のみ。個別の期待結果は未定義","1. 個別業務操作（place / get / amend / cancel / reserve / adjust / release / charge / adjust / refund）の期待結果がSPEC-CRUD-001に定義されていない。"]},{"id":"SEM-TCN-004","evaluable":true,"rating":4,"reason":"CI項目は、CRUD cell（entity・function・operation）、sequence、postcondition 3件を具体的に名指ししており、Criteriaを代表している。Orderのcancelled、InventoryReservationの全量release、BillingBalanceのplace前残高への復帰がそれぞれ独立したCIとして表されている。BillingBalanceの相対的な残高の観測方法が未確定であることも候補が明示している。","evidence":["| TCN-004-CI02 | TCN-004 | postcondition: Order が cancelled である |","| TCN-004-CI03 | TCN-004 | postcondition: InventoryReservation が全量release済みである |","| TCN-004-CI04 | TCN-004 | postcondition: BillingBalance が place 前の残高へ戻る |","3. BillingBalanceの「place前の残高」は相対的な値である。place前の残高をどの時点で、どの操作（候補: BillingBalance get、TCN-003-CI01）で観測するかはSPEC-CRUD-001に定義がなく、確認が必要である。"]}]}
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "Test Requirementの「SPEC-CRUD-001のCRUD matrix・sequence・postconditionに基づくCRUD Coverage Itemを作る」を、観点（TCN-001〜004）とカバレッジ項目に展開している。matrixの埋まり8セルと4つのnot_applicableを、業務操作11件、sequence1件、postcondition3件に具体化しており、件数も入力と一致する。テスト要求IDが未付与である点は、意味展開の評価には影響しない。",
+      "evidence": [
+        "| TCN-001 | 未付与 | Order × order-lifecycle のC／R／U セルの各業務操作が定義どおり存在し、検証対象になる |",
+        "定義済みcell 8（Order: C／R／U、InventoryReservation: C／U／D、BillingBalance: R／U）と not_applicable 4 で、12枠すべてが閉じている。業務操作単位では11件（TCN-001〜003の各CI）を定義した。",
+        "| TCN-004-CI04 | TCN-004 | postcondition: BillingBalance が place 前の残高へ戻る"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "matrix cellのcompleteness coverageにはCRUD Testingを、Order sequenceのpostcondition確認にはSPEC-CRUD-001のsequence定義を根拠とした技法を選んでおり、問題構造に合っている。not_applicable cellにはAuthorityを付けて保持している。技法名がcompletenessとconsistencyで分けて明記されており、誤った製品技法の付与は見当たらない。",
+      "evidence": [
+        "テスト技法: CRUD Testing（completenessとconsistencyを別々に閉じる）。",
+        "| TCN-004 | 未付与 | Order のlifecycle sequence `place → amend → cancel` を実行し、その後の状態関係を確認する | CRUD consistency | CRUD / SPEC-CRUD-001 sequence |",
+        "| Order × D（delete） | CRUD matrix completeness | not_applicable（Authority: SPEC-CRUD-001 matrix）"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "sequence 1件とpostcondition 3件の確認、およびmatrix上の全セルを対象とする方針は、Authorityの範囲で妥当である。一方、completeness項目のカバレッジ基準は「当該セルに配置された業務操作を全件カバー」であり、各CIは「セルの存在のみ」と明記されている。個別操作の期待結果が未定義のため、セルが存在するだけで何を満たせば十分かが実際の挙動検証として閉じていない。これは候補自身が確認事項1で明記している限界である。",
+      "evidence": [
+        "| TCN-001 | 未付与 | ... | CRUD completeness | CRUD / SPEC-CRUD-001 matrix | 当該セルに配置された業務操作を全件カバー |",
+        "セルの存在のみ。個別の期待結果は未定義",
+        "1. 個別業務操作（place / get / amend / cancel / reserve / adjust / release / charge / adjust / refund）の期待結果がSPEC-CRUD-001に定義されていない。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "CI項目は、CRUD cell（entity・function・operation）、sequence、postcondition 3件を具体的に名指ししており、Criteriaを代表している。Orderのcancelled、InventoryReservationの全量release、BillingBalanceのplace前残高への復帰がそれぞれ独立したCIとして表されている。BillingBalanceの相対的な残高の観測方法が未確定であることも候補が明示している。",
+      "evidence": [
+        "| TCN-004-CI02 | TCN-004 | postcondition: Order が cancelled である |",
+        "| TCN-004-CI03 | TCN-004 | postcondition: InventoryReservation が全量release済みである |",
+        "| TCN-004-CI04 | TCN-004 | postcondition: BillingBalance が place 前の残高へ戻る |",
+        "3. BillingBalanceの「place前の残高」は相対的な値である。place前の残高をどの時点で、どの操作（候補: BillingBalance get、TCN-003-CI01）で観測するかはSPEC-CRUD-001に定義がなく、確認が必要である。"
+      ]
+    }
+  ]
+}

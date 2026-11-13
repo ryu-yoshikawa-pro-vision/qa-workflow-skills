@@ -1,47 +1,47 @@
 {
- "runner_kind": "static",
- "repo_path": "<scratchpad>/prod-2a8",
- "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
- "argv": [
-  "/usr/bin/python3",
-  "/mnt/c/Users/ryu-yoshikawa/Documents/qa-workflow-skills/docs/implementation/pr22/evidence/final-acceptance-2026-11-12/static/eslint_adapter.py",
-  "src/application/contracts/common.ts",
-  "src/application/does-not-exist.ts"
- ],
- "reviewed_argv": [
-  "/usr/bin/python3",
-  "/mnt/c/Users/ryu-yoshikawa/Documents/qa-workflow-skills/docs/implementation/pr22/evidence/final-acceptance-2026-11-12/static/eslint_adapter.py",
-  "src/application/contracts/common.ts",
-  "src/application/does-not-exist.ts"
- ],
- "attempts": 1,
- "timeout_seconds": 300,
- "preflight": {
-  "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
-  "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
-  "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
-  "environment_ref": "local-wsl2-linux;node-v24.22.2;eslint-9.39.2;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
-  "operation_ref": "pr22-acceptance-static-missing-path-control",
-  "runner_ref": "static",
-  "script_chain_reviewed": true,
-  "permissions_verified": true,
-  "side_effects": [],
-  "isolated_environment": true,
-  "external_side_effects": false,
-  "shared_resource": false
- },
- "static_analysis": {
-  "tool_ref": "eslint",
-  "tool_version": "v9.39.2",
-  "rules_ref": "eslint.config.js@sha256:58a9526ad3c684d1be63d1e729ad6a896ab7c3b870e5988728f5e81c082aeb72",
-  "config_ref": "eslint.config.js",
-  "expected_paths": [
-   "src/application/contracts/common.ts",
-   "src/application/does-not-exist.ts"
+  "runner_kind": "static",
+  "repo_path": "<scratchpad>/prod-2a8",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "argv": [
+    "/usr/bin/python3",
+    "/mnt/c/Users/ryu-yoshikawa/Documents/qa-workflow-skills/docs/implementation/pr22/evidence/final-acceptance-2026-11-12/static/eslint_adapter.py",
+    "src/application/contracts/common.ts",
+    "src/application/does-not-exist.ts"
   ],
-  "accepted_exit_codes": [
-   0,
-   1
-  ]
- }
+  "reviewed_argv": [
+    "/usr/bin/python3",
+    "/mnt/c/Users/ryu-yoshikawa/Documents/qa-workflow-skills/docs/implementation/pr22/evidence/final-acceptance-2026-11-12/static/eslint_adapter.py",
+    "src/application/contracts/common.ts",
+    "src/application/does-not-exist.ts"
+  ],
+  "attempts": 1,
+  "timeout_seconds": 300,
+  "preflight": {
+    "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "environment_ref": "local-wsl2-linux;node-v24.22.2;eslint-9.39.2;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
+    "operation_ref": "pr22-acceptance-static-missing-path-control",
+    "runner_ref": "static",
+    "script_chain_reviewed": true,
+    "permissions_verified": true,
+    "side_effects": [],
+    "isolated_environment": true,
+    "external_side_effects": false,
+    "shared_resource": false
+  },
+  "static_analysis": {
+    "tool_ref": "eslint",
+    "tool_version": "v9.39.2",
+    "rules_ref": "eslint.config.js@sha256:58a9526ad3c684d1be63d1e729ad6a896ab7c3b870e5988728f5e81c082aeb72",
+    "config_ref": "eslint.config.js",
+    "expected_paths": [
+      "src/application/contracts/common.ts",
+      "src/application/does-not-exist.ts"
+    ],
+    "accepted_exit_codes": [
+      0,
+      1
+    ]
+  }
 }
