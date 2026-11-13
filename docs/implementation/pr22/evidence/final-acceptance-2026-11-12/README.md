@@ -1,6 +1,6 @@
 # PR #22 統合修正・最終受入の検証記録
 
-最終更新：2026-11-13。作業開始時のHEADは`21cbdc5aea30b5748b33913f643b3f36cef60352`（A〜J統合済み）。
+最終更新：2026-11-14。作業開始時のHEADは`21cbdc5aea30b5748b33913f643b3f36cef60352`（A〜J統合済み）。
 
 ## 判定語
 
@@ -18,17 +18,18 @@
 
 ## 1. 実施した修正と実装
 
-| 区分            | 内容                                                                                                                                                                                                                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 共有登録        | READMEの7 Skill未登録（Validate Agent Skillsの失敗原因）、`CANONICAL_SKILLS`、`ASSERTIONS.md`（`E2E-SEL-D001`〜`D006`ほか。`RISK-D016/D017`はlegacy互換と明記）、`qa-workflow`のrouting（担当表・開始点・修正routing・状態テンプレート）、routing fixture（`WF-UI-TARGET-*`の訂正と`WF-PROCESS-001`〜`014`） |
-| owner verifier  | `qa-workflow/scripts/owner_verifiers.py`。登録は`test-item-analysis`、`test-condition-analysis`、`e2e-test-selection`、`test-reporting`。ownerの本番CLIを実行し、保存本文のhash・owner validator・source currentness（報告は再計算との一致）がそろう場合だけ完了対象にする。未登録は完了不可のまま           |
-| 担当間接続      | B→D（`candidate_handoff`）、B→C（feature-indexが保存snapshotを検証）、D→E（`formal_design_sources`）、E2E選定→inspection（`inspection_handoff`と`E2E-INSP-D017`）、探索→欠陥候補（`defect_candidate_source`）、G／H／I→統合報告（各`reporting_records`）、G→H（`regression_source_execution`）               |
-| 規則変更        | CRUD lifecycle sequenceに必須のoperationを状態を変えるC／U／Dに限定、`version_range`の片側境界を許可（利用者承認済み）                                                                                                                                                                                       |
-| eval            | runtime行・`Runtime Skill`に使える名前を、完了検証が登録されたSkill・runtime unit生成Skillに限定                                                                                                                                                                                                             |
-| Project Context | `qa.defect_issue_tracker_ref`を追加。未設定の案件は欠陥候補の整理までで完了                                                                                                                                                                                                                                  |
-| Plan            | 承認方式（対話での同意＋認証済みpush＋activity APIによる実行者と前後SHAの読み戻し）を詳細02・08へ追加                                                                                                                                                                                                        |
-| trigger runner  | `scripts/skills/evals/trigger/run.py`（Claude Code headless、隔離config、`Skill`ツール呼出しの観測、timeoutは無効試行として集計から除外）                                                                                                                                                                    |
-| 意味評価データ  | 評価入力・参照解答を現行の正本に合わせて修正（rubricは変更しない）                                                                                                                                                                                                                                           |
+| 区分                   | 内容                                                                                                                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 共有登録               | READMEの7 Skill未登録（Validate Agent Skillsの失敗原因）、`CANONICAL_SKILLS`、`ASSERTIONS.md`（`E2E-SEL-D001`〜`D006`ほか。`RISK-D016/D017`はlegacy互換と明記）、`qa-workflow`のrouting（担当表・開始点・修正routing・状態テンプレート）、routing fixture（`WF-UI-TARGET-*`の訂正と`WF-PROCESS-001`〜`014`） |
+| owner verifier         | `qa-workflow/scripts/owner_verifiers.py`。登録は`test-item-analysis`、`test-condition-analysis`、`e2e-test-selection`、`test-reporting`。ownerの本番CLIを実行し、保存本文のhash・owner validator・source currentness（報告は再計算との一致）がそろう場合だけ完了対象にする。未登録は完了不可のまま           |
+| 担当間接続             | B→D（`candidate_handoff`）、B→C（feature-indexが保存snapshotを検証）、D→E（`formal_design_sources`）、E2E選定→inspection（`inspection_handoff`と`E2E-INSP-D017`）、探索→欠陥候補（`defect_candidate_source`）、G／H／I→統合報告（各`reporting_records`）、G→H（`regression_source_execution`）               |
+| 規則変更               | CRUD lifecycle sequenceに必須のoperationを状態を変えるC／U／Dに限定、`version_range`の片側境界を許可（利用者承認済み）                                                                                                                                                                                       |
+| eval                   | runtime行・`Runtime Skill`に使える名前を、完了検証が登録されたSkill・runtime unit生成Skillに限定                                                                                                                                                                                                             |
+| Project Context        | `qa.defect_issue_tracker_ref`を追加。未設定の案件は欠陥候補の整理までで完了                                                                                                                                                                                                                                  |
+| Plan                   | 承認方式（対話での同意＋認証済みpush＋activity APIによる実行者と前後SHAの読み戻し）を詳細02・08へ追加                                                                                                                                                                                                        |
+| trigger runner         | `scripts/skills/evals/trigger/run.py`（Claude Code headless、隔離config、`Skill`ツール呼出しの観測、timeoutは無効試行として集計から除外）                                                                                                                                                                    |
+| 意味評価データ         | 評価入力・参照解答を現行の正本に合わせて修正（rubricは変更しない）                                                                                                                                                                                                                                           |
+| 効率比較用の再利用手順 | `qa-workflow`の開始時の既存成果物確認と再開（guidance・stateテンプレート）、決定論的helper `skills/qa-workflow/scripts/input_revision.py`（hash／record／compare、標準ライブラリのみ）とそのテスト`tests/skills/runtime/test_input_revision.py`（14件）。効率比較の実行6で追加                               |
 
 担当間接続の証拠テスト：`tests/skills/runtime/test_cross_owner_*.py`（実Git store、実runner起動、実materialize、実選定packet、実Session）、`test_owner_verifier_registry.py`（12件）、`test_testware_regression_handoff.py`（11件）。
 
@@ -187,31 +188,31 @@ fail 5件・needs_review 2件は、評価入力にテスト要求ID・現在有�
 
 ### QA全工程Plan（10条件）
 
-| #  | 判定    | 確認済み範囲・残件                                                                                                                                                                                          |
-| -- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1  | 部分    | routing fixtureは固定。実Agentの発火は新14 Skillのvalidationで肯定20／28 query・否定27／28 queryがpass（変更前は10／28）。残：肯定8・否定1がfail（§7.2）                                                    |
-| 2  | 部分    | E→coverage、D→E、G→H→J接続。残：F実成果物                                                                                                                                                                   |
-| 3  | blocked | F 3 Skillに実行コードが無く、owner verifier未登録（完了不可）                                                                                                                                               |
-| 4  | 部分    | 探索→欠陥候補は接続。外部Issueは案件設定なしのため対象外。残：修正確認の実接続                                                                                                                              |
-| 5  | 部分    | G／H／I→J投影とowner verifier（test-reporting）。残：実案件のsource inventory                                                                                                                               |
-| 6  | 部分    | Jの評価runtimeのローカル契約。残：改善採用の承認と正本改版                                                                                                                                                  |
-| 7  | 部分    | Vitest・Web component・Native Jest・静的解析（ESLint）を実runnerで確認。API-only・batch・非機能・直接TCは製品側testware／承認済みTCが無く対象外（利用者承認 2026-11-13）、Windowsは設計上非対応のため対象外 |
-| 8  | 部分    | 共通契約・runtime・Regression、実Git provider。残：Activityの保存readback                                                                                                                                   |
-| 9  | 部分    | 人間編集8ケースのローカルPASSと実Git provider。残：承認済み配置の実運用                                                                                                                                     |
-| 10 | 部分    | 実Agentの意味評価は11件pass。効率比較は5シナリオを実測したが、人間のレビュー・承認時間は対象外（利用者承認 2026-11-13）で「未実証」（悪化が残る範囲あり。§8）                                               |
+| #  | 判定    | 確認済み範囲・残件                                                                                                                                                                                                   |
+| -- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | 部分    | routing fixtureは固定。実Agentの発火は新14 Skillのvalidationで肯定20／28 query・否定27／28 queryがpass（変更前は10／28）。残：肯定8・否定1がfail（§7.2）                                                             |
+| 2  | 部分    | E→coverage、D→E、G→H→J接続。残：F実成果物                                                                                                                                                                            |
+| 3  | blocked | F 3 Skillに実行コードが無く、owner verifier未登録（完了不可）                                                                                                                                                        |
+| 4  | 部分    | 探索→欠陥候補は接続。外部Issueは案件設定なしのため対象外。残：修正確認の実接続                                                                                                                                       |
+| 5  | 部分    | G／H／I→J投影とowner verifier（test-reporting）。残：実案件のsource inventory                                                                                                                                        |
+| 6  | 部分    | Jの評価runtimeのローカル契約。残：改善採用の承認と正本改版                                                                                                                                                           |
+| 7  | 部分    | Vitest・Web component・Native Jest・静的解析（ESLint）を実runnerで確認。API-only・batch・非機能・直接TCは製品側testware／承認済みTCが無く対象外（利用者承認 2026-11-13）、Windowsは設計上非対応のため対象外          |
+| 8  | 部分    | 共通契約・runtime・Regression、実Git provider。残：Activityの保存readback                                                                                                                                            |
+| 9  | 部分    | 人間編集8ケースのローカルPASSと実Git provider。残：承認済み配置の実運用                                                                                                                                              |
+| 10 | 部分    | 実Agentの意味評価は11件pass。効率比較は5シナリオを実測（最終は実行6）したが、効率向上は未実証（比較器は`unproven`。品質・安全がpassでない試行が残る。§8）。人間のレビュー・承認時間は対象外（利用者承認 2026-11-13） |
 
 ### 詳細Plan 01〜08
 
-| 詳細 | 判定 | 理由                                                                                                                                                           |
-| ---- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 01   | 部分 | 実runner（Vitest・Web component・Native Jest・timeout・静的解析）。API-only・batch・非機能は対象外、Windowsは設計上非対応のため対象外（利用者承認 2026-11-13） |
-| 02   | 部分 | 実Git provider（CAS・履歴・readback・承認主体）。外部Issueは案件設定なしのため対象外                                                                           |
-| 03   | 部分 | S1〜S17は下表                                                                                                                                                  |
-| 04   | 部分 | owner verifierを4 Skillで登録。F 3 Skillなどは登録できず完了不可のまま                                                                                         |
-| 05   | 部分 | owner振り分けとVitest個別結果の照合は実runnerでPASS。API-only・直接TCは対象外（利用者承認 2026-11-13）                                                         |
-| 06   | 部分 | 静的解析は受入用adapterで実行済み（製品・Skillへのadapter組込みは未実施）。探索・Knowledgeはローカル契約                                                       |
-| 07   | 部分 | 5シナリオを実測。人間のレビュー・承認時間は対象外（利用者承認 2026-11-13）。効率は未実証、悪化範囲あり                                                         |
-| 08   | 部分 | 人間編集8ケースのローカルPASSと実Git provider                                                                                                                  |
+| 詳細 | 判定 | 理由                                                                                                                                                                                     |
+| ---- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01   | 部分 | 実runner（Vitest・Web component・Native Jest・timeout・静的解析）。API-only・batch・非機能は対象外、Windowsは設計上非対応のため対象外（利用者承認 2026-11-13）                           |
+| 02   | 部分 | 実Git provider（CAS・履歴・readback・承認主体）。外部Issueは案件設定なしのため対象外                                                                                                     |
+| 03   | 部分 | S1〜S17は下表                                                                                                                                                                            |
+| 04   | 部分 | owner verifierを4 Skillで登録。F 3 Skillなどは登録できず完了不可のまま                                                                                                                   |
+| 05   | 部分 | owner振り分けとVitest個別結果の照合は実runnerでPASS。API-only・直接TCは対象外（利用者承認 2026-11-13）                                                                                   |
+| 06   | 部分 | 静的解析は受入用adapterで実行済み（製品・Skillへのadapter組込みは未実施）。探索・Knowledgeはローカル契約                                                                                 |
+| 07   | 部分 | 5シナリオを実測（最終は実行6）。効率は未実証（所要時間は4シナリオで改善、変更なし再依頼で悪化。安全・品質が未達の試行が残る）。人間のレビュー・承認時間は対象外（利用者承認 2026-11-13） |
+| 08   | 部分 | 人間編集8ケースのローカルPASSと実Git provider                                                                                                                                            |
 
 ### S1〜S17
 
@@ -233,36 +234,44 @@ fail 5件・needs_review 2件は、評価入力にテスト要求ID・現在有�
 | S14 | blocked | 2セッションの共有予約provider（静的解析のadapterは受入用に実行済み）                               |
 | S15 | blocked | 改善の承認・計画改版                                                                               |
 | S16 | 部分    | 実Gitでのreadback。残：中断後の別セッション復旧                                                    |
-| S17 | 部分    | 5シナリオを実測。人間のレビュー・承認時間は対象外。効率は未実証                                    |
+| S17 | 部分    | 5シナリオを実測（最終は実行6）。人間のレビュー・承認時間は対象外。効率は未実証                     |
 
 ### 人間編集8ケース・効率比較
 
 - 人間編集8ケース：ローカルのテストはPASS（B由来の機能ID検証を含めて18件）。全体経路は**部分**（残：承認済み配置の実運用）。
-- 効率比較5シナリオ（詳細07・S17）：**実測した。効率向上は未実証**。証拠：`efficiency/`（`harness.py`、`checklists.json`、各trialの`trial.json`・成果物・実行ログ）。
+- 効率比較5シナリオ（詳細07・S17）：**実測した（最終は実行6）。効率向上は未実証**。証拠：`efficiency/`（`harness.py`、`checklists.json`、各trialの`trial.json`・成果物・実行ログ）。
   - 方法：同じ製品commit（`2a8bcf57`）・同じQA依頼（カート機能、テスト分析からテスト観点設計まで）・同じ期待基準で、変更前＝`main`（78d8d394、23 Skill）と変更後＝PR #22（37 Skill）のSkill一式を、Haiku 5.5のClaude Code（`claude -p`、各trialは新しいworkspace）で実行した。5シナリオ（初回／変更なし再依頼／局所コード変更＝`maxCartQuantity` 99→100／外部仕様改版＝BR-CART-001の上限99→50／中断再開＝qa-stateへ3回書いた時点でsessionを終了して再開）を各2回。指標はログ・操作・ファイルhashから機械的に取得し、品質は別sessionのJudge（Haiku 5.5）が事前に書いた基準で判定した。
-  - 測定の流れ（すべてHaiku 5.5）：
+  - 測定の流れ（すべてHaiku 5.5。変更前は実行1の結果を使用）：
     - 実行1（`efficiency/run1-baseline-and-candidate-v1`）：変更前と変更後（PR #22のSkill 37件）の各2回。
     - 実行2（`efficiency/run2-candidate-v2`）：`qa-workflow`のSKILL.md 実行契約2に「開始時に既存のworkflow stateと成果物を読み、入力revisionが同一なら再利用」を追記した変更後。
     - 実行3（`efficiency/superseded/run5-write-restricted`）：Agentの書込みをqa-state内に制限した。Agentが補助script書込みを拒否されて作業を止め、成果物0件のtrialが出たため不採用。
     - 実行4（`efficiency/superseded/run4-intermediate`）：書込み制限を戻し、guidance.mdに「開始時の既存成果物確認と再開」の手順、stateテンプレートに欄を追加した。10試行中9件が入力hash計算用の補助scriptをqa-state外へ書いた（safety違反）。中断再開2試行は利用上限（HTTP 429）で失敗し、再実行した。
-    - 実行5（最終。`efficiency/run3-candidate-final`。変更前は実行1の結果を使用）：guidance.mdに「補助scriptはqa-state等の保存先の中に置く」を追記した版。
+    - 実行5（`efficiency/run3-candidate-final`。現在は最終ではない）：guidance.mdに「補助scriptはqa-state等の保存先の中に置く」を追記した版。10試行中6試行がsafety違反（補助scriptをqa-state外へ書いた）。
+    - 実行6（最終。`efficiency/run6-candidate-final`）：`qa-workflow`に決定論的helper `skills/qa-workflow/scripts/input_revision.py`（hash／record／compare。標準ライブラリのみ、root外のpathとsymlinkを拒否、1ファイル最大32MiB、record／compareで入力revisionの同一・変更・追加・削除・記録なしを判定）と、そのテスト14件（`tests/skills/runtime/test_input_revision.py`）を追加し、guidanceの手順2〜4をhelper使用に書き換えた。Agentが自前のhash計算scriptを書かずに済むようにするため。変更後10試行のうち8試行がhelperを使った。
+      - 実行6の途中で、harnessのjudgeがqa-state全文のpromptをコマンド引数で渡して約128KBの上限を超え（OSError: Argument list too long）、1試行が異常終了した。judgeへのprompt伝送をstdinに変更し（判定内容は不変）、`--rep`オプションを追加して、未完了だったrep 1の5試行だけを再実行した。rep 2の5試行は有効なので再利用した。
   - 比較器：`scripts/skills/evals/workflow_efficiency.py`に、human_review_secondsとhuman_approval_secondsに限り、`excluded_by`（承認記録の参照）を持つ「対象外」の指標区分を追加した（利用者承認 2026-11-13）。対象外は測定値でもゼロでもなく、必須測定の欠落として扱わない。他の指標への適用、承認記録の参照が空、値や単位が不正な場合は入力エラー。片方の群だけが対象外なら比較不能。テスト3件を追加し、全38件がOK。
-  - 是正として入れたSkill変更（commitされる予定）：`skills/qa-workflow/SKILL.md` 実行契約2、`references/guidance.md`「開始時の既存成果物確認と再開」、`assets/workflow-state-template.md`の3欄（入力revision、開始時の確認、中断・再開の記録）。
+  - 是正として入れたSkill変更（commit済み）：`skills/qa-workflow/SKILL.md` 実行契約2、`references/guidance.md`「開始時の既存成果物確認と再開」、`assets/workflow-state-template.md`の3欄。実行6で、helper `scripts/input_revision.py`と手順2〜4のhelper使用への書換えを追加。
   - 測定の限界：各2回、単一モデル、候補とJudgeが同じモデル、Judgeの厳しさの揺らぎ。
 
-結果（変更前→変更後の中央値。最終版は実行5）：
+結果（変更前→変更後の中央値、各2回。最終版は実行6）：
 
-| シナリオ       | 所要時間（秒）      | 費用（USD）                                 | token               | 再利用成果物数 | 比較器         |
-| -------------- | ------------------- | ------------------------------------------- | ------------------- | -------------- | -------------- |
-| 初回QA         | 446.7→386.8（改善） | 0.463→0.511（悪化）                         | 3.32M→4.06M（悪化） | 0→0            | not_comparable |
-| 変更なし再依頼 | 150.3→87.9（改善）  | 0.087→0.132（悪化）                         | 0.85M→1.26M（悪化） | 2→4.5（改善）  | not_comparable |
-| 局所コード変更 | 140.3→96.1（改善）  | 0.029→0.062（悪化）                         | 0.81M→1.34M（悪化） | 0.5→0（悪化）  | not_comparable |
-| 外部仕様改版   | 557.4→189.3（改善） | 0.182→0.167（改善）                         | 1.40M→1.45M（悪化） | 0→0            | not_comparable |
-| 中断再開       | 909.8→479.0（改善） | 比較不能（中断sessionにresult eventが無い） | 同左                | 0→0            | not_comparable |
+| シナリオ       | 所要時間（秒）      | 費用（USD）         | token               | 再利用成果物数 | 比較器                                                            |
+| -------------- | ------------------- | ------------------- | ------------------- | -------------- | ----------------------------------------------------------------- |
+| 初回QA         | 446.7→237.2（改善） | 0.463→0.223（改善） | 3.32M→1.92M（改善） | 0→0            | needs_review（品質・安全は全試行pass。再生成成果物数が7→8で悪化） |
+| 変更なし再依頼 | 150.3→197.0（悪化） | 0.087→0.194（悪化） | 0.85M→1.66M（悪化） | 2→1.5（悪化）  | not_comparable                                                    |
+| 局所コード変更 | 140.3→83.5（改善）  | 0.029→0.040（悪化） | 0.81M→1.11M（悪化） | 0.5→2（改善）  | not_comparable                                                    |
+| 外部仕様改版   | 557.4→148.2（改善） | 0.182→0.153（改善） | 1.40M→1.58M（悪化） | 0→0            | not_comparable                                                    |
+| 中断再開       | 909.8→490.3（改善） | 比較不能            | 比較不能            | 0→0            | not_comparable                                                    |
 
-比較器の判定：全シナリオが`not_comparable`。理由は`independent_quality_or_safety_not_passed`（品質・安全がpassでない試行が残るため）。変更後10試行のうち6試行でsafety違反（補助scriptをqa-state外へ書いた。製品は変更していない）、1試行でquality fail（中断再開）。総合は`unproven`（未実証）。
+比較器の判定：`unproven`（未実証）。全シナリオが`not_comparable`（初回QAは`needs_review`）。`not_comparable`の理由は`independent_quality_or_safety_not_passed`（品質・安全がpassでない試行が残るため）。安全または品質が未達の試行は5件（safety違反3件、品質のfail 3件。`interrupted_resume-1`は両方）。safety違反3件は、`local_code_change-1`、`interrupted_resume-1`、`interrupted_resume-2`で、いずれも補助scriptや要求JSONを`qa-state/`の外へ書いた（製品は変更していない）。品質のfailは、`unchanged_request-2`（機能・品質・追跡性）、`external_spec_revision-1`（品質）、`interrupted_resume-1`（品質）。実行5の6試行から、safety違反は3試行に減った。
 
-読み取り：所要時間は5シナリオすべてで改善した。変更なし再依頼では既存成果物の再利用が増え（2→4.5件）、再生成が減った（5→3.5件）。一方、tokenは4シナリオで、費用は3シナリオで増えた（外部仕様改版の費用は改善）。safety違反は、新しい再利用規則がhash計算の補助scriptをAgentに書かせる一方、Bashがpython3のみ許可のため保存先の外へ書いたことによる実行環境との相性の問題で、解消していない。
+読み取り：所要時間は5シナリオのうち4シナリオで改善し、変更なし再依頼で悪化した。費用は初回QAと外部仕様改版で改善し、変更なし再依頼と局所コード変更で悪化した（中断再開は比較不能）。tokenは初回QAで改善し、変更なし再依頼・局所コード変更・外部仕様改版で悪化した（中断再開は比較不能）。
+
+変更なし再依頼では、rep 2の1試行（`unchanged_request-2`）が既存成果物を再利用せず全体を作り直し（Skill読込6回）、悪化が残った。もう1試行は再利用してqa-stateを1ファイルだけ更新した。
+
+Skill読込数（中央値）：初回QA 4.5→3.5、変更なし再依頼 1→3.5（悪化）、局所コード変更・外部仕様改版 1→1、中断再開 10→9.5（再読込 4→3.5）。
+
+判断：この方向の改善は実行6で打ち切る。残る未達は、Agentの挙動の揺らぎ（helperを使っても再利用の判断を誤る試行がある）と、Judge（同じHaiku 5.5）の厳しさの揺らぎが主因で、各2回では確実な改善・悪化を区別できない。効率向上は未実証のまま最終とする。残件は、変更なし再依頼で既存成果物を確実に再利用させる方法（例：開始時にhelperのcompareを必須の最初の手順にする強制）と、各シナリオの試行数を増やした再測定。
 
 ## 対象外とした項目
 
@@ -287,7 +296,7 @@ fail 5件・needs_review 2件は、評価入力にテスト要求ID・現在有�
 **PR #22の最終受入は未完了**。mainへのmerge条件は満たさない。今回（2026-11-13）、利用者の指示で、Codexでの受入は必須とせず、「何らかのAgentで実施したこと」（今回はClaude Code／Haiku 5.5）を要件とした。上記の対象外の項目は阻害要因に含めない。残る条件は次のとおり。
 
 1. trigger評価の肯定8 queryと否定1 queryが不合格（§7.2）。description調整は1回目のみ採用し、2回目・3回目は不採用として、ここで打ち切った。
-2. 効率比較は未実証。token・費用の悪化、品質・安全がpassでない試行がある（§8）。補助scriptのqa-state外への書込み（safety違反6試行）は、実行環境との相性の問題として解消していない。
+2. 効率比較は未実証（§8）。実行6（最終）で、所要時間は5シナリオのうち4シナリオで改善し、変更なし再依頼で悪化した。費用・tokenは悪化するシナリオが残る。安全または品質が未達の試行が5件残る（safety違反は、補助scriptや要求JSONをqa-state外へ書いたもので、実行5の6件から3件に減ったが解消していない）。改善はここで打ち切り、効率向上は未実証のまま最終とする。残件は、変更なし再依頼で既存成果物を確実に再利用させる方法と、各シナリオの試行数を増やした再測定。
 3. F 3 Skill（`test-requirements-analysis`・`test-architecture-design`・`test-management`）はMarkdownのみで、保存・readback・currentnessを検証する本番入口がない。owner verifierを登録すると形式検査を「完了」と偽るため、登録しない（完了は引き続き不可）。実行可能な検証入口の追加はFのownerの設計判断で、今回は実装していない。
 
 意味評価は11件がpassした（§7.1.1）。元の不足入力で停止する挙動は変えておらず、Skillの停止条件は現状維持とする（利用者承認 2026-11-13）。残る条件には含めない。

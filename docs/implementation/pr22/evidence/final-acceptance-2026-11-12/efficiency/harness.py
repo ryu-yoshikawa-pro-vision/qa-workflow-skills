@@ -419,7 +419,6 @@ def judge(
     command = [
         "claude",
         "-p",
-        prompt,
         "--model",
         MODEL,
         "--no-session-persistence",
@@ -438,7 +437,7 @@ def judge(
             capture_output=True,
             text=True,
             timeout=900,
-            stdin=subprocess.DEVNULL,
+            input=prompt,
         )
         match = re.search(r"\{.*\}", done.stdout, re.S)
         if match:
@@ -611,7 +610,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         return records
 
     selected = [args.only_group] if args.only_group else list(groups)
-    jobs = [(g, r) for r in range(1, args.reps + 1) for g in selected]
+    reps = [args.rep] if args.rep is not None else range(1, args.reps + 1)
+    jobs = [(g, r) for r in reps for g in selected]
     with ThreadPoolExecutor(args.concurrency) as pool:
         list(pool.map(lambda job: pipeline(*job), jobs))
     return 0
@@ -784,6 +784,7 @@ def main() -> int:
     r.add_argument("--skills-candidate", type=Path, required=True)
     r.add_argument("--product-archive", type=Path, required=True)
     r.add_argument("--reps", type=int, default=2)
+    r.add_argument("--rep", type=int)
     r.add_argument("--concurrency", type=int, default=4)
     r.add_argument("--only-group", choices=["baseline", "candidate"])
     a = sub.add_parser("assemble")
@@ -792,6 +793,9 @@ def main() -> int:
         "--baseline-dir", type=Path, help="take baseline trials from another run"
     )
     args = cli.parse_args()
+    if args.command == "run" and args.rep is not None:
+        if not 1 <= args.rep <= args.reps:
+            cli.error(f"--rep must be between 1 and --reps ({args.reps})")
     return cmd_run(args) if args.command == "run" else cmd_assemble(args)
 
 

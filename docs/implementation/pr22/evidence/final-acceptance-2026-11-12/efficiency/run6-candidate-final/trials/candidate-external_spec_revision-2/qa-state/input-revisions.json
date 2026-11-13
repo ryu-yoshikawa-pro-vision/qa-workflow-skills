@@ -1,0 +1,11 @@
+{
+  "revisions": {
+    "product/docs/03_domain/business_rules.md": "8fe29aa8a481408bfb5aa05665e283a4af45ac54ec2c16856697bd48342f3735",
+    "product/docs/12_quality/acceptance_criteria.md": "cb057739f87894749eab42eb3102afa6c749456e3837c290ab3d393981537343",
+    "product/docs/spec/features/cart.md": "19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25",
+    "product/src/application/use-cases/cart-use-cases.ts": "9b7018cb617b3eeb366f0d6dcddf1046053b73ab69bfad863756fcc0d6b64f7a",
+    "product/src/domain/services/cart.ts": "fca912a84cba6fb58dcb3b188bdb741d51adbe0ac11d5c375c7e5d012b2ed1c0"
+  },
+  "root": "<scratchpad>/eff8/workspaces/candidate-external_spec_revision-2",
+  "schema_version": "input-revision-v1"
+}
