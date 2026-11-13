@@ -1,6 +1,6 @@
 ---
 name: ui-target-analysis
-description: UIの構造・操作・画面状態・ナビゲーションを、仕様Authorityと分けて分析・更新する。既存ui-target-v1の読取・移行や、人間が作業用copyで編集したUI差分の検証を行う場合に使用する。
+description: UIの構造・操作・画面状態・ナビゲーションを、仕様Authorityと分けて分析・更新する。「画面の階層・領域・操作対象・遷移・UI状態の整理」「既存ui-target-v1の読取・移行」「人間が作業用copyで編集したUI差分の検証」を求められたら、自分で整理する前に必ずこのSkillを読み込む。
 ---
 
 # UI対象分析

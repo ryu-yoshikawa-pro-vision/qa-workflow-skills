@@ -1,6 +1,6 @@
 ---
 name: feature-analysis
-description: 初回製品分析・PR更新・merge・release・資料改版のUI/API/バッチ/連携/権限/データ処理について、機能ID・情報源母集団・開発差分・変更履歴を調査するときに使用する。
+description: 製品の機能階層・機能ID・情報源母集団・開発差分・変更履歴（UI/API/バッチ/連携/権限/データ処理）を、初回製品分析・PR更新・merge・release・資料改版のときに調査する。「機能一覧・機能ID・機能差分・source revisionの更新や確認」を求められたら、自分でファイルを調べる前に必ずこのSkillを読み込んで従う。
 ---
 
 # 製品機能と開発差分の分析

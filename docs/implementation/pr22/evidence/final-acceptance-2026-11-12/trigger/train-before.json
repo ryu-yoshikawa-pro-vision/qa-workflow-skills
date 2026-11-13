@@ -1,0 +1,3239 @@
+{
+  "model": "claude-haiku-5-5",
+  "max_turns": 6,
+  "product_archive": "/tmp/claude-1000/-mnt-c-Users-ryu-yoshikawa-Documents-qa-workflow-skills/6d129db5-ce29-4e6f-9d37-45e95c6f8df0/scratchpad/product-2a8bcf5.tar",
+  "skills_available": [
+    "adversarial-review",
+    "agent-answer-form",
+    "coverage-analysis",
+    "defect-management",
+    "e2e-test-execution",
+    "e2e-test-implementation",
+    "e2e-test-inspection",
+    "e2e-test-reporting",
+    "e2e-test-result-analysis",
+    "e2e-test-selection",
+    "exploratory-testing",
+    "feature-analysis",
+    "project-context",
+    "qa-knowledge",
+    "qa-workflow",
+    "question-analysis",
+    "regression-testing",
+    "spec-analysis",
+    "test-analysis",
+    "test-architecture-design",
+    "test-case-design",
+    "test-condition-analysis",
+    "test-condition-design",
+    "test-evaluation",
+    "test-execution",
+    "test-item-analysis",
+    "test-management",
+    "test-reporting",
+    "test-requirement-design",
+    "test-requirements-analysis",
+    "test-target-inspection",
+    "testware-execution",
+    "testware-implementation",
+    "ui-target-analysis",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation"
+  ],
+  "plan": {
+    "queries": 56,
+    "runs": 168,
+    "concurrency": 3,
+    "assumed_seconds_per_run": 15,
+    "estimated_minutes": 14.0
+  },
+  "attempts": [
+    {
+      "query_id": "defect-management:train:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "defect-management"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "defect-management"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "defect-management"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:pos:1",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:pos:1",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 37.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:pos:1",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:1",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 14.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:1",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "defect-management:train:neg:1",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-selection"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-selection"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-selection"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-selection"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 56.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-selection"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 25.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 17.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:0",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "feature-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 12.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:0",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 32.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:0",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "feature-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:1",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "feature-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:1",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:pos:1",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "feature-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:0",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:0",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:0",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:1",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:1",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "feature-analysis:train:neg:1",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:0",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:0",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:0",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:1",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:1",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:pos:1",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "project-context"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:0",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:0",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:0",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:1",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:1",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "project-context:train:neg:1",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:0",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 17.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:0",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 16.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:0",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-architecture-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 4.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:1",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 15.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:1",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:1",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:0",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:0",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:0",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:1",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 19.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:1",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 64.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:1",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 5.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 4.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 5.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 5.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:0",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-evaluation"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:0",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-evaluation"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:0",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-evaluation"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:1",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:1",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:pos:1",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:0",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:0",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:0",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:1",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:1",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-evaluation:train:neg:1",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:0",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 16.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:0",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 12.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:0",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:1",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 18.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:1",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 15.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:1",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-item-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 23.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:0",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 11.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:0",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:0",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 69.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:1",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "ui-target-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:1",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 17.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:1",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 14.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:0",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-management"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 19.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:0",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:0",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-management"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:1",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 17.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:1",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 16.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:pos:1",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:0",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:0",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:0",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:1",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-architecture-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:1",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-architecture-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-management:train:neg:1",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-architecture-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:0",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-reporting"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:0",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-reporting"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:0",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-reporting"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:1",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 11.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:1",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 11.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:pos:1",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 13.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:0",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 16.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:0",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-reporting"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:0",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:1",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:1",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-reporting:train:neg:1",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-management"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 18.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 10.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 43.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-requirements-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 16.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 32.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:0",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:0",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:0",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 30.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:1",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:1",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:pos:1",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:0",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:0",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 19.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:0",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 14.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:1",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:1",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-execution:train:neg:1",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "e2e-test-execution"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:0",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:0",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:0",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:1",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 12.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:1",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 21.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:pos:1",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "testware-implementation"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 15.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:0",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 34.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:0",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:0",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:1",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:1",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "testware-implementation:train:neg:1",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 34.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 43.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 30.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 36.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 18.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "invalid_timeout",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 240.0,
+      "stream_tail": "speed\":\"standard\"},\"input_transformations\":[],\"diagnostics\":null,\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0eb0871e-c5d8-4be5-9414-9e452026c3aa\",\"uuid\":\"cba8124e-81be-4345-9454-8d0c36aa581a\",\"timestamp\":\"2026-11-13T04:14:06.809Z\",\"request_id\":\"req_011CgzH3EW6A9EB54oLE5AzW\"}\n"
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "invalid_timeout",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 240.0,
+      "stream_tail": "{\"type\":\"tool_progress\",\"tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM-heartbeat-6\",\"tool_name\":\"Agent\",\"parent_tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM\",\"elapsed_time_seconds\":217,\"heartbeat\":true,\"session_id\":\"726de1f4-62bb-4f91-93df-2fa99375b679\",\"uuid\":\"bfe3b7c2-b62e-4e5c-93a6-12a5b720ffa2\"}\n"
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 4.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "spec-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 3.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 17.6,
+      "stream_tail": ""
+    }
+  ],
+  "summary": [
+    {
+      "query_id": "defect-management:train:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "e2e-test-execution"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "defect-management:train:neg:1",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "regression-testing"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "defect-management:train:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "defect-management:train:pos:1",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "e2e-test-execution"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "e2e-test-selection:train:neg:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:0",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "e2e-test-selection:train:pos:1",
+      "skill": "e2e-test-selection",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "feature-analysis:train:neg:0",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "spec-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "feature-analysis:train:neg:1",
+      "skill": "feature-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "feature-analysis:train:pos:0",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "feature-analysis:train:pos:1",
+      "skill": "feature-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "project-context:train:neg:0",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "spec-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "project-context:train:neg:1",
+      "skill": "project-context",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "project-context:train:pos:0",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "project-context:train:pos:1",
+      "skill": "project-context",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:0",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-requirements-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-architecture-design:train:neg:1",
+      "skill": "test-architecture-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:0",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.3333333333333333,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-architecture-design:train:pos:1",
+      "skill": "test-architecture-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-item-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-analysis:train:neg:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:0",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-analysis:train:pos:1",
+      "skill": "test-condition-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-evaluation:train:neg:0",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-evaluation:train:neg:1",
+      "skill": "test-evaluation",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-evaluation:train:pos:0",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-evaluation:train:pos:1",
+      "skill": "test-evaluation",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:0",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "spec-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-item-analysis:train:neg:1",
+      "skill": "test-item-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "ui-target-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:0",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-item-analysis:train:pos:1",
+      "skill": "test-item-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-management:train:neg:0",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-requirements-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-management:train:neg:1",
+      "skill": "test-management",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-architecture-design"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-management:train:pos:0",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-management:train:pos:1",
+      "skill": "test-management",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-reporting:train:neg:0",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "e2e-test-reporting"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-reporting:train:neg:1",
+      "skill": "test-reporting",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-management"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-reporting:train:pos:0",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-reporting:train:pos:1",
+      "skill": "test-reporting",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-requirements-analysis:train:neg:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:0",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.3333333333333333,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-requirements-analysis:train:pos:1",
+      "skill": "test-requirements-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.3333333333333333,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "testware-execution:train:neg:0",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "testware-implementation"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-execution:train:neg:1",
+      "skill": "testware-execution",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "e2e-test-execution"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-execution:train:pos:0",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-execution:train:pos:1",
+      "skill": "testware-execution",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-implementation:train:neg:0",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-implementation:train:neg:1",
+      "skill": "testware-implementation",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "testware-implementation:train:pos:0",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "testware-implementation:train:pos:1",
+      "skill": "testware-implementation",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "ui-target-analysis:train:neg:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "spec-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:0",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "ui-target-analysis:train:pos:1",
+      "skill": "ui-target-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 1,
+      "invalid_attempts": 2,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "insufficient_valid_attempts"
+    }
+  ]
+}

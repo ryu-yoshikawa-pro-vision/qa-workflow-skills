@@ -1,6 +1,6 @@
 ---
 name: test-condition-analysis
-description: Independently identify reusable common test-condition candidates from current specifications, Authority refs, product feature inventory, and available UI or item refs. Use for stable COND IDs, evidence, lifecycle, source revision impact, and advisory candidate crosschecks; do not use for formal TCN/CI, item applicability decisions, expected results, risk scoring, or test execution.
+description: Independently identify reusable common test-condition candidates from current specifications, Authority refs, product feature inventory, and available UI or item refs. When the user asks (in Japanese or English) to list, maintain or recheck common test-condition candidates (共通テスト条件候補, COND ID, 根拠revision, stale化, ITEMとの照合), load this Skill first, before analysing. Use for stable COND IDs, evidence, lifecycle, source revision impact, and advisory candidate crosschecks; do not use for formal TCN/CI, item applicability decisions, expected results, risk scoring, or test execution.
 ---
 
 # Test Condition Analysis

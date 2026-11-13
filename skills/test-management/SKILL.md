@@ -1,6 +1,6 @@
 ---
 name: test-management
-description: QA計画の作成・改版、開始／終了基準、予定source・実行母集団、進捗・差異、プロジェクトリスクと是正処置を管理する。計画対実績の確認に使用する。Product Risk、qa-workflow state、Regression Run、raw実行結果、統合reportは管理しない。
+description: QA計画の作成・改版、開始／終了基準、予定source・実行母集団、進捗・差異、プロジェクトリスクと是正処置を管理する。「QA計画・開始終了基準・日程・進捗・計画対実績・見積差異・計画改版」を求められたら、自分で計画を書く前に必ずこのSkillを読み込む。Product Risk、qa-workflow state、Regression Run、raw実行結果、統合reportは管理しない。
 ---
 
 # テスト計画・モニタリング・コントロール

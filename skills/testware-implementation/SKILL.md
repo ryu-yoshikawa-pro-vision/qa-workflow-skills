@@ -1,6 +1,6 @@
 ---
 name: testware-implementation
-description: API-only Playwright、Vitest、component、batch、event、非機能など、ブラウザE2E以外の保存可能な自動testware・fixture・設定を安全に実装・更新するSkill。TCまたは明示対象と変更権限・仕様根拠があるときに使用する。
+description: API-only Playwright、Vitest、component、batch、event、非機能など、ブラウザE2E以外の保存可能な自動testware・fixture・設定を安全に実装・更新するSkill。「非E2Eのテストコード・fixture・設定の追加や更新」を求められたら、コードを書く前に必ずこのSkillを読み込む。TCまたは明示対象と変更権限・仕様根拠があるときに使用する。
 ---
 
 # 非E2E testware実装

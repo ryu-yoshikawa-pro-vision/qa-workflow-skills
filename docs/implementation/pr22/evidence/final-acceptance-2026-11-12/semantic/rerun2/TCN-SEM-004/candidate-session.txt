@@ -1,0 +1,12 @@
+候補成果物を `candidate-output.md` に書き込みました。ただし **runtimeは実行できておらず、この成果物は未完成扱い**です。
+
+**実行したruntime:** なし。`crud_matrix.py`（親の`condition_structure.py`と`verify_runtime_evidence`も含む）をBashで実行しようとしましたが、Bash権限が拒否されました。機械証拠は手組みしていません。Skillのruntime gateを通っていないため、契約適合済みとは扱えません。
+
+**残したもの:** 実行用の入力JSONを `cases/TCN-SEM-004/runtime/crud-request.json` に保存しました。権限が使えるようになれば `python3 <skill>/scripts/crud_matrix.py < crud-request.json` で実行できます。その後、結果を反映して成果物を更新する必要があります。
+
+**判断に迷った点:**
+- **粒度:** CRUD cell単位ではなく業務操作単位で項目化しました（11件）。`BillingBalance.U` のように1セルに複数の業務操作があるためです。
+- **期待結果:** 個別業務操作の期待結果はAuthorityに定義がないため、創作せず「セルの存在のみ」としました。確認事項に回しています。sequenceのpostcondition 3件だけは期待結果を持ちます。
+- **横断的なpostcondition:** runtimeのsequenceは単一entityなので、InventoryReservationとBillingBalanceにまたがるpostconditionは機械的に表せません。成果物の記述だけで保持しています。
+- **未採用のsequence:** InventoryReservationとBillingBalanceのlifecycle sequenceは、Authorityにないため作っていません。
+- **欠けている入力:** テスト要求ID・テストレベル・優先度が入力にないため、未付与・未設定としました。

@@ -1,6 +1,6 @@
 ---
 name: testware-execution
-description: 非E2EのVitest・API-only Playwright・component・batch・event・非機能testwareの実runner実行、非ブラウザTCの直接観測、許可された静的解析ツール実行とraw結果・cleanup・診断を担当するSkill。実行のみ・TCなしでも直接開始できる。
+description: 非E2EのVitest・API-only Playwright・component・batch・event・非機能testwareの実runner実行、非ブラウザTCの直接観測、許可された静的解析ツール実行とraw結果・cleanup・診断を担当するSkill。「非E2Eテストの実行、raw結果の取得、静的解析の実行」を求められたら、コマンドを自分で組み立てる前に必ずこのSkillを読み込む。実行のみ・TCなしでも直接開始できる。
 ---
 
 # 非E2E testware実行

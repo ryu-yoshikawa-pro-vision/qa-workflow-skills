@@ -123,32 +123,61 @@ def make_config_dir(base: Path, credentials: Path) -> Path:
     return config
 
 
+SKILL_MD_MARKER = "/.claude/skills/"
+
+
+def _tool_uses(line: str) -> list[dict[str, Any]]:
+    try:
+        event = json.loads(line)
+    except ValueError:
+        return []
+    if not isinstance(event, dict) or event.get("type") != "assistant":
+        return []
+    content = (event.get("message") or {}).get("content")
+    if not isinstance(content, list):
+        return []
+    return [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+
+
+def skill_loads_in_line(line: str) -> list[tuple[str, str]]:
+    """``(skill, method)`` for each Skill load in one stream-json line.
+
+    ``method`` is ``skill_tool`` (the ``Skill`` tool) or ``read_skill_md`` (the
+    model read ``.claude/skills/<name>/SKILL.md`` directly, which loads the same
+    instructions). Reading any other file of a Skill, or mentioning a Skill in
+    text, is not a load.
+    """
+    loads: list[tuple[str, str]] = []
+    for block in _tool_uses(line):
+        tool_input = block.get("input")
+        if not isinstance(tool_input, dict):
+            continue
+        if block.get("name") == "Skill" and isinstance(tool_input.get("skill"), str):
+            loads.append((tool_input["skill"], "skill_tool"))
+        elif block.get("name") == "Read" and isinstance(
+            tool_input.get("file_path"), str
+        ):
+            path = tool_input["file_path"].replace("\\", "/")
+            head, marker, tail = path.rpartition(SKILL_MD_MARKER)
+            parts = tail.split("/")
+            if marker and len(parts) == 2 and parts[1] == "SKILL.md" and parts[0]:
+                loads.append((parts[0], "read_skill_md"))
+    return loads
+
+
+def skill_loads(stream: str) -> list[tuple[str, str]]:
+    return [load for line in stream.splitlines() for load in skill_loads_in_line(line)]
+
+
 def invoked_skills(stream: str) -> list[str]:
-    """Skills loaded through the ``Skill`` tool in a stream-json log, in order."""
-    found: list[str] = []
-    for line in stream.splitlines():
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if event.get("type") != "assistant":
-            continue
-        for block in event.get("message", {}).get("content", []):
-            if (
-                isinstance(block, dict)
-                and block.get("type") == "tool_use"
-                and block.get("name") == "Skill"
-                and isinstance(block.get("input"), dict)
-                and isinstance(block["input"].get("skill"), str)
-            ):
-                found.append(block["input"]["skill"])
-    return found
+    """Skills loaded (by either method) in a stream-json log, in order."""
+    return [name for name, _ in skill_loads(stream)]
 
 
 def skill_call_in_line(line: str) -> str | None:
-    """The Skill named by a ``Skill`` tool call in one stream-json line, if any."""
-    skills = invoked_skills(line)
-    return skills[0] if skills else None
+    """The first Skill loaded in one stream-json line, if any."""
+    loads = skill_loads_in_line(line)
+    return loads[0][0] if loads else None
 
 
 def observed_result(stream: str) -> dict[str, Any] | None:
@@ -273,6 +302,9 @@ def run_attempt(
         "attempt": attempt,
         "status": status,
         "invoked_skills": loaded,
+        "load_methods": [m for _, m in skill_loads(stream)][:1]
+        if status == "valid"
+        else [],
         "target_triggered": entry["skill"] in loaded,
         "stopped_at_first_skill_call": early_skill is not None,
         "seconds": round(time.monotonic() - started, 1),

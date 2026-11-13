@@ -1,6 +1,6 @@
 ---
 name: test-item-analysis
-description: Identify and maintain stable test-item candidates for product features, screens, APIs, batches, components, events, and data flows, including hierarchy, many-to-many feature references, status, source evidence, history, and change impact. Use for test targets and item identity; do not use to inventory product features, decide specifications or risks, create formal test requirements or conditions, or execute tests.
+description: Identify and maintain stable test-item candidates for product features, screens, APIs, batches, components, events, and data flows, including hierarchy, many-to-many feature references, status, source evidence, history, and change impact. When the user asks (in Japanese or English) to organize test items (テストアイテム, ITEM ID, 親子関係, stable ID, 機能との対応, 変更履歴), load this Skill first, before analysing. Use for test targets and item identity; do not use to inventory product features, decide specifications or risks, create formal test requirements or conditions, or execute tests.
 ---
 
 # Test Item Analysis

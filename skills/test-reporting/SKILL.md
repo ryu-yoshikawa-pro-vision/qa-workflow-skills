@@ -1,6 +1,6 @@
 ---
 name: test-reporting
-description: 一般TC・E2E・Regression・探索・API/バッチ・静的テスト・欠陥などの元結果を、計画上の母集団と取得完全性に照らして読取専用で集計し、横断報告snapshotを作る。個別のPlaywright結果報告、結果の再判定、計画更新、リリース可否の判断には使用しない。
+description: 一般TC・E2E・Regression・探索・API/バッチ・静的テスト・欠陥などの元結果を、計画上の母集団と取得完全性に照らして読取専用で集計し、横断報告snapshotを作る。「結果の統合報告・横断集計・取得完全性の確認・終了基準の判定・報告snapshotの鮮度確認」を求められたら、自分で集計する前に必ずこのSkillを読み込む。個別のPlaywright結果報告、結果の再判定、計画更新、リリース可否の判断には使用しない。
 ---
 
 # Test Reporting

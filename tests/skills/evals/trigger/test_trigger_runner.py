@@ -195,5 +195,39 @@ class EarlyStopTests(unittest.TestCase):
             self.assertIsNone(run.skill_call_in_line(line))
 
 
+def read_call(path: str) -> dict:
+    return {"type": "tool_use", "name": "Read", "input": {"file_path": path}}
+
+
+class SkillMdReadTests(unittest.TestCase):
+    def test_reading_a_skill_md_loads_that_skill(self) -> None:
+        line = assistant(
+            read_call("/work/.claude/skills/feature-analysis/SKILL.md"),
+        )
+        self.assertEqual(
+            run.skill_loads_in_line(line), [("feature-analysis", "read_skill_md")]
+        )
+        self.assertEqual(run.skill_call_in_line(line), "feature-analysis")
+
+    def test_other_files_of_a_skill_or_other_paths_are_not_loads(self) -> None:
+        for path in (
+            "/work/.claude/skills/feature-analysis/references/guidance.md",
+            "/work/product/SKILL.md",
+            "/work/.claude/skills/feature-analysis/nested/SKILL.md",
+            "/work/.claude/skills/SKILL.md",
+        ):
+            self.assertEqual(run.skill_loads_in_line(assistant(read_call(path))), [])
+
+    def test_both_methods_are_reported_in_order(self) -> None:
+        text = stream(
+            INIT,
+            assistant(read_call("/w/.claude/skills/a/SKILL.md")),
+            assistant(skill_call("b")),
+        )
+        self.assertEqual(
+            run.skill_loads(text), [("a", "read_skill_md"), ("b", "skill_tool")]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

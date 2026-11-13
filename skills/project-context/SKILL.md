@@ -1,6 +1,6 @@
 ---
 name: project-context
-description: QA案件のProject Contextを初回発見・新規初期化・必要項目検証・差分更新・既存配置方針再利用する場合に使用する。既存16節とDEC/ASMを維持し、安全な保存条件を判定する。
+description: QA案件のProject Contextを初回発見・新規初期化・必要項目検証・差分更新・既存配置方針の再利用で扱う。「Project Contextの有無確認・初期化・確認・更新、保存先や編集方針の承認確認」を求められたら、自分で調べる前に必ずこのSkillを読み込む。既存16節とDEC/ASMを維持し、安全な保存条件を判定する。
 ---
 
 # Project Contextの管理

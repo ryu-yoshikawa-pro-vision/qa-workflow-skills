@@ -1,0 +1,16 @@
+候補成果物を `cases/TCN-SEM-012/candidate-output.md` に書き込みました。ただし runtime は実行できておらず、この成果物は完成扱いできません。
+
+**runtime の状況**
+- `test_data_requirements.py` と `runtime_contract.py` の実行を試みましたが、Bash が「don't ask」モードで拒否されました。回避はしていません。
+- そのため機械証拠（runtime 結果、Entity、`verify_runtime_evidence`）はなく、成果物の Machine Runtime 節は「未実行」と明記しています。target_ref も未導出です。
+
+**成果物の内容（入力記述からの人手導出）**
+- target A: role は互換。version は `R-A-LOW`（>= 2.0）と `R-A-HIGH`（<= 1.4）が空集合になり conflict（blocking）。
+- target B: role と version（= 1.3）とも互換。A の conflict は B に波及させていません。
+- 全体は unresolved 扱いです。
+
+**判断に迷った点**
+- A の version については、具体的なテストデータ値の導出をブロック中としました。仕様側で境界の正誤を確定する必要があります。
+- `version` の typed value 型は入力に無いため、`"1.3"` を string として扱いました。型は未確定として記載しています。
+- `SPEC-DATA-012` の本文と `M-ORDERS` の Machine Entity は入力に無く、「承認済み・current」は入力記述のまま扱いました。
+- 優先度とプロダクトリスクは入力に無いため「未指定」としています。

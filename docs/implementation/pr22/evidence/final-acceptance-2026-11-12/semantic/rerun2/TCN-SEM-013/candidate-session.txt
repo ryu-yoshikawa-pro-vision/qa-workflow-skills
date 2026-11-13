@@ -1,0 +1,20 @@
+書き込みました: `cases/TCN-SEM-013/candidate-output.md`
+
+**runtime:** 実行できていません。Bashが権限で拒否され（don't ask mode）、`materialize_coverage.py`、`test_data_requirements.py`、`verify_runtime_evidence` を動かせませんでした。権限の回復を待って再試行すると、回避はしていません。両runtimeは `metadata` と `input` を含む正規化JSONを要求しますが、入力にはtarget ID、execution fingerprint、expected result root、Machine Entityの実値がありません。これらを推測で作ることはしなかったため、成果物は**未完成**としています。Machine Runtimeの節も「未取得」と明記しています。
+
+**作成した内容:** SPEC-MAT-013 と `coverage-techniques.md` の materialization 規則から、次の条件を導出しました。
+- 4キー一致による grouping 判定
+- Cの model 差分による非 grouping
+- キー1つずつの不一致
+- role 衝突による merge 拒否
+- intersection 非空による統合許可
+- 異 dimension の union
+- 決定性
+
+**判断に迷った点:**
+- 入力の「A・Bが両方ともmerge後のCIへ適用される」は、`role=admin` と `role=guest` の衝突（intersection が空）と両立しません。規則どおりなら merge は拒否されるはずです。このため role 衝突の期待結果はブロック中（確認待ち）としました。
+- 異 dimension の union は SPEC-MAT-013 の抜粋に記載がないため、仕様根拠不足としてブロックしました。
+- 既存の TCN ID と TR-MERGE-013 の優先度は入力にないため、`TCN-XXX` の仮ラベルと「未指定」にしています。
+- 自己検証の経緯は成果物に書いていません。
+
+**次に必要なこと:** Bash の実行権限が得られたら、canonical 入力で `materialize_coverage` と `verify_runtime_evidence` を実行し、結果を成果物へ配置する必要があります。あわせて、上の衝突の前提を確認してください。
