@@ -49,8 +49,9 @@
 
 - CI（HEAD `59d56017`）: CodeQL、Analyze×3、code-quality、codex-contract、deterministic-output-evals、semantic-output-evals、validate、windows-launcherがpass。CodeRabbitはリポジトリstar数の条件によりskipped（非required）。`render`・`vercel`のcheck suiteはqueuedのまま（外部integration、非required。意味は未確認）。
 - 回帰（HEAD `59d56017`時点）: runtimeテスト1,039件中1件が失敗した。これはPython 3.12起因の既知の`test_ci_handoff`のJSON nestingである。deterministic 670件はOK、semantic 14件はOK、`semantic/validate.py`はOK。
-- 回帰（2026-11-14、独立レビュー修正後の最終実行、Python 3.12.3・ローカル）: tests/skills/runtime 全件1359件、失敗1（既知の`test_ci_handoff`、baselineでも同一）、エラー1（`test_non_e2e_runner`の12秒タイムアウト。全件実行の負荷下のみで、単独実行は通る）。deterministic・semantic（非モデル採点）・trigger単体・skills-ref validate 37件・dprint・`git diff --check`・format_tracked_tests・patch whitespaceはOK。`tests/codex`の1件失敗は、untrackedの`.agents/skills`配下由来（既知。baselineでは通る）。CI（Python 3.11）は未確認（push後に親が確認して本記録を更新する）。
-- PR状態: OPEN、非Draft、mergeable CLEAN。141 commit（merge commit 2件を含む）、変更1,262ファイル（+189,580／-868）、削除0・rename 0。`.github/`と`.codex/`に差分は無い。
+- 回帰（2026-11-14、独立レビュー修正後の最終実行、Python 3.12.3・ローカル）: tests/skills/runtime 全件1359件、失敗1（既知の`test_ci_handoff`、baselineでも同一）、エラー1（`test_non_e2e_runner`の12秒タイムアウト。全件実行の負荷下のみで、単独実行は通る）。deterministic・semantic（非モデル採点）・trigger単体・skills-ref validate 37件・dprint・`git diff --check`・format_tracked_tests・patch whitespaceはOK。`tests/codex`の1件失敗は、untrackedの`.agents/skills`配下由来（既知。baselineでは通る）。このローカル実行の後、CI（Python 3.11）はHEAD `491c5dd2`で確認済み（下記）。
+- CI（HEAD `491c5dd2`、2026-11-15、ジョブログで確認）: deterministic-output-evals、semantic-output-evals、Validate Agent Skills、code-quality、Codex Harnessのcodex-contractとwindows-launcher、CodeQL（python・javascript-typescript・actions）がsuccess。CodeRabbitはskipped（必須外）。`tests/skills/runtime`はdiscoverで1359件OK（失敗・エラー0）。CIはPython 3.11のため、ローカルPython 3.12の既知の`test_ci_handoff`失敗と`test_non_e2e_runner`のタイムアウトは出ない。`tests/skills/evals/deterministic` 671件OK、semantic 27件＋14件OK、`tests/codex` 58件OK、trigger単体17件OK。今回追加・変更の主要テスト（独立負例27件、test_f_verifier_architecture 67件、test_f_owner_verifier_registration 66件、test_workflow_runtime 26件、test_integration_required_scopes 24件、test_downstream_state 22件）もCIで実行されokだった。CIでカバーされない範囲: `docs/implementation/pr22/evidence/`配下の検証用script、実Agent評価（trigger・意味評価・効率比較）、外部provider（qa-training-storeの`qa/artifacts`とDraft PR #221）、Codex CLIの実行。
+- PR状態（HEAD `59d56017`時点）: OPEN、非Draft、mergeable CLEAN。141 commit（merge commit 2件を含む）、変更1,262ファイル（+189,580／-868）、削除0・rename 0。`.github/`と`.codex/`に差分は無い。なお2026-11-15の確認では`git diff --stat main...HEAD`が1,287ファイルで、1,262との集計基準の差は未確認。
 - ruleset `protect-main`: required status checksは`validate`・`deterministic-output-evals`・`semantic-output-evals`。non-fast-forward禁止・削除禁止・linear history。required approving reviewは0件。
 - リポジトリ設定: merge commit不可、rebase不可、squashのみ可、merge後にbranch自動削除。
 - baseの`main`は未更新（78d8d394）。
@@ -154,7 +155,7 @@
 
 ## 8. マージ方法と注意点
 
-- マージ方法はsquashのみ可能。142 commit（現HEAD `4dc2a082`時点。前回記録の141 commitは HEAD `59d56017`時点の値）が1 commitになる。
+- マージ方法はsquashのみ可能。HEAD `4dc2a082`時点で142 commit（前回記録の141 commitはHEAD `59d56017`時点の値）が1 commitになる。commit数はpushにより変わりうる。
 - merge後、branch `feat/development-qa-traceability`はリポジトリ設定により自動削除される。親Agentは削除操作をしない。
 - 影響（推定を含む）:
   - PR本文のbranch絶対リンク（`blob/feat/development-qa-traceability/...`）4件は、削除後に404になる見込み。マージ後にmainの同じ文書へ更新する。
@@ -203,7 +204,7 @@
 - 組合せ: 端末ユーザー名がGitHubの公開アカウント名の接頭辞と一致するものが27 blobあり、組み合わせると個人を特定しやすい。
 - 判定不能として残るもの: (d)のホスト名12値の所属、会話ログ61ファイルの公開継続可否、thinkingの署名データ（不透明で内容を確認できない）。2026-11-14に利用者は会話ログを残す判断をした（下記）。ホスト名12値は会話ログ内のコマンド出力に含まれ、その所属（組織の機器か個人端末か）は確認できていない。thinkingの署名データは利用者の判断に含まれず、未確認のまま残る。マージは利用者の明示指示まで実行しない。
 - 件数の差:
-  - 既存記録の「141 commit」はHEAD `59d56017`時点の値である。現HEAD `4dc2a082`では142 commitである。
+  - 既存記録の「141 commit」はHEAD `59d56017`時点の値である。HEAD `4dc2a082`時点では142 commitであった。
   - 前回検査（§2.1、1,404 blob・141 commit）と今回の再検査（2,443 blob・142 commit）は検査基準が異なる。今回の再検査（§9.1）を最新の正本とする。
   - 既存記録の「1,179 blob」はどの集計基準でも再現できず、基準は不明である。今回の一意blobはHEADのツリーで2,208件である。
 - 取扱い:
@@ -247,11 +248,11 @@
 - 検証結果（作業ツリー、Python 3.12.3、ローカル）:
   - tests/skills/runtime 1359件中、失敗1（既知の`test_ci_handoff`、Python 3.12依存、baselineでも同一）、エラー1（§2.3の回帰欄を参照。12秒タイムアウト、負荷依存で再発しうる）。
   - deterministic 671件OK、semantic validate OK（Skill 37、cases 210）、shared 27件、repo 14件、trigger単体17件、skills-ref validate 37件、agent-answer-form OK、format_tracked_tests OK、`git diff --check` OK。
-  - `tests/codex`は1件失敗（untrackedの`.agents/skills`配下由来、既知）。format_tracked checkは既知のCRLF 3ファイルで差分あり（HEADと同じ。CIでの結果は別途確認）。
+  - `tests/codex`は1件失敗（untrackedの`.agents/skills`配下由来、既知）。format_tracked checkは、ローカルのCRLF作業ツリーでは既知のCRLF 3ファイル（`scripts/skills/evals/deterministic/__init__.py`、`result.py`、`scripts/skills/evals/semantic/__init__.py`）で指摘が出る。CI（HEAD `491c5dd2`）のcode-qualityジョブ（`format_tracked.py check`：ruff-check、ruff-format-check、dprint check）は全てsuccessで、CRLFの指摘は出ていない（ジョブログで確認）。
   - 新規テスト: `test_f_verifier_requirements` 46件、`test_f_verifier_architecture` 54件、`test_f_verifier_management` 36件、`test_f_owner_verifier_registration` 64件、`test_integration_required_scopes` 22件。`test_e2e_selection_contract`は32→44件、`test_owner_verifier_registry`は12→18件。期待値は緩めていない。
   - 期待値の変更（利用者要求「照合手段が無い場合は対象外を確定しない」に基づく）: `test_approved_exclusion_is_removed_from_completion`を`test_approved_exclusion_is_not_confirmed_and_keeps_scope_required`へ（can_completeはtrueからfalseへ）、`test_integration_required_scopes`のX2・X4・X5の対照部分（承認参照つき対象外で完了→不可）、`test_historical_v2_placeholder_exclusion_is_not_accepted`を`test_historical_v2_excluded_claims_are_not_accepted`へ。`test_unapproved_draft_is_separated_and_not_confirmed`は、承認済みlevelに確定割当が無いためcomplete true→falseへ（fixtureは不変）。判定の複製を解消するため`test_approval_ref_rule_is_shared_by_workflow_and_state`を削除。承認不要の部分workflow、必須scope欠落の拒否、重複identity・未知キー・型不正の拒否は維持。
   - 新規テスト（2026-11-14の独立レビュー修正後）: architecture約13件、registration 2件、独立負例27件（`tests/skills/runtime/test_independent_completion_negatives.py`）。
-  - 未実施: Python 3.11（CI。push後に親が確認し本記録を更新する）、windows-launcher、Codex CLIのローカル実行。
+  - 未実施: windows-launcherとCodex CLIのローカル実行。Python 3.11（CI）はHEAD `491c5dd2`で確認済み（§2.3）。
 - 新たに確認された制約:
   - A10: verifierは保存先を再読しないため、再開時に古い`expected_revision`と古いreadback・本文を組で渡すと通る。現行readbackの再取得は呼出し側の責務。
   - `requested_scopes`の宣言内容の完全性と、`approval_ref`の真正性は、runtimeでは証明しない。
