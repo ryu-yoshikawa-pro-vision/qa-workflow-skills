@@ -32,7 +32,7 @@
 | 効率比較用の再利用手順 | `qa-workflow`の開始時の既存成果物確認と再開（guidance・stateテンプレート）、決定論的helper `skills/qa-workflow/scripts/input_revision.py`（hash／record／compare、標準ライブラリのみ）とそのテスト`tests/skills/runtime/test_input_revision.py`（14件）。効率比較の実行6で追加                                                                                                                                                                                                                     |
 
 担当間接続の証拠テスト：`tests/skills/runtime/test_cross_owner_*.py`（実Git store、実runner起動、実materialize、実選定packet、実Session）、`test_owner_verifier_registry.py`（18件）、`test_testware_regression_handoff.py`（11件）。
-F 3 Skillの検証入口（2026-11-14）：`test_f_verifier_requirements`（46件）、`test_f_verifier_architecture`（54件）、`test_f_verifier_management`（36件）、`test_f_owner_verifier_registration`（64件）、`test_integration_required_scopes`（22件）。保存・読戻しは呼出し側のfixtureであり、実providerではない。
+F 3 Skillの検証入口（2026-11-14）：`test_f_verifier_requirements`（46件）、`test_f_verifier_architecture`（54件）、`test_f_verifier_management`（36件）、`test_f_owner_verifier_registration`（64件）、`test_integration_required_scopes`（22件）。保存・読戻しは呼出し側のfixtureであり、実providerではない。独立レビュー修正後（2026-11-14）：未承認案だけの要求は完了させない（`test_independent_completion_negatives.py`、独立負例27件）。承認済み対象外は、承認の照合手段（承認provider・認証主体）が未定義のため確定せず、当該scopeは必須として完了不可のまま残る。
 
 owner verifierを**登録していない**Skill：保存成果物のreadback検証を持たない`defect-management`・`test-evaluation`・`feature-analysis`・`project-context`・`ui-target-analysis`等。F 3 Skill（`test-requirements-analysis`・`test-architecture-design`・`test-management`）は2026-11-14に検証入口を実装・登録した（fixture検証のみ。実成果物の検証は未実施）。未登録scopeは`unverified_scopes`として完了不可のまま残る。
 
@@ -193,7 +193,7 @@ fail 5件・needs_review 2件は、評価入力にテスト要求ID・現在有�
 | -- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1  | 部分    | routing fixtureは固定。実Agentの発火は新14 Skillのvalidationで肯定20／28 query・否定27／28 queryがpass（変更前は10／28）。残：肯定8・否定1がfail（§7.2）                                                             |
 | 2  | 部分    | E→coverage、D→E、G→H→J接続。残：F実成果物                                                                                                                                                                            |
-| 3  | blocked | F 3 Skillの検証入口は実装・登録済み（fixture検証のみ）。実成果物の検証と承認の真正性は未確立のため、完了不可のまま                                                                                                   |
+| 3  | blocked | F 3 Skillの検証入口は実装・登録済み（fixture検証のみ）。未承認案だけの要求は完了させない。承認済み対象外は照合手段が無いため確定しない。実成果物の検証と承認の真正性は未確立のため、完了不可のまま                   |
 | 4  | 部分    | 探索→欠陥候補は接続。外部Issueは案件設定なしのため対象外。残：修正確認の実接続                                                                                                                                       |
 | 5  | 部分    | G／H／I→J投影とowner verifier（test-reporting）。残：実案件のsource inventory                                                                                                                                        |
 | 6  | 部分    | Jの評価runtimeのローカル契約。残：改善採用の承認と正本改版                                                                                                                                                           |
@@ -209,7 +209,7 @@ fail 5件・needs_review 2件は、評価入力にテスト要求ID・現在有�
 | 01   | 部分 | 実runner（Vitest・Web component・Native Jest・timeout・静的解析）。API-only・batch・非機能は対象外、Windowsは設計上非対応のため対象外（利用者承認 2026-11-13）                           |
 | 02   | 部分 | 実Git provider（CAS・履歴・readback・承認主体）。外部Issueは案件設定なしのため対象外                                                                                                     |
 | 03   | 部分 | S1〜S17は下表                                                                                                                                                                            |
-| 04   | 部分 | owner verifierを7 Skillで登録（F 3 Skill 3件は2026-11-14に追加、fixture検証）。実成果物の検証は未実施で、完了不可のまま                                                                  |
+| 04   | 部分 | owner verifierを7 Skillで登録（F 3 Skill 3件は2026-11-14に追加、fixture検証）。承認済み対象外は照合手段が定まるまで確定しない。実成果物の検証は未実施で、完了不可のまま                  |
 | 05   | 部分 | owner振り分けとVitest個別結果の照合は実runnerでPASS。API-only・直接TCは対象外（利用者承認 2026-11-13）                                                                                   |
 | 06   | 部分 | 静的解析は受入用adapterで実行済み（製品・Skillへのadapter組込みは未実施）。探索・Knowledgeはローカル契約                                                                                 |
 | 07   | 部分 | 5シナリオを実測（最終は実行6）。効率は未実証（所要時間は4シナリオで改善、変更なし再依頼で悪化。安全・品質が未達の試行が残る）。人間のレビュー・承認時間は対象外（利用者承認 2026-11-13） |
@@ -302,7 +302,7 @@ Skill読込数（中央値）：初回QA 4.5→3.5、変更なし再依頼 1→3
 
    1. trigger評価の肯定8 queryと否定1 queryが不合格（§7.2）。description調整は1回目のみ採用し、2回目・3回目は不採用として、ここで打ち切った。
    2. 効率比較は未実証（§8）。実行6（最終）で、所要時間は5シナリオのうち4シナリオで改善し、変更なし再依頼で悪化した。費用・tokenは悪化するシナリオが残る。安全または品質が未達の試行が5件残る（safety違反は、補助scriptや要求JSONをqa-state外へ書いたもので、実行5の6件から3件に減ったが解消していない）。改善はここで打ち切り、効率向上は未実証のまま最終とする。残件は、変更なし再依頼で既存成果物を確実に再利用させる方法と、各シナリオの試行数を増やした再測定。
-   3. F 3 Skill（`test-requirements-analysis`・`test-architecture-design`・`test-management`）は、2026-11-14に検証入口（canonical JSON packetのowner verifier）を実装・登録した。fixtureによる検証のみで、実成果物の検証・承認の真正性（承認主体の認証は未選定）は未確立。完了判定は引き続きowner証拠と承認の境界に依存し、判定は未完了のまま。
+   3. F 3 Skill（`test-requirements-analysis`・`test-architecture-design`・`test-management`）は、2026-11-14に検証入口（canonical JSON packetのowner verifier）を実装・登録した。fixtureによる検証のみで、実成果物の検証・承認の真正性（承認主体の認証は未選定）は未確立。完了判定は引き続きowner証拠と承認の境界に依存し、承認の照合手段（承認provider・認証主体）が未定義のため、承認済み対象外は確定しない（2026-11-14）。判定は未完了のまま。
 
 2. **その他の未完了条件**: 対象外承認を受けていない非PASS条件は、上の3項目のほかにも§8の詳細表に残る。個別判定の正本は§8の各表であり、ここには重複して複製しない。下表は、残件を種類別にまとめた参照である。
 
