@@ -201,6 +201,48 @@ class GitPublishTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.PublishError, "incomplete_changed_paths"):
             self._publish(self.a, self.base, candidate, "tests/other.txt", digest)
 
+    def _publish_branch(self, repo: Path, branch: str, base: str, candidate: str):
+        return MODULE.publish(
+            repo_path=repo,
+            remote="origin",
+            branch=branch,
+            expected_head=base,
+            candidate=candidate,
+            allowed_prefixes=["tests"],
+            prior_content_hashes={"tests/case.txt": self._digest},
+        )
+
+    def test_default_or_protected_branch_names_are_refused_before_push(self):
+        git(self.a, "push", "-q", "origin", self.base + ":refs/heads/main")
+        candidate, self._digest = self._candidate(self.a, "tests/case.txt", "new")
+        for branch in ["main", "refs/heads/main", "MAIN", "master"]:
+            with self.subTest(branch=branch):
+                with self.assertRaisesRegex(
+                    MODULE.PublishError, "protected_or_default_branch_refused"
+                ):
+                    self._publish_branch(self.a, branch, self.base, candidate)
+        self.assertEqual(
+            git(self.a, "ls-remote", "origin", "refs/heads/main").split()[0],
+            self.base,
+        )
+
+    def test_remote_default_branch_from_symbolic_ref_is_refused(self):
+        git(self.a, "push", "-q", "origin", self.base + ":refs/heads/trunk")
+        git(self.a, "fetch", "-q", "origin")
+        git(self.a, "remote", "set-head", "origin", "trunk")
+        candidate, self._digest = self._candidate(self.a, "tests/case.txt", "new")
+        with self.assertRaisesRegex(
+            MODULE.PublishError, "protected_or_default_branch_refused"
+        ):
+            self._publish_branch(self.a, "Trunk", self.base, candidate)
+        self.assertEqual(
+            git(self.a, "ls-remote", "origin", "refs/heads/trunk").split()[0],
+            self.base,
+        )
+        # A non-default feature branch still publishes normally.
+        result = self._publish_branch(self.a, "fixture", self.base, candidate)
+        self.assertEqual(result["state"], "published_and_readback_verified")
+
 
 if __name__ == "__main__":
     unittest.main()

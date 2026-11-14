@@ -2,7 +2,7 @@
 
 subcommand:
 - hash: 対象fileのSHA-256をJSONで出す。
-- record: 同じJSONを --state のfileへ原子的に書く。
+- record: 同じJSONを --state のfileへ原子的に書く。--state のfile名は input-revisions.json に限り、別形式の既存fileは上書きしない。
 - compare: --state の記録と現在の対象を比べ、same / changed / no_record を出す。
 
 Python標準ライブラリだけを使い、ネットワークを使わず、--state 以外へ書き込みません。
@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
 REVISION_SCHEMA = "input-revision-v1"
+STATE_NAME = "input-revisions.json"
 COMPARE_SCHEMA = "input-revision-compare-v1"
 MAX_FILE_BYTES = 32 * 1024 * 1024
 _CHUNK_BYTES = 1024 * 1024
@@ -53,7 +54,7 @@ class _Parser(argparse.ArgumentParser):
 
 def _resolve_target(root: Path, raw: str) -> tuple[str, Path]:
     """相対pathを検証し、(正規化した相対path, 解決済みの実path) を返す。"""
-    if not raw:
+    if not raw or "\x00" in raw:
         raise InputError("invalid_path")
     relative = PurePosixPath(raw)
     if relative.is_absolute() or ".." in relative.parts:
@@ -93,6 +94,8 @@ def _sha256_file(path: Path) -> str:
 
 
 def _compute_document(root_arg: str, raw_paths: list[str]) -> dict[str, Any]:
+    if "\x00" in root_arg:
+        raise InputError("invalid_path")
     root = Path(root_arg).resolve()
     if not root.is_dir():
         raise InputError("root_not_directory")
@@ -138,6 +141,37 @@ def _load_recorded(state: Path) -> dict[str, str] | None:
     return revisions
 
 
+def _check_record_state(state: Path) -> None:
+    """record の --state を検査する。拒否時は何も書かない。
+
+    名前は input-revisions.json に限る。既存fileがあれば、空fileか
+    schema_version が REVISION_SCHEMA のJSON objectの場合だけ置換を許す。
+    """
+    if "\x00" in str(state):
+        raise InputError("invalid_path")
+    if state.name != STATE_NAME:
+        raise InputError("state_name_not_allowed")
+    try:
+        text = state.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return
+    except UnicodeDecodeError as exc:
+        raise InputError("state_not_a_record") from exc
+    except OSError as exc:
+        raise InputError("state_read_failed") from exc
+    if not text.strip():
+        return
+    try:
+        document = json.loads(text)
+    except (ValueError, RecursionError) as exc:
+        raise InputError("state_not_a_record") from exc
+    if (
+        not isinstance(document, dict)
+        or document.get("schema_version") != REVISION_SCHEMA
+    ):
+        raise InputError("state_not_a_record")
+
+
 def _write_state(state: Path, text: str) -> None:
     """同じdirectoryの一時fileへ書いてから os.replace で置換する。"""
     if not state.parent.is_dir():
@@ -162,6 +196,7 @@ def _write_state(state: Path, text: str) -> None:
 
 
 def _record(args: argparse.Namespace) -> dict[str, Any]:
+    _check_record_state(args.state)
     document = _compute_document(args.root, args.paths)
     _write_state(args.state, _dumps(document) + "\n")
     return document

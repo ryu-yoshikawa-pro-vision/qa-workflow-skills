@@ -26,4 +26,4 @@ assets/output-template.mdで作業対象、元TCまたは明示対象、source/t
 - 読取専用snapshot照合: scripts/snapshot_guard.py
 - 既定出力: assets/output-template.md
 
-- 隔離commitの共有branchへの反映: `scripts/publish_git.py`（実Gitの非強制fast-forward・変更前hash・readbackを検証。明示的な反映許可が必要）
+- 隔離commitの共有branchへの反映: `scripts/publish_git.py`（実Gitの非強制fast-forward・変更前hash・readbackを検証。明示的な反映許可が必要。`main`・`master`・remoteのdefault branchは拒否する）

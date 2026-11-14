@@ -46,6 +46,8 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 
 Git providerは許可済みrepository rootの外にGit metadataを保存するworktree／外部Git dirを拒否します。対象branchの履歴・objectが許可外rootへ暗黙に作成されないようにするためです。
 
+Git providerは既存pathを最後に変更したcommitの件名（`qa artifact: <kind> <path>`）と`QA-Project-Ref` trailerが、呼出しのkindと案件に一致しない場合、読出し・書込みともに`artifact_project_mismatch`で拒否します。trailerの無いcommitも案件を証明できないため拒否します。書込みは参照更新の前に拒否されます。commit messageに入る値は改行として扱われる文字を含められません。
+
 ### 保存済み配置方針の再利用条件
 
 `prepare-placement`はSection 12の有効DECの備考・決定根拠とSection 14の同一scopeの行から方針を再構成し、owner、scope、target_ref、policy revision、approval_ref、approval_revision、editable_scope、feature_index_ref、DEC IDを照合します。入力`existing_policy`の値だけでは再利用と判定しません。承認revisionは新規記録時にDEC備考とSection 14備考の双方に保存します。旧文書に承認revisionがない場合、承認revisionを推測せず、同一方針の再利用は行いません。既存DECを置換するときは、記録済み内容を維持したまま旧DECを置換済みにします。

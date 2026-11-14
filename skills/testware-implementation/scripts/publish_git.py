@@ -21,8 +21,40 @@ HEX_SHA = re.compile(r"^[a-f0-9]{40}$")
 REMOTE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
+DEFAULT_BRANCH_NAMES = ("main", "master")
+
+
 class PublishError(ValueError):
     pass
+
+
+def _normalize_branch(name: str) -> str:
+    value = name
+    while value.startswith("refs/heads/"):
+        value = value[len("refs/heads/") :]
+    return value.rstrip("/").casefold()
+
+
+def _remote_default_branch(repo: Path, remote: str) -> str | None:
+    # Local remote-tracking HEAD only; absent when the clone never recorded it.
+    process = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "symbolic-ref",
+            "--short",
+            "refs/remotes/" + remote + "/HEAD",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if process.returncode:
+        return None
+    short = process.stdout.decode("utf-8", "strict").strip()
+    prefix = remote + "/"
+    return short[len(prefix) :] if short.startswith(prefix) else None
 
 
 def _git_bytes(repo: Path, *args: str) -> bytes:
@@ -77,6 +109,12 @@ def publish(
     if not HEX_SHA.fullmatch(expected_head) or not HEX_SHA.fullmatch(candidate):
         raise PublishError("invalid_commit")
     _git(repo, "check-ref-format", "--branch", branch)
+    protected = {_normalize_branch(name) for name in DEFAULT_BRANCH_NAMES}
+    default_branch = _remote_default_branch(repo, remote)
+    if default_branch is not None:
+        protected.add(_normalize_branch(default_branch))
+    if _normalize_branch(branch) in protected:
+        raise PublishError("protected_or_default_branch_refused")
     if not allowed_prefixes or not isinstance(prior_content_hashes, dict):
         raise PublishError("missing_write_scope")
     if _git(repo, "status", "--porcelain", "--untracked-files=all"):

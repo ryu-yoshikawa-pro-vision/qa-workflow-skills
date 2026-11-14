@@ -2,10 +2,15 @@
 
 A Skill without runtime-v2 roots can complete a workflow scope only when its
 *owner's own production CLI* verifies the stored artifact. This module registers
-those verification entry points. It never judges process semantics itself and
-never accepts a self-declared "verified" value: every registered verifier runs the
-owner's script as a subprocess (JSON on stdin, JSON on stdout) and compares the
-result with the identity the scope claims. A missing script, a failing command,
+those verification entry points. It never judges process semantics itself.
+The evidence (the stored text and its readback) is supplied by the caller; this
+module does not read the storage provider again to confirm it. Each registered
+verifier checks that the supplied text's hash matches the readback, runs the
+owner's script as a subprocess (JSON on stdin, JSON on stdout) to validate the
+readback and the identity the scope claims, and checks source currentness where
+the registration defines it. A self-declared "verified" value is not enough: the
+owner's validator must pass. Producing the readback from the store is the
+caller's responsibility (store side). A missing script, a failing command,
 unparsable output or any mismatch leaves the scope unverified.
 
 Registered owners are only those with a deterministic production entry point that

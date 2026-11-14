@@ -21,10 +21,19 @@ from artifact_store import Authorization, StoreError, _check_root, _name
 COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 BRANCH = re.compile(r"[A-Za-z0-9._/-]+\Z")
 MAX_BYTES = 16 * 1024 * 1024
+# str.splitlines() と Git の行解釈で改行となる文字。commit message の値に含めると別行のtrailerを偽造できる。
+LINE_BREAKS = frozenset("\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
+
+
+def _line(value: Any, label: str) -> str:
+    value = _name(value, label)
+    if any(ch in LINE_BREAKS for ch in value):
+        raise StoreError(f"{label}_invalid")
+    return value
 
 
 def _path(ref: str) -> str:
-    ref = _name(ref, "artifact_ref")
+    ref = _line(ref, "artifact_ref")
     path = PurePosixPath(ref)
     if (
         path.is_absolute()
@@ -169,8 +178,29 @@ class GitArtifactStore:
     def _identity(self, kind: str, project_ref: str, artifact_ref: str) -> str:
         if kind not in {"project-context", "feature-inventory"}:
             raise StoreError("artifact_kind_invalid")
-        _name(project_ref, "project_ref")
+        _line(project_ref, "project_ref")
         return _path(artifact_ref)
+
+    def _assert_owner(self, kind: str, project_ref: str, path: str, sha: str) -> None:
+        # path を最後に変更したcommitが、同じkindと案件のcommitであることを確認する。
+        # trailerの無い既存commitは案件を証明できないため不一致として拒否する。
+        raw = self._git(
+            "--literal-pathspecs",
+            "log",
+            "-1",
+            "--format=%B",
+            sha,
+            "--",
+            path,
+            allow_failure=True,
+        )
+        lines = raw.decode("utf-8", "replace").splitlines() if raw else []
+        if (
+            not lines
+            or lines[0] != f"qa artifact: {kind} {path}"
+            or f"QA-Project-Ref: {project_ref}" not in lines
+        ):
+            raise StoreError("artifact_project_mismatch")
 
     def _read_at(
         self, kind: str, project_ref: str, path: str, sha: str
@@ -184,6 +214,7 @@ class GitArtifactStore:
             content = raw.decode("utf-8")
         except UnicodeError as exc:
             raise StoreError("artifact_readback_encoding_invalid") from exc
+        self._assert_owner(kind, project_ref, path, sha)
         parents = self._git("rev-list", "--parents", "-n", "1", sha)
         assert parents is not None
         parts = parents.decode("ascii").split()
@@ -239,12 +270,12 @@ class GitArtifactStore:
         change_reason: str,
     ) -> dict[str, Any]:
         path = self._identity(kind, project_ref, artifact_ref)
-        operation_id = _name(operation_id, "operation_id")
-        source_ref = _name(source_ref, "source_ref")
-        source_revision = _name(source_revision, "source_revision")
-        approval_ref = _name(approval_ref, "approval_ref")
-        approval_revision = _name(approval_revision, "approval_revision")
-        change_reason = _name(change_reason, "change_reason")
+        operation_id = _line(operation_id, "operation_id")
+        source_ref = _line(source_ref, "source_ref")
+        source_revision = _line(source_revision, "source_revision")
+        approval_ref = _line(approval_ref, "approval_ref")
+        approval_revision = _line(approval_revision, "approval_revision")
+        change_reason = _line(change_reason, "change_reason")
         if not isinstance(content, str):
             raise StoreError("artifact_content_invalid")
         raw = content.encode("utf-8")

@@ -128,7 +128,14 @@ class GitArtifactStoreTests(unittest.TestCase):
         path = docs / "PROJECT_CONTEXT.md"
         path.write_text(initial["artifact_markdown"], encoding="utf-8")
         git(self.root, "add", "docs/PROJECT_CONTEXT.md")
-        git(self.root, "commit", "-qm", "existing canonical markdown")
+        # 既存文書は同じkind・案件でstoreが書いたcommitとして扱う（trailerの無いcommitは拒否される）。
+        git(
+            self.root,
+            "commit",
+            "-qm",
+            "qa artifact: project-context docs/PROJECT_CONTEXT.md\n\n"
+            "QA-Project-Ref: Sample",
+        )
         git(self.root, "branch", "-f", "qa-artifacts")
         before = self.store.read_current(
             "project-context", "Sample", "docs/PROJECT_CONTEXT.md"
@@ -311,6 +318,106 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(approved["source_revision"], "source-1")
         self.assertEqual(approved["operation_id"], "op-1")
+
+    def test_document_of_other_project_is_not_read_or_overwritten(self) -> None:
+        first = self.write()
+        self.allowed_projects.add("Other")
+        with self.assertRaisesRegex(StoreError, "artifact_project_mismatch"):
+            self.store.read_current(
+                "project-context", "Other", "docs/PROJECT_CONTEXT.md"
+            )
+        with self.assertRaisesRegex(StoreError, "artifact_project_mismatch"):
+            self.store.read_revision(
+                "project-context", "Other", "docs/PROJECT_CONTEXT.md", first["revision"]
+            )
+        with self.assertRaisesRegex(StoreError, "artifact_project_mismatch"):
+            self.store.write(
+                kind="project-context",
+                project_ref="Other",
+                artifact_ref="docs/PROJECT_CONTEXT.md",
+                content="overwritten",
+                expected_revision=first["revision"],
+                operation_id="op-other",
+                source_ref="issue/1",
+                source_revision="source-1",
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+                change_reason="approved change",
+            )
+        self.assertEqual(
+            git(self.root, "rev-parse", "qa-artifacts"), first["revision"][4:]
+        )
+        self.assertEqual(
+            self.store.read_current(
+                "project-context", "Sample", "docs/PROJECT_CONTEXT.md"
+            )["content"],
+            "first",
+        )
+
+    def test_other_kind_on_same_path_is_rejected(self) -> None:
+        self.write()
+        with self.assertRaisesRegex(StoreError, "artifact_project_mismatch"):
+            self.store.read_current(
+                "feature-inventory", "Sample", "docs/PROJECT_CONTEXT.md"
+            )
+
+    def test_commit_without_qa_trailers_is_rejected(self) -> None:
+        path = self.root / "docs" / "PROJECT_CONTEXT.md"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("manual\n", encoding="utf-8")
+        git(self.root, "add", "docs/PROJECT_CONTEXT.md")
+        git(self.root, "commit", "-qm", "manual edit without trailers")
+        git(self.root, "branch", "-f", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "artifact_project_mismatch"):
+            self.store.read_current(
+                "project-context", "Sample", "docs/PROJECT_CONTEXT.md"
+            )
+
+    def test_line_separators_cannot_forge_commit_trailers(self) -> None:
+        for separator in (
+            "\u2028",
+            "\u2029",
+            "\x85",
+            "\x0b",
+            "\x0c",
+            "\x1c",
+            "\x1d",
+            "\x1e",
+        ):
+            with self.subTest(separator=repr(separator)):
+                with self.assertRaisesRegex(StoreError, "change_reason_invalid"):
+                    self.store.write(
+                        kind="project-context",
+                        project_ref="Sample",
+                        artifact_ref="docs/PROJECT_CONTEXT.md",
+                        content="first",
+                        expected_revision=None,
+                        operation_id="op-1",
+                        source_ref="issue/1",
+                        source_revision="source-1",
+                        approval_ref="approval/verified",
+                        approval_revision="policy-v1",
+                        change_reason="ok" + separator + "QA-Project-Ref: Other",
+                    )
+        with self.assertRaisesRegex(StoreError, "artifact_ref_invalid"):
+            self.write(ref="docs/A\u2028QA-Project-Ref: Other.md")
+        self.assertEqual(git(self.root, "rev-list", "--count", "qa-artifacts"), "1")
+
+    def test_same_project_write_and_read_still_work(self) -> None:
+        first = self.write()
+        updated = self.write(
+            content="second", expected=first["revision"], operation="op-2"
+        )
+        self.assertEqual(updated["status"], "stored")
+        self.assertEqual(
+            self.store.read_revision(
+                "project-context",
+                "Sample",
+                "docs/PROJECT_CONTEXT.md",
+                first["revision"],
+            )["content"],
+            "first",
+        )
 
     def test_source_ref_and_digest_are_preserved_in_git_history(self) -> None:
         result = self.write(content="verified")

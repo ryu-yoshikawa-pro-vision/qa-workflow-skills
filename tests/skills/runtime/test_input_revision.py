@@ -256,6 +256,93 @@ class InputRevisionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(_stdout_json(result)["revisions"]["alias.md"], ABC_SHA256)
 
+    def _main_json(self, argv: list[str]) -> tuple[int, dict]:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = input_revision.main(argv)
+        return code, json.loads(stdout.getvalue())
+
+    def test_record_rejects_state_with_other_file_name(self) -> None:
+        keep = self.state_dir / "keep.md"
+        keep.write_text("KEEP", encoding="utf-8")
+        result = _run(
+            "record",
+            "--root",
+            str(self.root),
+            "--state",
+            str(keep),
+            "spec.md",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(
+            _stdout_json(result),
+            {"status": "error", "reason": "state_name_not_allowed"},
+        )
+        self.assertEqual(keep.read_text(encoding="utf-8"), "KEEP")
+        self.assertEqual(
+            sorted(entry.name for entry in self.state_dir.iterdir()), ["keep.md"]
+        )
+
+    def test_record_does_not_overwrite_non_record_state(self) -> None:
+        cases = {
+            "wrong_schema": json.dumps({"schema_version": "other", "revisions": {}}),
+            "json_array": "[1, 2, 3]",
+            "broken_json": "{not json",
+            "binary": None,
+        }
+        for label, content in cases.items():
+            with self.subTest(label=label):
+                if content is None:
+                    self.state.write_bytes(b"\xff\xfe\x00binary")
+                else:
+                    self.state.write_text(content, encoding="utf-8")
+                before = self.state.read_bytes()
+                result = self._record("spec.md")
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertEqual(
+                    _stdout_json(result),
+                    {"status": "error", "reason": "state_not_a_record"},
+                )
+                self.assertEqual(self.state.read_bytes(), before)
+
+    def test_record_overwrites_empty_state(self) -> None:
+        self.state.write_text("", encoding="utf-8")
+        result = self._record("spec.md")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(self.state.read_text(encoding="utf-8"))["revisions"],
+            {"spec.md": ABC_SHA256},
+        )
+
+    def test_record_update_after_change_compares_same(self) -> None:
+        self._record("spec.md")
+        (self.root / "spec.md").write_bytes(b"changed")
+        self.assertEqual(self._compare("spec.md")["status"], "changed")
+        self.assertEqual(self._record("spec.md").returncode, 0)
+        self.assertEqual(self._compare("spec.md")["status"], "same")
+
+    def test_nul_in_paths_is_invalid_path_json_error(self) -> None:
+        cases = {
+            "target": ["hash", "--root", str(self.root), "spec\x00.md"],
+            "root": ["hash", "--root", str(self.root) + "\x00", "spec.md"],
+            "state": [
+                "record",
+                "--root",
+                str(self.root),
+                "--state",
+                str(self.state) + "\x00",
+                "spec.md",
+            ],
+        }
+        for label, argv in cases.items():
+            with self.subTest(label=label):
+                code, document = self._main_json(argv)
+                self.assertEqual(code, 2)
+                self.assertEqual(
+                    document, {"status": "error", "reason": "invalid_path"}
+                )
+        self.assertFalse(self.state.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

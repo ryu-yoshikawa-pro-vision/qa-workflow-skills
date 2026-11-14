@@ -292,7 +292,7 @@ resource ref、workflow間のisolation条件、利用するreservation provider�
 依頼を受けたら、担当Skillへ進む前に次を順に行います。
 
 1. 既存のworkflow stateと成果物の置き場（保存先、`qa-state/`など）を最初に読みます。何も無いときだけ新規に開始します。
-2. 入力revisionの比較には`scripts/input_revision.py`を使います。`python3 <Skill>/scripts/input_revision.py compare --root <入力のroot> --state <保存先>/input-revisions.json <対象path...>`で比べ、helperが使える場合は自前の補助scriptを書きません。保存先の外へファイルを書きません。
+2. 入力revisionの比較には`scripts/input_revision.py`を使います。`python3 <Skill>/scripts/input_revision.py compare --root <入力のroot> --state <保存先>/input-revisions.json <対象path...>`で比べ、helperが使える場合は自前の補助scriptを書きません。`record`の`--state`は`input-revisions.json`という名前で、保存先（`qa-state/`など）の中に置きます。保存先の外へファイルを書きません。
 3. `status`が`same`なら、保存済み成果物を**再利用**し、再生成しません。stateへ「再利用（入力revision同一）」と今回の確認を記録して終えます。
 4. `changed`・`added`・`removed`なら、そのpathに依存する成果物だけを`要再検証`にして再実行し、他は再利用します。再利用と再実行の別をstateへ記録し、実行後に`input_revision.py record`で記録を更新します。`no_record`なら新規として扱い、完了後に`record`で記録します。
 5. 前回が途中で中断していれば、stateが示す最後に完了した工程の次から再開し、完了済みの工程を最初からやり直しません。中断した事実、再開した工程、引き継いだ成果物をstateへ記録します。
