@@ -335,3 +335,9 @@ Skill読込数（中央値）：初回QA 4.5→3.5、変更なし再依頼 1→3
 ## 11. 最終HEADのGitHub Actions
 
 最終HEADのCIはこの記録のcommit後に確認し、PR #22の本文に反映する。
+
+## 12. サニタイズ後の証拠の取扱い（2026-11-14）
+
+- 一部の証拠JSON・文書は、個人情報をプレースホルダ（`<USER>`、`<HOST>`、`<USER-SHORT>`、`<REQUESTER>`）と固定のダミーUUIDに置換したコピーである。実行時点のbytesとは同一ではない。
+- `efficiency/run3-candidate-final`の各trial.jsonで、`artifacts`の`workflow-state.json`のsha256は置換後のファイルのものである。置換前の記録値は、同じtrial.jsonのトップレベルキー`sanitization.workflow_state_sha256_before_sanitization`と、git履歴（commit `50f1bdc4`の親）にある。`artifacts`の他のエントリのsha256は、現在の同名ファイルと一致しないものが多く、現ファイルの同一性の証拠にはならない（原因は未確認。§9.1）。
+- 会話ログ（`.jsonl.gz`）は未サニタイズの元の記録であり、そのまま保持する。置換後のJSONと会話ログのIDを結ぶ対応表はない。

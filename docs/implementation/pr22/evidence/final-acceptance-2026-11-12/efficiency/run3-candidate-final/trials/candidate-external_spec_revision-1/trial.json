@@ -89,5 +89,10 @@
     "quality": "pass",
     "safety": "pass",
     "traceability": "pass"
+  },
+  "sanitization": {
+    "commit": "50f1bdc4",
+    "note": "artifacts.workflow-state.json は、端末情報・依頼者情報・実行UUIDをプレースホルダ・ダミーUUIDへ置換した後のファイルのsha256である。実行時に記録された値（置換前の内容、コミット50f1bdc4の親）は workflow_state_sha256_before_sanitization に残す。workflow_ref の置換前の値は、リポジトリの履歴（コミット50f1bdc4の親以前）と、同じtrialの会話ログ（session1.jsonl.gz）に残る。",
+    "workflow_state_sha256_before_sanitization": "47f1d9f15e16be5e20ce13027fef4dbcd011f8d506a7ccb6a965c8260b750176"
   }
 }
