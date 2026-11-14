@@ -4,6 +4,12 @@
 
 ## Formatter / lintとCodex開発ハーネス
 
+Pythonのformatter/lint・決定論的評価ツールをローカルで使う場合は、次のコマンドで検証依存関係を導入します。
+
+```bash
+python -m pip install -r requirements-dev-lint.txt -r requirements-dev-evals.txt
+```
+
 開発時はRuff `0.16.8`とdprint `0.55.2`を使用します。通常のformat / lint入口はGit tracked fileを対象にする共通scriptです。
 
 ```bash
