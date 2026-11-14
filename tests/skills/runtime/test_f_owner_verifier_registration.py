@@ -573,6 +573,34 @@ class ArchitectureRegistrationTests(StoredOwnerCases, unittest.TestCase):
             "owner_verification_schema_invalid",
         )
 
+    def test_requirement_with_only_unapproved_drafts_is_not_verified(self) -> None:
+        # 割当済みと表示されても、確定割当が無いQA要求は verify しない。
+        packet = self.packet()
+        for row in packet["assignments"]:
+            row["disposition"] = "未承認案"
+        self.sealed(packet)
+        self.assert_unverified(
+            self.run_verify(
+                self.evidence(packet, approvals=[]), packet["artifact_ref"]
+            ),
+            "completion_not_met",
+        )
+
+    def test_approved_level_without_confirmed_assignment_is_not_verified(self) -> None:
+        # 承認済みlevel（API）の割当が未承認案だけなら、他の割当が確定でも verify しない。
+        packet = self.packet()
+        packet["assignments"][1]["disposition"] = "未承認案"
+        self.sealed(packet)
+        rows = [
+            row for row in self.approval_rows(packet) if row["approval_id"] == "APR-002"
+        ]
+        self.assert_unverified(
+            self.run_verify(
+                self.evidence(packet, approvals=rows), packet["artifact_ref"]
+            ),
+            "completion_not_met",
+        )
+
     def test_approved_assignments_with_matching_evidence_are_verified(self) -> None:
         packet = self.packet()
         record = self.assert_verified(

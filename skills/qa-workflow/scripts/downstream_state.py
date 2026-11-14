@@ -320,6 +320,15 @@ def _validate_frozen_pair(
         and not _v2_scope_declaration_complete(result["payload"], input_value)
     ):
         raise InvalidInput("historical workflow scope declaration is invalid")
+    if version == _V2 and (
+        result["payload"].get("excluded_scopes")
+        or any(
+            isinstance(row, dict) and row.get("requirement") == "excluded_by_approval"
+            for row in input_value["requested_scopes"]
+        )
+    ):
+        # 承認の照合手段が無い間、対象外は確定し得ない。保存済みの対象外の主張は再開で受理しない。
+        raise InvalidInput("historical excluded scope claim is not confirmable")
     expected_input = input_fingerprint(
         _SKILL,
         metadata["runtime_unit_key"],

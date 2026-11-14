@@ -27,7 +27,7 @@ description: QA要求・製品構成・重要品質特性に対し、テスト�
 
 `assets/output-template.md`の形式を使います。割当IDはartifact系列内で安定させ、ref・revision・scopeと合わせます。環境準備や保存先が未接続の状態を成功としません。
 
-保存する正本は`references/data-contract.md`の canonical JSON packet です。`scripts/architecture_runtime.py`の`validate`・`validate_readback`・`impact`・`completion_check`で検証し、Markdown表は`assets/output-template.md`の形式でpacketから描画します。承認の本人性・保存先の真正性は、このscriptでは確立せず、呼出し側の証拠の束縛と内部整合だけを検査します。
+保存する正本は`references/data-contract.md`の canonical JSON packet です。`scripts/architecture_runtime.py`の`validate`・`validate_readback`・`impact`・`completion_check`で検証し（完了には各QA要求と決定済みlevelの確定割当が必要で、未承認案だけでは完了しません）、Markdown表は`assets/output-template.md`の形式でpacketから描画します。承認の本人性・保存先の真正性は、このscriptでは確立せず、呼出し側の証拠の束縛と内部整合だけを検査します。
 
 ## 次の担当
 

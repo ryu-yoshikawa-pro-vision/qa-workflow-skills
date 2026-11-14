@@ -634,6 +634,47 @@ def _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_close
     assert result["issues"][0]["issue_type"] == "scope_ownership_unavailable", result
 
 
+def _test_historical_v2_excluded_claims_are_not_accepted() -> None:
+    """承認の照合手段が無い間、保存済みv2でも対象外の主張は受理しない（古い承認の再利用を防ぐ）。"""
+    import copy
+
+    base_source, base_envelope, module_runtime = _historical_v2_source_and_envelope()
+    # 対象外を含まない実結果のv2は受理され、後段（scope所有の確認）で止まる。
+    assert (
+        _historical_issue(
+            copy.deepcopy(base_source), copy.deepcopy(base_envelope), module_runtime
+        )
+        == "scope_ownership_unavailable"
+    )
+
+    def excluded_case(approval_ref: str) -> str:
+        source = copy.deepcopy(base_source)
+        envelope = copy.deepcopy(base_envelope)
+        row = {
+            "skill": "test-management",
+            "target": None,
+            "execution_range": None,
+            "requirement": "excluded_by_approval",
+            "approval_ref": approval_ref,
+        }
+        source["input"]["requested_scopes"] = [
+            *source["input"]["requested_scopes"],
+            row,
+        ]
+        envelope["payload"]["requested_scopes"] = copy.deepcopy(
+            source["input"]["requested_scopes"]
+        )
+        envelope["payload"]["excluded_scopes"] = [copy.deepcopy(row)]
+        _refresh_identity(source, envelope, "workflow-runtime-v2")
+        return _historical_issue(source, envelope, module_runtime)
+
+    # 具体的な参照・placeholder・別scope向けのどれでも、保存済みの対象外は確定扱いせず拒否する。
+    for approval_ref in ("APPROVAL-001", "未設定", "APR-OTHER-SCOPE"):
+        assert excluded_case(approval_ref) != "scope_ownership_unavailable", (
+            approval_ref
+        )
+
+
 class TestDownstreamState(unittest.TestCase):
     def test_unbound_first_run_returns_empty_canonical_state(self) -> None:
         _test_unbound_first_run_returns_empty_canonical_state()
@@ -659,6 +700,9 @@ class TestDownstreamState(unittest.TestCase):
         self,
     ) -> None:
         _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed()
+
+    def test_historical_v2_excluded_claims_are_not_accepted(self) -> None:
+        _test_historical_v2_excluded_claims_are_not_accepted()
 
     def test_historical_contract_versions_match_their_input_key_sets(self) -> None:
         _test_historical_contract_versions_match_their_input_key_sets()

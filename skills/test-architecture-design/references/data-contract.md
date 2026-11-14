@@ -73,6 +73,9 @@ targetごとに、次の順で決めます。
 - 完了に必要な束縛は、artifact_ref・scope・content_fingerprint・revision（`expected_revision`）・割当IDの一致、stateが`承認済み`、approver・approver_role・evidence_refが非placeholderであることです。
 - LLM出力の`承認済み`表記だけでは承認証拠にしません。承認証拠が無い、旧revision、別artifact、別scope、別割当向けの場合は`complete: false`です。
 - 未承認案（`disposition: 未承認案`）は確定割当に含めず、`unapproved_assignment_ids`として分離します。未解決（`未確定`の目標、`blocked`の割当、未解決のopen item、未割当の要求、準備未完了の確定割当）は完了を阻みます。
+- 完了の単位は、packetのscopeに属する各qa_requirement sourceです。`coverage: 割当済み`の要求は、その要求を参照する割当のうち`disposition: 確定`が少なくとも1件なければ完了しません（`requirement_unconfirmed`、subjectは要求ref）。`coverage`の表示だけでは確定とみなしません。未承認案・blocked・対象外の割当だけの要求も同じく完了しません。
+- `decision`が`明示指定`・`承認済みarchitecture`・`test-analysis既定値`の目標について、決定されたlevel（`levels`）ごとに、同じ目標の確定割当が少なくとも1件必要です。未承認案だけのlevelは完了しません（`level_unconfirmed`、subjectは目標ref、messageにlevelと決定根拠）。承認済みlevelの確定割当は、既存の承認証拠の束縛（`approval_evidence`）で別途検査します。承認者・承認者role・証拠refは、NFKC・書式文字除去・空白圧縮・casefoldの後に、未設定・未確定・未承認・承認済み等の状態語（`承認済み`・`approved`を含む）でないことを要求します。`validate`は割当のlevelが`levels`と一致することを要求するため、未承認案は必ず決定済みlevelに属します。同じlevelに確定割当が既にある追加案（別のtype・methodの変更案）は完了を止めません。`decision: 未確定`（競合）は既存の`level_unresolved`で止めます。
+- 割当はscopeを持ちません。割当のscopeは`qa_requirement_ref`で参照するqa_requirement sourceのscopeに属します。要求の充足・決定済みlevelの充足は現scopeの割当だけで判定し、別scopeの確定割当は現scopeの要求やlevelを満たしません。別scopeのqa_requirementと、要求範囲に含まれない未承認案（同じtargetの別levelを含む）は、このpacketの完了を止めません。`coverage: 対象外`は`exclusion_reason`付きの除外として既存の契約に従います。
 
 ### 検証の境界
 

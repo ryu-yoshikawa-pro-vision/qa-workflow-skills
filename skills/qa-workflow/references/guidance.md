@@ -444,8 +444,8 @@ handoff identityはorigin artifact/revisionとartifact-local handoff refの組�
 - `requested_scopes`（要求集合）は、工程開始時にqa-workflowが利用者の要求から記録する、今回の完了に必須のscopeの一覧です。各要素は`skill / target / execution_range / requirement`を持ちます。`requirement`は`required`（必須）または`excluded_by_approval`（承認された対象外）です。
 - 要求集合は`workflow_runtime.py`の完了判定に必須の入力です。未宣言・空の集合は完了できません。呼び出し側が「全工程確認済み」と自己申告しても、要求集合の代わりにはなりません。
 - 完了判定の対象は要求集合に含めたscopeだけです。QA計画だけ、報告だけ、欠陥だけ、既存成果物を使う途中開始は、要求集合を小さく宣言して表します。qa-workflowは他Skillを推論で追加しません。
-- `excluded_by_approval`は、`approval_ref`（承認の参照）が非空のときだけ完了判定から外します。`approval_ref`の真正性は`workflow_runtime.py`が証明しません。呼び出し側が承認証拠として渡す境界で、他の呼び出し側証拠と同じ扱いです。空・欠落は`approval_ref_missing`として完了不可です。
-- 状態値「省略」は、要求集合に含まれないSkillの行にだけ使います。要求集合に含まれるscopeが未実行・未完了・未検証のままなら「省略」にはできず、「未開始」「実行中」「ブロック中」などとして完了不可で残します。承認された対象外は「省略」と承認参照を併記します。
+- `excluded_by_approval`は、現時点では対象外として確定しません。承認記録を実在の承認として照合する手段（承認provider・認証主体）が未定義のためです。形式上の参照（`APR-999`、別scope・別revisionを指す参照を含む）があっても、承認の真正性を確認したものとして扱いません。該当scopeは必須のまま完了判定に残し、黙って除外しません。空・欠落・空白のみ、および`未設定`・`未取得`・`未確認`・`未承認`・`失効`・`unknown`・`N/A`・`-`・`dummy`・`pending`・`TODO`・`承認済み`・`approved`などのplaceholderや承認状態の語は、`approval_ref_missing`になります。それ以外の具体的な参照は`approval_unverifiable`になります。どちらも`unverified_exclusions`に`skill / target / execution_range / reason`で出し、blockingとして完了不可です。`excluded_scopes`（確定した対象外）は現在常に空です。再開条件は、対象外の宣言を取り下げて`required`にするか、承認記録の照合手段（承認provider）が定義され、その照合結果が提示されるまで、そのscopeを必須として検証することです。照合手段が定義された場合は、`workflow_runtime.py`の`_exclusion_confirmed`だけを差し替えます。保存済みv2の対象外の主張は、再開時に受理しません（`downstream_state.py`）。古い承認参照を再利用して対象外を確定することはありません。真正性について実際に検証したのは、承認参照の形式（空・placeholder・状態語の除外）だけです。検証していないのは、承認の実在、対象scope・revisionとの一致、承認状態（承認済み・失効）、承認者、再開時の失効です。
+- 状態値「省略」は、要求集合に含まれないSkillの行にだけ使います。要求集合に含まれるscopeが未実行・未完了・未検証のままなら「省略」にはできず、「未開始」「実行中」「ブロック中」などとして完了不可で残します。承認された対象外の「省略」と承認参照の併記は、承認の照合手段が定義されるまで使いません。
 - 完了したワークフローに「未開始」の行を残してはいけません（`WF-D004`）。
 - `workflow_runtime.py`の出力で、要求集合に含まれず`workflow_scopes`にあるscopeは`unrequested_scopes`として記録されます。必須扱いはしませんが、既存の未検証・未登録ルールには従い、未検証なら完了不可です。
 

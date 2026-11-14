@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,11 @@ GENERATOR = "workflow_runtime"
 GENERATOR_CONTRACT_VERSION = "workflow-runtime-v2"
 # 工程開始時にqa-workflowが記録した要求集合（requested_scopes）の検査契約。v1は要求集合を持たない過去契約。
 REQUESTED_SCOPE_REQUIREMENTS = frozenset({"required", "excluded_by_approval"})
+# 未確定の対象外を解消する条件。承認照合の手段が定義されるまで、対象外は確定されない。
+EXCLUSION_RESUME_CONDITION = (
+    "対象外の宣言を取り下げてrequiredにする、または承認記録の照合手段（承認provider）が定義され、"
+    "その照合結果が提示されるまで、このscopeは必須として検証する"
+)
 SCRIPT_PATH = Path(__file__).resolve()
 # Only these Skills currently provide runtime-v2 root derivation and evidence.
 # A name appearing in workflow_scopes is not itself a verification contract.
@@ -492,6 +498,68 @@ def _scope_identity(row: dict[str, Any]) -> tuple[str, str, str]:
     return (row["skill"], str(row["target"]), str(row["execution_range"]))
 
 
+# 未確定の対象外の理由（approval_ref_missing か approval_unverifiable）を選ぶための判定。
+# 対象外の確定には使わない。承認参照の形式（placeholderでないか）だけを見る。
+# 判定はNFKC・空白正規化・casefold後に行う。承認placeholderの語彙は
+# test-architecture-design の APPROVAL_PLACEHOLDERS と揃え、承認状態の語は参照ではないとして加える。
+_APPROVAL_REF_PLACEHOLDERS = frozenset(
+    {
+        "unknown",
+        "n/a",
+        "na",
+        "none",
+        "null",
+        "nil",
+        "tbd",
+        "tba",
+        "todo",
+        "dummy",
+        "pending",
+        "placeholder",
+        "未取得",
+        "未設定",
+        "未確認",
+        "未確定",
+        "未定",
+        "不明",
+        "取得不能",
+        "未承認",
+        "失効",
+        "不要",
+        "expired",
+        "unapproved",
+        "not required",
+        "not retrieved",
+        "承認済み",
+        "承認済",
+        "approved",
+    }
+)
+
+
+def _approval_ref_is_concrete(value: Any) -> bool:
+    """承認参照として採用できる文字列か。真正性は判定しない（形式と placeholder のみ）。"""
+    if not isinstance(value, str):
+        return False
+    normalized = " ".join(unicodedata.normalize("NFKC", value).split()).casefold()
+    if not normalized or not any(
+        unicodedata.category(char)[0] in "LN" for char in normalized
+    ):
+        return False
+    return normalized not in _APPROVAL_REF_PLACEHOLDERS
+
+
+def _exclusion_confirmed(row: dict[str, Any]) -> bool:
+    """excluded_by_approval の対象外を確定できるかを返す。現在は常に False。
+
+    承認記録を実在の承認として照合する手段（承認provider・認証主体）が未定義のため、
+    形式の正しい approval_ref（APR-999、別scopeの参照を含む）も承認の真正性を確認したものとして
+    扱わない。対象外を確定しないscopeは必須のまま完了判定に残し、黙って除外しない。
+    照合手段が定義されたら、この関数の判定だけを差し替える。
+    """
+    return False
+
+
 def _requested_scope_rows(value: Any) -> list[dict[str, Any]]:
     rows = ensure_list(value, "requested_scopes")
     result = []
@@ -704,19 +772,35 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     approval_issues: list[dict[str, Any]] = []
     required_rows: list[dict[str, Any]] = []
     excluded_rows: list[dict[str, Any]] = []
+    unverified_exclusions: list[dict[str, Any]] = []
     for row in requested:
-        approval_ref = row.get("approval_ref")
         if row["requirement"] == "excluded_by_approval":
-            if isinstance(approval_ref, str) and approval_ref.strip():
+            # 対象外は照合手段がある場合だけ確定する（現在は確定しない）。未確定の行は
+            # そのscopeを必須のまま残し、未確定の理由を issue と unverified_exclusions に出す。
+            if _exclusion_confirmed(row):
                 excluded_rows.append(row)
                 continue
+            reason = (
+                "approval_unverifiable"
+                if _approval_ref_is_concrete(row.get("approval_ref"))
+                else "approval_ref_missing"
+            )
+            unverified_exclusions.append(
+                {
+                    "skill": row["skill"],
+                    "target": row["target"],
+                    "execution_range": row["execution_range"],
+                    "reason": reason,
+                }
+            )
             approval_issues.append(
                 {
-                    "issue_type": "approval_ref_missing",
+                    "issue_type": reason,
                     "blocking": True,
                     "skill": row["skill"],
                     "target": row["target"],
                     "execution_range": row["execution_range"],
+                    "resume": EXCLUSION_RESUME_CONDITION,
                 }
             )
         required_rows.append(row)
@@ -979,6 +1063,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "requested_scopes": requested,
             "missing_requested_scopes": missing_required,
             "excluded_scopes": excluded_rows,
+            "unverified_exclusions": unverified_exclusions,
             "unrequested_scopes": unrequested,
             "unverified_scopes": unverified_scopes,
             "verified_owner_scopes": verified_owner_scopes,

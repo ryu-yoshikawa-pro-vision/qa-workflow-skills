@@ -1125,7 +1125,11 @@ class RequestedScopeContractTests(unittest.TestCase):
         )
         self.assertEqual(result["payload"]["missing_requested_scopes"], [])
 
-    def test_approved_exclusion_is_removed_from_completion(self) -> None:
+    def test_approved_exclusion_is_not_confirmed_and_keeps_scope_required(self) -> None:
+        # 旧期待値: 形式上の承認参照があれば対象外として除外し、完了する。
+        # 新期待値: 承認の照合手段が無いため対象外は確定しない（excluded_scopes は空）。
+        #   scope は必須のまま残り、完了しない。理由は利用者要求 4.4（照合手段がない場合は
+        #   対象外を確定しない）。
         request = self._base()
         self._set_requested(
             request,
@@ -1141,11 +1145,29 @@ class RequestedScopeContractTests(unittest.TestCase):
             ],
         )
         result = run(request)
+        payload = result["payload"]
         self.assertEqual(result["runtime_status"], "ok", result)
-        self.assertTrue(result["payload"]["can_complete"], result)
+        self.assertFalse(payload["can_complete"], result)
+        self.assertEqual(payload["excluded_scopes"], [], result)
         self.assertEqual(
-            [row["skill"] for row in result["payload"]["excluded_scopes"]],
-            ["test-management"],
+            payload["unverified_exclusions"],
+            [
+                {
+                    "skill": "test-management",
+                    "target": None,
+                    "execution_range": None,
+                    "reason": "approval_unverifiable",
+                }
+            ],
+            result,
+        )
+        self.assertEqual(
+            payload["missing_requested_scopes"],
+            [{"skill": "test-management", "target": None, "execution_range": None}],
+            result,
+        )
+        self.assertIn(
+            "approval_unverifiable", {i["issue_type"] for i in result["issues"]}
         )
 
     def test_approval_exclusion_without_reference_blocks_completion(self) -> None:
@@ -1233,6 +1255,143 @@ class RequestedScopeContractTests(unittest.TestCase):
                 request = self._base()
                 self._set_requested(request, rows)
                 self.assertEqual(run(request)["runtime_status"], "invalid_input")
+
+    PLACEHOLDER_APPROVAL_REFS = (
+        "未設定",
+        "未取得",
+        "未確認",
+        "未承認",
+        "失効",
+        "unknown",
+        "N/A",
+        "-",
+        "—",
+        "dummy",
+        "approved",
+        "承認済み",
+        "TODO",
+        "pending",
+        "null",
+        "none",
+        "  Unknown  ",
+        "ｎ／ａ",
+        "－",
+        "placeholder",
+    )
+
+    def _exclusion_request(
+        self, row_extra: dict, *, scope_present: bool = True
+    ) -> dict:
+        """test-management（未登録）を承認済み対象外として宣言する入力。"""
+        request = self._base()
+        if scope_present:
+            request["input"]["workflow_scopes"].append(
+                {
+                    "skill": "test-management",
+                    "target": None,
+                    "execution_range": None,
+                    "input_mode": "artifact",
+                    "normalized_input": {},
+                    "current_structure_state": None,
+                }
+            )
+        row = {
+            "skill": "test-management",
+            "target": None,
+            "execution_range": None,
+            "requirement": "excluded_by_approval",
+            **row_extra,
+        }
+        self._set_requested(request, [required_scope("test-condition-design"), row])
+        return request
+
+    def test_placeholder_approval_ref_never_excludes_scope(self) -> None:
+        # 期待結果: 承認参照がplaceholder（未設定・unknown・N/A・dummy・状態語など）なら、
+        #   対象外は確定せず、scopeは workflow_scopes から除かれず未検証のまま残る。
+        #   他scopeが検証済みでも完了しない。
+        for approval in self.PLACEHOLDER_APPROVAL_REFS:
+            with self.subTest(approval=approval):
+                result = run(self._exclusion_request({"approval_ref": approval}))
+                payload = result["payload"]
+                self.assertEqual(result["runtime_status"], "ok", result)
+                self.assertFalse(payload["can_complete"], result)
+                self.assertEqual(payload["excluded_scopes"], [], result)
+                self.assertEqual(
+                    [row["skill"] for row in payload["unverified_exclusions"]],
+                    ["test-management"],
+                    result,
+                )
+                self.assertEqual(
+                    payload["unverified_exclusions"][0]["reason"],
+                    "approval_ref_missing",
+                    result,
+                )
+                self.assertEqual(
+                    [row["skill"] for row in payload["unverified_scopes"]],
+                    ["test-management"],
+                    result,
+                )
+                self.assertIn(
+                    "approval_ref_missing",
+                    {issue["issue_type"] for issue in result["issues"]},
+                )
+
+    def test_concrete_approval_ref_is_unverifiable_and_keeps_scope_unverified(
+        self,
+    ) -> None:
+        # 旧期待値: 形式上の参照がある承認済み対象外は除外され、完了する。
+        # 新期待値: 対象外は確定せず、scope は未検証のまま残る。完了しない（理由は上と同じ）。
+        result = run(self._exclusion_request({"approval_ref": "APPROVAL-001"}))
+        payload = result["payload"]
+        self.assertFalse(payload["can_complete"], result)
+        self.assertEqual(payload["excluded_scopes"], [], result)
+        self.assertEqual(
+            [row["reason"] for row in payload["unverified_exclusions"]],
+            ["approval_unverifiable"],
+            result,
+        )
+        self.assertEqual(
+            [row["skill"] for row in payload["unverified_scopes"]],
+            ["test-management"],
+            result,
+        )
+
+    def test_no_exclusion_is_confirmed_for_any_reference_form(self) -> None:
+        # 形式が正しい参照・別scope向け・別revision向けを示す文字列でも対象外は確定しない。
+        for approval in (
+            "APR-999",
+            "APPROVAL-001",
+            "APR-OTHER-SCOPE",
+            "APPROVAL-001@rev-0",
+            "承認記録-2026-0001",
+        ):
+            with self.subTest(approval=approval):
+                result = run(self._exclusion_request({"approval_ref": approval}))
+                payload = result["payload"]
+                self.assertFalse(payload["can_complete"], result)
+                self.assertEqual(payload["excluded_scopes"], [], result)
+                self.assertEqual(
+                    payload["unverified_exclusions"][0]["reason"],
+                    "approval_unverifiable",
+                    result,
+                )
+
+    def test_placeholder_exclusion_leaves_required_scope_missing(self) -> None:
+        # placeholderの対象外は、scopeが無い場合も必須欠落として完了を止める。
+        result = run(
+            self._exclusion_request({"approval_ref": "未設定"}, scope_present=False)
+        )
+        payload = result["payload"]
+        self.assertFalse(payload["can_complete"], result)
+        self.assertEqual(
+            payload["missing_requested_scopes"],
+            [{"skill": "test-management", "target": None, "execution_range": None}],
+        )
+        self.assertEqual(payload["excluded_scopes"], [])
+        self.assertIn(
+            "required_scope_missing",
+            {issue["issue_type"] for issue in result["issues"]},
+        )
 
     def test_non_requested_scope_is_recorded_but_not_required(self) -> None:
         # 未要求scopeは記録されるが必須扱いしない。ただし既存の未検証ルールは従う。

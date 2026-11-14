@@ -15,6 +15,7 @@ import hashlib
 import json
 import re
 import sys
+import unicodedata
 from typing import Any
 
 SCHEMA = "test-architecture-v1"
@@ -35,6 +36,7 @@ DECISION_BY_BASIS = {
     "default": "test-analysis既定値",
 }
 DISPOSITIONS = ("確定", "未承認案", "blocked", "対象外")
+DECIDED_DECISIONS = ("明示指定", "承認済みarchitecture", "test-analysis既定値")
 READINESS = ("準備済み", "未確定", "blocked")
 AUTOMATION = ("自動", "手動", "混在", "未確定")
 ACQUISITIONS = ("取得済", "部分取得", "未取得", "取得不能", "0件確認済み", "不明")
@@ -65,7 +67,25 @@ GENERAL_PLACEHOLDERS = frozenset(
     }
 )
 APPROVAL_PLACEHOLDERS = GENERAL_PLACEHOLDERS | frozenset(
-    {"未承認", "失効", "不要", "expired", "unapproved", "not required", "not retrieved"}
+    {
+        "none",
+        "null",
+        "nil",
+        "tba",
+        "dummy",
+        "pending",
+        "placeholder",
+        "未承認",
+        "失効",
+        "不要",
+        "expired",
+        "unapproved",
+        "not required",
+        "not retrieved",
+        "承認済み",
+        "承認済",
+        "approved",
+    }
 )
 
 ROOT_KEYS = frozenset(
@@ -371,10 +391,17 @@ def _text_list(value: Any, name: str, *, min_items: int = 0) -> list[str]:
     return result
 
 
+def _placeholder_key(value: str) -> str:
+    """placeholder判定用の正規化: NFKC、書式文字（ゼロ幅等）除去、空白圧縮、casefold。"""
+    text = unicodedata.normalize("NFKC", value)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return " ".join(text.split()).casefold()
+
+
 def _is_placeholder(
     value: str, placeholders: frozenset[str] = GENERAL_PLACEHOLDERS
 ) -> bool:
-    return value.strip().casefold() in placeholders
+    return _placeholder_key(value) in {_placeholder_key(item) for item in placeholders}
 
 
 def _parse_qa_ref(value: str, name: str) -> tuple[str, str, str]:
@@ -1135,6 +1162,8 @@ def completion_check(request: dict[str, Any]) -> dict[str, Any]:
         if len(reasons) == before:
             approved.append(aid)
 
+    _check_confirmed_coverage(artifact, set(confirmed), add)
+
     complete = not reasons
     return make_result(
         "complete" if complete else "incomplete",
@@ -1147,6 +1176,64 @@ def completion_check(request: dict[str, Any]) -> dict[str, Any]:
         blocked_assignment_ids=blocked,
         approval_authenticity=NOT_ESTABLISHED,
     )
+
+
+def _check_confirmed_coverage(
+    artifact: dict[str, Any], confirmed: set[str], add: Any
+) -> None:
+    """完了対象（packetのscopeに属するqa_requirement）ごとに確定割当の裏付けを確認する。
+
+    割当はscopeを持たず、qa_requirement_refで参照するqa_requirement sourceのscopeに属する。
+    したがって、要求の充足・決定済みlevelの充足は、現scopeの割当だけで判定する。
+    別scopeの確定割当は現scopeの要求やlevelを満たさず、別scopeの未承認案は完了を止めない。
+    """
+    sources = {row["source_id"]: row for row in artifact["sources"]}
+    in_scope = {
+        _qa_ref(source["artifact_ref"], source["local_id"], source["revision"])
+        for source in sources.values()
+        if source["role"] == "qa_requirement" and source["scope"] == artifact["scope"]
+    }
+    scoped = [
+        item
+        for item in artifact["assignments"]
+        if item["qa_requirement_ref"] in in_scope
+    ]
+    scoped_confirmed = {
+        item["assignment_id"] for item in scoped if item["assignment_id"] in confirmed
+    }
+    for row in artifact["requirement_coverage"]:
+        ref = row["qa_requirement_ref"]
+        if ref not in in_scope or row["coverage"] != "割当済み":
+            continue
+        if not any(
+            item["qa_requirement_ref"] == ref
+            and item["assignment_id"] in scoped_confirmed
+            for item in scoped
+        ):
+            add(
+                "requirement_unconfirmed",
+                "an assigned qa requirement has no confirmed assignment",
+                ref,
+            )
+    used_levels = {(item["target_ref"], item["level"]) for item in scoped}
+    confirmed_levels = {
+        (item["target_ref"], item["level"])
+        for item in scoped
+        if item["assignment_id"] in scoped_confirmed
+    }
+    for row in artifact["level_priority"]:
+        # 採用が決まったlevel（明示指定・承認済みarchitecture・既定値）のうち、現scopeの割当で使われるものを
+        # 確定割当で裏付ける。validatorは割当のlevelが決定集合（levels）と一致することを要求する。
+        if row["decision"] not in DECIDED_DECISIONS:
+            continue
+        for level in row["levels"]:
+            key = (row["target_ref"], level)
+            if key in used_levels and key not in confirmed_levels:
+                add(
+                    "level_unconfirmed",
+                    f"decided level {level} ({row['decision']}) has no confirmed assignment",
+                    row["target_ref"],
+                )
 
 
 def _default_levels(artifact: dict[str, Any], target: str) -> set[str]:

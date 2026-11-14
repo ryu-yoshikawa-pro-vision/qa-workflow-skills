@@ -26,7 +26,7 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 本Skillは工程固有generatorを再実装せず、対象scopeが1件以上ある場合だけ担当Skillのruntime dispatch結果を統合します。scope 0ではruntimeをdispatchせず、既存のworkflow契約を維持します。統合するMachine Runtime Input / ResultとMachine Entityは、Skill名・runtime unit・Model Key・stable ID・fingerprint・freshnessを持つ機械証拠です。
 
 `workflow_runtime.py`へのnormalized inputは、既存workflow stateと同じcanonical UUIDの`workflow_ref`を必須で渡します。Result payloadも同じ値を返し、別workflowのevidence混在を許しません。
-工程開始時に記録した要求集合（`requested_scopes`、各要素は`skill / target / execution_range / requirement`）を必ず渡します。未宣言・空は完了不可（`required_scopes_undeclared`）です。要求集合に含まれる`required` scopeの欠落は`required_scope_missing`、`excluded_by_approval`は非空の`approval_ref`がある場合だけ完了判定から外します。`approval_ref`の真正性は`workflow_runtime.py`が証明せず、呼び出し側の承認証拠に依存します。要求外のSkillを推論で追加せず、状態値「省略」の定義は`references/guidance.md`の「要求集合と「省略」」に従います。
+工程開始時に記録した要求集合（`requested_scopes`、各要素は`skill / target / execution_range / requirement`）を必ず渡します。未宣言・空は完了不可（`required_scopes_undeclared`）です。要求集合に含まれる`required` scopeの欠落は`required_scope_missing`、`excluded_by_approval`は、承認の照合手段（承認provider）が定義されるまで対象外として確定しません。該当scopeは必須のまま残り、placeholderや欠落は`approval_ref_missing`、具体的な参照は`approval_unverifiable`として`unverified_exclusions`に出ます（完了不可）。`approval_ref`の形式があっても承認済みとして扱わず、真正性・対象scope・revision・承認状態は`workflow_runtime.py`が確認しません。再開条件と検証の範囲は`references/guidance.md`の「要求集合と「省略」」を参照します。要求外のSkillを推論で追加せず、状態値「省略」の定義は`references/guidance.md`の「要求集合と「省略」」に従います。
 
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
 

@@ -815,6 +815,7 @@ class CompletionTests(unittest.TestCase):
         self.assertIn("placeholder_value", codes(call(completion(seal(packet)))))
 
     def test_unapproved_draft_is_separated_and_not_confirmed(self) -> None:
+        # 承認済みarchitectureのAPI levelは、確定割当（ARCH-002）が無い限り決定を裏付けない。
         packet = payment_packet()
         packet["assignments"][1]["disposition"] = "未承認案"
         seal(packet)
@@ -825,9 +826,352 @@ class CompletionTests(unittest.TestCase):
                 approval_evidence=evidence_for(packet, ids={"APR-002": ["ARCH-003"]}),
             )
         )
-        self.assertTrue(result["complete"], result)
+        self.assertFalse(result["complete"], result)
+        self.assertIn("level_unconfirmed", codes(result))
+        self.assertEqual(
+            [
+                issue["subject_id"]
+                for issue in result["issues"]
+                if issue["code"] == "level_unconfirmed"
+            ],
+            [TARGET_PAYMENT],
+        )
         self.assertNotIn("ARCH-002", result["confirmed_assignment_ids"])
         self.assertIn("ARCH-002", result["unapproved_assignment_ids"])
+
+    def test_qa_requirement_with_only_unapproved_drafts_is_not_complete(self) -> None:
+        # B-1: coverage は「割当済み」だが、対応する割当が全て未承認案の要求は完了しない。
+        packet = base_packet()
+        packet["assignments"][0]["disposition"] = "未承認案"
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertIn("requirement_unconfirmed", codes(result))
+        self.assertEqual(result["confirmed_assignment_ids"], [])
+        self.assertEqual(result["unapproved_assignment_ids"], ["ARCH-001"])
+        subjects = [
+            issue["subject_id"]
+            for issue in result["issues"]
+            if issue["code"] == "requirement_unconfirmed"
+        ]
+        self.assertEqual(subjects, [QA_REF])
+
+    def test_approved_requirement_with_only_unapproved_drafts_is_not_complete(
+        self,
+    ) -> None:
+        packet = payment_packet()
+        for row in packet["assignments"]:
+            row["disposition"] = "未承認案"
+        seal(packet)
+        result = call(
+            completion(
+                packet,
+                expected_revision=REV,
+                approval_evidence=evidence_for(packet),
+            )
+        )
+        self.assertFalse(result["complete"], result)
+        self.assertIn("requirement_unconfirmed", codes(result))
+        self.assertEqual(result["confirmed_assignment_ids"], [])
+
+    def test_confirmed_requirement_with_unrelated_extra_draft_stays_complete(
+        self,
+    ) -> None:
+        # B-2: 決定済みlevelに確定割当があり、同じlevelの別方式の追加案だけが未承認。
+        packet = base_packet()
+        extra = assignment(
+            "ARCH-002",
+            TARGET_CONFIRM,
+            "システム",
+            "test-analysis既定値",
+            disposition="未承認案",
+        )
+        extra["method"] = "手動実行"
+        packet["assignments"].append(extra)
+        coverage_for(packet)
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(result["confirmed_assignment_ids"], ["ARCH-001"])
+        self.assertEqual(result["unapproved_assignment_ids"], ["ARCH-002"])
+
+    def test_other_scope_draft_does_not_block_current_scope(self) -> None:
+        # B-3: 完了対象は確定済み。別scopeの要求に紐づく未承認案は現scopeを止めない。
+        packet = base_packet()
+        other_source = source(
+            "SRC-003",
+            "qa_requirement",
+            "test-requirements-analysis",
+            "artifact:qra-other-r1",
+            "qra-other-r1",
+            "other-content",
+            approval="承認済み",
+            evidence="evidence:qra-other-approval",
+            local_id="QAR-009",
+        )
+        other_source["scope"] = "other-scope"
+        other_ref = "artifact:qra-other-r1#QAR-009@qra-other-r1"
+        draft = assignment(
+            "ARCH-002",
+            TARGET_PAYMENT,
+            "API",
+            "test-analysis既定値",
+            disposition="未承認案",
+        )
+        draft["qa_requirement_ref"] = other_ref
+        draft["source_ids"] = ["SRC-003", "SRC-002"]
+        packet["sources"].append(other_source)
+        packet["assignments"].append(draft)
+        packet["level_priority"].append(priority(TARGET_PAYMENT, default=["API"]))
+        packet["requirement_coverage"].append(
+            {
+                "qa_requirement_ref": other_ref,
+                "coverage": "割当済み",
+                "assignment_ids": ["ARCH-002"],
+                "exclusion_reason": None,
+            }
+        )
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(result["confirmed_assignment_ids"], ["ARCH-001"])
+        self.assertEqual(result["unapproved_assignment_ids"], ["ARCH-002"])
+
+    def test_explicit_level_only_as_unapproved_draft_keeps_range_incomplete(
+        self,
+    ) -> None:
+        # 明示指定された必須levelが未承認案だけなら、そのtargetの範囲は完了しない。
+        packet = base_packet()
+        packet["assignments"] += [
+            assignment(
+                "ARCH-002", TARGET_PAYMENT, "API", "明示指定", disposition="未承認案"
+            ),
+            assignment("ARCH-003", TARGET_PAYMENT, "システム", "明示指定"),
+        ]
+        packet["level_priority"].append(
+            priority(TARGET_PAYMENT, explicit=["API", "システム"], default=["システム"])
+        )
+        coverage_for(packet)
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertIn("level_unconfirmed", codes(result))
+        self.assertEqual(result["confirmed_assignment_ids"], ["ARCH-001", "ARCH-003"])
+        subjects = [
+            issue["subject_id"]
+            for issue in result["issues"]
+            if issue["code"] == "level_unconfirmed"
+        ]
+        self.assertEqual(subjects, [TARGET_PAYMENT])
+
+    def test_explicit_levels_all_confirmed_keep_each_level(self) -> None:
+        packet = base_packet()
+        packet["assignments"] += [
+            assignment(
+                "ARCH-002",
+                TARGET_PAYMENT,
+                "API",
+                "明示指定",
+                approval_id="APR-001",
+            ),
+            assignment("ARCH-003", TARGET_PAYMENT, "システム", "明示指定"),
+        ]
+        packet["level_priority"].append(
+            priority(TARGET_PAYMENT, explicit=["API", "システム"], default=["システム"])
+        )
+        coverage_for(packet)
+        seal(packet)
+        result = call(
+            completion(
+                packet,
+                expected_revision=REV,
+                approval_evidence=evidence_for(packet, ids={"APR-001": ["ARCH-002"]}),
+            )
+        )
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(
+            result["confirmed_assignment_ids"], ["ARCH-001", "ARCH-002", "ARCH-003"]
+        )
+
+    def test_unassigned_requirement_is_not_complete(self) -> None:
+        packet = base_packet()
+        packet["assignments"] = []
+        packet["level_priority"] = []
+        coverage_for(packet)
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertIn("requirement_unassigned", codes(result))
+        self.assertNotIn("requirement_unconfirmed", codes(result))
+
+    def test_assigned_requirement_with_only_excluded_assignment_is_not_complete(
+        self,
+    ) -> None:
+        packet = base_packet()
+        packet["assignments"][0]["disposition"] = "対象外"
+        packet["assignments"][0]["exclusion_reason"] = "対象外理由"
+        seal(packet)
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertIn("requirement_unconfirmed", codes(result))
+        self.assertEqual(result["confirmed_assignment_ids"], [])
+
+    def test_requirement_excluded_by_coverage_does_not_block_confirmed_scope(
+        self,
+    ) -> None:
+        # coverage「対象外」は除外根拠（exclusion_reason）付きの既存契約に従い、完了を阻まない。
+        packet = base_packet()
+        excluded_source = source(
+            "SRC-003",
+            "qa_requirement",
+            "test-requirements-analysis",
+            "artifact:qra-excluded-r1",
+            "qra-excluded-r1",
+            "excluded-content",
+            approval="承認済み",
+            evidence="evidence:qra-excluded-approval",
+            local_id="QAR-002",
+        )
+        excluded_ref = "artifact:qra-excluded-r1#QAR-002@qra-excluded-r1"
+        packet["sources"].append(excluded_source)
+        packet["requirement_coverage"].append(
+            {
+                "qa_requirement_ref": excluded_ref,
+                "coverage": "対象外",
+                "assignment_ids": [],
+                "exclusion_reason": "今回のリリース範囲外",
+            }
+        )
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(result["confirmed_assignment_ids"], ["ARCH-001"])
+
+    def test_approved_level_change_draft_beside_confirmed_level_stays_complete(
+        self,
+    ) -> None:
+        # 承認済みlevelに既存の確定割当（承認証拠つき）があり、同levelの変更案だけが未承認。
+        packet = payment_packet()
+        change = assignment(
+            "ARCH-004",
+            TARGET_PAYMENT,
+            "API",
+            "承認済みarchitecture",
+            basis_sources=("SRC-001",),
+            approval_id="APR-003",
+            disposition="未承認案",
+        )
+        change["method"] = "手動実行"
+        packet["assignments"].append(change)
+        coverage_for(packet)
+        seal(packet)
+        evidence = evidence_for(packet)
+        result = call(
+            completion(packet, expected_revision=REV, approval_evidence=evidence)
+        )
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(
+            result["confirmed_assignment_ids"], ["ARCH-001", "ARCH-002", "ARCH-003"]
+        )
+        self.assertEqual(result["unapproved_assignment_ids"], ["ARCH-004"])
+
+    def test_default_level_only_as_unapproved_draft_is_not_complete(self) -> None:
+        # 既定値を採用したlevelが未承認案だけなら、そのtargetの範囲は完了しない。
+        packet = base_packet()
+        packet["assignments"][0]["disposition"] = "未承認案"
+        packet["assignments"].append(
+            assignment("ARCH-002", TARGET_PAYMENT, "API", "test-analysis既定値")
+        )
+        packet["level_priority"].append(priority(TARGET_PAYMENT, default=["API"]))
+        coverage_for(packet)
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertNotIn("requirement_unconfirmed", codes(result))
+        subjects = [
+            issue["subject_id"]
+            for issue in result["issues"]
+            if issue["code"] == "level_unconfirmed"
+        ]
+        self.assertEqual(subjects, [TARGET_CONFIRM])
+
+    def test_other_scope_confirmed_assignment_does_not_satisfy_current_level(
+        self,
+    ) -> None:
+        # F3: 別scopeの確定割当が、同targetの現scopeの決定済みlevelを満たしてはならない。
+        packet = base_packet()
+        other_source = source(
+            "SRC-003",
+            "qa_requirement",
+            "test-requirements-analysis",
+            "artifact:qra-other-r1",
+            "qra-other-r1",
+            "other-content",
+            approval="承認済み",
+            evidence="evidence:qra-other-approval",
+            local_id="QAR-009",
+        )
+        other_source["scope"] = "other-scope"
+        other_ref = "artifact:qra-other-r1#QAR-009@qra-other-r1"
+        in_scope_draft = assignment(
+            "ARCH-002",
+            TARGET_PAYMENT,
+            "API",
+            "test-analysis既定値",
+            disposition="未承認案",
+        )
+        other_confirmed = assignment(
+            "ARCH-003", TARGET_PAYMENT, "API", "test-analysis既定値"
+        )
+        other_confirmed["method"] = "手動実行"
+        other_confirmed["qa_requirement_ref"] = other_ref
+        other_confirmed["source_ids"] = ["SRC-003", "SRC-002"]
+        packet["sources"].append(other_source)
+        packet["assignments"] += [in_scope_draft, other_confirmed]
+        packet["level_priority"].append(priority(TARGET_PAYMENT, default=["API"]))
+        packet["requirement_coverage"][0]["assignment_ids"] = ["ARCH-001", "ARCH-002"]
+        packet["requirement_coverage"].append(
+            {
+                "qa_requirement_ref": other_ref,
+                "coverage": "割当済み",
+                "assignment_ids": ["ARCH-003"],
+                "exclusion_reason": None,
+            }
+        )
+        seal(packet)
+        self.assertTrue(call(validate_request(packet))["valid"])
+        result = call(completion(packet))
+        self.assertFalse(result["complete"], result)
+        self.assertIn("level_unconfirmed", codes(result))
+        self.assertNotIn("requirement_unconfirmed", codes(result))
+
+    def test_approver_placeholder_variants_are_not_identity(self) -> None:
+        # F2: 状態語・書式文字・全角・大文字小文字の揺れは承認者として採用しない。
+        for approver in (
+            "承認済み",
+            "承\u200b認済み",
+            "ｕｎｋｎｏｗｎ",
+            "Approved",
+            "  APPROVED  ",
+        ):
+            with self.subTest(approver=approver):
+                packet = payment_packet()
+                evidence = evidence_for(packet)
+                evidence[0]["approver"] = approver
+                result = call(
+                    completion(
+                        packet, expected_revision=REV, approval_evidence=evidence
+                    )
+                )
+                self.assertFalse(result["complete"], result)
+                self.assertIn("approval_identity_missing", codes(result))
 
     def test_level_conflict_is_unresolved_and_not_confirmed(self) -> None:
         packet = base_packet()
@@ -976,7 +1320,8 @@ class FailClosedTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertTrue(
-            imported <= {"__future__", "hashlib", "json", "re", "sys", "typing"},
+            imported
+            <= {"__future__", "hashlib", "json", "re", "sys", "typing", "unicodedata"},
             imported,
         )
         for node in ast.walk(tree):

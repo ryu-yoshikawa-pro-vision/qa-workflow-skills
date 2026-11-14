@@ -962,8 +962,9 @@ class IntegrationScenarioTests(unittest.TestCase):
 
     def test_x2_approved_exclusion_requires_a_reference(self) -> None:
         # 期待結果: excluded_by_approval に approval_ref が無い（欠落・空白）と、
-        #   approval_ref_missing で完了しない。approval_ref があれば、その scope は除外されて
-        #   完了する（対照）。
+        #   approval_ref_missing で完了しない。
+        # 旧期待値（approval_ref があれば除外されて完了）は変更した。承認の照合手段が無いため、
+        #   具体的な参照があっても対象外は確定せず、approval_unverifiable で完了しない（利用者要求 4.4）。
         scopes = self.scopes_for(RA, TA)
         base = [required(RA, self.arts[RA].ref), required(TA, self.arts[TA].ref)]
         for approval in (None, "   "):
@@ -972,10 +973,85 @@ class IntegrationScenarioTests(unittest.TestCase):
                 self.assertFalse(result["payload"]["can_complete"], result)
                 self.assertIn("approval_ref_missing", issue_types(result))
         result = run_workflow(base + [excluded(TM, "APPROVAL-001")], scopes)
-        self.assert_complete(result)
+        self.assertFalse(result["payload"]["can_complete"], result)
+        self.assertEqual(result["payload"]["excluded_scopes"], [], result)
         self.assertEqual(
-            [row["skill"] for row in result["payload"]["excluded_scopes"]], [TM]
+            [row["reason"] for row in result["payload"]["unverified_exclusions"]],
+            ["approval_unverifiable"],
         )
+        self.assertIn("approval_unverifiable", issue_types(result))
+
+    def test_x5_placeholder_exclusion_does_not_hide_an_unverified_scope(self) -> None:
+        # 期待結果: 承認参照がplaceholderなら、excluded_by_approval は対象外にならず、
+        #   未登録 Skill の scope は未検証のまま残る。他scopeが verified でも完了しない。
+        #   対照（具体的な承認参照）も、照合手段が無いため対象外は確定せず完了しない（旧期待値は完了）。
+        dm_scope = {
+            "skill": UNREGISTERED,
+            "target": "unregistered-target",
+            "execution_range": "plan",
+            "input_mode": "artifact",
+            "normalized_input": {},
+            "current_structure_state": None,
+        }
+        for approval in ("未設定", "unknown", "N/A", "dummy", "失効", "承認済み", "-"):
+            with self.subTest(approval=approval):
+                requested = self.requested_for(RA, TA, TM) + [
+                    {
+                        **excluded(UNREGISTERED, approval),
+                        "target": "unregistered-target",
+                    }
+                ]
+                result = run_workflow(
+                    requested, self.scopes_for(RA, TA, TM) + [dm_scope]
+                )
+                self.assertFalse(result["payload"]["can_complete"], result)
+                self.assertEqual(result["payload"]["excluded_scopes"], [], result)
+                self.assertEqual(
+                    unverified_reasons(result),
+                    {UNREGISTERED: "owner_verifier_not_registered"},
+                )
+                self.assertEqual(
+                    [
+                        row["skill"]
+                        for row in result["payload"]["unverified_exclusions"]
+                    ],
+                    [UNREGISTERED],
+                )
+                self.assertIn("approval_ref_missing", issue_types(result))
+        result = run_workflow(
+            self.requested_for(RA, TA, TM)
+            + [
+                {
+                    **excluded(UNREGISTERED, "APPROVAL-001"),
+                    "target": "unregistered-target",
+                }
+            ],
+            self.scopes_for(RA, TA, TM) + [dm_scope],
+        )
+        self.assertFalse(result["payload"]["can_complete"], result)
+        self.assertEqual(result["payload"]["excluded_scopes"], [], result)
+        self.assertEqual(
+            unverified_reasons(result), {UNREGISTERED: "owner_verifier_not_registered"}
+        )
+        self.assertEqual(
+            [row["reason"] for row in result["payload"]["unverified_exclusions"]],
+            ["approval_unverifiable"],
+        )
+
+    def test_x6_exclusion_of_a_verified_scope_blocks_until_redeclared_required(
+        self,
+    ) -> None:
+        # 期待結果: 検証済みの TM を承認済み対象外として宣言しても、対象外は確定せず完了しない。
+        #   TM は検証済みのまま残る（黙って除外しない）。対象外の宣言を required に直すと完了する。
+        scopes = self.scopes_for(RA, TA, TM)
+        tm_excluded = {**excluded(TM, "APPROVAL-001"), "target": self.arts[TM].ref}
+        result = run_workflow(self.requested_for(RA, TA) + [tm_excluded], scopes)
+        self.assertFalse(result["payload"]["can_complete"], result)
+        self.assertEqual(result["payload"]["excluded_scopes"], [], result)
+        self.assertIn(TM, verified_skills(result))
+        self.assertIn("approval_unverifiable", issue_types(result))
+        result = run_workflow(self.requested_for(RA, TA, TM), scopes)
+        self.assert_complete(result)
 
     def test_x3_self_declared_or_unknown_keys_are_rejected(self) -> None:
         # 期待結果: 入力に未知のキー（「全工程確認済み」等の自己申告）を入れると、
@@ -1028,11 +1104,18 @@ class IntegrationScenarioTests(unittest.TestCase):
                     {skill: "owner_verifier_not_registered"},
                 )
                 self.assertIn("unsupported_skill_verifier", issue_types(result))
+        # 旧期待値: 承認済み除外（approval_ref あり）なら完了する。
+        # 新期待値: 対象外は確定しない。scope は必須のまま残り、workflow_scopes に無いので欠落し、完了しない。
         excluded_result = run_workflow(
             self.requested_for(RA, TA, TM) + [excluded(UNREGISTERED)],
             self.scopes_for(RA, TA, TM),
         )
-        self.assert_complete(excluded_result)
+        self.assertFalse(excluded_result["payload"]["can_complete"], excluded_result)
+        self.assertEqual(excluded_result["payload"]["excluded_scopes"], [])
+        self.assertEqual(
+            excluded_result["payload"]["missing_requested_scopes"],
+            [{"skill": UNREGISTERED, "target": None, "execution_range": "plan"}],
+        )
 
 
 if __name__ == "__main__":
