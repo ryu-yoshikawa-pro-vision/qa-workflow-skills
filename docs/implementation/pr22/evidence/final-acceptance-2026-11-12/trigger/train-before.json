@@ -1,7 +1,7 @@
 {
   "model": "claude-haiku-5-5",
   "max_turns": 6,
-  "product_archive": "/tmp/claude-1000/-mnt-c-Users-ryu-yoshikawa-Documents-qa-workflow-skills/6d129db5-ce29-4e6f-9d37-45e95c6f8df0/scratchpad/product-2a8bcf5.tar",
+  "product_archive": "/tmp/claude-1000/-mnt-c-Users-<USER>-Documents-qa-workflow-skills/00000000-0000-4000-8000-900000000003/scratchpad/product-2a8bcf5.tar",
   "skills_available": [
     "adversarial-review",
     "agent-answer-form",
@@ -2480,7 +2480,7 @@
       "target_triggered": false,
       "stopped_at_first_skill_call": false,
       "seconds": 240.0,
-      "stream_tail": "speed\":\"standard\"},\"input_transformations\":[],\"diagnostics\":null,\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"0eb0871e-c5d8-4be5-9414-9e452026c3aa\",\"uuid\":\"cba8124e-81be-4345-9454-8d0c36aa581a\",\"timestamp\":\"2026-11-13T04:14:06.809Z\",\"request_id\":\"req_011CgzH3EW6A9EB54oLE5AzW\"}\n"
+      "stream_tail": "speed\":\"standard\"},\"input_transformations\":[],\"diagnostics\":null,\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"00000000-0000-4000-8000-800000000001\",\"uuid\":\"00000000-0000-4000-8000-800000000002\",\"timestamp\":\"2026-11-13T04:14:06.809Z\",\"request_id\":\"req_011CgzH3EW6A9EB54oLE5AzW\"}\n"
     },
     {
       "query_id": "ui-target-analysis:train:pos:1",
@@ -2493,7 +2493,7 @@
       "target_triggered": false,
       "stopped_at_first_skill_call": false,
       "seconds": 240.0,
-      "stream_tail": "{\"type\":\"tool_progress\",\"tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM-heartbeat-6\",\"tool_name\":\"Agent\",\"parent_tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM\",\"elapsed_time_seconds\":217,\"heartbeat\":true,\"session_id\":\"726de1f4-62bb-4f91-93df-2fa99375b679\",\"uuid\":\"bfe3b7c2-b62e-4e5c-93a6-12a5b720ffa2\"}\n"
+      "stream_tail": "{\"type\":\"tool_progress\",\"tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM-heartbeat-6\",\"tool_name\":\"Agent\",\"parent_tool_use_id\":\"toolu_01U1BHDcx2yiES37qXhoHSrM\",\"elapsed_time_seconds\":217,\"heartbeat\":true,\"session_id\":\"00000000-0000-4000-8000-800000000003\",\"uuid\":\"00000000-0000-4000-8000-800000000004\"}\n"
     },
     {
       "query_id": "ui-target-analysis:train:neg:0",

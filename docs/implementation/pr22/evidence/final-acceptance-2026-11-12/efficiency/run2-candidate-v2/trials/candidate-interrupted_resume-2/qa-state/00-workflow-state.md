@@ -2,7 +2,7 @@
 
 ## 基本
 
-- workflow_ref: 3f9c2a7e-6b1d-4e8a-9c5f-2d7a8b1e4c60
+- workflow_ref: 00000000-0000-4000-8000-900000000001
 - Skill / 対象 / 実行範囲: `qa-workflow` / カート（`SCREEN-STOREFRONT-CART`、BR-CART-001〜003、AC-CART-001〜003）/ テスト分析〜テスト観点（条件）設計
 - 要求成果物: テスト条件・カバレッジ基準（`test-condition-design`の出力）まで
 - 対象外（今回の指示範囲外）: テストケース設計（`test-case-design`）、カバレッジ分析（`coverage-analysis`）、独立レビュー（`adversarial-review`）、テスト実行、E2E

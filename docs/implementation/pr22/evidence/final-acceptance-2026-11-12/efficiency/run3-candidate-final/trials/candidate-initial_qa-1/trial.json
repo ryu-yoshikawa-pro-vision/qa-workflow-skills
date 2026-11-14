@@ -80,7 +80,7 @@
     "05-test-conditions.md": "427cc6d47f4b02fcbf4b6f9ffcb9ab9021a5ab6b3847441feb0d3003db70c49c",
     "README.md": "9bc9a0bb4734f1c0ce825f8e3714f399d61b62b485e4dd9a4b520494c52b1927",
     "pending-approvals.md": "4cad8cb89d551006bf612419fc9d5571b53542b07434028f997ad26f824cebe4",
-    "workflow-state.json": "d75ed6d07a68855ebe9fd4e721054b0d82f3857d143c852d7053a20bf8f22ca2"
+    "workflow-state.json": "12bbb85a79601efa3e011a6f8bd3365d1c73fb294d57ee440d07599564568563"
   },
   "judge": {
     "functional": "pass",

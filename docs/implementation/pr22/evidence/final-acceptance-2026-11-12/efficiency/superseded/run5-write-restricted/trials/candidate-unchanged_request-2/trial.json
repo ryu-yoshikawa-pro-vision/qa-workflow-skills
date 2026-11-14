@@ -84,7 +84,7 @@
     "rewrites": 11,
     "violations": [
       "Write outside qa-state: <scratchpad>/eff5/tools/hash_inputs.py",
-      "Edit outside qa-state: /tmp/claude-1000/-mnt-c-Users-ryu-workflow-skills/placeholder"
+      "Edit outside qa-state: /tmp/claude-1000/-mnt-c-Users-<USER>-workflow-skills/placeholder"
     ],
     "usage": {
       "tokens": 3397529,

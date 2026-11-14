@@ -1,7 +1,7 @@
 {
   "model": "claude-haiku-5-5",
   "max_turns": 6,
-  "product_archive": "/tmp/claude-1000/-mnt-c-Users-ryu-yoshikawa-Documents-qa-workflow-skills/6d129db5-ce29-4e6f-9d37-45e95c6f8df0/scratchpad/product-2a8bcf5.tar",
+  "product_archive": "/tmp/claude-1000/-mnt-c-Users-<USER>-Documents-qa-workflow-skills/00000000-0000-4000-8000-900000000003/scratchpad/product-2a8bcf5.tar",
   "skills_available": [
     "adversarial-review",
     "agent-answer-form",
@@ -1939,7 +1939,7 @@
       "target_triggered": false,
       "stopped_at_first_skill_call": false,
       "seconds": 180.0,
-      "stream_tail": "す。\",\"ttft_ms\":1987,\"type\":\"result\",\"duration_ms\":7788,\"uuid\":\"e18a813f-010e-4c80-bd92-462894d6636e\",\"ttft_stream_ms\":533,\"time_to_request_ms\":56,\"first_content_frame_ms\":533,\"queued_turn_count\":0,\"result_index\":1,\"model_usage_since_last_result\":{},\"credential_expires_at\":\"2026-12-09T03:13:28.413Z\"}\n"
+      "stream_tail": "す。\",\"ttft_ms\":1987,\"type\":\"result\",\"duration_ms\":7788,\"uuid\":\"00000000-0000-4000-8000-900000000004\",\"ttft_stream_ms\":533,\"time_to_request_ms\":56,\"first_content_frame_ms\":533,\"queued_turn_count\":0,\"result_index\":1,\"model_usage_since_last_result\":{},\"credential_expires_at\":\"2026-12-09T03:13:28.413Z\"}\n"
     },
     {
       "query_id": "testware-implementation:validation:pos:1",

@@ -1,5 +1,5 @@
 {
-  "workflow_ref": "4bffab0d-196a-495c-8c71-f03ed1519ca1",
+  "workflow_ref": "00000000-0000-4000-8000-900000000002",
   "schema": "qa-workflow-state/v1-manual",
   "target": "カート機能（product/docs/spec/features/cart.md）",
   "requested_scope": "テスト分析からテスト観点（条件）設計まで",
