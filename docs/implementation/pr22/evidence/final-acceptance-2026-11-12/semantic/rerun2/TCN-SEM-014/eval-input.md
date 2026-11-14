@@ -1,0 +1,7 @@
+# Eval Input
+
+テスト要求`TR-ORDERS-014`は「注文一覧の表示対象（target A／B／C）を、正式なCoverage Itemで漏れなく確認すること」を求める。
+
+Model `M-ORDERS`にはcurrent target A、B、Cがある。Aは意味上Bと重複するtargetで、Disposition `重複`の`covered_by_target_version`はBのcurrent versionを参照する。Aのcurrent versionは`target_content_fingerprint=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`、`generation_fingerprint=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`。Bのcurrent versionは`target_content_fingerprint=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`、`generation_fingerprint=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`で、BはCI-001へcurrent mappingされている。CI-001の`execution_fingerprint`はBのcurrent mappingと一致する。AからBへのself reference / cycleはない。Cのcurrent versionは`target_content_fingerprint=sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`、`generation_fingerprint=sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`で、まだCIへ到達していない。target closureとmodel completionを評価する。
+
+`TR-ORDERS-014`の根拠は、承認済みでcurrentな`SPEC-ORD-014`で、「注文一覧の表示対象は、model `M-ORDERS`のすべてのcurrent targetをCoverage Itemで確認し、`重複`のDispositionは、cover先targetのcurrent execution mappingで閉じられる場合に限り確認済みとする」と定める。テストレベルはシステムテスト。current modelのMachine Entityは確認済み。

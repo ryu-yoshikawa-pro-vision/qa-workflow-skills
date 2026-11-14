@@ -1,0 +1,47 @@
+{
+  "skill": "test-reporting",
+  "criteria": [
+    {
+      "id": "RPT-SEM-001",
+      "title": "計画上の母集団との照合",
+      "description": "予定sourceの欠落を0件にせず取得未完了として不足を示し、全体PASS率・完了判定を確定していないか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-002",
+      "title": "集計単位の分離",
+      "description": "logical primary・attempt・testなどを別単位で扱い、retryや異なる単位を二重加算していないか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-003",
+      "title": "build・環境・revisionの現在性",
+      "description": "別build・旧revisionの結果を除外し、現在性のないsourceを完了にしていないか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-004",
+      "title": "静的レビューと空集合",
+      "description": "全対象のレビュー完了なしに指摘0件・完了としない、計画上の空集合と取得失敗を区別しているか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-005",
+      "title": "終了基準・承認とリリース判断",
+      "description": "旧計画revisionの報告をcurrentにせず、完了・PASS率・承認を区別し、リリース可否を判断していないか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-006",
+      "title": "読取専用と責務境界",
+      "description": "元結果を改変せず、E2E単体報告や欠陥Issue状態の更新など他ownerの責務を取り込んでいないか。",
+      "critical": true
+    },
+    {
+      "id": "RPT-SEM-007",
+      "title": "計測単位の合算・現在性・期間・重複取得",
+      "description": "異なる計測単位を合算した基準で判定せず、計画revisionの未確認と不一致を区別し、対象期間外と重複したsource取得を完了扱いしていないか。",
+      "critical": true
+    }
+  ]
+}

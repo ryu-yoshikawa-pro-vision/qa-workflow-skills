@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Any
 
 import artifact_graph
+import owner_verifiers
 from runtime_contract import (
     FULL_DIGEST_RE,
     InvalidInput,
@@ -34,8 +36,28 @@ from runtime_contract import (
 
 SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
-GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
+GENERATOR_CONTRACT_VERSION = "workflow-runtime-v2"
+# 工程開始時にqa-workflowが記録した要求集合（requested_scopes）の検査契約。v1は要求集合を持たない過去契約。
+REQUESTED_SCOPE_REQUIREMENTS = frozenset({"required", "excluded_by_approval"})
+# 未確定の対象外を解消する条件。承認照合の手段が定義されるまで、対象外は確定されない。
+EXCLUSION_RESUME_CONDITION = (
+    "対象外の宣言を取り下げてrequiredにする、または承認記録の照合手段（承認provider）が定義され、"
+    "その照合結果が提示されるまで、このscopeは必須として検証する"
+)
 SCRIPT_PATH = Path(__file__).resolve()
+# Only these Skills currently provide runtime-v2 root derivation and evidence.
+# A name appearing in workflow_scopes is not itself a verification contract.
+RUNTIME_V2_SKILL_ROOTS = frozenset(
+    {
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "qa-workflow",
+    }
+)
+
 _WCAG_STATE_OPERATIONS = {
     "register-wcag-evaluation-plan",
     "read-wcag-evaluation-state",
@@ -298,7 +320,7 @@ def _execute_and_finalize_wcag_report(
     qa_read_request = {
         "metadata": _runtime_metadata(
             "qa-workflow",
-            "workflow-runtime-v1",
+            GENERATOR_CONTRACT_VERSION,
             input_mode="artifact",
             reference_refs=[context_ref],
         ),
@@ -472,6 +494,107 @@ def _scope_rows(value: Any) -> list[dict[str, Any]]:
     return result
 
 
+def _scope_identity(row: dict[str, Any]) -> tuple[str, str, str]:
+    return (row["skill"], str(row["target"]), str(row["execution_range"]))
+
+
+# 未確定の対象外の理由（approval_ref_missing か approval_unverifiable）を選ぶための判定。
+# 対象外の確定には使わない。承認参照の形式（placeholderでないか）だけを見る。
+# 判定はNFKC・空白正規化・casefold後に行う。承認placeholderの語彙は
+# test-architecture-design の APPROVAL_PLACEHOLDERS と揃え、承認状態の語は参照ではないとして加える。
+_APPROVAL_REF_PLACEHOLDERS = frozenset(
+    {
+        "unknown",
+        "n/a",
+        "na",
+        "none",
+        "null",
+        "nil",
+        "tbd",
+        "tba",
+        "todo",
+        "dummy",
+        "pending",
+        "placeholder",
+        "未取得",
+        "未設定",
+        "未確認",
+        "未確定",
+        "未定",
+        "不明",
+        "取得不能",
+        "未承認",
+        "失効",
+        "不要",
+        "expired",
+        "unapproved",
+        "not required",
+        "not retrieved",
+        "承認済み",
+        "承認済",
+        "approved",
+    }
+)
+
+
+def _approval_ref_is_concrete(value: Any) -> bool:
+    """承認参照として採用できる文字列か。真正性は判定しない（形式と placeholder のみ）。"""
+    if not isinstance(value, str):
+        return False
+    normalized = " ".join(unicodedata.normalize("NFKC", value).split()).casefold()
+    if not normalized or not any(
+        unicodedata.category(char)[0] in "LN" for char in normalized
+    ):
+        return False
+    return normalized not in _APPROVAL_REF_PLACEHOLDERS
+
+
+def _exclusion_confirmed(row: dict[str, Any]) -> bool:
+    """excluded_by_approval の対象外を確定できるかを返す。現在は常に False。
+
+    承認記録を実在の承認として照合する手段（承認provider・認証主体）が未定義のため、
+    形式の正しい approval_ref（APR-999、別scopeの参照を含む）も承認の真正性を確認したものとして
+    扱わない。対象外を確定しないscopeは必須のまま完了判定に残し、黙って除外しない。
+    照合手段が定義されたら、この関数の判定だけを差し替える。
+    """
+    return False
+
+
+def _requested_scope_rows(value: Any) -> list[dict[str, Any]]:
+    rows = ensure_list(value, "requested_scopes")
+    result = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise InvalidInput(f"requested_scopes[{index}]が不正です")
+        reject_unknown(
+            row,
+            {"skill", "target", "execution_range", "requirement"},
+            {"approval_ref"},
+        )
+        skill = ensure_nonempty_string(row["skill"], f"requested_scopes[{index}].skill")
+        if skill == "qa-workflow":
+            raise InvalidInput("requested scopeへqa-workflow自身を含められません")
+        for field in ("target", "execution_range"):
+            if row[field] is not None and (
+                not isinstance(row[field], str) or not row[field].strip()
+            ):
+                raise InvalidInput(f"requested scope {field}が不正です")
+        if row["requirement"] not in REQUESTED_SCOPE_REQUIREMENTS:
+            raise InvalidInput("requested scope requirementが不正です")
+        approval_ref = row.get("approval_ref")
+        if approval_ref is not None and not isinstance(approval_ref, str):
+            raise InvalidInput("requested scope approval_refが不正です")
+        if row["requirement"] == "required" and approval_ref is not None:
+            raise InvalidInput("required requested scopeはapproval_refを持てません")
+        identity = (skill, str(row["target"]), str(row["execution_range"]))
+        if identity in seen:
+            raise InvalidInput("requested scopeが重複しています")
+        seen.add(identity)
+        result.append(canonicalize(row))
+    return result
+
+
 def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
     rows = ensure_list(value, name)
     result = []
@@ -628,6 +751,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "current_runtime_units",
             "unsupported_item_closures",
         },
+        {"requested_scopes"},
     )
     workflow_ref = ensure_nonempty_string(input_value["workflow_ref"], "workflow_ref")
     try:
@@ -641,6 +765,68 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         raise InvalidInput(
             "本Plan対象scopeがないworkflowではworkflow_runtimeをdispatchできません"
         )
+    # 要求集合は完了に必須の入力。未宣言・空は完了不可（自己申告で必須scopeを隠せない）。
+    raw_requested = input_value.get("requested_scopes")
+    scope_set_declared = raw_requested is not None and raw_requested != []
+    requested = _requested_scope_rows(raw_requested) if scope_set_declared else []
+    approval_issues: list[dict[str, Any]] = []
+    required_rows: list[dict[str, Any]] = []
+    excluded_rows: list[dict[str, Any]] = []
+    unverified_exclusions: list[dict[str, Any]] = []
+    for row in requested:
+        if row["requirement"] == "excluded_by_approval":
+            # 対象外は照合手段がある場合だけ確定する（現在は確定しない）。未確定の行は
+            # そのscopeを必須のまま残し、未確定の理由を issue と unverified_exclusions に出す。
+            if _exclusion_confirmed(row):
+                excluded_rows.append(row)
+                continue
+            reason = (
+                "approval_unverifiable"
+                if _approval_ref_is_concrete(row.get("approval_ref"))
+                else "approval_ref_missing"
+            )
+            unverified_exclusions.append(
+                {
+                    "skill": row["skill"],
+                    "target": row["target"],
+                    "execution_range": row["execution_range"],
+                    "reason": reason,
+                }
+            )
+            approval_issues.append(
+                {
+                    "issue_type": reason,
+                    "blocking": True,
+                    "skill": row["skill"],
+                    "target": row["target"],
+                    "execution_range": row["execution_range"],
+                    "resume": EXCLUSION_RESUME_CONDITION,
+                }
+            )
+        required_rows.append(row)
+    excluded_identities = {_scope_identity(row) for row in excluded_rows}
+    # 承認された対象外のscopeは完了判定から外す。
+    scopes = [row for row in scopes if _scope_identity(row) not in excluded_identities]
+    present_identities = {_scope_identity(row) for row in scopes}
+    required_identities = {_scope_identity(row) for row in required_rows}
+    missing_required = [
+        {
+            "skill": row["skill"],
+            "target": row["target"],
+            "execution_range": row["execution_range"],
+        }
+        for row in required_rows
+        if _scope_identity(row) not in present_identities
+    ]
+    unrequested = [
+        {
+            "skill": row["skill"],
+            "target": row["target"],
+            "execution_range": row["execution_range"],
+        }
+        for row in scopes
+        if _scope_identity(row) not in required_identities
+    ]
     runtime_rows = _runtime_rows(input_value["runtime_units"], "runtime_units")
     current_runtime_rows = _current_runtime_rows(input_value["current_runtime_units"])
     entities = _entity_rows(input_value["current_entities"])
@@ -648,13 +834,35 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         input_value["unsupported_item_closures"],
         current_runtime_rows,
         entities,
-        normalized=[scope["normalized_input"] for scope in scopes],
+        normalized=[
+            scope["normalized_input"]
+            for scope in scopes
+            if scope["skill"] in RUNTIME_V2_SKILL_ROOTS
+        ],
     )
 
     expected_units: list[dict[str, Any]] = []
     expected_entities: list[dict[str, str]] = []
+    unverified_scopes: list[dict[str, Any]] = []
+    verified_owner_scopes: list[dict[str, Any]] = []
     for scope in scopes:
         scope_skill = scope["skill"]
+        if scope_skill not in RUNTIME_V2_SKILL_ROOTS:
+            # runtime-v2 rootを持たないSkillは、ownerの本番CLIが保存済み成果物を
+            # 検証できた場合だけ完了対象にする。登録の有無・失敗は未検証のまま残す。
+            outcome = owner_verifiers.verify(scope_skill, scope)
+            if outcome["status"] == "verified":
+                verified_owner_scopes.append(outcome["record"])
+                continue
+            unverified_scopes.append(
+                {
+                    "skill": scope_skill,
+                    "target": scope["target"],
+                    "execution_range": scope["execution_range"],
+                    "reason": outcome["reason"],
+                }
+            )
+            continue
         normalized = scope["normalized_input"]
         validate_current_structure_state(
             scope_skill,
@@ -752,7 +960,16 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         list(value)
         for value in sorted(set(actual_entity_keys) - set(expected_entity_keys))
     ]
-    issues = []
+    issues = [
+        {
+            "issue_type": "unsupported_skill_verifier"
+            if scope["reason"] == owner_verifiers.NOT_REGISTERED
+            else "owner_verification_failed",
+            "blocking": True,
+            **scope,
+        }
+        for scope in unverified_scopes
+    ]
     if missing_units:
         issues.append(
             {
@@ -797,6 +1014,8 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
     issues.extend(closure_issues)
     issues.extend(evaluate_target_disposition_closure(current_runtime_rows, entities))
     for scope in scopes:
+        if scope["skill"] not in RUNTIME_V2_SKILL_ROOTS:
+            continue
         issues.extend(
             evaluate_materialize_completion(
                 scope["normalized_input"], current_runtime_rows, entities, closures
@@ -818,9 +1037,20 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                     "runtime_unit_key": row["runtime_unit_key"],
                 }
             )
+    if not scope_set_declared:
+        issues.append(
+            {
+                "issue_type": "required_scopes_undeclared",
+                "blocking": True,
+                "resume": "qa-workflowが工程開始時に要求集合requested_scopesを記録し、その集合で再実行する",
+            }
+        )
+    for row in missing_required:
+        issues.append({"issue_type": "required_scope_missing", "blocking": True, **row})
+    issues.extend(approval_issues)
     issues_by_key = {canonical_json_text(row): row for row in issues}
     issues = [issues_by_key[key] for key in sorted(issues_by_key)]
-    can_complete = not issues and bool(scopes)
+    can_complete = not issues and bool(scopes) and scope_set_declared
     return {
         "runtime_status": "ok",
         "support_status": "supported",
@@ -829,6 +1059,14 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "deterministic_generated": True,
         "payload": {
             "workflow_ref": workflow_ref,
+            "scope_set_declared": scope_set_declared,
+            "requested_scopes": requested,
+            "missing_requested_scopes": missing_required,
+            "excluded_scopes": excluded_rows,
+            "unverified_exclusions": unverified_exclusions,
+            "unrequested_scopes": unrequested,
+            "unverified_scopes": unverified_scopes,
+            "verified_owner_scopes": verified_owner_scopes,
             "expected_runtime_units": expected_units,
             "runtime_units": fresh_rows,
             "expected_entities": expected_entities,

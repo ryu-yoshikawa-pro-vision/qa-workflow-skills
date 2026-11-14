@@ -1,0 +1,34 @@
+[
+  {
+    "query": "別案件のProject Contextを勝手に選ばず、同名候補の重複を検出して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Project Contextのrequired keyと旧文書互換を調べて。",
+    "should_trigger": true
+  },
+  {
+    "query": "編集可能な正本と生成専用一覧を調査して配置合意を記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "保存先にCASがないならProject Contextの保存を停止して。",
+    "should_trigger": true
+  },
+  {
+    "query": "製品機能IDの階層を作って。",
+    "should_trigger": false
+  },
+  {
+    "query": "製品の機能影響なしを決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "この新しい機能の仕様根拠を確定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Product Riskを数値評価して。",
+    "should_trigger": false
+  }
+]

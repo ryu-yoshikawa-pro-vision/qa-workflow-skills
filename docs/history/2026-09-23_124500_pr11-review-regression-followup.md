@@ -52,7 +52,7 @@ Codex CLIでtest-analysisとtest-condition-designのSkill文書を読ませ、�
 
 実行commandの形:
 
-    python scripts/skills/evals/semantic/run.py --skill <skill> --eval-id <eval-id> --output <candidate.md> --judge-command C:\Users\sella\AppData\Roaming\npm\codex.cmd exec --ephemeral --sandbox read-only -C <repo> -
+    python scripts/skills/evals/semantic/run.py --skill <skill> --eval-id <eval-id> --output <candidate.md> --judge-command C:\Users\<USER>\AppData\Roaming\npm\codex.cmd exec --ephemeral --sandbox read-only -C <repo> -
 
 24件の判定はPASS 4、needs_review 15、fail 5だった。
 

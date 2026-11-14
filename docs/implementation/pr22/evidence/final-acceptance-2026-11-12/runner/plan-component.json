@@ -1,0 +1,69 @@
+{
+  "runner_kind": "component",
+  "repo_path": "<scratchpad>/qts",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "argv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/component/cart-page.test.tsx",
+    "--reporter=json",
+    "--outputFile={reporter_file}"
+  ],
+  "reviewed_argv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/component/cart-page.test.tsx",
+    "--reporter=json",
+    "--outputFile={reporter_file}"
+  ],
+  "attempts": 1,
+  "timeout_seconds": 120,
+  "reporter_format": "vitest-json",
+  "testware_ref": "qa-training-store:tests/component/cart-page.test.tsx",
+  "testware_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "runner_version": "4.1.11",
+  "selected": [
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "shows all DTO prices, issues, totals, and a disabled recovery CTA"
+      ]
+    },
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "renders the empty recovery route when no lines exist"
+      ]
+    },
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "keeps the cart visible while surfacing a mutation failure"
+      ]
+    }
+  ],
+  "selection_verified": true,
+  "selection_evidence_ref": "local://pr22-acceptance/qts-evidence/selection-component.json (vitest list --json, 3 tests, 2026-11-12)",
+  "planned_scope_ref": "qa-training-store:tests/component/cart-page.test.tsx@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "preflight": {
+    "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "environment_ref": "local-wsl2-linux:6.6.87.2;node-v24.22.2;pnpm-10.34.5;vitest-4.1.11;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
+    "operation_ref": "pr22-acceptance-web-component-cart-20261112T205800",
+    "runner_ref": "vitest@4.1.11",
+    "script_chain_reviewed": true,
+    "permissions_verified": true,
+    "side_effects": [],
+    "isolated_environment": true,
+    "external_side_effects": false,
+    "shared_resource": false
+  }
+}

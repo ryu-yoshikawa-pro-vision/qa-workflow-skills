@@ -1,0 +1,213 @@
+[
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Install fixed format and lint tools",
+    "status": "replaced_by_local_pinned_install"
+  },
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Record tool versions",
+    "rc": 0,
+    "seconds": 0.1
+  },
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Test tracked formatter contracts",
+    "rc": 0,
+    "seconds": 3.2
+  },
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Test patch whitespace range contracts",
+    "rc": 0,
+    "seconds": 0.6
+  },
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Check tracked Python, Markdown, JSON, YAML, TOML, and JavaScript",
+    "rc": 0,
+    "seconds": 2.5
+  },
+  {
+    "workflow": "code-quality",
+    "job": "code-quality",
+    "step": "Check patch whitespace",
+    "rc": 0,
+    "seconds": 0.1
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Install official skills-ref",
+    "status": "replaced_by_local_pinned_install"
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Validate Agent Skills specification",
+    "rc": 0,
+    "seconds": 6.5
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Validate repository eval structure",
+    "rc": 0,
+    "seconds": 0.2
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Validate agent answer form",
+    "rc": 0,
+    "seconds": 3.0
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Validate semantic dataset counts",
+    "rc": 0,
+    "seconds": 1.7
+  },
+  {
+    "workflow": "validate-skills",
+    "job": "validate",
+    "step": "Validate trigger dataset contract",
+    "rc": 0,
+    "seconds": 0.2
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Install deterministic eval YAML dependency",
+    "status": "replaced_by_local_pinned_install"
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Validate output eval datasets",
+    "rc": 0,
+    "seconds": 0.1
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Compile deterministic grader, Skill validators, and repository tests",
+    "rc": 0,
+    "seconds": 1.2
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Compile runtime scripts",
+    "rc": 0,
+    "seconds": 2.0
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Run shared deterministic runtime unit tests",
+    "rc": 0,
+    "seconds": 0.6
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Run repository deterministic eval tests",
+    "rc": 0,
+    "seconds": 90.4
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Run runtime unit and integration tests",
+    "rc": 1,
+    "seconds": 193.1
+  },
+  {
+    "workflow": "deterministic-output-evals",
+    "job": "deterministic-output-evals",
+    "step": "Validate semantic datasets and runtime",
+    "rc": 0,
+    "seconds": 1.5
+  },
+  {
+    "workflow": "semantic-output-evals",
+    "job": "semantic-output-evals",
+    "step": "Compile Semantic Eval runtime and repository tests",
+    "rc": 0,
+    "seconds": 0.1
+  },
+  {
+    "workflow": "semantic-output-evals",
+    "job": "semantic-output-evals",
+    "step": "Validate Semantic Eval datasets",
+    "rc": 0,
+    "seconds": 0.2
+  },
+  {
+    "workflow": "semantic-output-evals",
+    "job": "semantic-output-evals",
+    "step": "Run Semantic Eval shared runtime tests",
+    "rc": 0,
+    "seconds": 0.5
+  },
+  {
+    "workflow": "semantic-output-evals",
+    "job": "semantic-output-evals",
+    "step": "Run Semantic Eval repository tests",
+    "rc": 0,
+    "seconds": 0.6
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Install latest stable Codex CLI",
+    "status": "replaced_by_local_pinned_install"
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Record Codex CLI version",
+    "rc": 0,
+    "seconds": 0.1
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Check Hook syntax",
+    "rc": 0,
+    "seconds": 0.0
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Run Codex config, Hook, launcher, and execpolicy contracts",
+    "rc": 0,
+    "seconds": 45.3
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Install official skills-ref",
+    "status": "replaced_by_local_pinned_install"
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "codex-contract",
+    "step": "Validate development Agent Skills",
+    "rc": 0,
+    "seconds": 0.4
+  },
+  {
+    "workflow": "codex-harness",
+    "job": "windows-launcher",
+    "step": "*",
+    "status": "not_run_windows_job"
+  }
+]

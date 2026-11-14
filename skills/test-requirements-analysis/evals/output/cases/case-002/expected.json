@@ -1,0 +1,5 @@
+{
+  "known_sources": ["REQUEST-MISSING"],
+  "required_qa_requirement_ids": ["QAR-003"],
+  "must_not_claim_approved": true
+}

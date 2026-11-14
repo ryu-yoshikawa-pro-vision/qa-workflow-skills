@@ -203,11 +203,16 @@ def evaluate(request: Any) -> dict[str, Any]:
     if not isinstance(baseline, dict):
         raise InvalidInput("v2_baseline must be an object")
     reject_unknown(
-        baseline, {"qa_workflow_verification_valid", "qa_workflow_can_complete"}
+        baseline,
+        {"qa_workflow_verification_valid", "qa_workflow_can_complete"},
+        {"qa_workflow_scope_set_declared"},
     )
     if not all(
         isinstance(baseline.get(field), bool)
         for field in ("qa_workflow_verification_valid", "qa_workflow_can_complete")
+    ) or (
+        "qa_workflow_scope_set_declared" in baseline
+        and not isinstance(baseline["qa_workflow_scope_set_declared"], bool)
     ):
         raise InvalidInput("v2_baseline fields must be boolean")
     if (
@@ -215,6 +220,11 @@ def evaluate(request: Any) -> dict[str, Any]:
         and not baseline["qa_workflow_verification_valid"]
     ):
         raise InvalidInput("qa-workflow completion requires valid verification")
+    # 要求集合（requested_scopes）を宣言したv2完了だけを完了baselineとして扱う。
+    # 宣言がない（過去契約v1を含む）can_complete=trueは完了扱いしない。
+    qa_workflow_complete = baseline["qa_workflow_can_complete"] and (
+        baseline.get("qa_workflow_scope_set_declared") is True
+    )
     package = _validate_ui_target(request.get("ui_target_package"))
     downstream = _active_downstream(request.get("active_downstream"))
 
@@ -241,10 +251,7 @@ def evaluate(request: Any) -> dict[str, Any]:
             "blocking_issue": None,
             "issues": [],
         }
-    if (
-        not baseline["qa_workflow_verification_valid"]
-        or not baseline["qa_workflow_can_complete"]
-    ):
+    if not baseline["qa_workflow_verification_valid"] or not qa_workflow_complete:
         return {
             "valid": True,
             "migration_status": "runtime_v2_cutover_required",

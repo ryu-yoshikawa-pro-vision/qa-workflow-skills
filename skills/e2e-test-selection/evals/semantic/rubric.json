@@ -1,0 +1,35 @@
+{
+  "skill": "e2e-test-selection",
+  "criteria": [
+    {
+      "id": "SEM-E2E-SEL-001",
+      "title": "候補と根拠",
+      "description": "候補母集団、目的、source refs/revisions、各候補の価値判断を技術非依存で説明する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-E2E-SEL-002",
+      "title": "経路分離",
+      "description": "TC直接指定、TCなしの明示E2E候補、既存E2E実行だけを区別し、TCやPlaywright実装を捏造しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-E2E-SEL-003",
+      "title": "完了と再利用",
+      "description": "完全な母集団とcurrent sourceがある場合だけreadyとし、重複する既存E2E/TCの再利用を検討する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-E2E-SEL-004",
+      "title": "未解決と再開条件",
+      "description": "stale/unknown sourceや不完全な母集団を完了扱いせず、ownerと再開条件を示す。",
+      "critical": true
+    },
+    {
+      "id": "SEM-E2E-SEL-005",
+      "title": "限定再評価",
+      "description": "変更された根拠に関係する候補だけ再評価し、履歴とcandidate IDを保つ。",
+      "critical": false
+    }
+  ]
+}

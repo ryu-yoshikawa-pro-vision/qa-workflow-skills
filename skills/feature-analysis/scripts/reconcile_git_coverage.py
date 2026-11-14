@@ -1,0 +1,399 @@
+"""Reconcile enumerated Git changes with the feature change inventory.
+
+This checks coverage of changed Git paths, not completeness of semantic
+product feature discovery. The Git inventory must originate from an authorized
+source; a caller-supplied JSON assertion is not independent source evidence.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import Any
+
+from feature_registry import (  # noqa: E402
+    _primary_code_source_id,
+    _superseded_ids,
+)
+from feature_registry import handle as validate_feature_registry  # noqa: E402
+
+MAX_INPUT = 32 * 1024 * 1024
+
+
+class Invalid(ValueError):
+    pass
+
+
+def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise Invalid("duplicate_json_key")
+        result[key] = value
+    return result
+
+
+def _text(value: Any, name: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "\x00" in value:
+        raise Invalid(f"{name}_invalid")
+    return value
+
+
+def analyze(request: Any) -> dict[str, Any]:
+    required = {"git_inventory", "registry_request", "source_id"}
+    allowed = required | {"previous_head_git_inventory", "source_event_basis"}
+    if (
+        not isinstance(request, dict)
+        or not required <= set(request)
+        or not set(request) <= allowed
+    ):
+        raise Invalid("request_schema_invalid")
+    source_id = _text(request["source_id"], "source_id")
+    git = request["git_inventory"]
+    registry_request = request["registry_request"]
+    if not isinstance(git, dict) or not isinstance(registry_request, dict):
+        raise Invalid("inventory_or_registry_invalid")
+    registry = validate_feature_registry(registry_request)
+    if registry["status"] not in {"complete", "incomplete"}:
+        return {
+            "status": registry["status"],
+            "reasons": registry.get("reasons", []),
+            "coverage": None,
+        }
+    snapshot = registry_request["snapshot"]
+    if git.get("status") != "complete":
+        return {
+            "status": "incomplete",
+            "reasons": ["git_inventory_not_complete"],
+            "coverage": None,
+        }
+    if (
+        git.get("complete_file_listing") is not True
+        or git.get("complete_change_listing") is not True
+        or git.get("base_sha") is None
+        or git.get("unretrieved") != []
+    ):
+        return {
+            "status": "incomplete",
+            "reasons": ["git_diff_listing_unconfirmed"],
+            "coverage": None,
+        }
+    head_sha = _text(git.get("head_sha"), "git_head_sha")
+    event = snapshot.get("event")
+    basis = snapshot.get("event_basis")
+    source_basis = request.get("source_event_basis")
+    previous_inventory = request.get("previous_head_git_inventory")
+    if source_basis is not None:
+        if (
+            event not in {"pr_update", "rebase", "analysis_update"}
+            or not isinstance(source_basis, dict)
+            or set(source_basis) != {"base_sha", "head_sha", "previous_head_sha"}
+        ):
+            raise Invalid("source_event_basis_invalid")
+        if event in {"pr_update", "rebase"} and source_id == _primary_code_source_id(
+            snapshot
+        ):
+            raise Invalid("primary_source_event_basis_override")
+        basis = source_basis
+    checks_previous_diff = event in {"pr_update", "rebase"} or (
+        event == "analysis_update" and source_basis is not None
+    )
+    if checks_previous_diff:
+        if not isinstance(basis, dict):
+            raise Invalid("event_basis_required")
+        if git.get("base_sha") != basis["base_sha"] or head_sha != basis["head_sha"]:
+            return {
+                "status": "stale",
+                "reasons": ["pr_base_head_inventory_mismatch"],
+                "coverage": None,
+            }
+        if basis.get("previous_head_sha") is None:
+            if source_basis is None or event not in {"pr_update", "rebase"}:
+                raise Invalid("previous_head_required")
+            if previous_inventory is not None:
+                raise Invalid("new_source_previous_diff_unexpected")
+        elif previous_inventory is None:
+            return {
+                "status": "incomplete",
+                "reasons": ["previous_head_diff_not_enumerated"],
+                "coverage": None,
+            }
+        if previous_inventory is not None and not isinstance(previous_inventory, dict):
+            raise Invalid("previous_head_inventory_invalid")
+        if previous_inventory is not None and (
+            previous_inventory.get("status") != "complete"
+            or previous_inventory.get("complete_change_listing") is not True
+            or previous_inventory.get("unretrieved") != []
+        ):
+            return {
+                "status": "incomplete",
+                "reasons": ["previous_head_diff_incomplete"],
+                "coverage": None,
+            }
+        if previous_inventory is not None and (
+            previous_inventory.get("base_sha") != basis["previous_head_sha"]
+            or previous_inventory.get("head_sha") != head_sha
+        ):
+            return {
+                "status": "stale",
+                "reasons": ["previous_head_diff_revision_mismatch"],
+                "coverage": None,
+            }
+    elif previous_inventory is not None:
+        raise Invalid("previous_head_inventory_unexpected")
+    source_rows = [
+        row
+        for row in snapshot["sources"]
+        if isinstance(row, dict) and row.get("id") == source_id
+    ]
+    if len(source_rows) != 1 or source_id not in snapshot["expected_source_ids"]:
+        raise Invalid("git_source_not_in_expected_inventory")
+    source = source_rows[0]
+    if source["kind"] != "code" or source["status"] != "complete":
+        raise Invalid("git_source_not_complete_code")
+    if source["revision"] != head_sha:
+        return {
+            "status": "stale",
+            "reasons": ["git_revision_registry_mismatch"],
+            "coverage": None,
+        }
+    if event == "analysis_update":
+        previous = registry_request.get("previous_snapshot") or {}
+        older = previous.get("changes", [])
+        superseded_ids = {ref for row in older for ref in _superseded_ids(row)}
+        current_bases = {
+            row["before_revision"]
+            for row in older
+            if row["source_id"] == source_id
+            and row["after_revision"] == head_sha
+            and row["id"] not in superseded_ids
+        }
+        if previous.get("event") in {"pr_update", "rebase"}:
+            if source_id == _primary_code_source_id(previous):
+                original = previous["event_basis"]
+                current_bases.update(
+                    (original["base_sha"], original["previous_head_sha"])
+                )
+        chosen_bases = {
+            ref
+            for ref in (
+                git["base_sha"],
+                source_basis.get("previous_head_sha") if source_basis else None,
+            )
+            if ref is not None
+        }
+        if chosen_bases != current_bases or len(current_bases) > 2:
+            return {
+                "status": "stale",
+                "reasons": ["analysis_git_baselines_mismatch"],
+                "coverage": None,
+            }
+    if event in {"merge", "release"}:
+        # Neither event provides a PR base. The saved source revision is
+        # the only verified baseline for its complete change inventory.
+        previous = registry_request.get("previous_snapshot") or {}
+        old_sources = previous.get("sources", [])
+        old = [
+            row
+            for row in old_sources
+            if isinstance(row, dict)
+            and row.get("id") == source_id
+            and row.get("kind") == "code"
+        ]
+        if len(old) != 1:
+            return {
+                "status": "stale",
+                "reasons": ["event_previous_code_source_missing"],
+                "coverage": None,
+            }
+        if git["base_sha"] != old[0].get("revision"):
+            return {
+                "status": "stale",
+                "reasons": ["event_previous_git_revision_mismatch"],
+                "coverage": None,
+            }
+    if source_basis is not None and event in {"pr_update", "rebase"}:
+        old_sources = (registry_request.get("previous_snapshot") or {}).get(
+            "sources", []
+        )
+        old = [row for row in old_sources if row.get("id") == source_id]
+        if basis["previous_head_sha"] is None:
+            if old:
+                raise Invalid("new_source_already_in_previous_snapshot")
+        elif len(old) != 1 or old[0].get("revision") != basis["previous_head_sha"]:
+            raise Invalid("source_event_previous_head_mismatch")
+    files = git.get("files")
+    changes = git.get("changes")
+    if not isinstance(files, list) or not isinstance(changes, list):
+        raise Invalid("git_manifest_arrays_invalid")
+    head_paths: set[str] = set()
+    for item in files:
+        if not isinstance(item, dict):
+            raise Invalid("git_file_invalid")
+        path = _text(item.get("path"), "git_file_path")
+        if path in head_paths:
+            raise Invalid("duplicate_git_file")
+        head_paths.add(path)
+    git_paths: set[str] = set()
+    for item in changes:
+        if not isinstance(item, dict):
+            raise Invalid("git_change_invalid")
+        status = _text(item.get("status"), "git_change_status")
+        before = _text(item.get("before_path"), "git_before_path")
+        after = _text(item.get("after_path"), "git_after_path")
+        if not (
+            status in {"A", "M", "D", "T", "U", "X", "B"}
+            or (
+                status[:1] in {"R", "C"}
+                and status[1:].isdigit()
+                and len(status[1:]) <= 3
+            )
+        ):
+            raise Invalid("git_change_status_invalid")
+        if after in git_paths:
+            raise Invalid("duplicate_git_change_path")
+        git_paths.add(after)
+        if status == "D" and after in head_paths:
+            raise Invalid("deleted_path_present_at_head")
+        if status != "D" and after not in head_paths:
+            raise Invalid("changed_path_missing_at_head")
+        if status[:1] not in {"R", "C"} and before != after:
+            raise Invalid("non_rename_change_paths_mismatch")
+    base_change_paths = set(git_paths)
+    previous_head_paths: set[str] = set()
+    if isinstance(previous_inventory, dict):
+        preceding = previous_inventory.get("changes")
+        if not isinstance(preceding, list):
+            raise Invalid("previous_head_changes_invalid")
+        for row in preceding:
+            if not isinstance(row, dict):
+                raise Invalid("previous_head_change_invalid")
+            status = _text(row.get("status"), "previous_head_status")
+            before = _text(row.get("before_path"), "previous_head_before_path")
+            after = _text(row.get("after_path"), "previous_head_after_path")
+            if not (
+                status in {"A", "M", "D", "T", "U", "X", "B"}
+                or (
+                    status[:1] in {"R", "C"}
+                    and status[1:].isdigit()
+                    and len(status[1:]) <= 3
+                )
+            ):
+                raise Invalid("previous_head_change_status_invalid")
+            if after in previous_head_paths:
+                raise Invalid("previous_head_change_duplicate")
+            if status == "D" and after in head_paths:
+                raise Invalid("previous_head_deleted_path_present")
+            if status != "D" and after not in head_paths:
+                raise Invalid("previous_head_changed_path_missing_at_head")
+            if status[:1] not in {"R", "C"} and before != after:
+                raise Invalid("previous_head_paths_mismatch")
+            previous_head_paths.add(after)
+    git_paths |= previous_head_paths
+    required_pairs = {(git["base_sha"], path) for path in base_change_paths} | {
+        (basis["previous_head_sha"], path) for path in previous_head_paths
+    }
+    registered_pairs: set[tuple[str, str]] = set()
+    registry_paths: set[str] = set()
+    previous = registry_request.get("previous_snapshot")
+    previous_ids = (
+        set(_source_rows["id"] for _source_rows in previous["changes"])
+        if previous is not None
+        else set()
+    )
+    superseded = {
+        parent for row in snapshot["changes"] for parent in _superseded_ids(row)
+    }
+    unmatched_ids: list[str] = []
+    mismatched_revision_ids: list[str] = []
+    unclassified_paths: set[str] = set()
+    for row in snapshot["changes"]:
+        if row["source_id"] != source_id or row["id"] in superseded:
+            continue
+        if row["id"] in previous_ids and event in {
+            "pr_update",
+            "rebase",
+            "merge",
+            "release",
+        }:
+            continue
+        if row["id"] in previous_ids and row["after_revision"] != head_sha:
+            continue
+        # A saved DIF correction is history, not a new source change.
+        # Only same-HEAD analysis updates may classify it as current.
+        if _superseded_ids(row) and (
+            event != "analysis_update" or row["after_revision"] != head_sha
+        ):
+            continue
+        locator = row["locator"]
+        registry_paths.add(locator)
+        if locator not in git_paths:
+            unmatched_ids.append(row["id"])
+        pair = (row["before_revision"], locator)
+        if pair not in required_pairs or row["after_revision"] != head_sha:
+            mismatched_revision_ids.append(row["id"])
+        else:
+            registered_pairs.add(pair)
+        if row["classification"] in {"unclassified", "unresolved"}:
+            unclassified_paths.add(locator)
+    missing = sorted(git_paths - registry_paths)
+    missing_pairs = required_pairs - registered_pairs
+    reasons = list(registry.get("reasons", []))
+    if missing:
+        reasons.append("git_changes_not_registered")
+    if missing_pairs:
+        reasons.append("git_change_revision_pairs_not_registered")
+    if unmatched_ids:
+        reasons.append("registry_changes_not_in_git_diff")
+    if mismatched_revision_ids:
+        reasons.append("git_change_revisions_mismatch")
+    if unclassified_paths:
+        reasons.append("git_changes_unclassified")
+    return {
+        "status": "complete" if not reasons else "incomplete",
+        "reasons": sorted(set(reasons)),
+        "coverage": {
+            "source_id": source_id,
+            "git_head_sha": head_sha,
+            "git_change_paths": sorted(git_paths),
+            "base_change_paths": sorted(base_change_paths),
+            "previous_head_change_paths": sorted(previous_head_paths),
+            "registered_paths": sorted(registry_paths & git_paths),
+            "missing_git_paths": missing,
+            "missing_git_revision_pairs": [
+                {"before_revision": before, "path": path, "after_revision": head_sha}
+                for before, path in sorted(missing_pairs)
+            ],
+            "unmatched_registry_change_ids": sorted(unmatched_ids),
+            "mismatched_revision_change_ids": sorted(mismatched_revision_ids),
+            "unclassified_git_paths": sorted(unclassified_paths),
+            "rate": (
+                len(registered_pairs) / len(required_pairs) if required_pairs else None
+            ),
+            "candidate_snapshot_sha256": registry["handoff"]["snapshot_sha256"],
+        },
+    }
+
+
+def handle(request: Any) -> dict[str, Any]:
+    try:
+        return analyze(request)
+    except (Invalid, KeyError, TypeError, RecursionError) as exc:
+        return {"status": "blocked", "reasons": [str(exc)], "coverage": None}
+
+
+def main() -> int:
+    try:
+        raw = sys.stdin.buffer.read(MAX_INPUT + 1)
+        if len(raw) > MAX_INPUT:
+            raise Invalid("input_too_large")
+        request = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs)
+        result = handle(request)
+    except (Invalid, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        result = {"status": "blocked", "reasons": [str(exc)], "coverage": None}
+    sys.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

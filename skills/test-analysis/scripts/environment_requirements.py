@@ -9,7 +9,6 @@ from runtime_contract import (
     InvalidInput,
     UnsupportedInput,
     canonical_json_text,
-    compare_versions,
     constraint_intersection_compatible,
     ensure_key,
     ensure_list,
@@ -17,6 +16,7 @@ from runtime_contract import (
     run_cli,
     typed_value,
     typed_value_compare,
+    validate_version_range,
 )
 
 SKILL = "test-analysis"
@@ -130,12 +130,7 @@ def _normalize_requirement(row: dict, index: int) -> dict:
         normalized["maximum"] = row.get("maximum")
         normalized["minimum_inclusive"] = row.get("minimum_inclusive")
         normalized["maximum_inclusive"] = row.get("maximum_inclusive")
-        if (
-            not isinstance(normalized["minimum_inclusive"], bool)
-            or not isinstance(normalized["maximum_inclusive"], bool)
-            or compare_versions(normalized["minimum"], normalized["maximum"]) > 0
-        ):
-            raise InvalidInput("version range inclusiveが不正です")
+        validate_version_range(normalized, "environment version range")
     elif operator == "boolean":
         if not isinstance(row.get("value"), bool):
             raise InvalidInput("environment boolean valueが不正です")

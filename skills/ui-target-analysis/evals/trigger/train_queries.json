@@ -1,0 +1,50 @@
+[
+  {
+    "query": "この画面群を見て、ページ階層・表示領域・操作対象・画面遷移をUI構造として整理して。",
+    "should_trigger": true
+  },
+  {
+    "query": "ui-target-v1の旧記録も参照しながら、現在有効な認可ルールとlogin失敗時の仕様Authorityを整理して。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様書の正本を比較して、ログイン失敗時の現在有効な期待挙動とUNKNOWNを決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "このプロトタイプからボタン、入力欄、表示状態、親子構造を抽出してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "人が別copyで直した画面構造の差分を確認し、承認分だけ既存UI writerに渡せる形にして。",
+    "should_trigger": true
+  },
+  {
+    "query": "この要件からTest Requirement、Coverage Item、リスク優先度を設計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "feature artifactの明示scope参照から、該当UI package内のfile・section・line・stable IDを引いて。",
+    "should_trigger": true
+  },
+  {
+    "query": "既存のui-target-v1を読み、画面遷移と操作対象の現在の構造を調べたい。",
+    "should_trigger": true
+  },
+  {
+    "query": "この画面を使う人の満足度を調査するタスク、質問、尺度を作成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "画面のスクリーンリーダー利用とキーボード操作がWCAGに適合しているか評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "フォームの送信後にspinnerが表示されることを観測した。期待結果は決めず、UI状態と観測sourceを記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このPull Requestで変更された業務仕様を要約し、承認待ちの決定事項を管理して。",
+    "should_trigger": false
+  }
+]

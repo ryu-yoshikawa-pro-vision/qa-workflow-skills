@@ -1,0 +1,14 @@
+[
+  {
+    "name": "cart page > shows all DTO prices, issues, totals, and a disabled recovery CTA",
+    "file": "<scratchpad>/qts/tests/component/cart-page.test.tsx"
+  },
+  {
+    "name": "cart page > renders the empty recovery route when no lines exist",
+    "file": "<scratchpad>/qts/tests/component/cart-page.test.tsx"
+  },
+  {
+    "name": "cart page > keeps the cart visible while surfacing a mutation failure",
+    "file": "<scratchpad>/qts/tests/component/cart-page.test.tsx"
+  }
+]

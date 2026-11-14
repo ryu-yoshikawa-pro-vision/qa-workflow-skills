@@ -1,0 +1,13 @@
+{
+  "expected_axis_status": {
+    "efficiency": "measured",
+    "quality": "unmeasured"
+  },
+  "expected_achieved": 0,
+  "expected_rejected_claims": [
+    [
+      "quality",
+      "improved"
+    ]
+  ]
+}

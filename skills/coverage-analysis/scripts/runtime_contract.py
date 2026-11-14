@@ -720,6 +720,30 @@ def compare_versions(left: Any, right: Any) -> int:
     return (left_padded > right_padded) - (left_padded < right_padded)
 
 
+def validate_version_range(row: dict[str, Any], label: str) -> None:
+    """Validate a version_range whose minimum or maximum may be open.
+
+    At least one bound is required. A present bound needs a boolean inclusive
+    flag; an absent (open) bound must carry ``None`` for its inclusive flag.
+    """
+    present = []
+    for side in ("minimum", "maximum"):
+        bound = row.get(side)
+        inclusive = row.get(f"{side}_inclusive")
+        if bound is None:
+            if inclusive is not None:
+                raise InvalidInput(f"{label}の開いた{side}にinclusiveは指定できません")
+            continue
+        version_components(bound, side)
+        if not isinstance(inclusive, bool):
+            raise InvalidInput(f"{label}の{side}_inclusiveが不正です")
+        present.append(side)
+    if not present:
+        raise InvalidInput(f"{label}にはminimumまたはmaximumが必要です")
+    if len(present) == 2 and compare_versions(row["minimum"], row["maximum"]) > 0:
+        raise InvalidInput(f"{label}のminimumがmaximumを超えています")
+
+
 def typed_value_compare(left: dict[str, Any], right: dict[str, Any]) -> int:
     """Compare same-type range values without changing their canonical form."""
     left_value = typed_value(left)
@@ -787,27 +811,31 @@ def constraint_intersection_compatible(constraints: Iterable[dict[str, Any]]) ->
         upper: tuple[int, ...] | None = None
         upper_inclusive = True
         for row in rows:
-            minimum = version_components(row.get("minimum"), "minimum")
-            maximum = version_components(row.get("maximum"), "maximum")
-            minimum_text = row["minimum"]
-            maximum_text = row["maximum"]
-            if compare_versions(minimum_text, maximum_text) > 0:
-                raise InvalidInput("version_rangeのminimumがmaximumを超えています")
-            if (
-                lower is None
-                or compare_versions(minimum_text, ".".join(map(str, lower))) > 0
-            ):
-                lower, lower_inclusive = minimum, row["minimum_inclusive"]
-            elif compare_versions(minimum_text, ".".join(map(str, lower))) == 0:
-                lower_inclusive = lower_inclusive and row["minimum_inclusive"]
-            if (
-                upper is None
-                or compare_versions(maximum_text, ".".join(map(str, upper))) < 0
-            ):
-                upper, upper_inclusive = maximum, row["maximum_inclusive"]
-            elif compare_versions(maximum_text, ".".join(map(str, upper))) == 0:
-                upper_inclusive = upper_inclusive and row["maximum_inclusive"]
-        assert lower is not None and upper is not None
+            validate_version_range(row, "version_range")
+            minimum_text = row.get("minimum")
+            maximum_text = row.get("maximum")
+            # Noneは開いた境界（その側に制約なし）として扱う。
+            if minimum_text is not None:
+                minimum = version_components(minimum_text, "minimum")
+                if (
+                    lower is None
+                    or compare_versions(minimum_text, ".".join(map(str, lower))) > 0
+                ):
+                    lower, lower_inclusive = minimum, row["minimum_inclusive"]
+                elif compare_versions(minimum_text, ".".join(map(str, lower))) == 0:
+                    lower_inclusive = lower_inclusive and row["minimum_inclusive"]
+            if maximum_text is not None:
+                maximum = version_components(maximum_text, "maximum")
+                if (
+                    upper is None
+                    or compare_versions(maximum_text, ".".join(map(str, upper))) < 0
+                ):
+                    upper, upper_inclusive = maximum, row["maximum_inclusive"]
+                elif compare_versions(maximum_text, ".".join(map(str, upper))) == 0:
+                    upper_inclusive = upper_inclusive and row["maximum_inclusive"]
+        if lower is None or upper is None:
+            # 片側だけの制約の集合は、もう一方へ無限に開いているため常に交差する。
+            return True
         relation = compare_versions(
             ".".join(map(str, lower)), ".".join(map(str, upper))
         )

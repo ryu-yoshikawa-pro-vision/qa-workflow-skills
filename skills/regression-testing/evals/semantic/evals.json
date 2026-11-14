@@ -50,6 +50,14 @@
       "criteria": [
         "REG-SEM-006"
       ]
+    },
+    {
+      "id": "REG-SEM-007",
+      "input": "cases/reg-sem-007/input.md",
+      "reference": "cases/reg-sem-007/reference.md",
+      "criteria": [
+        "REG-SEM-007"
+      ]
     }
   ]
 }

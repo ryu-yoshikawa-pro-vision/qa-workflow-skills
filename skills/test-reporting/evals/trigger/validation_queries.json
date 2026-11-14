@@ -1,0 +1,66 @@
+[
+  {
+    "query": "一般TC、E2E、非E2Eの実行結果を一つの報告snapshotに集約して不足sourceを示して。",
+    "should_trigger": true
+  },
+  {
+    "query": "paginationが途中で失敗したsourceがある状態の集計を、完全な結果と区別して報告して。",
+    "should_trigger": true
+  },
+  {
+    "query": "旧revisionのsourceと現在のrevisionが混在していないか照合して全体報告を更新して。",
+    "should_trigger": true
+  },
+  {
+    "query": "計画上対象なしのsourceと、取得できず0件に見えるsourceを区別して報告して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Regression・探索・API・バッチの結果を単位ごとに分けて、完了状態を示して。",
+    "should_trigger": true
+  },
+  {
+    "query": "計画が未承認の状態で終了判定を出してよいか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "元の実行結果は変更せず、読取専用で集計して報告に欠陥Issueのrefを添えて。",
+    "should_trigger": true
+  },
+  {
+    "query": "cleanupが未確認のrunがある場合の報告状態を示して。",
+    "should_trigger": true
+  },
+  {
+    "query": "e2e-test-reportingの形式でPlaywright結果の詳細を書いて。",
+    "should_trigger": false
+  },
+  {
+    "query": "テストの優先度とリスクを評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "実装したテストコードをリファクタリングして。",
+    "should_trigger": false
+  },
+  {
+    "query": "リリースしてよいか最終判断して。",
+    "should_trigger": false
+  },
+  {
+    "query": "外部Issueの修正確認を元のrunnerで再実行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "ユーザビリティ評価の指摘をまとめて。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様の曖昧な点を質問に整理して。",
+    "should_trigger": false
+  },
+  {
+    "query": "QA Knowledgeの古いentryを再検証して。",
+    "should_trigger": false
+  }
+]

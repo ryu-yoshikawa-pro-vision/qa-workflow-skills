@@ -1,0 +1,43 @@
+{
+  "skill": "ui-target-analysis",
+  "eval_id": "UI-SEM-002",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "UI-SEM-002",
+      "title": "\u6839\u62e0\u3068currentness",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "Feature artifact\u306eref/revision\u3068FEATURE-021\u304b\u3089SCOPE-004\u3078\u306e\u660e\u793amapping\u3001UI package\u306eref\u3068v12\u3092\u793a\u3057\u3001current inspect snapshot\u304b\u3089\u5c0e\u51fa\u3057\u305f\u3068\u8a18\u8f09\u3057\u3066\u3044\u307e\u3059\u3002\u5909\u66f4\u884c\u304c\u306a\u3044\u3053\u3068\u3082\u5831\u544a\u3057\u3001feature index\u3084\u5909\u66f4ID\u3092\u634f\u9020\u3057\u3066\u3044\u307e\u305b\u3093\u3002",
+      "evidence": [
+        "`feature artifact: artifact://feature/checkout / feature-r3`",
+        "`UI package: artifact://ui-target/checkout / ui-target-v1 v12`",
+        "`explicit mapping: FEATURE-021 \u2192 SCOPE-004`",
+        "`index\u306fcurrent inspect snapshot\u304b\u3089\u5c0e\u51fa\u3057\u307e\u3057\u305f\u3002\u4fdd\u5b58\u6e08\u307ffeature index\u306f\u4f5c\u6210\u3057\u307e\u305b\u3093\u3002`",
+        "`\u3053\u306erevision\u3067\u306fchanged UI row\u306f\u3042\u308a\u307e\u305b\u3093\u3002materialize\u5f8c\u306f\u65b0version\u304b\u3089\u518d\u5c0e\u51fa\u3057\u3001\u5909\u66f4stable ID\u3068\u5f71\u97ffscope\u3060\u3051\u518d\u78ba\u8a8d\u3057\u307e\u3059\u3002`"
+      ]
+    },
+    {
+      "id": "UI-SEM-003",
+      "title": "\u6b63\u672c\u4f4d\u7f6e\u3068stable identity",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "\u53c2\u7167\u5bfe\u8c61\u306e\u5404stable ID\u306b\u3064\u3044\u3066\u3001current package\u5185\u306e\u6b63\u78ba\u306afile\u3001section\u3001line\u3092\u793a\u3057\u3066\u3044\u307e\u3059\u3002\u64cd\u4f5c\u884c\u3001\u69cb\u9020\u884c\u3001scope\u884c\u3092\u533a\u5225\u3057\u3001\u5bfe\u8c61\u69cb\u9020\u3068\u89aa\u69cb\u9020\u306e\u95a2\u4fc2\u3082\u5bfe\u5fdc\u3065\u3051\u3066\u3044\u307e\u3059\u3002",
+      "evidence": [
+        "`UIOP-012`\u3092`02_behavior_and_business_rules.md`\u306e`UI\u64cd\u4f5c\u4e00\u89a7` line 44\u306b\u8a18\u8f09\u3057\u307e\u3059\u3002",
+        "`UIOP-013`\u3092`02_behavior_and_business_rules.md`\u306e`UI\u64cd\u4f5c\u4e00\u89a7` line 51\u306b\u8a18\u8f09\u3057\u307e\u3059\u3002",
+        "`PAGE-008`\u3001`NAV-002`\u3001`DIALOG-004`\u3092`01_ui_structure_and_navigation.md`\u306e`UI\u69cb\u9020\u4e00\u89a7`\u5404line\u306b\u8a18\u8f09\u3057\u307e\u3059\u3002",
+        "`SCOPE-004`\u3092`00_scope_and_context.md`\u306e`\u5206\u6790\u5bfe\u8c61\u6a5f\u80fdscope\u4e00\u89a7` line 19\u306b\u8a18\u8f09\u3057\u307e\u3059\u3002",
+        "| PAGE-008 | \u753b\u9762 | `01_ui_structure_and_navigation.md` | UI\u69cb\u9020\u4e00\u89a7 | 27 | UIOP-012\u306e\u5bfe\u8c61 |"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 2,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

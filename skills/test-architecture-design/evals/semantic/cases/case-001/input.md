@@ -1,0 +1,1 @@
+API levelを明示されたtargetについて、承認済みarchitectureのsystem levelも別分担として必要な場合に保持してください。環境未準備のcomponent assignmentも、実行可能と誤報せず影響を示してください。

@@ -1,0 +1,20 @@
+{
+  "revisions": {
+    "product/docs/12_quality/acceptance_criteria.md": "cb057739f87894749eab42eb3102afa6c749456e3837c290ab3d393981537343",
+    "product/docs/12_quality/requirements_traceability.md": "3ad9acafa315210e1872db0f40d42ce4f7ad35327d0ffec572788fcd4e5c3e1a",
+    "product/docs/spec/README.md": "c63c81266b8c131a78d5a4048231e7c6dafceb433802bc18f0164903e220c854",
+    "product/docs/spec/features/authentication.md": "3334ecd7b5fb00c66754ca70837449cfdc88a99c4bd15769070430ffca92bef1",
+    "product/docs/spec/features/cart.md": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216",
+    "product/docs/spec/features/checkout-and-payment.md": "9877302a255eb33e23a0651963930978543f4511a9457ca053e08df8ab859c76",
+    "product/docs/spec/features/storefront.md": "3f77926ad16369ea5091672cf1c165ddf2f7f7f12f01512596d1e2a907c58c4a",
+    "product/docs/spec/glossary.md": "e3e637ea9885ac12852d2a6855382e13f7b8e763b91c1bf9086f776c9f0c77e0",
+    "product/docs/spec/known-deviations.md": "518d110c069d82bb20303dee57feb968633f98b9223c38d879a211e205c89edd",
+    "product/docs/spec/product-scope.md": "23508ebe243d011e5e707039ffa6ddcb8d02612974877a58e1c3ced2cc789189",
+    "product/docs/spec/roles-and-permissions.md": "519731749c55d9e01602017f9041d7ac9cc7e94e9ea0f86f16fd003dff12224e",
+    "product/docs/spec/state-and-scenarios.md": "ccd0cab4b0bd156ea611c0bfad331b16f023d49acec4d95118d7fab70b8b4b90",
+    "product/docs/spec/ui-ux-contract.md": "ac9b86d99ff6cf1bc26159941a5bb3f1de7b95d9e27957f129f2dfb4f8ec9221",
+    "product/docs/spec/unresolved-specifications.md": "c3ac09d0f145d97380ee1cf0e59180a53dcf0806aff20a5af6dde4d72fe056aa"
+  },
+  "root": "<scratchpad>/eff8/workspaces/candidate-unchanged_request-2",
+  "schema_version": "input-revision-v1"
+}

@@ -2,7 +2,7 @@
   { "query": "このテスト分析自体をCold Reviewして重大な欠陥を探してください。", "should_trigger": false },
   { "query": "Playwrightのlocatorとfixtureをどのように実装するか決めてください。", "should_trigger": false },
   {
-    "query": "境界値分析や状態遷移を使うべき領域と、E2E自動化する候補範囲を技術非依存に選定してください。",
+    "query": "境界値分析や状態遷移を使うべき領域を、Product Riskと問題構造から評価してください。",
     "should_trigger": true
   },
   { "query": "既存仕様と今回の差分から、回帰影響候補とProduct Riskを整理して。", "should_trigger": true },
@@ -45,5 +45,10 @@
     "query": "Domain、CRUD、Random、Metamorphic、Syntax-Based Testingの違いを一般向けに説明してください。",
     "should_trigger": false
   },
-  { "query": "過去不具合と今回の変更範囲を踏まえたテストリスクの優先順位を決めてください。", "should_trigger": true }
+  { "query": "過去不具合と今回の変更範囲を踏まえたテストリスクの優先順位を決めてください。", "should_trigger": true },
+  { "query": "既存E2E対象のselection IDとrevisionを再利用してください。", "should_trigger": false },
+  {
+    "query": "割引計算の変更による影響範囲とProduct Risk、必要な確認レベルを分析してください。",
+    "should_trigger": true
+  }
 ]

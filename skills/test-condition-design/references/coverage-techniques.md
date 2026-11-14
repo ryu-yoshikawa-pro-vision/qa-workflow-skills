@@ -78,6 +78,7 @@ CRUDの**completeness**と**consistency**を別々に閉じます。
 - completenessでは明示されたentity / function / operation matrixの候補を扱い、missing operationは欠陥と断定せず、Authority付き`not_applicable`または確認事項へ閉じる
 - consistencyでは業務意味が明示されたoperation sequenceを別に扱い、sequence中のoperation、entity、functionをmatrixへ解決する
 - consistency sequenceが未正規化、またはmissing operationが未処置ならCRUD全体をcompleteとしない
+- lifecycle sequenceに必須なのは、そのentityの適用対象operationのうち状態を変えるC／U／Dだけ。R（読み取り）はcompletenessのmatrix cellで担保し、Authorityが指定したsequenceにRが無いことだけを理由にconsistencyをblockedにしない
 - 未提示の副作用、順序、禁止operation、CRUDセルを創作しない
 - completeness itemは`entity × function × operation`の具体cellを示す。業務操作だけではCRUD operationとのmappingを推測しない
 - consistency criterionは指定sequenceを実行した後の状態関係を示す。cell対応を列挙しただけで業務状態の一貫性を確認したとはしない
@@ -85,9 +86,11 @@ CRUDの**completeness**と**consistency**を別々に閉じます。
 ## Classification Tree / 組合せ
 
 - classification adapterはfactor / class skeletonとstable identityを採番済みcombinatorial childへ渡す。adapter自身をexecution CIにしない
+- 入力が既存／採番済みcombinatorial childの再利用を指定しているのに、current Machine Entityまたは取得可能なsourceからstable model keyを確認できない場合は、既存のblocked／unresolved契約でchild生成を保留する。keyを推測した`identity_action=new`や仮IDの生成で既存childを置き換えない
 - factor値、constraints、strength別subsetが不足する場合も判明済みskeletonを保持し、未確定parameterを明示してchild completionを保留する
 - constraintsを適用した後のfeasible tuple集合をstrengthごとに作り、その全件をcoverage基準とする。limitや不足値を理由にstrengthを下げない
 - 生成row、required tuple、covered tupleを区別し、重複する意味上の組合せを作らない
+- 入力が複数のstrength（例：全factor pairwiseとsubsetの3-wise）を明示的に要求した場合は、strengthごとに別criterionとして保持する。高いstrengthのtupleが低いstrengthのtupleを射影として満たすことを理由に、明示要求されたcriterionを削除・統合しない。同じrowで複数criterionのtupleを満たせることによる実行の重複削減は、`test-case-design`のTC組成で扱う
 
 ## State Transition / Flow
 

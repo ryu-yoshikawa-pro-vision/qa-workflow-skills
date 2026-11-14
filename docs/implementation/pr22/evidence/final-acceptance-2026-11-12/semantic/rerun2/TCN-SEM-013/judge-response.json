@@ -1,0 +1,63 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "TR-MERGE-013を、merge許可条件の全項目、model不一致、項目ごとの不一致、同一dimension衝突によるmerge拒否、intersection非空の許可、異dimensionのunion、決定性の各条件へ展開できている。ただし、衝突時にmergeを拒否するというReferenceの判定が明確なのに、C4の期待結果を確認待ちとして確定させていない点、C6を仕様根拠不足としてブロックしている点、runtime未実行で機械証拠がない点が実質的な不足として残る。",
+      "evidence": [
+        "TCN-XXX-C1: 対象A・Bが同一TCN・同一model・current target version・同一execution fingerprint・同一expected result rootを全て満たすとき、grouping候補になる",
+        "TCN-XXX-C2: 対象Cは同一execution fingerprintと同一expected result rootを持つが別modelに属するため、A・Bとgroupingしない",
+        "TCN-XXX-C4: 同一dimensionのrequirementが衝突する（A: `role=admin`、B: `role=guest`、intersection = ∅）場合、mergeを拒否し統合CIを作らない | 期待結果の確認待ち",
+        "TCN-XXX-C6: 異なるdimensionのrequirementは同一dimension intersectionの対象外となり、同時成立するrequirement unionとして扱われる | **仕様根拠不足**",
+        "**未取得。** Bash実行権限が拒否されたため、materialize_coverage.py / test_data_requirements.py / runtime_contract.py（verify_runtime_evidence）を実行できなかった。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "製品behaviorの技法を誤って付与せず、技法欄をmaterialization規則に統一している点は適切。一方で、C2・C3・C6のカテゴリに「境界」と付けており、境界値分析のような製品技法と紛らわしい。判定はdeterministic grouping predicateの連言として正しく扱われている。",
+      "evidence": [
+        "TCN-XXX-C2 ... | 境界（model不一致） | materialization規則（predicate項目ごとの不一致）",
+        "TCN-XXX-C3 ... | 境界（項目ごとの不一致） | materialization規則（「すべて一致する場合だけ」）",
+        "grouping predicateは4項目の連言として表せるため、条件列挙の補助として使用する（runtime非実行）。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "統合許可、model不一致、各キーの不一致、conflict拒否、intersection非空、決定性という十分性の軸は揃っている。ただし、predicateの項目数が「全4キー」と5項目で混在しており、判定基準の記述に不整合がある。また、C4の期待結果とC6の仕様根拠が未確定のため、十分性の判定がブロックされている。",
+      "evidence": [
+        "TCN-XXX-C1 ... 全4キー一致のA・Bを1組の候補として判定する（本文では同一TCN・同一model・current target version・同一execution fingerprint・同一expected result rootの5項目を列挙）",
+        "TCN-XXX-C3: predicateの各項目（同一TCN、同一model、current target version、同一execution fingerprint、同一expected result root）のいずれか1つが不一致なら",
+        "decision table: grouping predicateは4項目の連言として表せる",
+        "TCN-XXX-C6 | **仕様根拠不足**（SPEC-MAT-013の抜粋に異dimensionの扱いなし）"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "各Coverage ItemはC1〜C7の観点に対応し、SPEC-MAT-013の規則に具体化されている。CI03は5ケースへの具体化を明記しているが、実際には1項目にまとめて記述しており、代表性の具体性が一部弱い。CI04とCI06は期待結果または根拠が未確定で、代表する挙動がまだ固定されていない。",
+      "evidence": [
+        "TCN-XXX-CI03 | predicate項目1つ不一致の5ケース | 5件へ具体化する（キー別）",
+        "TCN-XXX-CI04 | role衝突（admin ∩ guest = ∅）によるmerge拒否 | 期待結果の前提確認待ち",
+        "TCN-XXX-CI06 | 異dimensionのrequirement union | **根拠不足** | ブロック中",
+        "TCN-XXX-CI07 | 同一入力での決定的出力 | 実行回数・入力順の指定は未確定"
+      ]
+    },
+    {
+      "id": "SEM-TCN-006",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "採用しない候補のDispositionは、ブロック、対象外、統合候補として理由付きで示されており、大枠は妥当。ただし、「不明operatorを含むrequirementの扱い」を入力範囲外として除外した根拠は示されているが薄い。また、C4はReferenceで衝突時拒否と明確に定まっているのに、確認待ちとして扱っており、disposition の理由づけが過度に保守的。",
+      "evidence": [
+        "不明operatorを含むrequirementの扱い | coverage-techniques規則 | 対象外（今回の入力範囲外） | 入力のTR-MERGE-013はeq/同一dimension衝突に限定されている。採否は要確認",
+        "A・B統合が成立する前提（「両方がmerge後のCIへ適用される」） | ブロック中 | 同一dimensionの`role=admin`と`role=guest`はintersectionが∅でconflictとなり、SPEC-MAT-013に従えばmergeは拒否される",
+        "C3の5ケースは同一の判定規則（全項目一致の連言）に属する | 統合候補"
+      ]
+    }
+  ]
+}

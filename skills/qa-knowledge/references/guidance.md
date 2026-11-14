@@ -26,6 +26,10 @@ Entry bodyは1ファイル / 1独立revisionのproject-local artifactです。bo
 - dependency mismatch: 保存状態がまだ`要再検証`に更新されていなくても、current判断から除外します。保存できる場合だけentry revisionを条件に更新します。
 - replacement: semantic identity変更、分割、適用範囲分離、既存entry統合に限ります。old/newを一括安全に反映できない保存先ではblockします。
 - lookup / history: fixed rootをdeterministicに列挙し、scope / kind / environment / version / state / currentnessで絞ります。listing incompleteならcompletenessをfalseにします。`有効`かつcurrentなentryだけがcurrent recommendationです。
+- identity / scope: `identity.kind` / `identity.scope_refs`はentry直下の`kind` / `scope_refs`と値・順序まで一致させます。create / read / update / replacement / revalidation / lookupで同じ検証をし、不一致entryは自動修正・再採番・別scope流用をせず拒否して正本ownerへ戻します。
+- 部分lookup: 適用範囲が確実に異なるentryの依存source取得不能で検索全体を止めません（診断情報のみ）。適用範囲を判断できないentry（identity破損・scope不明・ref重複・読取不能）とroot列挙の失敗・打切りは`incomplete`にします。
+- 別session再開: `read_entry()`が返した`entry_revision`をentry本体と別に引き継ぎ、`lookup_input()`で検証用入力にします。本体へ書かず、読んでいないrevisionを作りません。再検証は`plan_revalidation()`で自entryの依存sourceが変わったentryだけを選び、更新は`update_entry()`でそのrevisionを条件にした、保存先provider自身のnative conditional writeに限ります（providerなしはblocked。ヘルパー自身のcompare-then-writeはしません）。create / updateは保存後にreadbackし、読み戻せたrevisionだけを返します。conflictはauto mergeせず、再読込して意味判断をやり直します。plan_update / plan_replacementは現・新entryを必須にし、identity検証を省略できません。
+- 再利用: 分析Skillがcurrent entryを入力として読むだけならgatewayにしません。改善候補は`improvement_reference()`で参照とsource revisionだけを渡し、採否・計画改版・効果測定は各ownerが行います（Knowledge登録は完了の代用にしません）。承認済み改善からの更新は`plan_approved_improvement_update()`で承認refとsource revisionを必須にします。
 
 ## Storage safety
 

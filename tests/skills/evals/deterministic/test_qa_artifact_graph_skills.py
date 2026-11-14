@@ -1574,15 +1574,22 @@ class KnowledgeRuntimeTests(unittest.TestCase):
             knowledge.canonical_entry_ref(identity),
             knowledge.canonical_entry_ref({**identity, "subject": "other"}),
         )
+        entry = self.entry()
         self.assertEqual(
             knowledge.plan_update(
-                expected_entry_revision="r1", native_atomic_conditional_write=False
+                expected_entry_revision="r1",
+                native_atomic_conditional_write=False,
+                current_entry=entry,
+                updated_entry=entry,
             )["status"],
             "blocked",
         )
         self.assertEqual(
             knowledge.plan_update(
-                expected_entry_revision="r1", native_atomic_conditional_write=True
+                expected_entry_revision="r1",
+                native_atomic_conditional_write=True,
+                current_entry=entry,
+                updated_entry=entry,
             )["status"],
             "conditional_write_required",
         )
@@ -1591,22 +1598,35 @@ class KnowledgeRuntimeTests(unittest.TestCase):
                 target_entry_revision_changed=True, different_entry_only_changed=False
             )["auto_merge"]
         )
+        old_entry = self.entry()
+        new_entry = self.entry(
+            {
+                "kind": "test_environment",
+                "scope_refs": ["project:checkout"],
+                "subject": "other",
+            }
+        )
         self.assertEqual(
             knowledge.plan_replacement(
-                old_entry_ref="KN-1",
-                new_entry_ref="KN-2",
+                old_entry_ref=old_entry["entry_ref"],
+                new_entry_ref=new_entry["entry_ref"],
                 native_atomic_multi_entry_update=False,
-            )["status"],
-            "blocked",
+                old_entry=old_entry,
+                new_entry=new_entry,
+            )["reason"],
+            "replacement_requires_atomic_old_new_update",
         )
 
     def test_same_entry_concurrent_updates_fail_closed_without_provider_cas(self):
+        entry = self.entry()
         with ThreadPoolExecutor(max_workers=2) as executor:
             decisions = list(
                 executor.map(
                     lambda _: knowledge.plan_update(
                         expected_entry_revision="r1",
                         native_atomic_conditional_write=False,
+                        current_entry=entry,
+                        updated_entry=entry,
                     ),
                     range(2),
                 )
@@ -1930,7 +1950,23 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 claims = list(
                     executor.map(
                         lambda _: workflow.claim_mutable_operation(
-                            workflow_state_root, workflow_ref, "browser:save-order"
+                            workflow_state_root,
+                            workflow_ref,
+                            "browser:save-order",
+                            operation_details={
+                                "owner_skill": "e2e-test-execution",
+                                "scope_ref": "scope:order",
+                                "operation_type": "browser_mutation",
+                                "target_ref": "order:save",
+                                "source_revisions": [
+                                    {"ref": "product", "revision": "v1"}
+                                ],
+                                "artifact_revisions": [],
+                                "expected_revision": None,
+                                "approval_ref": None,
+                                "permission_scope": None,
+                                "resume_owner": "e2e-test-execution",
+                            },
                         ),
                         range(8),
                     )
@@ -1972,7 +2008,7 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                     expected_claim_revision=winner["claim_revision"],
                     native_atomic_conditional_release=True,
                 )["status"],
-                "conditional_release_required",
+                "blocked",
             )
 
             reservation_root = Path(temp) / "reservations"
@@ -1989,40 +2025,27 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(
-                sum(item["status"] == "reserved" for item in reservations), 1
+                [r["status"] for r in reservations], ["blocked", "blocked"]
             )
-            reservation = next(
-                item for item in reservations if item["status"] == "reserved"
+            self.assertTrue(
+                all(
+                    r["reason"] == "reservation_provider_not_selected"
+                    for r in reservations
+                )
             )
-            reservation_data = json.loads(
-                Path(reservation["reservation_ref"]).read_text(encoding="utf-8")
-            )
-            owner_ref = reservation_data["workflow_ref"]
+            self.assertFalse(reservation_root.exists())
             self.assertEqual(
                 workflow.release_shared_resource(
-                    current_workflow_ref=owner_ref,
-                    expected_workflow_ref=owner_ref,
-                    expected_reservation_revision=reservation["reservation_revision"],
-                    current_reservation_revision=reservation["reservation_revision"],
-                    native_atomic_conditional_release=False,
-                    owner_state_verified=True,
-                    owner_execution_state="complete",
-                    cleanup_confirmed=True,
-                )["status"],
-                "blocked",
-            )
-            self.assertEqual(
-                workflow.release_shared_resource(
-                    current_workflow_ref="other",
-                    expected_workflow_ref=owner_ref,
-                    expected_reservation_revision=reservation["reservation_revision"],
-                    current_reservation_revision=reservation["reservation_revision"],
+                    current_workflow_ref=workflow_ref,
+                    expected_workflow_ref=workflow_ref,
+                    expected_reservation_revision="provider:r1",
+                    current_reservation_revision="provider:r1",
                     native_atomic_conditional_release=True,
                     owner_state_verified=True,
                     owner_execution_state="complete",
                     cleanup_confirmed=True,
                 )["reason"],
-                "reservation_owner_mismatch",
+                "reservation_release_provider_not_connected",
             )
             self.assertEqual(
                 workflow.reserve_shared_resource(
@@ -2043,8 +2066,11 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 external_reservation_acquired=True,
                 external_reservation_revision="provider:revision-1",
             )
-            self.assertEqual(external["status"], "reserved")
-            self.assertEqual(external["provider"], "existing_external_reservation")
+            self.assertEqual(external["status"], "blocked")
+            self.assertEqual(
+                external["reason"], "external_reservation_readback_required"
+            )
+            self.assertEqual(external["provider"], "unverified_external_reservation")
 
             unsafe_resource = "resource:local-without-release"
             unsafe_target = (
@@ -2068,7 +2094,8 @@ class WorkflowArtifactGraphTests(unittest.TestCase):
                 workflow_ref,
                 native_atomic_conditional_release=True,
             )
-            self.assertEqual(safe_local["status"], "reserved")
+            self.assertEqual(safe_local["status"], "blocked")
+            self.assertEqual(safe_local["reason"], "reservation_provider_not_selected")
 
     def test_partial_update_requires_owner_scope_dependency_and_cas_proof(self):
         base = {
@@ -2609,7 +2636,13 @@ class SQLiteWcagWorkflowStateTests(unittest.TestCase):
 class StandaloneSkillPortabilityTests(unittest.TestCase):
     def test_new_skill_candidate_outputs_pass_existing_deterministic_runner(self):
         skills = {
-            "regression-testing": ["REG-OUT-001", "REG-OUT-002"],
+            "regression-testing": [
+                "REG-OUT-001",
+                "REG-OUT-002",
+                "REG-OUT-003",
+                "REG-OUT-004",
+                "REG-OUT-005",
+            ],
             "exploratory-testing": ["EXP-OUT-001", "EXP-OUT-002"],
             "qa-knowledge": ["KN-OUT-001", "KN-OUT-002"],
         }

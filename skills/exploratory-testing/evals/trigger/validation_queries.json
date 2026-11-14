@@ -30,5 +30,13 @@
   {
     "query": "仕様のどちらを正本とすべきか確認して。",
     "should_trigger": false
+  },
+  {
+    "query": "owner不明のsymptomを、既存TCなしでhypothesisから実対象で調べて。",
+    "should_trigger": true
+  },
+  {
+    "query": "既に原因ownerが分かっているE2E失敗を再調査して。",
+    "should_trigger": false
   }
 ]

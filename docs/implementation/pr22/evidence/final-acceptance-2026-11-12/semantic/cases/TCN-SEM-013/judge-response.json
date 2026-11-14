@@ -1,0 +1,54 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Eval Inputには、A・Bが同一TCN・同一model・同一execution fingerprint・同一expected result root・同一source modelであること、Aの要件がrole=admin、Bの要件が同じrole dimensionのrole=guestであること、両方がmerge後CIへ適用されること、Cが別modelであることが示されている。Candidateはこれらを条件へ展開せず、テスト要求を「未特定」として扱い、条件を一件も生成していない。merge group predicateとrequirement union/intersection contractを検証するという中心的な要求の展開が欠落しており、重大な欠落である。",
+      "evidence": [
+        "| 未特定 | ブロック中 | テスト要求の意味を条件へ展開できる具体的な記述、および現在有効な仕様根拠が入力に存在しない。 |",
+        "該当なし（ブロック中のため条件を生成しない）。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "Candidateは製品技法（状態遷移・境界値等）を誤って付与してはおらず、その点は適切である。しかし、Eval Inputが求める対象（deterministic grouping predicateとrequirement union/intersection contractの検証）に対する処理・検証方法を選択していない。候補の扱いは「ブロック中」のみで、検証手段が定義されていないため、意味上の実質的な不足がある。",
+      "evidence": [
+        "| grouping predicate（同一TCN・同一model・同一execution fingerprint・同一expected result root での統合判定） | 評価入力 | ブロック中 | 統合判定の入力値（fingerprint、expected result root、source target version、model所属）の具体値と判定規則の正本が入力にないため、採否・充足基準を定義できない。 | なし |",
+        "| requirement union / intersection（`role` dimension の `admin` / `guest` 統合） | 評価入力 | ブロック中 | dimension定義、union / intersection の適用規則、merge後CIの正本参照が入力にないため、カバレッジ基準を定義できない。 | なし |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Coverage Criteriaが一件も定義されていない。Eval Inputの範囲でも、同一グループ判定の成立条件（TCN・model・target version・execution・expected rootの一致）、requirement unionとintersectionの適用、conflict時の拒否、Cの除外を充足基準として定められるが、Candidateは具体値と正本の不足を理由に定義を放棄している。何を満たせば十分かという中核的な判断が欠落しており、重大な欠落である。",
+      "evidence": [
+        "統合判定の入力値（fingerprint、expected result root、source target version、model所属）の具体値と判定規則の正本が入力にないため、採否・充足基準を定義できない。",
+        "dimension定義、union / intersection の適用規則、merge後CIの正本参照が入力にないため、カバレッジ基準を定義できない。",
+        "該当なし（ブロック中のため項目を生成しない）。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Coverage Itemが一件も生成されていない。そのためCriteriaを代表・具体化するItemは存在せず、評価対象の検証を担保しない。Eval Inputに示された同一グループ判定、requirement union/intersection、conflict拒否、Cの除外のいずれについてもItemがなく、重大な欠落である。",
+      "evidence": [
+        "## カバレッジ項目一覧\n\n該当なし（ブロック中のため項目を生成しない）。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-006",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "採用しない候補のDispositionはすべて「ブロック中」とされ、採用しない理由として具体性を欠く。Eval Inputでは別modelのtarget Cは同一TCNのmerge groupに含めてはならない前提だが、Cを除外するDispositionが一切記載されていない。また、統合判定の入力や正本が入力にないとする理由は、Eval Inputが同一TCN・model・fingerprint・root・roleの値を示している点と整合しない。意味上の実質的な不足がある。",
+      "evidence": [
+        "| grouping predicate（同一TCN・同一model・同一execution fingerprint・同一expected result root での統合判定） | 評価入力 | ブロック中 | 統合判定の入力値（fingerprint、expected result root、source target version、model所属）の具体値と判定規則の正本が入力にないため、採否・充足基準を定義できない。 | なし |",
+        "| requirement union / intersection（`role` dimension の `admin` / `guest` 統合） | 評価入力 | ブロック中 | dimension定義、union / intersection の適用規則、merge後CIの正本参照が入力にないため、カバレッジ基準を定義できない。 | なし |"
+      ]
+    }
+  ]
+}

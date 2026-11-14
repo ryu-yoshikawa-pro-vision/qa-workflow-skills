@@ -1,0 +1,7 @@
+{
+  "review_mode": "non_e2e_testware",
+  "required_source_revisions": [
+    "tests/unit/pricing.test.ts@2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+  ],
+  "expected_defects": []
+}

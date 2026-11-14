@@ -1,0 +1,89 @@
+{
+  "branch": "qa/artifacts",
+  "passed": true,
+  "repo": "ryu-yoshikawa-pro-vision/qa-training-store",
+  "steps": {
+    "approver_check": {
+      "activity_read_after_the_run": true,
+      "expected_approver": "ryu-yoshikawa-pro-vision",
+      "matches": true,
+      "note": "GitHub records push activity with a delay; the run read it too early.",
+      "observed_actors": [
+        "ryu-yoshikawa-pro-vision"
+      ]
+    },
+    "branch_created": {
+      "head": "efb873cf2133c18a6ee24ec870262596992a9fe0"
+    },
+    "create_if_absent_again": {
+      "reason": "create_if_absent_conflict",
+      "status": "blocked"
+    },
+    "independent_readback": {
+      "current_is_latest_accepted": true,
+      "rev1": {
+        "revision": "git:0aab4e91c359fbb1d7ef6e5fa6b2027d6b3cc558",
+        "sha256_matches_write": true
+      },
+      "rev2": {
+        "revision": "git:f820638b612e01647e7b6fbe9d08cd21b34ed1e8",
+        "sha256_matches_write": true
+      },
+      "rev3": {
+        "revision": "git:49248e0db8573bb085186e7635524f2f50a7156b",
+        "sha256_matches_write": true
+      },
+      "stale_write_not_in_remote": true
+    },
+    "remote_cas_conflict": {
+      "rejected": true,
+      "remote_head_unchanged": true,
+      "stale_push_returncode": 1,
+      "write_3_activity": {
+        "activity_type": "push",
+        "actor": "ryu-yoshikawa-pro-vision",
+        "after": "49248e0db8573bb085186e7635524f2f50a7156b",
+        "before": "f820638b612e01647e7b6fbe9d08cd21b34ed1e8",
+        "timestamp": "2026-11-12T22:33:25Z"
+      }
+    },
+    "unapproved_write": {
+      "reason": "access_denied",
+      "ref_unchanged": true,
+      "status": "blocked"
+    },
+    "write_1_create": {
+      "activity": {
+        "activity_type": "push",
+        "actor": "ryu-yoshikawa-pro-vision",
+        "after": "0aab4e91c359fbb1d7ef6e5fa6b2027d6b3cc558",
+        "before": "efb873cf2133c18a6ee24ec870262596992a9fe0",
+        "polls": 1,
+        "timestamp": "2026-11-12T22:33:16Z"
+      },
+      "activity_matches_previous_head": true,
+      "result": {
+        "revision": "git:0aab4e91c359fbb1d7ef6e5fa6b2027d6b3cc558",
+        "sha256": "fd6da00e174021187a33b98214f9fac26f0a11faaeade63d0a14c3bfa5ede013",
+        "status": "stored"
+      }
+    },
+    "write_2_update": {
+      "activity": {
+        "activity_type": "push",
+        "actor": "ryu-yoshikawa-pro-vision",
+        "after": "f820638b612e01647e7b6fbe9d08cd21b34ed1e8",
+        "before": "0aab4e91c359fbb1d7ef6e5fa6b2027d6b3cc558",
+        "polls": 1,
+        "timestamp": "2026-11-12T22:33:18Z"
+      },
+      "activity_matches_previous_head": true,
+      "result": {
+        "previous_revision": "git:0aab4e91c359fbb1d7ef6e5fa6b2027d6b3cc558",
+        "revision": "git:f820638b612e01647e7b6fbe9d08cd21b34ed1e8",
+        "sha256": "0bd12e037ae0059496a04dd110d46a10abbc70a4749768b4afdf85af6f9e626d",
+        "status": "stored"
+      }
+    }
+  }
+}

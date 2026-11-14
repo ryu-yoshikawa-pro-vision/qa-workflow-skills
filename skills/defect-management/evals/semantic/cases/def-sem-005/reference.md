@@ -1,0 +1,3 @@
+# Reference
+
+statusの変更通知だけでは修正確認にならず、closeしない。修正対象のbuild（build:42）と変更refが特定でき、旧buildや不明な変更でないことを確認する。確認できなければ再実行依頼を出さずブロックする。確認できれば元の実行ownerへ、同じTCと期待基準でbuild:42の再実行を依頼し、合否と結果確定・cleanupはownerが確定する。closeはその結果（fix_confirmed、対象build一致）がある場合だけ、承認とIssueの最新revisionを確認して行う。周辺のRegression Run選定はregression-testingで別に扱う。

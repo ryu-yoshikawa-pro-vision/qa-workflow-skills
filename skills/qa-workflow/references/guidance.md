@@ -41,6 +41,23 @@
 - `regression-testing`
 - `exploratory-testing`
 - `qa-knowledge`
+- `defect-management`
+- `e2e-test-selection`
+- `feature-analysis`
+- `project-context`
+- `test-architecture-design`
+- `test-condition-analysis`
+- `test-evaluation`
+- `test-item-analysis`
+- `test-management`
+- `test-reporting`
+- `test-requirements-analysis`
+- `testware-execution`
+- `testware-implementation`
+- `ui-target-analysis`
+- `usability-evaluation`
+- `usability-inspection`
+- `wcag-conformance-evaluation`
 
 Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しません。本ワークフローは、Agentクライアントが必要なSkillを追加で読み込み / 利用できる実装で動作することを前提とします。
 
@@ -48,27 +65,41 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 
 ## 工程固有ロジックの正本
 
-| 工程固有ロジック                                            | 担当Skill                  |
-| ----------------------------------------------------------- | -------------------------- |
-| 現在有効な仕様根拠の解決                                    | `spec-analysis`            |
-| 不明点分類 / 回答正規化                                     | `question-analysis`        |
-| プロダクトリスク / リスクマトリクス / 設計深度              | `test-analysis`            |
-| テスト要求粒度 / 上流閉鎖                                   | `test-requirement-design`  |
-| カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`    |
-| 詳細テストケース / 期待結果の根拠の具体化                   | `test-case-design`         |
-| 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`   |
-| AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`           |
-| カバレッジ / 閉鎖性 / ギャップ                              | `coverage-analysis`        |
-| 独立レビュー / 重大度                                       | `adversarial-review`       |
-| E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`      |
-| Playwright E2Eコード変更、静的 / 軽量検証                   | `e2e-test-implementation`  |
-| 実行安全確認、準備、Playwright実行、構造化結果、cleanup     | `e2e-test-execution`       |
-| 実行事実からの原因分析、追加証拠要求、修正routing           | `e2e-test-result-analysis` |
-| 検証済み結果の人間向け報告                                  | `e2e-test-reporting`       |
-| Regression baseline / membership / Run selection / Activity | `regression-testing`       |
-| Charterに沿った探索・owner不明hypothesisの実対象調査        | `exploratory-testing`      |
-| QA knowledge candidate triage / entry lifecycle / lookup    | `qa-knowledge`             |
-| ルーティング / ブロック中 / 再開 / 変更伝播 / 完了          | `qa-workflow`              |
+| 工程固有ロジック                                            | 担当Skill                    |
+| ----------------------------------------------------------- | ---------------------------- |
+| 案件Project Context / 成果物配置・編集方針の合意            | `project-context`            |
+| 製品機能ID / 情報源母集団 / 開発差分分類                    | `feature-analysis`           |
+| 現在有効な仕様根拠の解決                                    | `spec-analysis`              |
+| UI構造・画面・操作・状態・遷移、human editing               | `ui-target-analysis`         |
+| 不明点分類 / 回答正規化                                     | `question-analysis`          |
+| QA要求 / 品質目標 / 合意状態                                | `test-requirements-analysis` |
+| テストレベル・タイプ・方式・環境の全体設計                  | `test-architecture-design`   |
+| QA計画 / 開始・終了基準 / 進捗・差異 / プロジェクトリスク   | `test-management`            |
+| プロダクトリスク / リスクマトリクス / 設計深度              | `test-analysis`              |
+| テスト要求粒度 / 上流閉鎖                                   | `test-requirement-design`    |
+| テストアイテム候補                                          | `test-item-analysis`         |
+| テスト条件候補                                              | `test-condition-analysis`    |
+| カバレッジ基準 / カバレッジ項目 / テスト技法                | `test-condition-design`      |
+| 詳細テストケース / 期待結果の根拠の具体化                   | `test-case-design`           |
+| E2E自動化対象の選定・理由・履歴                             | `e2e-test-selection`         |
+| 生きたテスト対象のUI情報・ふるまい収集 / 管理               | `test-target-inspection`     |
+| AIによる詳細TC実行・期待結果比較・結果記録                  | `test-execution`             |
+| 非E2E testware実装・静的 / 軽量検証                         | `testware-implementation`    |
+| 非E2E testware runner・実行結果・cleanup                    | `testware-execution`         |
+| カバレッジ / 閉鎖性 / ギャップ                              | `coverage-analysis`          |
+| 独立レビュー / 重大度                                       | `adversarial-review`         |
+| E2E対象、repo / 実対象の事実、実装可能性、安全条件          | `e2e-test-inspection`        |
+| Playwright E2Eコード変更、静的 / 軽量検証                   | `e2e-test-implementation`    |
+| 実行安全確認、準備、Playwright実行、構造化結果、cleanup     | `e2e-test-execution`         |
+| 実行事実からの原因分析、追加証拠要求、修正routing           | `e2e-test-result-analysis`   |
+| 検証済み結果の人間向け報告                                  | `e2e-test-reporting`         |
+| Regression baseline / membership / Run selection / Activity | `regression-testing`         |
+| Charterに沿った探索・owner不明hypothesisの実対象調査        | `exploratory-testing`        |
+| QA knowledge candidate triage / entry lifecycle / lookup    | `qa-knowledge`               |
+| 欠陥候補 / 外部Issue引継ぎ / 修正確認依頼                   | `defect-management`          |
+| 計画母集団に基づく統合報告snapshot                          | `test-reporting`             |
+| QA活動の評価・改善の効果測定                                | `test-evaluation`            |
+| ルーティング / ブロック中 / 再開 / 変更伝播 / 完了          | `qa-workflow`                |
 
 ### 現在有効な仕様根拠への依存
 
@@ -109,13 +140,16 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 プロダクトリスクは深度・優先度の横断入力です。反証レビューは各成果物層に適用できます。
 
-## E2E要求時の分岐
+## testware / E2E要求時の分岐
 
 すべてのSkillを固定順に実行しません。要求成果物と有効な成果物から必要な依存だけを選びます。
 
 - 生きたテスト対象の情報収集・更新・鮮度確認だけが必要 → `test-target-inspection`
 - 設計前にcurrentな対象情報が必要 → `test-target-inspection` → 必要な設計Skillへ戻る
+- `test-item-analysis` / `test-condition-analysis`は候補分析だけを担当し、正式な要求・条件設計は`test-requirement-design` / `test-condition-design`へrouting
+- 非E2Eのtestware implementation / runner execution → `testware-implementation` / `testware-execution`
 - 詳細TCをAIが今回runとして実行・観測 → `test-execution`
+- どの業務経路・機能をE2E自動化するかの選定 → `e2e-test-selection`。再利用できるcurrent選定結果がなければ選定し、選定済み対象だけを`e2e-test-inspection`へ渡す。TC直接指定、既存E2E実行のみ、有効な選定結果がある場合は選定を再実行しない
 - repoへ残すPlaywright E2Eのinspection / 実装 / 正式runner実行 → 既存の`e2e-test-inspection` / `e2e-test-implementation` / `e2e-test-execution`
 
 - 詳細TCからE2E実装: `e2e-test-inspection` → `e2e-test-implementation` → `adversarial-review`（対象: `E2E実装`） → `coverage-analysis`（対象: `TC → E2E実装`）
@@ -134,7 +168,7 @@ currentな画面名称・到達方法・操作可能性・観測可能性が必�
 
 | Skill                | 正規対象 / 実行範囲                                  |
 | -------------------- | ---------------------------------------------------- |
-| `test-analysis`      | `テスト分析` / `E2E対象選定`                         |
+| `test-analysis`      | `テスト分析` / `E2E対象選定`（旧成果物の読取互換）   |
 | `coverage-analysis`  | `テスト設計` / `TC → E2E実装` / `E2E実装 → 実行結果` |
 | `adversarial-review` | `テスト設計成果物` / `E2E実装`                       |
 
@@ -162,6 +196,7 @@ Explorationは未知領域のCharterベース探索、Investigationは既存owne
 - 新規・改修のテスト設計を要求する場合だけ、仕様根拠、Risk、TR、TCN、TC、coverage等の該当契約を要求します。
 - E2Eを要求する場合だけ、E2E実行・分析・報告・cleanupの該当契約を確認します。
 - Regressionは`regression-testing`、Exploration / Investigationは`exploratory-testing`、QA Knowledgeは`qa-knowledge`の完了条件を正本とします。
+- 案件配置・機能ID・QA要求・方式・計画・E2E選定・欠陥・統合報告・活動評価は各担当Skillの完了条件を正本とします。`workflow_runtime.py`にowner verifierが登録されていないscopeは`unverified_scopes`として残り、workflow全体を完了にしません。
 
 要求された分析・報告と安全なcleanupが完了し、追加修正が要求されていなければ、FAILを含む実行結果でも完了できます。
 
@@ -201,35 +236,36 @@ Project Contextの`qa.workflow_state_root`はworkflowごとのpersisted stateと
 
 ### UIテスト対象分析
 
-今後のテスト設計で継続利用するUI仕様理解packageを作る要求は、`spec-analysis`のUIテスト対象分析modeから開始します。単一表に収まる小規模な対象でも、継続利用・更新する目的があればmodeを選びます。package作成や仕様理解だけが要求されている場合、`test-analysis`以降へ自動進行しません。
+UI構造・画面・操作・状態・遷移を分析し、継続利用する`ui-target-v1` packageを作成・更新する要求は`ui-target-analysis`から開始します。単一表に収まる小規模な対象でも、継続利用・更新する目的があれば独立packageを使います。package作成や構造理解だけが要求されている場合、`test-analysis`以降へ自動進行しません。`ui-target-analysis`は既存writerとhelperを利用し、single writer、history、migration、`ui-target-v1`互換性を維持します。期待仕様、Authority、US / UC / Behavior / AC、UNKNOWNの正本は`spec-analysis`です。UI構造、画面観測、repository factを期待仕様のAuthorityへ昇格しません。
 
 - packageに未解決事項があり回答整理も要求された場合は`question-analysis`へ進みます。正式回答は対応するUNKNOWN IDを保持して記録し、`spec-analysis`へ戻ってcurrent UNKNOWNとpackageを更新してから後続を再開します。暫定回答を正式なDECISIONへ昇格しません。
-- packageが既にあり、不明点への回答を反映する要求は、`question-analysis`の解消処理後に`spec-analysis` modeをresumeします。回答済み論点は根拠がcurrentな間は再質問しません。
-- repository調査は補助入力として`spec-analysis`のRepository確認へ記録します。repository factを仕様Authorityへ昇格したり、implementation gapを仕様変更として扱ったりしません。
+- packageが既にあり、不明点への回答を反映する要求は、`question-analysis`の解消処理後に`spec-analysis`で期待仕様を更新し、`ui-target-analysis`で必要なUI packageを再開します。回答済み論点は根拠がcurrentな間は再質問しません。
+- repository調査は補助入力として`spec-analysis`のRepository確認へ記録し、UI構造の分析は`ui-target-analysis`へ渡します。repository factを仕様Authorityへ昇格したり、implementation gapを仕様変更として扱ったりしません。
 - current live UIの表示・到達性・実画面状態を観測する要求は`test-target-inspection`へ進みます。repositoryを読むだけの調査はこのSkillへrouteしません。
 - 保存済みFigma / screenshot等の画面資料をbrowser操作なしでUI/UX評価する要求は`usability-evaluation`へ進みます。live browserで使用性、focus、responsiveを観測する要求は`usability-inspection`へ進みます。WCAG 2.xと適合レベルを指定したformal評価は`wcag-conformance-evaluation`へ進みます。
 - UI仕様理解packageが完成しても、テスト設計が不要ならそこで終了します。ready scopeとblocked scopeが混在する場合、packageの`scope_readiness[].blocking_unknown_ids[]`だけを`question-analysis`へ渡し、独立してreadyなscopeの進行をUNKNOWN総数だけで停止しません。
 
 ### WCAG formal evaluation state
 
-WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。これらは既存の`qa.workflow_state_root`から場所を解決し、`artifact_graph.py`のlocal SQLite providerでcurrent WCAG評価情報を読み書きします。対応範囲は単一ホストlocal filesystemです。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
+WCAG canonical Plan provenanceとreport完了には、`register-wcag-evaluation-plan`、`read-wcag-evaluation-state`、`finalize-wcag-report` operationを使います。この既存のWCAG固有経路は`qa.workflow_state_root`配下のlocal SQLiteを利用します。workflow stateのSQLite更新時にはrevision履歴を同じtransactionで保存し、`read_sqlite_workflow_state_revision(root, workflow_ref, revision_token)`で旧revisionを取得します。revision 1から連続する履歴がない旧DBは`historical_revision_available=false`です。新規DBには最初のhistory revisionを同一transactionで記録し、記録済みのrevisionが一つでも欠落した場合はreadback／CASをblockします。旧DBに履歴がない場合は移行開始時のcurrent revisionからのみ履歴を保持し、欠落した古いrevisionを作成しません。履歴はあるが開始revisionを証明できない旧DBは、不完全な履歴を安全な移行と推測せず更新を停止します。対応する原子性は単一hostのlocal filesystemのみであり、汎用QA成果物や共有リソースの保存先としてSQLiteを採用したことにはなりません。network filesystem、複数host、未設定root、DB破損、transaction / lock failureではblockedとします。
 
 登録は既存WCAG evaluation ownerが確定した評価入力、scope決定とevidence refs、selected sample / variation / processおよびsource artifact refsを引き継ぎます。caller提供Planだけから正本を作らず、同じevaluation revisionの対象縮小を拒否します。SQLite state revisionはWCAG evaluation revisionとは別です。WCAG `close-report`が返すのはunresolved candidateであり、generation fingerprint一致だけではclosure証明になりません。QA workflowはdeclared runtime dependencyの`result_fingerprint`とcandidate envelope全体を照合します。Machine Runtime freshness検証はその依存fingerprintを独立に取得したcurrent runtime rowと比較します。このcurrent rowを使うfreshness検証を通らない同一generationのpayload / 工程入力差し替えは、staleとして扱います。照合済みcandidateに含まれる有限な工程入力を、QA workflowはcurrent recordから取得したPlan・結果に結合し、既存`close_report()`を再実行してWCAG-EM工程とaccessible outputのcomplete状態を確認します。その後、期待SQLite revisionでCAS更新し、別connectionから再読込して完了を返します。ただし、現行`finalize-wcag-report`はcurrent Machine Runtime rowを独立取得せず、callerが用意したdependency metadataとcandidateの一致を確認するだけです。metadataも自己作成できる直接呼び出しは完了を偽装でき、ownerが独立してcurrent rowを結び付ける取得契約が残っています。これは既存のgeneric workflow / handoff CASを置き換えず、SQLite recordの存在だけでowner承認を証明しません。
 
 ### mutable operation開始直前
 
 1. owner execution contractに同一operation identity向けatomic pre-start claimまたはidempotent startがあるか確認し、ある場合はowner contractを利用します。
-2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref)`を使います。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へclaimを導出し、callerに別claim rootを選ばせません。
-3. claimを取得できない、またはhelper / filesystem能力が失敗した場合はmutable operationを開始せず`blocked`にします。state CASだけで実operationの二重開始を防止済みと扱いません。
+2. owner contractがなければ`claim_mutable_operation(workflow_state_root, workflow_ref, operation_ref, operation_details=...)`を使います。`operation_details`には`owner_skill`、`scope_ref`、`operation_type`、`target_ref`、`source_revisions[]`、`artifact_revisions[]`、`expected_revision`、`approval_ref`、`permission_scope`、`resume_owner`を入れます。source／成果物のrevisionは操作前にownerの正本から確定し、秘密情報の実値は渡しません。helperは`qa.workflow_state_root`配下の`claims/<canonical identity digest>.json`へatomic create-if-absentで記録し、独立readbackを照合してから`may_start=true`を返します。`operation_details`なしの3引数呼出しは`operation_details_required`でblockします。旧3引数呼出しが作成したclaimは別セッションで読取互換として保持しますが、再実行は許可しません。
+3. 別セッションでの再開時は、保存時の`claim_revision`を保持して`read_mutable_operation_claim(..., expected_claim_revision=...)`で独立読戻しします。`status=current`でも`may_start=false`であり、元ownerの実開始・実保存・cleanupを再取得するまで同じoperation identityの副作用を再実行しません。revision不一致は`conflict`、欠落・改ざん・読取権限不足は`blocked`です。
+4. claimが重複・改ざん・読戻し不一致・保存失敗になった場合は、同じoperation identityを再実行せず`blocked`にします。`recover_claim()`はprovider-nativeの条件付き解放を実行しません。現状は実行・cleanup証拠の真偽とclaim revisionを検証する接続がないため、開始前の中断でも`claim_release_provider_not_connected`で停止します。実ownerの保存済み状態と条件付き解放を接続するまで、`may_start`を復旧させません。claimは承認主体の認証や遠隔providerのCASを代行しません。
 
 ### shared resource使用前
 
-resource ref、workflow間のisolation条件、外部reservationの取得状態などはProject Contextの実施環境 / 対象条件欄で確認します。project-local reservation artifactのrootには既存`qa.reservation_root`を使い、次の順で`reserve_shared_resource`を適用します。
+resource ref、workflow間のisolation条件、利用するreservation provider、認可・解放条件をProject Contextの実施環境 / 対象条件欄で確認します。`qa.reservation_root`は場所を示すだけで、保存先のnative CASや予約・解放能力を保証しません。
 
-1. resourceがworkflowごとにisolatedならreservationは`not_required`です。
-2. 既存external reservationが取得済みならそれを使います。
-3. project-local reservationはatomic create-if-absentに加えてlifecycleを閉じるnative atomic conditional release能力も確認できる場合だけ取得します。release capabilityがないlocal filesystemではreservation fileを作らず`blocked`にします。
-4. いずれも満たさなければshared resource使用を`blocked`にします。recovery / releaseはowner execution state、cleanup確認、expected revisionを確認し、native conditional releaseがなければ実行しません。
+1. 実際にworkflowごとに分離されたresourceなら`isolated=True`を指定し、reservationは`not_required`です。分離が未確認ならこの扱いにしません。
+2. 選定済み外部providerで取得したreservationのrefとrevisionを、元providerの保存状態から独立に取得して照合します。現時点で共通helperの`reserve_shared_resource(external_reservation=..., external_reservation_acquired=True, external_reservation_revision=...)`は、その文字列だけでは所有者を証明できないため`external_reservation_readback_required`でblockします。返したref／revisionは検証待ちの情報であり、`reserved`やresource使用許可ではありません。正式なproviderの取得・readback・認可・cleanupは各ownerの実装に残します。
+3. provider未選定で`reserve_shared_resource(..., native_atomic_conditional_release=True)`を呼んでも`reservation_provider_not_selected`で停止します。SQLiteや旧JSONへ自動的に予約を作成しません。既存の予約ファイルやDBを削除・自動移行しません。
+4. `release_shared_resource()`はowner／cleanup／revisionの基本条件を確認する判定helperであり、外部providerでの原子的解放ではありません。確認フラグだけで実解放を許可せず、未接続の場合は`reservation_release_provider_not_connected`を返します。実行ownerが保存した元結果とcleanupを独立取得したうえで、選定したproviderの条件付き解放・再読込を実施してください。その経路がない場合はresourceを使用せず`blocked`にします。
 
 ### current完了直前 / current成果物再利用直前
 
@@ -246,6 +282,13 @@ resource ref、workflow間のisolation条件、外部reservationの取得状態�
 - 有効なテスト条件 / カバレッジ項目がありケースだけ作る → `test-case-design`
 - 成果物チェーンの抜け・閉鎖性を見る → `coverage-analysis`
 - 成果物を重大度付きで独立レビューする → `adversarial-review`
+- 新規案件・成果物配置の変更 → `project-context`
+- PR / merge / release / 資料改版から機能IDと変更分類を更新する → `feature-analysis`
+- QA活動の目的・品質目標を定める → `test-requirements-analysis`。有効なQA要求があり方式だけ決める → `test-architecture-design`。有効な要求・方式があり計画・進捗だけ扱う → `test-management`
+- E2E自動化対象を選ぶ → `e2e-test-selection`
+- FAIL / Finding / Observationから欠陥候補・外部Issue引継ぎを扱う → `defect-management`
+- 確定済みの複数方式の結果を計画母集団に照らして横断報告する → `test-reporting`。E2E結果だけの人間向け報告は`e2e-test-reporting`
+- QA活動を評価し改善の効果を確認する → `test-evaluation`
 
 常に`spec-analysis`から開始しません。
 
@@ -260,6 +303,16 @@ resource ref、workflow間のisolation条件、外部reservationの取得状態�
 5. `要再検証` / ブロック中のまま利用可能扱いされていない
 
 工程固有の妥当性が疑わしい場合は、詳細規則を`qa-workflow`で再評価せず担当Skillへ戻します。
+
+### 開始時の既存成果物確認と再開
+
+依頼を受けたら、担当Skillへ進む前に次を順に行います。
+
+1. 既存のworkflow stateと成果物の置き場（保存先、`qa-state/`など）を最初に読みます。何も無いときだけ新規に開始します。
+2. 入力revisionの比較には`scripts/input_revision.py`を使います。`python3 <Skill>/scripts/input_revision.py compare --root <入力のroot> --state <保存先>/input-revisions.json <対象path...>`で比べ、helperが使える場合は自前の補助scriptを書きません。`record`の`--state`は`input-revisions.json`という名前で、保存先（`qa-state/`など）の中に置きます。保存先の外へファイルを書きません。
+3. `status`が`same`なら、保存済み成果物を**再利用**し、再生成しません。stateへ「再利用（入力revision同一）」と今回の確認を記録して終えます。
+4. `changed`・`added`・`removed`なら、そのpathに依存する成果物だけを`要再検証`にして再実行し、他は再利用します。再利用と再実行の別をstateへ記録し、実行後に`input_revision.py record`で記録を更新します。`no_record`なら新規として扱い、完了後に`record`で記録します。
+5. 前回が途中で中断していれば、stateが示す最後に完了した工程の次から再開し、完了済みの工程を最初からやり直しません。中断した事実、再開した工程、引き継いだ成果物をstateへ記録します。
 
 ## 既定フロー
 
@@ -318,7 +371,7 @@ adversarial-review
 - テスト条件 / カバレッジ基準 / カバレッジ項目 → `test-condition-design`
 - テストケース → `test-case-design`
 - カバレッジ判定自体 → `coverage-analysis`
-- E2E対象選定の価値判断 → `test-analysis`（対象: `E2E対象選定`）
+- E2E対象選定の価値判断 → `e2e-test-selection`。旧`test-analysis`成果物のE2E選定表は既存記録として`test-analysis`（対象: `E2E対象選定`）で読み取り、新規選定には使わない
 - currentな実対象UI情報・テスト対象資料の鮮度 → `test-target-inspection`
 - E2E対象選定後のrepo構造、Playwright設定、実装可能性、安全条件 → `e2e-test-inspection`
 - Playwright E2E実装 → `e2e-test-implementation`
@@ -328,6 +381,14 @@ adversarial-review
 - 既存repo Playwright E2Eのrunner実行条件、状態準備、cleanup → `e2e-test-execution`
 - E2E実行結果の原因分析 / 証拠不足 → `e2e-test-result-analysis`
 - 確定済み結果の報告 → `e2e-test-reporting`
+- QA目的・品質目標・合意状態 → `test-requirements-analysis`
+- テストレベル・タイプ・方式・環境・データの割当 → `test-architecture-design`
+- 計画・開始 / 終了基準・予定母集団・差異・プロジェクトリスク・是正処置 → `test-management`
+- 欠陥候補の成熟度・外部Issue照合・修正確認依頼 → `defect-management`。再実行・判定は元の実行Skillへ戻す
+- 複数方式の横断集計・取得完全性 → `test-reporting`。元結果の再判定はしない
+- QA活動の評価・改善の採用 / 効果測定 → `test-evaluation`。採用された改善の正本改版は各正本ownerへ戻す
+- 機能ID・情報源母集団・開発差分分類 → `feature-analysis`
+- Project Contextの配置・編集方針・stable key → `project-context`
 
 レビューSkill自身や`qa-workflow`が担当層を直接再設計しません。
 
@@ -352,7 +413,7 @@ adversarial-review
 
 handoff identityはorigin artifact/revisionとartifact-local handoff refの組です。`operation_ref`、expected observation集合、current result集合、lineage、close readinessはhelperが導出します。開始順はpending CAS → mutable-operation claim → canonical順resource reserve → in-progress CAS → browser開始です。owner resultはimmutable evidence refとcleanup状態を持ち、read-onlyに返します。started operationを同じidentityでbrowser再実行しません。再観測時はformal ownerが新handoff refと`retry_of_handoff_ref`をmaterializeします。
 
-結果をresumeへ返す前に、origin currentness、expected/returned集合、duplicateまたはsupersedes lineage、cleanup、reservation releaseを確認し、close-ready → closed CAS → state reread → resume decisionの順を守ります。release/CAS失敗や不一致はblockedへ閉じ、再browser実行で隠しません。開始前failureでlocal claim recoveryにnative conditional releaseがなければ`atomic_claim_release_unavailable`をexpected safe blockとして保持します。
+結果をresumeへ返す前に、origin currentness、expected/returned集合、duplicateまたはsupersedes lineage、cleanup、reservation releaseを確認し、close-ready → closed CAS → state reread → resume decisionの順を守ります。release/CAS失敗や不一致はblockedへ閉じ、再browser実行で隠しません。開始前failureでもownerの実行・cleanupと条件付きclaim解放の経路が未接続なら`claim_release_provider_not_connected`をexpected safe blockとして保持します。
 
 ## ワークフロー全体状態
 
@@ -377,6 +438,16 @@ handoff identityはorigin artifact/revisionとartifact-local handoff refの組�
 - Regressionは`regression-testing`、Exploration / Investigationは`exploratory-testing`、QA Knowledgeは`qa-knowledge`の完了条件に従います。各Skillのdomain完了条件を本Skillへ複製しません。
 
 重大度の詳細条件や残存リスク受容条件は`adversarial-review`を正本とします。
+
+## 要求集合と「省略」
+
+- `requested_scopes`（要求集合）は、工程開始時にqa-workflowが利用者の要求から記録する、今回の完了に必須のscopeの一覧です。各要素は`skill / target / execution_range / requirement`を持ちます。`requirement`は`required`（必須）または`excluded_by_approval`（承認された対象外）です。
+- 要求集合は`workflow_runtime.py`の完了判定に必須の入力です。未宣言・空の集合は完了できません。呼び出し側が「全工程確認済み」と自己申告しても、要求集合の代わりにはなりません。
+- 完了判定の対象は要求集合に含めたscopeだけです。QA計画だけ、報告だけ、欠陥だけ、既存成果物を使う途中開始は、要求集合を小さく宣言して表します。qa-workflowは他Skillを推論で追加しません。
+- `excluded_by_approval`は、現時点では対象外として確定しません。承認記録を実在の承認として照合する手段（承認provider・認証主体）が未定義のためです。形式上の参照（`APR-999`、別scope・別revisionを指す参照を含む）があっても、承認の真正性を確認したものとして扱いません。該当scopeは必須のまま完了判定に残し、黙って除外しません。空・欠落・空白のみ、および`未設定`・`未取得`・`未確認`・`未承認`・`失効`・`unknown`・`N/A`・`-`・`dummy`・`pending`・`TODO`・`承認済み`・`approved`などのplaceholderや承認状態の語は、`approval_ref_missing`になります。それ以外の具体的な参照は`approval_unverifiable`になります。どちらも`unverified_exclusions`に`skill / target / execution_range / reason`で出し、blockingとして完了不可です。`excluded_scopes`（確定した対象外）は現在常に空です。再開条件は、対象外の宣言を取り下げて`required`にするか、承認記録の照合手段（承認provider）が定義され、その照合結果が提示されるまで、そのscopeを必須として検証することです。照合手段が定義された場合は、`workflow_runtime.py`の`_exclusion_confirmed`だけを差し替えます。保存済みv2の対象外の主張は、再開時に受理しません（`downstream_state.py`）。古い承認参照を再利用して対象外を確定することはありません。真正性について実際に検証したのは、承認参照の形式（空・placeholder・状態語の除外）だけです。検証していないのは、承認の実在、対象scope・revisionとの一致、承認状態（承認済み・失効）、承認者、再開時の失効です。
+- 状態値「省略」は、要求集合に含まれないSkillの行にだけ使います。要求集合に含まれるscopeが未実行・未完了・未検証のままなら「省略」にはできず、「未開始」「実行中」「ブロック中」などとして完了不可で残します。承認された対象外の「省略」と承認参照の併記は、承認の照合手段が定義されるまで使いません。
+- 完了したワークフローに「未開始」の行を残してはいけません（`WF-D004`）。
+- `workflow_runtime.py`の出力で、要求集合に含まれず`workflow_scopes`にあるscopeは`unrequested_scopes`として記録されます。必須扱いはしませんが、既存の未検証・未登録ルールには従い、未検証なら完了不可です。
 
 ## 品質ゲート
 

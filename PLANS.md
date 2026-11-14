@@ -2,6 +2,10 @@
 
 一般的なrepository調査、曖昧さの扱い、Planの構成は[`feature-plan Skill`](.agents/skills/feature-plan/SKILL.md)を正本とします。
 
+## PR #22関連のQA全工程Plan
+
+開発連動QAとQA全工程の追加責務について、Planの目的・責務・依存関係は[Planインデックス](docs/plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)で整理します。索引は実装Planではなく、本文・完了条件の正本は各Planとその詳細文書です。過去のPlan全件を置き換えるものではありません。
+
 ## 保存
 
 - 合意済みPlanは`docs/plans/`へ保存します。

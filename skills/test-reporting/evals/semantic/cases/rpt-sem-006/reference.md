@@ -1,0 +1,3 @@
+# Reference
+
+Playwright E2E単体の人間向け詳細報告はe2e-test-reportingの責務で、横断報告ではE2Eの元結果として参照する。元のrawの結果は変更・再判定せず、retryで初回FAILを消さない。欠陥Issueは読取りのprojectionに留め、状態を更新しない。

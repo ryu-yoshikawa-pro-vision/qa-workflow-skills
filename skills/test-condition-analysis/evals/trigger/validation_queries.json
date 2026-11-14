@@ -1,0 +1,25 @@
+[
+  {
+    "query": "ログイン失敗回数、停止時間、復旧イベントから、複数itemへ再利用できる共通条件候補を整理してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "仕様変更でAuthority revisionが変わったとき、依存するCOND候補だけを特定してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "同名だが意味の違う条件を別IDのままにし、分割・統合・廃止を根拠付きで履歴化したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "未確認の非機能条件は確定扱いせず、適用可能なitem kindと不足根拠を表示してください。",
+    "should_trigger": true
+  },
+  { "query": "テストアイテムのfeature mapping漏れと親子循環を直してください。", "should_trigger": false },
+  { "query": "TCN-001の正式な適用判定とCI coverage targetを materialize してください。", "should_trigger": false },
+  { "query": "承認済みのAuthorityから期待動作を整理し、曖昧な箇所に質問を作ってください。", "should_trigger": false },
+  {
+    "query": "同値分割と境界値分析を適用して、番号付きの実行可能なテストケースを作ってください。",
+    "should_trigger": false
+  }
+]

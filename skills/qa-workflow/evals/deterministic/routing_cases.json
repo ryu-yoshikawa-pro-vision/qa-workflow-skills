@@ -713,26 +713,37 @@
   {
     "id": "WF-UI-TARGET-001",
     "input_conditions": "テスト設計へ進まず、複数資料の対象理解を継続更新できるUIテスト対象分析packageだけを作る",
-    "start": "spec-analysis",
-    "final": "spec-analysis",
-    "skills": ["spec-analysis"],
+    "start": "ui-target-analysis",
+    "final": "ui-target-analysis",
+    "skills": [
+      "ui-target-analysis"
+    ],
     "overall": "実行中"
   },
   {
     "id": "WF-UI-TARGET-002",
     "input_conditions": "UIテスト対象分析packageを作り、未解決UNKNOWNをquestion-analysisへ回す",
-    "start": "spec-analysis",
+    "start": "ui-target-analysis",
     "final": "question-analysis",
-    "skills": ["spec-analysis", "question-analysis"],
-    "states": { "question-analysis": "ブロック中" },
+    "skills": [
+      "ui-target-analysis",
+      "question-analysis"
+    ],
+    "states": {
+      "question-analysis": "ブロック中"
+    },
     "overall": "部分完了（ブロック中あり）"
   },
   {
     "id": "WF-UI-TARGET-003",
     "input_conditions": "回答済みUNKNOWNを正規化して既存UIテスト対象分析packageへ反映する",
     "start": "question-analysis",
-    "final": "spec-analysis",
-    "skills": ["question-analysis", "spec-analysis"],
+    "final": "ui-target-analysis",
+    "skills": [
+      "question-analysis",
+      "spec-analysis",
+      "ui-target-analysis"
+    ],
     "overall": "実行中"
   },
   {
@@ -740,15 +751,19 @@
     "input_conditions": "現在の実画面を開いて表示名と到達可否を観測する",
     "start": "test-target-inspection",
     "final": "test-target-inspection",
-    "skills": ["test-target-inspection"],
+    "skills": [
+      "test-target-inspection"
+    ],
     "overall": "実行中"
   },
   {
     "id": "WF-UI-TARGET-005",
     "input_conditions": "対象理解packageの作成だけを完了しテスト分析やテスト設計へは進まない",
-    "start": "spec-analysis",
-    "final": "spec-analysis",
-    "skills": ["spec-analysis"],
+    "start": "ui-target-analysis",
+    "final": "ui-target-analysis",
+    "skills": [
+      "ui-target-analysis"
+    ],
     "overall": "実行中"
   },
   {
@@ -756,7 +771,9 @@
     "input_conditions": "保存済みFigmaとscreenshotのevidenceからUI/UXを評価する",
     "start": "usability-evaluation",
     "final": "usability-evaluation",
-    "skills": ["usability-evaluation"],
+    "skills": [
+      "usability-evaluation"
+    ],
     "overall": "実行中"
   },
   {
@@ -764,16 +781,166 @@
     "input_conditions": "live browserでユーザーフローを操作してusability inspectionを実施する",
     "start": "usability-inspection",
     "final": "usability-inspection",
-    "skills": ["usability-inspection"],
+    "skills": [
+      "usability-inspection"
+    ],
     "overall": "実行中",
-    "targets": { "usability-inspection": "general" }
+    "targets": {
+      "usability-inspection": "general"
+    }
   },
   {
     "id": "WF-UI-TARGET-008",
     "input_conditions": "対象ページのWCAG-EM 2.0 formal conformance evaluationを行う",
     "start": "wcag-conformance-evaluation",
     "final": "wcag-conformance-evaluation",
-    "skills": ["wcag-conformance-evaluation"],
+    "skills": [
+      "wcag-conformance-evaluation"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-001",
+    "input_conditions": "新規案件のProject Contextを初期化し、QA成果物の配置・編集方針を合意する",
+    "start": "project-context",
+    "final": "project-context",
+    "skills": [
+      "project-context"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-002",
+    "input_conditions": "PRの開発差分から製品機能IDと変更分類を更新する",
+    "start": "feature-analysis",
+    "final": "feature-analysis",
+    "skills": [
+      "feature-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-003",
+    "input_conditions": "有効な機能一覧・仕様・UI構造からテストアイテム候補だけを識別する",
+    "start": "test-item-analysis",
+    "final": "test-item-analysis",
+    "skills": [
+      "test-item-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-004",
+    "input_conditions": "有効な機能一覧・仕様から機能横断の共通テスト条件候補だけを識別する",
+    "start": "test-condition-analysis",
+    "final": "test-condition-analysis",
+    "skills": [
+      "test-condition-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-005",
+    "input_conditions": "案件のQA活動の目的・品質目標・要求元を定義し合意状態を記録する",
+    "start": "test-requirements-analysis",
+    "final": "test-requirements-analysis",
+    "skills": [
+      "test-requirements-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-006",
+    "input_conditions": "QA目的の定義からテストレベル・方式の全体設計、QA計画と終了基準の作成まで行う",
+    "start": "test-requirements-analysis",
+    "final": "test-management",
+    "skills": [
+      "test-requirements-analysis",
+      "test-architecture-design",
+      "test-management"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-007",
+    "input_conditions": "有効なQA要求と方式があり、QA計画の進捗と計画対実績の差異だけを確認する",
+    "start": "test-management",
+    "final": "test-management",
+    "skills": [
+      "test-management"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-008",
+    "input_conditions": "有効なProduct RiskとTCがあり、どの業務経路をE2E自動化するか選ぶ",
+    "start": "e2e-test-selection",
+    "final": "e2e-test-selection",
+    "skills": [
+      "e2e-test-selection"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-009",
+    "input_conditions": "E2E自動化対象を選定し、選定した対象をPlaywright E2Eとして実装する。TCは指定しない",
+    "start": "e2e-test-selection",
+    "final": "e2e-test-implementation",
+    "skills": [
+      "e2e-test-selection",
+      "e2e-test-inspection",
+      "e2e-test-implementation"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-010",
+    "input_conditions": "確定済みのFAILとFindingから欠陥候補を整理し、外部Issueとの重複を照合する",
+    "start": "defect-management",
+    "final": "defect-management",
+    "skills": [
+      "defect-management"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-011",
+    "input_conditions": "確定済みの一般TC・E2E・Regression・API結果を計画母集団に照らして横断報告する",
+    "start": "test-reporting",
+    "final": "test-reporting",
+    "skills": [
+      "test-reporting"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-012",
+    "input_conditions": "今回のQA活動を評価し、前回採用した改善の効果を確認する",
+    "start": "test-evaluation",
+    "final": "test-evaluation",
+    "skills": [
+      "test-evaluation"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-013",
+    "input_conditions": "非E2EのVitest testwareを追加実装して静的・軽量検証する",
+    "start": "testware-implementation",
+    "final": "testware-implementation",
+    "skills": [
+      "testware-implementation"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-014",
+    "input_conditions": "既存のVitest suiteを実行し、結果とcleanupを記録する",
+    "start": "testware-execution",
+    "final": "testware-execution",
+    "skills": [
+      "testware-execution"
+    ],
     "overall": "実行中"
   }
 ]

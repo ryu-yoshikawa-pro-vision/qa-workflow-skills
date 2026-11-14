@@ -1,0 +1,36 @@
+{
+  "skill": "test-evaluation",
+  "canonical_output": true,
+  "cases": [
+    {
+      "id": "EVL-OUT-001",
+      "input": "cases/evl-out-001/input.md",
+      "expected": "cases/evl-out-001/expected.json"
+    },
+    {
+      "id": "EVL-OUT-002",
+      "input": "cases/evl-out-002/input.md",
+      "expected": "cases/evl-out-002/expected.json"
+    },
+    {
+      "id": "EVL-OUT-003",
+      "input": "cases/evl-out-003/input.md",
+      "expected": "cases/evl-out-003/expected.json"
+    },
+    {
+      "id": "EVL-OUT-004",
+      "input": "cases/evl-out-004/input.md",
+      "expected": "cases/evl-out-004/expected.json"
+    },
+    {
+      "id": "EVL-OUT-005",
+      "input": "cases/evl-out-005/input.md",
+      "expected": "cases/evl-out-005/expected.json"
+    },
+    {
+      "id": "EVL-OUT-006",
+      "input": "cases/evl-out-006/input.md",
+      "expected": "cases/evl-out-006/expected.json"
+    }
+  ]
+}

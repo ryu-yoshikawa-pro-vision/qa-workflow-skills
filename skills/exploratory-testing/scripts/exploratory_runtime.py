@@ -42,6 +42,15 @@ CHARTER_FIELDS = {
 }
 
 
+INVESTIGATION_ORIGIN_KEYS = (
+    "symptom_ref",
+    "hypothesis_ref",
+    "unresolved_finding_ref",
+    "symptom",
+    "hypothesis",
+)
+
+
 def _canonical(value: Any) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -62,20 +71,38 @@ def charter_identity(
     ).hexdigest()
 
 
+def _text_list(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
 def validate_charter(mode: str, charter: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(charter, dict):
+        return {
+            "valid": False,
+            "missing_fields": [],
+            "issues": ["charter_must_be_object"],
+        }
     missing = sorted(
         field
         for field in CHARTER_FIELDS
         if field not in charter or charter[field] is None or charter[field] == ""
     )
     issues: list[str] = []
-    if mode not in MODES:
+    if not isinstance(mode, str) or mode not in MODES:
         issues.append("invalid_mode")
     if mode == "investigation" and not any(
-        charter.get(key)
-        for key in ("symptom_ref", "hypothesis_ref", "symptom", "hypothesis")
+        isinstance(charter.get(key), str) and charter[key].strip()
+        for key in INVESTIGATION_ORIGIN_KEYS
     ):
         issues.append("investigation_requires_symptom_or_hypothesis")
+    # The in-scope target is fixed before any operation (guidance "Charter gate");
+    # an empty list is an unfixed target, not "no restriction".
+    if not _text_list(charter.get("in_scope")):
+        issues.append("in_scope_required")
     if not isinstance(charter.get("allowed_origins"), list) or not charter.get(
         "allowed_origins"
     ):
@@ -85,9 +112,11 @@ def validate_charter(mode: str, charter: dict[str, Any]) -> dict[str, Any]:
     ):
         issues.append("allowed_operations_required")
     side_effect_operations = charter.get("side_effect_operations")
+    allowed_operations = charter.get("allowed_operations")
+    if not isinstance(allowed_operations, list):
+        allowed_operations = []
     if not isinstance(side_effect_operations, list) or any(
-        item not in charter.get("allowed_operations", [])
-        for item in side_effect_operations
+        item not in allowed_operations for item in side_effect_operations
     ):
         issues.append("invalid_side_effect_operation_mapping")
     maximum = charter.get("side_effect_maximum")
@@ -128,6 +157,19 @@ def authorize_operation(
     prior_side_effect_attempts: int,
     uncertain_previous_attempt: bool = False,
 ) -> dict[str, Any]:
+    """Check the Charter preconditions of one operation; not a final authorization.
+
+    It checks that the in-scope target is fixed, the origin and the operation are
+    allowed, and the side-effect limit is not exceeded. It does not judge whether
+    the target belongs to ``in_scope`` / ``out_of_scope`` / ``side_effect_scope``:
+    those are free text, and this helper has no trusted target identity (it does not
+    guess from the URL and takes no self-declared scope flag). ``allowed`` therefore
+    carries ``final_authorization=False``, ``target_scope_verified=False`` and the
+    ``pending_checks`` the execution boundary that touches the real target must
+    complete from trusted target information, stopping when it cannot.
+    """
+    if not _text_list(charter.get("in_scope")):
+        return {"status": "blocked", "reason": "in_scope_not_fixed"}
     target_origin = _origin(target_url)
     allowed = {
         _origin(value)
@@ -148,17 +190,36 @@ def authorize_operation(
             "reason": "side_effect_limit_reached",
             "consumed_attempts": consumed,
         }
+    side_effect = operation in charter.get("side_effect_operations", [])
+    pending = ["target_in_scope", "target_not_out_of_scope"]
+    if side_effect:
+        pending.append("side_effect_target_within_side_effect_scope")
     return {
         "status": "allowed",
         "origin": target_origin,
         "operation": operation,
-        "side_effect_attempt_number": next_attempt
-        if operation in charter.get("side_effect_operations", [])
-        else None,
+        "side_effect_attempt_number": next_attempt if side_effect else None,
+        "final_authorization": False,
+        "target_scope_verified": False,
+        "pending_checks": pending,
     }
 
 
+def _is_ref(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _ref_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(_is_ref(v) for v in value)
+
+
 def validate_session(session: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(session, dict):
+        return {"valid": False, "issues": ["session_must_be_object"]}
     issues: list[str] = []
     charter = session.get("charter")
     if not isinstance(charter, dict):
@@ -169,7 +230,10 @@ def validate_session(session: dict[str, Any]) -> dict[str, Any]:
         issues.extend(
             f"missing_charter_field:{field}" for field in result["missing_fields"]
         )
-    if session.get("state") not in SESSION_STATES:
+    if (
+        not isinstance(session.get("state"), str)
+        or session["state"] not in SESSION_STATES
+    ):
         issues.append("invalid_session_state")
     observations = session.get("observations", [])
     findings = session.get("findings", [])
@@ -182,24 +246,27 @@ def validate_session(session: dict[str, Any]) -> dict[str, Any]:
     finding_refs = [
         item.get("finding_ref") for item in findings if isinstance(item, dict)
     ]
+    # A ref must be a non-empty string; arrays / objects are an issue, not a crash.
     if (
         len(observation_refs) != len(observations)
+        or not all(_is_ref(ref) for ref in observation_refs)
         or len(observation_refs) != len(set(observation_refs))
-        or any(not ref for ref in observation_refs)
     ):
         issues.append("observation_refs_missing_or_duplicate")
     if (
         len(finding_refs) != len(findings)
+        or not all(_is_ref(ref) for ref in finding_refs)
         or len(finding_refs) != len(set(finding_refs))
-        or any(not ref for ref in finding_refs)
     ):
         issues.append("finding_refs_missing_or_duplicate")
-    obs_set = set(observation_refs)
+    obs_set = {ref for ref in observation_refs if _is_ref(ref)}
+    # An Observation is a measured fact: text for the action and the fact, and a
+    # non-empty list of evidence refs (not a bare string or an object).
     observation_evidence = all(
         isinstance(item, dict)
-        and item.get("evidence_refs")
-        and item.get("observed_fact")
-        and item.get("action_or_observation")
+        and _ref_list(item.get("evidence_refs"))
+        and _text(item.get("observed_fact"))
+        and _text(item.get("action_or_observation"))
         for item in observations
     )
     for finding in findings:
@@ -207,20 +274,29 @@ def validate_session(session: dict[str, Any]) -> dict[str, Any]:
             issues.append("invalid_finding")
             continue
         refs = finding.get("source_observation_refs", [])
-        if not refs or not set(refs) <= obs_set:
+        if (
+            not isinstance(refs, list)
+            or not refs
+            or not all(_is_ref(ref) for ref in refs)
+            or not set(refs) <= obs_set
+        ):
             issues.append(
                 f"finding_source_observation_unresolved:{finding.get('finding_ref')}"
             )
+        # evidence_refs must be a list of refs and recommended_routing a string, so a
+        # JSON array / object / number is an issue here instead of failing later.
         if (
-            not finding.get("evidence_refs")
+            not _ref_list(finding.get("evidence_refs"))
             or not finding.get("follow_up_reason")
-            or not finding.get("recommended_routing")
+            or not _is_ref(finding.get("recommended_routing"))
         ):
             issues.append(
                 f"finding_missing_evidence_or_reason:{finding.get('finding_ref')}"
             )
     cleanup = session.get("cleanup", {})
-    if cleanup.get("status") not in CLEANUP_STATES:
+    if not isinstance(cleanup, dict):
+        cleanup = {}
+    if not _is_ref(cleanup.get("status")) or cleanup["status"] not in CLEANUP_STATES:
         issues.append("invalid_cleanup_state")
     if (
         session.get("state") == "完了"
@@ -314,4 +390,418 @@ def record_attempt(
         "side_effect_consumed": bool(attempt.get("side_effect")),
         "side_effect_count": next_count,
         "retry_without_state_check": attempt.get("outcome") == "unknown",
+    }
+
+
+def resolve_direct_start(request: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a direct entry request to a mode or to the owner that must handle it.
+
+    No formal TC, TR or E2E testware is required to start. Only a Charter
+    (exploration) or an owner-unknown symptom / hypothesis / unresolved Finding
+    (investigation) is needed. The word "investigate" alone never selects
+    investigation: work that an existing owner can handle is routed to that owner.
+    """
+    if request.get("current_ui_collection") is True:
+        return _route("test-target-inspection", "current_ui_fact_collection")
+    if request.get("e2e_failure_ref"):
+        return _route("e2e-test-result-analysis", "known_e2e_failure_has_owner")
+    if request.get("known_tc_ref") and not (
+        request.get("symptom_ref")
+        or request.get("hypothesis_ref")
+        or request.get("unresolved_finding_ref")
+    ):
+        return _route("test-execution", "known_tc_faithful_execution")
+    charter = request.get("charter")
+    start_refs = [
+        key
+        for key in ("symptom_ref", "hypothesis_ref", "unresolved_finding_ref")
+        if request.get(key)
+    ]
+    if start_refs:
+        known_owner = request.get("known_owner")
+        if known_owner:
+            return _route(str(known_owner), "symptom_owner_already_known")
+        if request.get("owner_unknown") is not True:
+            return {"status": "blocked", "reason": "owner_resolution_unconfirmed"}
+        mode = "investigation"
+        start_ref = {key: request[key] for key in start_refs}
+    elif isinstance(charter, dict) and charter:
+        mode = "exploration"
+        start_ref = {}
+    else:
+        return {"status": "blocked", "reason": "charter_or_unowned_symptom_required"}
+    if not isinstance(charter, dict) or not charter:
+        return {
+            "status": "blocked",
+            "reason": "charter_required",
+            "mode": mode,
+            "start_ref": start_ref,
+        }
+    # The start refs are the investigation origin. They are returned inside
+    # "charter" so the saved Session, validation and can_resume() keep the same origin.
+    checked = {**charter, **start_ref}
+    validation = validate_charter(mode, checked)
+    if not validation["valid"]:
+        return {
+            "status": "blocked",
+            "reason": "charter_invalid",
+            "mode": mode,
+            "missing_fields": validation["missing_fields"],
+            "issues": validation["issues"],
+        }
+    return {
+        "status": "start",
+        "mode": mode,
+        "start_ref": start_ref,
+        "charter": checked,
+        "required_prerequisite_skills": [],
+        "formal_tc_required": False,
+    }
+
+
+def _route(owner: str, reason: str) -> dict[str, Any]:
+    return {"status": "route", "owner_skill": owner, "reason": reason}
+
+
+FOLLOW_UP_ACTIONS = {
+    "question-analysis": None,
+    "test-analysis": None,
+    "test-case-design": None,
+    "test-target-inspection": None,
+    "e2e-test-result-analysis": None,
+    "qa-knowledge": "triage",
+    "defect-management": "defect_candidate_review",
+}
+
+
+def source_revision_refs(session: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return each Charter source as {"ref", "revision"} for re-reading by the owner.
+
+    A Charter source is a ref string or an object with "ref" and "revision".
+    A string ref takes its revision from the Session's optional
+    "source_revisions" map. A source without a revision keeps revision None; the
+    revision is never guessed or taken from the Session revision. A Charter whose
+    "source_refs" is not a list has no usable source set: it returns [] (see
+    source_set_problem()).
+    """
+    revisions = session.get("source_revisions")
+    revisions = revisions if isinstance(revisions, dict) else {}
+    declared = session["charter"].get("source_refs")
+    if not isinstance(declared, list):
+        return []
+    sources = []
+    for item in declared:
+        if isinstance(item, dict):
+            ref, revision = item.get("ref"), item.get("revision")
+        elif isinstance(item, str):
+            ref, revision = item, revisions.get(item)
+        else:
+            ref, revision = None, None
+        if not isinstance(ref, str) or not ref:
+            ref = json.dumps(item, ensure_ascii=False, sort_keys=True)
+            revision = None
+        if not isinstance(revision, str) or not revision:
+            revision = None
+        sources.append({"ref": ref, "revision": revision})
+    return sources
+
+
+def source_set_problem(session: dict[str, Any]) -> str | None:
+    """Tell why the Charter has no source set to hand off, or None when it has one.
+
+    ``source_refs_missing``: absent, null, empty string or empty list (nothing to
+    re-read). ``source_refs_invalid``: present but not a list. Starting an
+    exploration does not need a source; a hand-off to another owner does, because
+    the owner must re-read what the Finding was derived from.
+    """
+    declared = session["charter"].get("source_refs")
+    if isinstance(declared, list):
+        return None if declared else "source_refs_missing"
+    if declared is None or declared == "":
+        return "source_refs_missing"
+    return "source_refs_invalid"
+
+
+def _bound_target_and_environment(
+    session: dict[str, Any], target_snapshot: Any, environment_conditions: Any
+) -> dict[str, Any]:
+    """Return the target and environment ref only if they reproduce the Session hash."""
+    charter = session.get("charter")
+    if not isinstance(charter, dict) or not isinstance(target_snapshot, dict):
+        return {"reason": "charter_or_target_missing"}
+    if charter_identity(
+        charter, target_snapshot, environment_conditions
+    ) != session.get("charter_snapshot_identity"):
+        return {"reason": "charter_snapshot_identity_mismatch"}
+    build = target_snapshot.get("build_ref")
+    source_revision = target_snapshot.get("source_revision")
+    if isinstance(build, str) and build.strip():
+        target = {"kind": "build", "ref": build}
+    elif isinstance(source_revision, str) and source_revision.strip():
+        target = {"kind": "source_revision", "ref": source_revision}
+    else:
+        return {"reason": "target_build_or_revision_missing"}
+    return {
+        "target": target,
+        "environment_ref": "env:"
+        + hashlib.sha256(_canonical(environment_conditions)).hexdigest(),
+    }
+
+
+def reporting_records(
+    session: dict[str, Any],
+    *,
+    session_revision: str,
+    target_snapshot: dict[str, Any],
+    environment_conditions: Any,
+    executed_at: str | None = None,
+) -> dict[str, Any]:
+    """Project one Session to a test-reporting record (unit ``session``).
+
+    Exploration has no PASS / FAIL method, so the Session is "判定不能" and is
+    never counted in a pass rate. Findings are not records of this unit; they
+    flow through ``defect_candidate_source``. Target and environment must
+    reproduce the Session's Charter identity hash.
+    """
+    if not isinstance(session_revision, str) or not session_revision.strip():
+        return {"status": "blocked", "reason": "session_revision_required"}
+    bound = _bound_target_and_environment(
+        session, target_snapshot, environment_conditions
+    )
+    if "reason" in bound:
+        return {"status": "blocked", "reason": bound["reason"]}
+    cleanup = session.get("cleanup")
+    cleanup_status = cleanup.get("status") if isinstance(cleanup, dict) else None
+    return {
+        "status": "ready",
+        "records": [
+            {
+                "unit": "session",
+                "unit_ref": session["session_ref"],
+                "result_ref": f"{session['session_ref']}@{session_revision}",
+                "state": "判定不能",
+                "build_ref": bound["target"]["ref"],
+                "environment_ref": bound["environment_ref"],
+                "source_revision": None,
+                "executed_at": executed_at,
+                "result_finalized": session.get("state") == "完了",
+                "cleanup_status": cleanup_status,
+            }
+        ],
+    }
+
+
+def defect_candidate_source(
+    handoff: dict[str, Any],
+    session: dict[str, Any],
+    *,
+    target_snapshot: dict[str, Any],
+    environment_conditions: Any,
+    cause: dict[str, Any] | None = None,
+    expected_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project a ready ``defect-management`` hand-off to a defect-candidate source.
+
+    The Session stores neither the target build nor the environment, only the hash
+    of Charter + target snapshot + environment conditions. The caller supplies
+    the latter two and they are used only when they reproduce that hash, so a
+    different build or environment can never be attached to the Finding. Cause
+    and expected-result basis are never inferred: without them the defect owner
+    returns the candidate to the owner or to ``spec-analysis`` by its own rules.
+    """
+    if (
+        not isinstance(handoff, dict)
+        or handoff.get("kind") != "exploratory_finding_reference"
+        or handoff.get("follow_up_owner_skill") != "defect-management"
+    ):
+        return {"status": "blocked", "reason": "not_a_defect_management_handoff"}
+    if (
+        handoff.get("session_ref") != session.get("session_ref")
+        or handoff.get("charter_snapshot_identity")
+        != session.get("charter_snapshot_identity")
+        or handoff.get("state") != "current"
+        or handoff.get("unresolved")
+    ):
+        return {"status": "blocked", "reason": "handoff_does_not_match_session"}
+    bound = _bound_target_and_environment(
+        session, target_snapshot, environment_conditions
+    )
+    if "reason" in bound:
+        return {"status": "blocked", "reason": bound["reason"]}
+    charter = session["charter"]
+    target = bound["target"]
+    environment_ref = bound["environment_ref"]
+    finding = next(
+        (
+            row
+            for row in session.get("findings", [])
+            if isinstance(row, dict)
+            and row.get("finding_ref") == handoff["finding_ref"]
+        ),
+        None,
+    )
+    if finding is None:
+        return {"status": "blocked", "reason": "finding_not_in_session"}
+    facts = {
+        row.get("observation_ref"): row.get("observed_fact")
+        for row in session.get("observations", [])
+        if isinstance(row, dict)
+    }
+    symptoms = [
+        facts[ref]
+        for ref in finding["source_observation_refs"]
+        if isinstance(facts.get(ref), str) and facts[ref].strip()
+    ]
+    if not symptoms:
+        return {"status": "blocked", "reason": "observed_fact_missing"}
+    candidate: dict[str, Any] = {
+        "source_kind": "Finding",
+        "owner_skill": "exploratory-testing",
+        "run_ref": f"{session['session_ref']}@{handoff['session_revision']}",
+        "result_ref": handoff["finding_ref"],
+        "scope_ref": "charter:" + "+".join(sorted(charter["in_scope"])),
+        "environment_ref": environment_ref,
+        "target": target,
+        "symptom": "; ".join(symptoms),
+        "result_finalized": session.get("state") == "完了",
+        "cause": cause if cause is not None else {"status": "unknown"},
+        "evidence": [{"ref": ref} for ref in handoff["evidence_refs"]],
+    }
+    if expected_result is not None:
+        candidate["expected_result"] = expected_result
+    return {"status": "ready", "candidate": candidate}
+
+
+def build_follow_up_handoff(
+    session: dict[str, Any], finding_ref: str, *, session_revision: str | None
+) -> dict[str, Any]:
+    """Build a reference-only hand-off of one Finding to its follow-up owner.
+
+    The hand-off carries IDs and the revision needed to re-read the Session, not
+    the Observation text, spec or run results. Each source is a ref plus its own
+    revision, separate from the Session revision. It never promotes the Finding to a
+    formal defect or a knowledge entry; the receiving owner decides.
+    """
+    if not session_revision:
+        return {"status": "blocked", "reason": "session_revision_required"}
+    validation = validate_session(session)
+    if not validation["valid"]:
+        return {
+            "status": "blocked",
+            "reason": "session_invalid",
+            "issues": validation["issues"],
+        }
+    finding = next(
+        (
+            item
+            for item in session.get("findings", [])
+            if isinstance(item, dict) and item.get("finding_ref") == finding_ref
+        ),
+        None,
+    )
+    if finding is None:
+        return {"status": "blocked", "reason": "finding_not_in_session"}
+    owner = finding.get("recommended_routing")
+    if not isinstance(owner, str) or owner not in FOLLOW_UP_ACTIONS:
+        return {"status": "blocked", "reason": "unknown_follow_up_owner"}
+    evidence = finding.get("evidence_refs")
+    if not _ref_list(evidence) or not _ref_list(finding.get("source_observation_refs")):
+        return {"status": "blocked", "reason": "finding_refs_invalid"}
+    session_unresolved = session.get("unresolved", [])
+    finding_unresolved = finding.get("unresolved", [])
+    if not isinstance(session_unresolved, list) or not isinstance(
+        finding_unresolved, list
+    ):
+        return {"status": "blocked", "reason": "unresolved_must_be_list"}
+    unresolved = [item for item in (*session_unresolved, *finding_unresolved) if item]
+    sources = source_revision_refs(session)
+    source_problem = source_set_problem(session)
+    unresolved_sources = [item["ref"] for item in sources if item["revision"] is None]
+    if owner == "defect-management" and unresolved:
+        return {
+            "status": "blocked",
+            "reason": "unresolved_finding_not_defect_candidate",
+            "next": "owner_resolution_or_investigation",
+        }
+    if owner == "defect-management" and source_problem:
+        return {
+            "status": "blocked",
+            "reason": source_problem,
+            "next": "record_source_refs",
+        }
+    if owner == "defect-management" and unresolved_sources:
+        return {
+            "status": "blocked",
+            "reason": "source_revision_unresolved",
+            "unresolved": unresolved_sources,
+            "next": "record_source_revisions",
+        }
+    if source_problem:
+        unresolved.append(source_problem)
+    unresolved.extend(f"source_revision_unresolved:{ref}" for ref in unresolved_sources)
+    if session.get("state") in {"ブロック中", "部分完了（ブロック中あり）"}:
+        state = "blocked"
+        resume: dict[str, Any] | None = {
+            "owner_skill": "exploratory-testing",
+            "action": "resume_session",
+            "condition": "same charter, scope, permitted range and environment",
+        }
+    elif source_problem:
+        state = "blocked"
+        resume = {
+            "owner_skill": "exploratory-testing",
+            "action": "record_source_refs",
+            "condition": "record the Charter source refs and their revisions",
+        }
+    elif unresolved_sources:
+        state = "blocked"
+        resume = {
+            "owner_skill": "exploratory-testing",
+            "action": "record_source_revisions",
+            "condition": "re-read each source and record its revision",
+        }
+    elif unresolved:
+        state = "current"
+        resume = {
+            "owner_skill": "exploratory-testing",
+            "action": "owner_resolution_or_investigation",
+        }
+    else:
+        state = "current"
+        resume = None
+    return {
+        "status": "ready",
+        "handoff": {
+            "kind": "exploratory_finding_reference",
+            "owner_skill": "exploratory-testing",
+            "artifact_ref": session.get("session_ref"),
+            "content_hash": session_revision,
+            "state": state,
+            "validation": {
+                "runtime": "exploratory-testing/scripts/exploratory_runtime.py:validate_session",
+                "valid": True,
+                "issues": [],
+                "result_ref": None,
+            },
+            "resume": resume,
+            "required_approval": {
+                "required": owner == "defect-management",
+                "approval_ref": None,
+                "decided_by": "receiving_owner",
+            },
+            "follow_up_owner_skill": owner,
+            "target_action": FOLLOW_UP_ACTIONS[owner],
+            "session_ref": session.get("session_ref"),
+            "session_revision": session_revision,
+            "charter_snapshot_identity": session.get("charter_snapshot_identity"),
+            "finding_ref": finding_ref,
+            "source_observation_refs": list(finding["source_observation_refs"]),
+            "evidence_refs": list(evidence),
+            "source_refs": sources,
+            "follow_up_reason": finding["follow_up_reason"],
+            "unresolved": unresolved,
+            "promotion": "not_promoted",
+            "formal_defect": False,
+            "knowledge_entry_created": False,
+        },
     }

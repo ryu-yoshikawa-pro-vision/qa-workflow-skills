@@ -73,7 +73,7 @@ def _source_input() -> dict[str, Any]:
                     {
                         "number": 1,
                         "text": "管理者向け結果が表示される",
-                        "authority_refs": [],
+                        "authority_refs": ["SPEC-001"],
                     }
                 ],
                 "postconditions_or_cleanup": ["作成データを削除する"],
@@ -118,6 +118,12 @@ def _source_metadata() -> dict[str, Any]:
         "entity_ref": "TCN-001-CI01",
         "content": ci_content,
     }
+    authority = {
+        "skill": "spec-analysis",
+        "entity_type": "authority",
+        "entity_ref": "SPEC-001",
+        "content": {"authority_id": "SPEC-001", "text": "current authority"},
+    }
     return {
         "envelope_version": "1",
         "skill": SKILL,
@@ -131,10 +137,10 @@ def _source_metadata() -> dict[str, Any]:
         "selection_key": None,
         "scope_key": None,
         "input_mode": "artifact",
-        "upstream_entities": [tcn, ci],
+        "upstream_entities": [tcn, ci, authority],
         "upstream_runtime_units": [],
         "static_data_versions": {},
-        "authority_refs": [],
+        "authority_refs": ["SPEC-001"],
         "reference_refs": [],
     }
 

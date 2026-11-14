@@ -236,6 +236,52 @@ class TestDataRequirementRuntimeTests(unittest.TestCase):
             result["payload"]["conflicts"][0]["target_ref"], target_row["target_ref"]
         )
 
+    def test_one_sided_version_requirements_conflict_only_on_their_target(
+        self,
+    ) -> None:
+        a = target("sha256:" + "2" * 64)
+        b = target("sha256:" + "3" * 64)
+
+        def version_of(row: dict) -> list[dict]:
+            return [
+                {
+                    key: row[key]
+                    for key in (
+                        "target_ref",
+                        "target_content_fingerprint",
+                        "generation_fingerprint",
+                    )
+                }
+            ]
+
+        def version(key: str, row: dict, minimum, maximum) -> dict:
+            return requirement(
+                key,
+                "version_range",
+                versions=version_of(row),
+                minimum=minimum,
+                maximum=maximum,
+                minimum_inclusive=True if minimum is not None else None,
+                maximum_inclusive=True if maximum is not None else None,
+            )
+
+        result = run(
+            {
+                "current_source_targets": [a, b],
+                "requirements": [
+                    version("a-low", a, "2.0", None),
+                    version("a-high", a, None, "1.4"),
+                    version("b-exact", b, "1.3", "1.3"),
+                ],
+            }
+        )
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "unresolved")
+        self.assertEqual(
+            [row["target_ref"] for row in result["payload"]["conflicts"]],
+            [a["target_ref"]],
+        )
+
     def test_target_specific_cross_model_reference_is_rejected(self) -> None:
         first = target("sha256:" + "2" * 64, "ep-001")
         second = target("sha256:" + "3" * 64, "bva-001")

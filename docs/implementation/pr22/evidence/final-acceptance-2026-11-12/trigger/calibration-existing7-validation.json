@@ -1,0 +1,1543 @@
+{
+  "model": "claude-haiku-5-5",
+  "max_turns": 6,
+  "product_archive": "/tmp/claude-1000/-mnt-c-Users-<USER>-Documents-qa-workflow-skills/00000000-0000-4000-8000-900000000003/scratchpad/product-2a8bcf5.tar",
+  "skills_available": [
+    "adversarial-review",
+    "agent-answer-form",
+    "coverage-analysis",
+    "defect-management",
+    "e2e-test-execution",
+    "e2e-test-implementation",
+    "e2e-test-inspection",
+    "e2e-test-reporting",
+    "e2e-test-result-analysis",
+    "e2e-test-selection",
+    "exploratory-testing",
+    "feature-analysis",
+    "project-context",
+    "qa-knowledge",
+    "qa-workflow",
+    "question-analysis",
+    "regression-testing",
+    "spec-analysis",
+    "test-analysis",
+    "test-architecture-design",
+    "test-case-design",
+    "test-condition-analysis",
+    "test-condition-design",
+    "test-evaluation",
+    "test-execution",
+    "test-item-analysis",
+    "test-management",
+    "test-reporting",
+    "test-requirement-design",
+    "test-requirements-analysis",
+    "test-target-inspection",
+    "testware-execution",
+    "testware-implementation",
+    "ui-target-analysis",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation"
+  ],
+  "plan": {
+    "queries": 28,
+    "runs": 84,
+    "concurrency": 3,
+    "assumed_seconds_per_run": 15,
+    "estimated_minutes": 7.0
+  },
+  "attempts": [
+    {
+      "query_id": "test-analysis:validation:pos:0",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:pos:0",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:pos:0",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 65.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:pos:1",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 33.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:pos:1",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:pos:1",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:0",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:0",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:0",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "adversarial-review"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 44.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:1",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 42.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:1",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 72.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-analysis:validation:neg:1",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:0",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "coverage-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 18.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:0",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "coverage-analysis"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 19.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:0",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 16.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:1",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "coverage-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:1",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "coverage-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 9.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:1",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "coverage-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 12.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:0",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:0",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:0",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 27.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:1",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:1",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:1",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:0",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:0",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:0",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:1",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:1",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:pos:1",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:0",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:0",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:0",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 28.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:1",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "qa-workflow"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 14.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:1",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 32.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-case-design:validation:neg:1",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "qa-workflow"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 17.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:0",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:0",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-condition-design"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:0",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:1",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:1",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:1",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 30.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:0",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 31.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:0",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 81.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:0",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:1",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:1",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "question-analysis"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 21.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:1",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:0",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:0",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 4.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:0",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "regression-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:1",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:1",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:pos:1",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:0",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 18.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:0",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:0",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 15.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:1",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:1",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 29.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "regression-testing:validation:neg:1",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 33.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:0",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 37.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:0",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "exploratory-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:0",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "exploratory-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 7.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:1",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "exploratory-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 6.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:1",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "exploratory-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 8.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:1",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "exploratory-testing"
+      ],
+      "load_methods": [
+        "skill_tool"
+      ],
+      "target_triggered": true,
+      "stopped_at_first_skill_call": true,
+      "seconds": 11.3,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:0",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.9,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:0",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 21.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:0",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:1",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 20.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:1",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:1",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [
+        "test-target-inspection"
+      ],
+      "load_methods": [
+        "read_skill_md"
+      ],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": true,
+      "seconds": 15.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:0",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 23.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:0",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 25.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:0",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 26.7,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:1",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 24.0,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:1",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 28.6,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:1",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 22.8,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:0",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 19.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:0",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 81.1,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:0",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 28.2,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:1",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 9.4,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:1",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 10.5,
+      "stream_tail": ""
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:1",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempt": 3,
+      "status": "valid",
+      "invoked_skills": [],
+      "load_methods": [],
+      "target_triggered": false,
+      "stopped_at_first_skill_call": false,
+      "seconds": 13.4,
+      "stream_tail": ""
+    }
+  ],
+  "summary": [
+    {
+      "query_id": "coverage-analysis:validation:neg:0",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "coverage-analysis:validation:neg:1",
+      "skill": "coverage-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:0",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "coverage-analysis:validation:pos:1",
+      "skill": "coverage-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:0",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "exploratory-testing:validation:neg:1",
+      "skill": "exploratory-testing",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-target-inspection"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:0",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "exploratory-testing:validation:pos:1",
+      "skill": "exploratory-testing",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "regression-testing:validation:neg:0",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "regression-testing:validation:neg:1",
+      "skill": "regression-testing",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "regression-testing:validation:pos:0",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 1.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "regression-testing:validation:pos:1",
+      "skill": "regression-testing",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:0",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "spec-analysis:validation:neg:1",
+      "skill": "spec-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:0",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "spec-analysis:validation:pos:1",
+      "skill": "spec-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-analysis:validation:neg:0",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "adversarial-review"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-analysis:validation:neg:1",
+      "skill": "test-analysis",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-analysis:validation:pos:0",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-analysis:validation:pos:1",
+      "skill": "test-analysis",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-case-design:validation:neg:0",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-case-design:validation:neg:1",
+      "skill": "test-case-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "qa-workflow"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-case-design:validation:pos:0",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-case-design:validation:pos:1",
+      "skill": "test-case-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:0",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-design:validation:neg:1",
+      "skill": "test-condition-design",
+      "should_trigger": false,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "question-analysis"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:0",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.6666666666666666,
+      "other_skills_loaded": [],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "test-condition-design:validation:pos:1",
+      "skill": "test-condition-design",
+      "should_trigger": true,
+      "attempts": 3,
+      "valid_attempts": 3,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    }
+  ]
+}

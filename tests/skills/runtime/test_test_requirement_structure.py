@@ -117,6 +117,62 @@ def base_input() -> dict:
 
 
 class RequirementStructureRuntimeTests(unittest.TestCase):
+    def test_test_level_precedence_is_resolved_and_provenanced(self) -> None:
+        value = base_input()
+        value["test_requirements"][0]["test_level"] = "integration"
+        value["test_requirements"][1]["test_level"] = "acceptance"
+        value["test_level_evidence"] = [
+            {
+                "draft_key": "keep",
+                "evidence": {
+                    "explicit": {"level": "integration", "source_ref": "REQ-001"},
+                    "architecture": {
+                        "level": "system",
+                        "source_ref": "ARCH-001",
+                        "approved": True,
+                    },
+                    "default": {"level": "system", "source_ref": "PROJECT-001"},
+                },
+            },
+            {
+                "draft_key": "new",
+                "evidence": {
+                    "explicit": None,
+                    "architecture": {
+                        "level": "acceptance",
+                        "source_ref": "ARCH-002",
+                        "approved": True,
+                    },
+                    "default": {"level": "system", "source_ref": "PROJECT-001"},
+                },
+            },
+        ]
+        result = run(value)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        by_id = {row["entity_ref"]: row for row in result["payload"]["entities"]}
+        self.assertEqual(by_id["TR-001"]["content"]["test_level"], "integration")
+        self.assertEqual(by_id["TR-001"]["content"]["test_level_source"], "explicit")
+        self.assertEqual(by_id["TR-001"]["content"]["test_level_source_ref"], "REQ-001")
+        self.assertEqual(
+            by_id["TR-003"]["content"]["test_level_source"], "approved_architecture"
+        )
+
+    def test_test_level_evidence_mismatch_is_rejected(self) -> None:
+        value = base_input()
+        value["test_level_evidence"] = [
+            {
+                "draft_key": draft_row["draft_key"],
+                "evidence": {
+                    "explicit": {"level": "acceptance", "source_ref": "REQ-002"},
+                    "architecture": None,
+                    "default": {"level": "system", "source_ref": "PROJECT-001"},
+                },
+            }
+            for draft_row in value["test_requirements"]
+        ]
+        result = run(value)
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+
     def test_acceptance_closure_is_independent_from_authority_closure(self) -> None:
         value = {
             "authorities": [{"authority_id": "AUTH-001"}],

@@ -1,0 +1,21 @@
+{
+  "required_selection_ref": "E2ESEL-001",
+  "required_selection_revision": 1,
+  "required_current_revision_digest": "sha256:26ca0a700aef1d2842c4335bec040700814767cd5eac90abb0cebf6fb0981b66",
+  "required_sources": [
+    { "ref": "SPEC-001", "revision": "r8", "currentness": "current" },
+    { "ref": "TI-001", "revision": "r4", "currentness": "current" }
+  ],
+  "required_candidate_sources": {
+    "E2E-CAND-001": [["TI-001", "r4"], ["SPEC-001", "r8"]],
+    "E2E-CAND-002": [["TI-001", "r4"], ["SPEC-001", "r8"]]
+  },
+  "required_candidate_keys": {
+    "E2E-CAND-001": "checkout-primary",
+    "E2E-CAND-002": "non-payment"
+  },
+  "required_decisions": { "E2E-CAND-001": "selected", "E2E-CAND-002": "not_selected" },
+  "required_retired_candidates": {},
+  "population_complete": true,
+  "history": []
+}

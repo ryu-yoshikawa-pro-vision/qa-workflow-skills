@@ -128,13 +128,15 @@
 
 ## 12. 確定事項（決定事項の正本一覧）
 
+<!-- dprint-ignore -->
 | ID | 確定内容 | 状態 | 決定根拠 | 影響範囲 | 関係 | 関連仕様根拠ID | 置換先ID | 備考 |
-| -- | -------- | ---- | -------- | -------- | ---- | -------------- | -------- | ---- |
+| --- | -------- | ---- | -------- | -------- | ---- | -------------- | -------- | ---- |
 
 ## 13. 仮定（仮定の正本一覧）
 
+<!-- dprint-ignore -->
 | ID | 仮定 | 状態 | 理由 / 根拠 | 承認根拠 | 影響範囲 | 置換先ID | 備考 |
-| -- | ---- | ---- | ----------- | -------- | -------- | -------- | ---- |
+| --- | ---- | ---- | ----------- | -------- | -------- | -------- | ---- |
 
 ## 14. 既存QA成果物
 
@@ -150,7 +152,7 @@
 
 ## 16. QA artifact graphの固定rootとcurrentness項目
 
-各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`はproject-local reservation artifactの保存先です。resourceのisolation / external reservation / cleanup policyはこのroot値ではなく、Section 4の環境・resource条件へ記録します。
+各fieldのstable keyは表示文言・heading・行番号から独立しています。workflowが依存するfieldは、このkeyと正規化値をsnapshotへ記録します。値を未設定のまま利用できると推測しません。`qa.reservation_root`は予約保存先のroot候補であって、providerの選択やatomic conditional releaseの保証ではありません。共有resourceを使用する案件では、利用するprovider、認証されたowner、revisionとcleanup・解放方法をSection 4の環境・resource条件で決めます。未選定の場合は予約をblockし、SQLiteや旧JSONへ暗黙に作成しません。旧予約データを削除・自動移行しません。
 
 <!-- qa-context-field:start key=qa.regression_scope type=ordered_text -->
 
@@ -187,5 +189,39 @@
 （未設定）
 
 <!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_source_refs type=ordered_lines -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_artifact_root type=path -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_base_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.feature_approval_policy_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+<!-- qa-context-field:start key=qa.defect_issue_tracker_ref type=scalar -->
+
+（未設定）
+
+<!-- qa-context-field:end -->
+
+feature-analysisは情報源参照・機能一覧のroot・基準branch/revision・承認方針refのみを保持し、source全文やsecret・認証情報・機能一覧そのものをProject Contextへ複製しません。
+
+`qa.defect_issue_tracker_ref`は、欠陥候補を引き継ぐ外部Issue管理先の参照（例：`github:owner/repo`）だけを保持します。未設定の案件では外部Issue連携を行わず、`defect-management`は欠陥候補の整理・修正確認依頼までで完了できます。認証情報やIssue本文は記録しません。
 
 root pathはproject-local fixed locationにし、同じ案件内のworkflowから一意に解決できる値を記録します。secret実値は追加しません。
