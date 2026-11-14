@@ -32,3 +32,65 @@ Project riskとProduct Riskは別ID・別owner・別評価です。project risk 
 計画の承認は認証されたauthorityが対象scope・artifact ref・revisionを承認した記録と一致する必要があります。承認主体・roleと承認証拠refには有効な値を記録し、空欄、`-`、`unknown`、`未取得`、`未設定`、`未確定`、`未確認`、`取得不能`、`N/A`、`失効`、`未承認`、`不要`等のplaceholderを証拠として扱いません。revision変更時は旧承認が失効します。静的validatorは形式の一致だけを検証し、承認元の真正性を証明しません。
 
 実保存先が未選定・未認証なら書込みをblockedにします。Aのworkflow claim、fixture、Markdown出力だけをnative CAS・revision履歴・保存後readbackとみなしません。保存後に応答が失われた場合はsource ownerが実保存状態を照合してから再開します。
+
+## JSON正本packet（保存・検証）
+
+保存する正本は canonical JSON（キー順ソート、区切り`,`/`:`、UTF-8、非ASCIIそのまま）のpacketです。Markdown（`assets/output-template.md`）はこのpacketから描画する表示用であり、Markdownを正本や完了証拠にしません。`scripts/management_runtime.py`は次の5つの`operation`を持ち、入力はJSON stdin、結果はJSON stdoutです。stdlibだけを使い、ファイルの読み書き、外部通信、他Skillのimportを行いません。例は`assets/plan-packet.example.json`を参照します。
+
+### packetの項目と Markdown表の対応
+
+| packetキー                                                        | 内容                                                                                                                                                                   | Markdown表                            |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `schema` / `owner`                                                | `test-management-plan-v1` / `test-management`                                                                                                                          | 成果物メタデータ                      |
+| `artifact_ref` / `revision` / `scope` / `plan_version` / `target` | 保存先発行のref、不透明revision、scope、計画plan version、build・environment・期間                                                                                     | 成果物メタデータ                      |
+| `planned_sources[]`                                               | `source_id`（`SRC-NNN`）、owner、scope、artifact_ref、revision、content_hash。上流architecture・QA要求・source ownerを含む                                             | 入力source                            |
+| `planned_populations[]`                                           | `population_id`（`POP-NNN`）、`source_id`、query範囲、execution単位、build、environment、`required`                                                                    | 予定source inventory・必要実行母集団  |
+| `readbacks[]`                                                     | population単位の取得readback。`acquisition_state`、`execution_state`、`outcome`、`currentness`、`actual`（実identity or null）、`readback_ref`、`reason`、`zero_check` | source owner readback・取得／実行状態 |
+| `plan_items[]`                                                    | `PLAN-NNN`、QA要求ref、architecture ref、level／type、suite・順序、担当、見積工数、resource、`source_ids`                                                              | 計画・資源                            |
+| `criteria[]`                                                      | `CRIT-NNN`、開始／終了、基準、scope、evidence、判定                                                                                                                    | 開始・終了基準                        |
+| `project_risks[]`                                                 | `PROJ-RISK-NNN`、risk、scope、根拠、対応、owner、状態、状態証拠、承認主体                                                                                              | Project risk                          |
+| `corrective_actions[]`                                            | `CA-NNN`、差異／risk ref、scope、action、owner、期限（未設定可）、状態、結果ref、承認主体                                                                              | 是正処置                              |
+| `differences[]`                                                   | `DIFF-NNN`、scope、差異、根拠、対応、owner、状態、状態証拠、承認主体                                                                                                   | 差異・未処理事項                      |
+| `approval`                                                        | `state`と、承認済みの場合だけ`record`（artifact_ref、scope、revision、承認主体、role、証拠ref）                                                                        | 承認                                  |
+| `history[]`                                                       | revision、置換元revision、変更理由、scope。末尾は現在のrevision                                                                                                        | 改版履歴                              |
+| `monitoring`                                                      | `snapshot_ref`、測定時点、`counts`（再計算対象の全件数キー）                                                                                                           | Monitoring snapshot                   |
+
+`readbacks`の`actual`は、`owner`、`source_ref`、`revision`、`scope`、`range`、`execution_unit`、`build`、`environment`を持ちます。取得済・0件確認済みは予定identityと完全一致し、部分取得は範囲だけが異なる（不足理由必須）ものだけを許します。未取得・取得不能・不明では`actual`、`readback_ref`、`zero_check`を`null`にし、`currentness`を`unknown`にします。
+
+### 状態の組合せ規則
+
+- 取得済・部分取得: 実行状態は`対象なし`以外。実行済みは結果`PASS`／`FAIL`／`判定不能`／`未判定`のいずれか（判定不能は理由必須）。実行失敗は結果`判定不能`と理由必須。結果不明は結果`-`と理由必須。実行中・未実行・取消は結果`-`。
+- 0件確認済み: `zero_check`（query＝population範囲、checked_at）必須、実行状態`対象なし`、結果`-`。
+- 未取得・取得不能・不明: 実行状態は`未実行`か`結果不明`、結果`-`、理由必須。
+- 判定や完了の証拠: `解決済み`には状態証拠、`受容済み`には状態証拠と承認主体、`完了`には結果ref、`対応不要`には結果refと承認主体が必要です。判定済み基準には根拠refが必要です。
+
+### 検証operation
+
+| operation           | 入力                                                                                                                                        | 出力の主キー                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `validate`          | `{"operation","artifact"}`                                                                                                                  | `valid`、`status`（valid／invalid）、`counts`、`issues`                                                                                   |
+| `validate_readback` | `{"operation","candidate_artifact","readback","expected_revision"}`。readbackは`owner`、`scope`、`artifact_ref`、`revision`、`content_hash` | `valid`、`status`（readback_matches／blocked）、`storage_content_sha256`、`provider_authenticity`                                         |
+| `impact`            | `{"operation","artifact","current_source_refs"}`。refは`owner`、`scope`、`artifact_ref`、`revision`、`content_hash`                         | `status`（current／incomplete）、`stale_source_ids`、`unknown_source_ids`、`impacted_population_ids`、`impacted_plan_ids`、`unaffected_*` |
+| `build_snapshot`    | `{"operation","artifact"}`                                                                                                                  | `counts`（再計算値）、`matches_stored`、`mismatched_count_keys`                                                                           |
+| `completion_check`  | `{"operation","artifact"}`                                                                                                                  | `status`（complete／incomplete／blocked）、`complete`、`open`（未完了の理由コードとID）、`approval_authenticity`                          |
+
+いずれも構造・必須項目・状態規則の違反、未知キー、重複key、NUL、NaN、8 MiB超の入力は`status: blocked`、`valid: false`で閉じます。
+
+### 完了条件（completion_check）
+
+次をすべて満たす場合だけ`complete: true`です。
+
+- 構造検証に通り、再計算した件数（分母＝予定population、取得readbackの合計）が`monitoring.counts`と一致する。
+- 必須populationのすべてについて、readbackがあり`currentness: current`で、取得済は実行済み・結果`PASS`／`FAIL`、0件確認済みは`対象なし`。
+- 開始・終了基準がすべて`達成`で、終了基準が1件以上ある。
+- project risk・差異は`解決済み`／`受容済み`、是正処置は`完了`／`対応不要`。
+- `approval.state`が`不要`、または`承認済み`で`record`がこのartifact_ref・scope・revisionに完全に束縛され、承認主体・role・証拠refが実値である。
+
+完了判定は必須populationだけを対象にします。任意populationの未完了は完了を妨げませんが、`readback_missing`等として件数に残ります。対象外の免除機構はないため、母集団から外す場合は承認された改版で予定母集団から除きます。`completion_check`は源sourceの現在性を再確認しないため、`impact`の結果も併せて確認します。
+
+### 検証境界
+
+- `validate_readback`の`content_hash`は保存本文のcanonical bytesのSHA-256を照合するだけで、保存先のprovider・CAS・読戻しの真正性は`provider_authenticity: not_established_by_this_validator`です。
+- `impact`の`current_source_refs`は呼出し側の供給した証拠で、source ownerのraw結果や現在版そのものを読み直しません。供給が無い、空、形式不正、同一sourceの競合revisionは`unknown`（fail-closed）になります。
+- 承認の認証主体は検証しません。承認済みの`approval_authenticity`は`not_established_by_this_validator`です。承認主体・役割・証拠refが実値であることだけを形式として確認します。
+- source ownerの取得手段、承認の認証方式、保存先kindは本Skillでは未選定です。これらが定まるまで、完了の証拠は呼出し側の提供する証拠の束縛と整合性に限られます。

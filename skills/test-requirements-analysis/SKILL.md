@@ -26,6 +26,13 @@ description: QA活動の目的・品質目標・要求元・対象範囲・制�
 
 `assets/output-template.md`の形式を使います。安定IDは当該artifactとscope内だけで一意とし、保存先から発行されたartifact ref・revisionと合わせて追跡します。保存・承認providerが未接続なら提案／草案のまま扱い、正式保存・認証済み承認を宣言しません。
 
+### 保存済み成果物の検証入口
+
+- 保存する正本は`references/data-contract.md`のJSON packet（`schema: test-requirements-analysis-v1`）で、Markdownは表示用に描画します。
+- `scripts/qa_requirement_runtime.py`は保存後の検証入口です。登録時のowner verifierは、保存文字列のhash照合の後に`validate_readback`、`impact`（現在のsource refs）、`completion_check`の順で呼ぶ想定です。
+- validatorは記録の束縛と整合だけを確認します。承認主体・承認証拠・source取得の真正性は確認せず、結果の`not_established_by_this_validator`をそのまま扱います。
+- owner verifierへの登録は別段階です。登録前は、このscriptの成功を完了判定に使いません。
+
 ## 次の担当
 
 - QA全体のレベル／方式／環境割当: `test-architecture-design`

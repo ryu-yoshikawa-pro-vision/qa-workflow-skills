@@ -124,11 +124,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     in_progress = [
         clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"
     ]
+    # 未開始の行は「要求されず未実行」か「要求されたが未実行」かを表せないため、
+    # 完了時に残すと必須工程の省略を見逃す。要求外のSkillは「省略」と記録する。
+    not_started = [
+        clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "未開始"
+    ]
     result.add(
         "WF-D004",
-        not (overall == "完了" and (blocked or in_progress)),
-        "ブロック中または実行中が残る場合はワークフローを完了にできないこと",
-        evidence=blocked + in_progress or None,
+        not (overall == "完了" and (blocked or in_progress or not_started)),
+        "ブロック中・実行中・未開始の行が残る場合はワークフローを完了にできないこと",
+        evidence=blocked + in_progress + not_started or None,
     )
     result.add(
         "WF-D005",

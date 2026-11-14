@@ -226,7 +226,7 @@ def workflow_metadata() -> dict:
         "envelope_version": "1",
         "skill": "qa-workflow",
         "runtime_contract_version": "runtime-v2",
-        "generator_contract_version": "workflow-runtime-v1",
+        "generator_contract_version": "workflow-runtime-v2",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,
         "model_type": None,
@@ -958,6 +958,14 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         ]
         workflow_input = {
             "workflow_ref": "00000000-0000-4000-8000-000000000016",
+            "requested_scopes": [
+                {
+                    "skill": "test-condition-design",
+                    "target": None,
+                    "execution_range": None,
+                    "requirement": "required",
+                }
+            ],
             "workflow_scopes": [
                 {
                     "skill": "test-condition-design",
@@ -2245,6 +2253,15 @@ class EpVerticalIntegrationTests(unittest.TestCase):
         }
         workflow_input = {
             "workflow_ref": "00000000-0000-4000-8000-000000000016",
+            "requested_scopes": [
+                {
+                    "skill": "test-condition-design",
+                    "target": row["tcn_id"],
+                    "execution_range": None,
+                    "requirement": "required",
+                }
+                for row in normalized
+            ],
             "workflow_scopes": [
                 {
                     "skill": "test-condition-design",

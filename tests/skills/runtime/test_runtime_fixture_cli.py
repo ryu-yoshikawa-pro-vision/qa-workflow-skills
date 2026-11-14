@@ -281,7 +281,7 @@ CONFIG = {
         None,
         "all",
         "artifact",
-        "workflow-runtime-v1",
+        "workflow-runtime-v2",
         "skills/qa-workflow/scripts/workflow_runtime.py",
     ),
 }

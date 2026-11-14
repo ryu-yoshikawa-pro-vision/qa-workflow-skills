@@ -1,0 +1,182 @@
+{
+  "artifact_ref": "artifact:arch-orders-r1",
+  "assignments": [
+    {
+      "approval_id": null,
+      "assignment_id": "ARCH-001",
+      "automation": "自動",
+      "basis_source_ids": [
+        "SRC-002"
+      ],
+      "data": "匿名化注文データ",
+      "disposition": "確定",
+      "downstream_refs": [
+        {
+          "kind": "TC",
+          "ref": "artifact:tc-orders-r1#TC-001@tc-r1"
+        }
+      ],
+      "environment": "staging-orders",
+      "exclusion_reason": null,
+      "level": "システム",
+      "measurement": "注文完了状態の観測",
+      "method": "自動実行",
+      "qa_requirement_ref": "artifact:qra-orders-r1#QAR-001@qra-r3",
+      "readiness": "準備済み",
+      "runner_tool": "CI runner",
+      "selection_basis": "test-analysis既定値",
+      "source_ids": [
+        "SRC-001",
+        "SRC-002"
+      ],
+      "target_kind": "test_item",
+      "target_ref": "item:order-confirm",
+      "test_type": "業務フロー検証",
+      "verification_responsibility": "開発QA"
+    },
+    {
+      "approval_id": "APR-001",
+      "assignment_id": "ARCH-002",
+      "automation": "自動",
+      "basis_source_ids": [
+        "SRC-001"
+      ],
+      "data": "匿名化注文データ",
+      "disposition": "確定",
+      "downstream_refs": [
+        {
+          "kind": "TC",
+          "ref": "artifact:tc-orders-r1#TC-001@tc-r1"
+        }
+      ],
+      "environment": "staging-orders",
+      "exclusion_reason": null,
+      "level": "API",
+      "measurement": "注文完了状態の観測",
+      "method": "自動実行",
+      "qa_requirement_ref": "artifact:qra-orders-r1#QAR-001@qra-r3",
+      "readiness": "準備済み",
+      "runner_tool": "CI runner",
+      "selection_basis": "承認済みarchitecture",
+      "source_ids": [
+        "SRC-001"
+      ],
+      "target_kind": "test_item",
+      "target_ref": "item:order-payment",
+      "test_type": "業務フロー検証",
+      "verification_responsibility": "開発QA"
+    },
+    {
+      "approval_id": "APR-002",
+      "assignment_id": "ARCH-003",
+      "automation": "自動",
+      "basis_source_ids": [
+        "SRC-001"
+      ],
+      "data": "匿名化注文データ",
+      "disposition": "確定",
+      "downstream_refs": [
+        {
+          "kind": "TC",
+          "ref": "artifact:tc-orders-r1#TC-001@tc-r1"
+        }
+      ],
+      "environment": "staging-orders",
+      "exclusion_reason": null,
+      "level": "システム",
+      "measurement": "注文完了状態の観測",
+      "method": "自動実行",
+      "qa_requirement_ref": "artifact:qra-orders-r1#QAR-001@qra-r3",
+      "readiness": "準備済み",
+      "runner_tool": "CI runner",
+      "selection_basis": "承認済みarchitecture",
+      "source_ids": [
+        "SRC-001"
+      ],
+      "target_kind": "test_item",
+      "target_ref": "item:order-payment",
+      "test_type": "業務フロー検証",
+      "verification_responsibility": "開発QA"
+    }
+  ],
+  "change_impacts": [],
+  "constraints": [],
+  "content_fingerprint": "e66d777f492132a850d0fd17602a17d069bcd58b5cb76a543a63c7550cf95637",
+  "history": [],
+  "level_priority": [
+    {
+      "approved_levels": [],
+      "conflict_resolution": null,
+      "decision": "test-analysis既定値",
+      "default_levels": [
+        "システム"
+      ],
+      "explicit_levels": [],
+      "levels": [
+        "システム"
+      ],
+      "target_ref": "item:order-confirm"
+    },
+    {
+      "approved_levels": [
+        "API",
+        "システム"
+      ],
+      "conflict_resolution": null,
+      "decision": "承認済みarchitecture",
+      "default_levels": [
+        "システム"
+      ],
+      "explicit_levels": [],
+      "levels": [
+        "API",
+        "システム"
+      ],
+      "target_ref": "item:order-payment"
+    }
+  ],
+  "open_items": [],
+  "owner": "test-architecture-design",
+  "requirement_coverage": [
+    {
+      "assignment_ids": [
+        "ARCH-001",
+        "ARCH-002",
+        "ARCH-003"
+      ],
+      "coverage": "割当済み",
+      "exclusion_reason": null,
+      "qa_requirement_ref": "artifact:qra-orders-r1#QAR-001@qra-r3"
+    }
+  ],
+  "schema": "test-architecture-v1",
+  "scope": "orders-release-q4",
+  "sources": [
+    {
+      "acquisition": "取得済",
+      "approval_evidence_ref": "evidence:qra-approval-r3",
+      "approval_state": "承認済み",
+      "artifact_ref": "artifact:qra-orders-r1",
+      "content_hash": "d342a1d067493c621144a9ab2064d92b1c16a025dac2374b5b312960a16628e1",
+      "local_id": "QAR-001",
+      "owner": "test-requirements-analysis",
+      "revision": "qra-r3",
+      "role": "qa_requirement",
+      "scope": "orders-release-q4",
+      "source_id": "SRC-001"
+    },
+    {
+      "acquisition": "取得済",
+      "approval_evidence_ref": null,
+      "approval_state": "不要",
+      "artifact_ref": "artifact:ta-orders-r2",
+      "content_hash": "abc5bb40965a0ade69cdb18a06993b59cbb2571b81a3e40984817b66348f3846",
+      "local_id": null,
+      "owner": "test-analysis",
+      "revision": "ta-r2",
+      "role": "test_analysis",
+      "scope": "orders-release-q4",
+      "source_id": "SRC-002"
+    }
+  ]
+}

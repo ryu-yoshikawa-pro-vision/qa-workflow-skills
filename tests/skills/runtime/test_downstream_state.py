@@ -147,6 +147,220 @@ def _run(payload: str) -> tuple[int, dict[str, object]]:
     return completed.returncode, json.loads(completed.stdout)
 
 
+def _historical_v2_source_and_envelope() -> tuple[dict[str, Any], dict[str, Any], Any]:
+    """実際のworkflow_runtime v2の結果から、保存済み成果物の材料を作る。"""
+    workflow_test_path = (
+        ROOT / "tests" / "skills" / "runtime" / "test_workflow_runtime.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "workflow_runtime_test_fixtures_v2", workflow_test_path
+    )
+    assert spec is not None and spec.loader is not None
+    fixture_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture_module)
+    source, _parts = fixture_module.WorkflowRuntimeTests()._partial_scope_request()
+    module_runtime = fixture_module.runtime
+    for scope in source["input"]["workflow_scopes"]:
+        for row in scope["current_structure_state"]["runtime_results"]:
+            result = row["result"]
+            result["runtime_implementation_fingerprint"] = "sha256:" + "a" * 64
+            result["generator_implementation_fingerprint"] = "sha256:" + "b" * 64
+            result["generation_fingerprint"] = module_runtime.generation_fingerprint(
+                generator=result["generator"],
+                input_fp=result["input_fingerprint"],
+                model_fp=result["model_fingerprint"],
+                runtime_contract_version=result["runtime_contract_version"],
+                generator_contract_version=result["generator_contract_version"],
+                runtime_impl_fp=result["runtime_implementation_fingerprint"],
+                generator_impl_fp=result["generator_implementation_fingerprint"],
+                upstream=result["upstream_entity_fingerprints"],
+                static_data_versions=result["static_data_versions"],
+            )
+            result["payload"]["tcn_id_state"] = [
+                {"tcn_id": "TCN-001", "status": "active", "scope_refs": []},
+                {"tcn_id": "TCN-002", "status": "active", "scope_refs": []},
+            ]
+            result["payload"]["model_key_state"] = [
+                {"model_key": "ep-001", "status": "active", "scope_refs": []},
+                {"model_key": "ep-002", "status": "active", "scope_refs": []},
+            ]
+            refreshed_row = module_runtime.runtime_unit_row(result)
+            for field in ("runtime_units", "current_runtime_units"):
+                source_rows = source["input"][field]
+                for index, unit in enumerate(source_rows):
+                    if (
+                        unit.get("skill") == refreshed_row["skill"]
+                        and unit.get("runtime_unit_key")
+                        == refreshed_row["runtime_unit_key"]
+                    ):
+                        source_rows[index] = refreshed_row
+    workflow_cli = ROOT / "skills" / "qa-workflow" / "scripts" / "workflow_runtime.py"
+    completed = subprocess.run(
+        [sys.executable, str(workflow_cli)],
+        input=json.dumps(source, ensure_ascii=False),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        check=False,
+        timeout=20,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    envelope = json.loads(completed.stdout)
+    assert envelope["generator_contract_version"] == "workflow-runtime-v2"
+    return source, envelope, module_runtime
+
+
+def _refresh_identity(
+    source: dict[str, Any], envelope: dict[str, Any], version: str
+) -> None:
+    """版と入力を変えた後、保存済み成果物のフィンガープリントを同じ式で再計算する。"""
+    metadata = source["metadata"]
+    metadata["generator_contract_version"] = version
+    envelope["generator_contract_version"] = version
+    input_fp = downstream_state.input_fingerprint(
+        "qa-workflow",
+        metadata["runtime_unit_key"],
+        metadata["input_mode"],
+        source["input"],
+        metadata["authority_refs"],
+        metadata["reference_refs"],
+        metadata["selection_source"],
+    )
+    model_fp = downstream_state.model_fingerprint(metadata, input_fp)
+    upstream = downstream_state.upstream_entity_fingerprints(
+        downstream_state.validate_upstream_entities(metadata)
+    )
+    envelope["input_fingerprint"] = input_fp
+    envelope["model_fingerprint"] = model_fp
+    envelope["upstream_entity_fingerprints"] = upstream
+    envelope["generation_fingerprint"] = downstream_state.generation_fingerprint(
+        generator="workflow_runtime",
+        input_fp=input_fp,
+        model_fp=model_fp,
+        runtime_contract_version="runtime-v2",
+        generator_contract_version=version,
+        runtime_impl_fp=envelope["runtime_implementation_fingerprint"],
+        generator_impl_fp=envelope["generator_implementation_fingerprint"],
+        upstream=upstream,
+        static_data_versions=envelope["static_data_versions"],
+    )
+
+
+def _historical_issue(
+    source: dict[str, Any], envelope: dict[str, Any], module_runtime: Any
+) -> str:
+    markdown = (
+        module_runtime.render_runtime_input(
+            "qa-workflow", source["metadata"], source["input"]
+        )
+        + module_runtime.render_runtime_result("qa-workflow", envelope)
+        + module_runtime.render_machine_entities("qa-workflow", [])
+    )
+    sha = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+    state_record = {
+        "workflow_ref": source["input"]["workflow_ref"],
+        "schema_version": "1",
+        "state": {
+            "last_completed_qa_workflow_artifact": {
+                "artifact_ref": "artifact:qa-workflow:test",
+                "artifact_revision": "revision-001",
+                "artifact_sha256": sha,
+            }
+        },
+    }
+    request = _request(
+        workflow_ref=source["input"]["workflow_ref"],
+        workflow_state_record=state_record,
+        current_scope_ids=["SCOPE-001"],
+        blocked_scope_ids=[],
+        previous_qa_workflow_artifact_markdown=markdown,
+    )
+    _code, result = _run(json.dumps(request, ensure_ascii=False))
+    return str(result["issues"][0]["issue_type"]) if result["issues"] else "accepted"
+
+
+def _test_historical_contract_versions_match_their_input_key_sets() -> None:
+    """v1（6キー・要求集合なし）とv2（7キー・要求集合あり）だけを受理する。"""
+    import copy
+
+    base_source, base_envelope, module_runtime = _historical_v2_source_and_envelope()
+    # 実結果のv2は受理され、後段（scope所有の確認）で止まる。
+    assert (
+        _historical_issue(
+            copy.deepcopy(base_source), copy.deepcopy(base_envelope), module_runtime
+        )
+        == "scope_ownership_unavailable"
+    )
+
+    def case(mutate) -> str:
+        source = copy.deepcopy(base_source)
+        envelope = copy.deepcopy(base_envelope)
+        mutate(source, envelope)
+        return _historical_issue(source, envelope, module_runtime)
+
+    def v2_undeclared(source, envelope):
+        envelope["payload"]["scope_set_declared"] = False
+
+    def v2_missing_required(source, envelope):
+        envelope["payload"]["missing_requested_scopes"] = [
+            {"skill": "test-management", "target": None, "execution_range": None}
+        ]
+
+    def v2_without_requested_input(source, envelope):
+        del source["input"]["requested_scopes"]
+        _refresh_identity(source, envelope, "workflow-runtime-v2")
+
+    def v1_crafted_without_requested(source, envelope):
+        del source["input"]["requested_scopes"]
+        for key in (
+            "scope_set_declared",
+            "requested_scopes",
+            "missing_requested_scopes",
+            "excluded_scopes",
+            "unrequested_scopes",
+        ):
+            envelope["payload"].pop(key, None)
+        _refresh_identity(source, envelope, "workflow-runtime-v1")
+
+    def v1_label_with_requested_input(source, envelope):
+        for key in (
+            "scope_set_declared",
+            "requested_scopes",
+            "missing_requested_scopes",
+            "excluded_scopes",
+            "unrequested_scopes",
+        ):
+            envelope["payload"].pop(key, None)
+        _refresh_identity(source, envelope, "workflow-runtime-v1")
+
+    cases = (
+        ("v2 with scope set undeclared", v2_undeclared, "historical_runtime_invalid"),
+        (
+            "v2 with a missing required scope",
+            v2_missing_required,
+            "historical_runtime_invalid",
+        ),
+        (
+            "v2 label without requested input",
+            v2_without_requested_input,
+            "historical_runtime_invalid",
+        ),
+        (
+            "v1 crafted without requested input",
+            v1_crafted_without_requested,
+            "scope_ownership_unavailable",
+        ),
+        (
+            "v1 label with requested input",
+            v1_label_with_requested_input,
+            "historical_runtime_invalid",
+        ),
+    )
+    for label, mutate, expected in cases:
+        with_label = label
+        assert case(mutate) == expected, with_label
+
+
 def _test_unbound_first_run_returns_empty_canonical_state() -> None:
     code, result = _run(json.dumps(_request()))
     assert code == 0
@@ -445,6 +659,9 @@ class TestDownstreamState(unittest.TestCase):
         self,
     ) -> None:
         _test_historical_v2_pair_is_checked_before_unscoped_active_state_fails_closed()
+
+    def test_historical_contract_versions_match_their_input_key_sets(self) -> None:
+        _test_historical_contract_versions_match_their_input_key_sets()
 
     def test_blocked_scope_projects_inactive_identity_and_materialize_history(
         self,

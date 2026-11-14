@@ -653,6 +653,177 @@ class E2ESelectionContractTests(unittest.TestCase):
             envelope["payload"]["selection_record"]["selection_ref"], "E2ESEL-001"
         )
 
+    # --- impact: 保存sourceと呼出し側の現在revisionの比較 ----------------------
+
+    def dependent_selection(self) -> dict:
+        """CAND-001 depends on SPEC-001 and TI-001; CAND-002 depends on TI-001 only."""
+        packet = selection()
+        packet["candidates"][1]["source_refs"] = ["TI-001"]
+        return packet
+
+    def current_of(self, packet: dict, **changes: str) -> dict:
+        current = {row["ref"]: row["revision"] for row in packet["source_refs"]}
+        current.update(changes)
+        return current
+
+    def test_impact_keeps_a_selection_current_when_revisions_match(self) -> None:
+        packet = selection()
+        result = contract.impact(packet, self.current_of(packet))
+        self.assertEqual(result["source_status"], "current")
+        self.assertEqual(result["changed_source_refs"], [])
+        self.assertEqual(result["unknown_source_refs"], [])
+        self.assertEqual(result["impacted_candidate_ids"], [])
+        self.assertEqual(
+            result["unaffected_candidate_ids"], ["E2E-CAND-001", "E2E-CAND-002"]
+        )
+
+    def test_changed_dependency_impacts_only_the_candidates_that_use_it(self) -> None:
+        packet = self.dependent_selection()
+        original = copy.deepcopy(packet)
+        result = contract.impact(packet, self.current_of(packet, **{"SPEC-001": "s9"}))
+        self.assertEqual(result["source_status"], "stale")
+        self.assertEqual(result["changed_source_refs"], ["SPEC-001"])
+        self.assertEqual(result["impacted_candidate_ids"], ["E2E-CAND-001"])
+        self.assertEqual(result["unaffected_candidate_ids"], ["E2E-CAND-002"])
+        self.assertEqual(packet, original)
+
+    def test_changed_test_item_revision_is_stale_for_every_dependent_candidate(
+        self,
+    ) -> None:
+        packet = selection()
+        result = contract.impact(packet, self.current_of(packet, **{"TI-001": "i5"}))
+        self.assertEqual(result["source_status"], "stale")
+        self.assertEqual(result["changed_source_refs"], ["TI-001"])
+        self.assertEqual(
+            result["impacted_candidate_ids"], ["E2E-CAND-001", "E2E-CAND-002"]
+        )
+        self.assertEqual(result["unaffected_candidate_ids"], [])
+
+    def test_source_missing_from_current_map_is_unknown_and_fails_closed(self) -> None:
+        packet = selection()
+        result = contract.impact(packet, {"SPEC-001": "s8"})
+        self.assertEqual(result["source_status"], "unknown")
+        self.assertEqual(result["unknown_source_refs"], ["TI-001"])
+        self.assertEqual(result["changed_source_refs"], [])
+        self.assertEqual(
+            result["impacted_candidate_ids"], ["E2E-CAND-001", "E2E-CAND-002"]
+        )
+
+    def test_stale_revision_is_not_current_even_when_saved_currentness_says_so(
+        self,
+    ) -> None:
+        packet = selection()
+        self.assertEqual(packet["source_refs"][0]["currentness"], "current")
+        result = contract.impact(packet, {"SPEC-001": "s9", "TI-001": "i4"})
+        self.assertEqual(result["source_status"], "stale")
+        self.assertEqual(result["changed_source_refs"], ["SPEC-001"])
+
+    def test_saved_currentness_self_declaration_is_not_used_by_impact(self) -> None:
+        packet = selection()
+        packet["source_refs"][0]["currentness"] = "stale"
+        packet["source_refs"][0]["revision"] = "s8"
+        result = contract.impact(packet, self.current_of(packet))
+        self.assertEqual(result["source_status"], "current")
+        self.assertEqual(validate_status(packet), "unresolved")
+
+    def test_refs_the_selection_does_not_save_are_ignored(self) -> None:
+        packet = selection()
+        current = self.current_of(packet, **{"SPEC-999": "anything"})
+        result = contract.impact(packet, current)
+        self.assertEqual(result["source_status"], "current")
+
+    def test_impact_rejects_an_invalid_saved_packet(self) -> None:
+        packet = selection()
+        packet["history"] = "not-a-list"
+        with self.assertRaises(contract.ContractError):
+            contract.impact(packet, self.current_of(selection()))
+
+    def test_impact_rejects_malformed_current_revision_maps(self) -> None:
+        packet = selection()
+        for current in (
+            {},
+            None,
+            ["SPEC-001"],
+            {"SPEC-001": 8},
+            {"SPEC-001": ""},
+            {"": "s8"},
+            {"SPEC-001": "s8", "SPEC-001 ": "s8"},
+        ):
+            with self.subTest(current=current):
+                with self.assertRaises(contract.ContractError):
+                    contract.impact(packet, current)
+
+    def test_cli_impact_envelope_reports_status_and_impacted_candidates(self) -> None:
+        packet = self.dependent_selection()
+        current = self.current_of(packet, **{"SPEC-001": "s9"})
+        raw = json.dumps(
+            {
+                "operation": "impact",
+                "input": packet,
+                "current_source_revisions": current,
+            }
+        ).encode()
+        result = run_cli_bytes(raw)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, b"")
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["runtime_status"], "ok")
+        self.assertEqual(envelope["result_status"], "stale")
+        self.assertEqual(
+            envelope["payload"]["impacted_candidate_ids"], ["E2E-CAND-001"]
+        )
+
+    def test_cli_rejects_extra_or_missing_envelope_keys(self) -> None:
+        packet = selection()
+        current = self.current_of(packet)
+        bad_envelopes = (
+            {"input": packet, "extra": 1},
+            {"operation": "impact", "input": packet},
+            {"operation": "impact", "current_source_revisions": current},
+            {
+                "operation": "impact",
+                "input": packet,
+                "current_source_revisions": current,
+                "extra": 1,
+            },
+            {"operation": "validate", "input": packet, "current_source_revisions": {}},
+            {"operation": 1, "input": packet, "current_source_revisions": current},
+        )
+        for envelope in bad_envelopes:
+            with self.subTest(keys=sorted(envelope)):
+                result = run_cli_bytes(json.dumps(envelope).encode())
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, b"")
+                self.assertEqual(
+                    json.loads(result.stdout)["runtime_status"], "invalid_input"
+                )
+
+    def test_cli_rejects_duplicate_or_mistyped_current_revision_entries(self) -> None:
+        packet = json.dumps(selection())
+        duplicate = (
+            '{"operation":"impact","input":'
+            + packet
+            + ',"current_source_revisions":{"SPEC-001":"s8","SPEC-001":"s9"}}'
+        ).encode()
+        mistyped = json.dumps(
+            {
+                "operation": "impact",
+                "input": selection(),
+                "current_source_revisions": {"SPEC-001": 8, "TI-001": "i4"},
+            }
+        ).encode()
+        for raw in (duplicate, mistyped):
+            with self.subTest(raw=raw[:60]):
+                result = run_cli_bytes(raw)
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(
+                    json.loads(result.stdout)["runtime_status"], "invalid_input"
+                )
+
+
+def validate_status(packet: dict) -> str:
+    return contract.validate(packet)["selection_status"]
+
 
 if __name__ == "__main__":
     unittest.main()

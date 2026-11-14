@@ -796,6 +796,71 @@ def validate(packet: Any) -> dict:
     }
 
 
+def _current_source_revisions(value: Any) -> dict[str, str]:
+    """Validate the caller-supplied ``ref -> revision`` map of current sources.
+
+    The map is evidence supplied by the caller (the source owner's readback). This
+    function only checks its shape; it never fetches a revision itself.
+    """
+    if not isinstance(value, dict) or not value:
+        raise ContractError("current_source_revisionsは空でないobjectが必要です")
+    result: dict[str, str] = {}
+    for key, revision in value.items():
+        ref = _text(key, "current_source_revisions key")
+        if not isinstance(revision, str):
+            raise ContractError("current_source_revisionsの値は文字列が必要です")
+        if ref in result:
+            raise ContractError("current_source_revisionsのrefが重複しています")
+        result[ref] = _text(revision, "current_source_revisions value")
+    return result
+
+
+def impact(packet: Any, current_source_revisions: Any) -> dict:
+    """Compare saved source refs with the current revisions supplied by the caller.
+
+    The saved packet must pass ``validate`` first. A saved source is ``current``
+    only when the supplied map has the same ref with the same revision; a changed
+    revision is ``stale`` and a ref absent from the map is ``unknown`` (fail-closed).
+    The saved ``currentness`` self-declaration is ignored here. Candidates that
+    depend on a changed or unknown source are impacted; the others are unaffected.
+    The saved packet is not modified, so stable IDs and revision history are kept.
+    Refs in the map that the packet does not save are ignored.
+    """
+    result = validate(packet)
+    current = _current_source_revisions(current_source_revisions)
+    saved = {
+        row["ref"].strip(): row["revision"].strip() for row in packet["source_refs"]
+    }
+    changed = sorted(
+        ref
+        for ref, revision in saved.items()
+        if ref in current and current[ref] != revision
+    )
+    unknown = sorted(ref for ref in saved if ref not in current)
+    affected = set(changed) | set(unknown)
+    impacted = []
+    unaffected = []
+    for row in packet["candidates"]:
+        target = impacted if affected & set(row["source_refs"]) else unaffected
+        target.append(row["candidate_id"])
+    if unknown:
+        source_status = "unknown"
+    elif changed:
+        source_status = "stale"
+    else:
+        source_status = "current"
+    return {
+        "valid": True,
+        "selection_ref": result["selection_ref"],
+        "revision": result["revision"],
+        "source_status": source_status,
+        "changed_source_refs": changed,
+        "unknown_source_refs": unknown,
+        "impacted_candidate_ids": sorted(impacted),
+        "unaffected_candidate_ids": sorted(unaffected),
+    }
+
+
 def inspection_handoff(packet: Any) -> dict:
     """Derive the targets that ``e2e-test-inspection`` may take from a selection.
 
@@ -843,14 +908,34 @@ def main() -> int:
     try:
         raw = sys.stdin.buffer.read(MAX_INPUT_BYTES + 1)
         envelope = _load_request(raw)
-        if not isinstance(envelope, dict) or set(envelope) != {"input"}:
-            raise ContractError("runtime envelopeはinputだけを持つobjectが必要です")
-        result = validate(envelope["input"])
-        output = {
-            "runtime_status": "ok",
-            "result_status": result["selection_status"],
-            "payload": result,
-        }
+        if not isinstance(envelope, dict):
+            raise ContractError("runtime envelopeはobjectが必要です")
+        if set(envelope) == {"input"}:
+            result = validate(envelope["input"])
+            output = {
+                "runtime_status": "ok",
+                "result_status": result["selection_status"],
+                "payload": result,
+            }
+        elif (
+            set(envelope)
+            == {
+                "operation",
+                "input",
+                "current_source_revisions",
+            }
+            and envelope["operation"] == "impact"
+        ):
+            result = impact(envelope["input"], envelope["current_source_revisions"])
+            output = {
+                "runtime_status": "ok",
+                "result_status": result["source_status"],
+                "payload": result,
+            }
+        else:
+            raise ContractError(
+                "runtime envelopeはinputだけ、またはimpact operationの3キーだけを持つobjectが必要です"
+            )
     except InputLimitError as exc:
         output = _error_envelope("limit_exceeded", str(exc))
     except ContractError as exc:

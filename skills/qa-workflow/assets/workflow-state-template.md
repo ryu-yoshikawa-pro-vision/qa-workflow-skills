@@ -47,6 +47,8 @@
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
+要求されないSkillの行は完了前に「省略」へ変更し、完了したワークフローに「未開始」を残しません（承認された対象外は「省略」と承認参照を併記します。定義は`references/guidance.md`を参照）。
+
 | Skill                       | 対象 / 実行範囲                                                       | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
 | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
 | project-context             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |

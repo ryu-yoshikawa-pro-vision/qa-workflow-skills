@@ -41,6 +41,23 @@
 - `regression-testing`
 - `exploratory-testing`
 - `qa-knowledge`
+- `defect-management`
+- `e2e-test-selection`
+- `feature-analysis`
+- `project-context`
+- `test-architecture-design`
+- `test-condition-analysis`
+- `test-evaluation`
+- `test-item-analysis`
+- `test-management`
+- `test-reporting`
+- `test-requirements-analysis`
+- `testware-execution`
+- `testware-implementation`
+- `ui-target-analysis`
+- `usability-evaluation`
+- `usability-inspection`
+- `wcag-conformance-evaluation`
 
 Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しません。本ワークフローは、Agentクライアントが必要なSkillを追加で読み込み / 利用できる実装で動作することを前提とします。
 
@@ -421,6 +438,16 @@ handoff identityはorigin artifact/revisionとartifact-local handoff refの組�
 - Regressionは`regression-testing`、Exploration / Investigationは`exploratory-testing`、QA Knowledgeは`qa-knowledge`の完了条件に従います。各Skillのdomain完了条件を本Skillへ複製しません。
 
 重大度の詳細条件や残存リスク受容条件は`adversarial-review`を正本とします。
+
+## 要求集合と「省略」
+
+- `requested_scopes`（要求集合）は、工程開始時にqa-workflowが利用者の要求から記録する、今回の完了に必須のscopeの一覧です。各要素は`skill / target / execution_range / requirement`を持ちます。`requirement`は`required`（必須）または`excluded_by_approval`（承認された対象外）です。
+- 要求集合は`workflow_runtime.py`の完了判定に必須の入力です。未宣言・空の集合は完了できません。呼び出し側が「全工程確認済み」と自己申告しても、要求集合の代わりにはなりません。
+- 完了判定の対象は要求集合に含めたscopeだけです。QA計画だけ、報告だけ、欠陥だけ、既存成果物を使う途中開始は、要求集合を小さく宣言して表します。qa-workflowは他Skillを推論で追加しません。
+- `excluded_by_approval`は、`approval_ref`（承認の参照）が非空のときだけ完了判定から外します。`approval_ref`の真正性は`workflow_runtime.py`が証明しません。呼び出し側が承認証拠として渡す境界で、他の呼び出し側証拠と同じ扱いです。空・欠落は`approval_ref_missing`として完了不可です。
+- 状態値「省略」は、要求集合に含まれないSkillの行にだけ使います。要求集合に含まれるscopeが未実行・未完了・未検証のままなら「省略」にはできず、「未開始」「実行中」「ブロック中」などとして完了不可で残します。承認された対象外は「省略」と承認参照を併記します。
+- 完了したワークフローに「未開始」の行を残してはいけません（`WF-D004`）。
+- `workflow_runtime.py`の出力で、要求集合に含まれず`workflow_scopes`にあるscopeは`unrequested_scopes`として記録されます。必須扱いはしませんが、既存の未検証・未登録ルールには従い、未検証なら完了不可です。
 
 ## 品質ゲート
 

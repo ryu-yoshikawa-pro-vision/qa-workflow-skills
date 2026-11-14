@@ -35,7 +35,9 @@ from runtime_contract import (
 
 SKILL = "qa-workflow"
 GENERATOR = "workflow_runtime"
-GENERATOR_CONTRACT_VERSION = "workflow-runtime-v1"
+GENERATOR_CONTRACT_VERSION = "workflow-runtime-v2"
+# 工程開始時にqa-workflowが記録した要求集合（requested_scopes）の検査契約。v1は要求集合を持たない過去契約。
+REQUESTED_SCOPE_REQUIREMENTS = frozenset({"required", "excluded_by_approval"})
 SCRIPT_PATH = Path(__file__).resolve()
 # Only these Skills currently provide runtime-v2 root derivation and evidence.
 # A name appearing in workflow_scopes is not itself a verification contract.
@@ -312,7 +314,7 @@ def _execute_and_finalize_wcag_report(
     qa_read_request = {
         "metadata": _runtime_metadata(
             "qa-workflow",
-            "workflow-runtime-v1",
+            GENERATOR_CONTRACT_VERSION,
             input_mode="artifact",
             reference_refs=[context_ref],
         ),
@@ -486,6 +488,45 @@ def _scope_rows(value: Any) -> list[dict[str, Any]]:
     return result
 
 
+def _scope_identity(row: dict[str, Any]) -> tuple[str, str, str]:
+    return (row["skill"], str(row["target"]), str(row["execution_range"]))
+
+
+def _requested_scope_rows(value: Any) -> list[dict[str, Any]]:
+    rows = ensure_list(value, "requested_scopes")
+    result = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise InvalidInput(f"requested_scopes[{index}]が不正です")
+        reject_unknown(
+            row,
+            {"skill", "target", "execution_range", "requirement"},
+            {"approval_ref"},
+        )
+        skill = ensure_nonempty_string(row["skill"], f"requested_scopes[{index}].skill")
+        if skill == "qa-workflow":
+            raise InvalidInput("requested scopeへqa-workflow自身を含められません")
+        for field in ("target", "execution_range"):
+            if row[field] is not None and (
+                not isinstance(row[field], str) or not row[field].strip()
+            ):
+                raise InvalidInput(f"requested scope {field}が不正です")
+        if row["requirement"] not in REQUESTED_SCOPE_REQUIREMENTS:
+            raise InvalidInput("requested scope requirementが不正です")
+        approval_ref = row.get("approval_ref")
+        if approval_ref is not None and not isinstance(approval_ref, str):
+            raise InvalidInput("requested scope approval_refが不正です")
+        if row["requirement"] == "required" and approval_ref is not None:
+            raise InvalidInput("required requested scopeはapproval_refを持てません")
+        identity = (skill, str(row["target"]), str(row["execution_range"]))
+        if identity in seen:
+            raise InvalidInput("requested scopeが重複しています")
+        seen.add(identity)
+        result.append(canonicalize(row))
+    return result
+
+
 def _runtime_rows(value: Any, name: str) -> list[dict[str, Any]]:
     rows = ensure_list(value, name)
     result = []
@@ -642,6 +683,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "current_runtime_units",
             "unsupported_item_closures",
         },
+        {"requested_scopes"},
     )
     workflow_ref = ensure_nonempty_string(input_value["workflow_ref"], "workflow_ref")
     try:
@@ -655,6 +697,52 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         raise InvalidInput(
             "本Plan対象scopeがないworkflowではworkflow_runtimeをdispatchできません"
         )
+    # 要求集合は完了に必須の入力。未宣言・空は完了不可（自己申告で必須scopeを隠せない）。
+    raw_requested = input_value.get("requested_scopes")
+    scope_set_declared = raw_requested is not None and raw_requested != []
+    requested = _requested_scope_rows(raw_requested) if scope_set_declared else []
+    approval_issues: list[dict[str, Any]] = []
+    required_rows: list[dict[str, Any]] = []
+    excluded_rows: list[dict[str, Any]] = []
+    for row in requested:
+        approval_ref = row.get("approval_ref")
+        if row["requirement"] == "excluded_by_approval":
+            if isinstance(approval_ref, str) and approval_ref.strip():
+                excluded_rows.append(row)
+                continue
+            approval_issues.append(
+                {
+                    "issue_type": "approval_ref_missing",
+                    "blocking": True,
+                    "skill": row["skill"],
+                    "target": row["target"],
+                    "execution_range": row["execution_range"],
+                }
+            )
+        required_rows.append(row)
+    excluded_identities = {_scope_identity(row) for row in excluded_rows}
+    # 承認された対象外のscopeは完了判定から外す。
+    scopes = [row for row in scopes if _scope_identity(row) not in excluded_identities]
+    present_identities = {_scope_identity(row) for row in scopes}
+    required_identities = {_scope_identity(row) for row in required_rows}
+    missing_required = [
+        {
+            "skill": row["skill"],
+            "target": row["target"],
+            "execution_range": row["execution_range"],
+        }
+        for row in required_rows
+        if _scope_identity(row) not in present_identities
+    ]
+    unrequested = [
+        {
+            "skill": row["skill"],
+            "target": row["target"],
+            "execution_range": row["execution_range"],
+        }
+        for row in scopes
+        if _scope_identity(row) not in required_identities
+    ]
     runtime_rows = _runtime_rows(input_value["runtime_units"], "runtime_units")
     current_runtime_rows = _current_runtime_rows(input_value["current_runtime_units"])
     entities = _entity_rows(input_value["current_entities"])
@@ -865,9 +953,20 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
                     "runtime_unit_key": row["runtime_unit_key"],
                 }
             )
+    if not scope_set_declared:
+        issues.append(
+            {
+                "issue_type": "required_scopes_undeclared",
+                "blocking": True,
+                "resume": "qa-workflowが工程開始時に要求集合requested_scopesを記録し、その集合で再実行する",
+            }
+        )
+    for row in missing_required:
+        issues.append({"issue_type": "required_scope_missing", "blocking": True, **row})
+    issues.extend(approval_issues)
     issues_by_key = {canonical_json_text(row): row for row in issues}
     issues = [issues_by_key[key] for key in sorted(issues_by_key)]
-    can_complete = not issues and bool(scopes)
+    can_complete = not issues and bool(scopes) and scope_set_declared
     return {
         "runtime_status": "ok",
         "support_status": "supported",
@@ -876,6 +975,11 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
         "deterministic_generated": True,
         "payload": {
             "workflow_ref": workflow_ref,
+            "scope_set_declared": scope_set_declared,
+            "requested_scopes": requested,
+            "missing_requested_scopes": missing_required,
+            "excluded_scopes": excluded_rows,
+            "unrequested_scopes": unrequested,
             "unverified_scopes": unverified_scopes,
             "verified_owner_scopes": verified_owner_scopes,
             "expected_runtime_units": expected_units,

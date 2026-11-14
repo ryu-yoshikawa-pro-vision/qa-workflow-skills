@@ -2414,6 +2414,14 @@ class EntityAndEvidenceTests(unittest.TestCase):
             "metadata": workflow_metadata(),
             "input": {
                 "workflow_ref": "00000000-0000-4000-8000-000000000016",
+                "requested_scopes": [
+                    {
+                        "skill": "test-condition-design",
+                        "target": "TCN-001",
+                        "execution_range": None,
+                        "requirement": "required",
+                    }
+                ],
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",

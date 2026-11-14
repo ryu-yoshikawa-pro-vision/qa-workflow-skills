@@ -73,7 +73,7 @@ def _runtime_metadata(skill: str, unit: str) -> dict:
         "condition_structure": "condition-structure-v2",
         "case_structure": "case-structure-v2",
         "traceability": "traceability-v1",
-        "workflow_runtime": "workflow-runtime-v1",
+        "workflow_runtime": "workflow-runtime-v2",
     }
     scope_key = None if bare_unit == "case_structure" else "all"
     input_mode = (

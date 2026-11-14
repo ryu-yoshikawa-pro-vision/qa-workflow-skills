@@ -28,6 +28,10 @@ description: QA計画の作成・改版、開始／終了基準、予定source�
 
 `assets/output-template.md`を使います。artifact-local IDは保存先ref・revision・scopeと合わせます。Regression Runの実行対象選定、workflow状態、統合結果reportをここへ取り込みません。
 
+## 保存・検証（JSON正本）
+
+保存する正本はcanonical JSON packet（`references/data-contract.md`の「JSON正本packet」）で、Markdownは描画物です。`scripts/management_runtime.py`（stdin/stdoutのJSON、stdlibのみ）を、保存後にowner検証から`validate_readback`（保存本文とreadback・expected_revisionの照合）、`impact`（予定sourceの現在性）、`build_snapshot`（件数の再計算）、`completion_check`（完了条件）の順で呼びます。`assets/plan-packet.example.json`が入力例です。scriptは保存先・承認主体・source ownerの真正性を検証せず、それらは呼出し側の証拠として`not_established_by_this_validator`と返します。
+
 ## 次の担当
 
 - 統合実行結果snapshot: `test-reporting`

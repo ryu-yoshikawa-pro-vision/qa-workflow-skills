@@ -38,7 +38,7 @@ def metadata() -> dict:
         "envelope_version": "1",
         "skill": "qa-workflow",
         "runtime_contract_version": "runtime-v2",
-        "generator_contract_version": "workflow-runtime-v1",
+        "generator_contract_version": "workflow-runtime-v2",
         "runtime_unit_key": "artifact:workflow_runtime:all",
         "model_key": None,
         "model_type": None,
@@ -154,6 +154,17 @@ def structure_state(entities: list[dict]) -> tuple[dict, dict]:
     return state, row
 
 
+def required_scope(
+    skill: str, target: str | None = None, execution_range: str | None = None
+) -> dict:
+    return {
+        "skill": skill,
+        "target": target,
+        "execution_range": execution_range,
+        "requirement": "required",
+    }
+
+
 def run(request: dict) -> dict:
     result = subprocess.run(
         [sys.executable, str(SCRIPT)],
@@ -231,6 +242,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "workflow_ref": "00000000-0000-4000-8000-000000000016",
+                "requested_scopes": [required_scope("test-condition-design")],
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -530,6 +542,10 @@ class WorkflowRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "workflow_ref": "00000000-0000-4000-8000-000000000016",
+                "requested_scopes": [
+                    required_scope("test-condition-design", "TCN-001"),
+                    required_scope("test-condition-design", "TCN-002"),
+                ],
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -738,6 +754,9 @@ class WorkflowRuntimeTests(unittest.TestCase):
             "metadata": metadata(),
             "input": {
                 "workflow_ref": "00000000-0000-4000-8000-000000000016",
+                "requested_scopes": [
+                    required_scope("test-condition-design", "TCN-001"),
+                ],
                 "workflow_scopes": [
                     {
                         "skill": "test-condition-design",
@@ -1037,6 +1056,208 @@ class WorkflowRuntimeTests(unittest.TestCase):
                 and issue.get("entity_ref") == "TCN-002"
                 for issue in result["issues"]
             )
+        )
+
+
+class RequestedScopeContractTests(unittest.TestCase):
+    """工程開始時の要求集合（requested_scopes）による完了判定の契約。"""
+
+    def _base(self) -> dict:
+        return WorkflowRuntimeTests()._request()
+
+    def _set_requested(self, request: dict, rows: list[dict]) -> None:
+        request["input"]["requested_scopes"] = rows
+
+    def test_all_requested_scopes_verified_completes(self) -> None:
+        request = self._base()
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertTrue(result["payload"]["can_complete"], result)
+        self.assertTrue(result["payload"]["scope_set_declared"])
+        self.assertEqual(result["payload"]["missing_requested_scopes"], [])
+        self.assertEqual(result["payload"]["unrequested_scopes"], [])
+
+    def test_missing_required_scope_blocks_completion(self) -> None:
+        request = self._base()
+        self._set_requested(
+            request,
+            [
+                required_scope("test-condition-design"),
+                required_scope("test-management"),
+            ],
+        )
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertEqual(
+            result["payload"]["missing_requested_scopes"],
+            [{"skill": "test-management", "target": None, "execution_range": None}],
+        )
+        self.assertIn(
+            "required_scope_missing",
+            {issue["issue_type"] for issue in result["issues"]},
+        )
+
+    def test_required_scope_present_but_unregistered_blocks_completion(self) -> None:
+        request = self._base()
+        request["input"]["workflow_scopes"].append(
+            {
+                "skill": "test-management",
+                "target": None,
+                "execution_range": None,
+                "input_mode": "artifact",
+                "normalized_input": {},
+                "current_structure_state": None,
+            }
+        )
+        self._set_requested(
+            request,
+            [
+                required_scope("test-condition-design"),
+                required_scope("test-management"),
+            ],
+        )
+        result = run(request)
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertEqual(
+            [row["skill"] for row in result["payload"]["unverified_scopes"]],
+            ["test-management"],
+        )
+        self.assertEqual(result["payload"]["missing_requested_scopes"], [])
+
+    def test_approved_exclusion_is_removed_from_completion(self) -> None:
+        request = self._base()
+        self._set_requested(
+            request,
+            [
+                required_scope("test-condition-design"),
+                {
+                    "skill": "test-management",
+                    "target": None,
+                    "execution_range": None,
+                    "requirement": "excluded_by_approval",
+                    "approval_ref": "APPROVAL-001",
+                },
+            ],
+        )
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertTrue(result["payload"]["can_complete"], result)
+        self.assertEqual(
+            [row["skill"] for row in result["payload"]["excluded_scopes"]],
+            ["test-management"],
+        )
+
+    def test_approval_exclusion_without_reference_blocks_completion(self) -> None:
+        for label, approval in (
+            ("missing", None),
+            ("blank", "  "),
+        ):
+            with self.subTest(label=label):
+                request = self._base()
+                row = {
+                    "skill": "test-management",
+                    "target": None,
+                    "execution_range": None,
+                    "requirement": "excluded_by_approval",
+                }
+                if approval is not None:
+                    row["approval_ref"] = approval
+                self._set_requested(
+                    request, [required_scope("test-condition-design"), row]
+                )
+                result = run(request)
+                self.assertFalse(result["payload"]["can_complete"], result)
+                self.assertIn(
+                    "approval_ref_missing",
+                    {issue["issue_type"] for issue in result["issues"]},
+                )
+
+    def test_unrequested_skill_omission_is_not_a_blocker(self) -> None:
+        request = self._base()
+        self._set_requested(request, [required_scope("test-condition-design")])
+        result = run(request)
+        self.assertTrue(result["payload"]["can_complete"], result)
+        self.assertEqual(result["payload"]["unrequested_scopes"], [])
+
+    def test_self_declaration_cannot_hide_required_scopes(self) -> None:
+        request = self._base()
+        del request["input"]["requested_scopes"]
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertFalse(result["payload"]["scope_set_declared"])
+        self.assertIn(
+            "required_scopes_undeclared",
+            {issue["issue_type"] for issue in result["issues"]},
+        )
+
+        empty = self._base()
+        self._set_requested(empty, [])
+        result_empty = run(empty)
+        self.assertFalse(result_empty["payload"]["can_complete"])
+        self.assertIn(
+            "required_scopes_undeclared",
+            {issue["issue_type"] for issue in result_empty["issues"]},
+        )
+
+        unknown = self._base()
+        unknown["input"]["all_scopes_confirmed"] = True
+        self.assertEqual(run(unknown)["runtime_status"], "invalid_input")
+
+    def test_invalid_requested_scope_rows_are_rejected(self) -> None:
+        invalid_rows = (
+            [
+                required_scope("test-condition-design"),
+                required_scope("test-condition-design"),
+            ],
+            [{**required_scope("test-condition-design"), "requirement": "optional"}],
+            [
+                {
+                    **required_scope("test-condition-design"),
+                    "approval_ref": "APPROVAL-001",
+                }
+            ],
+            [{**required_scope("qa-workflow")}],
+            [
+                {
+                    "skill": "test-condition-design",
+                    "target": None,
+                    "execution_range": None,
+                }
+            ],
+            [{**required_scope("test-condition-design"), "unknown": 1}],
+        )
+        for rows in invalid_rows:
+            with self.subTest(rows=rows):
+                request = self._base()
+                self._set_requested(request, rows)
+                self.assertEqual(run(request)["runtime_status"], "invalid_input")
+
+    def test_non_requested_scope_is_recorded_but_not_required(self) -> None:
+        # 未要求scopeは記録されるが必須扱いしない。ただし既存の未検証ルールは従う。
+        request = self._base()
+        request["input"]["workflow_scopes"].append(
+            {
+                "skill": "defect-management",
+                "target": "project-1",
+                "execution_range": "plan",
+                "input_mode": "artifact",
+                "normalized_input": {},
+                "current_structure_state": None,
+            }
+        )
+        result = run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(
+            [row["skill"] for row in result["payload"]["unrequested_scopes"]],
+            ["defect-management"],
+        )
+        self.assertEqual(result["payload"]["missing_requested_scopes"], [])
+        self.assertFalse(result["payload"]["can_complete"])
+        self.assertEqual(
+            [row["skill"] for row in result["payload"]["unverified_scopes"]],
+            ["defect-management"],
         )
 
 

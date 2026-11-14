@@ -33,6 +33,46 @@ from runtime_contract import (
 
 _SKILL = "qa-workflow"
 _ROOT_ID = "qa-workflow::artifact:workflow_runtime:all"
+_V1 = "workflow-runtime-v1"
+_V2 = "workflow-runtime-v2"
+# 過去契約v1は要求集合を持たない。v2は工程開始時の要求集合を入力に持つ。
+_V1_INPUT_KEYS = frozenset(
+    {
+        "workflow_ref",
+        "workflow_scopes",
+        "runtime_units",
+        "current_entities",
+        "current_runtime_units",
+        "unsupported_item_closures",
+    }
+)
+_V2_INPUT_KEYS = _V1_INPUT_KEYS | {"requested_scopes"}
+_WORKFLOW_CONTRACTS = {_V1: _V1_INPUT_KEYS, _V2: _V2_INPUT_KEYS}
+_V2_PAYLOAD_KEYS = frozenset(
+    {
+        "scope_set_declared",
+        "requested_scopes",
+        "missing_requested_scopes",
+        "excluded_scopes",
+        "unrequested_scopes",
+    }
+)
+
+
+def _v2_scope_declaration_complete(
+    payload: dict[str, Any], input_value: dict[str, Any]
+) -> bool:
+    """v2の完了は要求集合が宣言され、欠落がなく、入力と一致していることが条件。"""
+    return (
+        payload.get("scope_set_declared") is True
+        and payload.get("missing_requested_scopes") == []
+        and isinstance(payload.get("requested_scopes"), list)
+        and payload["requested_scopes"] != []
+        and canonical_json_text(payload["requested_scopes"])
+        == canonical_json_text(input_value.get("requested_scopes"))
+    )
+
+
 _ALLOWED_FIELDS = {
     "workflow_ref",
     "workflow_state_record",
@@ -255,7 +295,7 @@ def _validate_frozen_pair(
         result.get("envelope_version") != "1"
         or result.get("skill") != _SKILL
         or result.get("runtime_contract_version") != "runtime-v2"
-        or result.get("generator_contract_version") != "workflow-runtime-v1"
+        or result.get("generator_contract_version") not in _WORKFLOW_CONTRACTS
         or result.get("generator") != "workflow_runtime"
         or result.get("runtime_unit_key") != "artifact:workflow_runtime:all"
         or result.get("model_key") is not None
@@ -273,6 +313,13 @@ def _validate_frozen_pair(
         raise InvalidInput(
             "historical result schema or frozen runtime identity is invalid"
         )
+    version = result["generator_contract_version"]
+    payload_v2 = _V2_PAYLOAD_KEYS.issubset(result["payload"])
+    if (version == _V2) != payload_v2 or (
+        version == _V2
+        and not _v2_scope_declaration_complete(result["payload"], input_value)
+    ):
+        raise InvalidInput("historical workflow scope declaration is invalid")
     expected_input = input_fingerprint(
         _SKILL,
         metadata["runtime_unit_key"],
@@ -289,7 +336,7 @@ def _validate_frozen_pair(
         input_fp=expected_input,
         model_fp=expected_model,
         runtime_contract_version="runtime-v2",
-        generator_contract_version="workflow-runtime-v1",
+        generator_contract_version=version,
         runtime_impl_fp=result["runtime_implementation_fingerprint"],
         generator_impl_fp=result["generator_implementation_fingerprint"],
         upstream=upstream,
@@ -309,15 +356,10 @@ def _validate_frozen_pair(
         raise InvalidInput(
             "historical runtime fingerprints or dependency projection mismatch"
         )
-    required_input = {
-        "workflow_ref",
-        "workflow_scopes",
-        "runtime_units",
-        "current_entities",
-        "current_runtime_units",
-        "unsupported_item_closures",
-    }
-    if set(input_value) != required_input:
+    if metadata.get("generator_contract_version") != version:
+        raise InvalidInput("historical runtime generator version mismatch")
+    # v1とv2はそれぞれ固定のキー集合だけを受理する（版とキー集合の不一致は拒否）。
+    if set(input_value) != _WORKFLOW_CONTRACTS[version]:
         raise InvalidInput("historical workflow input schema is invalid")
     entities = input_value["current_entities"]
     if not isinstance(entities, list):

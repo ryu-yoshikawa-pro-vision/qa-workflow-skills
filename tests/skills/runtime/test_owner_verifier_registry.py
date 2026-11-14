@@ -43,6 +43,11 @@ def workflow(scopes: list[dict]) -> dict:
     request = wf.WorkflowRuntimeTests()._request()
     request["input"].update(
         workflow_ref=WORKFLOW_REF,
+        # 工程開始時の要求集合は、検証対象のscopeそのものにする（基準fixtureの要求を残さない）。
+        requested_scopes=[
+            wf.required_scope(row["skill"], row["target"], row["execution_range"])
+            for row in scopes
+        ],
         workflow_scopes=scopes,
         runtime_units=[],
         current_runtime_units=[],
@@ -159,9 +164,11 @@ class OwnerVerifierRegistryTests(unittest.TestCase):
     def selection_evidence(self) -> tuple[dict, str]:
         packet = selection_fixture.selection()
         text = stored_text(packet)
+        current = {row["ref"]: row["revision"] for row in packet["source_refs"]}
         return {
             "stored_content": text,
             "readback": {"revision": "git:" + "a" * 40, "content_hash": sha(text)},
+            "current_source_revisions": current,
         }, packet["selection_ref"]
 
     def test_ready_selection_with_matching_readback_completes(self) -> None:
@@ -190,6 +197,121 @@ class OwnerVerifierRegistryTests(unittest.TestCase):
             "e2e-test-selection",
             "stored_artifact_readback_not_verified",
         )
+
+    def with_current(self, evidence: dict, **revisions: str) -> dict:
+        changed = copy.deepcopy(evidence)
+        changed["current_source_revisions"].update(revisions)
+        return changed
+
+    def test_selection_source_revision_changes_are_not_current(self) -> None:
+        evidence, ref = self.selection_evidence()
+        # 仕様改版（SPEC-001 s8→s9）。保存側のcurrentnessは current のまま。
+        spec_changed = self.with_current(evidence, **{"SPEC-001": "s9"})
+        self.assertEqual(
+            json.loads(spec_changed["stored_content"])["source_refs"][0]["currentness"],
+            "current",
+        )
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, spec_changed)]),
+            "e2e-test-selection",
+            "source_not_current",
+        )
+        # test item（TI-001 i4→i5）の変更でも不可。
+        item_changed = self.with_current(evidence, **{"TI-001": "i5"})
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, item_changed)]),
+            "e2e-test-selection",
+            "source_not_current",
+        )
+
+    def test_selection_with_a_source_missing_from_current_map_is_unknown(self) -> None:
+        evidence, ref = self.selection_evidence()
+        missing = copy.deepcopy(evidence)
+        del missing["current_source_revisions"]["TI-001"]
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, missing)]),
+            "e2e-test-selection",
+            "source_revision_unknown",
+        )
+        # 別selectionのsourceを渡した場合（refが一致しない）も unknown になる。
+        other = copy.deepcopy(evidence)
+        other["current_source_revisions"] = {"SPEC-777": "s8", "TI-777": "i4"}
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, other)]),
+            "e2e-test-selection",
+            "source_revision_unknown",
+        )
+
+    def test_selection_with_empty_or_malformed_current_map_is_rejected(self) -> None:
+        evidence, ref = self.selection_evidence()
+        for value in ({}, None, ["SPEC-001"], {"SPEC-001": 8}, {"SPEC-001": ""}):
+            with self.subTest(value=value):
+                broken = copy.deepcopy(evidence)
+                broken["current_source_revisions"] = value
+                self.assert_blocked(
+                    workflow([scope("e2e-test-selection", ref, broken)]),
+                    "e2e-test-selection",
+                    "owner_verification_schema_invalid",
+                )
+        missing_key = copy.deepcopy(evidence)
+        del missing_key["current_source_revisions"]
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, missing_key)]),
+            "e2e-test-selection",
+            "owner_verification_schema_invalid",
+        )
+
+    def test_change_to_a_source_the_selection_does_not_save_is_ignored(self) -> None:
+        evidence, ref = self.selection_evidence()
+        unrelated = self.with_current(evidence, **{"SPEC-999": "changed"})
+        result = workflow([scope("e2e-test-selection", ref, unrelated)])
+        self.assertTrue(result["payload"]["can_complete"], result)
+        self.assertEqual(result["payload"]["unverified_scopes"], [])
+
+    def test_selection_with_invalid_stored_body_is_not_completed(self) -> None:
+        evidence, ref = self.selection_evidence()
+        broken = json.loads(evidence["stored_content"])
+        broken["history"] = [{"revision": 2}]
+        evidence["stored_content"] = stored_text(broken)
+        evidence["readback"]["content_hash"] = sha(evidence["stored_content"])
+        self.assert_blocked(
+            workflow([scope("e2e-test-selection", ref, evidence)]),
+            "e2e-test-selection",
+            "selection_not_ready",
+        )
+
+    def test_candidate_expected_revision_must_be_a_real_saved_revision(self) -> None:
+        # owner側はexpected_revision=Noneで比較を省略するため、入口で必ず拒否する。
+        for kind, owner in (
+            ("item", "test-item-analysis"),
+            ("condition", "test-condition-analysis"),
+        ):
+            evidence, _, ref = self.candidate_evidence(kind)
+            evidence["readback"]["revision"] = "rev-WRONG"
+            for expected in (None, "", "   ", 7):
+                with self.subTest(kind=kind, expected=expected):
+                    bypass = copy.deepcopy(evidence)
+                    bypass["expected_revision"] = expected
+                    self.assert_blocked(
+                        workflow([scope(owner, ref, bypass)]),
+                        owner,
+                        "owner_verification_schema_invalid",
+                    )
+            missing = copy.deepcopy(evidence)
+            del missing["expected_revision"]
+            self.assert_blocked(
+                workflow([scope(owner, ref, missing)]),
+                owner,
+                "owner_verification_schema_invalid",
+            )
+            # 正しいexpected_revisionを渡しても、readback revisionが違えば完了しない。
+            mismatch = copy.deepcopy(evidence)
+            mismatch["expected_revision"] = "sha256:" + "1" * 64
+            self.assert_blocked(
+                workflow([scope(owner, ref, mismatch)]),
+                owner,
+                "stored_artifact_readback_not_verified",
+            )
 
     # --- test-reporting ----------------------------------------------------
     def report_evidence(self) -> tuple[dict, str]:
@@ -282,14 +404,13 @@ class OwnerVerifierRegistryTests(unittest.TestCase):
                 "test-condition-analysis",
                 "e2e-test-selection",
                 "test-reporting",
+                "test-requirements-analysis",
+                "test-architecture-design",
+                "test-management",
             },
         )
-        # Markdownだけで検証入口を持たないF、runtimeを持つがstored成果物のreadback検証が
-        # 無いownerは登録しない（登録しないことが完了不可を保つ）。
+        # 検証入口を持たないownerは登録しない（登録しないことが完了不可を保つ）。
         for skill in (
-            "test-requirements-analysis",
-            "test-architecture-design",
-            "test-management",
             "defect-management",
             "test-evaluation",
             "feature-analysis",
@@ -311,6 +432,9 @@ class OwnerVerifierRegistryTests(unittest.TestCase):
         evidence, ref = self.selection_evidence()
         request["input"]["workflow_scopes"].append(
             scope("e2e-test-selection", ref, evidence)
+        )
+        request["input"]["requested_scopes"].append(
+            wf.required_scope("e2e-test-selection", ref, "plan")
         )
         result = wf.run(request)
         self.assertTrue(result["payload"]["can_complete"], result)

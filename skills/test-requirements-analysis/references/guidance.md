@@ -45,3 +45,4 @@ QA目標の文章を製品仕様へ転記したり、TR形式のIDをQA要求ID�
 - 承認済み表示は対象scope・ref・revisionと承認証拠に結び付いている。
 - 取得不能／旧revisionをcurrentと扱わず、未取得を空集合と混同していない。
 - 下流architecture／計画へowner ref・revision・scopeを渡し、第二の正本を作っていない。
+- 保存済み成果物の完了判定は`scripts/qa_requirement_runtime.py`の`completion_check`を使い、Markdown表の形式チェックだけで完了としない。
