@@ -449,6 +449,13 @@ handoff identityはorigin artifact/revisionとartifact-local handoff refの組�
 - 完了したワークフローに「未開始」の行を残してはいけません（`WF-D004`）。
 - `workflow_runtime.py`の出力で、要求集合に含まれず`workflow_scopes`にあるscopeは`unrequested_scopes`として記録されます。必須扱いはしませんが、既存の未検証・未登録ルールには従い、未検証なら完了不可です。
 
+## 保存済みworkflowの再開（runtime-v2）
+
+- runtime-v2 rootを持つscopeは、`current_structure_state`を担当Skillの構造検証で確認し、そのまま`workflow_scopes[]`へ転記します。
+- owner verifier対象のscope（`test-item-analysis`、`test-condition-analysis`、`e2e-test-selection`、`test-reporting`、`test-requirements-analysis`、`test-architecture-design`、`test-management`）は`current_structure_state=null`です。保存済みresultの`verified_owner_scopes`の記録と1対1に対応し、登録Skill、`verified_artifact`（artifact_ref・artifact_revision・content_hash）、保存済み証拠の本文のsha256、targetが一致する場合だけ再開で受理します。
+- root以外のscopeに非nullの構造stateがある場合、rootのscopeにnullがある場合は拒否します。v1は従来の検査のままで、新しい完了baselineにしません。
+- この照合は保存された記録を信頼する境界の内側の整合性確認です。保存本文・記録・証拠を一式で偽造された場合は検出できません。owner verifierは現行readbackを再取得しないため、古いrevisionの自己整合した組も受理されえます。呼出し側が現行のreadbackを再取得する責務です。
+
 ## 品質ゲート
 
 - オーケストレーション以外の工程固有ロジックを再定義していない

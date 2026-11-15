@@ -15,6 +15,8 @@ from runtime_contract import (
     MAX_DEPTH,
     MAX_EXPLORATION_NODES,
     MAX_STRING_BYTES,
+    OWNER_VERIFIED_SKILLS,
+    RUNTIME_V2_SKILL_ROOTS,
     InvalidInput,
     LimitExceeded,
     RuntimeErrorBase,
@@ -402,6 +404,7 @@ def _validate_frozen_pair(
     if not isinstance(scopes, list) or not scopes:
         raise InvalidInput("historical workflow scopes are missing")
     seen_scopes: set[tuple[str, str | None, str | None]] = set()
+    owner_rows: list[dict[str, Any]] = []
     for row in scopes:
         if not isinstance(row, dict) or set(row) != {
             "skill",
@@ -416,8 +419,80 @@ def _validate_frozen_pair(
         if identity in seen_scopes or not isinstance(row["normalized_input"], dict):
             raise InvalidInput("historical workflow scope is duplicated or invalid")
         seen_scopes.add(identity)
+        if version == _V2 and row["skill"] not in RUNTIME_V2_SKILL_ROOTS:
+            # owner verifier で完了した scope は current_structure_state=null のみを持つ。
+            # 非nullは偽造の入口になるため拒否し、登録済み Skill に限り、完了の証拠は
+            # 保存済み result の verified_owner_scopes と保存済み証拠で別途確認する。
+            if row["current_structure_state"] is not None:
+                raise InvalidInput(
+                    "historical owner scope current_structure_state must be null"
+                )
+            if row["skill"] not in OWNER_VERIFIED_SKILLS:
+                raise InvalidInput("historical unregistered owner scope is not allowed")
+            owner_rows.append(row)
+            continue
         _validate_structure_state(row["skill"], row["current_structure_state"])
+    if version == _V2:
+        _validate_owner_verification_records(
+            result["payload"].get("verified_owner_scopes"), owner_rows
+        )
     return input_value, result["payload"]
+
+
+def _validate_owner_verification_records(
+    records: Any, owner_rows: list[dict[str, Any]]
+) -> None:
+    """null の owner scope ごとに、検証記録と保存済み証拠が整合することを確認する。
+
+    記録は owner verifier の戻り値（artifact_ref・artifact_revision・content_hash）を持ち、
+    content_hash は保存済み証拠の本文（UTF-8 の exact bytes）の sha256 と一致し、
+    artifact_ref は scope の target と一致しなければならない。証拠の欠落・改ざん、
+    記録の入替えは拒否する。
+    """
+    if not isinstance(records, list):
+        raise InvalidInput("historical verified owner scopes are invalid")
+    by_identity: dict[tuple[str, str | None, str | None], dict[str, Any]] = {}
+    for record in records:
+        if (
+            not isinstance(record, dict)
+            or set(record)
+            != {"skill", "target", "execution_range", "verified_artifact"}
+            or not isinstance(record["verified_artifact"], dict)
+        ):
+            raise InvalidInput("historical verified owner scope record is invalid")
+        identity = (record["skill"], record["target"], record["execution_range"])
+        if identity in by_identity:
+            raise InvalidInput("historical verified owner scope record is duplicated")
+        by_identity[identity] = record
+    owner_identities = {
+        (row["skill"], row["target"], row["execution_range"]) for row in owner_rows
+    }
+    if set(by_identity) != owner_identities:
+        # 未検証の null scope（検証記録なし）や、scope に対応しない検証記録は拒否する。
+        raise InvalidInput("historical owner scope has no matching verification record")
+    for row in owner_rows:
+        artifact = by_identity[(row["skill"], row["target"], row["execution_range"])][
+            "verified_artifact"
+        ]
+        for key in ("artifact_ref", "artifact_revision", "content_hash"):
+            if not isinstance(artifact.get(key), str) or not artifact[key].strip():
+                raise InvalidInput("historical owner verification identity is invalid")
+        if artifact["artifact_ref"] != row["target"]:
+            raise InvalidInput("historical owner verification target mismatch")
+        evidence = row["normalized_input"].get("owner_verification")
+        if not isinstance(evidence, dict):
+            raise InvalidInput("historical owner verification evidence is missing")
+        # 保存本文のキーは owner verifier の証拠契約に合わせる（test-reporting のみ別名）。
+        text_key = (
+            "stored_snapshot_content"
+            if row["skill"] == "test-reporting"
+            else "stored_content"
+        )
+        text = evidence.get(text_key)
+        if not isinstance(text, str) or not text.strip():
+            raise InvalidInput("historical owner verification stored text is missing")
+        if hashlib.sha256(text.encode("utf-8")).hexdigest() != artifact["content_hash"]:
+            raise InvalidInput("historical owner verification stored text is altered")
 
 
 def _validate_structure_state(skill: str, state: Any) -> None:
@@ -509,6 +584,9 @@ def _entity_maps(
     histories: dict[tuple[str, str, str], dict[str, Any]] = {}
     for scope in input_value["workflow_scopes"]:
         state = scope["current_structure_state"]
+        if state is None:
+            # owner verifier の完了 scope は Entity・CI・TC の履歴を持たない（推測で割り当てない）。
+            continue
         for runtime in state["runtime_results"]:
             result_payload = runtime["result"]["payload"]
             for field, skill, entity_type, id_field in (
@@ -661,6 +739,9 @@ def _scope_impact(
     for scope in input_value["workflow_scopes"]:
         skill = scope["skill"]
         state = scope["current_structure_state"]
+        if state is None:
+            # owner verifier の完了 scope は runtime result・Entity 履歴を持たない。
+            continue
         for runtime in state["runtime_results"]:
             result = runtime["result"]
             unit = result.get("runtime_unit_key")
@@ -1043,9 +1124,10 @@ def _scope_impact(
                 raise InvalidInput("inactive materialize history is missing")
             found = None
             for owner_scope in owner_scopes:
-                for runtime in owner_scope["current_structure_state"][
-                    "runtime_results"
-                ]:
+                owner_state = owner_scope["current_structure_state"]
+                if owner_state is None:
+                    continue
+                for runtime in owner_state["runtime_results"]:
                     identity_text = runtime["identity"]
                     if (
                         identity_text

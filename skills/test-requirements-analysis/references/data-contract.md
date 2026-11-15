@@ -71,5 +71,5 @@ handoffにはowner、artifact ref、revision、scope、要求ID、currentness、
 - このvalidatorが確認するのは、呼出し側が渡した承認recordとpacketの束縛、および記録の整合だけです。承認主体の認証、承認証拠の真正性、source ownerからの取得の真正性は確認しません。結果の`approval_authenticity`と`provider_authenticity`は常に`not_established_by_this_validator`です。
 - 承認主体、保存先kind、承認方式、source ownerからの取得手段は未選定です。選定されるまで、このvalidatorの成功を保存済みや認証済み承認の証拠として扱いません。
 - LLMの出力に書かれた「承認済み」という文字列は承認証拠になりません。`evidence_ref`と`approver`がない承認recordは不可です。
-- owner_verifiersへの登録は別段階で行います。登録前は、このscriptの成功を完了判定に使いません。
+- owner_verifiersには登録済みです（fixture検証のみ）。完了判定に使うのは、登録済みownerの本番CLIが保存済み成果物を検証した場合だけです。実providerのreadbackと承認の真正性は未確立です。
 - 対象外や例外承認の要否は、このvalidatorでは判定しません。要否の判断は`references/guidance.md`の品質ゲートに従います。

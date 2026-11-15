@@ -14,6 +14,7 @@ import artifact_graph
 import owner_verifiers
 from runtime_contract import (
     FULL_DIGEST_RE,
+    RUNTIME_V2_SKILL_ROOTS,
     InvalidInput,
     _default_expected_runtime_units,
     _expected_entities,
@@ -45,18 +46,7 @@ EXCLUSION_RESUME_CONDITION = (
     "その照合結果が提示されるまで、このscopeは必須として検証する"
 )
 SCRIPT_PATH = Path(__file__).resolve()
-# Only these Skills currently provide runtime-v2 root derivation and evidence.
-# A name appearing in workflow_scopes is not itself a verification contract.
-RUNTIME_V2_SKILL_ROOTS = frozenset(
-    {
-        "test-analysis",
-        "test-requirement-design",
-        "test-condition-design",
-        "test-case-design",
-        "coverage-analysis",
-        "qa-workflow",
-    }
-)
+# RUNTIME_V2_SKILL_ROOTS は runtime_contract.py を正本とする（ここでは再エクスポートのみ）。
 
 _WCAG_STATE_OPERATIONS = {
     "register-wcag-evaluation-plan",
@@ -486,6 +476,15 @@ def _scope_rows(value: Any) -> list[dict[str, Any]]:
             row["current_structure_state"], dict
         ):
             raise InvalidInput("workflow scope current_structure_stateが不正です")
+        if (
+            skill not in RUNTIME_V2_SKILL_ROOTS
+            and row["current_structure_state"] is not None
+        ):
+            # runtime-v2 rootを持たないSkillの状態は持たない。owner verifierの完了scopeは
+            # current_structure_state=nullに限り、非nullは偽造・誤投入として完了判定で拒否する。
+            raise InvalidInput(
+                "runtime-v2 rootを持たないSkillのcurrent_structure_stateはnullでなければなりません"
+            )
         identity = (skill, str(row["target"]), str(row["execution_range"]))
         if identity in seen:
             raise InvalidInput("workflow scopeが重複しています")

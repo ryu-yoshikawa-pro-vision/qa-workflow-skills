@@ -447,14 +447,6 @@ def ta_verified(packet: dict) -> dict:
     return ta_scope_with(packet, approvals=approvals_for(packet))
 
 
-def state_dict() -> dict:
-    return {
-        "runtime_results": [],
-        "carry_forward_entities": [],
-        "previous_ci_id_state": [],
-    }
-
-
 # ======================================================================
 # テスト
 # ======================================================================
@@ -937,9 +929,8 @@ class OwnerVerifierAndResumeNegatives(unittest.TestCase):
 
     def test_resume_accepts_stored_required_only_complete_result(self) -> None:
         # 期待結果（正常系）: requirement=required のみで完了した保存済みv2は、再開で受理される。
-        scopes = [
-            {**ta_verified(approved_packet()), "current_structure_state": state_dict()}
-        ]
+        # owner verifier で完了した scope は本番どおり current_structure_state=null を持つ。
+        scopes = [ta_verified(approved_packet())]
         requested = [wf_required(TA, ART)]
         value = wf_input(requested, scopes)
         result = wf_run(requested, scopes)

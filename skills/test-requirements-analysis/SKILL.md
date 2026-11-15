@@ -29,9 +29,9 @@ description: QA活動の目的・品質目標・要求元・対象範囲・制�
 ### 保存済み成果物の検証入口
 
 - 保存する正本は`references/data-contract.md`のJSON packet（`schema: test-requirements-analysis-v1`）で、Markdownは表示用に描画します。
-- `scripts/qa_requirement_runtime.py`は保存後の検証入口です。登録時のowner verifierは、保存文字列のhash照合の後に`validate_readback`、`impact`（現在のsource refs）、`completion_check`の順で呼ぶ想定です。
+- `scripts/qa_requirement_runtime.py`は保存後の検証入口です。登録済みのowner verifierは、保存文字列のhash照合の後に`validate_readback`、`impact`（現在のsource refs）、`completion_check`の順で呼ぶ想定です。
 - validatorは記録の束縛と整合だけを確認します。承認主体・承認証拠・source取得の真正性は確認せず、結果の`not_established_by_this_validator`をそのまま扱います。
-- owner verifierへの登録は別段階です。登録前は、このscriptの成功を完了判定に使いません。
+- owner verifierとして`scripts/owner_verifiers.py`に登録済みです（fixture検証のみ）。完了判定に使うのは、登録済みownerの本番CLIが保存済み成果物を検証した場合だけです。実providerのreadbackと承認の真正性は未確立で、このscriptの成功を承認済みや認証済みの証拠として扱いません。
 
 ## 次の担当
 

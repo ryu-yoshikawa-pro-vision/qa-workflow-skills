@@ -13,36 +13,20 @@ import owner_verifiers  # noqa: E402
 import tests.skills.runtime.test_owner_verifier_registry as registry_tests  # noqa: E402
 from scripts.skills.evals.deterministic.common import CANONICAL_SKILLS  # noqa: E402
 from tests.skills.runtime.test_workflow_runtime import (  # noqa: E402
-    SCRIPT,
     WorkflowRuntimeTests,
     run,
     runtime,
 )
 
 WORKFLOW_REF = "00000000-0000-4000-8000-000000000023"
-
-
-def _runtime_v2_roots_for_choice() -> set[str]:
-    return {
-        "test-analysis",
-        "test-requirement-design",
-        "test-condition-design",
-        "test-case-design",
-        "coverage-analysis",
-        "qa-workflow",
-    }
-
-
-# 登録されていないSkillを動的に選ぶ（後続で登録されても検証の意味を保つ）。
-UNREGISTERED_SKILL = sorted(
-    set(CANONICAL_SKILLS)
-    - _runtime_v2_roots_for_choice()
-    - set(owner_verifiers.VERIFIERS)
-)[0]
+# runtime-v2 rootの正本は runtime_contract.py（workflow_runtime.py は再エクスポートのみ）。
+RUNTIME_CONTRACT_SCRIPT = (
+    ROOT / "skills" / "qa-workflow" / "scripts" / "runtime_contract.py"
+)
 
 
 def runtime_v2_skill_roots() -> set[str]:
-    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    tree = ast.parse(RUNTIME_CONTRACT_SCRIPT.read_text(encoding="utf-8"))
     for node in tree.body:
         if (
             isinstance(node, ast.Assign)
@@ -54,6 +38,12 @@ def runtime_v2_skill_roots() -> set[str]:
             assert isinstance(call, ast.Call) and len(call.args) == 1
             return set(ast.literal_eval(call.args[0]))
     raise AssertionError("RUNTIME_V2_SKILL_ROOTS is not declared")
+
+
+# 登録されていないSkillを動的に選ぶ（後続で登録されても検証の意味を保つ）。
+UNREGISTERED_SKILL = sorted(
+    set(CANONICAL_SKILLS) - runtime_v2_skill_roots() - set(owner_verifiers.VERIFIERS)
+)[0]
 
 
 def unregistered_scope(skill: str = UNREGISTERED_SKILL) -> dict:

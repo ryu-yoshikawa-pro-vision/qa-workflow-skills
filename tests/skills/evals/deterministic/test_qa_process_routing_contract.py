@@ -192,8 +192,8 @@ class QaProcessRoutingContractTests(unittest.TestCase):
         self.assertIn("WF-D002", failed, result)
 
 
-def workflow_runtime_v2_roots() -> set[str]:
-    source = (REPO_ROOT / "skills/qa-workflow/scripts/workflow_runtime.py").read_text(
+def workflow_runtime_v2_roots() -> set[str]:  # 正本は runtime_contract.py
+    source = (REPO_ROOT / "skills/qa-workflow/scripts/runtime_contract.py").read_text(
         encoding="utf-8"
     )
     for node in ast.parse(source).body:

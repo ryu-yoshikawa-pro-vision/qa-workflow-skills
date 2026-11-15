@@ -34,6 +34,31 @@ TCN_ID_RE = re.compile(r"^TCN-(\d{3})$")
 TC_ID_RE = re.compile(r"^TC-(\d{3})$")
 CI_ID_RE = re.compile(r"^(TCN-\d{3})-CI(\d{2,})$")
 SCOPE_ID_RE = re.compile(r"^SCOPE-\d{3,}$")
+# runtime-v2 root（決定的runtimeとEntity・runtime unitの導出を持つSkill）の正本。
+# runtime-v2 rootを持たないSkillの完了はowner verifierの検証に限る（owner_verifiers.py）。
+RUNTIME_V2_SKILL_ROOTS = frozenset(
+    {
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "qa-workflow",
+    }
+)
+# owner verifier（owner_verifiers.VERIFIERS）に登録された Skill の正本。null の owner scope は
+# この集合の Skill に限る。owner_verifiers.py は import 時にこの集合と VERIFIERS の一致を検査する。
+OWNER_VERIFIED_SKILLS = frozenset(
+    {
+        "test-item-analysis",
+        "test-condition-analysis",
+        "e2e-test-selection",
+        "test-reporting",
+        "test-requirements-analysis",
+        "test-architecture-design",
+        "test-management",
+    }
+)
 
 SUPPORTED_STATUSES = {
     "ok",
@@ -6185,14 +6210,7 @@ def verify_runtime_evidence(request: dict[str, Any]) -> dict[str, Any]:
     current_structure_state = _current_structure_state_projection(
         skill, result_blocks, carry_rows, previous_states, previous_state_rows
     )
-    if skill in {
-        "test-analysis",
-        "test-requirement-design",
-        "test-condition-design",
-        "test-case-design",
-        "coverage-analysis",
-        "qa-workflow",
-    }:
+    if skill in RUNTIME_V2_SKILL_ROOTS:
         try:
             current_runtime_rows = [
                 _runtime_unit_result_row(body)

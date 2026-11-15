@@ -44,6 +44,8 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+from runtime_contract import OWNER_VERIFIED_SKILLS
+
 SKILLS_ROOT = Path(__file__).resolve().parents[2]
 TIMEOUT_SECONDS = 60
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
@@ -550,6 +552,11 @@ VERIFIERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "test-architecture-design": _verify_architecture,
     "test-management": _verify_management,
 }
+if set(VERIFIERS) != OWNER_VERIFIED_SKILLS:
+    # 登録の追加・削除は runtime_contract.OWNER_VERIFIED_SKILLS と同時に行う（単一の正本）。
+    raise RuntimeError(
+        "owner_verifiers.VERIFIERS と runtime_contract.OWNER_VERIFIED_SKILLS が一致しません"
+    )
 
 
 def verify(skill: str, scope: dict[str, Any]) -> dict[str, Any]:
