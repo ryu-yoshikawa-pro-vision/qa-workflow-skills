@@ -1,0 +1,3 @@
+# 期待結果
+
+旧HEAD Aの解析結果をcurrentにせずstaleとして再確認する。FEAT-001を別意味へ再割当せず旧IDを履歴で保持し、新規機能へ新IDを付与してsplitのfrom/to関係と根拠revisionを記録する。未分類差分を影響なしにせず、分類率の分母に残してCI判定ownerへ渡す。仕様AuthorityやProduct Riskは別ownerへ委ねる。

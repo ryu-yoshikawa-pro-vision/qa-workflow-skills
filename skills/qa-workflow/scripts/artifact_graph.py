@@ -1124,6 +1124,88 @@ def _initialize_sqlite_workflow_table(connection: sqlite3.Connection) -> None:
         "workflow_ref TEXT PRIMARY KEY, envelope_json TEXT NOT NULL, "
         "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0))"
     )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS workflow_state_history ("
+        "workflow_ref TEXT NOT NULL REFERENCES workflow_state(workflow_ref), "
+        "provider_revision INTEGER NOT NULL CHECK(provider_revision > 0), "
+        "envelope_json TEXT NOT NULL, "
+        "PRIMARY KEY(workflow_ref, provider_revision))"
+    )
+    connection.execute(
+        "CREATE TABLE IF NOT EXISTS workflow_state_history_origin ("
+        "workflow_ref TEXT PRIMARY KEY REFERENCES workflow_state(workflow_ref), "
+        "first_revision INTEGER NOT NULL CHECK(first_revision > 0))"
+    )
+
+
+def _sqlite_history_is_complete(
+    connection: sqlite3.Connection, workflow_ref: str, revision: int
+) -> bool:
+    """Only a complete chain from revision 1 can substantiate full history."""
+    rows = connection.execute(
+        "SELECT provider_revision,envelope_json FROM workflow_state_history "
+        "WHERE workflow_ref=? ORDER BY provider_revision",
+        (workflow_ref,),
+    ).fetchall()
+    for number, encoded in rows:
+        if not isinstance(number, int) or number < 1 or not isinstance(encoded, str):
+            raise ValueError("workflow_state_history_corrupt")
+        try:
+            envelope = json.loads(encoded)
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise ValueError("workflow_state_history_corrupt") from exc
+        if (
+            not isinstance(envelope, dict)
+            or set(envelope) != {"workflow_ref", "schema_version", "state"}
+            or envelope.get("workflow_ref") != workflow_ref
+            or envelope.get("schema_version") != "1"
+            or not isinstance(envelope.get("state"), dict)
+        ):
+            raise ValueError("workflow_state_history_corrupt")
+    has_origin_table = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' "
+        "AND name='workflow_state_history_origin'"
+    ).fetchone()
+    origin = (
+        connection.execute(
+            "SELECT first_revision FROM workflow_state_history_origin "
+            "WHERE workflow_ref=?",
+            (workflow_ref,),
+        ).fetchone()
+        if has_origin_table
+        else None
+    )
+    first = origin[0] if origin else 1
+    if not isinstance(first, int) or first < 1 or first > revision:
+        raise ValueError("workflow_state_history_origin_invalid")
+    complete = len(rows) == revision - first + 1 and all(
+        number == index for index, (number, _) in enumerate(rows, first)
+    )
+    if origin and not complete:
+        raise ValueError("workflow_state_history_missing")
+    return complete and first == 1
+
+
+def _sqlite_assert_history_snapshot(
+    connection: sqlite3.Connection,
+    workflow_ref: str,
+    revision: int,
+    encoded: str,
+) -> None:
+    """Never overwrite a contradictory historical snapshot."""
+    row = connection.execute(
+        "SELECT envelope_json FROM workflow_state_history "
+        "WHERE workflow_ref=? AND provider_revision=?",
+        (workflow_ref, revision),
+    ).fetchone()
+    if row is None:
+        connection.execute(
+            "INSERT INTO workflow_state_history "
+            "(workflow_ref, provider_revision, envelope_json) VALUES (?,?,?)",
+            (workflow_ref, revision, encoded),
+        )
+    elif row[0] != encoded:
+        raise ValueError("workflow_state_history_conflict")
 
 
 def _provider_revision_token(revision: int) -> str:
@@ -1131,8 +1213,11 @@ def _provider_revision_token(revision: int) -> str:
 
 
 def _provider_revision_number(token: str | None) -> int | None:
-    match = re.fullmatch(r"sqlite:([1-9][0-9]*)", token or "")
-    return int(match.group(1)) if match else None
+    if not isinstance(token, str) or len(token) > 26:
+        return None
+    match = re.fullmatch(r"sqlite:([1-9][0-9]*)", token)
+    number = int(match.group(1)) if match else None
+    return number if number is not None and number < 2**63 else None
 
 
 def _workflow_envelope(workflow_ref: str, state: dict[str, Any]) -> dict[str, Any]:
@@ -1171,6 +1256,14 @@ def create_sqlite_workflow_state(
                 "INSERT INTO workflow_state(workflow_ref,envelope_json,provider_revision) VALUES(?,?,1)",
                 (envelope["workflow_ref"], encoded),
             )
+            _sqlite_assert_history_snapshot(
+                connection, envelope["workflow_ref"], 1, encoded
+            )
+            connection.execute(
+                "INSERT INTO workflow_state_history_origin(workflow_ref,first_revision) "
+                "VALUES(?,1)",
+                (envelope["workflow_ref"],),
+            )
             connection.execute("COMMIT")
         result = read_sqlite_workflow_state(workflow_root, envelope["workflow_ref"])
         if result.get("status") != "current" or result.get("state") != state:
@@ -1189,7 +1282,7 @@ def read_sqlite_workflow_state(
     *,
     expected_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Read the current envelope from a new connection; the token is provider-owned."""
+    """Read the current envelope from a fresh SQLite connection."""
     ref = workflow_ref.lower() if isinstance(workflow_ref, str) else ""
     if not _UUID.fullmatch(ref):
         return {"status": "blocked", "reason": "workflow_state_identity_invalid"}
@@ -1198,39 +1291,77 @@ def read_sqlite_workflow_state(
         if not path.is_file():
             return {"status": "blocked", "reason": "workflow_state_not_found"}
         with closing(_sqlite_connection(path)) as connection:
+            connection.execute("BEGIN")
             row = connection.execute(
-                "SELECT envelope_json,provider_revision FROM workflow_state WHERE workflow_ref=?",
+                "SELECT envelope_json,provider_revision FROM workflow_state "
+                "WHERE workflow_ref=?",
                 (ref,),
             ).fetchone()
-        if row is None:
-            return {"status": "blocked", "reason": "workflow_state_not_found"}
-        envelope = json.loads(row[0])
-        if (
-            not isinstance(envelope, dict)
-            or set(envelope) != {"workflow_ref", "schema_version", "state"}
-            or envelope.get("workflow_ref") != ref
-            or envelope.get("schema_version") != "1"
-            or not isinstance(envelope.get("state"), dict)
-            or not isinstance(row[1], int)
-            or row[1] < 1
-        ):
-            return {"status": "blocked", "reason": "workflow_state_corrupt"}
-        token = _provider_revision_token(row[1])
-        if expected_revision is not None and expected_revision != token:
+            if row is None:
+                return {"status": "blocked", "reason": "workflow_state_not_found"}
+            encoded, number = row
+            envelope = json.loads(encoded)
+            if (
+                not isinstance(envelope, dict)
+                or set(envelope) != {"workflow_ref", "schema_version", "state"}
+                or envelope.get("workflow_ref") != ref
+                or envelope.get("schema_version") != "1"
+                or not isinstance(envelope.get("state"), dict)
+                or not isinstance(number, int)
+                or number < 1
+            ):
+                return {"status": "blocked", "reason": "workflow_state_corrupt"}
+            token = _provider_revision_token(number)
+            if expected_revision is not None and expected_revision != token:
+                return {
+                    "status": "conflict",
+                    "reason": "state_revision_changed",
+                    "current_revision": token,
+                }
+            existing_table = connection.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='workflow_state_history'"
+            ).fetchone()
+            history_complete = False
+            if existing_table:
+                stored = connection.execute(
+                    "SELECT envelope_json FROM workflow_state_history "
+                    "WHERE workflow_ref=? AND provider_revision=?",
+                    (ref, number),
+                ).fetchone()
+                if stored is not None and stored[0] != encoded:
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_history_mismatch",
+                    }
+                # The persisted history origin makes missing snapshots corruption,
+                # including when the current snapshot itself has disappeared.
+                history_complete = _sqlite_history_is_complete(connection, ref, number)
+            else:
+                origin_table = connection.execute(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='table' AND name='workflow_state_history_origin'"
+                ).fetchone()
+                if (
+                    origin_table
+                    and connection.execute(
+                        "SELECT 1 FROM workflow_state_history_origin WHERE workflow_ref=?",
+                        (ref,),
+                    ).fetchone()
+                ):
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_history_missing",
+                    }
             return {
-                "status": "conflict",
-                "reason": "state_revision_changed",
-                "current_revision": token,
+                "status": "current",
+                "state": envelope["state"],
+                "workflow_ref": ref,
+                "schema_version": "1",
+                "state_revision": token,
+                "revision_kind": "sqlite_atomic_provider_revision",
+                "historical_revision_available": history_complete,
             }
-        return {
-            "status": "current",
-            "state": envelope["state"],
-            "workflow_ref": ref,
-            "schema_version": "1",
-            "state_revision": token,
-            "revision_kind": "sqlite_atomic_provider_revision",
-            "historical_revision_available": False,
-        }
     except (
         OSError,
         sqlite3.Error,
@@ -1240,6 +1371,78 @@ def read_sqlite_workflow_state(
         ValueError,
     ):
         return {"status": "blocked", "reason": "workflow_state_unreadable"}
+
+
+def read_sqlite_workflow_state_revision(
+    workflow_root: str | Path,
+    workflow_ref: str,
+    revision_token: str,
+) -> dict[str, Any]:
+    """Fetch the exact historical SQLite revision; never infer missing history."""
+    ref = workflow_ref.lower() if isinstance(workflow_ref, str) else ""
+    revision = _provider_revision_number(revision_token)
+    if not _UUID.fullmatch(ref) or revision is None:
+        return {"status": "blocked", "reason": "historical_state_identity_invalid"}
+    try:
+        path = _local_sqlite_path(workflow_root)
+        if not path.is_file():
+            return {"status": "blocked", "reason": "historical_state_unavailable"}
+        with closing(_sqlite_connection(path)) as connection:
+            connection.execute("BEGIN")
+            current = connection.execute(
+                "SELECT envelope_json,provider_revision FROM workflow_state "
+                "WHERE workflow_ref=?",
+                (ref,),
+            ).fetchone()
+            if current is None or revision > current[1]:
+                return {"status": "blocked", "reason": "historical_state_unavailable"}
+            row = connection.execute(
+                "SELECT envelope_json FROM workflow_state_history "
+                "WHERE workflow_ref=? AND provider_revision=?",
+                (ref, revision),
+            ).fetchone()
+            if row is None:
+                return {"status": "blocked", "reason": "historical_state_unavailable"}
+            # An exact historical row is not sufficient if another tracked
+            # revision has been lost. Legacy databases without an origin
+            # marker retain their existing individual-revision read behavior.
+            _sqlite_history_is_complete(connection, ref, current[1])
+            current_snapshot = connection.execute(
+                "SELECT envelope_json FROM workflow_state_history "
+                "WHERE workflow_ref=? AND provider_revision=?",
+                (ref, current[1]),
+            ).fetchone()
+            if current_snapshot is not None and current_snapshot[0] != current[0]:
+                return {"status": "blocked", "reason": "historical_state_conflict"}
+            encoded = row[0]
+            if revision == current[1] and encoded != current[0]:
+                return {"status": "blocked", "reason": "historical_state_conflict"}
+            envelope = json.loads(encoded)
+            if (
+                not isinstance(envelope, dict)
+                or set(envelope) != {"workflow_ref", "schema_version", "state"}
+                or envelope.get("workflow_ref") != ref
+                or envelope.get("schema_version") != "1"
+                or not isinstance(envelope.get("state"), dict)
+            ):
+                return {"status": "blocked", "reason": "historical_state_corrupt"}
+            return {
+                "status": "historical",
+                "workflow_ref": ref,
+                "schema_version": "1",
+                "state": envelope["state"],
+                "state_revision": _provider_revision_token(revision),
+                "revision_kind": "sqlite_atomic_provider_revision",
+            }
+    except (
+        OSError,
+        sqlite3.Error,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ):
+        return {"status": "blocked", "reason": "historical_state_unavailable"}
 
 
 def conditional_write_sqlite_workflow_state(
@@ -1260,7 +1463,55 @@ def conditional_write_sqlite_workflow_state(
             }
         encoded = _json_bytes(envelope).decode("utf-8")
         with closing(_sqlite_connection(path)) as connection:
+            _initialize_sqlite_workflow_table(connection)
             connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                "SELECT envelope_json,provider_revision FROM workflow_state "
+                "WHERE workflow_ref=?",
+                (envelope["workflow_ref"],),
+            ).fetchone()
+            if current is not None and current[1] == revision:
+                if revision >= 2**63 - 1:
+                    connection.execute("ROLLBACK")
+                    return {
+                        "status": "blocked",
+                        "reason": "workflow_state_revision_exhausted",
+                    }
+                origin = connection.execute(
+                    "SELECT first_revision FROM workflow_state_history_origin "
+                    "WHERE workflow_ref=?",
+                    (envelope["workflow_ref"],),
+                ).fetchone()
+                if origin is None:
+                    # Old databases lack provenance. A clean contiguous chain
+                    # can be adopted; an empty history is a legacy baseline.
+                    # Ambiguous partial history must not be assumed safe.
+                    previous = connection.execute(
+                        "SELECT COUNT(*) FROM workflow_state_history WHERE workflow_ref=?",
+                        (envelope["workflow_ref"],),
+                    ).fetchone()[0]
+                    if previous and not _sqlite_history_is_complete(
+                        connection, envelope["workflow_ref"], revision
+                    ):
+                        raise ValueError("workflow_state_history_provenance_unknown")
+                    first_revision = 1 if previous else revision
+                    connection.execute(
+                        "INSERT INTO workflow_state_history_origin "
+                        "(workflow_ref,first_revision) VALUES(?,?)",
+                        (envelope["workflow_ref"], first_revision),
+                    )
+                    if not previous:
+                        _sqlite_assert_history_snapshot(
+                            connection, envelope["workflow_ref"], revision, current[0]
+                        )
+                # A recorded chain must be present before the current snapshot
+                # is accepted; recreating a lost row would hide data loss.
+                _sqlite_history_is_complete(
+                    connection, envelope["workflow_ref"], revision
+                )
+                _sqlite_assert_history_snapshot(
+                    connection, envelope["workflow_ref"], revision, current[0]
+                )
             cursor = connection.execute(
                 "UPDATE workflow_state SET envelope_json=?,provider_revision=provider_revision+1 "
                 "WHERE workflow_ref=? AND provider_revision=?",
@@ -1279,6 +1530,9 @@ def conditional_write_sqlite_workflow_state(
                     if current
                     else None,
                 }
+            _sqlite_assert_history_snapshot(
+                connection, envelope["workflow_ref"], revision + 1, encoded
+            )
             connection.execute("COMMIT")
         reread = read_sqlite_workflow_state(workflow_root, envelope["workflow_ref"])
         expected_new = _provider_revision_token(revision + 1)
@@ -2733,34 +2987,217 @@ def _claim_path(
     return Path(workflow_state_root) / "claims" / f"{digest}.json"
 
 
-def claim_mutable_operation(
-    workflow_state_root: str | Path, workflow_ref: str, operation_ref: str
-) -> dict[str, Any]:
-    """Claim before browser/API mutation; an existing claim never implies safe retry."""
-    claim = {
-        "workflow_ref": workflow_ref,
-        "operation_ref": operation_ref,
-        "status": "claimed",
+def _validate_claim_details(value: Any) -> dict[str, Any]:
+    """Validate pre-start facts; caller must independently verify their sources."""
+    required = {
+        "owner_skill",
+        "scope_ref",
+        "operation_type",
+        "target_ref",
+        "source_revisions",
+        "artifact_revisions",
+        "expected_revision",
+        "approval_ref",
+        "permission_scope",
+        "resume_owner",
     }
-    raw = _json_bytes(claim)
-    result = create_if_absent(
-        _claim_path(workflow_state_root, workflow_ref, operation_ref), raw
-    )
-    if result["status"] == "created":
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError("claim_details_schema_invalid")
+
+    def ref(value: Any, field: str, *, optional: bool = False) -> str | None:
+        if value is None and optional:
+            return None
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > 512
+            or any(
+                ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
+                for char in value
+            )
+        ):
+            raise ValueError(f"claim_details_{field}_invalid")
+        return value
+
+    validated = {
+        name: ref(value[name], name)
+        for name in (
+            "owner_skill",
+            "scope_ref",
+            "operation_type",
+            "target_ref",
+            "resume_owner",
+        )
+    }
+    for name in ("expected_revision", "approval_ref", "permission_scope"):
+        validated[name] = ref(value[name], name, optional=True)
+    for name in ("source_revisions", "artifact_revisions"):
+        rows = value[name]
+        if not isinstance(rows, list) or len(rows) > 256:
+            raise ValueError(f"claim_details_{name}_invalid")
+        identities: set[str] = set()
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"ref", "revision"}:
+                raise ValueError(f"claim_details_{name}_invalid")
+            artifact_ref = ref(row["ref"], f"{name}_ref")
+            revision = ref(row["revision"], f"{name}_revision")
+            if artifact_ref in identities:
+                raise ValueError(f"claim_details_{name}_duplicate")
+            identities.add(artifact_ref)
+            normalized.append({"ref": artifact_ref, "revision": revision})
+        validated[name] = sorted(normalized, key=lambda row: row["ref"])
+    if not validated["source_revisions"]:
+        raise ValueError("claim_details_source_revisions_required")
+    return validated
+
+
+def claim_mutable_operation(
+    workflow_state_root: str | Path,
+    workflow_ref: str,
+    operation_ref: str,
+    *,
+    operation_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist a mandatory detailed pre-start claim, then independently reread it.
+
+    Existing detail-free claims are readable for migration but may never
+    authorize a new side effect. This is not approval authentication.
+    """
+    if operation_details is None:
         return {
-            **result,
-            "status": "claim_acquired",
-            "may_start": True,
-            "claim_revision": "sha256:" + hashlib.sha256(raw).hexdigest(),
-        }
-    if result["status"] == "conflict":
-        return {
-            **result,
             "status": "blocked",
             "may_start": False,
-            "reason": "operation_already_claimed; inspect_owner_execution_and_cleanup",
+            "reason": "operation_details_required",
         }
-    return {**result, "may_start": False}
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if (
+            not isinstance(operation_ref, str)
+            or not operation_ref.strip()
+            or len(operation_ref) > 512
+            or any(
+                ord(char) < 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
+                for char in operation_ref
+            )
+        ):
+            raise ValueError("operation_ref_invalid")
+        details = (
+            _validate_claim_details(operation_details)
+            if operation_details is not None
+            else None
+        )
+        root = _local_baseline_root(workflow_state_root, create=True)
+        _ensure_local_directory(root / "claims", reason="workflow_claim_root")
+        target = _claim_path(root, ref, operation_ref)
+        claim = {
+            "workflow_ref": ref,
+            "operation_ref": operation_ref,
+            "status": "claimed",
+        }
+        if details is not None:
+            claim["operation_details"] = details
+        raw = _json_bytes(claim)
+        if len(raw) > 2 * 1024 * 1024:
+            raise ValueError("claim_limit_exceeded")
+        result = create_if_absent(target, raw)
+        if result["status"] == "created":
+            try:
+                _assert_local_regular_file(target, "workflow_claim")
+                stored = target.read_bytes()
+            except (OSError, _LocalBaselineError):
+                return {
+                    "status": "blocked",
+                    "may_start": False,
+                    "reason": "claim_readback_failed",
+                }
+            if stored != raw:
+                return {
+                    "status": "blocked",
+                    "may_start": False,
+                    "reason": "claim_readback_mismatch",
+                }
+            return {
+                **result,
+                "status": "claim_acquired",
+                "may_start": True,
+                "claim_revision": "sha256:" + hashlib.sha256(stored).hexdigest(),
+            }
+        if result["status"] == "conflict":
+            return {
+                **result,
+                "status": "blocked",
+                "may_start": False,
+                "reason": "operation_already_claimed; inspect_owner_execution_and_cleanup",
+            }
+        return {**result, "may_start": False}
+    except OSError:
+        return {
+            "status": "blocked",
+            "may_start": False,
+            "reason": "claim_storage_unavailable",
+        }
+    except (_LocalBaselineError, ValueError, TypeError) as exc:
+        reason = exc.reason if isinstance(exc, _LocalBaselineError) else str(exc)
+        return {"status": "blocked", "may_start": False, "reason": reason}
+
+
+def read_mutable_operation_claim(
+    workflow_state_root: str | Path,
+    workflow_ref: str,
+    operation_ref: str,
+    *,
+    expected_claim_revision: str | None = None,
+) -> dict[str, Any]:
+    """Read a persisted claim in a fresh session without restarting its action."""
+    try:
+        ref = _local_baseline_identity(workflow_ref)
+        if not isinstance(operation_ref, str) or not operation_ref.strip():
+            raise ValueError("operation_ref_invalid")
+        root = _local_baseline_root(workflow_state_root, create=False)
+        target = _claim_path(root, ref, operation_ref)
+        _assert_local_regular_file(target, "workflow_claim")
+        with target.open("rb") as stream:
+            raw = stream.read(2 * 1024 * 1024 + 1)
+        if len(raw) > 2 * 1024 * 1024:
+            raise ValueError("claim_limit_exceeded")
+        record = json.loads(raw.decode("utf-8"))
+        if (
+            not isinstance(record, dict)
+            or set(record)
+            not in (
+                {"workflow_ref", "operation_ref", "status"},
+                {"workflow_ref", "operation_ref", "status", "operation_details"},
+            )
+            or record.get("workflow_ref") != ref
+            or record.get("operation_ref") != operation_ref
+            or record.get("status") != "claimed"
+            or raw != _json_bytes(record)
+        ):
+            raise ValueError("claim_identity_or_contents_invalid")
+        if "operation_details" in record:
+            _validate_claim_details(record["operation_details"])
+        revision = "sha256:" + hashlib.sha256(raw).hexdigest()
+        if expected_claim_revision is not None and expected_claim_revision != revision:
+            return {
+                "status": "conflict",
+                "may_start": False,
+                "reason": "claim_revision_changed",
+                "current_revision": revision,
+            }
+        return {
+            "status": "current",
+            "may_start": False,
+            "workflow_ref": ref,
+            "operation_ref": operation_ref,
+            "claim_revision": revision,
+            "operation_details": record.get("operation_details"),
+        }
+    except (_LocalBaselineError, OSError, UnicodeError, ValueError, TypeError) as exc:
+        reason = (
+            exc.reason if isinstance(exc, _LocalBaselineError) else "claim_unreadable"
+        )
+        return {"status": "blocked", "may_start": False, "reason": reason}
 
 
 def recover_claim(
@@ -2778,8 +3215,11 @@ def recover_claim(
         return {"status": "blocked", "reason": "owner_execution_or_cleanup_unverified"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_claim_release_unavailable"}
+    # No selected owner provider can atomically release the claim.
     return {
-        "status": "conditional_release_required",
+        "status": "blocked",
+        "may_start": False,
+        "reason": "claim_release_provider_not_connected",
         "expected_revision": expected_claim_revision,
     }
 
@@ -2806,39 +3246,22 @@ def reserve_shared_resource(
                 "status": "blocked",
                 "reason": "external_reservation_revision_missing",
             }
+        # An asserted acquisition and revision are not verified provider state.
+        # Return the references for independent owner readback, never permission.
         return {
-            "status": "reserved",
+            "status": "blocked",
+            "reason": "external_reservation_readback_required",
             "reservation_ref": external_reservation,
             "owner_workflow_ref": workflow_ref,
-            "provider": "existing_external_reservation",
+            "provider": "unverified_external_reservation",
             "reservation_revision": external_reservation_revision,
         }
     if external_reservation:
         return {"status": "blocked", "reason": "external_reservation_not_confirmed"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
-    target_ref = content_identity({"resource_ref": resource_ref})
-    target = Path(reservation_root) / f"{target_ref}.json"
-    reservation = {
-        "resource_ref": resource_ref,
-        "workflow_ref": workflow_ref,
-        "status": "reserved",
-    }
-    result = create_if_absent(target, _json_bytes(reservation))
-    if result["status"] == "created":
-        return {
-            **result,
-            "status": "reserved",
-            "reservation_ref": str(target),
-            "reservation_revision": "sha256:"
-            + hashlib.sha256(_json_bytes(reservation)).hexdigest(),
-            "revision_kind": "local_exact_content_token_not_a_cas_condition",
-        }
-    return {
-        **result,
-        "status": "blocked",
-        "reason": "reservation_conflict_or_atomic_create_unavailable",
-    }
+    # Capability flags do not constitute a project-level provider selection.
+    return {"status": "blocked", "reason": "reservation_provider_not_selected"}
 
 
 def release_shared_resource(
@@ -2867,10 +3290,9 @@ def release_shared_resource(
         return {"status": "conflict", "reason": "reservation_revision_mismatch"}
     if not native_atomic_conditional_release:
         return {"status": "blocked", "reason": "atomic_conditional_release_unavailable"}
-    return {
-        "status": "conditional_release_required",
-        "expected_revision": expected_reservation_revision,
-    }
+    # Owner/cleanup flags are caller assertions, not authenticated provider evidence.
+    # The selected owner provider must perform its own conditional release.
+    return {"status": "blocked", "reason": "reservation_release_provider_not_connected"}
 
 
 def partial_update_decision(

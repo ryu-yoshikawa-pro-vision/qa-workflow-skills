@@ -1,0 +1,49 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-COV-001",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "E2E path / title pathをQA ID graphとは別契約で扱い、E2E実装から TestCase / result-1への追跡を分離して分析している。TC-101 / TC-102がAuthorityと意味的に一致することも示している。ただし、TC-101 / TC-102をAuthorityと意味一致と判定しながら「部分網羅」と表示しており、判定の扱いに不整合がある。また、Rubric / Referenceに根拠のない「扱い種別（新規、再利用、拡張、対象外、ブロック中）」の明示を必要なギャップとして扱っている。これらは成果物の利用を大きく損なうものではない。",
+      "evidence": [
+        "| テストケース | TC-101 | E2E実装 | tests/orders/order.spec.ts > order history | 部分網羅 | 対象外（入力なし） | 入力でTC-101に対応すると明示され、タイトル（order history）も注文履歴表示と意味が一致する。扱い種別は未提示",
+        "## E2E実装 → 実行結果（既存QA ID graphとは別契約で分析）",
+        "| 上流層 | 上流ID / 挙動 | 下流層 | 下流ID / 扱い | カバレッジ | プロダクトリスク / 優先度 | 根拠 / ギャップ | 推奨対応 | 修正Skill / 層 |",
+        "| 中 | TC-101／TC-102のE2E実装に扱い種別（新規、再利用、拡張、対象外、ブロック中）が入力で示されていない | TC-101、TC-102 | 扱い種別を明示する | e2e-test-implementation |"
+      ]
+    },
+    {
+      "id": "SEM-COV-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "重要な未網羅を正しく検出している。TC-102（order detail）は未実行で環境到達性の確認が必要な点を高優先度ギャップとし、実行証拠がないことを明示している。上流TR / TCN / CIが入力にないため、Authority からテストケースまでの閉鎖を判定できないことも高優先度ギャップとして挙げている。result-1の結果内容が入力にないため合否を判定できないことも指摘している。未実行を実行済みと誤認していない。",
+      "evidence": [
+        "| 高 | TC-102（order detail）が未実行で、環境到達性が未確認のため実行証拠がない | AUTH-ORDER-02 | 環境到達性を確認し、実行する | e2e-test-execution（実行事実） |",
+        "| 高 | 上流TR／TCN／CIが入力にないため、Authority → テストケースの閉鎖を判定できない | AUTH-ORDER-01、AUTH-ORDER-02 | 上流層を含めて再分析する | test-requirement-design／test-condition-design |",
+        "| 中 | result-1（order history）の結果内容が入力になく、実行結果の合否を判定できない | TC-101 | 結果内容を入力に含めて判定する | e2e-test-execution |",
+        "| order detail | TC-102へ解決でき、未実行理由が記録されているため追跡は閉じている。実行証拠は存在せず、環境到達性が確認されるまで実行は完了しない"
+      ]
+    },
+    {
+      "id": "SEM-COV-004",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "TC-101とTC-102は、注文履歴の表示と注文明細の表示という別の振る舞いを対象としており、同じ検証責務を重ねていないと正しく判定している。入力にない重複をでっち上げていない。",
+      "evidence": [
+        "| TC-101／TC-102 | 重複なし | 注文履歴の表示と注文明細の表示という別の振る舞いを対象としており、同じ検証責務を重ねていない | 対応なし | 該当なし |",
+        "## 重複 / 統合分析"
+      ]
+    },
+    {
+      "id": "SEM-COV-005",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "修正先を原因層ごとに分けている。TC-102の未実行は実行事実としてe2e-test-executionに、上流TR / TCN / CIの不足はtest-requirement-design / test-condition-designに、E2E実装の扱い種別はe2e-test-implementationに振り分けている。E2E実装から実行結果への不足と、QA ID graphの不足を混同していない。",
+      "evidence": [
+        "| E2E実装 | tests/orders/order.spec.ts > order detail | 実行結果 | 未実行（理由: 環境到達性の確認が必要） | ブロック中 | 対象外（入力なし） | TC-102へ解決でき、未実行理由が記録されているため追跡は閉じている。実行証拠は存在せず、環境到達性が確認されるまで実行は完了しない | 環境到達性を確認して実行する | e2e-test-execution（実行事実） |",
+        "| 上流層（TR／TCN／CI）の追加と再分析: test-requirement-design、test-condition-design",
+        "| TC-102の実行: e2e-test-execution"
+      ]
+    }
+  ]
+}

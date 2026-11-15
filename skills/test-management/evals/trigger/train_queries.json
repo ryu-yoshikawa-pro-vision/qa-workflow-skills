@@ -1,0 +1,17 @@
+[
+  { "query": "今回のQA計画、開始・終了基準、担当と日程を作成してください。", "should_trigger": true },
+  { "query": "承認済み計画revisionと必要なsource inventory、実行母集団を整理したい。", "should_trigger": true },
+  { "query": "取得済み、未取得、部分取得、実行済み、未実行を分けて進捗を更新してください。", "should_trigger": true },
+  { "query": "見積工数と実績の差異、project risk、是正担当を記録してください。", "should_trigger": true },
+  { "query": "計画改版で旧承認を失効させ、影響する環境・方式だけ再評価したい。", "should_trigger": true },
+  { "query": "報告に必要な予定sourceと取得範囲を、ownerとrevisionつきで引き渡してください。", "should_trigger": true },
+  { "query": "QA活動のstakeholder要求、品質目標、対象・対象外を定義してください。", "should_trigger": false },
+  {
+    "query": "API、system、componentの方式・環境をテストアーキテクチャへ割り当ててください。",
+    "should_trigger": false
+  },
+  { "query": "この製品変更のProduct Riskを採点し、優先度を決めてください。", "should_trigger": false },
+  { "query": "Regression baselineを更新して実行対象Runを選んでください。", "should_trigger": false },
+  { "query": "失敗したAPI testの原因をraw logから診断してください。", "should_trigger": false },
+  { "query": "全テスト結果を集計して、PASS率と全体の完了reportを出してください。", "should_trigger": false }
+]

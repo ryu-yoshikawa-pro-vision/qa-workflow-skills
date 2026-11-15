@@ -152,6 +152,36 @@ class CrudMatrixRuntimeTests(unittest.TestCase):
             resolved["payload"]["coverage_summary"]["completeness"]["covered"], 4
         )
 
+    def test_lifecycle_sequence_requires_only_state_changing_operations(
+        self,
+    ) -> None:
+        value = base()
+        # Rはmatrixのcellで担保し、lifecycle sequenceには含めなくてよい。
+        value["consistency_sequences"][0]["steps"] = [
+            step
+            for step in value["consistency_sequences"][0]["steps"]
+            if step["operation"] != "R"
+        ]
+        result = run(value)
+        self.assertEqual(result["result_status"], "ready", result["issues"])
+        self.assertTrue(
+            result["payload"]["coverage_summary"]["consistency"]["complete"]
+        )
+        # 状態を変えるoperationが欠けたsequenceは引き続き完了にしない。
+        value["consistency_sequences"][0]["steps"] = [
+            step
+            for step in value["consistency_sequences"][0]["steps"]
+            if step["operation"] != "U"
+        ]
+        blocked = run(value)
+        self.assertEqual(blocked["result_status"], "unresolved")
+        issue = next(
+            row
+            for row in blocked["issues"]
+            if row["issue_type"] == "incomplete_lifecycle_sequence"
+        )
+        self.assertEqual(issue["missing_operations"], ["U"])
+
     def test_sequence_cannot_invent_operation(self) -> None:
         value = base()
         value["consistency_sequences"][0]["steps"][0]["operation"] = "U"

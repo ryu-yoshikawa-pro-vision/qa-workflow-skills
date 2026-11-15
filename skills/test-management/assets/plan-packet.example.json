@@ -1,0 +1,283 @@
+{
+  "approval": {
+    "record": null,
+    "state": "不要"
+  },
+  "artifact_ref": "tm-plan:example-release-2026-11",
+  "corrective_actions": [
+    {
+      "action": "代替環境の構成を確認する",
+      "action_id": "CA-001",
+      "approver": null,
+      "due": "2026-11-05",
+      "finding_ref": "PROJ-RISK-001",
+      "owner": "test-manager",
+      "result_ref": "evidence:env-ready-001",
+      "scope": "scope:example-release",
+      "state": "完了"
+    }
+  ],
+  "criteria": [
+    {
+      "criterion": "QA要求とarchitectureの承認済み参照が揃っている",
+      "criterion_id": "CRIT-001",
+      "evidence_ref": "evidence:start-check-001",
+      "judgment": "達成",
+      "kind": "開始",
+      "scope": "scope:example-release"
+    },
+    {
+      "criterion": "必須母集団が取得済みかつ確定済み、または0件確認済み",
+      "criterion_id": "CRIT-002",
+      "evidence_ref": "evidence:end-check-001",
+      "judgment": "達成",
+      "kind": "終了",
+      "scope": "scope:example-release"
+    }
+  ],
+  "differences": [],
+  "history": [
+    {
+      "reason": "初版",
+      "replaces_revision": null,
+      "revision": "tm-rev-0001",
+      "scope": "scope:example-release"
+    }
+  ],
+  "monitoring": {
+    "counts": {
+      "acquired": 3,
+      "acquisition_unknown": 0,
+      "cancelled": 0,
+      "executed": 3,
+      "execution_failed": 0,
+      "fail": 1,
+      "not_acquired": 0,
+      "not_applicable": 1,
+      "not_run": 0,
+      "partial": 0,
+      "pass": 2,
+      "planned_total": 4,
+      "readback_missing": 0,
+      "required_total": 4,
+      "result_unknown": 0,
+      "running": 0,
+      "unavailable": 0,
+      "undetermined": 0,
+      "unjudged": 0,
+      "zero_confirmed": 1
+    },
+    "measured_at": "2026-11-13T18:00:00+09:00",
+    "snapshot_ref": "snapshot:example-release-001"
+  },
+  "owner": "test-management",
+  "plan_items": [
+    {
+      "architecture_ref": "arch-login#ARCH-001@arch-rev-1",
+      "effort": "3人日",
+      "level_type": "system / functional",
+      "owner": "test-manager",
+      "plan_id": "PLAN-001",
+      "qa_ref": "qa-req-login#QAR-001@qa-rev-1",
+      "resource": "QA 2名、staging環境",
+      "source_ids": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-003"
+      ],
+      "suite_order": "login -> checkout -> refund"
+    },
+    {
+      "architecture_ref": "arch-login#ARCH-002@arch-rev-1",
+      "effort": "1人日",
+      "level_type": "system / e2e",
+      "owner": "test-manager",
+      "plan_id": "PLAN-002",
+      "qa_ref": "qa-req-login#QAR-002@qa-rev-1",
+      "resource": "QA 1名",
+      "source_ids": [
+        "SRC-004"
+      ],
+      "suite_order": "selection run"
+    }
+  ],
+  "plan_version": "1",
+  "planned_populations": [
+    {
+      "environment": "staging",
+      "execution_unit": "logical-tc",
+      "population_id": "POP-001",
+      "query_range": "suite:login",
+      "required": true,
+      "source_id": "SRC-003",
+      "target_build": "build-2026.11.10"
+    },
+    {
+      "environment": "staging",
+      "execution_unit": "logical-tc",
+      "population_id": "POP-002",
+      "query_range": "suite:checkout",
+      "required": true,
+      "source_id": "SRC-003",
+      "target_build": "build-2026.11.10"
+    },
+    {
+      "environment": "staging",
+      "execution_unit": "logical-tc",
+      "population_id": "POP-003",
+      "query_range": "suite:payments-refund",
+      "required": true,
+      "source_id": "SRC-003",
+      "target_build": "build-2026.11.10"
+    },
+    {
+      "environment": "staging",
+      "execution_unit": "e2e-run",
+      "population_id": "POP-004",
+      "query_range": "selection:all-current",
+      "required": true,
+      "source_id": "SRC-004",
+      "target_build": "build-2026.11.10"
+    }
+  ],
+  "planned_sources": [
+    {
+      "artifact_ref": "qa-req-login",
+      "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "owner": "test-requirements-analysis",
+      "revision": "qa-rev-1",
+      "scope": "scope:example-release",
+      "source_id": "SRC-001"
+    },
+    {
+      "artifact_ref": "arch-login",
+      "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "owner": "test-architecture-design",
+      "revision": "arch-rev-1",
+      "scope": "scope:example-release",
+      "source_id": "SRC-002"
+    },
+    {
+      "artifact_ref": "tc-set-login-refund",
+      "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "owner": "test-case-design",
+      "revision": "tc-rev-1",
+      "scope": "scope:example-release",
+      "source_id": "SRC-003"
+    },
+    {
+      "artifact_ref": "e2e-selection-release-2026-11",
+      "content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "owner": "e2e-test-selection",
+      "revision": "sel-rev-1",
+      "scope": "scope:example-release",
+      "source_id": "SRC-004"
+    }
+  ],
+  "project_risks": [
+    {
+      "approver": null,
+      "description": "テスト環境の準備が遅延する",
+      "evidence_ref": "evidence:env-delay-001",
+      "owner": "test-manager",
+      "response": "代替環境を確保する",
+      "risk_id": "PROJ-RISK-001",
+      "scope": "scope:example-release",
+      "state": "解決済み",
+      "state_evidence_ref": "evidence:env-ready-001"
+    }
+  ],
+  "readbacks": [
+    {
+      "acquisition_state": "取得済",
+      "actual": {
+        "build": "build-2026.11.10",
+        "environment": "staging",
+        "execution_unit": "logical-tc",
+        "owner": "test-case-design",
+        "range": "suite:login",
+        "revision": "tc-rev-1",
+        "scope": "scope:example-release",
+        "source_ref": "tc-set-login-refund"
+      },
+      "currentness": "current",
+      "execution_state": "実行済み",
+      "outcome": "PASS",
+      "population_id": "POP-001",
+      "readback_ref": "readback:POP-001",
+      "reason": null,
+      "zero_check": null
+    },
+    {
+      "acquisition_state": "取得済",
+      "actual": {
+        "build": "build-2026.11.10",
+        "environment": "staging",
+        "execution_unit": "logical-tc",
+        "owner": "test-case-design",
+        "range": "suite:checkout",
+        "revision": "tc-rev-1",
+        "scope": "scope:example-release",
+        "source_ref": "tc-set-login-refund"
+      },
+      "currentness": "current",
+      "execution_state": "実行済み",
+      "outcome": "FAIL",
+      "population_id": "POP-002",
+      "readback_ref": "readback:POP-002",
+      "reason": null,
+      "zero_check": null
+    },
+    {
+      "acquisition_state": "0件確認済み",
+      "actual": {
+        "build": "build-2026.11.10",
+        "environment": "staging",
+        "execution_unit": "logical-tc",
+        "owner": "test-case-design",
+        "range": "suite:payments-refund",
+        "revision": "tc-rev-1",
+        "scope": "scope:example-release",
+        "source_ref": "tc-set-login-refund"
+      },
+      "currentness": "current",
+      "execution_state": "対象なし",
+      "outcome": "-",
+      "population_id": "POP-003",
+      "readback_ref": "readback:POP-003",
+      "reason": null,
+      "zero_check": {
+        "checked_at": "2026-11-12T09:00:00+09:00",
+        "query": "suite:payments-refund"
+      }
+    },
+    {
+      "acquisition_state": "取得済",
+      "actual": {
+        "build": "build-2026.11.10",
+        "environment": "staging",
+        "execution_unit": "e2e-run",
+        "owner": "e2e-test-selection",
+        "range": "selection:all-current",
+        "revision": "sel-rev-1",
+        "scope": "scope:example-release",
+        "source_ref": "e2e-selection-release-2026-11"
+      },
+      "currentness": "current",
+      "execution_state": "実行済み",
+      "outcome": "PASS",
+      "population_id": "POP-004",
+      "readback_ref": "readback:POP-004",
+      "reason": null,
+      "zero_check": null
+    }
+  ],
+  "revision": "tm-rev-0001",
+  "schema": "test-management-plan-v1",
+  "scope": "scope:example-release",
+  "target": {
+    "build": "build-2026.11.10",
+    "environment": "staging",
+    "period": "2026-11-10..2026-11-14"
+  }
+}

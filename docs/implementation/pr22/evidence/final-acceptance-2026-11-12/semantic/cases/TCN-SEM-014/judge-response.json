@@ -1,0 +1,47 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Reference では TR-ORDERS-014 をテスト条件へ展開し、A/B/C の閉鎖結果を Coverage Item で表すことが求められている。Candidate Output は TR-ORDERS-014 を「ブロック中」とし、テスト観点・条件を一件も作成していない。Eval Input の範囲でも A の重複chain、B の CI-001 確認、C の未到達は判断可能であり、仕様根拠の不足を理由に展開を全面停止したことは、Requirement展開という中核要求の重大な欠落にあたる。",
+      "evidence": [
+        "「TR-ORDERS-014 | ブロック中 | 現在有効な仕様根拠が解決できず…」",
+        "「該当なし。TR-ORDERS-014 はブロック中のため、テスト観点・条件（TCN）は作成しない。」"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "Reference の閉鎖条件（A の重複chainが B の指定 current content/generation に一致して進むこと、B の current mapping 終端が CI-001 の execution fingerprint と一致すること、self reference/cycle がないこと、C は未閉鎖のまま model completion を false にすること）に対し、Candidate Output は一部の観点を正しく捉えている。具体的には、A→B に self reference/cycle がないこと、B が完了するまで A を検証済みとしないこと、モデルを完了不可とすることである。しかし、これらを充足判定の基準として定式化しておらず、fingerprint 一致による閉鎖条件も未照合のまま「判定不能」としているため、何を満たせば十分かの基準が欠けている。",
+      "evidence": [
+        "「A→B の self reference / cycle は無い（入力記載）。」",
+        "「A の「重複」は、B が完了するまで検証責務の充足として扱わない。B が未完了の間は A も検証済みとしない。」",
+        "「モデル `M-ORDERS` の完了判定: 完了不可（complete化しない）」",
+        "「coverage status: unknown（機械的な materialize_coverage 結果が無いため算出不能）」"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Reference では B の確認を CI-001 で表し、A の重複を B 経由で CI-001 に示し、C の未到達を確認用 Coverage Item の不足として表すことが求められている。Candidate Output はカバレッジ項目を一件も採番しておらず、「該当なし」としている。B と CI-001 の対応や C の未到達は表の記述として現れるが、Coverage Item として代表・具体化されていないため、Criteria を代表する項目が存在しない。",
+      "evidence": [
+        "「該当なし。期待挙動の仕様根拠が無いため、カバレッジ項目（TCN-xxx-CIxx）は採番しない。」",
+        "「target B | M-ORDERS の current target | ブロック中 | … | —」",
+        "「target C | M-ORDERS の current target | ブロック中 | … | —」"
+      ]
+    },
+    {
+      "id": "SEM-TCN-005",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "Candidate Output は TCN もカバレッジ項目も生成していないため、同じ意味の条件の重複は存在しない。ただし、冗長性を抑制した結果ではなく、展開自体を行っていないことによる自明な充足であるため、高評価の根拠としては弱い。概ね問題はないが、評価対象となる条件群が無い点は改善余地として残る。",
+      "evidence": [
+        "「テスト観点・条件一覧: 該当なし。TR-ORDERS-014 はブロック中のため、テスト観点・条件（TCN）は作成しない。」",
+        "「カバレッジ項目一覧: 該当なし。」"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "revisions": {
+    "product/docs/12_quality/acceptance_criteria.md": "cb057739f87894749eab42eb3102afa6c749456e3837c290ab3d393981537343",
+    "product/docs/spec/features/cart.md": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216",
+    "product/src/application/contracts/common.ts": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932",
+    "product/src/application/use-cases/cart-use-cases.ts": "9b7018cb617b3eeb366f0d6dcddf1046053b73ab69bfad863756fcc0d6b64f7a",
+    "product/src/domain/services/cart.ts": "fca912a84cba6fb58dcb3b188bdb741d51adbe0ac11d5c375c7e5d012b2ed1c0"
+  },
+  "root": "<scratchpad>/eff8/workspaces/candidate-local_code_change-2",
+  "schema_version": "input-revision-v1"
+}

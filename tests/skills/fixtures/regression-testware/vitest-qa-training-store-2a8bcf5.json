@@ -1,0 +1,69 @@
+{
+  "source": "qa-training-store",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "runner": "vitest",
+  "command": "vitest run tests/unit/password-hasher.test.ts tests/unit/app-config.test.ts --reporter=json",
+  "note": "固定commitのexport（node_modulesは別checkoutを参照）で取得したVitest JSON reporter出力のうち、永続識別に使う項目だけを残した。Gが保存した正本runではなく、H担当の局所検証用fixture。",
+  "files": [
+    {
+      "file": "tests/unit/app-config.test.ts",
+      "status": "passed",
+      "tests": [
+        {
+          "ancestorTitles": [
+            "app config runtime environment"
+          ],
+          "title": "resolves safe defaults for {}",
+          "fullName": "app config runtime environment resolves safe defaults for {}",
+          "status": "passed"
+        },
+        {
+          "ancestorTitles": [
+            "app config runtime environment"
+          ],
+          "title": "resolves safe defaults for { EXPO_PUBLIC_BUILD_KIND: 'automation' }",
+          "fullName": "app config runtime environment resolves safe defaults for { EXPO_PUBLIC_BUILD_KIND: 'automation' }",
+          "status": "passed"
+        },
+        {
+          "ancestorTitles": [
+            "app config runtime environment"
+          ],
+          "title": "resolves safe defaults for { EXPO_PUBLIC_BUILD_KIND: 'unknown' }",
+          "fullName": "app config runtime environment resolves safe defaults for { EXPO_PUBLIC_BUILD_KIND: 'unknown' }",
+          "status": "passed"
+        },
+        {
+          "ancestorTitles": [
+            "app config runtime environment"
+          ],
+          "title": "forces test mode off for production even when the public flag requests it",
+          "fullName": "app config runtime environment forces test mode off for production even when the public flag requests it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "file": "tests/unit/password-hasher.test.ts",
+      "status": "passed",
+      "tests": [
+        {
+          "ancestorTitles": [
+            "PBKDF2 password hasher contract"
+          ],
+          "title": "uses the fixed algorithm, iteration, salt, and key sizes",
+          "fullName": "PBKDF2 password hasher contract uses the fixed algorithm, iteration, salt, and key sizes",
+          "status": "passed"
+        },
+        {
+          "ancestorTitles": [
+            "PBKDF2 password hasher contract"
+          ],
+          "title": "verifies deterministic seed hashes and rejects malformed encodings",
+          "fullName": "PBKDF2 password hasher contract verifies deterministic seed hashes and rejects malformed encodings",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

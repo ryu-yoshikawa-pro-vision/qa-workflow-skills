@@ -1,0 +1,64 @@
+{
+  "workflow": "qa-workflow",
+  "scope": "開発連動QA: product PR #220（merge commit 2a8bcf57ff091e84a8b3bf7b123568e967000d88）の機能分析・影響テスト項目候補の特定",
+  "requested_outputs": ["変更差分の分類", "機能台帳への反映（作業版）", "影響するテスト項目候補"],
+  "current_date": "2026-11-13",
+  "entry_skill": "feature-analysis",
+  "routed_skills": [
+    { "skill": "feature-analysis", "target": "PR #220 change classification", "status": "done_with_limits" },
+    { "skill": "qa-workflow", "target": "workflow orchestration", "status": "in_progress" }
+  ],
+  "completed_steps": [
+    "PR #220 diffを確認（package.json / pnpm-lock.yaml の2ファイル）",
+    "git_source_inventory.py（base d866f90 → head 2a8bcf57）: complete、未取得0件",
+    "依存変更の全件抽出（package.json 6件更新＋override同期、lockfile 79追加／71削除）",
+    "app.config.ts・app/・src/presentation/native-test-control-bridge の利用箇所を照合",
+    "影響テスト項目候補の特定（既存テスト資産に対応づけ）"
+  ],
+  "unverified": [
+    "reconcile_git_coverage.py / feature_registry.py の機械検証（保存先未確定のため未実行）",
+    "CI結果、ローカルbuild、prebuild、production bundle検査"
+  ],
+  "blocked": [],
+  "pending_approval": [
+    {
+      "id": "HOLD-01",
+      "item": "成果物の保存先と案件Project Context（qa.workflow_state_root・保存provider）の確定",
+      "reason": "未確定のため、正式な機能台帳の保存・承認記録はできない。現在の成果物は作業版（working draft）",
+      "owner": "project-context",
+      "needed_from": "ユーザー"
+    },
+    {
+      "id": "HOLD-02",
+      "item": "製品全体の初回機能台帳（baseline）の作成範囲",
+      "reason": "本PRの差分分析に必要な範囲だけを扱った。全機能の初回列挙は別作業で、実施範囲の判断が必要",
+      "owner": "feature-analysis",
+      "needed_from": "ユーザー"
+    },
+    {
+      "id": "HOLD-03",
+      "item": "PR #220のGitHub上のCI結果の取得",
+      "reason": "本依頼はgit読み取りに限定されているため未取得。GitHub参照の許可が必要",
+      "owner": "test-reporting / 実行担当",
+      "needed_from": "ユーザー"
+    },
+    {
+      "id": "HOLD-04",
+      "item": "ローカルのpnpm install・expo prebuild・production bundle検査の実施",
+      "reason": "製品コードは変更しないが、node_modules・android/ios生成物が発生する。実行可否の判断が必要",
+      "owner": "testware-execution / e2e-test-execution",
+      "needed_from": "ユーザー"
+    },
+    {
+      "id": "HOLD-05",
+      "item": "影響テスト項目候補のtest-item-analysis以降への進行",
+      "reason": "依頼範囲は候補特定まで。正式なITEM化・TC設計へ進めてよいかの判断が必要",
+      "owner": "test-item-analysis",
+      "needed_from": "ユーザー"
+    }
+  ],
+  "revalidation_required": [],
+  "stop_conditions": [
+    "保存先・承認元が未確定のため、正式保存とrevision確定は行わない"
+  ]
+}

@@ -34,7 +34,7 @@
     {
       "id": "SEM-RISK-006",
       "title": "Testability",
-      "description": "操作・観測・Oracleを踏まえたtestability / test level判断が妥当で、E2E対象選定時もlocator・fixture・Playwright構成・実装可否へ踏み込みすぎていないか。",
+      "description": "操作・観測・Oracleを踏まえたtestability / test level判断が妥当か。",
       "critical": false
     }
   ]

@@ -1,0 +1,23 @@
+{
+  "skill": "testware-implementation",
+  "criteria": [
+    {
+      "id": "TW-IMPL-SEM-001",
+      "title": "変更権限と競合",
+      "description": "HEAD・target hash・dirty・許可pathを確認し、隔離編集とnative条件付き反映を区別する。",
+      "critical": true
+    },
+    {
+      "id": "TW-IMPL-SEM-002",
+      "title": "assertionの根拠",
+      "description": "TCまたは明示対象、source Authorityと有効な期待結果を保持し、製品コードを変更しない。",
+      "critical": true
+    },
+    {
+      "id": "TW-IMPL-SEM-003",
+      "title": "未実施の扱い",
+      "description": "lightweight validationと実runnerを混同せず、実行していないものを未実行とする。",
+      "critical": true
+    }
+  ]
+}

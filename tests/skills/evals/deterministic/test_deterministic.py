@@ -271,6 +271,28 @@ class DeterministicValidatorTests(unittest.TestCase):
         ).replace("| test-case-design | 実行中 |", "| test-case-design | ブロック中 |")
         self.assert_fails("qa-workflow", invalid, exp, "WF-D004")
 
+    def test_workflow_complete_with_not_started_row_fails_wf_d004(self):
+        done = """# Workflow
+- ワークフロー全体状態: 完了
+- 開始Skill: test-case-design
+- 最終Skill: test-case-design
+| Skill | 対象 / 実行範囲 | 状態 | 成果物 / バージョン | ブロッカー / 備考 |
+| --- | --- | --- | --- | --- |
+| test-case-design |  | 完了 | TC | |
+| test-requirement-design |  | 未開始 | | |
+"""
+        exp = {
+            "expected_start_skill": "test-case-design",
+            "expected_final_skill": "test-case-design",
+            "expected_skills": ["test-case-design"],
+        }
+        self.assert_fails("qa-workflow", done, exp, "WF-D004")
+        omitted = done.replace(
+            "| test-requirement-design |  | 未開始 | | |",
+            "| test-requirement-design |  | 省略 | | 要求外 |",
+        )
+        self.assert_pass("qa-workflow", omitted, exp)
+
 
 if __name__ == "__main__":
     unittest.main()

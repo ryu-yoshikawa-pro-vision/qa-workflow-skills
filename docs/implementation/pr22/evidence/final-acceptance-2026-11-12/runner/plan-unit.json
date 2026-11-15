@@ -1,0 +1,69 @@
+{
+  "runner_kind": "vitest",
+  "repo_path": "<scratchpad>/qts",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "argv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/pricing.test.ts",
+    "--reporter=json",
+    "--outputFile={reporter_file}"
+  ],
+  "reviewed_argv": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/unit/pricing.test.ts",
+    "--reporter=json",
+    "--outputFile={reporter_file}"
+  ],
+  "attempts": 1,
+  "timeout_seconds": 120,
+  "reporter_format": "vitest-json",
+  "testware_ref": "qa-training-store:tests/unit/pricing.test.ts",
+  "testware_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "runner_version": "4.1.11",
+  "selected": [
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "applies a sale only within the half-open sale interval"
+      ]
+    },
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "floors the gold discount for each SKU unit before multiplying quantity"
+      ]
+    },
+    {
+      "path": "tests/unit/pricing.test.ts",
+      "title_path": [
+        "pricing policy",
+        "uses the same subtotal shipping rule for every membership rank"
+      ]
+    }
+  ],
+  "selection_verified": true,
+  "selection_evidence_ref": "local://pr22-acceptance/qts-evidence/selection.json (vitest list --json, 3 tests, 2026-11-12)",
+  "planned_scope_ref": "qa-training-store:tests/unit/pricing.test.ts@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "preflight": {
+    "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "environment_ref": "local-wsl2-linux:6.6.87.2;node-v24.22.2;pnpm-10.34.5;vitest-4.1.11;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
+    "operation_ref": "pr22-acceptance-vitest-pricing-20261112T205800",
+    "runner_ref": "vitest@4.1.11",
+    "script_chain_reviewed": true,
+    "permissions_verified": true,
+    "side_effects": [],
+    "isolated_environment": true,
+    "external_side_effects": false,
+    "shared_resource": false
+  }
+}

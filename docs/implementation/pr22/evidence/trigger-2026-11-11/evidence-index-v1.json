@@ -1,0 +1,87 @@
+{
+  "source_skill_package_head": "fc1478d2920e19daad749d305023bb16017bfe10",
+  "current_branch_commit_at_evidence_capture": "8dff9c85b6dfb334652b4321c279fb37642d25f7",
+  "package_hashes_compared_to_current_checkout": true,
+  "codex_cli": "0.167.0",
+  "current_skill_count": 24,
+  "current_skills": [
+    "adversarial-review",
+    "agent-answer-form",
+    "coverage-analysis",
+    "e2e-test-execution",
+    "e2e-test-implementation",
+    "e2e-test-inspection",
+    "e2e-test-reporting",
+    "e2e-test-result-analysis",
+    "e2e-test-selection",
+    "exploratory-testing",
+    "qa-knowledge",
+    "qa-workflow",
+    "question-analysis",
+    "regression-testing",
+    "spec-analysis",
+    "test-analysis",
+    "test-case-design",
+    "test-condition-design",
+    "test-execution",
+    "test-requirement-design",
+    "test-target-inspection",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation"
+  ],
+  "snapshot_file_count": 228,
+  "snapshot_method": "isolated filesystem copy because git worktree add was rejected by repository approval policy",
+  "official_e2e_dataset_counts": {
+    "train": {
+      "count": 12,
+      "positive": 6,
+      "negative": 6
+    },
+    "validation": {
+      "count": 8,
+      "positive": 4,
+      "negative": 4
+    }
+  },
+  "executed_query_attempts": 9,
+  "query_summaries": [
+    {
+      "case": "train-01",
+      "should_trigger": true,
+      "valid_attempts": 3,
+      "observed_target": 3,
+      "trigger_rate": 1.0,
+      "threshold_met": true,
+      "other_skills": []
+    },
+    {
+      "case": "train-02",
+      "should_trigger": false,
+      "valid_attempts": 3,
+      "observed_target": 0,
+      "trigger_rate": 0.0,
+      "threshold_met": true,
+      "other_skills": [
+        "e2e-test-execution"
+      ]
+    },
+    {
+      "case": "train-03",
+      "should_trigger": false,
+      "valid_attempts": 3,
+      "observed_target": 0,
+      "trigger_rate": 0.0,
+      "threshold_met": true,
+      "other_skills": [
+        "e2e-test-implementation",
+        "e2e-test-inspection"
+      ]
+    }
+  ],
+  "holdout_case_count": 16,
+  "holdout_sha256": "900648bb1b8eddcc68017226a64dc82bf166ddb95d13254d98c217588b442e24",
+  "holdout_train_validation_exact_overlap": 0,
+  "scoring_rule": "Only explicit skill-load events or successful completed command events reading .agents/skills/<skill>/SKILL.md count. Answer text and directory listings are not scored. A query passes only with 3 completed successful attempts and the EVALS.md threshold.",
+  "independent_context": "One codex --no-daemon --strict-config exec --json --sandbox read-only --ephemeral process per attempt."
+}

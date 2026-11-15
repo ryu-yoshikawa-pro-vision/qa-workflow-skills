@@ -1,0 +1,32 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceは要求のtarget適用範囲とconflict報告の判定根拠のみを示し、Requirementをtest conditionへ展開する規則や、テスト要求が未提供でブロックすべきかどうかの判断根拠を含まない。Eval Inputも「テスト要求」の有無を明示していないため、展開の正否を判断できない。",
+      "evidence": []
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceに技法選択（状態遷移・境界値・同値分割・組合せ等）の基準がなく、候補はtest conditionを生成せず技法も選択していないため、問題構造との適合性をReferenceに基づいて判断できない。",
+      "evidence": []
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceはcoverage criteriaの十分性を定義しておらず、候補もcoverage criteriaを生成していない（「未生成」）。ブロック判断が妥当かどうかもReferenceから確定できないため、十分性を評価する根拠がない。",
+      "evidence": []
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": false,
+      "rating": null,
+      "reason": "Referenceはcoverage itemの代表性基準を示しておらず、候補はcoverage itemを「未生成」としている。Criteriaが存在しないため代表性も判断できず、Referenceに根拠がない。",
+      "evidence": []
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  { "query": "今回のQA活動の目的と品質目標、対象範囲を整理してください。", "should_trigger": true },
+  { "query": "stakeholderのQA要求を要求元・成功条件・未決事項つきで整理したい。", "should_trigger": true },
+  { "query": "案件QAで対象外とする範囲と、その合意状態を記録してください。", "should_trigger": true },
+  { "query": "製品の個別TRではなく、今回のQA活動で保証すべき目標をまとめたい。", "should_trigger": true },
+  { "query": "既存QA目標が改版されたので、影響範囲とcurrentnessを確認してください。", "should_trigger": true },
+  { "query": "QA要求元・revision・承認証拠を含む要求artifactを作成してください。", "should_trigger": true },
+  { "query": "この仕様から詳細なテストケースと期待結果を作成してください。", "should_trigger": false },
+  { "query": "変更機能のProduct Riskを採点し、テスト深度を選んでください。", "should_trigger": false },
+  { "query": "API、component、systemのテストlevelと環境を割り当ててください。", "should_trigger": false },
+  { "query": "テスト計画の進捗、未取得source、是正処置を管理したい。", "should_trigger": false },
+  { "query": "Regression Suiteのmembershipと次回Runを選定してください。", "should_trigger": false },
+  { "query": "E2E、API、探索の結果を集計して総合reportを作成してください。", "should_trigger": false }
+]

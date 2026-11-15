@@ -1,0 +1,57 @@
+{
+  "runner-result": {
+    "source_result": "runner_pass",
+    "result_finalized": true,
+    "raw_capture_complete": true,
+    "cleanup_status": "対象なし",
+    "implementation_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "evidence_is_fixture": false,
+    "provider_readback": "not_connected",
+    "activity_state": "完了",
+    "executed_tc_count": 1
+  },
+  "runner-component": {
+    "source_result": "runner_pass",
+    "result_finalized": true,
+    "raw_capture_complete": true,
+    "cleanup_status": "対象なし",
+    "implementation_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "evidence_is_fixture": false,
+    "provider_readback": "not_connected",
+    "activity_state": "完了",
+    "executed_tc_count": 1
+  },
+  "runner-native": {
+    "source_result": "runner_fail",
+    "result_finalized": true,
+    "raw_capture_complete": true,
+    "cleanup_status": "対象なし",
+    "implementation_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "evidence_is_fixture": false,
+    "provider_readback": "not_connected",
+    "activity_state": "完了",
+    "executed_tc_count": 1
+  },
+  "runner-native-rerun": {
+    "source_result": "runner_pass",
+    "result_finalized": true,
+    "raw_capture_complete": true,
+    "cleanup_status": "対象なし",
+    "implementation_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "evidence_is_fixture": false,
+    "provider_readback": "not_connected",
+    "activity_state": "完了",
+    "executed_tc_count": 1
+  },
+  "runner-timeout": {
+    "source_result": "blocked_cleanup_or_timeout",
+    "result_finalized": false,
+    "raw_capture_complete": false,
+    "cleanup_status": "対象なし",
+    "implementation_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "evidence_is_fixture": false,
+    "provider_readback": "not_connected",
+    "activity_state": "実行中",
+    "executed_tc_count": 1
+  }
+}

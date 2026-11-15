@@ -1,0 +1,66 @@
+[
+  {
+    "query": "E2EのFAILを欠陥候補として整理して、既存の外部Issueと重複していないか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このFindingを外部Issueへ登録してよいか、承認と重複の状況を踏まえて判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Issue ISSUE-9の修正通知が来たので、元の実行ownerに修正確認の再実行を依頼して。",
+    "should_trigger": true
+  },
+  {
+    "query": "欠陥候補ごとに外部Issueへの提出先、保留理由、修正確認結果が閉じているか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "原因が未確定のFAILを正式Defectとして登録していいか判断して。",
+    "should_trigger": true
+  },
+  {
+    "query": "外部Issueのstatusが解決済みになったが、QA側でcloseしてよいか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "静的レビューのFindingを欠陥候補として外部Issueへ引き継ぎたい。",
+    "should_trigger": true
+  },
+  {
+    "query": "外部Issueの検索結果が不完全なまま二重登録しないか照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "Playwright E2Eテストを実行してHTMLレポートを出力して。",
+    "should_trigger": false
+  },
+  {
+    "query": "回帰テストのRun範囲とbaselineを選定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "このFAILの原因をtrace viewerで分析して根本原因を特定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "製品コードのバグを修正してPull Requestを作って。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様書から期待結果を整理して不明点を質問にして。",
+    "should_trigger": false
+  },
+  {
+    "query": "探索テストのCharterを作って今日のセッションを始めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "再利用できるQA知識として環境の注意点を登録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "テストケースの設計技法を選んで条件を洗い出して。",
+    "should_trigger": false
+  }
+]

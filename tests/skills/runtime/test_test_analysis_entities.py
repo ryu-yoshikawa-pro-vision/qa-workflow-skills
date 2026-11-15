@@ -886,7 +886,7 @@ class AnalysisEntityRuntimeTests(unittest.TestCase):
             "envelope_version": "1",
             "skill": "qa-workflow",
             "runtime_contract_version": "runtime-v2",
-            "generator_contract_version": "workflow-runtime-v1",
+            "generator_contract_version": "workflow-runtime-v2",
             "runtime_unit_key": "artifact:workflow_runtime:all",
             "model_key": None,
             "model_type": None,

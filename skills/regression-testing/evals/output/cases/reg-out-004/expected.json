@@ -1,0 +1,66 @@
+{
+  "artifact_type": "activity",
+  "activity_state": "完了",
+  "required_auxiliary_refs": [
+    "vitest:tests/unit/app-config.test.ts"
+  ],
+  "run": {
+    "artifact_type": "run",
+    "route_contract_version": "2",
+    "run_scope": "selected",
+    "baseline": {
+      "complete": true,
+      "currentness": "current",
+      "member_tc_refs": [
+        "TC-001",
+        "TC-002"
+      ]
+    },
+    "selected_tc_refs": [
+      "TC-001",
+      "TC-002"
+    ],
+    "suite_complete": false,
+    "required_routes": [
+      {
+        "tc_ref": "TC-001",
+        "route_type": "manual",
+        "route_ref": "manual",
+        "execution_ref": "EXEC-M-001"
+      },
+      {
+        "tc_ref": "TC-002",
+        "route_type": "testware",
+        "route_ref": "testware:vitest:TC-002",
+        "testware_ref": "vitest:tests/unit/password-hasher.test.ts",
+        "executor_owner": "testware-execution",
+        "implementation_revision": "rev-2026-11-09",
+        "selection_basis": "tests/unit/password-hasher.test.ts",
+        "execution_ref": "EXEC-T-002"
+      }
+    ],
+    "auxiliary_routes": [
+      {
+        "testware_ref": "vitest:tests/unit/app-config.test.ts",
+        "executor_owner": "testware-execution",
+        "implementation_revision": "rev-2026-11-09",
+        "selection_basis": "user_explicit",
+        "completion_required": true,
+        "execution_ref": "EXEC-A-001"
+      },
+      {
+        "testware_ref": "vitest:tests/unit/native-stores.test.ts",
+        "executor_owner": "testware-execution",
+        "implementation_revision": "rev-2026-11-09",
+        "selection_basis": "reference_only",
+        "completion_required": false,
+        "execution_ref": "EXEC-A-002"
+      }
+    ],
+    "auxiliary_testware_refs": [
+      "vitest:tests/unit/app-config.test.ts",
+      "vitest:tests/unit/native-stores.test.ts"
+    ],
+    "auxiliary_testware_count": 2
+  }
+}

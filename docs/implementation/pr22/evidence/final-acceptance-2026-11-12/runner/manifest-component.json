@@ -1,0 +1,126 @@
+{
+  "runner_kind": "component",
+  "reporter_format": "vitest-json",
+  "result_collection": "complete",
+  "collection_verified": true,
+  "source_ref": "qa-training-store@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "build_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "repo_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "environment_ref": "local-wsl2-linux:6.6.87.2;node-v24.22.2;pnpm-10.34.5;vitest-4.1.11;deps=frozen-lockfile@2a8bcf5,--ignore-scripts",
+  "runner_ref": "vitest@4.1.11",
+  "runner_version": "4.1.11",
+  "testware_ref": "qa-training-store:tests/component/cart-page.test.tsx",
+  "testware_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "tc_ref": null,
+  "tc_revision": null,
+  "planned_scope_ref": "qa-training-store:tests/component/cart-page.test.tsx@2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+  "selection_evidence_ref": "local://pr22-acceptance/qts-evidence/selection-component.json (vitest list --json, 3 tests, 2026-11-12)",
+  "selection_filter": null,
+  "selection_evidence_is_caller_declared": true,
+  "declared_selection_matched_report": true,
+  "declared_selected": [
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "shows all DTO prices, issues, totals, and a disabled recovery CTA"
+      ]
+    },
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "renders the empty recovery route when no lines exist"
+      ]
+    },
+    {
+      "path": "tests/component/cart-page.test.tsx",
+      "title_path": [
+        "cart page",
+        "keeps the cart visible while surfacing a mutation failure"
+      ]
+    }
+  ],
+  "run_ref": "pr22-acceptance-web-component-cart-20261112T205800",
+  "artifact_directory": "<scratchpad>/qts-artifacts/non-e2e-qqo0hlc9",
+  "attempts": [
+    {
+      "started": true,
+      "pid": 19806,
+      "return_code": 0,
+      "timeout": false,
+      "interrupted": false,
+      "launch_error": null,
+      "started_at": 1794484731.2191565,
+      "finished_at": 1794484734.5461974,
+      "number": 1,
+      "executed_argv_sha256": "09ec00bf982636a2edc2ae68080b96b2321dca04ef9eb4c242169bbb04a53793",
+      "stdout_ref": "<scratchpad>/qts-artifacts/non-e2e-qqo0hlc9/attempt-1/stdout.log",
+      "stderr_ref": "<scratchpad>/qts-artifacts/non-e2e-qqo0hlc9/attempt-1/stderr.log",
+      "raw_report_ref": "<scratchpad>/qts-artifacts/non-e2e-qqo0hlc9/attempt-1/reporter.json",
+      "result_collection": "complete",
+      "cleanup_state": "not_required",
+      "reconciliation": {
+        "source_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+        "raw_ref": "<scratchpad>/qts-artifacts/non-e2e-qqo0hlc9/attempt-1/reporter.json",
+        "raw_assertion_count": 3,
+        "selected_count": 3,
+        "results": [
+          {
+            "path": "tests/component/cart-page.test.tsx",
+            "title_path": [
+              "cart page",
+              "shows all DTO prices, issues, totals, and a disabled recovery CTA"
+            ],
+            "expected_instances": 1,
+            "collected_instances": 1,
+            "runner_status": "passed",
+            "tc_verdict": null
+          },
+          {
+            "path": "tests/component/cart-page.test.tsx",
+            "title_path": [
+              "cart page",
+              "renders the empty recovery route when no lines exist"
+            ],
+            "expected_instances": 1,
+            "collected_instances": 1,
+            "runner_status": "passed",
+            "tc_verdict": null
+          },
+          {
+            "path": "tests/component/cart-page.test.tsx",
+            "title_path": [
+              "cart page",
+              "keeps the cart visible while surfacing a mutation failure"
+            ],
+            "expected_instances": 1,
+            "collected_instances": 1,
+            "runner_status": "passed",
+            "tc_verdict": null
+          }
+        ],
+        "unexpected": [],
+        "failed_suites_without_tests": [],
+        "inconsistent_suites": [],
+        "reporter_consistent": true,
+        "reporter_success": true,
+        "collection_complete": true,
+        "tc_verdicts_assessed": false,
+        "attempt_completeness": "not_provided_by_reporter"
+      },
+      "process_tree_state": "terminated",
+      "workspace_head_after_cleanup": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "workspace_state_after_cleanup": "clean"
+    }
+  ],
+  "outcome": "runner_pass",
+  "direct_observation_verdict": null,
+  "tc_verdict": null,
+  "expected_authority_ref": null,
+  "direct_tc_authority_evidence": null,
+  "quality_verdict": null,
+  "evidence_is_fixture": false,
+  "provider_readback": "not_connected"
+}

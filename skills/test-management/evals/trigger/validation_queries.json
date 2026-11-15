@@ -1,0 +1,10 @@
+[
+  { "query": "既存runだけから開始して、計画対実績と未完了項目を監視してください。", "should_trigger": true },
+  { "query": "API sourceが未取得のため、0件実行と見なさず計画進捗を更新してください。", "should_trigger": true },
+  { "query": "同じsuiteの見積、消費工数、期限差異、是正を記録したい。", "should_trigger": true },
+  { "query": "報告対象の実行母集団とowner別取得範囲を定義してください。", "should_trigger": true },
+  { "query": "品質目標をstakeholder要求からQA要求artifactに整理してください。", "should_trigger": false },
+  { "query": "承認済みarchitectureのlevel優先ルールを確認してください。", "should_trigger": false },
+  { "query": "外部Issueの重複を調べ、登録後の状態を更新してください。", "should_trigger": false },
+  { "query": "Regression Runの選択とrequired-routeを解決してください。", "should_trigger": false }
+]

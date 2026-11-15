@@ -1,0 +1,26 @@
+{
+  "version": "v6",
+  "source_head": "d63b5588956b767c4ffac300c34ab0f30798c70a",
+  "archive": "trigger-evidence-v6.tar.gz",
+  "sha256": "9dfe4886df9f03f9008b61def5a670f2ac4dfebe1971aed7346a801a410ba64b",
+  "bytes": 422602,
+  "dataset_sha256": "1a3d7e7236d2c865bbe6cf2477b78fd4bbcdbfc12f6cd84318fa54fdf945ee01",
+  "attempt": {
+    "skill": "e2e-test-selection",
+    "split": "train",
+    "query_index": 3,
+    "attempt": 1,
+    "elapsed_seconds": 900.1,
+    "timed_out": true,
+    "turn_completed": false,
+    "scored": false,
+    "read_skills": [
+      "test-analysis"
+    ]
+  },
+  "codex_cli": "0.167.0",
+  "full_repository_snapshot": true,
+  "current_skills": 24,
+  "skill_package_files": 1051,
+  "credential_scan": "0 credential-shaped matches"
+}

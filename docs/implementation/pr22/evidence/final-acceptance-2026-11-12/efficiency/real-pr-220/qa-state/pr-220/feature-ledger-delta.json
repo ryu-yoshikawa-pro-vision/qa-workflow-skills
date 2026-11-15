@@ -1,0 +1,141 @@
+{
+  "schema": "feature-ledger-delta-working-v1",
+  "status": "working_draft_not_persisted",
+  "note": "feature_registry.persist_snapshot未実行。保存先（Project Context / native CAS provider）未確定のため、正式な機能台帳への登録ではない。",
+  "event": {
+    "kind": "merge",
+    "pr": 220,
+    "merge_commit_sha": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+    "base_sha": "d866f90961d73f738473b2c700780abe169ff79e",
+    "primary_source_id": "SRC-001"
+  },
+  "sources": [
+    {
+      "id": "SRC-001",
+      "kind": "code",
+      "ref": "product (local git checkout)",
+      "scope": "repository全tree + base→head差分",
+      "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "status": "complete",
+      "enumeration_complete": true,
+      "unretrieved": [],
+      "evidence_ref": "qa-state/pr-220/evidence/pr220-evidence.json#git_source_inventory"
+    },
+    {
+      "id": "SRC-002",
+      "kind": "spec",
+      "ref": "product/docs/spec/features/*.md（11ファイル）",
+      "scope": "既存の機能仕様。PRでは変更なし。暫定の機能グルーピングとしてのみ参照",
+      "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "status": "partial",
+      "enumeration_complete": false,
+      "unretrieved": ["spec-analysisによる現在有効なAuthority解決が未実施"],
+      "evidence_ref": "product/docs/spec/features/"
+    }
+  ],
+  "features": [],
+  "provisional_feature_refs": [
+    {
+      "ref": "PLATFORM-ROUTING",
+      "label": "expo-router画面遷移・ルート解決（Web / Native共通）",
+      "basis": "app/配下とsrc/presentation/**がexpo-routerを直接import（route-guard, shells, native-shell, root-layout.*）",
+      "stable_feature_id": null
+    },
+    {
+      "ref": "PLATFORM-NATIVE-RUNTIME",
+      "label": "ネイティブ実行環境・テスト制御のbuild metadata判定",
+      "basis": "app.config.tsのextra.testMode / buildKind をexpo-constantsで読むnative-test-control-bridge。AC-NATIVE-002に対応",
+      "stable_feature_id": null
+    },
+    {
+      "ref": "PLATFORM-BUILD-WEB",
+      "label": "Web build（Metro / @expo/metro-runtime）",
+      "basis": "app.config.ts web.bundler=metro。Web CI verify対象",
+      "stable_feature_id": null
+    },
+    {
+      "ref": "PLATFORM-BUILD-NATIVE",
+      "label": "Android / iOS build・prebuild（expo-build-properties, expo-dev-client）",
+      "basis": "app.config.ts plugins、Native CI / Native iOS CI",
+      "stable_feature_id": null
+    }
+  ],
+  "candidates": [],
+  "changes": [
+    {
+      "id": "DIF-001",
+      "source_id": "SRC-001",
+      "before_revision": "d866f90961d73f738473b2c700780abe169ff79e",
+      "after_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "locator": "package.json",
+      "classification": "impact",
+      "feature_ids": [],
+      "provisional_feature_refs": [
+        "PLATFORM-ROUTING",
+        "PLATFORM-NATIVE-RUNTIME",
+        "PLATFORM-BUILD-WEB",
+        "PLATFORM-BUILD-NATIVE"
+      ],
+      "change_summary": "dependencies 6件のversion更新（@expo/metro-runtime 57.0.17→57.0.18、expo 57.0.31→57.0.32、expo-build-properties 57.0.22→57.0.23、expo-constants 57.0.22→57.0.23、expo-dev-client 57.0.20→57.0.21、expo-router 57.0.29→57.0.30）。pnpm.overridesのexpo-constantsを57.0.23へ同期。追加・削除されたdependencyなし。",
+      "reason": "実行時に全ルート・全shellが依存するexpo-router / expo、テスト制御の判定に使うexpo-constants、native build設定のexpo-build-propertiesを含むため影響なしとは分類しない。変更幅は同一SDK line（57.0.x）のpatch相当で、機能仕様の変更は含まれない。",
+      "approval_ref": null
+    },
+    {
+      "id": "DIF-002",
+      "source_id": "SRC-001",
+      "before_revision": "d866f90961d73f738473b2c700780abe169ff79e",
+      "after_revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "locator": "pnpm-lock.yaml",
+      "classification": "impact",
+      "feature_ids": [],
+      "provisional_feature_refs": [
+        "PLATFORM-ROUTING",
+        "PLATFORM-NATIVE-RUNTIME",
+        "PLATFORM-BUILD-WEB",
+        "PLATFORM-BUILD-NATIVE"
+      ],
+      "change_summary": "lockfileのpackages/snapshots計79キー追加・71キー削除。直接更新に伴う同一packageの解決変更（@expo/cli、@expo/metro-runtime、expo-router、expo-modules-core等）と、transitive変更（追加: glob@14.0.3、minimatch@11.0.5、path-scurry@3.0.0、@isaacs/nonrecursive-glob-match@1.1.0 / 削除: zod@3.25.76 の1エントリ）を含む。",
+      "reason": "DIF-001の解決結果そのもの。加えてzod 3.x系のtransitive削除は、製品コードが直接依存しているか未確認のため影響なしとは分類しない。",
+      "approval_ref": null
+    }
+  ],
+  "history": [
+    {
+      "event_id": "EVT-220-MERGE",
+      "kind": "initial_working_entry",
+      "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+      "evidence_ref": "qa-state/pr-220/evidence/pr220-evidence.json",
+      "from_ids": [],
+      "to_ids": ["DIF-001", "DIF-002"]
+    }
+  ],
+  "metrics": {
+    "change_classification": {
+      "classified_effective_dif_ids": ["DIF-001", "DIF-002"],
+      "effective_dif_ids": ["DIF-001", "DIF-002"],
+      "rate": 1.0,
+      "scope": "今回のmerge差分のみ（過去DIFなし）"
+    },
+    "observed_candidate_mapping": {
+      "mapped_candidate_ids": [],
+      "candidate_ids": [],
+      "rate": null,
+      "note": "候補台帳が存在しないため分母0。rate=null"
+    },
+    "git_change_coverage": {
+      "git_change_paths": ["package.json", "pnpm-lock.yaml"],
+      "registered_paths": ["package.json", "pnpm-lock.yaml"],
+      "missing_git_paths": [],
+      "rate": 1.0,
+      "note": "reconcile_git_coverage.pyは未実行（registry_request未作成）。pathの対応は手作業で確認した"
+    }
+  },
+  "unknown_areas": [
+    "製品全体の機能台帳（初回baseline）は未作成。all_product_features_discoveredはnull（発見完了を主張しない）",
+    "upgraded packageの実行時挙動は未検証（ローカルbuild・prebuild・実機・Web実行は未実施）",
+    "PR #220で起動されたCI（Web CI / native-ci等）の結果は未取得",
+    "SRC-002の仕様Authority（spec-analysis）は未解決。docs/spec/features/は暫定グルーピングのみ"
+  ],
+  "all_product_features_discovered": null,
+  "source_boundary_complete": false
+}

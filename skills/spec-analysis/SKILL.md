@@ -1,6 +1,6 @@
 ---
 name: spec-analysis
-description: Figma、要件書、Q&A、リポジトリ、リリース資料などの情報源から、SPEC・DECISION・INFERENCE・UNKNOWNを区別し、対象範囲の現在有効な仕様根拠を解決した追跡可能な仕様分析を作るSkill。テスト分析前の仕様整理、複数情報源の統合、矛盾・制約・状態・業務ルールの抽出に使用する。
+description: 要件書、Q&A、リポジトリ、リリース資料などの情報源から、SPEC・DECISION・INFERENCE・UNKNOWNを区別し、対象範囲の現在有効な仕様Authorityを解決するSkill。UI構造・操作・画面状態・ナビゲーションの分析はui-target-analysisへ委譲し、そのAuthority参照を維持する。
 ---
 
 # 仕様分析
@@ -11,7 +11,7 @@ description: Figma、要件書、Q&A、リポジトリ、リリース資料な�
 2. 未定義の製品挙動を補完せず、`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`を区別します。
 3. テスト要求・テスト条件・テストケースを先回りして作りません。
 4. 通常の仕様抽出、分類、停止条件、最低品質確認は`references/guidance.md`に従います。
-5. テスト設計前の対象理解を継続packageとして作成・更新する場合、または複数資料からUI構造・業務ルール・UNKNOWNを追跡可能に整理する場合は`references/ui-test-target-analysis.md`を読みます。単発の仕様要約やMarkdown出力だけを理由にmodeを選びません。
+5. テスト設計前の対象理解を継続packageとして作成・更新する場合は`references/ui-test-target-analysis.md`を読みます。UI構造・操作・画面表示状態・ナビゲーションの意味更新は`ui-target-analysis`が所有し、仕様Authority、期待挙動、業務状態、権限、AC、UNKNOWN解決は本Skillが所有します。単発の仕様要約やMarkdown出力だけを理由にpackage modeを選びません。
 6. 複数の仕様根拠、バージョン差、情報源競合、決定事項の補足 / 上書き / 置換、承認済みASMの適用判断が必要な場合だけ`references/authority-resolution.md`を追加で読みます。
 7. 通常分析では`assets/output-template.md`、UIテスト対象分析modeではreferenceが指定する`assets/ui-test-target-analysis/`を使用します。案件固有形式がある場合は意味上の出力契約と追跡性を維持する限りそちらを優先します。
 8. 他Skillを参照するときは正規Skill名を使用します。

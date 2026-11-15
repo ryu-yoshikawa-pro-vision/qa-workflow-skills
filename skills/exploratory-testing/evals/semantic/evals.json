@@ -34,6 +34,15 @@
         "EXP-SEM-001",
         "EXP-SEM-004"
       ]
+    },
+    {
+      "id": "EXP-SEM-005",
+      "input": "cases/exp-sem-005/input.md",
+      "reference": "cases/exp-sem-005/reference.md",
+      "criteria": [
+        "EXP-SEM-001",
+        "EXP-SEM-003"
+      ]
     }
   ]
 }

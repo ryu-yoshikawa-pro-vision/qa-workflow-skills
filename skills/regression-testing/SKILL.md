@@ -16,7 +16,7 @@ description: 既存のcurrent QA成果物を継続Regressionへ接続し、basel
 5. full Runはcompleteかつcurrentなbaselineでだけ宣言します。selected RunはSuite全体の完了に数えません。candidate queryが不完全ならscopeを候補だけで狭めません。
 6. scope selection、required routeの確定、execution startを別段階として記録します。selection-only要求はroute未解決でもscope判断を完了でき、execution readinessだけを未解決として残します。実行を要求された場合はselected TCごとのrequired routeを開始前に固定します。actual startはsource execution contractで確認し、全routeの開始後だけlogical TCをexecutedとして数えます。source resultは再判定せずActivityへ投影します。
 7. Activity / Suiteの保存にatomic conditional writeが必要な場合、保存先が提供するnative conditionを確認します。read-compare-unconditional-writeをCASと呼びません。条件付き保存ができない操作は`blocked`にします。
-8. TCなしE2Eはuserまたはproject policyの明示時だけ補助testwareとして含め、TC count / TC coverageと分離します。
+8. TCなしE2E / testwareはuserまたはproject policyの明示時だけ補助testwareとして含め、TC count / TC coverageと分離します。今回実行する補助は`completion_required=true`として記録し、未開始・blockedのままActivityを`完了`にしません。TCに紐付く非E2E実行は`testware` required routeで表し、runnerの起動は実行ownerに委ねます。
 9. FAIL / Findingのfeedbackでは、source結果とevidenceを保ち、原因判断をowner Skillへ戻します。ユーザー向けfeedbackに「FAIL / FindingだけではDefectへ自動登録しない」と明記し、修正確認と、要求された場合の別目的Regressionを分けます。
 
 ## 正規対象

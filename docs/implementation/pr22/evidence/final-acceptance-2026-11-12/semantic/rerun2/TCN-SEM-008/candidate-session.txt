@@ -1,0 +1,16 @@
+候補成果物を `/tmp/claude-1000/-mnt-c-Users-<USER>-Documents-qa-workflow-skills/00000000-0000-4000-8000-900000000003/scratchpad/sem2/cases/TCN-SEM-008/candidate-output.md` に書き込みました。ただし成果物は未完成です。
+
+**runtimeの実行:** 分類木runtime（`classification_tree.py`）の実行をBashで試みましたが、権限拒否されました。組合せruntime（`combinatorial.py`）も未実行です。そのため機械生成のcoverage項目、生成行、Machine Runtime blockは含めていません。`verify_runtime_evidence` のgateも未実行です。
+
+**手作業で導出した内容:**
+- 制約適用後の成立組合せは11件、成立不能は `Firefox + macOS + SAML` の1件です。
+- CI01（全factor pairwise）は成立可能な値ペア16件です。
+- CI02（subset `{browser, os, auth}` の3-wise）は制約適用後のtuple 11件です。subsetが全3factorなので、このcriterionは全成立組合せと一致します。
+- 両者は別criterionとして残し、統合していません。
+
+**判断に迷った点:**
+- **`comb-008` の再利用:** 入力は「current Machine Entityで確認済み」と述べていますが、Entity本体もfingerprintも入力にありません。検証できないため、ブロック中として扱い、新規採番による置換もしていません。
+- **adapter model key:** 入力に記載がないため未採番のままです。
+- **Authority本文:** `SPEC-CTD-008` の本文は入力に無く、入力の記述を根拠として使いました。
+- **優先度と関連プロダクトリスク:** 入力に無いため「未提示」とし、推定で埋めていません。
+- **TCN・CI ID:** runtime採番前のdraft IDとして書いています。

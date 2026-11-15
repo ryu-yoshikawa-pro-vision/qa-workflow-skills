@@ -1,0 +1,14 @@
+[
+  {
+    "name": "pricing policy > applies a sale only within the half-open sale interval",
+    "file": "<scratchpad>/qts/tests/unit/pricing.test.ts"
+  },
+  {
+    "name": "pricing policy > floors the gold discount for each SKU unit before multiplying quantity",
+    "file": "<scratchpad>/qts/tests/unit/pricing.test.ts"
+  },
+  {
+    "name": "pricing policy > uses the same subtotal shipping rule for every membership rank",
+    "file": "<scratchpad>/qts/tests/unit/pricing.test.ts"
+  }
+]

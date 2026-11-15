@@ -618,8 +618,8 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 
 ### 2026-10-09 JST — owner identityで残作業を再開
 
-- 所有者をWindows ACLと`WindowsIdentity`で照合した。通常シェルは`MYCOMPUTER\CodexSandboxOffline`、元repositoryと`.git`のownerは`MYCOMPUTER\sella`。`safe.directory`、Git config、ACLは変更していない。
-- repository owner identity `mycomputer\sella`で通常のGitを実行できることを確認したため、別checkoutへの変更ファイル移行は不要だった。元のworking treeをそのまま使用し、ユーザー所有の未追跡ファイルを移動・変更していない。
+- 所有者をWindows ACLと`WindowsIdentity`で照合した。通常シェルは`MYCOMPUTER\CodexSandboxOffline`、元repositoryと`.git`のownerは`<HOST>\<USER>`。`safe.directory`、Git config、ACLは変更していない。
+- repository owner identity `<HOST>\<USER>`で通常のGitを実行できることを確認したため、別checkoutへの変更ファイル移行は不要だった。元のworking treeをそのまま使用し、ユーザー所有の未追跡ファイルを移動・変更していない。
 - PR / remote head / local HEADは`b2cc4ceafad443cd2475c8a3165dd3b75160fe8d`、branchは`feat/usability-evaluation-skill`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`、ahead 330 / behind 0。
 - `git status`では今回のtracked変更6ファイルだけを確認。未追跡の`.pr14-formal-probe-1791501932895.json`とユーザー所有の`3b77866a0b52347ce6201959f97492f197a61365`は保持し、stage対象外。`.gitignore`とignored overlayは変更なし。
 - owner identityから`git diff --check`がexit 0。差分は既に記録したclose_report Step 4.1 scope、direct/runtime回帰test、reporting contract、`_06b`、進捗記録のみ。
@@ -629,7 +629,7 @@ formal reportはfixture全体をclosureしていない。変更後confirmation s
 
 ### 2026-10-09 JST — commit / push / CI checkpoint
 
-- repository owner identity `mycomputer\sella`から通常Gitを使用。変更6ファイルだけをstageし、通常pre-commitを有効にしたcommit `444af10bbed85cdd989517ec9cfaaae3720459e1`を作成、PR branchへ通常pushした。`--no-verify`、force push、Git config / safe.directory変更は行っていない。
+- repository owner identity `<HOST>\<USER>`から通常Gitを使用。変更6ファイルだけをstageし、通常pre-commitを有効にしたcommit `444af10bbed85cdd989517ec9cfaaae3720459e1`を作成、PR branchへ通常pushした。`--no-verify`、force push、Git config / safe.directory変更は行っていない。
 - commit時のpre-commit一式がsuccess。修正後の再実行はfocused 33 tests、shared deterministic 12、repository deterministic 270、runtime 271、dataset 22 Skills / 155 cases PASS。shared semanticは27 PASS / Windows symlink privilegeによる2 SKIP、repository semantic 4 PASS、trigger contract 1 PASSもhook出力で成功。Python compile、Prettier、Markdownlint、text quality、`git diff --check`もPASS。
 - official `skills-ref`の訂正記録: owner identityのPython 3.11.5環境には`skills-ref` 0.1.0 CLIが存在した。通常起動はWindows cp932 decodeで失敗したため、`PYTHONUTF8=1`を付けてCIと同じ`skills-ref validate`を22 Skillへ実行し、22/22 PASS。Git安全設定とは無関係のPython encoding指定のみ使用。CI workflowもpinned `skills-ref`をinstallして同じvalidateを実施する。
 - 初回owner identity外からの`Get-Command skills-ref`がCLIを見つけなかったため、直前checkpointに「ローカルCLI未確認」と記録していた。この記録は上記のowner identity検証で解消・訂正した。
@@ -706,7 +706,7 @@ PR #14 repository implementation Plan未達: 1件
 
 ## 2026-10-10 JST — canonical WCAG正本保存と正式report完了
 
-- **開始状態:** PR #14 / local HEADは`08aab5d9c562794ce81f74109610b3635e5d0d72`、branchは`feat/usability-evaluation-skill`、baseは`main`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`。初回のsandbox Gitは所有者不一致で拒否されたため、repository owner identity `MYCOMPUTER\sella`の通常Gitを使用した。`safe.directory`、Git設定、ACL、hookは変更していない。
+- **開始状態:** PR #14 / local HEADは`08aab5d9c562794ce81f74109610b3635e5d0d72`、branchは`feat/usability-evaluation-skill`、baseは`main`、`origin/main=dec3f7c764db2869dc24eb3d6f154712a6677068`。初回のsandbox Gitは所有者不一致で拒否されたため、repository owner identity `<HOST>\<USER>`の通常Gitを使用した。`safe.directory`、Git設定、ACL、hookは変更していない。
 - `.pr14-formal-probe-1791501932895.json`とユーザー所有の未追跡`3b77866a0b52347ce6201959f97492f197a61365`は保持し、stage対象外。`.gitignore`とignored local overlayは変更していない。`.codex/runs`はworkspace permissionにより書き込み対象外なので変更せず、検証記録はこの追跡対象reportへ保存する。
 - **修正前の根本問題:** WCAG runtimeの`close-report`は`plan_basis`から内部整合するPlanを作るだけで、現在のevaluation ref/revision、version/level、scope、selected sample、variation、process集合を保存先から再取得しなかった。同じevaluation revisionのままAAからAへ縮小したPlanと結果を渡すと、direct helperと正式runtimeの両方が完了扱いになり得た。既存generic workflow stateはsemantic正本reader / native CASを提供しなかった。
 - **実装:** `qa-workflow/scripts/artifact_graph.py`にstdlib `sqlite3`の限定production providerを追加した。保存先は既存Project Contextの`qa.workflow_state_root/workflow-state.sqlite3`で、単一hostのlocal filesystemだけを受け付ける。workflow envelopeは不変で、`state.wcag_evaluations`にevaluation identity/revision、WCAG target、scope decisions/evidence refs、selected sample identities、variations、process membership、source artifact refs/revisions、canonical Plan、report stateを保存する。同revisionでscope/Planを変更できず、正当な変更は新evaluation revisionを要求する。raw URL、secret、DOM text、scope prose、semantic narrativeは保存しない。

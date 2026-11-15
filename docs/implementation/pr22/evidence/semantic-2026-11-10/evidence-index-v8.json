@@ -1,0 +1,628 @@
+{
+  "metadata": {
+    "repository": "ryu-yoshikawa-pro-vision/qa-workflow-skills",
+    "current_source_head": "b191c6ea111588b86f9030dc18275b9b4c594d83",
+    "source_head_by_runner": {
+      "agent-v2": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "agent-v4": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "agent-v5": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "agent-v6": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "agent-v7": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "agent-v8": "69ab5429a274e93c5e9648de1489f6fb3247eb89",
+      "agent-v9": "d5a91582563d2784a9f68888bfeef55448e890c7",
+      "agent-v10": "f91f40b68cb01136b48fe953e315f418ff54547e",
+      "agent-v11": "6f4970b9a70b0b316d7de9f3470cd189c2180d0f",
+      "agent-v12": "02dbf36357e787d251effb2ff81ab731e0dd7624",
+      "agent-v13": "b191c6ea111588b86f9030dc18275b9b4c594d83"
+    },
+    "generated_with": "Codex CLI 0.167.0 using default configured model (model identifier not exposed)",
+    "judge": "independent codex exec session per case via existing scripts/skills/evals/semantic/run.py --judge-command adapter; adapter uses --output-schema; run.py normalize_judge_response",
+    "reference_or_rubric_in_generation_prompt": false,
+    "package_isolation": "agent-v5/v6/v7/v8/v9 Skill package copies excluded evals/, tests/, and __pycache__; earlier agent-v2/v4 copies contained evaluation files but command trace audit found no command targeting reference.md or rubric.json. Treat earlier cases as trace-audited, with weaker filesystem isolation.",
+    "counts": {
+      "candidate_generated": 23,
+      "candidate_manifest_total": 31,
+      "judge_completed": 23,
+      "pass": 18,
+      "needs_review": 5,
+      "fail": 0,
+      "not_evaluable": 0,
+      "judge_error": 0
+    },
+    "criterion_counts": {
+      "pass": 81,
+      "needs_review": 5
+    },
+    "reference_and_rubric_packaging": "v6 archives exact evaluation-case.json, reference.md, and rubric.json for Judge audit only. These files were not included in candidate-generation Skill packages or prompts.",
+    "latest_update": "TCN-SEM-010 candidate turn completed with CLI subprocess timeout after turn.completed; independent Judge passed all five criteria."
+  },
+  "cases": [
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-001",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 595.5,
+      "agent_event_count": 34,
+      "agent_command_event_count": 14,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 32.1,
+      "judge_only_reference_sha256": "33912cbdb991fbf31a0c080f09d080286166a94d2cdbee29b0f31449e6c38b5d",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-003",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 407.5,
+      "agent_event_count": 54,
+      "agent_command_event_count": 24,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 18.5,
+      "judge_only_reference_sha256": "05743cd444400ba06e90b1ac7814a8e7e792ae6dddabfa2b82bb613c7a8c7500",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-004",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 498.3,
+      "agent_event_count": 50,
+      "agent_command_event_count": 22,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 20.5,
+      "judge_only_reference_sha256": "19fe0e233648fa932e0c16b725cda5c62baa3308f3dc180875c5ea6f183fd2a0",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-005",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 574.4,
+      "agent_event_count": 44,
+      "agent_command_event_count": 17,
+      "judge_verdict": "needs_review",
+      "judge_summary": {
+        "pass": 2,
+        "needs_review": 1,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 60.7,
+      "judge_only_reference_sha256": "1710643d726c67ade32460375e751b798c1b6380b797eba1ff4bdf041f9c7b4a",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-006",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 487.5,
+      "agent_event_count": 37,
+      "agent_command_event_count": 15,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 21.4,
+      "judge_only_reference_sha256": "7759dedf17e9ee5c2dc8ea948709a7747179a9b042875033c69ea7ae9b382904",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-requirement-design",
+      "eval_id": "TR-SEM-001",
+      "source_head": "bda79aabad951dc5a1550b64685c92b5a03aed4b",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 502.6,
+      "agent_event_count": 37,
+      "agent_command_event_count": 15,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 22.0,
+      "judge_only_reference_sha256": "732590899e046a7e35cf5a53cab7a899b9f1932d85a20c71fb9050797b777245",
+      "judge_only_rubric_sha256": "84dd02afaa34d595f4da85158aa81964980fee954521d3c39cc30164278d7271",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-002",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 739.2,
+      "agent_event_count": 37,
+      "agent_command_event_count": 15,
+      "judge_verdict": "needs_review",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 1,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 36.3,
+      "judge_only_reference_sha256": "4c82d48dbb6bcf16f1adb424af3368e56135ef3eb1152f728ba3cb8ab1504e8b",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-analysis",
+      "eval_id": "RISK-SEM-007",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 603.0,
+      "agent_event_count": 31,
+      "agent_command_event_count": 12,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 17.3,
+      "judge_only_reference_sha256": "11e18fc6c847cb67d9ba1f59a03b8e044d87bb01ddd80cbbf8aa04f08ad9facd",
+      "judge_only_rubric_sha256": "b4b18add7ede76c398954f9a31aa4174a0ce6bc757b9e31050c6a6ca6b04b596",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-requirement-design",
+      "eval_id": "TR-SEM-002",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 710.9,
+      "agent_event_count": 115,
+      "agent_command_event_count": 54,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 55.1,
+      "judge_only_reference_sha256": "d7eca89c5702685e50f5afa0ba41796ec6ee91a74d820ac6fec399f028733845",
+      "judge_only_rubric_sha256": "84dd02afaa34d595f4da85158aa81964980fee954521d3c39cc30164278d7271",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-requirement-design",
+      "eval_id": "TR-SEM-003",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 554.9,
+      "agent_event_count": 37,
+      "agent_command_event_count": 15,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 5,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 72.5,
+      "judge_only_reference_sha256": "f9f9ae860c9c01214bc9647ec7ca2a56164044f34406f5b221ae9995d25b1ad3",
+      "judge_only_rubric_sha256": "84dd02afaa34d595f4da85158aa81964980fee954521d3c39cc30164278d7271",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-001",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 889.0,
+      "agent_event_count": 150,
+      "agent_command_event_count": 66,
+      "judge_verdict": "needs_review",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 1,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 53.9,
+      "judge_only_reference_sha256": "3821600a4973d118ab7f17496230815cdc20c6d8c8d00a6e2637b95e56ae63f3",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-003",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 911.5,
+      "agent_event_count": 71,
+      "agent_command_event_count": 30,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 22.4,
+      "judge_only_reference_sha256": "5cc7f51925cf23c4ea88bbbd720217fab6264f92d40e6548fb2c8a0580e78624",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "e2e-test-selection",
+      "eval_id": "E2E-SEL-SEM-001",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 312.3,
+      "agent_event_count": 26,
+      "agent_command_event_count": 10,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 3,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 35.0,
+      "judge_only_reference_sha256": "8175fadf52e4617e583ce7cf7f72603532a5b471c8826b82f79bbfa277c30df8",
+      "judge_only_rubric_sha256": "6c4ba15a458c4e3f01a3b79d71137a686738ac295f72cfe7863259fe8b7c4834",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "e2e-test-selection",
+      "eval_id": "E2E-SEL-SEM-002",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 179.1,
+      "agent_event_count": 24,
+      "agent_command_event_count": 8,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 2,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 27.5,
+      "judge_only_reference_sha256": "5294b70cea1ca3d6d66e24c59d579b3c64580c3d98fd967cd424963d2ad316d6",
+      "judge_only_rubric_sha256": "6c4ba15a458c4e3f01a3b79d71137a686738ac295f72cfe7863259fe8b7c4834",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "e2e-test-selection",
+      "eval_id": "E2E-SEL-SEM-003",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 643.3,
+      "agent_event_count": 41,
+      "agent_command_event_count": 15,
+      "judge_verdict": "needs_review",
+      "judge_summary": {
+        "pass": 1,
+        "needs_review": 1,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": 33.3,
+      "judge_only_reference_sha256": "b1be5b5e98724640e8b861384c663daf6c87176cfb85734161085d6a8bbfddc2",
+      "judge_only_rubric_sha256": "6c4ba15a458c4e3f01a3b79d71137a686738ac295f72cfe7863259fe8b7c4834",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-002",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 1189.9,
+      "agent_event_count": 164,
+      "agent_command_event_count": 78,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 5,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_only_reference_sha256": "9ec3504a686c0f668dc69d7a290b7482d4353698c47c3785a267d45a526cf016",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-004",
+      "source_head": "6c3e9f1e8c1e848fdec716e7f17395a75d42bda6",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 1102.4,
+      "agent_event_count": 73,
+      "agent_command_event_count": 32,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_only_reference_sha256": "770506055689c02d0bbd28d9e815614e1708780d9d51e1041dcdac53589042f7",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-005",
+      "source_head": "69ab5429a274e93c5e9648de1489f6fb3247eb89",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 744.4,
+      "agent_event_count": 115,
+      "agent_command_event_count": 54,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_only_reference_sha256": "92a53a96f501e766601e720839a548e3576932cf8889893719d722cca334fc13",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-006",
+      "source_head": "d5a91582563d2784a9f68888bfeef55448e890c7",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 897.8,
+      "agent_event_count": 137,
+      "agent_command_event_count": 65,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_only_reference_sha256": "5bfa12a5503e615d24a01e19bcb29c2efd18e4e325b589fe7817be60df75d6d9",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-007",
+      "source_head": "f91f40b68cb01136b48fe953e315f418ff54547e",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 1017.7,
+      "agent_event_count": 155,
+      "agent_command_event_count": 74,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_only_reference_sha256": "70dc935b395e7bf645eac1c3f800fca676579f89022fe82d04e9e8fbb5777d71",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-008",
+      "source_head": "02dbf36357e787d251effb2ff81ab731e0dd7624",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 740.4,
+      "agent_event_count": 91,
+      "agent_command_event_count": 41,
+      "judge_verdict": "needs_review",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 1,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_runner_exit_code": 1,
+      "judge_execution_status": "completed; raw response normalized by existing run.py; exit 1 represents needs_review, not adapter error",
+      "judge_only_reference_sha256": "ef00a165cc919123e611f0df5d4ebfc4bf40db025477ae10a8923617af4e5a85",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ],
+      "review_notes": [
+        "SEM-TCN-002 improved to pass after Agent used blocked/unresolved instead of inventing a new child ID when stable identity was unavailable.",
+        "SEM-TCN-005 remains needs_review due Judge interpretation of redundant witness executions; no rubric/reference/runtime rule was changed."
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-009",
+      "source_head": "6f4970b9a70b0b316d7de9f3470cd189c2180d0f",
+      "generator_status": "generated",
+      "agent_elapsed_seconds": 877.2,
+      "agent_event_count": 175,
+      "agent_command_event_count": 74,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 4,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_runner_exit_code": 0,
+      "judge_execution_status": "completed; normalized response available; no adapter error",
+      "judge_only_reference_sha256": "666fac86b35e4cbf9c104c5d1a0a55835d647a61d53354c7d9eafdaea551cb60",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    },
+    {
+      "skill": "test-condition-design",
+      "eval_id": "TCN-SEM-010",
+      "source_head": "b191c6ea111588b86f9030dc18275b9b4c594d83",
+      "generator_status": "generated; turn.completed; wrapper timeout after completion",
+      "agent_elapsed_seconds": null,
+      "agent_cli_timeout_seconds": 1200,
+      "agent_event_count": 105,
+      "agent_command_event_count": 48,
+      "agent_candidate_bytes": 67536,
+      "judge_verdict": "pass",
+      "judge_summary": {
+        "pass": 5,
+        "needs_review": 0,
+        "fail": 0,
+        "not_evaluable": 0
+      },
+      "judge_elapsed_seconds": null,
+      "judge_runner_exit_code": 0,
+      "judge_execution_status": "completed; independent Judge response normalized by existing run.py; no adapter error",
+      "judge_only_reference_sha256": "bc1c1570d38cf4060e0b0d34b88abe143ef521242ca8f038e28840a6c793eb64",
+      "judge_only_rubric_sha256": "937be4907f1c446fe33aa52f8cfc7eeeb09fd4e112b4e4ca6ee2664c0317db70",
+      "generation_input_file": "input.md",
+      "judge_only_files_excluded_from_generation": [
+        "reference.md",
+        "rubric.json",
+        "evaluation-case.json"
+      ]
+    }
+  ]
+}

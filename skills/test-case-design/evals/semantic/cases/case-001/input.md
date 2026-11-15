@@ -39,12 +39,43 @@ TCN-001-CI01: 有効な新名称を保存したとき、保存成功後の設定
     "semantic_item_key": null,
     "semantic_item_text": null,
     "semantic_source_targets": [],
+    "scope_refs": [],
     "status": "active"
   },
-  "content_fingerprint": "sha256:479e6ff6d93ba5b8d7c25fc972ae33ec135a1e4a43b1cbe4a0967bf59a2cede9",
+  "content_fingerprint": "sha256:6543285b3fc79f8716e27aabd5671779d60f5a6e4a9ddffcd79bbad26fb582a5",
   "upstream_entity_dependencies": [],
   "runtime_dependencies": []
 }
+```
+
+## 入力するAuthority Machine Entity（current）
+
+```json
+[
+  {
+    "schema_version": "entity-state-v2",
+    "skill": "spec-analysis",
+    "entity_type": "authority",
+    "entity_ref": "AUTH-SETTING-001",
+    "model_key": null,
+    "content": {
+      "active_content": {
+        "text": "設定名は1〜50文字。有効な名称の保存成功時、設定一覧へ新しい名称が表示される。保存成功時のトースト表示は仕様にない。"
+      },
+      "authority_id": "AUTH-SETTING-001",
+      "authority_type": "SPEC",
+      "related_authority_refs": [],
+      "relations": [],
+      "scope": null,
+      "source_refs": [
+        "SRC-SETTING-SPEC@rev-3"
+      ]
+    },
+    "content_fingerprint": "sha256:94b3fb6568e8faaa8720b1c9f5a26965725dd7bb031ff4d795c17f1f718b9ebf",
+    "upstream_entity_dependencies": [],
+    "runtime_dependencies": []
+  }
+]
 ```
 
 ## Authority

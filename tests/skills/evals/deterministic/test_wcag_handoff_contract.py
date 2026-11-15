@@ -273,6 +273,8 @@ class WcagObservationHandoffTests(unittest.TestCase):
             external_reservation_acquired=True,
             external_reservation_revision="sqlite:7",
         )
+        self.assertEqual(reserved["status"], "blocked")
+        self.assertEqual(reserved["reason"], "external_reservation_readback_required")
         self.assertEqual(reserved["reservation_revision"], "sqlite:7")
 
 
@@ -379,13 +381,29 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
             )
 
             claim = graph.claim_mutable_operation(
-                Path(temporary) / "claims", workflow_ref, handoff["operation_ref"]
+                Path(temporary) / "claims",
+                workflow_ref,
+                handoff["operation_ref"],
+                operation_details={
+                    "owner_skill": "usability-inspection",
+                    "scope_ref": "wcag:scope",
+                    "operation_type": "browser_observation",
+                    "target_ref": "fixture-browser-session",
+                    "source_revisions": [
+                        {"ref": "wcag-evaluation", "revision": "rev-a"}
+                    ],
+                    "artifact_revisions": [],
+                    "expected_revision": None,
+                    "approval_ref": None,
+                    "permission_scope": None,
+                    "resume_owner": "usability-inspection",
+                },
             )
             self.assertTrue(claim["may_start"])
             acquired = provider.acquire_reservation(
                 "fixture-browser-session", workflow_ref
             )
-            reserved = graph.reserve_shared_resource(
+            candidate = graph.reserve_shared_resource(
                 "unused",
                 "fixture-browser-session",
                 workflow_ref,
@@ -394,13 +412,21 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
                 external_reservation_acquired=True,
                 external_reservation_revision=f"sqlite:{acquired['revision']}",
             )
+            self.assertEqual(candidate["status"], "blocked")
+            self.assertEqual(
+                candidate["reason"], "external_reservation_readback_required"
+            )
+            # The actual fixture provider owns the atomic reservation; a
+            # self-attested helper result cannot grant browser start permission.
+            self.assertEqual(acquired["status"], "reserved")
+            self.assertEqual(acquired["owner_workflow_ref"], workflow_ref)
             handoff["operation_claim_ref"] = claim["path"]
             handoff["operation_claim_revision"] = claim["claim_revision"]
             reservation_row = {
                 "resource_ref": "fixture-browser-session",
-                "reservation_ref": reserved["reservation_ref"],
-                "provider": reserved["provider"],
-                "reservation_revision": reserved["reservation_revision"],
+                "reservation_ref": acquired["reservation_ref"],
+                "provider": "sqlite_test_handoff_provider",
+                "reservation_revision": f"sqlite:{acquired['revision']}",
                 "status": "reserved",
             }
             handoff["resource_reservations"] = [reservation_row]
@@ -450,14 +476,16 @@ class SQLiteTestCASProviderTests(unittest.TestCase):
             release_decision = graph.release_shared_resource(
                 current_workflow_ref=workflow_ref,
                 expected_workflow_ref=workflow_ref,
-                expected_reservation_revision=reserved["reservation_revision"],
-                current_reservation_revision=reserved["reservation_revision"],
+                expected_reservation_revision=f"sqlite:{acquired['revision']}",
+                current_reservation_revision=f"sqlite:{acquired['revision']}",
                 native_atomic_conditional_release=True,
                 owner_state_verified=True,
                 owner_execution_state="complete",
                 cleanup_confirmed=True,
             )
-            self.assertEqual(release_decision["status"], "conditional_release_required")
+            self.assertEqual(release_decision["status"], "blocked")
+            # The fixture provider performs the actual native release; the
+            # common helper cannot authenticate this owner or release it.
             released = provider.release_reservation(
                 "fixture-browser-session", workflow_ref, acquired["revision"]
             )

@@ -1,0 +1,15 @@
+# 安全な再開判断
+
+## 現在の状態
+
+Manifest mismatchがあるcanonical bytes、`v09` baseline、編集copyを別々に保全します。正本のManifestを手で修正せず、不正なcanonicalをcurrentとして採用しません。提示情報だけでは、直前のrequestがcommit済みか判断できません。
+
+この状態ではwriterを呼ばず、canonical writeをblockedにします。作業copyやgenerated/control fileをcanonicalへコピーせず、既存`ui_target_package.py materialize`を唯一のwriterとして維持します。
+
+## 再開条件
+
+まず許可された保存先の履歴またはwrite receiptで、同一fingerprintのrequestがすでにcommitされたかを確認します。commit済みなら、その正式revisionを取得して独立readbackし、同じrequestを再送しません。未commitの場合も、canonical rootの復旧は権限あるruntime ownerが独立検証済み`v09` baselineから行い、その後のcurrent snapshotを`inspect`で確認するまでblockedを継続します。
+
+復旧後はhuman proposalをcurrent snapshotに対して再準備し、変更が許可されたscope内かを確認します。scopeやowner境界が不明ならblockedにします。UI ownerの意味確認、Q06配置合意、変更ごとのsource evidence、retire理由・明示承認を改めて確認します。approval refは証拠値であり、認証済み承認とはみなしません。authenticated approverとowner verifierを確認できないこのrunでは、正式保存はblockedのままです。承認されたrequestだけを同じsnapshotで既存writerへ渡し、receiptと独立readbackを確認します。応答消失後にcommit状態が不明なら、まず履歴／receiptを照合し、既存writerが冪等な再送を保証する場合に限り同一request・snapshot・fingerprintを再送してreadbackします。`stale_snapshot`またはcurrent revisionの変更は同一requestの再送理由にせず、fresh snapshotとowner reviewに戻します。新しいdraft IDは旧requestが未commitでID未割当と確認できた場合だけ使い、状態を確認できない場合はblockedを継続します。
+
+旧`ui-target-v1` packageの`PAGE-002`、`UIOP-004`、conditional file applicability、Manifest、stable ID lifecycle、migration互換性、retired `PAGE-001`のCHANGELOG履歴は維持します。package-local lockはremote CASや複数workspaceの履歴証明ではなく、独立fixtureもA runtime・実provider・他owner成果物の統合証拠ではありません。

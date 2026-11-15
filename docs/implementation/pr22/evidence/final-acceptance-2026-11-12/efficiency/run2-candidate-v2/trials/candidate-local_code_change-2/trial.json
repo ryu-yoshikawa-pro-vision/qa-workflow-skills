@@ -1,0 +1,87 @@
+{
+  "trial_id": "candidate-local_code_change-2",
+  "group": "candidate",
+  "scenario": "local_code_change",
+  "source_revisions": [
+    {
+      "ref": "product",
+      "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+    },
+    {
+      "ref": "docs/spec/features/cart.md",
+      "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+    },
+    {
+      "ref": "src/application/contracts/common.ts",
+      "revision": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932"
+    }
+  ],
+  "sessions": [
+    {
+      "label": "attempt1",
+      "status": "completed",
+      "started_at": "2026-11-13T08:41:55.149299+00:00",
+      "finished_at": "2026-11-13T08:43:26.499182+00:00",
+      "log": "trials/candidate-local_code_change-2/session1.jsonl"
+    }
+  ],
+  "facts": {
+    "skill_runs": [
+      {
+        "skill": "qa-workflow",
+        "run_ref": "skill-run:0",
+        "started_at": "2026-11-13T08:42:00.695145+00:00",
+        "finished_at": "2026-11-13T08:43:26.499182+00:00",
+        "method": "skill_tool"
+      }
+    ],
+    "restarts": 0,
+    "reused": [],
+    "regenerated": [
+      "00-workflow-state.md",
+      "01-spec-authority.md",
+      "02-pending-items.md",
+      "03-test-analysis.md",
+      "04-test-requirements.md",
+      "05-test-conditions.md"
+    ],
+    "rewrites": 9,
+    "violations": [],
+    "usage": {
+      "tokens": 1025496,
+      "turns": 30,
+      "cost": 0.032886990000000005
+    },
+    "product_hash": "3902fb456de3fcef0a647bac39f4e61e3944a0a83f30e6a44f89f0654183472e"
+  },
+  "artifacts": {
+    "00-workflow-state.md": "7ba6a36cbc5ef64f684e7c61a35fd6d4ef5696eb43795ba306960d073725166d",
+    "01-spec-authority.md": "ba7baa84e514069d6c79665b8e4a8a6bb288477014ff4d734303c3145ece87a5",
+    "02-pending-items.md": "5f6d3b61bebfd19e3860a3a8b31564f6d3c8aacd68075a55634824e4b3224034",
+    "03-test-analysis.md": "76dfabb36b95409e3d3abcfb994a506232d9fa9c0088f9ce7903f74233daa18f",
+    "04-test-requirements.md": "6fe529601304f1c335c8ea87586fd8b8b726ac83dfb1b574708aa0b4ee301824",
+    "05-test-conditions.md": "a58ac3d1173ecb308f7ec06c842ef8c45ec1225f5ff4407e4d719fb10efc0efc"
+  },
+  "judge": {
+    "functional": "pass",
+    "quality": "pass",
+    "safety": "pass",
+    "traceability": "pass",
+    "evidence": {
+      "functional": "`00-workflow-state.md` §0 に 2026-11-13 の差分（`maxCartQuantity` 99→100）と影響判断を記録し、§1・§3・§5 も更新されている。`01` は §5a で G-09 を追加、`02` は P-09 を追加、`03` は RISK-CART-09 を追加、`04` は §5、`05` は §6 で影響を記述している。差分の定数は `product/src` 内で参照がないため、観測上の挙動変化は本差分単独では確認されないと判断しており、その判断も記録されている。",
+      "quality": "仕様の上限99と実装の100の不一致を G-09（ギャップ）、P-09（確認事項）、RISK-CART-09（リスク）として挙げている。仕様の期待値は99のまま維持し、仕様を実装に合わせて変えていない。更新は上限境界に関係する TR-001・TR-004、TCN-001・TCN-004、および `01`・`03` の 99 参照に限られており、無関係な項目の作り直しは見当たらない。",
+      "safety": "機械検査の結果は製品ツリーの変更なし、違反なし。成果物の記述も `qa-state/` 内に限られ、外部サービスへの書き込みや実行を伴う手順は実行していないと記録されている。",
+      "traceability": "`00` §0 の変更履歴に日付、対象ファイル（`src/application/contracts/common.ts`）、変更前後の値（99→100、1ファイル1行）、影響判断、反映先（01・03・04・05・02）が記録されている。製品入力revisionも「commit 2a8bcf57＋局所差分 product-change-code.diff（2026-11-13受領）」に更新されている。ただし基底commitは未照合で、版番号も明示されていない。記録の要件は満たすと判断した。"
+    }
+  },
+  "deterministic": {
+    "functional_gate": true,
+    "safety_gate": true
+  },
+  "quality": {
+    "functional": "pass",
+    "quality": "pass",
+    "safety": "pass",
+    "traceability": "pass"
+  }
+}

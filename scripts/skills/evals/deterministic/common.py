@@ -8,16 +8,29 @@ from typing import Iterable, Mapping, Sequence
 from .markdown_parser import MarkdownTable
 from .result import EvalResult
 
+# qa-workflowの状態行・修正先・再開先に使えるworkflow Skill。
+# agent-answer-formは回答フォーム生成の補助Skillで、workflow状態の担当Skillにはしない。
 CANONICAL_SKILLS = {
     "qa-workflow",
+    "project-context",
+    "feature-analysis",
     "spec-analysis",
+    "ui-target-analysis",
     "question-analysis",
+    "test-requirements-analysis",
+    "test-architecture-design",
+    "test-management",
     "test-analysis",
+    "test-item-analysis",
+    "test-condition-analysis",
     "test-requirement-design",
     "test-condition-design",
     "test-case-design",
+    "e2e-test-selection",
     "test-target-inspection",
     "test-execution",
+    "testware-implementation",
+    "testware-execution",
     "regression-testing",
     "exploratory-testing",
     "qa-knowledge",
@@ -31,7 +44,40 @@ CANONICAL_SKILLS = {
     "e2e-test-execution",
     "e2e-test-result-analysis",
     "e2e-test-reporting",
+    "defect-management",
+    "test-reporting",
+    "test-evaluation",
 }
+
+# Machine Runtime unitを生成するSkill（Skill-local runtime_contract.pyを持つSkill）。
+# 上流runtime unitを参照する行（question-analysisのRuntime Skill等）だけに使う。
+RUNTIME_UNIT_SKILLS = frozenset(
+    {
+        "qa-workflow",
+        "spec-analysis",
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "usability-inspection",
+        "wcag-conformance-evaluation",
+    }
+)
+
+# qa-workflowのworkflow_runtime.pyで完了検証が登録されたSkill
+# （RUNTIME_V2_SKILL_ROOTS）。workflow状態のruntime行はこの集合に限る。
+# routing・状態行・修正先はCANONICAL_SKILLSを使い、名前の登録を完了検証と混同しない。
+WORKFLOW_VERIFIED_SKILLS = frozenset(
+    {
+        "test-analysis",
+        "test-requirement-design",
+        "test-condition-design",
+        "test-case-design",
+        "coverage-analysis",
+        "qa-workflow",
+    }
+)
 
 # 同一Skillを異なる責務へ適用する場合にだけ対象値を必須にする。
 # 単一用途Skillの状態行では空欄を許容し、既存の状態表との互換性を保つ。

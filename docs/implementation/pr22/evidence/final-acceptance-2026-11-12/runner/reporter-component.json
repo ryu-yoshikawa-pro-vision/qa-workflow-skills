@@ -1,0 +1,70 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 3,
+  "numPassedTests": 3,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1794484732162,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["cart page"],
+          "fullName": "cart page shows all DTO prices, issues, totals, and a disabled recovery CTA",
+          "status": "passed",
+          "title": "shows all DTO prices, issues, totals, and a disabled recovery CTA",
+          "duration": 526.25413,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cart page"],
+          "fullName": "cart page renders the empty recovery route when no lines exist",
+          "status": "passed",
+          "title": "renders the empty recovery route when no lines exist",
+          "duration": 24.08173799999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cart page"],
+          "fullName": "cart page keeps the cart visible while surfacing a mutation failure",
+          "status": "passed",
+          "title": "keeps the cart visible while surfacing a mutation failure",
+          "duration": 59.16675200000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1794484733835,
+      "endTime": 1794484734445.1667,
+      "status": "passed",
+      "message": "",
+      "name": "<scratchpad>/qts/tests/component/cart-page.test.tsx"
+    }
+  ]
+}

@@ -343,6 +343,62 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             evidence=fabricated or None,
         )
 
+    handoff = expected.get("selection_handoff")
+    if handoff is not None:
+        issues: list[dict] = []
+        selection_ref = str(handoff["selection_ref"])
+        revision = str(handoff["selection_revision"])
+        handed = [str(cid) for cid in handoff.get("target_candidate_ids", [])]
+        excluded = [str(cid) for cid in handoff.get("excluded_candidate_ids", [])]
+        implementing = {"新規E2E実装", "既存E2E再利用", "既存E2E拡張"}
+
+        def mentions(row: dict[str, str], token: str) -> bool:
+            return token in clean(row.get("E2E対象 / 識別子", "")) or token in clean(
+                row.get("決定根拠", "")
+            )
+
+        if handoff.get("usable") is True:
+            for cid in handed:
+                rows = [row for row in targets if mentions(row, cid)]
+                if not rows:
+                    issues.append({"candidate": cid, "problem": "対象決定に無い"})
+                for row in rows:
+                    basis = clean(row.get("決定根拠", ""))
+                    if selection_ref not in basis or revision not in basis:
+                        issues.append(
+                            {
+                                "candidate": cid,
+                                "problem": "決定根拠にselection refとrevisionが無い",
+                            }
+                        )
+        else:
+            # 使えない選定（stale・不明source・母集団不完全等）は実装対象にしない。
+            for row in targets:
+                if selection_ref in clean(row.get("決定根拠", "")) and (
+                    clean(row.get("扱い", "")) in implementing
+                ):
+                    issues.append(
+                        {
+                            "target": clean(row.get("E2E対象 / 識別子", "")),
+                            "problem": "使えない選定を根拠に実装対象としている",
+                        }
+                    )
+        for cid in excluded:
+            for row in targets:
+                if mentions(row, cid) and clean(row.get("扱い", "")) in implementing:
+                    issues.append(
+                        {
+                            "candidate": cid,
+                            "problem": "選定されていない候補を実装対象としている",
+                        }
+                    )
+        result.add(
+            "E2E-INSP-D017",
+            not issues,
+            "E2E選定の結果（selected・current）だけを対象にし、選定refとrevisionを記録すること",
+            evidence=issues or None,
+        )
+
     source_values = []
     for row in freshness + facts:
         source_values.extend(

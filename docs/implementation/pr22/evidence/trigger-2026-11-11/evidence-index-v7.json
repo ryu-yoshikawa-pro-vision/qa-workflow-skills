@@ -1,0 +1,44 @@
+{
+  "version": "v7",
+  "source_head": "d63b5588956b767c4ffac300c34ab0f30798c70a",
+  "archive": "trigger-evidence-v7.tar.gz",
+  "sha256": "08f15eb7e1c4617a6750e185a3b299b0672bb73731727bbecea269a0081ee01c",
+  "bytes": 696013,
+  "dataset_sha256": "1a3d7e7236d2c865bbe6cf2477b78fd4bbcdbfc12f6cd84318fa54fdf945ee01",
+  "query_sha256": "af7e4b7ab5e44cdd552a93ee5647d7a11a9e98143fb8a30a595a98ca228521ea",
+  "attempts": [
+    {
+      "attempt": 1,
+      "elapsed_seconds": 900.1,
+      "timed_out": true,
+      "turn_completed": false,
+      "event_count": 124,
+      "command_event_count": 50,
+      "observed_skill_reads": ["test-analysis"],
+      "target_trigger_observed": false,
+      "score_counted": false
+    },
+    {
+      "attempt": 2,
+      "elapsed_seconds": 900.0,
+      "timed_out": true,
+      "turn_completed": false,
+      "event_count": 124,
+      "command_event_count": 54,
+      "observed_skill_reads": ["test-analysis", "e2e-test-selection"],
+      "target_trigger_observed": true,
+      "score_counted": false
+    },
+    {
+      "attempt": 3,
+      "status": "interrupted-before-trace",
+      "turn_completed": false,
+      "score_counted": false
+    }
+  ],
+  "codex_cli": "0.167.0",
+  "full_repository_snapshot": true,
+  "current_skills": 24,
+  "skill_package_files": 1051,
+  "credential_scan": "0 credential-shaped matches"
+}

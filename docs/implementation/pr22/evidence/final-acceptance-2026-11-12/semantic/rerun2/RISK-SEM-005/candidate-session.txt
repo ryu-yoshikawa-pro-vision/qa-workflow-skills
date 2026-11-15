@@ -1,0 +1,14 @@
+候補成果物を `candidate-output.md` に書きました。ただし **未完成扱い** です。機械証拠の描画と最終 `verify_runtime_evidence` ゲートを通していないためです。
+
+**ランタイムの実行状況**
+- `risk_matrix`、`technique_candidates`、`analysis_entities` の3つは、実際に実行して `runtime_status: ok` / `result_status: ready` を得ました。`analysis_entities` は5件のEntity（RISK-001〜003、SEL-RANK-001、analysis-context）を生成しています。
+- 途中で Bash の実行権限が拒否され、2回再試行しても通りませんでした。そのため、結果を `render_*` で描画することも、`verify_runtime_evidence` を実行することもできていません。
+- 描画されたJSONを手で組み立てると契約違反になるため、ファイルの「Machine Runtime / Entity」節は「未添付」とし、その理由を書いています。
+- 作業用の入力JSONと `build_candidate.py` は `cases/RISK-SEM-005/work/` にあります。Bashが使えるようになれば、描画と検証はそのまま再開できます。
+
+**判断に迷った点**
+- **リスク評価は私の判断です。** 入力にはリスク一覧と影響度・発生可能性がなかったため、入力から候補を立て、マトリクスで評価しました。RISK-001と002は高、RISK-003は中（低信頼）です。
+- **運用プロファイル未取得では停止していません。** 分布値は準備未決の扱いにし、分析自体は進めました。
+- **「関連商品」の判定元が入力に定義されていません。** 合否判定の厳密性を下げる残存事項として記載し、question-analysisへの確認を推奨しています。
+- **Random Testingは「採用（条件付き）」としました。** 条件は、分布取得経路の決定、固定seed、系統的カバレッジの併用、判定元の確定の4つです。
+- **`authority_refs` は空にしています。** SPEC-SRCH-005 の spec-analysis Authority Machine Entity が入力に無く、存在しないEntityを作ることはできないためです。

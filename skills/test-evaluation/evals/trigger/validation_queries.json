@@ -1,0 +1,66 @@
+[
+  {
+    "query": "計画対実績と欠陥・coverageからQA活動の有効性を評価して、未測定の指標を明示して。",
+    "should_trigger": true
+  },
+  {
+    "query": "改善項目が採用されても実施されていない場合、達成扱いにならないことを確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "複数の指標から根拠のない総合点を作らずに、軸ごとの結果を報告して。",
+    "should_trigger": true
+  },
+  {
+    "query": "悪化した指標と改善なしの指標を、改善件数に数えずに整理して。",
+    "should_trigger": true
+  },
+  {
+    "query": "再利用性の評価で、実証していない範囲へ一般化しないよう注記して。",
+    "should_trigger": true
+  },
+  {
+    "query": "評価の入力となる報告や計画が旧版になっていないか確認してから評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "計画改版の影響を受けるアーキテクチャとRiskだけを再確認対象にして。",
+    "should_trigger": true
+  },
+  {
+    "query": "次回のQA活動で改善の効果を測定する条件を決めて。",
+    "should_trigger": true
+  },
+  {
+    "query": "Skill構成を変えた前後のQA遂行効率を実測して比較して。",
+    "should_trigger": false
+  },
+  {
+    "query": "E2E結果を人間向け報告にまとめて。",
+    "should_trigger": false
+  },
+  {
+    "query": "外部Issueの修正確認を再実行依頼して。",
+    "should_trigger": false
+  },
+  {
+    "query": "探索テストでFindingを調査して。",
+    "should_trigger": false
+  },
+  {
+    "query": "製品要求書の矛盾をレビューして。",
+    "should_trigger": false
+  },
+  {
+    "query": "テスト方式とアーキテクチャを設計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "リリース承認の判断をして。",
+    "should_trigger": false
+  },
+  {
+    "query": "機能抽出の網羅性を検証して。",
+    "should_trigger": false
+  }
+]

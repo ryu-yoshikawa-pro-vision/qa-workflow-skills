@@ -1,0 +1,5 @@
+{
+  "known_sources": ["REQUEST-01", "RISK-001"],
+  "required_qa_requirement_ids": ["QAR-001", "QAR-002"],
+  "must_not_claim_approved": false
+}

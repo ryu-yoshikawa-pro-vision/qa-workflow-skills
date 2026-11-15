@@ -1,0 +1,11 @@
+{
+  "skill": "testware-implementation",
+  "canonical_output": true,
+  "cases": [
+    {
+      "id": "TW-IMPL-OUT-001",
+      "input": "cases/case-001/input.md",
+      "expected": "cases/case-001/expected.json"
+    }
+  ]
+}

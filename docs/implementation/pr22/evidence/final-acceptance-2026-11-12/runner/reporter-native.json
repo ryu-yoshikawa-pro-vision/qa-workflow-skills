@@ -1,0 +1,102 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 3,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 4,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1794484766307,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 5504,
+          "failureDetails": [
+            {
+              "message": "thrown: \"Exceeded timeout of 5000 ms for a test.\nAdd a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.\""
+            }
+          ],
+          "failureMessages": [
+            "Error: thrown: \"Exceeded timeout of 5000 ms for a test.\nAdd a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.\"\n    at it (<scratchpad>/qts/tests/component/native/native-cart-screen.test.tsx:73:3)\n    at _dispatchDescribe (<scratchpad>/qts/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/index.js:91:26)\n    at describe (<scratchpad>/qts/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/index.js:55:5)\n    at Object.describe (<scratchpad>/qts/tests/component/native/native-cart-screen.test.tsx:68:1)\n    at Runtime._execModule (<scratchpad>/qts/node_modules/.pnpm/jest-runtime@29.7.0/node_modules/jest-runtime/build/index.js:1439:24)\n    at Runtime._loadModule (<scratchpad>/qts/node_modules/.pnpm/jest-runtime@29.7.0/node_modules/jest-runtime/build/index.js:1022:12)\n    at Runtime.requireModule (<scratchpad>/qts/node_modules/.pnpm/jest-runtime@29.7.0/node_modules/jest-runtime/build/index.js:882:12)\n    at jestAdapter (<scratchpad>/qts/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:77:13)\n    at runTestInternal (<scratchpad>/qts/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (<scratchpad>/qts/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:444:34)"
+          ],
+          "fullName": "NativeCartScreen recovers from an initial load error after retry",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "failed",
+          "title": "recovers from an initial load error after retry"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 448,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen disables every cart mutation button while one mutation is pending",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 10,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "disables every cart mutation button while one mutation is pending"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 14,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen disables quantity increase and preserves the quantity at the maximum",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "disables quantity increase and preserves the quantity at the maximum"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 11,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen exposes a hydration boundary, badge count, and stable product variant IDs",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "exposes a hydration boundary, badge count, and stable product variant IDs"
+        }
+      ],
+      "endTime": 1794484776453,
+      "message": "  ● NativeCartScreen › recovers from an initial load error after retry\n\n    thrown: \"Exceeded timeout of 5000 ms for a test.\n    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.\"\n\n      71 |   });\n      72 |\n    > 73 |   it(\"recovers from an initial load error after retry\", async () => {\n         |   ^\n      74 |     const empty = cart([]);\n      75 |     const getCart = jest\n      76 |       .fn<Promise<CartDto>, []>()\n\n      at it (tests/component/native/native-cart-screen.test.tsx:73:3)\n      at Object.describe (tests/component/native/native-cart-screen.test.tsx:68:1)\n",
+      "name": "<scratchpad>/qts/tests/component/native/native-cart-screen.test.tsx",
+      "startTime": 1794484766971,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}

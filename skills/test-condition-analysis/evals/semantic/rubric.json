@@ -1,0 +1,29 @@
+{
+  "skill": "test-condition-analysis",
+  "criteria": [
+    {
+      "id": "COND-SEM-001",
+      "title": "独立した条件候補",
+      "description": "条件候補をitemや正式TCN/CIから独立に識別し、item確定前でも条件を保持する。",
+      "critical": true
+    },
+    {
+      "id": "COND-SEM-002",
+      "title": "Authorityとsource evidence",
+      "description": "現在有効なAuthority/source refとrevisionに基づき、一般的な観点を仕様の根拠にしない。",
+      "critical": true
+    },
+    {
+      "id": "COND-SEM-003",
+      "title": "不確実性と履歴",
+      "description": "同名異義・異名同義、reuse/split/merge/retire、unknown、blocked、partial sourceを根拠と再確認条件付きで扱う。",
+      "critical": true
+    },
+    {
+      "id": "COND-SEM-004",
+      "title": "正式判断との分離",
+      "description": "候補pairを採用・対象外・duplicate・Disposition・TCN/CI/expected resultや実行結果に昇格せず、全直積を作らない。",
+      "critical": true
+    }
+  ]
+}

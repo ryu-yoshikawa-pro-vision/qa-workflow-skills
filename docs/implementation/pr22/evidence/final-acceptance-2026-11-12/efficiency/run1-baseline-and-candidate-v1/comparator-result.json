@@ -1,0 +1,1019 @@
+{
+  "scenarios": [
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.504739,
+            "median": 0.4630885,
+            "minimum": 0.421438,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.434416,
+            "median": 0.2762525,
+            "minimum": 0.118089,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "improved"
+        },
+        "human_approval_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_review_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 6.0,
+            "median": 5.0,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 7.0,
+            "median": 5.5,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 7.0,
+            "median": 7.0,
+            "minimum": 7.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 7.0,
+            "median": 6.0,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 52.0,
+            "median": 48.5,
+            "minimum": 45.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 47.0,
+            "median": 38.0,
+            "minimum": 29.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 6.0,
+            "median": 4.5,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 6.0,
+            "median": 5.0,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 3647484.0,
+            "median": 3317313.5,
+            "minimum": 2987143.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 3182569.0,
+            "median": 2325357.0,
+            "minimum": 1468145.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 473.978505,
+            "median": 446.681365,
+            "minimum": 419.384225,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 417.038632,
+            "median": 341.816396,
+            "minimum": 266.59416,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["required_measurement_unavailable"],
+      "scenario": "initial_qa",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-initial_qa-1", "baseline-initial_qa-2"],
+        "candidate": ["candidate-initial_qa-1", "candidate-initial_qa-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.113063,
+            "median": 0.086624,
+            "minimum": 0.060185,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.366745,
+            "median": 0.342538,
+            "minimum": 0.318331,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_review_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 13.0,
+            "median": 10.0,
+            "minimum": 7.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 29.0,
+            "median": 20.5,
+            "minimum": 12.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 5.0,
+            "median": 5.0,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 6.0,
+            "median": 6.0,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 36.0,
+            "median": 30.0,
+            "minimum": 24.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 56.0,
+            "median": 50.0,
+            "minimum": 44.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 2.0,
+            "median": 2.0,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 0.5,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 5.0,
+            "median": 3.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 956797.0,
+            "median": 853529.5,
+            "minimum": 750262.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 3148596.0,
+            "median": 3079677.5,
+            "minimum": 3010759.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 182.982924,
+            "median": 150.314187,
+            "minimum": 117.64545,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 734.760715,
+            "median": 548.186228,
+            "minimum": 361.611741,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "regressed"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed", "required_measurement_unavailable"],
+      "scenario": "unchanged_request",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-unchanged_request-1", "baseline-unchanged_request-2"],
+        "candidate": ["candidate-unchanged_request-1", "candidate-unchanged_request-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.032679,
+            "median": 0.029067,
+            "minimum": 0.025455,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.116549,
+            "median": 0.073671,
+            "minimum": 0.030793,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "regressed"
+        },
+        "human_approval_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_review_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 5.0,
+            "median": 4.5,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 9.0,
+            "median": 6.5,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 4.0,
+            "median": 3.5,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 7.0,
+            "median": 5.0,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 26.0,
+            "median": 23.0,
+            "minimum": 20.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 34.0,
+            "median": 29.0,
+            "minimum": 24.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 0.5,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 2.0,
+            "median": 1.5,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 949776.0,
+            "median": 809796.5,
+            "minimum": 669817.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1081460.0,
+            "median": 945886.0,
+            "minimum": 810312.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 171.624308,
+            "median": 140.31733100000002,
+            "minimum": 109.010354,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 184.029917,
+            "median": 129.520194,
+            "minimum": 75.010471,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["required_measurement_unavailable"],
+      "scenario": "local_code_change",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-local_code_change-1", "baseline-local_code_change-2"],
+        "candidate": ["candidate-local_code_change-1", "candidate-local_code_change-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": {
+            "maximum": 0.224625,
+            "median": 0.181663,
+            "minimum": 0.138701,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "candidate": {
+            "maximum": 0.176532,
+            "median": 0.1282085,
+            "minimum": 0.079885,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "USD"
+          },
+          "change": "improved"
+        },
+        "human_approval_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_review_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 26.0,
+            "median": 25.0,
+            "minimum": 24.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 22.0,
+            "median": 17.0,
+            "minimum": 12.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 8.0,
+            "median": 8.0,
+            "minimum": 8.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 7.0,
+            "median": 6.0,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "request_count": {
+          "baseline": {
+            "maximum": 46.0,
+            "median": 45.5,
+            "minimum": 45.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 40.0,
+            "median": 36.0,
+            "minimum": 32.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "token_count": {
+          "baseline": {
+            "maximum": 1506782.0,
+            "median": 1395706.0,
+            "minimum": 1284630.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1163542.0,
+            "median": 1099870.5,
+            "minimum": 1036199.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 564.24351,
+            "median": 557.3890240000001,
+            "minimum": 550.534538,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 462.57231,
+            "median": 317.40153050000004,
+            "minimum": 172.230751,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["required_measurement_unavailable"],
+      "scenario": "external_spec_revision",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-external_spec_revision-1", "baseline-external_spec_revision-2"],
+        "candidate": ["candidate-external_spec_revision-1", "candidate-external_spec_revision-2"]
+      }
+    },
+    {
+      "metrics": {
+        "cost_amount": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_approval_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "human_review_seconds": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "reanalyze_count": {
+          "baseline": {
+            "maximum": 3.0,
+            "median": 3.0,
+            "minimum": 3.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 5.0,
+            "median": 3.5,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "regressed"
+        },
+        "regenerated_artifact_count": {
+          "baseline": {
+            "maximum": 7.0,
+            "median": 6.5,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 7.0,
+            "median": 6.0,
+            "minimum": 5.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "request_count": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "retry_count": {
+          "baseline": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "reused_artifact_count": {
+          "baseline": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "unchanged"
+        },
+        "skill_call_count": {
+          "baseline": {
+            "maximum": 10.0,
+            "median": 10.0,
+            "minimum": 10.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 9.0,
+            "median": 7.5,
+            "minimum": 6.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "skill_restart_count": {
+          "baseline": {
+            "maximum": 4.0,
+            "median": 4.0,
+            "minimum": 4.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "candidate": {
+            "maximum": 4.0,
+            "median": 3.0,
+            "minimum": 2.0,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "count"
+          },
+          "change": "improved"
+        },
+        "token_count": {
+          "baseline": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "candidate": { "reason": "missing_or_inconsistent_unit", "status": "not_measured" },
+          "change": "not_comparable"
+        },
+        "wall_seconds": {
+          "baseline": {
+            "maximum": 953.136518,
+            "median": 909.8235784999999,
+            "minimum": 866.510639,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "candidate": {
+            "maximum": 702.308689,
+            "median": 626.572563,
+            "minimum": 550.836437,
+            "status": "measured",
+            "trial_count": 2,
+            "unit": "seconds"
+          },
+          "change": "improved"
+        }
+      },
+      "reasons": ["independent_quality_or_safety_not_passed", "required_measurement_unavailable"],
+      "scenario": "interrupted_resume",
+      "status": "not_comparable",
+      "trial_refs": {
+        "baseline": ["baseline-interrupted_resume-1", "baseline-interrupted_resume-2"],
+        "candidate": ["candidate-interrupted_resume-1", "candidate-interrupted_resume-2"]
+      }
+    }
+  ],
+  "schema_version": "qa-workflow-efficiency-result-v1",
+  "status": "unproven"
+}

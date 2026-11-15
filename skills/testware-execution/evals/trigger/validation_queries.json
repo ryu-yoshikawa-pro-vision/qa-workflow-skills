@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Vitestの部分実行・同名testを区別し、raw結果を取得してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "バッチ実行で終了コード0でも出力不一致をFAILにしてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "許可されたlintを実ツールで起動し出力と未解析範囲を保持して。",
+    "should_trigger": true
+  },
+  {
+    "query": "非ブラウザのAPI TCを直接実施し、未観測の副作用を判定不能として残して。",
+    "should_trigger": true
+  },
+  {
+    "query": "API-only Playwrightのテストコードを実装してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "ブラウザE2Eの本実行をお願いします。",
+    "should_trigger": false
+  },
+  {
+    "query": "テスト要求の論理的な矛盾をレビューしてください。",
+    "should_trigger": false
+  },
+  {
+    "query": "不具合Issueを作って報告してください。",
+    "should_trigger": false
+  }
+]

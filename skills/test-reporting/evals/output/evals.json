@@ -1,0 +1,51 @@
+{
+  "skill": "test-reporting",
+  "canonical_output": true,
+  "cases": [
+    {
+      "id": "RPT-OUT-001",
+      "input": "cases/rpt-out-001/input.md",
+      "expected": "cases/rpt-out-001/expected.json"
+    },
+    {
+      "id": "RPT-OUT-002",
+      "input": "cases/rpt-out-002/input.md",
+      "expected": "cases/rpt-out-002/expected.json"
+    },
+    {
+      "id": "RPT-OUT-003",
+      "input": "cases/rpt-out-003/input.md",
+      "expected": "cases/rpt-out-003/expected.json"
+    },
+    {
+      "id": "RPT-OUT-004",
+      "input": "cases/rpt-out-004/input.md",
+      "expected": "cases/rpt-out-004/expected.json"
+    },
+    {
+      "id": "RPT-OUT-005",
+      "input": "cases/rpt-out-005/input.md",
+      "expected": "cases/rpt-out-005/expected.json"
+    },
+    {
+      "id": "RPT-OUT-006",
+      "input": "cases/rpt-out-006/input.md",
+      "expected": "cases/rpt-out-006/expected.json"
+    },
+    {
+      "id": "RPT-OUT-007",
+      "input": "cases/rpt-out-007/input.md",
+      "expected": "cases/rpt-out-007/expected.json"
+    },
+    {
+      "id": "RPT-OUT-008",
+      "input": "cases/rpt-out-008/input.md",
+      "expected": "cases/rpt-out-008/expected.json"
+    },
+    {
+      "id": "RPT-OUT-009",
+      "input": "cases/rpt-out-009/input.md",
+      "expected": "cases/rpt-out-009/expected.json"
+    }
+  ]
+}

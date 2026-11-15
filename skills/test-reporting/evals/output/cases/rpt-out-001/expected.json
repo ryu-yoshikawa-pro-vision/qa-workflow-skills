@@ -1,0 +1,9 @@
+{
+  "expected_complete": true,
+  "expected_exit_judgement": "satisfied",
+  "expected_planned_totals": {
+    "e2e": 2,
+    "api": 3
+  },
+  "expected_incomplete_sources": []
+}

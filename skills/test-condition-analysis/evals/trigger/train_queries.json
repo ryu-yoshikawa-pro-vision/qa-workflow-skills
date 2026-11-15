@@ -1,0 +1,26 @@
+[
+  {
+    "query": "現在のAuthorityとfeature inventoryから、入力境界、権限、状態遷移の共通テスト条件候補を独立に列挙したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "正式TCNを作る前に再利用可能なCOND IDを付け、根拠revisionと履歴を管理してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "アイテムが未確定でも先に共通条件を候補化し、未確認・ブロック中の根拠を残してください。",
+    "should_trigger": true
+  },
+  { "query": "APIとUIで異なる認可経路や機能間の横断条件を同義性に注意して整理したい。", "should_trigger": true },
+  {
+    "query": "ITEMと共通条件候補を明示した根拠だけで照合し、可能なペア候補と不足候補を返してください。",
+    "should_trigger": true
+  },
+  { "query": "source revision変更後に影響する条件候補だけstaleにして再確認したい。", "should_trigger": true },
+  { "query": "テストアイテムの親子階層とFEAT IDの多対多リンクを作ってください。", "should_trigger": false },
+  { "query": "候補条件ごとに正式TCN、適用・対象外Disposition、CIを確定してください。", "should_trigger": false },
+  { "query": "仕様のAuthority、期待動作、UNKNOWNを分析してください。", "should_trigger": false },
+  { "query": "Product Riskの影響と発生可能性、検証深度を決めてください。", "should_trigger": false },
+  { "query": "この仕様から具体的なテストケース、手順、期待結果を作ってください。", "should_trigger": false },
+  { "query": "保存済みTCを実行して結果を記録し、後処理してください。", "should_trigger": false }
+]

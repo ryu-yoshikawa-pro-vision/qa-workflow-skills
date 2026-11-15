@@ -1,0 +1,125 @@
+{
+  "model": "claude-haiku-5-5",
+  "skills_available": [
+    "adversarial-review",
+    "agent-answer-form",
+    "coverage-analysis",
+    "defect-management",
+    "e2e-test-execution",
+    "e2e-test-implementation",
+    "e2e-test-inspection",
+    "e2e-test-reporting",
+    "e2e-test-result-analysis",
+    "e2e-test-selection",
+    "exploratory-testing",
+    "feature-analysis",
+    "project-context",
+    "qa-knowledge",
+    "qa-workflow",
+    "question-analysis",
+    "regression-testing",
+    "spec-analysis",
+    "test-analysis",
+    "test-architecture-design",
+    "test-case-design",
+    "test-condition-analysis",
+    "test-condition-design",
+    "test-evaluation",
+    "test-execution",
+    "test-item-analysis",
+    "test-management",
+    "test-reporting",
+    "test-requirement-design",
+    "test-requirements-analysis",
+    "test-target-inspection",
+    "testware-execution",
+    "testware-implementation",
+    "ui-target-analysis",
+    "usability-evaluation",
+    "usability-inspection",
+    "wcag-conformance-evaluation"
+  ],
+  "plan": {
+    "queries": 2,
+    "runs": 4,
+    "concurrency": 2,
+    "assumed_seconds_per_run": 12,
+    "estimated_minutes": 0.4
+  },
+  "attempts": [
+    {
+      "query_id": "defect-management:validation:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [],
+      "target_triggered": false,
+      "seconds": 9.3,
+      "stderr_tail": ""
+    },
+    {
+      "query_id": "defect-management:validation:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [],
+      "target_triggered": false,
+      "seconds": 9.3,
+      "stderr_tail": ""
+    },
+    {
+      "query_id": "defect-management:validation:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 1,
+      "status": "valid",
+      "invoked_skills": [
+        "test-reporting"
+      ],
+      "target_triggered": false,
+      "seconds": 9.3,
+      "stderr_tail": ""
+    },
+    {
+      "query_id": "defect-management:validation:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempt": 2,
+      "status": "valid",
+      "invoked_skills": [
+        "test-reporting"
+      ],
+      "target_triggered": false,
+      "seconds": 9.1,
+      "stderr_tail": ""
+    }
+  ],
+  "summary": [
+    {
+      "query_id": "defect-management:validation:neg:0",
+      "skill": "defect-management",
+      "should_trigger": false,
+      "attempts": 2,
+      "valid_attempts": 2,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [
+        "test-reporting"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "query_id": "defect-management:validation:pos:0",
+      "skill": "defect-management",
+      "should_trigger": true,
+      "attempts": 2,
+      "valid_attempts": 2,
+      "invalid_attempts": 0,
+      "trigger_rate": 0.0,
+      "other_skills_loaded": [],
+      "verdict": "fail"
+    }
+  ]
+}

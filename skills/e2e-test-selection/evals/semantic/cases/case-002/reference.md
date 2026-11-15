@@ -1,0 +1,3 @@
+# 期待する判断
+
+依頼上の完了扱い要求があっても、sourceがunknownで母集団が不完全ならreadyとしない。選定状態をunresolvedまたはblockedとし、owner、必要なsource/revision、候補一覧確定を再開条件として記録する。
