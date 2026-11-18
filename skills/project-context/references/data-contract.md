@@ -30,7 +30,7 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 
 保存の承認方式は`approval_source`引数で選びます。未指定（`None`）の場合は、`authorize`を渡していなければ既定の`user-confirmed`、渡していれば`trusted-callback`になります。`trusted-callback`は従来どおり、信頼済み`authorize`callbackが各操作を判定し、callbackがなければ`trusted_authorizer_required`で停止します。`trusted-callback`は、信頼済みhostが承認サービスを注入する場合の追加検証（より強い承認）で、任意です。`user-confirmed`は、ユーザーが当該成果物を明示的に確認した後にホストが`record_user_confirmation(...)`で登録した確認記録と完全一致する書込み・再分類だけを許可します。既定の承認はユーザー確認の自己申告であり、認証ではありません。確認記録の要求形は`trusted-callback`のcallbackへ渡される要求と同じキーを持ち、writeでは`operation_id`と`change_reason`も含みます（reclassifyはfeature_registryが`authorize`へ渡す決定dictそのもの）。ホストはユーザーが当該成果物を明示的に確認した後にだけ呼ぶこと。AIが確認前に呼んではなりません。確認記録はプロセス内にだけ保持され、永続化されません。取消し（失効）の機能はありません。ユーザー確認は呼出し元による自己申告であり、認証ではありません。不正な`approval_source`値（大文字小文字・空白の違いを含む。`None`は未指定として扱う）は`approval_source_invalid`、`user-confirmed`と`authorize`の併用は`approval_source_conflict`、`trusted-callback`で`authorize`がない場合は`trusted_authorizer_required`で拒否します。SQLiteのスキーマは変更せず、モードは永続化しません。
 
-`persist_prepared(store,preparation,project_ref,operation_id,approval_ref,approval_revision)`は、同じhelperの準備操作から作った候補だけを保存します。既存更新では元の保存本文とexpected revisionを再取得して照合し、競合・未承認・readback不一致を拒否します。返す保存先revisionは候補のローカル論理revisionと別に保持します。初回作成時も根拠のsource ref/revisionと変更理由が必要です。
+`persist_prepared(store,preparation,project_ref,operation_id,approval_ref,approval_revision)`は、同じhelperの準備操作から作った候補だけを保存します。ホストCLIの`save-prepared`も、この`persist_prepared`だけを経由します（任意の本文を直接書く保存経路はありません）。既存更新では元の保存本文とexpected revisionを再取得して照合し、競合・未承認・readback不一致を拒否します。返す保存先revisionは候補のローカル論理revisionと別に保持します。初回作成時も根拠のsource ref/revisionと変更理由が必要です。
 
 ### 初回配置・編集方針の記録
 
@@ -54,7 +54,15 @@ Git providerは既存pathを最後に変更したcommitの件名（`qa artifact:
 
 `GitArtifactStore`は、対象branchが主ワークツリーまたは任意のlinked worktreeでcheckoutされている場合は`branch_checked_out`で構築を拒否します（`symbolic-ref -q HEAD`と`worktree list --porcelain`の両方で判定）。
 
-`scripts/artifact_host.py` は、`GitArtifactStore`を`user-confirmed`で使うホストCLIです（JSON 1行、エラーは`{"status":"blocked","reason":...}`と非ゼロ終了）。`init-branch`は空treeのroot commitをplumbingで作り、HEAD・index・作業ツリーに触れません。`save`は`--user-confirmed-ref`（単一行・1024文字以内・制御文字なしの参照）を確認記録として登録してから書込みます。`approval_revision`は`sha256:<content sha256>`です。`read`・`export`・`verify-projection`も、同じプロセスで案件の読取確認を登録するため`--user-confirmed-ref`が必要です。`export`は現在の内容をバイト一致で投影ファイルへ書き出す読取専用の写しで、一時ファイルとrenameで書き、途中失敗で壊れたファイルを残しません。手編集は正本に反映されず、`verify-projection`が`drifted`で検出します。`project_context.py`のJSON CLIは引き続き保存しません。
+`scripts/artifact_host.py` は、`GitArtifactStore`を`user-confirmed`で使うホストCLIです（JSON 1行、エラーは`{"status":"blocked","reason":...}`と非ゼロ終了）。`init-branch`は空treeのroot commitをplumbingで作り、HEAD・index・作業ツリーに触れません。source repositoryのhookは実行させず（空のhooksPath）、author名・emailは`GitArtifactStore`と同じ検査（制御文字・改行の拒否、emailに`@`）を受けます。
+
+`save-prepared`は、`project_context.py`の`prepare-*`の要求JSON（`operation`、`artifact_ref`、`source_ref`、`source_revision`、`change_reason`、更新時は`markdown`と`expected_revision`）を`--prepared-file`で受け取り、`persist_prepared`で保存します。任意の本文は受け取りません。16節構造、案件名と`--project-ref`の一致、既存版本文の照合、DEC/ASM検証は`persist_prepared`が行い、失敗時は何も書きません。`--user-confirmed-ref`（単一行・1024文字以内・制御文字と改行類（U+2028・U+2029を含む）なしの参照）は、ホストがこのプロセス内で`persist_prepared`が`store.write`へ渡す要求と同じキー・値の確認記録として登録してから書込みます。`--operation-id`を省略すると`prepared-<preparedファイルのsha256>`を使います。`approval_revision`は`sha256:<内容のsha256>`です（placementの草案では草案の承認revisionを使う）。`feature-inventory`は`unsupported_kind_for_now`で拒否します（`feature_registry.persist_snapshot`のGit証跡・再分類の検証を経由する実装が未完了のため）。`save`（生の本文を書く旧コマンド）は削除されています。
+
+`read`・`export`・`verify-projection`も、同じプロセスで案件の読取確認を登録するため`--user-confirmed-ref`が必要です。`export`は現在の内容をバイト一致で投影ファイルへ書き出す読取専用の写しで、一時ファイルとrenameで書き、途中失敗で壊れたファイルを残しません。手編集は正本に反映されず、`verify-projection`が`drifted`で検出します。既存の`--out`が存在し内容がstoreの現在内容と一致しない（手編集されている）場合、`export`は`projection_drifted`で拒否し、上書きしません。`--force`を明示したときだけ上書きし、出力JSONに`"overwrote_drifted": true`を含めます。投影の0444の権限は目安であり保護ではありません（共有ファイルシステムや権限を変えられる利用者からは防げません）。`project_context.py`のJSON CLIは引き続き保存しません。
+
+`GitArtifactStore`の確認後の書込みは、構築時に加えて`update-ref`の直前にも保存先branchのcheckout検査を再実行します。ただし検査と`update-ref`の間に別worktreeでcheckoutされる競合は防げず、この限界は残ります。
+
+`operation_id`の冪等性（git store）は、同一の`expected_revision`（直前版）と同一内容の再送に対するものです。現在のheadを`expected_revision`とする新しい書込みで既存の`operation_id`を再利用した場合、storeはそれを新規操作として保存し、commit trailerに同じ`QA-Operation-Id`が複数残ります（SQLite版は`operation_id_reused`で拒否します）。`operation_id`の一意性は呼出し側の責務です。
 
 branchは案件とkindごとに分けます（例: `qa-artifacts/<project>/<kind>`）。Git branchのrevisionはcommit SHAのため、1つのbranchに複数のkindや案件を置くと、CAS revisionが無関係な成果物にまで及びます。
 

@@ -9,10 +9,13 @@ Ownership and limits:
   The working tree, HEAD and index are never changed by save or init-branch.
 - `export` writes a read-only projection copy. It is NOT the store: edits made by hand to
   the projection never reach the store. Use `verify-projection` to detect such drift.
-- Saving requires `--user-confirmed-ref`, a single-line reference to the user's explicit
-  confirmation. The host registers that confirmation in this process and then writes.
-  The confirmation is self-declared by the caller and is not authentication. The AI must
-  not supply it before the user has confirmed the specific artifact.
+- Saving goes only through `save-prepared`, which passes a prepared candidate from
+  project_context.py to project_context.persist_prepared (16-section, project identity,
+  previous-revision and approval checks). Arbitrary content is never written directly.
+  `save-prepared` requires `--user-confirmed-ref`, a single-line reference to the user's
+  explicit confirmation. The host registers that confirmation in this process and then
+  writes. The confirmation is self-declared by the caller and is not authentication. The
+  AI must not supply it before the user has confirmed the specific artifact.
 - `read`, `export` and `verify-projection` also require `--user-confirmed-ref`. In the
   user-confirmed mode a read of a project is allowed only after a confirmation of that
   project is registered in the same process.
@@ -39,7 +42,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from artifact_store import USER_CONFIRMED, StoreError
+import project_context
+from artifact_store import USER_CONFIRMED, StoreError, _name
 from git_artifact_store import (
     BRANCH,
     LINE_BREAKS,
@@ -112,17 +116,20 @@ def _git(
     run_env = dict(os.environ)
     if env:
         run_env.update(env)
-    try:
-        completed = subprocess.run(
-            ["git", "-C", str(repo), *args],
-            input=stdin,
-            capture_output=True,
-            check=False,
-            timeout=30,
-            env=run_env,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise HostError("git_provider_unavailable") from exc
+    # 空のhooksPathを指定し、source repositoryのhook（reference-transaction等）を実行させない。
+    # GitArtifactStore._git と同じ方式。
+    with tempfile.TemporaryDirectory(prefix="qa-host-no-hooks-") as no_hooks:
+        try:
+            completed = subprocess.run(
+                ["git", "-c", "core.hooksPath=" + no_hooks, "-C", str(repo), *args],
+                input=stdin,
+                capture_output=True,
+                check=False,
+                timeout=30,
+                env=run_env,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HostError("git_provider_unavailable") from exc
     if check and completed.returncode != 0:
         raise HostError("git_provider_command_failed")
     return completed
@@ -158,29 +165,6 @@ def _store(args: argparse.Namespace, approval_source: str | None) -> GitArtifact
     )
 
 
-def _write_request(
-    args: argparse.Namespace, digest: str, approval_ref: str
-) -> dict[str, Any]:
-    # GitArtifactStore.write が authorize へ渡す要求と同じキー・同じ値で登録する。
-    # 一致しない場合、確認記録は保存に使われない（完全一致が条件）。
-    return {
-        "operation": "write",
-        "kind": args.kind,
-        "project_ref": args.project_ref,
-        "artifact_ref": args.artifact_ref,
-        "expected_revision": None
-        if args.expected_revision == "none"
-        else args.expected_revision,
-        "approval_ref": approval_ref,
-        "sha256": digest,
-        "approval_revision": "sha256:" + digest,
-        "source_ref": args.source_ref,
-        "source_revision": args.source_revision,
-        "operation_id": args.operation_id,
-        "change_reason": args.change_reason,
-    }
-
-
 def _read_confirmation(args: argparse.Namespace, approval_ref: str) -> dict[str, Any]:
     # read記録は案件scopeだけを開く（書込みは許可しない）。
     return {
@@ -199,9 +183,19 @@ def _reader(args: argparse.Namespace) -> GitArtifactStore:
     return store
 
 
+def _author(name: Any, email: Any) -> tuple[str, str]:
+    # GitArtifactStore.__init__ と同じ検査（制御文字・改行の拒否、email に @ を要求）。
+    name = _name(name, "author_name")
+    email = _name(email, "author_email")
+    if "@" not in email:
+        raise StoreError("author_email_invalid")
+    return name, email
+
+
 def cmd_init_branch(args: argparse.Namespace) -> int:
     repo = Path(args.repo)
     branch = _branch(args.branch)
+    author_name, author_email = _author(args.author_name, args.author_email)
     ref = "refs/heads/" + branch
     if _git(repo, "check-ref-format", ref, check=False).returncode != 0:
         return _blocked("branch_invalid")
@@ -211,7 +205,7 @@ def cmd_init_branch(args: argparse.Namespace) -> int:
         return _blocked("branch_checked_out")
     # 空treeのroot commitを plumbing で作る。HEAD・index・作業ツリーには触れない。
     tree = _git(repo, "mktree", stdin=b"").stdout.decode("ascii").strip()
-    author = _author_env(args.author_name, args.author_email)
+    author = _author_env(author_name, author_email)
     commit = (
         _git(
             repo,
@@ -232,36 +226,84 @@ def cmd_init_branch(args: argparse.Namespace) -> int:
     return _emit({"status": "created", "branch": branch, "commit": commit})
 
 
-def cmd_save(args: argparse.Namespace) -> int:
-    approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
+def _prepared_request(path: str) -> tuple[dict[str, Any], bytes]:
+    """project_context.persist_prepared が受け取る preparation（prepare-* の要求JSON）を読む。"""
     try:
-        raw = Path(args.content_file).read_bytes()
+        raw = Path(path).read_bytes()
     except OSError:
-        return _blocked("content_file_unavailable")
+        raise HostError("prepared_file_unavailable")
+    if len(raw) > project_context.MAX_BYTES:
+        raise HostError("prepared_file_too_large")
     try:
-        raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return _blocked("artifact_content_encoding_invalid")
-    digest = hashlib.sha256(raw).hexdigest()
+        request = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=project_context._pairs
+        )
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise HostError("prepared_file_invalid") from exc
+    if not isinstance(request, dict):
+        raise HostError("prepared_file_invalid")
+    return request, raw
+
+
+def _prepared_approval_revision(
+    preparation: dict[str, Any], draft: dict[str, Any], digest: str
+) -> str | None:
+    # prepare-placement の草案は承認revisionを自身で持ち、persist_prepared がそれと一致を要求する。
+    # それ以外は persist_prepared へ渡す値をホストが決める（既存の "sha256:<内容>" 形式）。
+    if preparation.get("operation") == "prepare-placement":
+        return draft.get("approval_revision")
+    return "sha256:" + digest
+
+
+def cmd_save_prepared(args: argparse.Namespace) -> int:
+    approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
+    if args.kind != "project-context":
+        # feature-inventory は feature_registry.persist_snapshot（Git証跡・再分類の検証を含む）
+        # を経由する必要がある。このターンでは安全に実装できないため明示的に拒否する。
+        return _blocked("unsupported_kind_for_now")
+    preparation, raw = _prepared_request(args.prepared_file)
+    if preparation.get("artifact_ref") != args.artifact_ref:
+        return _blocked("artifact_ref_mismatch")
+    operation_id = args.operation_id or "prepared-" + hashlib.sha256(raw).hexdigest()
+    # 草案は persist_prepared と同じ関数で作る（純粋な検証。書込みはしない）。
+    draft = project_context.handle(preparation)
+    if draft.get("status") != "draft":
+        return _emit(
+            {"status": "blocked", "reason": str(draft.get("reason") or "not_draft")}, 1
+        )
     store = _store(args, USER_CONFIRMED)
-    # ユーザー確認の登録は、ユーザーが当該成果物を確認した後にだけ呼び出し側が行う。
-    store.record_user_confirmation(_write_request(args, digest, approval_ref))
-    result = store.write(
-        kind=args.kind,
-        project_ref=args.project_ref,
-        artifact_ref=args.artifact_ref,
-        content=raw.decode("utf-8"),
-        expected_revision=None
-        if args.expected_revision == "none"
-        else args.expected_revision,
-        operation_id=args.operation_id,
-        source_ref=args.source_ref,
-        source_revision=args.source_revision,
-        approval_ref=approval_ref,
-        approval_revision="sha256:" + digest,
-        change_reason=args.change_reason,
+    # 確認記録は persist_prepared が store.write へ渡す要求と同じキー・同じ値で登録する。
+    # 値の導出は persist_prepared の実コードに従う（expected_revision は草案、source・change_reason は要求）。
+    content = draft["artifact_markdown"]
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    approval_revision = _prepared_approval_revision(preparation, draft, digest)
+    store.record_user_confirmation(_read_confirmation(args, approval_ref))
+    store.record_user_confirmation(
+        {
+            "operation": "write",
+            "kind": "project-context",
+            "project_ref": args.project_ref,
+            "artifact_ref": preparation.get("artifact_ref"),
+            "expected_revision": draft.get("expected_revision"),
+            "approval_ref": approval_ref,
+            "sha256": digest,
+            "approval_revision": approval_revision,
+            "source_ref": preparation.get("source_ref"),
+            "source_revision": preparation.get("source_revision"),
+            "operation_id": operation_id,
+            "change_reason": preparation.get("change_reason"),
+        }
     )
-    return _emit(result)
+    result = project_context.persist_prepared(
+        store,
+        preparation,
+        project_ref=args.project_ref,
+        operation_id=operation_id,
+        approval_ref=approval_ref,
+        approval_revision=approval_revision,
+    )
+    succeeded = result.get("status") in {"stored", "idempotent"}
+    return _emit(result, 0 if succeeded else 1)
 
 
 def _current(
@@ -327,19 +369,30 @@ def cmd_export(args: argparse.Namespace) -> int:
     if hashlib.sha256(data).hexdigest() != payload["sha256"]:
         return _blocked("export_readback_mismatch")
     out = Path(args.out)
+    if out.is_symlink() or out.is_dir():
+        raise HostError("out_path_invalid")
+    overwrote_drifted = False
+    if out.is_file():
+        # 既存の投影が store の現在内容と異なる（手編集などのずれ）場合は上書きしない。
+        existing = hashlib.sha256(out.read_bytes()).hexdigest()
+        if existing != payload["sha256"]:
+            if not args.force:
+                return _blocked("projection_drifted")
+            overwrote_drifted = True
     atomic_write(out, data)
     written = out.read_bytes()
     if hashlib.sha256(written).hexdigest() != payload["sha256"]:
         return _blocked("export_readback_mismatch")
-    return _emit(
-        {
-            "status": "exported",
-            "out": str(out),
-            "revision": payload["revision"],
-            "sha256": payload["sha256"],
-            "bytes": len(written),
-        }
-    )
+    result: dict[str, Any] = {
+        "status": "exported",
+        "out": str(out),
+        "revision": payload["revision"],
+        "sha256": payload["sha256"],
+        "bytes": len(written),
+    }
+    if overwrote_drifted:
+        result["overwrote_drifted"] = True
+    return _emit(result)
 
 
 def cmd_verify_projection(args: argparse.Namespace) -> int:
@@ -409,29 +462,36 @@ def build_parser() -> argparse.ArgumentParser:
     init.set_defaults(handler=cmd_init_branch)
 
     save = sub.add_parser(
-        "save",
-        help="register the user confirmation and write one revision (CAS, atomic, read back)",
+        "save-prepared",
+        help="persist a prepared candidate via persist_prepared after registering the user confirmation",
+        description=(
+            "Persist one candidate prepared by project_context.py. --prepared-file is the prepare-* "
+            "request JSON (operation prepare-create, prepare-sections, prepare-update, prepare-ids, "
+            "prepare-placement) with artifact_ref, source_ref, source_revision, change_reason, and for "
+            "updates markdown and expected_revision. Arbitrary content is not accepted. The 16-section "
+            "structure, project identity, previous-revision match and DEC/ASM checks run in persist_prepared. "
+            "Call only after the user has confirmed this exact candidate: --user-confirmed-ref is a "
+            "self-declared confirmation, not authentication, and the AI must not pass it before that "
+            "confirmation. feature-inventory is not supported yet (unsupported_kind_for_now)."
+        ),
     )
     _add_store_arguments(save)
     save.add_argument(
-        "--content-file", required=True, help="UTF-8 file holding the artifact content"
+        "--prepared-file",
+        required=True,
+        help="JSON file holding the prepare-* request that persist_prepared accepts",
     )
     save.add_argument(
-        "--expected-revision",
-        required=True,
-        help="git:<sha> from the current read, or 'none' to create",
+        "--operation-id",
+        help="idempotency key (default: prepared-<sha256 of the prepared file>)",
     )
-    save.add_argument("--operation-id", required=True)
-    save.add_argument("--source-ref", required=True)
-    save.add_argument("--source-revision", required=True)
-    save.add_argument("--change-reason", required=True)
     save.add_argument(
         "--user-confirmed-ref",
         required=True,
-        help="single-line reference to the user's explicit confirmation of this artifact (self-declared)",
+        help="single-line reference to the user's explicit confirmation of this exact candidate (self-declared; do not pass before the user confirms)",
     )
     _add_author_arguments(save)
-    save.set_defaults(handler=cmd_save)
+    save.set_defaults(handler=cmd_save_prepared)
 
     read = sub.add_parser(
         "read", help="print the current (or given revision) content as JSON"
@@ -444,11 +504,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     export = sub.add_parser(
         "export",
-        help="write the current content byte-for-byte to --out (read-only projection; hand edits are not saved back)",
+        help="write the current content byte-for-byte to --out (read-only projection; hand edits are not saved back; drifted files are not overwritten without --force)",
     )
     _add_store_arguments(export)
     export.add_argument(
-        "--out", required=True, help="projection path; the parent directory must exist"
+        "--out",
+        required=True,
+        help=(
+            "projection path; the parent directory must exist. Hand edits to this file never reach "
+            "the store. An existing file whose content differs from the store is refused "
+            "(projection_drifted) unless --force is given."
+        ),
+    )
+    export.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing projection that has drifted from the store (output then has overwrote_drifted: true)",
     )
     export.add_argument("--user-confirmed-ref", required=True)
     _add_author_arguments(export)
