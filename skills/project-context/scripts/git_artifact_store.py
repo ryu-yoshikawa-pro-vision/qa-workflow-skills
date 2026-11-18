@@ -17,7 +17,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from artifact_store import (
-    GATED,
     USER_CONFIRMED,
     Authorization,
     StoreError,
@@ -68,10 +67,10 @@ class GitArtifactStore(UserConfirmationMixin):
         *,
         author_name: str,
         author_email: str,
-        confirmation: str = GATED,
+        approval_source: str | None = None,
     ) -> None:
         self.root = _check_root(repository_root, authorized_root)
-        self._init_confirmation(confirmation, authorize)
+        self._init_approval_source(approval_source, authorize)
         # Git ref transactions must not invoke hooks from a source repository.
         self._empty_hooks = tempfile.TemporaryDirectory(prefix="qa-git-no-hooks-")
         self.branch = _name(branch, "branch")
@@ -388,8 +387,8 @@ class GitArtifactStore(UserConfirmationMixin):
             f"QA-Approval-Revision: {approval_revision}\n"
             f"QA-Change-Reason: {change_reason}\n"
             + (
-                f"QA-Approval-Mode: {USER_CONFIRMED}\n"
-                if self.confirmation == USER_CONFIRMED
+                f"QA-Approval-Source: {USER_CONFIRMED}\n"
+                if self.approval_source == USER_CONFIRMED
                 else ""
             )
         )

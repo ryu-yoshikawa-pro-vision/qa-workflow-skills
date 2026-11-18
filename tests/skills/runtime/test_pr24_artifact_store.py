@@ -725,6 +725,68 @@ class ArtifactStoreTests(unittest.TestCase):
         self.assertEqual(bad["reasons"], ["previous_snapshot_not_current"])
 
 
+class ApprovalSourceResolutionTests(unittest.TestCase):
+    """approval_source 未指定時の解決規則と、明示指定との組合せを検証する。"""
+
+    def setUp(self) -> None:
+        ArtifactStoreTests.setUp(self)
+
+    def test_omitted_arguments_resolve_to_user_confirmed(self) -> None:
+        store = LocalArtifactStore(self.root, self.root, None)
+        self.assertEqual(store.approval_source, "user-confirmed")
+        # 確認記録のない案件の読取は既定の user-confirmed で拒否される。
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            store.read_current("project-context", "Sample", "artifact.md")
+
+    def test_none_approval_source_is_unspecified_not_invalid(self) -> None:
+        store = LocalArtifactStore(self.root, self.root, None, approval_source=None)
+        self.assertEqual(store.approval_source, "user-confirmed")
+
+    def test_authorize_only_resolves_to_trusted_callback(self) -> None:
+        self.assertEqual(self.store.approval_source, "trusted-callback")
+        self.assertEqual(ArtifactStoreTests.write(self)["status"], "stored")
+        self.assertTrue(self.approvals)
+
+    def test_user_confirmed_with_authorize_is_conflict(self) -> None:
+        with self.assertRaisesRegex(StoreError, "approval_source_conflict"):
+            LocalArtifactStore(
+                self.root,
+                self.root,
+                self.authorize,
+                approval_source="user-confirmed",
+            )
+
+    def test_explicit_trusted_callback_without_authorize_is_rejected(self) -> None:
+        with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
+            LocalArtifactStore(
+                self.root, self.root, None, approval_source="trusted-callback"
+            )
+
+    def test_invalid_values_are_rejected_with_or_without_authorize(self) -> None:
+        values = (
+            "User-Confirmed",
+            " user-confirmed",
+            "user-confirmed ",
+            "GATED",
+            "gated",
+            "Trusted-Callback",
+            "trusted_callback",
+            "always",
+            "",
+            True,
+            0,
+        )
+        for value in values:
+            for authorize in (None, self.authorize):
+                with self.subTest(
+                    approval_source=value, callback=authorize is not None
+                ):
+                    with self.assertRaisesRegex(StoreError, "approval_source_invalid"):
+                        LocalArtifactStore(
+                            self.root, self.root, authorize, approval_source=value
+                        )
+
+
 class UserConfirmedArtifactStoreTests(unittest.TestCase):
     """user-confirmed モード。既存のsetUp・writeヘルパーを再利用する。"""
 
@@ -734,10 +796,10 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
 
     def new_store(self) -> LocalArtifactStore:
         return LocalArtifactStore(
-            self.root, self.root, None, confirmation="user-confirmed"
+            self.root, self.root, None, approval_source="user-confirmed"
         )
 
-    def gated_reader(self) -> LocalArtifactStore:
+    def trusted_reader(self) -> LocalArtifactStore:
         return LocalArtifactStore(self.root, self.root, self.authorize)
 
     @staticmethod
@@ -770,29 +832,32 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
         (store or self.store).record_user_confirmation(confirmation)
         return confirmation
 
-    def test_gated_default_still_requires_trusted_authorizer(self) -> None:
+    def test_trusted_callback_requires_trusted_authorizer(self) -> None:
         with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
-            LocalArtifactStore(self.root, self.root, None)
-        with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
-            LocalArtifactStore(self.root, self.root, None, confirmation="gated")
+            LocalArtifactStore(
+                self.root, self.root, None, approval_source="trusted-callback"
+            )
 
-    def test_confirmation_mode_validation(self) -> None:
-        for value in ("always", "", None, True):
-            with self.subTest(confirmation=value):
-                with self.assertRaisesRegex(StoreError, "confirmation_mode_invalid"):
-                    LocalArtifactStore(self.root, self.root, None, confirmation=value)
-        with self.assertRaisesRegex(StoreError, "confirmation_mode_conflict"):
+    def test_approval_source_validation(self) -> None:
+        # None は未指定を表すため不正値ではない（既定解決の対象）。
+        for value in ("always", "", True):
+            with self.subTest(approval_source=value):
+                with self.assertRaisesRegex(StoreError, "approval_source_invalid"):
+                    LocalArtifactStore(
+                        self.root, self.root, None, approval_source=value
+                    )
+        with self.assertRaisesRegex(StoreError, "approval_source_conflict"):
             LocalArtifactStore(
                 self.root,
                 self.root,
                 self.authorize,
-                confirmation="user-confirmed",
+                approval_source="user-confirmed",
             )
 
     def test_confirmation_record_is_only_for_user_confirmed_store(self) -> None:
-        gated = self.gated_reader()
-        with self.assertRaisesRegex(StoreError, "confirmation_mode_required"):
-            gated.record_user_confirmation(
+        trusted = self.trusted_reader()
+        with self.assertRaisesRegex(StoreError, "approval_source_required"):
+            trusted.record_user_confirmation(
                 {"operation": "read", "project_ref": "Sample"}
             )
         with self.assertRaisesRegex(StoreError, "confirmation_record_invalid"):
@@ -808,7 +873,9 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(StoreError, "access_denied"):
             self.store.write(**self.args())
         self.assertIsNone(
-            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+            self.trusted_reader().read_current(
+                "project-context", "Sample", "artifact.md"
+            )
         )
 
     def test_mismatched_confirmation_is_denied(self) -> None:
@@ -832,7 +899,9 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
                 with self.assertRaisesRegex(StoreError, "access_denied"):
                     store.write(**self.args(**{field: changed}))
         self.assertIsNone(
-            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+            self.trusted_reader().read_current(
+                "project-context", "Sample", "artifact.md"
+            )
         )
 
     def test_exact_confirmation_stores_and_resend_is_idempotent(self) -> None:
@@ -881,15 +950,15 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
                 **self.args(content="v3", expected_revision="r2", operation_id="op-3")
             )
         del self.store.read_revision
-        gated = self.gated_reader()
+        trusted = self.trusted_reader()
         self.assertEqual(
-            gated.read_revision("project-context", "Sample", "artifact.md", "r1")[
+            trusted.read_revision("project-context", "Sample", "artifact.md", "r1")[
                 "content"
             ],
             "initial",
         )
         self.assertEqual(
-            gated.read_revision("project-context", "Sample", "artifact.md", "r2")[
+            trusted.read_revision("project-context", "Sample", "artifact.md", "r2")[
                 "content"
             ],
             "v2",
@@ -936,7 +1005,9 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(StoreError, "access_denied"):
             fresh.write(**self.args())
         self.assertIsNone(
-            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+            self.trusted_reader().read_current(
+                "project-context", "Sample", "artifact.md"
+            )
         )
 
     def test_recorded_confirmation_is_a_snapshot_not_a_live_reference(self) -> None:
@@ -950,11 +1021,13 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(StoreError, "access_denied"):
             self.store.write(**self.args(change_reason="changed reason"))
 
-    def test_confirmation_mode_is_exact_string_match(self) -> None:
+    def test_approval_source_is_exact_string_match(self) -> None:
         for value in ("User-Confirmed", " user-confirmed", "user-confirmed ", "GATED"):
-            with self.subTest(confirmation=value):
-                with self.assertRaisesRegex(StoreError, "confirmation_mode_invalid"):
-                    LocalArtifactStore(self.root, self.root, None, confirmation=value)
+            with self.subTest(approval_source=value):
+                with self.assertRaisesRegex(StoreError, "approval_source_invalid"):
+                    LocalArtifactStore(
+                        self.root, self.root, None, approval_source=value
+                    )
 
 
 if __name__ == "__main__":

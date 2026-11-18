@@ -1,7 +1,9 @@
 """Local SQLite provider for Project Context and feature-inventory artifacts.
 
-The trusted host selects an explicitly authorized local root and supplies a real
-authorization callback. Neither JSON inputs nor approval_ref strings grant access.
+The trusted host selects an explicitly authorized local root. Approval comes either
+from the user-confirmed records the host registers (default) or from a real
+authorization callback injected by a trusted host. Neither JSON inputs nor
+approval_ref strings grant access.
 The SQLite transaction provides native create-if-absent and revision CAS.
 """
 
@@ -23,11 +25,12 @@ MAX_REF = 1024
 DB_DIR = ".qa-context-feature"
 DB_FILE = "artifacts.sqlite3"
 Authorization = Callable[[dict[str, str | None]], bool]
-# gated: 信頼済みauthorize callbackが操作ごとに承認を判定する（既定）。
-# user-confirmed: 呼出し元が明示的に渡した確認記録との完全一致で判定する。
-GATED = "gated"
+# 承認の出所（approval_source）。未指定（None）は authorize の有無で解決する。
+# user-confirmed（既定）: 呼出し元が明示的に渡した確認記録との完全一致で判定する。ユーザー確認の自己申告であり、認証ではない。
+# trusted-callback: 信頼済みhostが注入した authorize callbackが操作ごとに承認を判定する（より強い追加検証。任意）。
+TRUSTED_CALLBACK = "trusted-callback"
 USER_CONFIRMED = "user-confirmed"
-CONFIRMATION_MODES = frozenset({GATED, USER_CONFIRMED})
+APPROVAL_SOURCES = frozenset({TRUSTED_CALLBACK, USER_CONFIRMED})
 CONFIRMABLE_OPERATIONS = frozenset({"read", "write", "reclassify"})
 
 
@@ -35,13 +38,16 @@ class StoreError(ValueError):
     pass
 
 
-def _confirmation_mode(confirmation: Any, authorize: Any) -> str:
-    if not isinstance(confirmation, str) or confirmation not in CONFIRMATION_MODES:
-        raise StoreError("confirmation_mode_invalid")
-    # None は「callbackを渡していない」ことを表す。渡された callback と確認記録は併用しない。
-    if confirmation == USER_CONFIRMED and authorize is not None:
-        raise StoreError("confirmation_mode_conflict")
-    return confirmation
+def _approval_source(approval_source: Any, authorize: Any) -> str:
+    if approval_source is None:
+        # 未指定: callback があれば従来どおり trusted-callback、なければ既定の user-confirmed。
+        return USER_CONFIRMED if authorize is None else TRUSTED_CALLBACK
+    if not isinstance(approval_source, str) or approval_source not in APPROVAL_SOURCES:
+        raise StoreError("approval_source_invalid")
+    # 渡された callback と確認記録は併用しない。
+    if approval_source == USER_CONFIRMED and authorize is not None:
+        raise StoreError("approval_source_conflict")
+    return approval_source
 
 
 def _canonical_request(request: Any) -> str | None:
@@ -65,13 +71,13 @@ class UserConfirmationMixin:
     record_user_confirmation を呼ぶこと。AIが確認前に呼んではならない。
     """
 
-    confirmation: str
+    approval_source: str
     authorize: Any
 
-    def _init_confirmation(self, confirmation: Any, authorize: Any) -> None:
-        mode = _confirmation_mode(confirmation, authorize)
-        self.confirmation = mode
-        if mode == GATED:
+    def _init_approval_source(self, approval_source: Any, authorize: Any) -> None:
+        mode = _approval_source(approval_source, authorize)
+        self.approval_source = mode
+        if mode == TRUSTED_CALLBACK:
             if not callable(authorize):
                 raise StoreError("trusted_authorizer_required")
             self.authorize = authorize
@@ -83,14 +89,14 @@ class UserConfirmationMixin:
     def record_user_confirmation(self, authorization: Mapping[str, Any]) -> None:
         """ユーザー確認済みの操作レコードを登録する。登録済みの完全一致だけを許可する。
 
-        authorization は、gatedモードでcallbackに渡される要求と同じキーを持つdict。
+        authorization は、trusted-callbackモードでcallbackに渡される要求と同じキーを持つdict。
         write は operation, kind, project_ref, artifact_ref, expected_revision, sha256,
         source_ref, source_revision, approval_ref, approval_revision, operation_id,
         change_reason を持つ。reclassify は feature_registry が authorize に渡す決定dict
         そのものを使う。どの operation の確認記録でも、登録された案件の読取scopeが開く。書込み後の独立readbackはこの挙動に依存する。read の記録は案件scopeだけを登録し、読取の個別承認にはならず、書込みを許可しない。
         """
-        if self.confirmation != USER_CONFIRMED:
-            raise StoreError("confirmation_mode_required")
+        if self.approval_source != USER_CONFIRMED:
+            raise StoreError("approval_source_required")
         if not isinstance(authorization, dict):
             raise StoreError("confirmation_record_invalid")
         operation = authorization.get("operation")
@@ -152,12 +158,12 @@ class LocalArtifactStore(UserConfirmationMixin):
         self,
         root: Path,
         authorized_root: Path,
-        authorize: Authorization | None,
+        authorize: Authorization | None = None,
         *,
-        confirmation: str = GATED,
+        approval_source: str | None = None,
     ) -> None:
         self.root = _check_root(root, authorized_root)
-        self._init_confirmation(confirmation, authorize)
+        self._init_approval_source(approval_source, authorize)
         directory = self.root / DB_DIR
         try:
             directory.mkdir(mode=0o700, exist_ok=True)
@@ -396,9 +402,9 @@ class LocalArtifactStore(UserConfirmationMixin):
             "approval_revision": approval_revision,
         }
         # user-confirmed の確認記録は操作単位で照合するため、冪等キーと変更理由も含める。
-        # gatedモードのcallbackへ渡す要求の形は変えない。
+        # trusted-callbackモードのcallbackへ渡す要求の形は変えない。
         authorization = dict(approval_request)
-        if self.confirmation == USER_CONFIRMED:
+        if self.approval_source == USER_CONFIRMED:
             authorization.update(operation_id=operation_id, change_reason=change_reason)
         try:
             with closing(self._connect()) as conn, conn:

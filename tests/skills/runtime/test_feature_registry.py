@@ -918,7 +918,7 @@ class UserConfirmedReclassificationTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
-        store = LocalArtifactStore(root, root, None, confirmation="user-confirmed")
+        store = LocalArtifactStore(root, root, None, approval_source="user-confirmed")
         seen: list[dict] = []
         checked = store.authorize
 
