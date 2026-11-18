@@ -12,6 +12,7 @@ import json
 import os
 import sqlite3
 import stat
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
 from typing import Any, Callable
@@ -22,10 +23,100 @@ MAX_REF = 1024
 DB_DIR = ".qa-context-feature"
 DB_FILE = "artifacts.sqlite3"
 Authorization = Callable[[dict[str, str | None]], bool]
+# gated: 信頼済みauthorize callbackが操作ごとに承認を判定する（既定）。
+# user-confirmed: 呼出し元が明示的に渡した確認記録との完全一致で判定する。
+GATED = "gated"
+USER_CONFIRMED = "user-confirmed"
+CONFIRMATION_MODES = frozenset({GATED, USER_CONFIRMED})
+CONFIRMABLE_OPERATIONS = frozenset({"read", "write", "reclassify"})
 
 
 class StoreError(ValueError):
     pass
+
+
+def _confirmation_mode(confirmation: Any, authorize: Any) -> str:
+    if not isinstance(confirmation, str) or confirmation not in CONFIRMATION_MODES:
+        raise StoreError("confirmation_mode_invalid")
+    # None は「callbackを渡していない」ことを表す。渡された callback と確認記録は併用しない。
+    if confirmation == USER_CONFIRMED and authorize is not None:
+        raise StoreError("confirmation_mode_conflict")
+    return confirmation
+
+
+def _canonical_request(request: Any) -> str | None:
+    try:
+        return json.dumps(
+            request,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+class UserConfirmationMixin:
+    """user-confirmed モードの確認記録と照合を両providerで共有する。
+
+    確認記録は「ユーザーが当該操作を明示的に確認した」というホストの自己申告であり、
+    認証ではない。ホストはユーザーが当該成果物を明示的に確認した後にだけ
+    record_user_confirmation を呼ぶこと。AIが確認前に呼んではならない。
+    """
+
+    confirmation: str
+    authorize: Any
+
+    def _init_confirmation(self, confirmation: Any, authorize: Any) -> None:
+        mode = _confirmation_mode(confirmation, authorize)
+        self.confirmation = mode
+        if mode == GATED:
+            if not callable(authorize):
+                raise StoreError("trusted_authorizer_required")
+            self.authorize = authorize
+            return
+        self._confirmations: set[str] = set()
+        self._confirmed_projects: set[str] = set()
+        self.authorize = self._confirmed_authorize
+
+    def record_user_confirmation(self, authorization: Mapping[str, Any]) -> None:
+        """ユーザー確認済みの操作レコードを登録する。登録済みの完全一致だけを許可する。
+
+        authorization は、gatedモードでcallbackに渡される要求と同じキーを持つdict。
+        write は operation, kind, project_ref, artifact_ref, expected_revision, sha256,
+        source_ref, source_revision, approval_ref, approval_revision, operation_id,
+        change_reason を持つ。reclassify は feature_registry が authorize に渡す決定dict
+        そのものを使う。read は案件のscopeを登録するだけで、読取の個別承認にはならない。
+        """
+        if self.confirmation != USER_CONFIRMED:
+            raise StoreError("confirmation_mode_required")
+        if not isinstance(authorization, dict):
+            raise StoreError("confirmation_record_invalid")
+        operation = authorization.get("operation")
+        project = authorization.get("project_ref")
+        if operation not in CONFIRMABLE_OPERATIONS or not isinstance(project, str):
+            raise StoreError("confirmation_record_invalid")
+        _name(project, "project_ref")
+        canonical = _canonical_request(authorization)
+        if canonical is None:
+            raise StoreError("confirmation_record_invalid")
+        self._confirmed_projects.add(project)
+        if operation != "read":
+            self._confirmations.add(canonical)
+
+    def _confirmed_authorize(self, request: Any) -> bool:
+        """user-confirmed時の authorize。確認記録と完全一致した書込み／再分類だけ True。
+
+        読取は登録済み案件scope内なら確認記録なしで True（他案件・未登録案件は False）。
+        """
+        if not isinstance(request, dict):
+            return False
+        if request.get("operation") == "read":
+            project = request.get("project_ref")
+            return isinstance(project, str) and project in self._confirmed_projects
+        canonical = _canonical_request(request)
+        return canonical is not None and canonical in self._confirmations
 
 
 def _name(value: Any, label: str) -> str:
@@ -54,19 +145,19 @@ def _check_root(root: Path, authorized_root: Path) -> Path:
     return resolved
 
 
-class LocalArtifactStore:
+class LocalArtifactStore(UserConfirmationMixin):
     """Provider-native SQLite CAS; not a substitute for an unselected remote store."""
 
     def __init__(
         self,
         root: Path,
         authorized_root: Path,
-        authorize: Authorization,
+        authorize: Authorization | None,
+        *,
+        confirmation: str = GATED,
     ) -> None:
         self.root = _check_root(root, authorized_root)
-        if not callable(authorize):
-            raise StoreError("trusted_authorizer_required")
-        self.authorize = authorize
+        self._init_confirmation(confirmation, authorize)
         directory = self.root / DB_DIR
         try:
             directory.mkdir(mode=0o700, exist_ok=True)
@@ -304,10 +395,15 @@ class LocalArtifactStore:
             "approval_ref": approval_ref,
             "approval_revision": approval_revision,
         }
+        # user-confirmed の確認記録は操作単位で照合するため、冪等キーと変更理由も含める。
+        # gatedモードのcallbackへ渡す要求の形は変えない。
+        authorization = dict(approval_request)
+        if self.confirmation == USER_CONFIRMED:
+            authorization.update(operation_id=operation_id, change_reason=change_reason)
         try:
             with closing(self._connect()) as conn, conn:
                 conn.execute("BEGIN IMMEDIATE")
-                self._authorized(approval_request)
+                self._authorized(authorization)
                 receipt = conn.execute(
                     """SELECT fingerprint, version FROM artifact_receipts
                        WHERE kind=? AND project_ref=? AND artifact_ref=?

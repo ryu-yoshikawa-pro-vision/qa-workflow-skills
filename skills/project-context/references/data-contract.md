@@ -28,13 +28,15 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 
 `scripts/artifact_store.py` の `LocalArtifactStore` は、許可されたローカルroot内に所有者限定SQLiteを設け、`project-context`／`feature-inventory`のnative transactionによる新規作成・revision CAS・immutable履歴・独立読戻しを行います。遠隔providerの代替ではありません。Pythonの信頼済み呼出し元は`authorize(request)`を渡して認証済み承認のscope／revision／許可を保存直前に検証します。JSONの`approval_ref`単独では権限を証明できません。
 
+保存の認可方式は`confirmation`引数で選びます（既定は`gated`）。`gated`は従来どおり、信頼済み`authorize`callbackが各操作を判定し、callbackがなければ`trusted_authorizer_required`で停止します。`user-confirmed`は呼出し元が`authorize`に`None`を渡す場合だけ指定でき、ユーザーが当該成果物を明示的に確認した後にホストが`record_user_confirmation(...)`で登録した確認記録と完全一致する書込み・再分類だけを許可します。確認記録の要求形は`gated`のcallbackへ渡される要求と同じキーを持ち、writeでは`operation_id`と`change_reason`も含みます（reclassifyはfeature_registryが`authorize`へ渡す決定dictそのもの）。ホストはユーザーが当該成果物を明示的に確認した後にだけ呼ぶこと。AIが確認前に呼んではなりません。確認記録はプロセス内にだけ保持され、永続化されません。取消し（失効）の機能はありません。ユーザー確認は呼出し元による自己申告であり、認証ではありません。不正な`confirmation`値は`confirmation_mode_invalid`、`authorize`との併用は`confirmation_mode_conflict`で拒否します。SQLiteのスキーマは変更せず、モードは永続化しません。
+
 `persist_prepared(store,preparation,project_ref,operation_id,approval_ref,approval_revision)`は、同じhelperの準備操作から作った候補だけを保存します。既存更新では元の保存本文とexpected revisionを再取得して照合し、競合・未承認・readback不一致を拒否します。返す保存先revisionは候補のローカル論理revisionと別に保持します。初回作成時も根拠のsource ref/revisionと変更理由が必要です。
 
 ### 初回配置・編集方針の記録
 
 `prepare-placement`は、既存Project Contextの`markdown`、`dec_asm_owner=project-context`、`artifact_ref`、`expected_revision`、`source_ref`／`source_revision`、`change_reason`、`policy`を受け取ります。`policy`の必須keyは`owner`、`scope`、`target_ref`、`revision`、`approval_ref`、`approval_revision`、`editable_scope`、`feature_index_ref`です。既存DEC/ASMがある場合は`existing_decisions`／`existing_assumptions`へ保存済み行を含め、既存helperの履歴検証に通します。
 
-初回または方針変更時は、既存Section 12のDECとSection 14の参照を同一draftに記録します。同一方針は`existing_policy`との一致で`reuse_candidate`を返し、不要なrevisionを作りません。この段階の`approval_ref`は自己申告値です。`persist_prepared`から実保存する際には、承認scope・revisionを外部認証した`authorize`callbackが必要です。
+初回または方針変更時は、既存Section 12のDECとSection 14の参照を同一draftに記録します。同一方針は`existing_policy`との一致で`reuse_candidate`を返し、不要なrevisionを作りません。この段階の`approval_ref`は自己申告値です。`persist_prepared`から実保存する際には、承認scope・revisionを外部認証した`authorize`callbackが必要です。（`user-confirmed`の場合は、完全一致する確認記録が必要です。）
 
 `prepare-sections`は、根拠source・revision、変更理由、元文書ref／revisionを必須にし、既存文書の1〜11節と15節の本文だけを差分更新します。DEC/ASMの12/13節、成果物参照の14節、stable keyの16節はそれぞれ専用の更新操作へ委譲します。`prepare-create`にも任意の`section_updates`を指定でき、取得できた案件情報だけで既定templateを初期化します。いずれも保存済み正本への変更ではなく、実書込みには`persist_prepared`と認証済み承認を必要とします。
 
@@ -43,10 +45,12 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 正本が既存のGit管理Markdownである場合は、`scripts/git_artifact_store.py`の`GitArtifactStore`を明示選択できます。対象Git branchの`docs/PROJECT_CONTEXT.md`等を正本とし、Git commit SHAをexpected revisionに使う`update-ref`のnative CASで同一pathを更新します。履歴はGit commitから独立読戻しします。選択したbranchのGit objectが正本であり、未checkoutの作業ディレクトリを現行文書とは扱いません。ローカルSQLiteは別の案件でSQLiteを正本に選択した場合にのみ利用します。
 
 読み取りにも信頼済みhostから注入された`authorize`による案件scopeの権限確認を行います。operation再送時も権限を再評価します。両保存providerは認証済み呼出し元を仮定し、権限を自己申告するJSON CLIからは呼び出しません。
+`user-confirmed`では、読取は登録済みの案件scope内であれば確認記録なしで許可されます（CASのための読取を含む）。確認記録を登録していない案件（他案件を含む）の読取は拒否します。この緩和により、`user-confirmed`では案件内の読取ごとの承認と、登録後の読取の取消しは行いません。これらの防止は`gated`のみの保証です。
 
 Git providerは許可済みrepository rootの外にGit metadataを保存するworktree／外部Git dirを拒否します。対象branchの履歴・objectが許可外rootへ暗黙に作成されないようにするためです。
 
 Git providerは既存pathを最後に変更したcommitの件名（`qa artifact: <kind> <path>`）と`QA-Project-Ref` trailerが、呼出しのkindと案件に一致しない場合、読出し・書込みともに`artifact_project_mismatch`で拒否します。trailerの無いcommitも案件を証明できないため拒否します。書込みは参照更新の前に拒否されます。commit messageに入る値は改行として扱われる文字を含められません。
+`user-confirmed`で書込んだcommitには`QA-Approval-Mode: user-confirmed`のtrailerを付けます。`gated`のcommitには付けません。`_assert_owner`は件名と`QA-Project-Ref`だけを参照するため、trailer付きcommitも従来どおり読取れます。
 
 ### 保存済み配置方針の再利用条件
 

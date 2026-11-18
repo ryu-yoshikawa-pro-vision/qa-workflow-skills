@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import sqlite3
 import sys
 import tempfile
@@ -722,6 +723,200 @@ class ArtifactStoreTests(unittest.TestCase):
         )
         self.assertEqual(bad["status"], "blocked", bad)
         self.assertEqual(bad["reasons"], ["previous_snapshot_not_current"])
+
+
+class UserConfirmedArtifactStoreTests(unittest.TestCase):
+    """user-confirmed モード。既存のsetUp・writeヘルパーを再利用する。"""
+
+    def setUp(self) -> None:
+        ArtifactStoreTests.setUp(self)
+        self.store = self.new_store()
+
+    def new_store(self) -> LocalArtifactStore:
+        return LocalArtifactStore(
+            self.root, self.root, None, confirmation="user-confirmed"
+        )
+
+    def gated_reader(self) -> LocalArtifactStore:
+        return LocalArtifactStore(self.root, self.root, self.authorize)
+
+    @staticmethod
+    def args(**overrides: object) -> dict:
+        base: dict = {
+            "kind": "project-context",
+            "project_ref": "Sample",
+            "artifact_ref": "artifact.md",
+            "content": "initial",
+            "expected_revision": None,
+            "operation_id": "op-1",
+            "source_ref": "issue/1",
+            "source_revision": "source-v1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v1",
+            "change_reason": "reviewed",
+        }
+        base.update(overrides)
+        return base
+
+    def record(
+        self, store: LocalArtifactStore | None = None, **overrides: object
+    ) -> dict:
+        request = self.args(**overrides)
+        confirmation = {
+            "operation": "write",
+            **{key: value for key, value in request.items() if key != "content"},
+            "sha256": hashlib.sha256(request["content"].encode("utf-8")).hexdigest(),
+        }
+        (store or self.store).record_user_confirmation(confirmation)
+        return confirmation
+
+    def test_gated_default_still_requires_trusted_authorizer(self) -> None:
+        with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
+            LocalArtifactStore(self.root, self.root, None)
+        with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
+            LocalArtifactStore(self.root, self.root, None, confirmation="gated")
+
+    def test_confirmation_mode_validation(self) -> None:
+        for value in ("always", "", None, True):
+            with self.subTest(confirmation=value):
+                with self.assertRaisesRegex(StoreError, "confirmation_mode_invalid"):
+                    LocalArtifactStore(self.root, self.root, None, confirmation=value)
+        with self.assertRaisesRegex(StoreError, "confirmation_mode_conflict"):
+            LocalArtifactStore(
+                self.root,
+                self.root,
+                self.authorize,
+                confirmation="user-confirmed",
+            )
+
+    def test_confirmation_record_is_only_for_user_confirmed_store(self) -> None:
+        gated = self.gated_reader()
+        with self.assertRaisesRegex(StoreError, "confirmation_mode_required"):
+            gated.record_user_confirmation(
+                {"operation": "read", "project_ref": "Sample"}
+            )
+        with self.assertRaisesRegex(StoreError, "confirmation_record_invalid"):
+            self.store.record_user_confirmation(
+                {"operation": "delete", "project_ref": "Sample"}
+            )
+        with self.assertRaisesRegex(StoreError, "confirmation_record_invalid"):
+            self.store.record_user_confirmation(
+                {"operation": "write", "project_ref": "Sample", "bad": object()}
+            )
+
+    def test_write_without_record_is_denied(self) -> None:
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args())
+        self.assertIsNone(
+            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+        )
+
+    def test_mismatched_confirmation_is_denied(self) -> None:
+        cases = [
+            ("content", "changed"),
+            ("expected_revision", "r1"),
+            ("approval_revision", "policy-v2"),
+            ("operation_id", "op-other"),
+            ("project_ref", "Other"),
+            ("artifact_ref", "other.md"),
+            ("kind", "feature-inventory"),
+            ("source_ref", "issue/2"),
+            ("source_revision", "source-v2"),
+            ("approval_ref", "approval/other"),
+            ("change_reason", "changed reason"),
+        ]
+        for field, changed in cases:
+            with self.subTest(field=field):
+                store = self.new_store()
+                self.record(store)
+                with self.assertRaisesRegex(StoreError, "access_denied"):
+                    store.write(**self.args(**{field: changed}))
+        self.assertIsNone(
+            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+        )
+
+    def test_exact_confirmation_stores_and_resend_is_idempotent(self) -> None:
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "idempotent")
+
+    def test_same_operation_with_different_content_is_still_rejected(self) -> None:
+        self.record()
+        self.store.write(**self.args())
+        self.record(content="different")
+        with self.assertRaisesRegex(StoreError, "operation_id_reused"):
+            self.store.write(**self.args(content="different"))
+
+    def test_cas_conflict_and_readback_mismatch_keep_existing_revisions(self) -> None:
+        self.record()
+        self.store.write(**self.args())
+        self.record(content="v2", expected_revision="r1", operation_id="op-2")
+        self.assertEqual(
+            self.store.write(
+                **self.args(content="v2", expected_revision="r1", operation_id="op-2")
+            )["revision"],
+            "r2",
+        )
+        self.record(content="stale", expected_revision="r1", operation_id="op-stale")
+        with self.assertRaisesRegex(StoreError, "revision_conflict"):
+            self.store.write(
+                **self.args(
+                    content="stale", expected_revision="r1", operation_id="op-stale"
+                )
+            )
+
+        self.record(content="v3", expected_revision="r2", operation_id="op-3")
+        original_read = self.store.read_revision
+
+        def tampered(kind: str, project_ref: str, artifact_ref: str, revision: str):
+            row = original_read(kind, project_ref, artifact_ref, revision)
+            if row is not None and revision == "r3":
+                row = {**row, "content": row["content"] + " tampered"}
+            return row
+
+        self.store.read_revision = tampered
+        with self.assertRaisesRegex(StoreError, "independent_readback_mismatch"):
+            self.store.write(
+                **self.args(content="v3", expected_revision="r2", operation_id="op-3")
+            )
+        del self.store.read_revision
+        gated = self.gated_reader()
+        self.assertEqual(
+            gated.read_revision("project-context", "Sample", "artifact.md", "r1")[
+                "content"
+            ],
+            "initial",
+        )
+        self.assertEqual(
+            gated.read_revision("project-context", "Sample", "artifact.md", "r2")[
+                "content"
+            ],
+            "v2",
+        )
+
+    def test_reads_are_allowed_only_inside_confirmed_project_scope(self) -> None:
+        self.record()
+        self.store.write(**self.args())
+        self.assertEqual(
+            self.store.read_current("project-context", "Sample", "artifact.md")[
+                "content"
+            ],
+            "initial",
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", "artifact.md")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_revision("project-context", "Other", "artifact.md", "r1")
+        # 別プロセス相当（記録のない新しいstore）は案件scopeを持たないため読めない。
+        fresh = self.new_store()
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.read_current("project-context", "Sample", "artifact.md")
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertEqual(
+            fresh.read_current("project-context", "Sample", "artifact.md")["content"],
+            "initial",
+        )
 
 
 if __name__ == "__main__":

@@ -16,7 +16,15 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from artifact_store import Authorization, StoreError, _check_root, _name
+from artifact_store import (
+    GATED,
+    USER_CONFIRMED,
+    Authorization,
+    StoreError,
+    UserConfirmationMixin,
+    _check_root,
+    _name,
+)
 
 COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 BRANCH = re.compile(r"[A-Za-z0-9._/-]+\Z")
@@ -48,7 +56,7 @@ def _path(ref: str) -> str:
     return ref
 
 
-class GitArtifactStore:
+class GitArtifactStore(UserConfirmationMixin):
     """Git ref is the canonical owner; commit SHA is its native CAS revision."""
 
     def __init__(
@@ -56,15 +64,14 @@ class GitArtifactStore:
         repository_root: Path,
         authorized_root: Path,
         branch: str,
-        authorize: Authorization,
+        authorize: Authorization | None,
         *,
         author_name: str,
         author_email: str,
+        confirmation: str = GATED,
     ) -> None:
         self.root = _check_root(repository_root, authorized_root)
-        if not callable(authorize):
-            raise StoreError("trusted_authorizer_required")
-        self.authorize = authorize
+        self._init_confirmation(confirmation, authorize)
         # Git ref transactions must not invoke hooks from a source repository.
         self._empty_hooks = tempfile.TemporaryDirectory(prefix="qa-git-no-hooks-")
         self.branch = _name(branch, "branch")
@@ -380,6 +387,11 @@ class GitArtifactStore:
             f"QA-Approval-Ref: {approval_ref}\n"
             f"QA-Approval-Revision: {approval_revision}\n"
             f"QA-Change-Reason: {change_reason}\n"
+            + (
+                f"QA-Approval-Mode: {USER_CONFIRMED}\n"
+                if self.confirmation == USER_CONFIRMED
+                else ""
+            )
         )
         commit_raw = self._git(
             "commit-tree", tree_sha, "-p", head, content=message.encode("utf-8")

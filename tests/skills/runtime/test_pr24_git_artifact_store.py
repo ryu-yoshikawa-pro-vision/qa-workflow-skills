@@ -1434,5 +1434,192 @@ class GitArtifactStoreTests(unittest.TestCase):
         self.assertEqual(saved2["status"], "stored", saved2)
 
 
+class UserConfirmedGitArtifactStoreTests(unittest.TestCase):
+    """user-confirmed モード。既存のsetUpとnew_storeの形を再利用する。"""
+
+    REF = "docs/PROJECT_CONTEXT.md"
+
+    def setUp(self) -> None:
+        GitArtifactStoreTests.setUp(self)
+        self.store = self.new_store(confirmation="user-confirmed")
+
+    def new_store(self, *, confirmation: str = "gated") -> GitArtifactStore:
+        if confirmation == "gated":
+            return GitArtifactStoreTests.new_store(self)
+        return GitArtifactStore(
+            self.root,
+            self.root,
+            "qa-artifacts",
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+            confirmation=confirmation,
+        )
+
+    def args(self, **overrides: object) -> dict:
+        base: dict = {
+            "kind": "project-context",
+            "project_ref": "Sample",
+            "artifact_ref": self.REF,
+            "content": "first",
+            "expected_revision": None,
+            "operation_id": "op-1",
+            "source_ref": "issue/1",
+            "source_revision": "source-1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v1",
+            "change_reason": "approved change",
+        }
+        base.update(overrides)
+        return base
+
+    def record(
+        self, store: GitArtifactStore | None = None, **overrides: object
+    ) -> dict:
+        request = self.args(**overrides)
+        confirmation = {
+            "operation": "write",
+            **{key: value for key, value in request.items() if key != "content"},
+            "sha256": hashlib.sha256(request["content"].encode("utf-8")).hexdigest(),
+        }
+        (store or self.store).record_user_confirmation(confirmation)
+        return confirmation
+
+    def test_mode_trailer_is_written_only_for_user_confirmed_commits(self) -> None:
+        self.record()
+        first = self.store.write(**self.args())
+        self.assertEqual(first["status"], "stored", first)
+        message = git(self.root, "log", "-1", "--format=%B", "qa-artifacts")
+        self.assertIn("QA-Approval-Mode: user-confirmed", message.splitlines())
+        # trailer付きcommitは従来どおり案件ownerとして読める（_assert_owner の後方互換）。
+        self.assertEqual(self.gated_read_content(), "first")
+        gated = self.new_store()
+        second = gated.write(
+            **self.args(
+                content="second",
+                expected_revision=first["revision"],
+                operation_id="op-2",
+            )
+        )
+        self.assertEqual(second["status"], "stored", second)
+        gated_message = git(self.root, "log", "-1", "--format=%B", "qa-artifacts")
+        self.assertNotIn("QA-Approval-Mode", gated_message)
+        self.assertEqual(
+            gated.read_current("project-context", "Sample", self.REF)["content"],
+            "second",
+        )
+
+    def gated_read_content(self) -> str:
+        return self.new_store().read_current("project-context", "Sample", self.REF)[
+            "content"
+        ]
+
+    def test_write_requires_exact_confirmation(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args())
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+        cases = [
+            ("content", "changed"),
+            ("approval_revision", "policy-v2"),
+            ("operation_id", "op-other"),
+            ("project_ref", "Other"),
+            ("artifact_ref", "docs/OTHER.md"),
+            ("change_reason", "changed reason"),
+        ]
+        for field, changed in cases:
+            with self.subTest(field=field):
+                store = self.new_store(confirmation="user-confirmed")
+                self.record(store)
+                with self.assertRaisesRegex(StoreError, "access_denied"):
+                    store.write(**self.args(**{field: changed}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_exact_confirmation_stores_and_resend_is_idempotent(self) -> None:
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "idempotent")
+
+    def test_cas_conflict_and_readback_mismatch_keep_history(self) -> None:
+        self.record()
+        first = self.store.write(**self.args())
+        self.record(
+            content="second", expected_revision=first["revision"], operation_id="op-2"
+        )
+        second = self.store.write(
+            **self.args(
+                content="second",
+                expected_revision=first["revision"],
+                operation_id="op-2",
+            )
+        )
+        self.assertEqual(second["status"], "stored", second)
+        self.record(
+            content="stale", expected_revision=first["revision"], operation_id="op-3"
+        )
+        with self.assertRaisesRegex(StoreError, "revision_conflict"):
+            self.store.write(
+                **self.args(
+                    content="stale",
+                    expected_revision=first["revision"],
+                    operation_id="op-3",
+                )
+            )
+
+        self.record(
+            content="third", expected_revision=second["revision"], operation_id="op-4"
+        )
+        original_read = self.store.read_revision
+
+        def tampered(kind: str, project_ref: str, artifact_ref: str, revision: str):
+            row = original_read(kind, project_ref, artifact_ref, revision)
+            if row is not None:
+                row = {**row, "content": row["content"] + " tampered"}
+            return row
+
+        self.store.read_revision = tampered
+        with self.assertRaisesRegex(StoreError, "independent_readback_mismatch"):
+            self.store.write(
+                **self.args(
+                    content="third",
+                    expected_revision=second["revision"],
+                    operation_id="op-4",
+                )
+            )
+        del self.store.read_revision
+        reader = self.new_store()
+        self.assertEqual(
+            reader.read_revision(
+                "project-context", "Sample", self.REF, first["revision"]
+            )["content"],
+            "first",
+        )
+        self.assertEqual(
+            reader.read_revision(
+                "project-context", "Sample", self.REF, second["revision"]
+            )["content"],
+            "second",
+        )
+
+    def test_reads_are_limited_to_confirmed_project_scope(self) -> None:
+        self.record()
+        self.store.write(**self.args())
+        self.assertEqual(
+            self.store.read_current("project-context", "Sample", self.REF)["content"],
+            "first",
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", self.REF)
+        fresh = self.new_store(confirmation="user-confirmed")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.read_current("project-context", "Sample", self.REF)
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertEqual(
+            fresh.read_current("project-context", "Sample", self.REF)["content"],
+            "first",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
