@@ -918,6 +918,44 @@ class UserConfirmedArtifactStoreTests(unittest.TestCase):
             "initial",
         )
 
+    def test_write_record_opens_project_read_scope_for_other_artifacts(self) -> None:
+        # 仕様: どの operation の確認記録でも、登録された案件の読取scopeが開く。
+        self.record()
+        self.assertIsNone(
+            self.store.read_current("project-context", "Sample", "other.md")
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", "other.md")
+
+    def test_read_record_never_promotes_to_write(self) -> None:
+        fresh = self.new_store()
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertIsNone(
+            fresh.read_current("project-context", "Sample", "artifact.md")
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.write(**self.args())
+        self.assertIsNone(
+            self.gated_reader().read_current("project-context", "Sample", "artifact.md")
+        )
+
+    def test_recorded_confirmation_is_a_snapshot_not_a_live_reference(self) -> None:
+        confirmation = self.record()
+        confirmation["sha256"] = hashlib.sha256(b"changed").hexdigest()
+        confirmation["change_reason"] = "changed reason"
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        # 改変後の値に一致する要求は、登録時点の確認記録と一致しないため拒否される。
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(content="changed"))
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(change_reason="changed reason"))
+
+    def test_confirmation_mode_is_exact_string_match(self) -> None:
+        for value in ("User-Confirmed", " user-confirmed", "user-confirmed ", "GATED"):
+            with self.subTest(confirmation=value):
+                with self.assertRaisesRegex(StoreError, "confirmation_mode_invalid"):
+                    LocalArtifactStore(self.root, self.root, None, confirmation=value)
+
 
 if __name__ == "__main__":
     unittest.main()

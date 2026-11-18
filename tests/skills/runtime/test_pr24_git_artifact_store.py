@@ -1620,6 +1620,88 @@ class UserConfirmedGitArtifactStoreTests(unittest.TestCase):
             "first",
         )
 
+    def test_every_confirmed_field_mismatch_is_denied(self) -> None:
+        # SQLite側の11項目と揃える。既存テストが扱う6項目以外を検証する。
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        cases = [
+            ("kind", "feature-inventory"),
+            ("source_ref", "issue/2"),
+            ("source_revision", "source-2"),
+            ("approval_ref", "approval/other"),
+            ("expected_revision", "git:" + "0" * 40),
+        ]
+        for field, changed in cases:
+            with self.subTest(field=field):
+                store = self.new_store(confirmation="user-confirmed")
+                self.record(store)
+                with self.assertRaisesRegex(StoreError, "access_denied"):
+                    store.write(**self.args(**{field: changed}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_read_record_never_promotes_to_write(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        fresh = self.new_store(confirmation="user-confirmed")
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertIsNone(fresh.read_current("project-context", "Sample", self.REF))
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.write(**self.args())
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_write_record_opens_project_read_scope_for_other_artifacts(self) -> None:
+        # 仕様: どの operation の確認記録でも、登録された案件の読取scopeが開く。
+        self.record()
+        self.assertIsNone(
+            self.store.read_current("project-context", "Sample", "docs/OTHER.md")
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", "docs/OTHER.md")
+
+    def test_recorded_confirmation_is_a_snapshot_not_a_live_reference(self) -> None:
+        confirmation = self.record()
+        confirmation["sha256"] = hashlib.sha256(b"changed").hexdigest()
+        confirmation["change_reason"] = "changed reason"
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(content="changed"))
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(change_reason="changed reason"))
+
+    def test_confirmation_mode_is_exact_string_match(self) -> None:
+        for value in ("User-Confirmed", " user-confirmed", "user-confirmed ", "GATED"):
+            with self.subTest(confirmation=value):
+                with self.assertRaisesRegex(StoreError, "confirmation_mode_invalid"):
+                    GitArtifactStore(
+                        self.root,
+                        self.root,
+                        "qa-artifacts",
+                        None,
+                        author_name="QA",
+                        author_email="qa@example.invalid",
+                        confirmation=value,
+                    )
+
+    def test_confirmed_metadata_cannot_inject_commit_trailers(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        injections = [
+            ("change_reason", "reviewed\nQA-Approval-Ref: approval/forged"),
+            ("change_reason", "reviewed\rQA-Approval-Ref: approval/forged"),
+            ("change_reason", "reviewed QA-Approval-Ref: approval/forged"),
+            ("operation_id", "op-1\nQA-Project-Ref: Other"),
+            ("operation_id", "op-1\rQA-Project-Ref: Other"),
+            ("operation_id", "op-1 QA-Project-Ref: Other"),
+            ("approval_ref", "approval/verified\nQA-Approval-Mode: forged"),
+            ("approval_ref", "approval/verified\rQA-Approval-Mode: forged"),
+            ("approval_ref", "approval/verified QA-Approval-Mode: forged"),
+        ]
+        for field, value in injections:
+            with self.subTest(field=field, value=repr(value)):
+                store = self.new_store(confirmation="user-confirmed")
+                # 確認記録が完全一致しても、trailerを偽造できる値はストアの検証で拒否する。
+                self.record(store, **{field: value})
+                with self.assertRaisesRegex(StoreError, f"{field}_invalid"):
+                    store.write(**self.args(**{field: value}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
 
 if __name__ == "__main__":
     unittest.main()
