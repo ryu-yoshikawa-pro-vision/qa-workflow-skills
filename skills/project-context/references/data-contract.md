@@ -52,6 +52,12 @@ Git providerは許可済みrepository rootの外にGit metadataを保存するwo
 Git providerは既存pathを最後に変更したcommitの件名（`qa artifact: <kind> <path>`）と`QA-Project-Ref` trailerが、呼出しのkindと案件に一致しない場合、読出し・書込みともに`artifact_project_mismatch`で拒否します。trailerの無いcommitも案件を証明できないため拒否します。書込みは参照更新の前に拒否されます。commit messageに入る値は改行として扱われる文字を含められません。
 `user-confirmed`で書込んだcommitには`QA-Approval-Source: user-confirmed`のtrailerを付けます。`trusted-callback`のcommitには付けません。`_assert_owner`は件名と`QA-Project-Ref`だけを参照するため、trailer付きcommitも従来どおり読取れます。旧版の`QA-Approval-Mode`のtrailerを持つcommitも同じ理由で読取れます（後方互換）。trailer `QA-Approval-Source` は監査用の表示であり、承認の証跡ではありません（読取時に検証されません）。
 
+`GitArtifactStore`は、対象branchが主ワークツリーまたは任意のlinked worktreeでcheckoutされている場合は`branch_checked_out`で構築を拒否します（`symbolic-ref -q HEAD`と`worktree list --porcelain`の両方で判定）。
+
+`scripts/artifact_host.py` は、`GitArtifactStore`を`user-confirmed`で使うホストCLIです（JSON 1行、エラーは`{"status":"blocked","reason":...}`と非ゼロ終了）。`init-branch`は空treeのroot commitをplumbingで作り、HEAD・index・作業ツリーに触れません。`save`は`--user-confirmed-ref`（単一行・1024文字以内・制御文字なしの参照）を確認記録として登録してから書込みます。`approval_revision`は`sha256:<content sha256>`です。`read`・`export`・`verify-projection`も、同じプロセスで案件の読取確認を登録するため`--user-confirmed-ref`が必要です。`export`は現在の内容をバイト一致で投影ファイルへ書き出す読取専用の写しで、一時ファイルとrenameで書き、途中失敗で壊れたファイルを残しません。手編集は正本に反映されず、`verify-projection`が`drifted`で検出します。`project_context.py`のJSON CLIは引き続き保存しません。
+
+branchは案件とkindごとに分けます（例: `qa-artifacts/<project>/<kind>`）。Git branchのrevisionはcommit SHAのため、1つのbranchに複数のkindや案件を置くと、CAS revisionが無関係な成果物にまで及びます。
+
 ### 保存済み配置方針の再利用条件
 
 `prepare-placement`はSection 12の有効DECの備考・決定根拠とSection 14の同一scopeの行から方針を再構成し、owner、scope、target_ref、policy revision、approval_ref、approval_revision、editable_scope、feature_index_ref、DEC IDを照合します。入力`existing_policy`の値だけでは再利用と判定しません。承認revisionは新規記録時にDEC備考とSection 14備考の双方に保存します。旧文書に承認revisionがない場合、承認revisionを推測せず、同一方針の再利用は行いません。既存DECを置換するときは、記録済み内容を維持したまま旧DECを置換済みにします。
