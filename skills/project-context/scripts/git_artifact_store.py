@@ -39,6 +39,37 @@ def _line(value: Any, label: str) -> str:
     return value
 
 
+def branch_checked_out(repository: Path, ref: str) -> bool:
+    """ref（refs/heads/<branch>）が主ワークツリーまたは任意のlinked worktreeでcheckoutされていればTrue。
+
+    判定は `git symbolic-ref -q HEAD` と `git worktree list --porcelain` の両方で行う。
+    どちらか一方だけでは、detached HEAD の主ワークツリーとlinked worktreeの取り違えを見逃すため。
+    """
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(repository), "symbolic-ref", "-q", "HEAD"],
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        listing = subprocess.run(
+            ["git", "-C", str(repository), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise StoreError("git_provider_unavailable") from exc
+    if listing.returncode != 0:
+        raise StoreError("git_provider_command_failed")
+    if head.returncode == 0 and head.stdout.decode("utf-8", "replace").strip() == ref:
+        return True
+    return any(
+        line == "branch " + ref
+        for line in listing.stdout.decode("utf-8", "replace").splitlines()
+    )
+
+
 def _path(ref: str) -> str:
     ref = _line(ref, "artifact_ref")
     path = PurePosixPath(ref)
@@ -91,7 +122,12 @@ class GitArtifactStore(UserConfirmationMixin):
         if not metadata.is_relative_to(self.root):
             raise StoreError("git_metadata_outside_authorized_root")
         self._git("check-ref-format", "--branch", self.branch)
+        self._assert_not_checked_out()
         self._head()
+
+    def _assert_not_checked_out(self) -> None:
+        if branch_checked_out(self.root, self.ref):
+            raise StoreError("branch_checked_out")
 
     def _git(
         self,

@@ -1778,5 +1778,76 @@ class UserConfirmedGitArtifactStoreTests(unittest.TestCase):
         self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
 
 
+class CheckedOutBranchGuardTests(unittest.TestCase):
+    """保存先branchが主ワークツリーまたはlinked worktreeでcheckoutされている場合の拒否。"""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.root = self.base / "repo"
+        self.root.mkdir()
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "qa@example.invalid")
+        git(self.root, "config", "user.name", "QA")
+        (self.root / "README.md").write_text("original\n", encoding="utf-8")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-qm", "baseline")
+
+    @staticmethod
+    def authorize(request: dict) -> bool:
+        return True
+
+    def store(self, branch: str, root: Path | None = None) -> GitArtifactStore:
+        return GitArtifactStore(
+            root or self.root,
+            root or self.root,
+            branch,
+            self.authorize,
+            author_name="QA",
+            author_email="qa@example.invalid",
+        )
+
+    def test_branch_checked_out_in_main_worktree_is_rejected(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        git(self.root, "switch", "-q", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_branch_checked_out_in_linked_worktree_is_rejected(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        # 主ワークツリーはmainのままでも、linked worktreeでcheckout中なら拒否する。
+        self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), "refs/heads/main")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_linked_worktree_checkout_rejected_even_when_main_is_detached(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        git(self.root, "checkout", "-q", "--detach")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_branch_not_checked_out_is_accepted(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+        self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), "refs/heads/main")
+
+    def test_other_branch_checked_out_does_not_block_store(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", "-b", "feature/other", str(linked))
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+
+    def test_missing_branch_still_reports_existing_error(self) -> None:
+        with self.assertRaisesRegex(StoreError, "git_provider_command_failed"):
+            self.store("qa-artifacts")
+
+
 if __name__ == "__main__":
     unittest.main()
