@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -194,6 +195,22 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(StoreError, "revision_conflict"):
             self.write(content="changed", expected=first["revision"], operation="op-2")
+
+    def test_reused_operation_id_under_current_head_is_a_new_operation(self) -> None:
+        # 文書化された挙動: git store の operation_id 冪等性は、同一 expected_revision（直前版）の
+        # 再送に限る。現在のheadを expected とする書込みでは、既存の operation_id を再利用しても
+        # 新規操作として保存される（SQLite版は operation_id_reused で拒否する）。呼出し側の一意性責務。
+        first = self.write(content="first", operation="op-1")
+        second = self.write(
+            content="second", expected=first["revision"], operation="op-2"
+        )
+        self.assertEqual(second["status"], "stored", second)
+        third = self.write(
+            content="third", expected=second["revision"], operation="op-2"
+        )
+        self.assertEqual(third["status"], "stored", third)
+        messages = git(self.root, "log", "--format=%B", "qa-artifacts")
+        self.assertEqual(messages.count("QA-Operation-Id: op-2"), 2)
 
     def test_native_ref_cas_detects_concurrent_edits(self) -> None:
         first = self.write()
@@ -1847,6 +1864,67 @@ class CheckedOutBranchGuardTests(unittest.TestCase):
     def test_missing_branch_still_reports_existing_error(self) -> None:
         with self.assertRaisesRegex(StoreError, "git_provider_command_failed"):
             self.store("qa-artifacts")
+
+    def test_checkout_after_construction_is_rejected_before_ref_update(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        store = self.store("qa-artifacts")
+        linked = self.base / "late-linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        before = git(self.root, "rev-parse", "refs/heads/qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            store.write(
+                kind="project-context",
+                project_ref="Sample",
+                artifact_ref="docs/PROJECT_CONTEXT.md",
+                content="late",
+                expected_revision=None,
+                operation_id="op-late",
+                source_ref="issue/1",
+                source_revision="source-1",
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+                change_reason="approved change",
+            )
+        self.assertEqual(git(self.root, "rev-parse", "refs/heads/qa-artifacts"), before)
+
+    def test_prunable_worktree_whose_directory_is_gone_does_not_block(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "vanished"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        shutil.rmtree(linked)
+        listing = git(self.root, "worktree", "list", "--porcelain")
+        self.assertIn("prunable", listing)
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+
+    def test_live_linked_worktree_still_blocks_when_another_worktree_is_prunable(
+        self,
+    ) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        gone = self.base / "gone"
+        git(self.root, "worktree", "add", "-q", str(gone), "qa-artifacts")
+        shutil.rmtree(gone)
+        git(self.root, "branch", "other")
+        live = self.base / "live"
+        git(self.root, "worktree", "add", "-q", str(live), "other")
+        self.assertIn("prunable", git(self.root, "worktree", "list", "--porcelain"))
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            GitArtifactStore(
+                self.root,
+                self.root,
+                "other",
+                self.authorize,
+                author_name="QA",
+                author_email="qa@example.invalid",
+            )
+
+    def test_branch_name_prefix_of_checked_out_branch_is_not_confused(self) -> None:
+        git(self.root, "branch", "qa")
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "prefix-linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        store = self.store("qa")
+        self.assertEqual(store.branch, "qa")
 
 
 if __name__ == "__main__":

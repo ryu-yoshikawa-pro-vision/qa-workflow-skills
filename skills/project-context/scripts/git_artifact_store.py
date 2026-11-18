@@ -44,6 +44,9 @@ def branch_checked_out(repository: Path, ref: str) -> bool:
 
     判定は `git symbolic-ref -q HEAD` と `git worktree list --porcelain` の両方で行う。
     どちらか一方だけでは、detached HEAD の主ワークツリーとlinked worktreeの取り違えを見逃すため。
+    `worktree list --porcelain` は worktree ごとに空行区切りのブロックを出す。`prunable` 行を含む
+    ブロックは、ディレクトリが消えて取り除き待ちの worktree なので checkout 中として扱わない。
+    branch の一致は行全体の完全一致で比べる（部分一致する別branchを取り違えない）。
     """
     try:
         head = subprocess.run(
@@ -64,10 +67,27 @@ def branch_checked_out(repository: Path, ref: str) -> bool:
         raise StoreError("git_provider_command_failed")
     if head.returncode == 0 and head.stdout.decode("utf-8", "replace").strip() == ref:
         return True
-    return any(
-        line == "branch " + ref
-        for line in listing.stdout.decode("utf-8", "replace").splitlines()
-    )
+    for block in _worktree_blocks(listing.stdout.decode("utf-8", "replace")):
+        if any(line.startswith("prunable") for line in block):
+            continue
+        if "branch " + ref in block:
+            return True
+    return False
+
+
+def _worktree_blocks(porcelain: str) -> list[list[str]]:
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for line in porcelain.splitlines():
+        if line == "":
+            if current:
+                blocks.append(current)
+            current = []
+        else:
+            current.append(line)
+    if current:
+        blocks.append(current)
+    return blocks
 
 
 def _path(ref: str) -> str:
@@ -435,6 +455,9 @@ class GitArtifactStore(UserConfirmationMixin):
         new_sha = commit_raw.decode("ascii").strip()
         if not COMMIT.fullmatch(new_sha):
             raise StoreError("git_commit_invalid")
+        # 構築後に別worktreeでbranchがcheckoutされた場合に備え、参照更新の直前にも再検査する。
+        # 検査と update-ref の間の競合は防げない（data-contract に記載）。
+        self._assert_not_checked_out()
         updated = self._git("update-ref", self.ref, new_sha, head, allow_failure=True)
         if updated is None:
             raise StoreError("revision_conflict")
