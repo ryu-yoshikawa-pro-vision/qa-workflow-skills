@@ -45,12 +45,12 @@ prepare-updateは既存のSection 16に存在するkeyのみ更新します。�
 正本が既存のGit管理Markdownである場合は、`scripts/git_artifact_store.py`の`GitArtifactStore`を明示選択できます。対象Git branchの`docs/PROJECT_CONTEXT.md`等を正本とし、Git commit SHAをexpected revisionに使う`update-ref`のnative CASで同一pathを更新します。履歴はGit commitから独立読戻しします。選択したbranchのGit objectが正本であり、未checkoutの作業ディレクトリを現行文書とは扱いません。ローカルSQLiteは別の案件でSQLiteを正本に選択した場合にのみ利用します。
 
 読み取りにも信頼済みhostから注入された`authorize`による案件scopeの権限確認を行います。operation再送時も権限を再評価します。両保存providerは認証済み呼出し元を仮定し、権限を自己申告するJSON CLIからは呼び出しません。
-`user-confirmed`では、読取は登録済みの案件scope内であれば確認記録なしで許可されます（CASのための読取を含む）。確認記録を登録していない案件（他案件を含む）の読取は拒否します。この緩和により、`user-confirmed`では案件内の読取ごとの承認と、登録後の読取の取消しは行いません。これらの防止は`gated`のみの保証です。
+`user-confirmed`では、読取は登録済みの案件scope内であれば確認記録なしで許可されます（CASのための読取を含む）。ここでの「登録済みの案件scope」とは、いずれかの確認記録（read / write / reclassify）が登録された案件を指します。write／reclassifyの確認記録も、その案件の別artifactを含む読取scopeを開きます（書込み後の独立readbackはこの挙動に依存します）。read記録だけの案件では書込みは許可されず、`access_denied`で拒否します。確認記録を登録していない案件（他案件を含む）の読取は拒否します。この緩和により、`user-confirmed`では案件内の読取ごとの承認と、登録後の読取の取消しは行いません。これらの防止は`gated`のみの保証です。
 
 Git providerは許可済みrepository rootの外にGit metadataを保存するworktree／外部Git dirを拒否します。対象branchの履歴・objectが許可外rootへ暗黙に作成されないようにするためです。
 
 Git providerは既存pathを最後に変更したcommitの件名（`qa artifact: <kind> <path>`）と`QA-Project-Ref` trailerが、呼出しのkindと案件に一致しない場合、読出し・書込みともに`artifact_project_mismatch`で拒否します。trailerの無いcommitも案件を証明できないため拒否します。書込みは参照更新の前に拒否されます。commit messageに入る値は改行として扱われる文字を含められません。
-`user-confirmed`で書込んだcommitには`QA-Approval-Mode: user-confirmed`のtrailerを付けます。`gated`のcommitには付けません。`_assert_owner`は件名と`QA-Project-Ref`だけを参照するため、trailer付きcommitも従来どおり読取れます。
+`user-confirmed`で書込んだcommitには`QA-Approval-Mode: user-confirmed`のtrailerを付けます。`gated`のcommitには付けません。`_assert_owner`は件名と`QA-Project-Ref`だけを参照するため、trailer付きcommitも従来どおり読取れます。trailer `QA-Approval-Mode` は監査用の表示であり、承認の証跡ではありません（読取時に検証されません）。
 
 ### 保存済み配置方針の再利用条件
 

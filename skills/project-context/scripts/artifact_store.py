@@ -87,7 +87,7 @@ class UserConfirmationMixin:
         write は operation, kind, project_ref, artifact_ref, expected_revision, sha256,
         source_ref, source_revision, approval_ref, approval_revision, operation_id,
         change_reason を持つ。reclassify は feature_registry が authorize に渡す決定dict
-        そのものを使う。read は案件のscopeを登録するだけで、読取の個別承認にはならない。
+        そのものを使う。どの operation の確認記録でも、登録された案件の読取scopeが開く。書込み後の独立readbackはこの挙動に依存する。read の記録は案件scopeだけを登録し、読取の個別承認にはならず、書込みを許可しない。
         """
         if self.confirmation != USER_CONFIRMED:
             raise StoreError("confirmation_mode_required")
