@@ -1014,65 +1014,81 @@ def _verify_git_evidence(
             raise ContractError("git_coverage_not_verified:" + ",".join(sorted(extra)))
 
 
+def reclassification_decisions(
+    request: dict[str, Any],
+    expected_revision: str | None,
+) -> list[dict[str, Any]]:
+    """Return one decision per superseded DIF, exactly as sent to the approval owner.
+
+    persist_snapshot authorizes these decisions, and the host CLI registers the same
+    dicts as user confirmations, so both sides derive the request from this one place.
+    """
+    prior = request.get("previous_snapshot")
+    if prior is None:
+        if any(_superseded_ids(row) for row in request["snapshot"]["changes"]):
+            raise ContractError("change_supersession_without_predecessor")
+        return []
+    old = _rows(prior.get("changes"), "previous_changes", "DIF")
+    snapshot = request["snapshot"]
+    decisions: list[dict[str, Any]] = []
+    for row in snapshot["changes"]:
+        if row["id"] in old or not _superseded_ids(row):
+            continue
+        for parent in _superseded_ids(row):
+            replaced = old[parent]
+            decisions.append(
+                {
+                    "operation": "reclassify",
+                    "kind": "feature-inventory",
+                    "project_ref": snapshot["project_ref"],
+                    "artifact_ref": snapshot["artifact_ref"],
+                    "expected_revision": expected_revision,
+                    "operation_id": snapshot["operation_id"],
+                    "change_id": row["id"],
+                    "supersedes_id": parent,
+                    "old_classification": replaced["classification"],
+                    "classification": row["classification"],
+                    "source_id": row["source_id"],
+                    "source_ref": next(
+                        source["ref"]
+                        for source in snapshot["sources"]
+                        if source["id"] == row["source_id"]
+                    ),
+                    "source_scope": next(
+                        source["scope"]
+                        for source in snapshot["sources"]
+                        if source["id"] == row["source_id"]
+                    ),
+                    "source_revision": row["after_revision"],
+                    "before_revision": row["before_revision"],
+                    "locator": row["locator"],
+                    "old_feature_ids": list(replaced["feature_ids"]),
+                    "feature_ids": list(row["feature_ids"]),
+                    "old_evidence_ref": replaced["evidence_ref"],
+                    "evidence_ref": row["evidence_ref"],
+                    "approval_ref": row["approval_ref"],
+                    "approval_revision": row["approval_revision"],
+                    "reason": row["reason"],
+                }
+            )
+    return decisions
+
+
 def _authorize_reclassifications(
     store: LocalArtifactStore | GitArtifactStore,
     request: dict[str, Any],
     expected_revision: str | None,
 ) -> None:
     """Check each new classification override with the trusted approval owner."""
-    prior = request.get("previous_snapshot")
-    if prior is None:
-        if any(_superseded_ids(row) for row in request["snapshot"]["changes"]):
-            raise ContractError("change_supersession_without_predecessor")
-        return
-    old = _rows(prior.get("changes"), "previous_changes", "DIF")
-    snapshot = request["snapshot"]
-    for row in snapshot["changes"]:
-        if row["id"] in old or not _superseded_ids(row):
-            continue
-        for parent in _superseded_ids(row):
-            replaced = old[parent]
-            decision = {
-                "operation": "reclassify",
-                "kind": "feature-inventory",
-                "project_ref": snapshot["project_ref"],
-                "artifact_ref": snapshot["artifact_ref"],
-                "expected_revision": expected_revision,
-                "operation_id": snapshot["operation_id"],
-                "change_id": row["id"],
-                "supersedes_id": parent,
-                "old_classification": replaced["classification"],
-                "classification": row["classification"],
-                "source_id": row["source_id"],
-                "source_ref": next(
-                    source["ref"]
-                    for source in snapshot["sources"]
-                    if source["id"] == row["source_id"]
-                ),
-                "source_scope": next(
-                    source["scope"]
-                    for source in snapshot["sources"]
-                    if source["id"] == row["source_id"]
-                ),
-                "source_revision": row["after_revision"],
-                "before_revision": row["before_revision"],
-                "locator": row["locator"],
-                "old_feature_ids": list(replaced["feature_ids"]),
-                "feature_ids": list(row["feature_ids"]),
-                "old_evidence_ref": replaced["evidence_ref"],
-                "evidence_ref": row["evidence_ref"],
-                "approval_ref": row["approval_ref"],
-                "approval_revision": row["approval_revision"],
-                "reason": row["reason"],
-            }
-            try:
-                verified = store.authorize(decision)
-            except Exception as exc:
-                raise ContractError("change_approval_provider_unavailable") from exc
-            if verified is not True:
-                raise ContractError(
-                    f"change_reclassification_approval_unverified:{row['id']}"
-                )
+    for decision in reclassification_decisions(request, expected_revision):
+        try:
+            verified = store.authorize(decision)
+        except Exception as exc:
+            raise ContractError("change_approval_provider_unavailable") from exc
+        if verified is not True:
+            raise ContractError(
+                f"change_reclassification_approval_unverified:{decision['change_id']}"
+            )
 
 
 def _git_ref_output(root: Path, *args: str, optional: bool = False) -> str | None:
@@ -1095,15 +1111,37 @@ def _git_ref_output(root: Path, *args: str, optional: bool = False) -> str | Non
         raise ContractError("git_source_ref_invalid") from exc
 
 
+class _SourceHeads:
+    """Re-reads HEAD of each authorized source root and compares it with the observed value."""
+
+    def __init__(self, roots: dict[str, str]) -> None:
+        self.roots = roots
+
+    def check(self) -> None:
+        for location, expected in sorted(self.roots.items()):
+            if (
+                _git_ref_output(Path(location), "rev-parse", "--verify", "HEAD")
+                != expected
+            ):
+                raise ContractError("git_head_changed")
+
+
 @contextmanager
 def _hold_git_source_refs(
     inputs: list[dict[str, Any]] | None,
+    *,
+    hold: bool = True,
 ):
-    """Hold Git's HEAD and checked-out branch ref locks across verification/write.
+    """Verify the observed source HEADs across the write; optionally hold Git's ref locks.
 
-    Normal Git checkout, commit and update-ref honor these lockfiles. A source
-    whose ref locks cannot be acquired fails closed, rather than racing CAS on
-    an unrelated artifact store.
+    With hold=True (the default, the previous behaviour), HEAD and the checked-out
+    branch ref are locked with O_EXCL from verification until the write. Normal Git
+    checkout, commit and update-ref honor these lockfiles. A source whose ref locks
+    cannot be acquired fails closed. This writes into the source repository's .git.
+
+    With hold=False nothing is created under the source repository's .git. An existing
+    lockfile still blocks the save. The caller must call the yielded check right before
+    the store write. A HEAD move between that check and the write is not prevented.
     """
     roots: dict[str, str] = {}
     for entry in inputs or []:
@@ -1122,6 +1160,7 @@ def _hold_git_source_refs(
         if str(root) in roots and roots[str(root)] != expected:
             raise ContractError("git_source_root_revision_conflict")
         roots[str(root)] = expected
+    heads = _SourceHeads(roots)
     with ExitStack() as stack:
         for location, expected in sorted(roots.items()):
             root = Path(location)
@@ -1141,6 +1180,10 @@ def _hold_git_source_refs(
                 ):
                     raise ContractError("git_source_ref_outside_authorized_root")
                 lock = Path(str(target) + ".lock")
+                if not hold:
+                    if lock.exists() or lock.is_symlink():
+                        raise ContractError("git_source_ref_lock_unavailable")
+                    continue
                 try:
                     lock.parent.mkdir(parents=True, exist_ok=True)
                     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -1153,13 +1196,20 @@ def _hold_git_source_refs(
                 stack.callback(lock.unlink, missing_ok=True)
             if _git_ref_output(root, "rev-parse", "--verify", "HEAD") != expected:
                 raise ContractError("git_head_changed")
-        yield
+        yield heads
         for location, expected in roots.items():
             if (
                 _git_ref_output(Path(location), "rev-parse", "--verify", "HEAD")
                 != expected
             ):
                 raise ContractError("git_head_changed_during_persistence")
+
+
+def snapshot_content(snapshot: dict[str, Any]) -> str:
+    """The exact text persist_snapshot stores. The host CLI derives the write digest from it."""
+    return json.dumps(
+        snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
 
 
 def persist_snapshot(
@@ -1171,8 +1221,14 @@ def persist_snapshot(
     approval_revision: str,
     change_reason: str,
     git_inventory_requests: list[dict[str, Any]] | None = None,
+    hold_source_refs: bool = True,
 ) -> dict[str, Any]:
-    """Persist a validated inventory using actual saved and Git source revisions."""
+    """Persist a validated inventory using actual saved and Git source revisions.
+
+    hold_source_refs=True (default) holds the source repository's ref locks across the
+    verification and the write. False creates no lockfile in the source repository and
+    re-checks the source HEAD right before the write instead (see _hold_git_source_refs).
+    """
     try:
         report = handle(request)
         if report["status"] not in {"complete", "incomplete"}:
@@ -1190,12 +1246,13 @@ def persist_snapshot(
                 raise ContractError("previous_snapshot_not_current")
         elif request["previous_snapshot"] is not None:
             raise ContractError("previous_snapshot_without_expected_revision")
-        with _hold_git_source_refs(git_inventory_requests):
+        with _hold_git_source_refs(
+            git_inventory_requests, hold=hold_source_refs
+        ) as heads:
             _verify_git_evidence(request, report, git_inventory_requests)
             _authorize_reclassifications(store, request, expected_revision)
-            content = json.dumps(
-                snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-            )
+            content = snapshot_content(snapshot)
+            heads.check()
             written = store.write(
                 kind="feature-inventory",
                 project_ref=project_ref,

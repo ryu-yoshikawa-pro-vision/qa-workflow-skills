@@ -102,3 +102,5 @@ analysis_updateでは前回保存された現HEADの有効DIFが持つ旧SHAを�
 GitlinkはHEADだけでなく、baseで存在しHEADで削除・置換された旧SHAもgitlink:path@SHAとして未取得に含めます。親sourceのgit_inventory_requests[].gitlink_sourcesにはその文字列をkey、検証対象の子source IDをvalueとして明示します。子sourceの現在HEADまたは認証済みの前回snapshotのrevisionと照合し、未解決なら保存拒否します。解決済みのgitlinkだけを親の完全なGit列挙として扱います。
 
 code sourceを持つ保存では、許可rootのHEADとcheckout先branch refのGitロックを検証から保存まで保持します。競合、refの変更、未許可metadata pathはblockedとします。実Gitの取得失敗理由（git_head_changed等）は保存結果にも保持します。実保存providerのCAS・認可検証も引き続き必須です。
+
+`persist_snapshot`は`hold_source_refs`（既定`True`）を持ちます。`True`では上記のとおりソースrepoのHEADとbranch refのlockfileを作って保持します。`hold_source_refs=False`（ホストCLI `save-snapshot` の既定）では、ソースrepoの`.git`に何も書きません（lockを作らない）。代わりに既存のlockfileがあれば`git_source_ref_lock_unavailable`で拒否し、`store.write`の直前にHEADが観測したheadと一致することを再取得で確認します（不一致は`git_head_changed`）。**競合窓**: この確認と書込みの間にソースのHEADが動いた場合は検出できず、その版が保存されうります。`True`ではこの窓をlockで塞ぎますが、そのためソースrepoの`.git`へ一時的に書込みます。読取専用の製品repoを扱う運用では`False`を既定とし、競合窓を承知のうえで使います。
