@@ -9,9 +9,12 @@ Ownership and limits:
   The working tree, HEAD and index are never changed by save or init-branch.
 - `export` writes a read-only projection copy. It is NOT the store: edits made by hand to
   the projection never reach the store. Use `verify-projection` to detect such drift.
-- Saving goes only through `save-prepared`, which passes a prepared candidate from
-  project_context.py to project_context.persist_prepared (16-section, project identity,
-  previous-revision and approval checks). Arbitrary content is never written directly.
+- project-context is saved only through `save-prepared`, which passes a prepared candidate
+  from project_context.py to project_context.persist_prepared (16-section, project identity,
+  previous-revision and approval checks). feature-inventory is saved only through
+  `save-snapshot`, which passes the snapshot to feature_registry.persist_snapshot (Git source
+  evidence, reclassification approval, previous-snapshot checks). Arbitrary content is never
+  written directly.
   `save-prepared` requires `--user-confirmed-ref`, a single-line reference to the user's
   explicit confirmation. The host registers that confirmation in this process and then
   writes. The confirmation is self-declared by the caller and is not authentication. The
@@ -46,8 +49,10 @@ import project_context
 from artifact_store import USER_CONFIRMED, StoreError, _name
 from git_artifact_store import (
     BRANCH,
+    COMMIT,
     LINE_BREAKS,
     GitArtifactStore,
+    _path,
     branch_checked_out,
 )
 
@@ -258,9 +263,16 @@ def _prepared_approval_revision(
 def cmd_save_prepared(args: argparse.Namespace) -> int:
     approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
     if args.kind != "project-context":
-        # feature-inventory は feature_registry.persist_snapshot（Git証跡・再分類の検証を含む）
-        # を経由する必要がある。このターンでは安全に実装できないため明示的に拒否する。
-        return _blocked("unsupported_kind_for_now")
+        # feature-inventory は feature_registry.persist_snapshot（Git証跡・再分類の検証を含む）を
+        # 経由する save-snapshot で保存する。ここ（persist_prepared 経由）では保存しない。
+        return _emit(
+            {
+                "status": "blocked",
+                "reason": "unsupported_kind_for_now",
+                "hint": "feature-inventory is saved with save-snapshot",
+            },
+            1,
+        )
     preparation, raw = _prepared_request(args.prepared_file)
     if preparation.get("artifact_ref") != args.artifact_ref:
         return _blocked("artifact_ref_mismatch")
@@ -301,6 +313,111 @@ def cmd_save_prepared(args: argparse.Namespace) -> int:
         operation_id=operation_id,
         approval_ref=approval_ref,
         approval_revision=approval_revision,
+    )
+    succeeded = result.get("status") in {"stored", "idempotent"}
+    return _emit(result, 0 if succeeded else 1)
+
+
+def _feature_registry() -> Any:
+    """feature_registry は feature-analysis の scripts にある。このコマンドでだけ読み込む。"""
+    scripts = str(Path(__file__).resolve().parents[2] / "feature-analysis" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    try:
+        import feature_registry  # noqa: PLC0415
+    except ImportError as exc:
+        raise HostError("feature_analysis_unavailable") from exc
+    return feature_registry
+
+
+def _json_file(path: str, label: str) -> Any:
+    feature_registry = _feature_registry()
+    try:
+        raw = Path(path).read_bytes()
+    except OSError:
+        raise HostError(f"{label}_unavailable")
+    if len(raw) > feature_registry.MAX_INPUT:
+        raise HostError(f"{label}_too_large")
+    try:
+        return json.loads(
+            raw.decode("utf-8"), object_pairs_hook=feature_registry._pairs
+        )
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise HostError(f"{label}_invalid") from exc
+
+
+def _expected_snapshot_revision(value: str) -> str | None:
+    if value == "none":
+        return None
+    if value.startswith("git:") and COMMIT.fullmatch(value[4:]):
+        return value
+    raise HostError("expected_revision_invalid")
+
+
+def cmd_save_snapshot(args: argparse.Namespace) -> int:
+    feature_registry = _feature_registry()
+    approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
+    change_reason = _single_line(args.change_reason, "change_reason")
+    expected = _expected_snapshot_revision(args.expected_revision)
+    snapshot = _json_file(args.snapshot_file, "snapshot")
+    if not isinstance(snapshot, dict):
+        raise HostError("snapshot_invalid")
+    previous = None
+    if args.previous_snapshot_file is not None:
+        previous = _json_file(args.previous_snapshot_file, "previous_snapshot")
+        if not isinstance(previous, dict):
+            raise HostError("previous_snapshot_invalid")
+    requests = _json_file(args.git_inventory_requests_file, "git_inventory_requests")
+    if requests is not None and not isinstance(requests, list):
+        raise HostError("git_inventory_requests_invalid")
+    if snapshot.get("project_ref") != args.project_ref:
+        return _blocked("project_ref_mismatch")
+    if args.operation_id is not None and args.operation_id != snapshot.get(
+        "operation_id"
+    ):
+        return _blocked("operation_id_mismatch")
+    request = {
+        "snapshot": snapshot,
+        "previous_snapshot": previous,
+        "observed_head_revision": args.observed_head_revision,
+    }
+    # 確認記録は persist_snapshot が store へ渡す認可要求と同じキー・同じ値で登録する。
+    # 値は feature_registry（snapshot_content・reclassification_decisions）と
+    # GitArtifactStore.write の実コードから導く。ホストが独自に値を組み立てない。
+    try:
+        content = feature_registry.snapshot_content(snapshot)
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        approval_revision = "sha256:" + digest
+        write_record = {
+            "operation": "write",
+            "kind": "feature-inventory",
+            "project_ref": args.project_ref,
+            "artifact_ref": _path(snapshot["artifact_ref"]),
+            "expected_revision": expected,
+            "sha256": digest,
+            "source_ref": args.project_ref,
+            "source_revision": snapshot["source_revision"],
+            "approval_ref": approval_ref,
+            "approval_revision": approval_revision,
+            "operation_id": snapshot["operation_id"],
+            "change_reason": change_reason,
+        }
+        decisions = feature_registry.reclassification_decisions(request, expected)
+    except (KeyError, TypeError, ValueError, StoreError, StopIteration, AttributeError):
+        return _blocked("snapshot_invalid")
+    store = _store(args, USER_CONFIRMED)
+    store.record_user_confirmation(write_record)
+    for decision in decisions:
+        store.record_user_confirmation(decision)
+    result = feature_registry.persist_snapshot(
+        store,
+        request,
+        expected_revision=expected,
+        approval_ref=approval_ref,
+        approval_revision=approval_revision,
+        change_reason=change_reason,
+        git_inventory_requests=requests,
+        hold_source_refs=args.hold_source_refs,
     )
     succeeded = result.get("status") in {"stored", "idempotent"}
     return _emit(result, 0 if succeeded else 1)
@@ -472,7 +589,7 @@ def build_parser() -> argparse.ArgumentParser:
             "structure, project identity, previous-revision match and DEC/ASM checks run in persist_prepared. "
             "Call only after the user has confirmed this exact candidate: --user-confirmed-ref is a "
             "self-declared confirmation, not authentication, and the AI must not pass it before that "
-            "confirmation. feature-inventory is not supported yet (unsupported_kind_for_now)."
+            "confirmation. feature-inventory is saved with save-snapshot (unsupported_kind_for_now here)."
         ),
     )
     _add_store_arguments(save)
@@ -492,6 +609,63 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_author_arguments(save)
     save.set_defaults(handler=cmd_save_prepared)
+
+    snapshot = sub.add_parser(
+        "save-snapshot",
+        help="persist a feature-inventory snapshot via feature_registry.persist_snapshot",
+        description=(
+            "Persist one feature-inventory snapshot (kind feature-inventory) to the store branch. "
+            "--snapshot-file is the snapshot object; --previous-snapshot-file is the previous saved "
+            "snapshot (omit for the first save, which requires --expected-revision none). "
+            "--git-inventory-requests-file is the JSON list of git_inventory_requests entries "
+            "(source_id, repository_root, authorized_root, base_sha, head_sha, ...), or null when the "
+            "snapshot has no code source. The source Git trees are re-read by persist_snapshot. "
+            "--observed-head-revision is the head the caller observed; it must equal the snapshot "
+            "source_revision (otherwise stale). The host registers, in this process only, the write "
+            "and each reclassification request that persist_snapshot will send to the store, then "
+            "saves. --user-confirmed-ref is a self-declared confirmation of this exact snapshot "
+            "(not authentication); the AI must not pass it before the user has confirmed. By default "
+            "no ref lock is written into the source repository; --hold-source-refs restores the lock "
+            "behaviour."
+        ),
+    )
+    snapshot.add_argument(
+        "--repo", required=True, help="absolute path of the store Git repository"
+    )
+    snapshot.add_argument(
+        "--branch", required=True, help="branch name [A-Za-z0-9._/-]+"
+    )
+    snapshot.add_argument("--project-ref", required=True, dest="project_ref")
+    snapshot.add_argument("--snapshot-file", required=True)
+    snapshot.add_argument("--previous-snapshot-file")
+    snapshot.add_argument("--git-inventory-requests-file", required=True)
+    snapshot.add_argument(
+        "--expected-revision",
+        required=True,
+        help="none (create-if-absent) or git:<sha> of the previous saved revision",
+    )
+    snapshot.add_argument(
+        "--observed-head-revision",
+        required=True,
+        help="source head observed by the caller; must equal the snapshot source_revision",
+    )
+    snapshot.add_argument("--change-reason", required=True)
+    snapshot.add_argument(
+        "--user-confirmed-ref",
+        required=True,
+        help="single-line reference to the user's explicit confirmation of this snapshot (self-declared; do not pass before the user confirms)",
+    )
+    snapshot.add_argument(
+        "--operation-id",
+        help="must equal the snapshot operation_id when given (default: the snapshot's)",
+    )
+    snapshot.add_argument(
+        "--hold-source-refs",
+        action="store_true",
+        help="hold the source repository's HEAD and branch ref locks during verification and write (writes lock files into the source .git)",
+    )
+    _add_author_arguments(snapshot)
+    snapshot.set_defaults(handler=cmd_save_snapshot)
 
     read = sub.add_parser(
         "read", help="print the current (or given revision) content as JSON"
