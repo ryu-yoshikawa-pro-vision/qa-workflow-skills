@@ -205,7 +205,6 @@ class SourceRefLockOptionTests(unittest.TestCase):
             self.store.read_current("feature-inventory", "Sample", ARTIFACT_REF)
         )
 
-
     def test_head_moved_after_write_is_stored_with_a_warning(self) -> None:
         original = self.store.write
 
