@@ -1516,19 +1516,136 @@ class SaveSnapshotTests(unittest.TestCase):
             (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
         )
 
-    def test_save_is_refused_when_the_source_is_inside_the_store_repository(
+    def test_save_is_allowed_when_the_source_is_an_independent_repo_inside_the_store(
         self,
     ) -> None:
+        # 実際の配置の再現: store の作業ツリーの配下に、独自の .git を持つ別repoのソースがある。
         nested_source, baseline, head = make_source(self.repo)
+        nested_git = source_listing(nested_source)
+        main_before = git(self.repo, "rev-parse", "main")
         snap, evidence = initial_snapshot(nested_source, baseline, head)
-        os.environ["QA_FEATURE_AUTHORIZED_ROOT"] = str(nested_source)
-        try:
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(nested_source)}
+        ):
             code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
-        finally:
-            os.environ["QA_FEATURE_AUTHORIZED_ROOT"] = str(self.source)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(git(self.repo, "rev-parse", "main"), main_before)
+        self.assertEqual(source_listing(nested_source), nested_git)
+
+    def test_save_is_refused_when_the_source_is_a_plain_directory_of_the_store(
+        self,
+    ) -> None:
+        # 独自の .git を持たない。store と同じrepoの作業ツリーの単なるサブディレクトリ（同一repo）。
+        plain = self.repo / "plain-src"
+        plain.mkdir()
+        (plain / "auth.py").write_text("def access(): return True\n", encoding="utf-8")
+        snap, evidence = initial_snapshot(plain, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(plain)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
         self.assertEqual(
             (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
         )
+
+    def test_save_is_refused_when_source_and_store_are_worktrees_of_one_repository(
+        self,
+    ) -> None:
+        # 作業ツリーのtoplevelは異なるが、同じGitリポジトリ（common git dir が一致）。
+        linked = self.base / "linked-worktree"
+        git(self.repo, "worktree", "add", "-q", "--detach", str(linked), "main")
+        snap, evidence = initial_snapshot(linked, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(linked)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.repo)}
+        ):
+            code, payload = run_host(*self.argv_for_repo(linked, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_the_store_is_an_independent_repo_inside_the_source(
+        self,
+    ) -> None:
+        inner_store = self.source / "store-inside"
+        inner_store.mkdir()
+        git(inner_store, "init", "-q", "-b", "main")
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(inner_store, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_either_side_is_reached_through_a_symlink(
+        self,
+    ) -> None:
+        link = self.base / "store-link"
+        link.symlink_to(self.repo, target_is_directory=True)
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        # ソースが store への symlink 経由で指される（同一repo）。
+        evidence[0]["repository_root"] = str(link)
+        evidence[0]["authorized_root"] = str(link)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(link)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+        # 保存先が symlink 経由で指される。ソースは store の実パス（同一repo）。
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.repo)}
+        ):
+            code, payload = run_host(*self.argv_for_repo(link, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_undeterminable_store_source_relation_is_refused(self) -> None:
+        not_repo = self.base / "not-a-repo"
+        not_repo.mkdir()
+        snap, evidence = initial_snapshot(not_repo, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(not_repo)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+
+        plain_store = self.base / "plain-store"
+        plain_store.mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(plain_store, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+
+    def test_failed_git_judgement_is_refused_fail_closed(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(artifact_host, "_git_path_option", return_value=None),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_unrelated_source_repository_is_allowed(self) -> None:
+        # setUp の store と source は兄弟（無関係）。同じ権限で保存できる。
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
 
     def test_save_with_code_source_requires_the_trusted_root_variable(self) -> None:
         snap, evidence = initial_snapshot(self.source, self.baseline, self.head)

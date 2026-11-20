@@ -468,27 +468,57 @@ def _trusted_authorized_roots(requests: list[Any] | None) -> None:
             raise HostError("trusted_authorized_root_mismatch")
 
 
-def _store_repo_root(repo: Path) -> Path | None:
-    completed = _git(repo, "rev-parse", "--show-toplevel", check=False)
+def _git_path_option(repo: Path, option: str) -> Path | None:
+    """`git rev-parse <option>` の結果を、symlink解決後の絶対パスで返す（読取りのみ）。"""
+    completed = _git(repo, "rev-parse", option, check=False)
     if completed.returncode != 0:
         return None
     try:
-        return Path(completed.stdout.decode("utf-8").strip()).resolve(strict=True)
-    except (UnicodeDecodeError, OSError, ValueError):
+        raw = completed.stdout.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return None
+    if not raw:
+        return None
+    path = Path(raw)
+    if not path.is_absolute():
+        path = repo / path
+    try:
+        return path.resolve(strict=True)
+    except (OSError, ValueError):
         return None
 
 
-def _refuse_store_inside_source(repo: Path, requests: list[Any] | None) -> None:
-    """保存先（store）のrepositoryが、読取り元のsource repositoryと同一か包含関係なら拒否する。
+def _repo_identity(repo: Path) -> tuple[Path, Path, Path] | None:
+    """repo を含む作業ツリーの (toplevel, common git dir, absolute git dir) を返す。
 
-    同じrepoへ保存すると、ソースの作業ツリーとHEADを保存が動かすため、取り違えを防ぐ。
-    store の root が解決できない場合は、store 側の検査（branch・repository）に任せる。
+    判定できなければ None。読取りだけを行う（READ_ONLY_GIT_ENV の GIT_OPTIONAL_LOCKS=0）。
+    """
+    top = _git_path_option(repo, "--show-toplevel")
+    common = _git_path_option(repo, "--git-common-dir")
+    gitdir = _git_path_option(repo, "--absolute-git-dir")
+    if top is None or common is None or gitdir is None:
+        return None
+    return top, common, gitdir
+
+
+def _refuse_store_inside_source(repo: Path, requests: list[Any] | None) -> None:
+    """保存先（store）が読取り元（source）の .git に書き込みうる配置なら拒否する。
+
+    拒否するのは次の場合だけ:
+    (a) store と source が同一のGitリポジトリ（common git dir または absolute git dir が一致）。
+    (b) store の toplevel が source の toplevel の配下（store が source の作業ツリー内にある）。
+    source が store の配下にあっても、source が独自の .git を持つ独立したリポジトリなら許可する。
+    判定に失敗した場合は拒否する（fail closed）。
     """
     if not requests:
         return
-    store_root = _store_repo_root(repo)
-    if store_root is None:
-        return
+    try:
+        store = _repo_identity(repo)
+    except HostError as exc:
+        raise HostError("store_source_relation_unverifiable") from exc
+    if store is None:
+        raise HostError("store_source_relation_unverifiable")
+    store_top, store_common, store_gitdir = store
     for entry in requests:
         if not isinstance(entry, dict) or not isinstance(
             entry.get("repository_root"), str
@@ -496,13 +526,17 @@ def _refuse_store_inside_source(repo: Path, requests: list[Any] | None) -> None:
             continue
         try:
             source_root = Path(entry["repository_root"]).resolve(strict=True)
-        except (OSError, ValueError):
-            continue
-        if (
-            store_root == source_root
-            or store_root.is_relative_to(source_root)
-            or source_root.is_relative_to(store_root)
-        ):
+            source = _repo_identity(source_root)
+        except (OSError, ValueError, HostError) as exc:
+            raise HostError("store_source_relation_unverifiable") from exc
+        if source is None:
+            raise HostError("store_source_relation_unverifiable")
+        source_top, source_common, source_gitdir = source
+        same_repository = store_common == source_common or store_gitdir == source_gitdir
+        store_in_source_tree = store_top == source_top or store_top.is_relative_to(
+            source_top
+        )
+        if same_repository or store_in_source_tree:
             raise HostError("store_repo_is_source_repo")
 
 
@@ -813,8 +847,10 @@ def build_parser() -> argparse.ArgumentParser:
             "--git-inventory-requests-file is the JSON list of git_inventory_requests entries "
             "(source_id, repository_root, authorized_root, base_sha, head_sha, ...), or null when the "
             "snapshot has no code source. Each authorized_root must equal the trusted root in the "
-            "QA_FEATURE_AUTHORIZED_ROOT environment variable, and the store repository must not be the "
-            "source repository or contain/be contained by it (store_repo_is_source_repo). The source Git "
+            "QA_FEATURE_AUTHORIZED_ROOT environment variable. The store must not be the same Git repository "
+            "as the source, nor inside the source's working tree (store_repo_is_source_repo); a source that "
+            "is an independent repository nested inside the store is allowed. An undeterminable relation is "
+            "refused (store_source_relation_unverifiable). The source Git "
             "trees are re-read by persist_snapshot. "
             "--observed-head-revision is the head the caller observed; it must equal the snapshot "
             "source_revision (otherwise stale). The host registers, in this process only, the write "
