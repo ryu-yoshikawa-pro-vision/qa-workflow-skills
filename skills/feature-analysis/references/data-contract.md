@@ -63,7 +63,7 @@ Git保存時の`authorize`（承認方式が`trusted-callback`の場合）には
 
 ## 保存前のGit現在性確認
 
-`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は保存をblockし、信頼済み呼出し元が現在のSHAを取り直します。理由は呼出し経路で異なります。`git_source_inventory`単体は`git_head_changed`を返し、`persist_snapshot`経由（ホストCLI `save-snapshot`を含む）では取得不完全の理由で包んで`git_source_listing_incomplete:git_head_changed`になります。過去コミットのtreeを現在の情報源として保存しません。
+`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は保存をblockし、信頼済み呼出し元が現在のSHAを取り直します。理由は見つけた段階で異なります。保存前のHEAD再確認（`persist_snapshot`のlock保持・書込み直前の検査）で見つかれば`git_head_changed`です。取得経路（`git_source_inventory`）で見つかった場合は`git_source_listing_incomplete:git_head_changed`に包まれます（`git_source_inventory`単体は`git_head_changed`を返します）。過去コミットのtreeを現在の情報源として保存しません。
 
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
 

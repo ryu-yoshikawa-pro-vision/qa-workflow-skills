@@ -775,6 +775,12 @@ def source_listing(repo: Path) -> dict[str, tuple[int, int]]:
     return listing
 
 
+def source_lock_files(repo: Path) -> list[str]:
+    return sorted(
+        str(p.relative_to(repo / ".git")) for p in (repo / ".git").rglob("*.lock")
+    )
+
+
 def make_source(base: Path) -> tuple[Path, str, str]:
     source = base / "source"
     source.mkdir()
@@ -841,6 +847,12 @@ class SaveSnapshotTests(unittest.TestCase):
         )
         self.assertEqual((code, payload["status"]), (0, "created"), payload)
         self.source, self.baseline, self.head = make_source(self.base)
+        # 信頼済みの authorized root は、テストのソースrepoだけを指す（入力JSONの値では主張できない）。
+        env_patch = mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.source)}
+        )
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         self.counter = 0
 
     def write_json(self, value: object) -> Path:
@@ -1191,25 +1203,36 @@ class SaveSnapshotTests(unittest.TestCase):
             [{"change_id": "DIF-002", "reason": "not_listed"}],
             payload,
         )
-        self.assertEqual(payload["reasons"], ["reclassification_not_confirmed:DIF-002:not_listed"])
+        self.assertEqual(
+            payload["reasons"], ["reclassification_not_confirmed:DIF-002:not_listed"]
+        )
         self.assertEqual(self.read()[1]["revision"], first["revision"])
 
     def test_reclassification_with_mismatched_confirmation_is_refused(self) -> None:
         first, update, previous, evidence2 = self.saved_then_reclassified()
         cases = {
             "other_change": (
-                {"change_id": "DIF-009", "approval_ref": "approval/verified",
-                 "approval_revision": "policy-v2"},
+                {
+                    "change_id": "DIF-009",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v2",
+                },
                 "not_listed",
             ),
             "other_ref": (
-                {"change_id": "DIF-002", "approval_ref": "approval/other",
-                 "approval_revision": "policy-v2"},
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/other",
+                    "approval_revision": "policy-v2",
+                },
                 "approval_ref_mismatch",
             ),
             "other_revision": (
-                {"change_id": "DIF-002", "approval_ref": "approval/verified",
-                 "approval_revision": "policy-v1"},
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v1",
+                },
                 "approval_revision_mismatch",
             ),
         }
@@ -1347,6 +1370,237 @@ class SaveSnapshotTests(unittest.TestCase):
 
     def save_file(self, snapshot_path: Path, evidence: list) -> tuple[int, dict]:
         return run_host(*self.argv(snapshot_path, evidence))
+
+    def test_default_save_holds_no_lock_while_writing(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        seen: list[tuple[list[str], dict]] = []
+        original = artifact_host.GitArtifactStore.write
+
+        def spy(store, **kwargs):
+            seen.append((source_lock_files(self.source), source_listing(self.source)))
+            return original(store, **kwargs)
+
+        before = source_listing(self.source)
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(artifact_host.GitArtifactStore, "write", spy),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0], ([], before))
+
+    def test_head_moved_before_the_save_is_refused_as_git_head_changed(self) -> None:
+        # The snapshot is consistent with the source HEAD, but the evidence names an older commit
+        # that exists in the repository and is not the checked-out HEAD.
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        evidence[0]["head_sha"] = self.baseline
+        evidence[0]["base_sha"] = None
+        code, payload = self.save(snap, evidence, observed=self.head)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reasons"], ["git_head_changed"], payload)
+
+    def test_inventory_path_wraps_a_head_mismatch_as_listing_incomplete(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        artifact_host._feature_registry()
+        import git_source_inventory
+
+        blocked = {"status": "blocked", "reason": "git_head_changed"}
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(git_source_inventory, "handle", return_value=blocked),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(
+            payload["reasons"],
+            ["git_source_listing_incomplete:git_head_changed"],
+            payload,
+        )
+
+    def test_previous_snapshot_that_is_not_the_stored_one_is_refused(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        update, evidence2 = updated_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+        altered = copy.deepcopy(snap)
+        altered["probe_note"] = "not the stored revision"
+        code, payload = self.save(
+            update,
+            evidence2,
+            expected=first["revision"],
+            previous=self.write_json(altered),
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertIn("previous_snapshot_not_current", payload["reasons"])
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_confirmation_record_with_a_different_sha256_is_refused(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        feature_registry = artifact_host._feature_registry()
+        content = feature_registry.snapshot_content(snap)
+        store = artifact_host.GitArtifactStore(
+            self.repo,
+            self.repo,
+            FI_BRANCH,
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+            approval_source="user-confirmed",
+        )
+        store.record_user_confirmation(
+            {
+                "operation": "read",
+                "kind": "feature-inventory",
+                "project_ref": "Sample",
+                "artifact_ref": FI_ARTIFACT,
+                "approval_ref": CONFIRMATION,
+            }
+        )
+        store.record_user_confirmation(
+            {
+                "operation": "write",
+                "kind": "feature-inventory",
+                "project_ref": "Sample",
+                "artifact_ref": FI_ARTIFACT,
+                "expected_revision": None,
+                "sha256": "0" * 64,
+                "source_ref": "Sample",
+                "source_revision": snap["source_revision"],
+                "approval_ref": CONFIRMATION,
+                "approval_revision": "sha256:" + "0" * 64,
+                "operation_id": snap["operation_id"],
+                "change_reason": "initial inventory",
+            }
+        )
+        result = feature_registry.persist_snapshot(
+            store,
+            {
+                "snapshot": snap,
+                "previous_snapshot": None,
+                "observed_head_revision": self.head,
+            },
+            expected_revision=None,
+            approval_ref=CONFIRMATION,
+            approval_revision="sha256:"
+            + hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            change_reason="initial inventory",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIsNone(
+            store.read_current("feature-inventory", "Sample", FI_ARTIFACT)
+        )
+
+    def test_save_is_refused_when_the_store_is_the_source_repository(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(self.source, snap, evidence))
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "store_repo_is_source_repo")
+
+    def test_save_is_refused_when_the_store_is_inside_the_source_repository(
+        self,
+    ) -> None:
+        (self.source / "sub").mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(
+            *self.argv_for_repo(self.source / "sub", snap, evidence)
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_the_source_is_inside_the_store_repository(
+        self,
+    ) -> None:
+        nested_source, baseline, head = make_source(self.repo)
+        snap, evidence = initial_snapshot(nested_source, baseline, head)
+        os.environ["QA_FEATURE_AUTHORIZED_ROOT"] = str(nested_source)
+        try:
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        finally:
+            os.environ["QA_FEATURE_AUTHORIZED_ROOT"] = str(self.source)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_with_code_source_requires_the_trusted_root_variable(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("QA_FEATURE_AUTHORIZED_ROOT", None)
+            code, payload = self.save(snap, evidence)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "trusted_authorized_root_missing"), payload
+        )
+
+    def test_trusted_root_variable_must_match_the_request_root(self) -> None:
+        other = self.base / "other-root"
+        other.mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(other)}):
+            code, payload = self.save(snap, evidence)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "trusted_authorized_root_mismatch"), payload
+        )
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_save_reports_a_head_moved_after_the_write_as_a_warning(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        original = artifact_host.GitArtifactStore.write
+
+        def write_then_move_head(store, **kwargs):
+            written = original(store, **kwargs)
+            (self.source / "src" / "auth.py").write_text(
+                "def access(): return 0\n", encoding="utf-8"
+            )
+            git(self.source, "commit", "-qam", "moved after write")
+            return written
+
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(
+                artifact_host.GitArtifactStore, "write", write_then_move_head
+            ),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["warnings"], ["source_head_changed_after_write"])
+        self.assertEqual(self.read()[1]["revision"], payload["revision"])
+
+    def test_read_only_git_calls_from_the_host_carry_the_environment(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        seen: list[dict] = []
+        real_run = subprocess.run
+
+        def recording_run(args, **kwargs):
+            if args and args[0] == "git":
+                seen.append(kwargs.get("env") or {})
+            return real_run(args, **kwargs)
+
+        buffer = io.StringIO()
+        with (
+            mock.patch("subprocess.run", recording_run),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        self.assertEqual(code, 0, buffer.getvalue())
+        self.assertGreater(len(seen), 0)
+        for env in seen:
+            self.assertEqual(env.get("GIT_NO_LAZY_FETCH"), "1", env)
+            self.assertEqual(env.get("GIT_OPTIONAL_LOCKS"), "0", env)
+
+    def argv_for_repo(self, repo: Path, snap: dict, evidence: list) -> list[str]:
+        args = self.argv(self.write_json(snap), evidence)
+        args[args.index("--repo") + 1] = str(repo)
+        return args
 
     def test_read_export_and_verify_work_for_feature_inventory(self) -> None:
         snap, evidence = initial_snapshot(self.source, self.baseline, self.head)

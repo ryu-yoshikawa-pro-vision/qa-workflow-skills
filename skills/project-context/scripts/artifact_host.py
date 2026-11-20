@@ -51,6 +51,7 @@ from git_artifact_store import (
     BRANCH,
     COMMIT,
     LINE_BREAKS,
+    READ_ONLY_GIT_ENV,
     GitArtifactStore,
     _path,
     branch_checked_out,
@@ -166,7 +167,7 @@ def _git(
     env: dict[str, str] | None = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess[bytes]:
-    run_env = dict(os.environ)
+    run_env = {**os.environ, **READ_ONLY_GIT_ENV}
     if env:
         run_env.update(env)
     # 空のhooksPathを指定し、source repositoryのhook（reference-transaction等）を実行させない。
@@ -440,6 +441,71 @@ def _unconfirmed_reclassifications(
     return unconfirmed
 
 
+def _trusted_authorized_roots(requests: list[Any] | None) -> None:
+    """save-snapshot の code source は、信頼済みの環境変数 QA_FEATURE_AUTHORIZED_ROOT で許可された
+    root だけを読む（feature-analysis data-contract の Git CLI 入口と同じ規則）。入力JSONの
+    authorized_root だけでは読取りを主張できないため、各 entry を環境変数の root と照合する。
+    """
+    if requests is None:
+        return
+    trusted = os.environ.get("QA_FEATURE_AUTHORIZED_ROOT")
+    if not trusted:
+        raise HostError("trusted_authorized_root_missing")
+    try:
+        trusted_root = Path(trusted).resolve(strict=True)
+    except (OSError, ValueError) as exc:
+        raise HostError("trusted_authorized_root_unavailable") from exc
+    for entry in requests:
+        if not isinstance(entry, dict) or not isinstance(
+            entry.get("authorized_root"), str
+        ):
+            raise HostError("trusted_authorized_root_mismatch")
+        try:
+            allowed = Path(entry["authorized_root"]).resolve(strict=True)
+        except (OSError, ValueError) as exc:
+            raise HostError("trusted_authorized_root_unavailable") from exc
+        if allowed != trusted_root:
+            raise HostError("trusted_authorized_root_mismatch")
+
+
+def _store_repo_root(repo: Path) -> Path | None:
+    completed = _git(repo, "rev-parse", "--show-toplevel", check=False)
+    if completed.returncode != 0:
+        return None
+    try:
+        return Path(completed.stdout.decode("utf-8").strip()).resolve(strict=True)
+    except (UnicodeDecodeError, OSError, ValueError):
+        return None
+
+
+def _refuse_store_inside_source(repo: Path, requests: list[Any] | None) -> None:
+    """保存先（store）のrepositoryが、読取り元のsource repositoryと同一か包含関係なら拒否する。
+
+    同じrepoへ保存すると、ソースの作業ツリーとHEADを保存が動かすため、取り違えを防ぐ。
+    store の root が解決できない場合は、store 側の検査（branch・repository）に任せる。
+    """
+    if not requests:
+        return
+    store_root = _store_repo_root(repo)
+    if store_root is None:
+        return
+    for entry in requests:
+        if not isinstance(entry, dict) or not isinstance(
+            entry.get("repository_root"), str
+        ):
+            continue
+        try:
+            source_root = Path(entry["repository_root"]).resolve(strict=True)
+        except (OSError, ValueError):
+            continue
+        if (
+            store_root == source_root
+            or store_root.is_relative_to(source_root)
+            or source_root.is_relative_to(store_root)
+        ):
+            raise HostError("store_repo_is_source_repo")
+
+
 def _expected_snapshot_revision(value: str) -> str | None:
     if value == "none":
         return None
@@ -465,6 +531,8 @@ def cmd_save_snapshot(args: argparse.Namespace) -> int:
     if requests is not None and not isinstance(requests, list):
         raise HostError("git_inventory_requests_invalid")
     confirmed = _confirmed_reclassifications(args.confirmed_reclassifications_file)
+    _trusted_authorized_roots(requests)
+    _refuse_store_inside_source(Path(args.repo), requests)
     if snapshot.get("project_ref") != args.project_ref:
         return _blocked("project_ref_mismatch")
     if args.operation_id is not None and args.operation_id != snapshot.get(
@@ -744,7 +812,10 @@ def build_parser() -> argparse.ArgumentParser:
             "snapshot (omit for the first save, which requires --expected-revision none). "
             "--git-inventory-requests-file is the JSON list of git_inventory_requests entries "
             "(source_id, repository_root, authorized_root, base_sha, head_sha, ...), or null when the "
-            "snapshot has no code source. The source Git trees are re-read by persist_snapshot. "
+            "snapshot has no code source. Each authorized_root must equal the trusted root in the "
+            "QA_FEATURE_AUTHORIZED_ROOT environment variable, and the store repository must not be the "
+            "source repository or contain/be contained by it (store_repo_is_source_repo). The source Git "
+            "trees are re-read by persist_snapshot. "
             "--observed-head-revision is the head the caller observed; it must equal the snapshot "
             "source_revision (otherwise stale). The host registers, in this process only, the write "
             "and each reclassification request that persist_snapshot will send to the store, then "
@@ -774,7 +845,11 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot.add_argument(
         "--observed-head-revision",
         required=True,
-        help="source head observed by the caller; must equal the snapshot source_revision",
+        help=(
+            "source head observed by the caller; must equal the snapshot source_revision (otherwise stale). "
+            "This is only a self-consistency check against the snapshot. When there is no code source "
+            "(--git-inventory-requests-file is null) there is no independent check of HEAD."
+        ),
     )
     snapshot.add_argument("--change-reason", required=True)
     snapshot.add_argument(
