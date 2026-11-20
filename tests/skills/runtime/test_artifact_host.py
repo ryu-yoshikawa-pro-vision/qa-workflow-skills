@@ -1147,11 +1147,206 @@ class SaveSnapshotTests(unittest.TestCase):
             "change_reclassification_approval_unverified:DIF-002", unverified["reasons"]
         )
 
+        table = self.write_json(
+            [
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v2",
+                }
+            ]
+        )
         code, payload = self.save(
-            update, evidence2, expected=first["revision"], previous=previous
+            update,
+            evidence2,
+            expected=first["revision"],
+            previous=previous,
+            extra=("--confirmed-reclassifications-file", str(table)),
         )
         self.assertEqual((code, payload["status"]), (0, "stored"), payload)
         self.assertEqual(payload["analysis_status"], "complete", payload)
+
+    def saved_then_reclassified(self) -> tuple[dict, dict, Path, list]:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        previous = self.write_json(snap)
+        update, evidence2 = reclassified_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+        return first, update, previous, evidence2
+
+    def confirmation_table(self, *rows: dict) -> str:
+        return str(self.write_json(list(rows)))
+
+    def test_reclassification_without_confirmation_table_is_refused(self) -> None:
+        first, update, previous, evidence2 = self.saved_then_reclassified()
+        code, payload = self.save(
+            update, evidence2, expected=first["revision"], previous=previous
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "reclassification_not_confirmed", payload)
+        self.assertEqual(
+            payload["unconfirmed"],
+            [{"change_id": "DIF-002", "reason": "not_listed"}],
+            payload,
+        )
+        self.assertEqual(payload["reasons"], ["reclassification_not_confirmed:DIF-002:not_listed"])
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_reclassification_with_mismatched_confirmation_is_refused(self) -> None:
+        first, update, previous, evidence2 = self.saved_then_reclassified()
+        cases = {
+            "other_change": (
+                {"change_id": "DIF-009", "approval_ref": "approval/verified",
+                 "approval_revision": "policy-v2"},
+                "not_listed",
+            ),
+            "other_ref": (
+                {"change_id": "DIF-002", "approval_ref": "approval/other",
+                 "approval_revision": "policy-v2"},
+                "approval_ref_mismatch",
+            ),
+            "other_revision": (
+                {"change_id": "DIF-002", "approval_ref": "approval/verified",
+                 "approval_revision": "policy-v1"},
+                "approval_revision_mismatch",
+            ),
+        }
+        for name, (row, reason) in cases.items():
+            table = self.confirmation_table(row)
+            code, payload = self.save(
+                update,
+                evidence2,
+                expected=first["revision"],
+                previous=previous,
+                extra=("--confirmed-reclassifications-file", table),
+            )
+            self.assertEqual((code, payload["status"]), (1, "blocked"), (name, payload))
+            self.assertEqual(payload["reason"], "reclassification_not_confirmed", name)
+            self.assertEqual(
+                payload["unconfirmed"],
+                [{"change_id": "DIF-002", "reason": reason}],
+                (name, payload),
+            )
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_malformed_confirmation_tables_are_refused_before_writing(self) -> None:
+        valid = {
+            "change_id": "DIF-002",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v2",
+        }
+        bad_tables: dict[str, object] = {
+            "object_not_array": valid,
+            "missing_key": {k: v for k, v in valid.items() if k != "approval_ref"},
+            "extra_key": {**valid, "note": "x"},
+            "not_object": ["DIF-002"],
+            "duplicate_change_id": [valid, dict(valid)],
+            "control_character": {**valid, "approval_ref": "approval\u0007"},
+            "line_break": {**valid, "approval_revision": "policy\nv2"},
+            "too_long": {**valid, "approval_ref": "x" * 1025},
+            "empty": {**valid, "change_id": "  "},
+        }
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        for name, table in bad_tables.items():
+            code, payload = self.save(
+                snap,
+                evidence,
+                extra=("--confirmed-reclassifications-file", self.write_json(table)),
+            )
+            self.assertEqual((code, payload["status"]), (1, "blocked"), (name, payload))
+            self.assertTrue(payload["reason"].startswith("confirmed_"), (name, payload))
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_confirmation_table_is_harmless_for_an_initial_snapshot(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        table = self.confirmation_table(
+            {
+                "change_id": "DIF-777",
+                "approval_ref": "approval/unused",
+                "approval_revision": "policy-unused",
+            }
+        )
+        code, payload = self.save(
+            snap,
+            evidence,
+            extra=("--confirmed-reclassifications-file", table),
+        )
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["reasons"], [])
+
+    def test_reclassification_without_predecessor_reports_its_reason(self) -> None:
+        _first, update, _previous, evidence2 = self.saved_then_reclassified()
+        code, payload = self.save(update, evidence2)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "change_supersession_without_predecessor")
+        self.assertIn("先行するDIF", payload["detail"])
+
+    def test_artifact_ref_extension_error_names_the_rule(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["artifact_ref"] = "qa/feature-inventory.txt"
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "snapshot_invalid:git_artifact_ref_invalid")
+        self.assertIn("相対パス", payload["detail"])
+        self.assertIn(".md", payload["detail"])
+        self.assertIn(".json", payload["detail"])
+
+    def test_non_finite_numbers_in_the_snapshot_are_refused(self) -> None:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+            snap["probe_value"] = value
+            code, payload = self.save(snap, evidence)
+            self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+            self.assertEqual(payload["reason"], "snapshot_invalid:nonfinite_number")
+            self.assertIn("NaN", payload["detail"])
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_lone_surrogate_is_refused_and_u2028_round_trips(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["probe_text"] = "\ud800"
+        # ensure_ascii keeps the lone surrogate as an escape so that the file itself is valid UTF-8.
+        path = self.base / "surrogate.json"
+        path.write_text(json.dumps(snap), encoding="utf-8")
+        code, payload = self.save_file(path, evidence)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "snapshot_invalid:text_not_utf8")
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["probe_text"] = "line\u2028separator"
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        code, read = self.read()
+        self.assertEqual(read["sha256"], payload["sha256"])
+        self.assertIn("\u2028", json.loads(read["content"])["probe_text"])
+
+    def test_stored_output_carries_reasons_and_no_warning_by_default(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["reasons"], [])
+        self.assertNotIn("warnings", payload)
+
+    def test_snapshot_size_boundary_is_16_mib(self) -> None:
+        limit = artifact_host._feature_registry().MAX_INPUT
+        prefix = b'{"p":"'
+        suffix = b'"}'
+        for size, expect_error in ((limit, False), (limit + 1, True)):
+            path = self.base / f"size-{size}.json"
+            body = prefix + b"a" * (size - len(prefix) - len(suffix)) + suffix
+            path.write_bytes(body)
+            self.assertEqual(len(body), size)
+            if expect_error:
+                with self.assertRaises(artifact_host.HostError) as raised:
+                    artifact_host._json_file(str(path), "snapshot")
+                self.assertEqual(str(raised.exception), "snapshot_too_large")
+            else:
+                loaded = artifact_host._json_file(str(path), "snapshot")
+                self.assertEqual(len(loaded["p"]), size - len(prefix) - len(suffix))
+
+    def save_file(self, snapshot_path: Path, evidence: list) -> tuple[int, dict]:
+        return run_host(*self.argv(snapshot_path, evidence))
 
     def test_read_export_and_verify_work_for_feature_inventory(self) -> None:
         snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
