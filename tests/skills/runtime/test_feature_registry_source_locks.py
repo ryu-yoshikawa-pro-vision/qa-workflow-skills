@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "skills" / "feature-analysis" / "scripts"))
@@ -203,6 +204,68 @@ class SourceRefLockOptionTests(unittest.TestCase):
         self.assertIsNone(
             self.store.read_current("feature-inventory", "Sample", ARTIFACT_REF)
         )
+
+
+    def test_head_moved_after_write_is_stored_with_a_warning(self) -> None:
+        original = self.store.write
+
+        def write_then_move_head(**kwargs):
+            written = original(**kwargs)
+            # The write is already stored; the source HEAD moves after it.
+            self.commit_source_change("def access(): return False\n")
+            return written
+
+        self.store.write = write_then_move_head
+        result = self.save(hold=False)
+        self.assertEqual(result["status"], "stored", result)
+        self.assertEqual(result["warnings"], ["source_head_changed_after_write"])
+        self.assertIsInstance(result["reasons"], list)
+        stored = self.store.read_current("feature-inventory", "Sample", ARTIFACT_REF)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored["revision"], result["revision"])
+
+    def test_default_save_without_head_move_has_no_warning(self) -> None:
+        result = self.save(hold=False)
+        self.assertEqual(result["status"], "stored", result)
+        self.assertNotIn("warnings", result)
+        self.assertEqual(result["reasons"], [])
+
+    def test_read_only_git_calls_carry_no_lazy_fetch_and_no_optional_locks(
+        self,
+    ) -> None:
+        seen: list[dict] = []
+        real_run = subprocess.run
+
+        def recording_run(args, **kwargs):
+            if args and args[0] == "git":
+                seen.append(kwargs.get("env") or {})
+            return real_run(args, **kwargs)
+
+        with (
+            mock.patch.dict(os.environ, {"QA_SENTINEL_ENV": "kept"}),
+            mock.patch("subprocess.run", recording_run),
+        ):
+            result = self.save(hold=False)
+        self.assertEqual(result["status"], "stored", result)
+        self.assertGreater(len(seen), 0)
+        for env in seen:
+            self.assertEqual(env.get("GIT_NO_LAZY_FETCH"), "1", env)
+            self.assertEqual(env.get("GIT_OPTIONAL_LOCKS"), "0", env)
+            self.assertEqual(env.get("QA_SENTINEL_ENV"), "kept")
+
+    def test_non_finite_numbers_are_refused_with_a_reason(self) -> None:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            data = self.request()
+            # An extra top-level key is not validated per field, so the value reaches the digest.
+            data["snapshot"]["probe_value"] = value
+            result = self.save(data=data)
+            self.assertEqual(result["status"], "blocked", result)
+            self.assertIn("snapshot_nonfinite_number", result["reasons"], result)
+            self.assertIsNone(
+                self.store.read_current("feature-inventory", "Sample", ARTIFACT_REF)
+            )
+        with self.assertRaises(feature_registry.ContractError):
+            feature_registry.snapshot_content({"value": float("nan")})
 
 
 if __name__ == "__main__":

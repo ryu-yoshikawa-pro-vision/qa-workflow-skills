@@ -40,6 +40,10 @@ def _sha(value: Any, field: str) -> str:
     return value
 
 
+# 読取専用のgit呼出しに付ける環境変数。遅延取得（partial clone）と任意のindex更新lockを抑止する。
+READ_ONLY_GIT_ENV = {"GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
+
+
 def _git(root: Path, *args: str) -> bytes:
     try:
         # Spool Git output to disk so a large repository cannot exhaust RAM
@@ -51,6 +55,7 @@ def _git(root: Path, *args: str) -> bytes:
                 stderr=subprocess.DEVNULL,
                 timeout=TIMEOUT,
                 check=False,
+                env={**os.environ, **READ_ONLY_GIT_ENV},
             )
             if process.returncode:
                 raise Invalid(f"git_exit_{process.returncode}:{args[0]}")

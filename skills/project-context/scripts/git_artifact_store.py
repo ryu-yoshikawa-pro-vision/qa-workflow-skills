@@ -29,6 +29,8 @@ COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 BRANCH = re.compile(r"[A-Za-z0-9._/-]+\Z")
 MAX_BYTES = 16 * 1024 * 1024
 # str.splitlines() と Git の行解釈で改行となる文字。commit message の値に含めると別行のtrailerを偽造できる。
+# 読取専用のgit呼出しに付ける環境変数。遅延取得（partial clone）と任意のindex更新lockを抑止する。
+READ_ONLY_GIT_ENV = {"GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
 LINE_BREAKS = frozenset("\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
 
 
@@ -54,12 +56,14 @@ def branch_checked_out(repository: Path, ref: str) -> bool:
             capture_output=True,
             check=False,
             timeout=30,
+            env={**os.environ, **READ_ONLY_GIT_ENV},
         )
         listing = subprocess.run(
             ["git", "-C", str(repository), "worktree", "list", "--porcelain"],
             capture_output=True,
             check=False,
             timeout=30,
+            env={**os.environ, **READ_ONLY_GIT_ENV},
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise StoreError("git_provider_unavailable") from exc
@@ -156,7 +160,7 @@ class GitArtifactStore(UserConfirmationMixin):
         index: Path | None = None,
         allow_failure: bool = False,
     ) -> bytes | None:
-        env = dict(os.environ)
+        env = {**os.environ, **READ_ONLY_GIT_ENV}
         if index is not None:
             env["GIT_INDEX_FILE"] = str(index)
         env["GIT_AUTHOR_NAME"] = self.author_name

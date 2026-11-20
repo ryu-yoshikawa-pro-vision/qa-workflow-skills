@@ -24,6 +24,8 @@ from artifact_store import LocalArtifactStore, StoreError  # noqa: E402
 from git_artifact_store import GitArtifactStore  # noqa: E402
 
 MAX_INPUT = 16 * 1024 * 1024
+# 読取専用のgit呼出しに付ける環境変数。遅延取得（partial clone）と任意のindex更新lockを抑止する。
+READ_ONLY_GIT_ENV = {"GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
 ID = re.compile(r"^(SRC|CAND|FEAT|DIF)-[0-9]{3,}$")
 EVENTS = {
     "initial",
@@ -691,9 +693,7 @@ def analyze(request: Any) -> dict[str, Any]:
             "metrics": None,
         }
     snapshot_sha256 = hashlib.sha256(
-        json.dumps(
-            snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        _canonical_json(snapshot).encode("utf-8")
     ).hexdigest()
     return {
         "status": "complete" if not issues else "incomplete",
@@ -1098,6 +1098,7 @@ def _git_ref_output(root: Path, *args: str, optional: bool = False) -> str | Non
             capture_output=True,
             check=False,
             timeout=15,
+            env={**os.environ, **READ_ONLY_GIT_ENV},
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ContractError("git_source_ref_unavailable") from exc
@@ -1116,6 +1117,8 @@ class _SourceHeads:
 
     def __init__(self, roots: dict[str, str]) -> None:
         self.roots = roots
+        # 書込み後の検査で見つかった事象。書込みは済んでいるため blocked にせず警告として返す。
+        self.warnings: list[str] = []
 
     def check(self) -> None:
         for location, expected in sorted(self.roots.items()):
@@ -1124,6 +1127,20 @@ class _SourceHeads:
                 != expected
             ):
                 raise ContractError("git_head_changed")
+
+    def check_after_write(self) -> None:
+        """Compare HEAD with the observed value after the store write (warning only)."""
+        for location, expected in sorted(self.roots.items()):
+            try:
+                current = _git_ref_output(
+                    Path(location), "rev-parse", "--verify", "HEAD"
+                )
+            except ContractError:
+                self.warnings.append("source_head_unverified_after_write")
+                return
+            if current != expected:
+                self.warnings.append("source_head_changed_after_write")
+                return
 
 
 @contextmanager
@@ -1197,19 +1214,26 @@ def _hold_git_source_refs(
             if _git_ref_output(root, "rev-parse", "--verify", "HEAD") != expected:
                 raise ContractError("git_head_changed")
         yield heads
-        for location, expected in roots.items():
-            if (
-                _git_ref_output(Path(location), "rev-parse", "--verify", "HEAD")
-                != expected
-            ):
-                raise ContractError("git_head_changed_during_persistence")
+        heads.check_after_write()
+
+
+def _canonical_json(value: Any) -> str:
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except ValueError as exc:
+        # NaN / Infinity は正規化JSONに表せないため拒否する。
+        raise ContractError("snapshot_nonfinite_number") from exc
 
 
 def snapshot_content(snapshot: dict[str, Any]) -> str:
     """The exact text persist_snapshot stores. The host CLI derives the write digest from it."""
-    return json.dumps(
-        snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    )
+    return _canonical_json(snapshot)
 
 
 def persist_snapshot(
@@ -1268,6 +1292,10 @@ def persist_snapshot(
             )
         written["analysis_status"] = report["status"]
         written["snapshot_sha256"] = report["handoff"]["snapshot_sha256"]
+        written["reasons"] = list(report["reasons"])
+        if heads.warnings:
+            # 書込み済みの版は取り消せないため、status は stored のまま警告を付ける。
+            written["warnings"] = list(heads.warnings)
         return written
     except (ContractError, StoreError, KeyError, TypeError, ValueError) as exc:
         return {"status": "blocked", "reasons": [str(exc)], "metrics": None}

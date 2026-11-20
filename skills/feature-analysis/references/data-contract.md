@@ -63,7 +63,7 @@ Git保存時の`authorize`（承認方式が`trusted-callback`の場合）には
 
 ## 保存前のGit現在性確認
 
-`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は`git_head_changed`でblockし、信頼済み呼出し元が現在のSHAを取り直します。過去コミットのtreeを現在の情報源として保存しません。
+`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は保存をblockし、信頼済み呼出し元が現在のSHAを取り直します。理由は呼出し経路で異なります。`git_source_inventory`単体は`git_head_changed`を返し、`persist_snapshot`経由（ホストCLI `save-snapshot`を含む）では取得不完全の理由で包んで`git_source_listing_incomplete:git_head_changed`になります。過去コミットのtreeを現在の情報源として保存しません。
 
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
 
@@ -103,4 +103,6 @@ GitlinkはHEADだけでなく、baseで存在しHEADで削除・置換された�
 
 code sourceを持つ保存では、許可rootのHEADとcheckout先branch refのGitロックを検証から保存まで保持します。競合、refの変更、未許可metadata pathはblockedとします。実Gitの取得失敗理由（git_head_changed等）は保存結果にも保持します。実保存providerのCAS・認可検証も引き続き必須です。
 
-`persist_snapshot`は`hold_source_refs`（既定`True`）を持ちます。`True`では上記のとおりソースrepoのHEADとbranch refのlockfileを作って保持します。`hold_source_refs=False`（ホストCLI `save-snapshot` の既定）では、ソースrepoの`.git`に何も書きません（lockを作らない）。代わりに既存のlockfileがあれば`git_source_ref_lock_unavailable`で拒否し、`store.write`の直前にHEADが観測したheadと一致することを再取得で確認します（不一致は`git_head_changed`）。**競合窓**: この確認と書込みの間にソースのHEADが動いた場合は検出できず、その版が保存されうります。`True`ではこの窓をlockで塞ぎますが、そのためソースrepoの`.git`へ一時的に書込みます。読取専用の製品repoを扱う運用では`False`を既定とし、競合窓を承知のうえで使います。
+`persist_snapshot`は`hold_source_refs`（既定`True`）を持ちます。`True`では上記のとおりソースrepoのHEADとbranch refのlockfileを作って保持します。`hold_source_refs=False`（ホストCLI `save-snapshot` の既定）では、ソースrepoの`.git`に何も書きません（lockを作らない）。代わりに既存のlockfileがあれば`git_source_ref_lock_unavailable`で拒否し、`store.write`の直前にHEADが観測したheadと一致することを再取得で確認します（不一致は書込み前なので`git_head_changed`で拒否）。読取りのgitは`GIT_NO_LAZY_FETCH=1`と`GIT_OPTIONAL_LOCKS=0`を付けて実行し、遅延取得による書込みや任意のindex更新lockを避けます。
+
+**競合窓**: 直前の確認と`store.write`の間にソースのHEADが動いた場合は書込み前に検出できず、その版が保存されうります。書込み後にHEADが動いたことは検出します。書込み済みの版は取り消さないため、`status`は`stored`のまま`warnings: ["source_head_changed_after_write"]`を付けて返します（書込み後の検査自体が確認できなかった場合は`source_head_unverified_after_write`）。`True`ではこの窓をlockで塞ぎますが、そのためソースrepoの`.git`へ一時的に書込みます。読取専用の製品repoを扱う運用では`False`を既定とし、競合窓を承知のうえで使います。
