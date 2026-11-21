@@ -27,6 +27,19 @@ description: 要件書、Q&A、リポジトリ、リリース資料などの情�
 - **処理**: 情報を`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`へ分類し、対象範囲の現在有効な仕様根拠を解決して、後続QA設計で使える追跡可能な仕様モデルへ変換します。
 - **出力**: 追跡可能な仕様分析。対象範囲内の現在有効な期待挙動が情報源または正本一覧へ戻れ、業務ルール、状態・遷移、フロー、制約、不明点を必要に応じて表現できる状態にします。
 
+## 保存（任意）
+
+- 分析結果を保存する場合は、`assets/output-template.md` の見出しと表をそのまま使い、対象範囲ごとに `spec-analysis/<scope-id>.md` として保存します。保存先branchは案件・kindごとに分けます（例: `qa-artifacts/<project>/spec-analysis`）。
+- 保存前に `scripts/spec_document.py validate` で形式を検証し、通過した文書だけを project-context の `artifact_host.py save-document` で保存します。検証に失敗した文書は保存されず、確認記録も登録されません。
+- `--user-confirmed-ref` は、利用者がその文書を確認した後にだけ渡します。AIが確認前に値を作ってはなりません。確認記録は自己申告であり、認証ではありません。
+- 更新する場合は、保存直前に `read` で現在のrevisionを取り直し、`--expected-revision git:<sha>` に渡します。古い値は `revision_conflict` で止まり、データは失われません。
+- 保存の理由コード、証跡記法、既知の制約は `references/persistence-contract.md` に従います。検証は形式だけを見るため、意味の正しさ（SPECの根拠、UNKNOWNの妥当性）は本Skillの自己検証で扱います。
+
+```
+python3 scripts/spec_document.py validate --document-file <file> --scope-id <scope-id> --source-revision <rev>
+python3 ../project-context/scripts/artifact_host.py save-document --repo <store-repo> --branch qa-artifacts/<project>/spec-analysis --project-ref <project> --artifact-ref spec-analysis/<scope-id>.md --document-file <file> [--expected-revision git:<sha>] --source-ref <ref> --source-revision <rev> --change-reason <reason> --user-confirmed-ref <confirmation>
+```
+
 ## 基本停止条件
 
 - 対象挙動について仕様根拠候補となる権威ある情報源または正本一覧上の有効な仕様根拠がない
@@ -42,4 +55,5 @@ description: 要件書、Q&A、リポジトリ、リリース資料などの情�
 - UIテスト対象分析mode: `references/ui-test-target-analysis.md`
 - 仕様根拠の競合 / バージョン / 決定事項 / ASMの詳細解決: `references/authority-resolution.md`
 - 既定出力形式: `assets/output-template.md`
+- 保存契約（保存・検証・理由コード）: `references/persistence-contract.md`
 - UIテスト対象分析package assets: `assets/ui-test-target-analysis/`

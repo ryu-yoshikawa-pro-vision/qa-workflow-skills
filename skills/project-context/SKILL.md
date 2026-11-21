@@ -26,3 +26,5 @@ description: QA案件のProject Contextを初回発見・新規初期化・必�
 - helper: scripts/project_context.py
 
 既存のGit管理Markdownを正本として更新する場合は`scripts/git_artifact_store.py`の`GitArtifactStore`を利用します。Git refを条件付き更新（commit SHAでCAS）し、元のMarkdown pathと旧revisionをGit履歴に保持します。ローカルSQLite正本への移行は行いません。両保存先とも承認方式に応じた判定を行い、読取にも権限確認を適用します（`user-confirmed`では、読取は登録済み案件scopeの判定になります）。`trusted-callback`では信頼済みhostからの認可callbackを必須とします。既定の`user-confirmed`では、確認記録の完全一致が判定になります。
+
+対象kindは `project-context`・`feature-inventory`（既存の保存経路）と `spec-analysis`（`save-document`、詳細は `../spec-analysis/references/persistence-contract.md`）です。

@@ -71,3 +71,7 @@ branchは案件とkindごとに分けます（例: `qa-artifacts/<project>/<kind
 ### 保存済み配置方針の再利用条件
 
 `prepare-placement`はSection 12の有効DECの備考・決定根拠とSection 14の同一scopeの行から方針を再構成し、owner、scope、target_ref、policy revision、approval_ref、approval_revision、editable_scope、feature_index_ref、DEC IDを照合します。入力`existing_policy`の値だけでは再利用と判定しません。承認revisionは新規記録時にDEC備考とSection 14備考の双方に保存します。旧文書に承認revisionがない場合、承認revisionを推測せず、同一方針の再利用は行いません。既存DECを置換するときは、記録済み内容を維持したまま旧DECを置換済みにします。
+
+### spec-analysis の保存（追記）
+
+`spec-analysis` は `save-document` で保存します（`scripts/artifact_host.py`）。`save-document` は `../spec-analysis/scripts/spec_document.py` の `validate` で形式を検証し、通過した文書だけを確認記録の登録後に `persist_document` で保存します。保存先は `qa-artifacts/<project>/spec-analysis` のbranchの `spec-analysis/<scope-id>.md` です。`save-prepared` と `save-snapshot` は spec-analysis を受け付けません（`unsupported_kind_for_now`）。`read`・`export`・`verify-projection` は `--kind spec-analysis` で同じ規則により読みます。保存の理由コード、証跡記法、既知の制約（readback 不一致時に未検証 commit が head に残ること、同一 operation_id の再利用）は `../spec-analysis/references/persistence-contract.md` に従います。
