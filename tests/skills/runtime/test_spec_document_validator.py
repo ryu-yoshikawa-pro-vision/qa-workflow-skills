@@ -13,6 +13,7 @@ SKILL_ROOT = Path(__file__).resolve().parents[3] / "skills"
 sys.path.insert(0, str(SKILL_ROOT / "spec-analysis" / "scripts"))
 sys.path.insert(0, str(SKILL_ROOT / "project-context" / "scripts"))
 
+import artifact_store  # noqa: E402
 import spec_document  # noqa: E402
 
 REVISION = "source-1"
@@ -260,6 +261,9 @@ class SpecDocumentValidatorTests(unittest.TestCase):
             "source_revision_not_in_document",
             codes_of(VALID, revision="source-missing"),
         )
+
+    def test_size_limit_matches_the_store(self) -> None:
+        self.assertEqual(spec_document.MAX_BYTES, artifact_store.MAX_BYTES)
 
     def test_artifact_ref_is_derived_from_scope(self) -> None:
         self.assertEqual(

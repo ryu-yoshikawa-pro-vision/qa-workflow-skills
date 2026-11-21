@@ -19,16 +19,13 @@ import argparse
 import hashlib
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
-PROJECT_CONTEXT_SCRIPT = (
-    Path(__file__).resolve().parents[2] / "project-context" / "scripts"
-)
-sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPT))
-from artifact_store import MAX_BYTES, StoreError  # noqa: E402
-
+# This skill's scripts stay self-contained (runtime portability contract): no import from
+# project-context. The store is injected, so the limit and the error class are mirrored here.
+# StoreError is a ValueError subclass; tests assert MAX_BYTES equals artifact_store.MAX_BYTES.
+MAX_BYTES = 16 * 1024 * 1024
 KIND = "spec-analysis"
 REASON_PREFIX = "spec_document_invalid:"
 
@@ -507,7 +504,8 @@ def persist_document(
             approval_revision=approval_revision,
             change_reason=change_reason,
         )
-    except StoreError as exc:
+    except ValueError as exc:
+        # The store's own reason code (StoreError), returned as-is.
         return {"status": "blocked", "reasons": [str(exc)]}
     written["analysis_status"] = "valid"
     written["document_sha256"] = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
