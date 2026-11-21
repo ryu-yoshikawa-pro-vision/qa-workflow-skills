@@ -22,6 +22,9 @@ Ownership and limits:
 - `read`, `export` and `verify-projection` also require `--user-confirmed-ref`. In the
   user-confirmed mode a read of a project is allowed only after a confirmation of that
   project is registered in the same process.
+- spec-analysis documents are saved only through `save-document`, which validates the
+  Markdown with spec_document.validate first and then calls spec_document.persist_document.
+  The same user-confirmed rules apply.
 - Nothing here embeds a fixed repository path. Pass the repository path explicitly.
 
 Branch operation guidance:
@@ -650,6 +653,106 @@ def cmd_save_snapshot(args: argparse.Namespace) -> int:
     return _emit(result, 0 if succeeded else 1)
 
 
+def _spec_document() -> Any:
+    """spec_document は spec-analysis の scripts にある。このコマンドでだけ読み込む。"""
+    scripts = str(Path(__file__).resolve().parents[2] / "spec-analysis" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    try:
+        import spec_document  # noqa: PLC0415
+    except ImportError as exc:
+        raise HostError("spec_document_unavailable") from exc
+    return spec_document
+
+
+def _document_text(path: str, limit: int) -> str:
+    try:
+        raw = Path(path).read_bytes()
+    except OSError:
+        raise HostError("document_file_unavailable")
+    if len(raw) > limit:
+        raise HostError("document_file_too_large")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HostError("encoding_invalid")
+
+
+def _expected_document_revision(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value.startswith("git:") and COMMIT.fullmatch(value[4:]):
+        return value
+    raise HostError("expected_revision_invalid")
+
+
+def cmd_save_document(args: argparse.Namespace) -> int:
+    """spec-analysis の文書を検証してから保存する。確認記録は検証の通過後にだけ登録する。"""
+    spec = _spec_document()
+    approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
+    source_ref = _single_line(args.source_ref, "source_ref")
+    source_revision = _single_line(args.source_revision, "source_revision")
+    change_reason = _single_line(args.change_reason, "change_reason")
+    expected = _expected_document_revision(args.expected_revision)
+    markdown = _document_text(args.document_file, spec.MAX_BYTES)
+    prefix, suffix = "spec-analysis/", ".md"
+    scope_id = None
+    if args.artifact_ref.startswith(prefix) and args.artifact_ref.endswith(suffix):
+        scope_id = args.artifact_ref[len(prefix) : -len(suffix)]
+    report = spec.validate(markdown, scope_id, source_revision)
+    if report["status"] != "valid":
+        # 検証が通らなければ store に触れず、確認記録も登録しない。
+        return _emit(
+            {
+                "status": "blocked",
+                "reason": report["reasons"][0],
+                "reasons": report["reasons"],
+            },
+            1,
+        )
+    if args.operation_id is not None:
+        operation_id = _single_line(args.operation_id, "operation_id")
+    else:
+        digest = hashlib.sha256(
+            markdown.encode("utf-8") + b"\n" + (expected or "none").encode("ascii")
+        )
+        operation_id = "spec-" + digest.hexdigest()[:32]
+    # 確認記録は persist_document が store.write へ渡す要求と同じキー・同じ値で登録する。
+    record = spec.write_confirmation_record(
+        project_ref=args.project_ref,
+        artifact_ref=args.artifact_ref,
+        expected_revision=expected,
+        approval_ref=approval_ref,
+        markdown=markdown,
+        source_ref=source_ref,
+        source_revision=source_revision,
+        operation_id=operation_id,
+        change_reason=change_reason,
+    )
+    store = _store(args, USER_CONFIRMED)
+    store.record_user_confirmation(record)
+    result = spec.persist_document(
+        store,
+        {
+            "project_ref": args.project_ref,
+            "scope_id": scope_id,
+            "markdown": markdown,
+        },
+        artifact_ref=args.artifact_ref,
+        expected_revision=expected,
+        operation_id=operation_id,
+        approval_ref=approval_ref,
+        approval_revision=record["approval_revision"],
+        change_reason=change_reason,
+        source_ref=source_ref,
+        source_revision=source_revision,
+    )
+    succeeded = result.get("status") in {"stored", "idempotent"}
+    if not succeeded and "reason" not in result:
+        result["reason"] = result["reasons"][0]
+    return _emit(result, 0 if succeeded else 1)
+
+
 def _current(
     args: argparse.Namespace, store: GitArtifactStore
 ) -> dict[str, Any] | None:
@@ -913,6 +1016,54 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_author_arguments(snapshot)
     snapshot.set_defaults(handler=cmd_save_snapshot)
+
+    document = sub.add_parser(
+        "save-document",
+        help="validate and persist a spec-analysis document via spec_document.persist_document",
+        description=(
+            "Persist one spec-analysis Markdown document (kind spec-analysis) to the store branch. "
+            "--artifact-ref must be spec-analysis/<scope-id>.md. --document-file is validated first "
+            "(spec_document.validate, read-only); a document that fails validation is not written and "
+            "no confirmation is registered. --expected-revision is git:<sha> of the current revision; "
+            "omit it to create. The store's CAS, idempotency and independent readback apply. "
+            "--user-confirmed-ref is a self-declared confirmation of this exact document (not "
+            "authentication); the AI must not pass it before the user has confirmed the document."
+        ),
+    )
+    document.add_argument(
+        "--repo", required=True, help="absolute path of the store Git repository"
+    )
+    document.add_argument(
+        "--branch", required=True, help="branch name [A-Za-z0-9._/-]+"
+    )
+    document.add_argument("--project-ref", required=True, dest="project_ref")
+    document.add_argument(
+        "--artifact-ref",
+        required=True,
+        dest="artifact_ref",
+        help="spec-analysis/<scope-id>.md",
+    )
+    document.add_argument(
+        "--document-file", required=True, help="Markdown file of the document"
+    )
+    document.add_argument(
+        "--expected-revision",
+        help="git:<sha> of the current revision (omit to create the artifact)",
+    )
+    document.add_argument(
+        "--operation-id",
+        help="idempotency key (default: spec-<sha256 of the document and expected revision>)",
+    )
+    document.add_argument("--source-ref", required=True, dest="source_ref")
+    document.add_argument("--source-revision", required=True, dest="source_revision")
+    document.add_argument("--change-reason", required=True, dest="change_reason")
+    document.add_argument(
+        "--user-confirmed-ref",
+        required=True,
+        help="single-line reference to the user's explicit confirmation of this document (self-declared; do not pass before the user confirms)",
+    )
+    _add_author_arguments(document)
+    document.set_defaults(handler=cmd_save_document)
 
     read = sub.add_parser(
         "read", help="print the current (or given revision) content as JSON"

@@ -1823,5 +1823,222 @@ def reclassified_snapshot(
     return snap, evidence
 
 
+# save-document（spec-analysis）。使い捨てのstore repoだけで実行する。
+from test_spec_document_validator import VALID as SPEC_DOCUMENT  # noqa: E402
+
+DOC_BRANCH = "qa-artifacts/project-a/spec-analysis"
+DOC_ARTIFACT = "spec-analysis/scope-1.md"
+DOC_CONFIRMATION = "user confirmed the document 2026-11-22"
+
+
+class SaveDocumentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "store"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("store\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", DOC_BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+
+    def document(self, text: str, name: str = "document.md") -> Path:
+        path = self.base / name
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def head(self) -> str:
+        return git(self.repo, "rev-parse", DOC_BRANCH)
+
+    def save_argv(
+        self,
+        path: Path,
+        *,
+        expected: str | None = None,
+        confirmation: str = DOC_CONFIRMATION,
+        operation: str | None = None,
+    ) -> list[str]:
+        args = [
+            "save-document",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--document-file",
+            str(path),
+            "--source-ref",
+            "issue/1",
+            "--source-revision",
+            "source-1",
+            "--change-reason",
+            "approved change",
+            "--user-confirmed-ref",
+            confirmation,
+            "--author-name",
+            "QA",
+            "--author-email",
+            "qa@example.invalid",
+        ]
+        if expected is not None:
+            args += ["--expected-revision", expected]
+        if operation is not None:
+            args += ["--operation-id", operation]
+        return args
+
+    def read_argv(self, *extra: str) -> list[str]:
+        return [
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "spec-analysis",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            *extra,
+        ]
+
+    def test_create_then_read_returns_the_same_document(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "valid")
+        code, read = run_host("read", *self.read_argv())
+        self.assertEqual((code, read["status"]), (0, "read"), read)
+        self.assertEqual(read["content"], SPEC_DOCUMENT)
+        self.assertEqual(read["revision"], payload["revision"])
+
+    def test_create_when_the_artifact_exists_is_refused(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        # The same content with the same derived operation id is an idempotent retry (exit 0).
+        code, again = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual((code, again["status"]), (0, "idempotent"), again)
+        code, payload = run_host(
+            *self.save_argv(self.document(SPEC_DOCUMENT), operation="op-other")
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "create_if_absent_conflict"), payload
+        )
+
+    def test_update_needs_the_current_revision(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        updated = SPEC_DOCUMENT.replace("item one", "item one revised", 1)
+        code, second = run_host(
+            *self.save_argv(
+                self.document(updated, "v2.md"),
+                expected=first["revision"],
+                operation="op-2",
+            )
+        )
+        self.assertEqual((code, second["status"]), (0, "stored"), second)
+        code, stale = run_host(
+            *self.save_argv(
+                self.document(updated, "v3.md"),
+                expected=first["revision"],
+                operation="op-3",
+            )
+        )
+        self.assertEqual((code, stale["reason"]), (1, "revision_conflict"), stale)
+
+    def test_invalid_document_is_not_written_and_no_confirmation_is_needed(
+        self,
+    ) -> None:
+        head = self.head()
+        broken = SPEC_DOCUMENT.replace("## 後続Skillへの補足", "## 後続", 1)
+        code, payload = run_host(*self.save_argv(self.document(broken)))
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(
+            payload["reason"], "spec_document_invalid:section_missing:後続Skillへの補足"
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_missing_or_oversized_document_file_is_refused(self) -> None:
+        head = self.head()
+        code, payload = run_host(*self.save_argv(self.base / "absent.md"))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "document_file_unavailable"), payload
+        )
+        big = self.base / "big.md"
+        big.write_bytes(b"x" * (16 * 1024 * 1024 + 1))
+        code, payload = run_host(*self.save_argv(big))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "document_file_too_large"), payload
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_confirmation_must_be_one_line(self) -> None:
+        path = self.document(SPEC_DOCUMENT)
+        code, payload = run_host(*self.save_argv(path, confirmation="a\nb"))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "user_confirmed_ref_invalid"), payload
+        )
+        code, payload = run_host(*self.save_argv(path, confirmation="   "))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "user_confirmed_ref_required"), payload
+        )
+
+    def test_export_and_verify_projection_follow_the_store(self) -> None:
+        code, saved = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, saved)
+        out = self.base / "projection.md"
+        code, exported = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, exported["status"]), (0, "exported"), exported)
+        self.assertEqual(out.read_text(encoding="utf-8"), SPEC_DOCUMENT)
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "in_sync"), verified)
+        out.chmod(0o644)
+        out.write_text(SPEC_DOCUMENT + "\nhand edit\n", encoding="utf-8")
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "drifted"), verified)
+        code, refused = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, refused["reason"]), (1, "projection_drifted"), refused)
+        code, forced = run_host("export", *self.read_argv("--out", str(out), "--force"))
+        self.assertEqual((code, forced["status"]), (0, "exported"), forced)
+        self.assertTrue(forced["overwrote_drifted"])
+
+    def test_save_prepared_still_refuses_spec_analysis(self) -> None:
+        code, payload = run_host(
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "spec-analysis",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--prepared-file",
+            str(self.base / "unused.json"),
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "unsupported_kind_for_now"), payload
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
