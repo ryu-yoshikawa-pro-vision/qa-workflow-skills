@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from artifact_store import (
+    STORE_KINDS,
     USER_CONFIRMED,
     Authorization,
     StoreError,
@@ -242,7 +243,7 @@ class GitArtifactStore(UserConfirmationMixin):
             raise StoreError("access_denied")
 
     def _identity(self, kind: str, project_ref: str, artifact_ref: str) -> str:
-        if kind not in {"project-context", "feature-inventory"}:
+        if kind not in STORE_KINDS:
             raise StoreError("artifact_kind_invalid")
         _line(project_ref, "project_ref")
         return _path(artifact_ref)

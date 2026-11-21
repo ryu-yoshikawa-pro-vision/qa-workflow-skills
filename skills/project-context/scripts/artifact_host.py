@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any
 
 import project_context
-from artifact_store import USER_CONFIRMED, StoreError, _name
+from artifact_store import STORE_KINDS, USER_CONFIRMED, StoreError, _name
 from git_artifact_store import (
     BRANCH,
     COMMIT,
@@ -57,7 +57,7 @@ from git_artifact_store import (
     branch_checked_out,
 )
 
-KINDS = ("project-context", "feature-inventory")
+KINDS = tuple(sorted(STORE_KINDS))
 DEFAULT_AUTHOR_NAME = "qa-artifact-host"
 DEFAULT_AUTHOR_EMAIL = "qa-artifact-host@example.invalid"
 INIT_MESSAGE = "qa artifact: init"

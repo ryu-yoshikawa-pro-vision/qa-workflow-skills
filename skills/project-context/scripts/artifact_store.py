@@ -19,7 +19,9 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any, Callable
 
-KINDS = frozenset({"project-context", "feature-inventory"})
+# 保存できる kind の単一定義。local store・Git store・ホストCLIはここを参照する。
+STORE_KINDS = frozenset({"project-context", "feature-inventory", "spec-analysis"})
+KINDS = STORE_KINDS
 MAX_BYTES = 16 * 1024 * 1024
 MAX_REF = 1024
 DB_DIR = ".qa-context-feature"
