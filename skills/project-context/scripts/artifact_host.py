@@ -22,8 +22,9 @@ Ownership and limits:
 - `read`, `export` and `verify-projection` also require `--user-confirmed-ref`. In the
   user-confirmed mode a read of a project is allowed only after a confirmation of that
   project is registered in the same process.
-- spec-analysis documents are saved only through `save-document`, which validates the
-  Markdown with spec_document.validate first and then calls spec_document.persist_document.
+- spec-analysis and question-analysis documents are saved only through `save-document`
+  (`--kind`, default spec-analysis). It validates the Markdown with the kind's validate
+  first (spec_document or question_document), then calls the kind's persist_document.
   The same user-confirmed rules apply.
 - Nothing here embeds a fixed repository path. Pass the repository path explicitly.
 
@@ -40,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import subprocess
@@ -653,16 +655,23 @@ def cmd_save_snapshot(args: argparse.Namespace) -> int:
     return _emit(result, 0 if succeeded else 1)
 
 
-def _spec_document() -> Any:
-    """spec_document は spec-analysis の scripts にある。このコマンドでだけ読み込む。"""
-    scripts = str(Path(__file__).resolve().parents[2] / "spec-analysis" / "scripts")
+# 文書 kind ごとの検証・保存 module。各 module は自分の skill の scripts にある。
+DOCUMENT_MODULES = {
+    "spec-analysis": "spec_document",
+    "question-analysis": "question_document",
+}
+
+
+def _document_module(kind: str) -> Any:
+    """文書 kind の module を、その skill の scripts から読み込む。このコマンドでだけ読み込む。"""
+    name = DOCUMENT_MODULES[kind]
+    scripts = str(Path(__file__).resolve().parents[2] / kind / "scripts")
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
     try:
-        import spec_document  # noqa: PLC0415
+        return importlib.import_module(name)
     except ImportError as exc:
-        raise HostError("spec_document_unavailable") from exc
-    return spec_document
+        raise HostError(f"{name}_unavailable") from exc
 
 
 def _document_text(path: str, limit: int) -> str:
@@ -687,19 +696,20 @@ def _expected_document_revision(value: str | None) -> str | None:
 
 
 def cmd_save_document(args: argparse.Namespace) -> int:
-    """spec-analysis の文書を検証してから保存する。確認記録は検証の通過後にだけ登録する。"""
-    spec = _spec_document()
+    """spec-analysis / question-analysis の文書を検証してから保存する。確認記録は検証の通過後にだけ登録する。"""
+    kind = args.kind
+    doc = _document_module(kind)
     approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
     source_ref = _single_line(args.source_ref, "source_ref")
     source_revision = _single_line(args.source_revision, "source_revision")
     change_reason = _single_line(args.change_reason, "change_reason")
     expected = _expected_document_revision(args.expected_revision)
-    markdown = _document_text(args.document_file, spec.MAX_BYTES)
-    prefix, suffix = "spec-analysis/", ".md"
+    markdown = _document_text(args.document_file, doc.MAX_BYTES)
+    prefix, suffix = f"{kind}/", ".md"
     scope_id = None
     if args.artifact_ref.startswith(prefix) and args.artifact_ref.endswith(suffix):
         scope_id = args.artifact_ref[len(prefix) : -len(suffix)]
-    report = spec.validate(markdown, scope_id, source_revision)
+    report = doc.validate(markdown, scope_id, source_revision)
     if report["status"] != "valid":
         # 検証が通らなければ store に触れず、確認記録も登録しない。
         return _emit(
@@ -716,9 +726,9 @@ def cmd_save_document(args: argparse.Namespace) -> int:
         digest = hashlib.sha256(
             markdown.encode("utf-8") + b"\n" + (expected or "none").encode("ascii")
         )
-        operation_id = "spec-" + digest.hexdigest()[:32]
+        operation_id = kind.split("-", 1)[0] + "-" + digest.hexdigest()[:32]
     # 確認記録は persist_document が store.write へ渡す要求と同じキー・同じ値で登録する。
-    record = spec.write_confirmation_record(
+    record = doc.write_confirmation_record(
         project_ref=args.project_ref,
         artifact_ref=args.artifact_ref,
         expected_revision=expected,
@@ -731,7 +741,7 @@ def cmd_save_document(args: argparse.Namespace) -> int:
     )
     store = _store(args, USER_CONFIRMED)
     store.record_user_confirmation(record)
-    result = spec.persist_document(
+    result = doc.persist_document(
         store,
         {
             "project_ref": args.project_ref,
@@ -1019,11 +1029,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     document = sub.add_parser(
         "save-document",
-        help="validate and persist a spec-analysis document via spec_document.persist_document",
+        help="validate and persist a spec-analysis or question-analysis document",
         description=(
-            "Persist one spec-analysis Markdown document (kind spec-analysis) to the store branch. "
-            "--artifact-ref must be spec-analysis/<scope-id>.md. --document-file is validated first "
-            "(spec_document.validate, read-only); a document that fails validation is not written and "
+            "Persist one Markdown document of --kind (spec-analysis or question-analysis; default "
+            "spec-analysis) to the store branch. --artifact-ref must be <kind>/<scope-id>.md. "
+            "--document-file is validated first (the kind's validate, read-only); a document that fails validation is not written and "
             "no confirmation is registered. --expected-revision is git:<sha> of the current revision; "
             "omit it to create. The store's CAS, idempotency and independent readback apply. "
             "--user-confirmed-ref is a self-declared confirmation of this exact document (not "
@@ -1036,12 +1046,18 @@ def build_parser() -> argparse.ArgumentParser:
     document.add_argument(
         "--branch", required=True, help="branch name [A-Za-z0-9._/-]+"
     )
+    document.add_argument(
+        "--kind",
+        default="spec-analysis",
+        choices=sorted(DOCUMENT_MODULES),
+        help="document kind (default spec-analysis)",
+    )
     document.add_argument("--project-ref", required=True, dest="project_ref")
     document.add_argument(
         "--artifact-ref",
         required=True,
         dest="artifact_ref",
-        help="spec-analysis/<scope-id>.md",
+        help="<kind>/<scope-id>.md (for example spec-analysis/<scope-id>.md)",
     )
     document.add_argument(
         "--document-file", required=True, help="Markdown file of the document"
@@ -1052,7 +1068,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     document.add_argument(
         "--operation-id",
-        help="idempotency key (default: spec-<sha256 of the document and expected revision>)",
+        help="idempotency key (default: <spec|question>-<sha256 of the document and expected revision>)",
     )
     document.add_argument("--source-ref", required=True, dest="source_ref")
     document.add_argument("--source-revision", required=True, dest="source_revision")
