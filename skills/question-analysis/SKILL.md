@@ -31,8 +31,25 @@ description: 仕様・QA成果物の曖昧さ、矛盾、欠落、未解決事�
 - **処理**: 各論点を`ブロッカー` / `要確認` / `仮定可能` / `提案・任意`へ分類し、停止・継続範囲と回答後の正規化先・再開先を決めます。
 - **出力**: 不明点・矛盾の分類、根拠、影響範囲、回答なしの場合の扱い、ブロック中範囲、回答後の正規化先、再開先Skill / 対象を明示します。
 
+## 保存（任意）
+
+- 分析結果を保存する場合は、`assets/output-template.md` の見出しと表をそのまま使い、対象範囲（領域など）ごとに `question-analysis/<scope-id>.md` として保存します。保存先branchは案件・kindごとに分けます（例: `qa-artifacts/<project>/question-analysis`）。
+- 保存前に `scripts/question_document.py validate` で形式を検証し、通過した文書だけを project-context の `artifact_host.py save-document --kind question-analysis` で保存します。検証に失敗した文書は保存されず、確認記録も登録されません。
+- `--user-confirmed-ref` は、利用者がその文書を確認した後にだけ渡します。AIが確認前に値を作ってはなりません。確認記録は自己申告であり、認証ではありません。
+- 更新する場合は、保存直前に `read` で現在のrevisionを取り直し、`--expected-revision git:<sha>` に渡します。古い値は `revision_conflict` で止まり、データは失われません。
+- 保存の理由コード、証跡記法、既知の制約は `references/persistence-contract.md` に従います。検証は形式だけを見るため、意味の正しさ（分類の妥当性、質問の必要性、UNKNOWNの存在）は本Skillの自己検証と `question_ids.py` の既存検証で扱います。
+
+```
+python3 scripts/question_document.py validate --document-file <file> --scope-id <scope-id> --source-revision <rev>
+python3 ../project-context/scripts/artifact_host.py save-document --kind question-analysis --repo <store-repo> --branch qa-artifacts/<project>/question-analysis --project-ref <project> --artifact-ref question-analysis/<scope-id>.md --document-file <file> [--expected-revision git:<sha>] --source-ref <ref> --source-revision <rev> --change-reason <reason> --user-confirmed-ref <confirmation>
+```
+
+- 保存契約（保存・検証・理由コード）: `references/persistence-contract.md`
+
 ## リソース
 
 - 詳細判断基準: `references/guidance.md`
 - 既定出力形式: `assets/output-template.md`
 - Q ID / UNKNOWN参照 helper: `scripts/question_ids.py`
+- 保存の検証 helper: `scripts/question_document.py`
+- 保存契約: `references/persistence-contract.md`

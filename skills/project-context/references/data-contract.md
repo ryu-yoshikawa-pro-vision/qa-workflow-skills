@@ -75,3 +75,7 @@ branchは案件とkindごとに分けます（例: `qa-artifacts/<project>/<kind
 ### spec-analysis の保存（追記）
 
 `spec-analysis` は `save-document` で保存します（`scripts/artifact_host.py`）。`save-document` は `../spec-analysis/scripts/spec_document.py` の `validate` で形式を検証し、通過した文書だけを確認記録の登録後に `persist_document` で保存します。保存先は `qa-artifacts/<project>/spec-analysis` のbranchの `spec-analysis/<scope-id>.md` です。`save-prepared` と `save-snapshot` は spec-analysis を受け付けません（`unsupported_kind_for_now`）。`read`・`export`・`verify-projection` は `--kind spec-analysis` で同じ規則により読みます。保存の理由コード、証跡記法、既知の制約（readback 不一致時に未検証 commit が head に残ること、同一 operation_id の再利用）は `../spec-analysis/references/persistence-contract.md` に従います。
+
+### question-analysis の保存（追記）
+
+`question-analysis` は `save-document --kind question-analysis` で保存します（`scripts/artifact_host.py`）。`save-document` は `../question-analysis/scripts/question_document.py` の `validate` で形式を検証し、通過した文書だけを確認記録の登録後に `persist_document` で保存します。保存先は `qa-artifacts/<project>/question-analysis` のbranchの `question-analysis/<scope-id>.md` です。`save-prepared` と `save-snapshot` は question-analysis を受け付けません（`unsupported_kind_for_now`）。`read`・`export`・`verify-projection` は `--kind question-analysis` で同じ規則により読みます。
