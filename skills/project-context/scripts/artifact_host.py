@@ -22,9 +22,10 @@ Ownership and limits:
 - `read`, `export` and `verify-projection` also require `--user-confirmed-ref`. In the
   user-confirmed mode a read of a project is allowed only after a confirmation of that
   project is registered in the same process.
-- spec-analysis and question-analysis documents are saved only through `save-document`
-  (`--kind`, default spec-analysis). It validates the Markdown with the kind's validate
-  first (spec_document or question_document), then calls the kind's persist_document.
+- spec-analysis, question-analysis and test-analysis documents are saved only through
+  `save-document` (`--kind`, default spec-analysis). It validates the Markdown with the
+  kind's validate first (spec_document, question_document or test_analysis_document), then
+  calls the kind's persist_document.
   The same user-confirmed rules apply.
 - Nothing here embeds a fixed repository path. Pass the repository path explicitly.
 
@@ -659,6 +660,7 @@ def cmd_save_snapshot(args: argparse.Namespace) -> int:
 DOCUMENT_MODULES = {
     "spec-analysis": "spec_document",
     "question-analysis": "question_document",
+    "test-analysis": "test_analysis_document",
 }
 
 
@@ -696,7 +698,7 @@ def _expected_document_revision(value: str | None) -> str | None:
 
 
 def cmd_save_document(args: argparse.Namespace) -> int:
-    """spec-analysis / question-analysis の文書を検証してから保存する。確認記録は検証の通過後にだけ登録する。"""
+    """spec-analysis / question-analysis / test-analysis の文書を検証してから保存する。確認記録は検証の通過後にだけ登録する。"""
     kind = args.kind
     doc = _document_module(kind)
     approval_ref = _single_line(args.user_confirmed_ref, "user_confirmed_ref")
@@ -1029,9 +1031,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     document = sub.add_parser(
         "save-document",
-        help="validate and persist a spec-analysis or question-analysis document",
+        help="validate and persist a spec-analysis, question-analysis or test-analysis document",
         description=(
-            "Persist one Markdown document of --kind (spec-analysis or question-analysis; default "
+            "Persist one Markdown document of --kind (spec-analysis, question-analysis or test-analysis; default "
             "spec-analysis) to the store branch. --artifact-ref must be <kind>/<scope-id>.md. "
             "--document-file is validated first (the kind's validate, read-only); a document that fails validation is not written and "
             "no confirmation is registered. --expected-revision is git:<sha> of the current revision; "

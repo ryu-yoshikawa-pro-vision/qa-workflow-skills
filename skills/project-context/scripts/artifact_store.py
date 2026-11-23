@@ -21,7 +21,13 @@ from typing import Any, Callable
 
 # 保存できる kind の単一定義。local store・Git store・ホストCLIはここを参照する。
 STORE_KINDS = frozenset(
-    {"project-context", "feature-inventory", "spec-analysis", "question-analysis"}
+    {
+        "project-context",
+        "feature-inventory",
+        "spec-analysis",
+        "question-analysis",
+        "test-analysis",
+    }
 )
 KINDS = STORE_KINDS
 MAX_BYTES = 16 * 1024 * 1024
