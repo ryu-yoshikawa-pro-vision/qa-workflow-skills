@@ -44,7 +44,25 @@ description: 新規機能・変更機能・指定対象機能について、変�
 - **処理**: 対象のプロダクトリスクを評価し、何をなぜどの深さでテストするか、テストレベル、観測方法、テスト重点、適用技法を決めます。
 - **出力**: 変更・影響、プロダクトリスク、テスト重点、テストレベル / 観測方法、最小限のテスト可能性、選択技法、対象外・残存リスクを説明できるテスト分析を作ります。
 
+## 保存（任意）
+
+- 分析結果を保存する場合は、`assets/output-template.md` の見出しと表をそのまま使い、対象範囲（scope）ごとに `test-analysis/<scope-id>.md` として保存します。保存先branchは案件・kindごとに分けます（例: `qa-artifacts/<project>/test-analysis`）。手組みの文書で、`Machine Runtime / Entity（機械証拠）` 節だけが runtime の出力です。
+- 保存前に `scripts/test_analysis_document.py validate` で形式を検証し、通過した文書だけを project-context の `artifact_host.py save-document --kind test-analysis` で保存します。検証に失敗した文書は保存されず、確認記録も登録されません。保存前には、`runtime_contract.py` の `verify_runtime_evidence` による最終証拠ゲートも通します。
+- `--user-confirmed-ref` は、利用者がその文書を確認した後にだけ渡します。AIが確認前に値を作ってはなりません。確認記録は自己申告であり、認証ではありません。
+- 更新する場合は、保存直前に `read` で現在のrevisionを取り直し、`--expected-revision git:<sha>` に渡します。古い値は `revision_conflict` で止まり、データは失われません。
+- 入力 revision（spec-analysis・question-analysis・project-context の保存 revision と製品 revision）は `--source-revision` にまとめ、本文の「テスト分析範囲」にも同じ文字列を書きます。
+- 保存の理由コード、既知の制約、runtime の起動手順は `references/persistence-contract.md` に従います。検証は形式だけを見るため、意味の正しさ（リスク評価、技法の適合、根拠の実在）は本Skillの自己検証と証拠ゲートで扱います。
+
+```
+python3 scripts/test_analysis_document.py validate --document-file <file> --scope-id <scope-id> --source-revision <rev>
+python3 ../project-context/scripts/artifact_host.py save-document --kind test-analysis --repo <store-repo> --branch qa-artifacts/<project>/test-analysis --project-ref <project> --artifact-ref test-analysis/<scope-id>.md --document-file <file> [--expected-revision git:<sha>] --source-ref <ref> --source-revision <rev> --change-reason <reason> --user-confirmed-ref <confirmation>
+```
+
+- 保存契約（保存・検証・理由コード・runtime起動）: `references/persistence-contract.md`
+
 ## リソース
 
 - 詳細判断基準: `references/guidance.md`
 - 既定出力形式: `assets/output-template.md`
+- 保存の検証 helper: `scripts/test_analysis_document.py`
+- 保存契約: `references/persistence-contract.md`

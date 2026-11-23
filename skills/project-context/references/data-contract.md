@@ -79,3 +79,7 @@ branchは案件とkindごとに分けます（例: `qa-artifacts/<project>/<kind
 ### question-analysis の保存（追記）
 
 `question-analysis` は `save-document --kind question-analysis` で保存します（`scripts/artifact_host.py`）。`save-document` は `../question-analysis/scripts/question_document.py` の `validate` で形式を検証し、通過した文書だけを確認記録の登録後に `persist_document` で保存します。保存先は `qa-artifacts/<project>/question-analysis` のbranchの `question-analysis/<scope-id>.md` です。`save-prepared` と `save-snapshot` は question-analysis を受け付けません（`unsupported_kind_for_now`）。`read`・`export`・`verify-projection` は `--kind question-analysis` で同じ規則により読みます。
+
+### test-analysis の保存（追記）
+
+`test-analysis` は `save-document --kind test-analysis` で保存します（`scripts/artifact_host.py`）。`save-document` は `../test-analysis/scripts/test_analysis_document.py` の `validate` で形式を検証し、通過した文書だけを確認記録の登録後に `persist_document` で保存します。保存先は `qa-artifacts/<project>/test-analysis` のbranchの `test-analysis/<scope-id>.md` です。`save-prepared` と `save-snapshot` は test-analysis を受け付けません（`unsupported_kind_for_now`）。`read`・`export`・`verify-projection` は `--kind test-analysis` で同じ規則により読みます。保存の理由コード、入力 revision の記録、既知の制約は `../test-analysis/references/persistence-contract.md` に従います。
