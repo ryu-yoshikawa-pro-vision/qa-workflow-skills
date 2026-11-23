@@ -31,6 +31,8 @@ description: 仕様・QA成果物の曖昧さ、矛盾、欠落、未解決事�
 - **処理**: 各論点を`ブロッカー` / `要確認` / `仮定可能` / `提案・任意`へ分類し、停止・継続範囲と回答後の正規化先・再開先を決めます。
 - **出力**: 不明点・矛盾の分類、根拠、影響範囲、回答なしの場合の扱い、ブロック中範囲、回答後の正規化先、再開先Skill / 対象を明示します。
 
+ユーザーへ報告・質問する際にDEC / ASMのIDを挙げる場合は、初出ごとに日本語の補足と1行要約・状態を併記します（規約は`../project-context/references/guidance.md`の「ユーザーへの報告での略号（DEC / ASM）」）。
+
 ## 保存（任意）
 
 - 分析結果を保存する場合は、`assets/output-template.md` の見出しと表をそのまま使い、対象範囲（領域など）ごとに `question-analysis/<scope-id>.md` として保存します。保存先branchは案件・kindごとに分けます（例: `qa-artifacts/<project>/question-analysis`）。

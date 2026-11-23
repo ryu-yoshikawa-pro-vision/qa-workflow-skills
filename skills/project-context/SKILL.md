@@ -15,6 +15,8 @@ description: QA案件のProject Contextを初回発見・新規初期化・必�
 6. 決定論的な発見・候補作成・field更新の判定はscripts/project_context.pyを使用します。このhelperのdraftやreuse_candidateは保存成功・認証済み承認ではありません。
 7. 明示されたローカル保存providerではscripts/artifact_store.pyのLocalArtifactStoreとpersist_preparedを使用します。承認方式が`trusted-callback`の場合、認証済み権限・承認の照合は信頼済み呼出し元のauthorize callbackで行い、CLI入力だけで許可しません。書込みは案件の許可されたproviderによるnative create-if-absent／CAS、履歴取得、独立readback、実認証済み承認の条件が揃ってから実行します。不足時はその操作をblockし、読取専用分析を止めません。保存の承認方式（`approval_source`）は、`authorize`を渡していなければ既定の`user-confirmed`、渡していれば`trusted-callback`です。`user-confirmed`は、ユーザーの確認後にホストが登録した確認記録との完全一致で判定します（詳細はreferences/data-contract.md）。`user-confirmed`のユーザー確認は自己申告であり認証ではありません。`trusted-callback`は、信頼済みhostが承認サービスを注入する場合の追加検証（より強い承認）で、任意です。ホストはユーザーが当該成果物を明示的に確認した後にのみ `record_user_confirmation` を呼ぶ。AIが確認前に呼んではならない。ホスト経由（`scripts/artifact_host.py` の `save-prepared`）のuser-confirmed保存は、自己申告の確認記録であり認証ではありません。実認証済み承認の条件を満たすものではないため、ユーザーの確認が得られた候補に限って実行します。
 
+8. ユーザーへの報告・質問・確認依頼でDEC / ASMのIDを挙げるときは、初出ごとに日本語の補足と1行要約・状態を併記します（規約は`references/guidance.md`の「ユーザーへの報告での略号（DEC / ASM）」）。保存するファイルの見出し・列名・ID形式は変えません。
+
 ## リソース
 
 - 既存template: ../qa-workflow/assets/project-context-template.md

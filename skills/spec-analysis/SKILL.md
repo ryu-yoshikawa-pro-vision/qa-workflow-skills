@@ -27,6 +27,8 @@ description: 要件書、Q&A、リポジトリ、リリース資料などの情�
 - **処理**: 情報を`SPEC` / `DECISION` / `INFERENCE` / `UNKNOWN`へ分類し、対象範囲の現在有効な仕様根拠を解決して、後続QA設計で使える追跡可能な仕様モデルへ変換します。
 - **出力**: 追跡可能な仕様分析。対象範囲内の現在有効な期待挙動が情報源または正本一覧へ戻れ、業務ルール、状態・遷移、フロー、制約、不明点を必要に応じて表現できる状態にします。
 
+ユーザーへ報告・質問する際にDEC / ASMのIDを挙げる場合は、初出ごとに日本語の補足と1行要約・状態を併記します（規約は`../project-context/references/guidance.md`の「ユーザーへの報告での略号（DEC / ASM）」）。
+
 ## 保存（任意）
 
 - 分析結果を保存する場合は、`assets/output-template.md` の見出しと表をそのまま使い、対象範囲ごとに `spec-analysis/<scope-id>.md` として保存します。保存先branchは案件・kindごとに分けます（例: `qa-artifacts/<project>/spec-analysis`）。
