@@ -309,7 +309,7 @@ class TestAnalysisValidatorTests(unittest.TestCase):
         )
         self.assertIn(
             "local_path_present",
-            reasons(replaced(VALID, "- 環境制約: なし", "- 環境制約: C:\\work")),
+            reasons(replaced(VALID, "- 環境制約: なし", "- 環境制約: Z:\\data")),
         )
 
     def test_encoding_and_size_are_checked(self) -> None:
