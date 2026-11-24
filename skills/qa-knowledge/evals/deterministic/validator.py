@@ -72,6 +72,18 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
             expected_ref is not None and entry.get("entry_ref") == expected_ref,
             "entry_refがstructured semantic identityから決定論的に解決されること",
         )
+        identity_dict = identity if isinstance(identity, dict) else {}
+        result.add(
+            "KN-D012",
+            isinstance(identity, dict)
+            and identity_dict.get("kind")
+            in {"test_subject_or_mechanism", "test_focus", "test_environment"}
+            and identity_dict.get("kind") == entry.get("kind")
+            and isinstance(identity_dict.get("scope_refs"), list)
+            and bool(identity_dict.get("scope_refs"))
+            and identity_dict.get("scope_refs") == entry.get("scope_refs"),
+            "identityのkind / scope_refsがentry直下の適用対象と値・順序まで一致すること",
+        )
         required = (
             "kind",
             "content",

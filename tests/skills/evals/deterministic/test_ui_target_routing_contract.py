@@ -18,8 +18,8 @@ class UiTargetRoutingContractTests(unittest.TestCase):
         )
 
     def test_fixture_count_and_identity_sets_are_synchronized(self) -> None:
-        self.assertEqual(len(self.cases), 69)
-        self.assertEqual(len(self.candidates), 69)
+        self.assertEqual(len(self.cases), 83)
+        self.assertEqual(len(self.candidates), 83)
         self.assertEqual(
             {row["id"] for row in self.cases},
             {row["id"] for row in self.candidates},
@@ -29,23 +29,31 @@ class UiTargetRoutingContractTests(unittest.TestCase):
         self,
     ) -> None:
         expected = {
-            "WF-UI-TARGET-001": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-001": (
+                "ui-target-analysis",
+                "ui-target-analysis",
+                ["ui-target-analysis"],
+            ),
             "WF-UI-TARGET-002": (
-                "spec-analysis",
+                "ui-target-analysis",
                 "question-analysis",
-                ["spec-analysis", "question-analysis"],
+                ["ui-target-analysis", "question-analysis"],
             ),
             "WF-UI-TARGET-003": (
                 "question-analysis",
-                "spec-analysis",
-                ["question-analysis", "spec-analysis"],
+                "ui-target-analysis",
+                ["question-analysis", "spec-analysis", "ui-target-analysis"],
             ),
             "WF-UI-TARGET-004": (
                 "test-target-inspection",
                 "test-target-inspection",
                 ["test-target-inspection"],
             ),
-            "WF-UI-TARGET-005": ("spec-analysis", "spec-analysis", ["spec-analysis"]),
+            "WF-UI-TARGET-005": (
+                "ui-target-analysis",
+                "ui-target-analysis",
+                ["ui-target-analysis"],
+            ),
             "WF-UI-TARGET-006": (
                 "usability-evaluation",
                 "usability-evaluation",

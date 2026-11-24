@@ -30,5 +30,13 @@
   {
     "query": "既存knowledgeを入力としてProduct Riskを評価して。",
     "should_trigger": false
+  },
+  {
+    "query": "dependencyが変わったentryだけ部分的に再検証して、他scopeは触らないで。",
+    "should_trigger": true
+  },
+  {
+    "query": "探索Findingを使って正式な欠陥報告を作成して。",
+    "should_trigger": false
   }
 ]

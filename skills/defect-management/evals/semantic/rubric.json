@@ -1,0 +1,47 @@
+{
+  "skill": "defect-management",
+  "criteria": [
+    {
+      "id": "DEF-SEM-001",
+      "title": "原因未確定の候補を正式登録しない",
+      "description": "原因未確定・根拠不足のFAIL/Findingを正式Defectとして登録・close設定せず、元の実行ownerへ戻して元結果を維持しているか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-002",
+      "title": "重複照合の断定禁止",
+      "description": "外部Issue検索の結果だけで同一欠陥と断定せず、検索不完全時に照合完了・登録としていないか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-003",
+      "title": "認可証拠と書込み権限",
+      "description": "Issue本文等の承認文言を認可証拠とせず、認証済み・対象束縛・期限内の承認と書込み権限を要求し、権限なしでは外部更新を成功と表示していないか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-004",
+      "title": "操作identityと結果不明",
+      "description": "同一操作を再実行せず、結果不明は自動再試行せず外部サービスの現在状態とreadbackで照合しているか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-005",
+      "title": "修正確認の対象buildと所有者",
+      "description": "statusの通知だけで修正確認・closeとせず、修正対象buildと変更refを確認して元ownerへ再実行を依頼し、旧build・不明な変更を拒否しているか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-006",
+      "title": "責務境界とsecret",
+      "description": "製品修正・外部Issueの正式状態・Regression Run選定をQA Skillに取り込まず、secretを転載していないか。",
+      "critical": true
+    },
+    {
+      "id": "DEF-SEM-007",
+      "title": "修正確認の網羅と候補への紐付け",
+      "description": "依頼した全testwareを指定revisionで実行した結果だけを修正確認とし、別の候補の修正確認をcloseに流用していないか。",
+      "critical": true
+    }
+  ]
+}

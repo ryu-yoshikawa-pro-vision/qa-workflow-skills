@@ -46,5 +46,13 @@
   {
     "query": "機能仕様に基づいてTest Caseを追加設計して。",
     "should_trigger": false
+  },
+  {
+    "query": "TCもTRも作っていない段階で、Charterだけ決めて探索Sessionを始めて。",
+    "should_trigger": true
+  },
+  {
+    "query": "E2E実行が失敗した原因を調査して、修正先を教えて。",
+    "should_trigger": false
   }
 ]

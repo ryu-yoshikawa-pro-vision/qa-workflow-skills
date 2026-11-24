@@ -747,27 +747,38 @@
   },
   {
     "id": "WF-UI-TARGET-001",
-    "start": "spec-analysis",
-    "final": "spec-analysis",
-    "skills": ["spec-analysis"],
+    "start": "ui-target-analysis",
+    "final": "ui-target-analysis",
+    "skills": [
+      "ui-target-analysis"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}
   },
   {
     "id": "WF-UI-TARGET-002",
-    "start": "spec-analysis",
+    "start": "ui-target-analysis",
     "final": "question-analysis",
-    "skills": ["spec-analysis", "question-analysis"],
+    "skills": [
+      "ui-target-analysis",
+      "question-analysis"
+    ],
     "overall": "部分完了（ブロック中あり）",
     "targets": {},
-    "states": { "question-analysis": "ブロック中" }
+    "states": {
+      "question-analysis": "ブロック中"
+    }
   },
   {
     "id": "WF-UI-TARGET-003",
     "start": "question-analysis",
-    "final": "spec-analysis",
-    "skills": ["question-analysis", "spec-analysis"],
+    "final": "ui-target-analysis",
+    "skills": [
+      "question-analysis",
+      "spec-analysis",
+      "ui-target-analysis"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}
@@ -776,16 +787,20 @@
     "id": "WF-UI-TARGET-004",
     "start": "test-target-inspection",
     "final": "test-target-inspection",
-    "skills": ["test-target-inspection"],
+    "skills": [
+      "test-target-inspection"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}
   },
   {
     "id": "WF-UI-TARGET-005",
-    "start": "spec-analysis",
-    "final": "spec-analysis",
-    "skills": ["spec-analysis"],
+    "start": "ui-target-analysis",
+    "final": "ui-target-analysis",
+    "skills": [
+      "ui-target-analysis"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}
@@ -794,7 +809,9 @@
     "id": "WF-UI-TARGET-006",
     "start": "usability-evaluation",
     "final": "usability-evaluation",
-    "skills": ["usability-evaluation"],
+    "skills": [
+      "usability-evaluation"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}
@@ -803,16 +820,180 @@
     "id": "WF-UI-TARGET-007",
     "start": "usability-inspection",
     "final": "usability-inspection",
-    "skills": ["usability-inspection"],
+    "skills": [
+      "usability-inspection"
+    ],
     "overall": "実行中",
-    "targets": { "usability-inspection": "general" },
+    "targets": {
+      "usability-inspection": "general"
+    },
     "states": {}
   },
   {
     "id": "WF-UI-TARGET-008",
     "start": "wcag-conformance-evaluation",
     "final": "wcag-conformance-evaluation",
-    "skills": ["wcag-conformance-evaluation"],
+    "skills": [
+      "wcag-conformance-evaluation"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-001",
+    "start": "project-context",
+    "final": "project-context",
+    "skills": [
+      "project-context"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-002",
+    "start": "feature-analysis",
+    "final": "feature-analysis",
+    "skills": [
+      "feature-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-003",
+    "start": "test-item-analysis",
+    "final": "test-item-analysis",
+    "skills": [
+      "test-item-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-004",
+    "start": "test-condition-analysis",
+    "final": "test-condition-analysis",
+    "skills": [
+      "test-condition-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-005",
+    "start": "test-requirements-analysis",
+    "final": "test-requirements-analysis",
+    "skills": [
+      "test-requirements-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-006",
+    "start": "test-requirements-analysis",
+    "final": "test-management",
+    "skills": [
+      "test-requirements-analysis",
+      "test-architecture-design",
+      "test-management"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-007",
+    "start": "test-management",
+    "final": "test-management",
+    "skills": [
+      "test-management"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-008",
+    "start": "e2e-test-selection",
+    "final": "e2e-test-selection",
+    "skills": [
+      "e2e-test-selection"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-009",
+    "start": "e2e-test-selection",
+    "final": "e2e-test-implementation",
+    "skills": [
+      "e2e-test-selection",
+      "e2e-test-inspection",
+      "e2e-test-implementation"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-010",
+    "start": "defect-management",
+    "final": "defect-management",
+    "skills": [
+      "defect-management"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-011",
+    "start": "test-reporting",
+    "final": "test-reporting",
+    "skills": [
+      "test-reporting"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-012",
+    "start": "test-evaluation",
+    "final": "test-evaluation",
+    "skills": [
+      "test-evaluation"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-013",
+    "start": "testware-implementation",
+    "final": "testware-implementation",
+    "skills": [
+      "testware-implementation"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-014",
+    "start": "testware-execution",
+    "final": "testware-execution",
+    "skills": [
+      "testware-execution"
+    ],
     "overall": "実行中",
     "targets": {},
     "states": {}

@@ -1,0 +1,8 @@
+{
+  "expected_complete": true,
+  "expected_planned_totals": {
+    "e2e": 1,
+    "e2e-attempts": 2
+  },
+  "expected_incomplete_sources": []
+}

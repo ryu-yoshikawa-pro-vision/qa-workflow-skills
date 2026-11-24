@@ -1,0 +1,3018 @@
+{
+  "schema_version": "qa-workflow-efficiency-v1",
+  "scenarios": [
+    {
+      "scenario": "initial_qa",
+      "baseline": [
+        {
+          "trial_ref": "baseline-initial_qa-1",
+          "run_ref": "run:baseline-initial_qa-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#initial_qa",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.initial_qa",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-initial_qa-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 419.384225,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 7,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 2987143,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 45,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.421438,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:03:38.288101+00:00",
+            "finished_at": "2026-11-13T08:10:37.672326+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-initial_qa-1:skill-run:0",
+                "started_at": "2026-11-13T08:03:53.493515+00:00",
+                "finished_at": "2026-11-13T08:04:02.803864+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-initial_qa-1:skill-run:1",
+                "started_at": "2026-11-13T08:04:02.803864+00:00",
+                "finished_at": "2026-11-13T08:04:32.108385+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "baseline-initial_qa-1:skill-run:2",
+                "started_at": "2026-11-13T08:04:32.108385+00:00",
+                "finished_at": "2026-11-13T08:10:37.672326+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-initial_qa-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-initial_qa-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "baseline-initial_qa-2",
+          "run_ref": "run:baseline-initial_qa-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#initial_qa",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.initial_qa",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-initial_qa-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 473.978505,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 7,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 3647484,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 52,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.504739,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:03:38.037832+00:00",
+            "finished_at": "2026-11-13T08:11:32.016337+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-initial_qa-2:skill-run:0",
+                "started_at": "2026-11-13T08:03:54.764558+00:00",
+                "finished_at": "2026-11-13T08:04:11.943410+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "baseline-initial_qa-2:skill-run:1",
+                "started_at": "2026-11-13T08:04:11.943410+00:00",
+                "finished_at": "2026-11-13T08:04:34.178699+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-initial_qa-2:skill-run:2",
+                "started_at": "2026-11-13T08:04:34.178699+00:00",
+                "finished_at": "2026-11-13T08:04:35.126375+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "baseline-initial_qa-2:skill-run:3",
+                "started_at": "2026-11-13T08:04:35.126375+00:00",
+                "finished_at": "2026-11-13T08:04:36.150300+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "baseline-initial_qa-2:skill-run:4",
+                "started_at": "2026-11-13T08:04:36.150300+00:00",
+                "finished_at": "2026-11-13T08:04:37.230936+00:00"
+              },
+              {
+                "skill": "question-analysis",
+                "run_ref": "baseline-initial_qa-2:skill-run:5",
+                "started_at": "2026-11-13T08:04:37.230936+00:00",
+                "finished_at": "2026-11-13T08:11:32.016337+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-initial_qa-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-initial_qa-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "trial_ref": "candidate-initial_qa-1",
+          "run_ref": "run:candidate-initial_qa-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#initial_qa",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.initial_qa",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-initial_qa-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 342.378668,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 8,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1348511,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 33,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.154237,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-initial_qa-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:35:46.150169+00:00",
+            "finished_at": "2026-11-13T08:41:28.528837+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-initial_qa-1:skill-run:0",
+                "started_at": "2026-11-13T08:36:01.631731+00:00",
+                "finished_at": "2026-11-13T08:36:46.484605+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-initial_qa-1:skill-run:1",
+                "started_at": "2026-11-13T08:36:46.484605+00:00",
+                "finished_at": "2026-11-13T08:36:54.761772+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-initial_qa-1:skill-run:2",
+                "started_at": "2026-11-13T08:36:54.761772+00:00",
+                "finished_at": "2026-11-13T08:41:28.528837+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-initial_qa-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-initial_qa-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "candidate-initial_qa-2",
+          "run_ref": "run:candidate-initial_qa-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#initial_qa",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.initial_qa",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-initial_qa-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 343.052284,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 2,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 2116556,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 34,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.291231,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-initial_qa-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:35:46.109320+00:00",
+            "finished_at": "2026-11-13T08:41:29.161604+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-initial_qa-2:skill-run:0",
+                "started_at": "2026-11-13T08:35:57.828219+00:00",
+                "finished_at": "2026-11-13T08:36:34.596469+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-initial_qa-2:skill-run:1",
+                "started_at": "2026-11-13T08:36:34.596469+00:00",
+                "finished_at": "2026-11-13T08:36:34.622203+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "candidate-initial_qa-2:skill-run:2",
+                "started_at": "2026-11-13T08:36:34.622203+00:00",
+                "finished_at": "2026-11-13T08:36:54.846465+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "candidate-initial_qa-2:skill-run:3",
+                "started_at": "2026-11-13T08:36:54.846465+00:00",
+                "finished_at": "2026-11-13T08:36:56.769975+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-initial_qa-2:skill-run:4",
+                "started_at": "2026-11-13T08:36:56.769975+00:00",
+                "finished_at": "2026-11-13T08:41:29.161604+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-initial_qa-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-initial_qa-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "unchanged_request",
+      "baseline": [
+        {
+          "trial_ref": "baseline-unchanged_request-1",
+          "run_ref": "run:baseline-unchanged_request-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#unchanged_request",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.unchanged_request",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "fail",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 117.64545,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 7,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 2,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 750262,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 24,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.060185,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:11:10.571757+00:00",
+            "finished_at": "2026-11-13T08:13:08.217207+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-unchanged_request-1:skill-run:0",
+                "started_at": "2026-11-13T08:11:35.737849+00:00",
+                "finished_at": "2026-11-13T08:13:08.217207+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-unchanged_request-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-unchanged_request-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "baseline-unchanged_request-2",
+          "run_ref": "run:baseline-unchanged_request-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#unchanged_request",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.unchanged_request",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 182.982924,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 13,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 2,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 956797,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 36,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.113063,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:12:07.098886+00:00",
+            "finished_at": "2026-11-13T08:15:10.081810+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-unchanged_request-2:skill-run:0",
+                "started_at": "2026-11-13T08:12:27.632687+00:00",
+                "finished_at": "2026-11-13T08:15:10.081810+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-unchanged_request-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-unchanged_request-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "trial_ref": "candidate-unchanged_request-1",
+          "run_ref": "run:candidate-unchanged_request-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#unchanged_request",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.unchanged_request",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "fail",
+            "quality": "fail",
+            "safety": "fail",
+            "traceability": "fail",
+            "independent_evidence_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 180.162072,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 14,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 2614796,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 46,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.182914,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:41:51.155192+00:00",
+            "finished_at": "2026-11-13T08:44:51.317264+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-unchanged_request-1:skill-run:0",
+                "started_at": "2026-11-13T08:41:56.814409+00:00",
+                "finished_at": "2026-11-13T08:44:51.317264+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-unchanged_request-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-unchanged_request-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "candidate-unchanged_request-2",
+          "run_ref": "run:candidate-unchanged_request-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#unchanged_request",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.unchanged_request",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 105.923989,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 15,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 2,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 771211,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 33,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.096329,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-unchanged_request-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:41:55.179624+00:00",
+            "finished_at": "2026-11-13T08:43:41.103613+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-unchanged_request-2:skill-run:0",
+                "started_at": "2026-11-13T08:42:01.190672+00:00",
+                "finished_at": "2026-11-13T08:43:41.103613+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-unchanged_request-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-unchanged_request-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "local_code_change",
+      "baseline": [
+        {
+          "trial_ref": "baseline-local_code_change-1",
+          "run_ref": "run:baseline-local_code_change-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#local_code_change",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.local_code_change",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-local_code_change-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 109.010354,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 669817,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 20,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.025455,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:11:10.768943+00:00",
+            "finished_at": "2026-11-13T08:12:59.779297+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-local_code_change-1:skill-run:0",
+                "started_at": "2026-11-13T08:11:35.894205+00:00",
+                "finished_at": "2026-11-13T08:12:59.779297+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-local_code_change-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-local_code_change-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "baseline-local_code_change-2",
+          "run_ref": "run:baseline-local_code_change-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#local_code_change",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.local_code_change",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-local_code_change-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 171.624308,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 949776,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 26,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.032679,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:12:07.004385+00:00",
+            "finished_at": "2026-11-13T08:14:58.628693+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-local_code_change-2:skill-run:0",
+                "started_at": "2026-11-13T08:12:27.924132+00:00",
+                "finished_at": "2026-11-13T08:14:58.628693+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-local_code_change-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-local_code_change-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "trial_ref": "candidate-local_code_change-1",
+          "run_ref": "run:candidate-local_code_change-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#local_code_change",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.local_code_change",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-local_code_change-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 87.326676,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 991279,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 25,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.033328,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-local_code_change-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:41:51.186160+00:00",
+            "finished_at": "2026-11-13T08:43:18.512836+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-local_code_change-1:skill-run:0",
+                "started_at": "2026-11-13T08:41:55.795800+00:00",
+                "finished_at": "2026-11-13T08:43:18.512836+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-local_code_change-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-local_code_change-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "candidate-local_code_change-2",
+          "run_ref": "run:candidate-local_code_change-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "7fece7ddab796dcbb6d3930254993dd0f1826de631278d41d79fe974b9127932"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#local_code_change",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.local_code_change",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-local_code_change-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 91.349883,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 9,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1025496,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 30,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.032887,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-local_code_change-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:41:55.149299+00:00",
+            "finished_at": "2026-11-13T08:43:26.499182+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-local_code_change-2:skill-run:0",
+                "started_at": "2026-11-13T08:42:00.695145+00:00",
+                "finished_at": "2026-11-13T08:43:26.499182+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-local_code_change-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-local_code_change-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "external_spec_revision",
+      "baseline": [
+        {
+          "trial_ref": "baseline-external_spec_revision-1",
+          "run_ref": "run:baseline-external_spec_revision-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#external_spec_revision",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.external_spec_revision",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 550.534538,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 26,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 8,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1284630,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 45,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.138701,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:14:05.147833+00:00",
+            "finished_at": "2026-11-13T08:23:15.682371+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-external_spec_revision-1:skill-run:0",
+                "started_at": "2026-11-13T08:14:15.980636+00:00",
+                "finished_at": "2026-11-13T08:23:15.682371+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-external_spec_revision-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-external_spec_revision-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "baseline-external_spec_revision-2",
+          "run_ref": "run:baseline-external_spec_revision-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#external_spec_revision",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.external_spec_revision",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 564.24351,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 24,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 8,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1506782,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 46,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.224625,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/baseline-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:15:21.581311+00:00",
+            "finished_at": "2026-11-13T08:24:45.824821+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-external_spec_revision-2:skill-run:0",
+                "started_at": "2026-11-13T08:15:30.892072+00:00",
+                "finished_at": "2026-11-13T08:24:45.824821+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-external_spec_revision-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-external_spec_revision-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "trial_ref": "candidate-external_spec_revision-1",
+          "run_ref": "run:candidate-external_spec_revision-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#external_spec_revision",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.external_spec_revision",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 108.165617,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 12,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1295920,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 27,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.047749,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-1/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:43:28.910273+00:00",
+            "finished_at": "2026-11-13T08:45:17.075890+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-external_spec_revision-1:skill-run:0",
+                "started_at": "2026-11-13T08:43:31.555726+00:00",
+                "finished_at": "2026-11-13T08:45:17.075890+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-external_spec_revision-1/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-external_spec_revision-1/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        },
+        {
+          "trial_ref": "candidate-external_spec_revision-2",
+          "run_ref": "run:candidate-external_spec_revision-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "19635e51dbcef2551fadc5fb3b0510cc755a606d999a59c718c57f7267351f25"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#external_spec_revision",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.external_spec_revision",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 171.695241,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 34,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": 1200992,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "request_count": {
+              "value": 53,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "cost_amount": {
+              "value": 0.133448,
+              "unit": "USD",
+              "source_ref": "efficiency/trials/candidate-external_spec_revision-2/trial.json",
+              "unmeasured_reason": null
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:43:40.983307+00:00",
+            "finished_at": "2026-11-13T08:46:32.678548+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-external_spec_revision-2:skill-run:0",
+                "started_at": "2026-11-13T08:43:44.624616+00:00",
+                "finished_at": "2026-11-13T08:46:32.678548+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-external_spec_revision-2/session1.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-external_spec_revision-2/session1.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": null
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "interrupted_resume",
+      "baseline": [
+        {
+          "trial_ref": "baseline-interrupted_resume-1",
+          "run_ref": "run:baseline-interrupted_resume-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#interrupted_resume",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.interrupted_resume",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "unverified",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 866.510639,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 10,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 7,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "request_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "cost_amount": {
+              "value": null,
+              "unit": "unknown",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:14:07.709881+00:00",
+            "finished_at": "2026-11-13T08:28:34.220520+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:0",
+                "started_at": "2026-11-13T08:14:19.675084+00:00",
+                "finished_at": "2026-11-13T08:14:33.512234+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:1",
+                "started_at": "2026-11-13T08:14:33.512234+00:00",
+                "finished_at": "2026-11-13T08:15:34.175639+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:2",
+                "started_at": "2026-11-13T08:15:34.175639+00:00",
+                "finished_at": "2026-11-13T08:15:34.229928+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:3",
+                "started_at": "2026-11-13T08:15:34.229928+00:00",
+                "finished_at": "2026-11-13T08:15:36.668781+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:4",
+                "started_at": "2026-11-13T08:15:36.668781+00:00",
+                "finished_at": "2026-11-13T08:15:36.795044+00:00"
+              },
+              {
+                "skill": "question-analysis",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:5",
+                "started_at": "2026-11-13T08:15:36.795044+00:00",
+                "finished_at": "2026-11-13T08:21:46.538140+00:00"
+              },
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:6",
+                "started_at": "2026-11-13T08:21:46.538140+00:00",
+                "finished_at": "2026-11-13T08:21:59.804685+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:7",
+                "started_at": "2026-11-13T08:21:59.804685+00:00",
+                "finished_at": "2026-11-13T08:22:00.988321+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:8",
+                "started_at": "2026-11-13T08:22:00.988321+00:00",
+                "finished_at": "2026-11-13T08:22:04.851856+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "baseline-interrupted_resume-1:skill-run:9",
+                "started_at": "2026-11-13T08:22:04.851856+00:00",
+                "finished_at": "2026-11-13T08:28:34.220520+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-interrupted_resume-1/session1.jsonl",
+                "revision": "log"
+              },
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-interrupted_resume-1/session2.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-interrupted_resume-1/session1.jsonl",
+              "trials/baseline-interrupted_resume-1/session2.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": "trials/baseline-interrupted_resume-1/session1.jsonl"
+          }
+        },
+        {
+          "trial_ref": "baseline-interrupted_resume-2",
+          "run_ref": "run:baseline-interrupted_resume-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#interrupted_resume",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.interrupted_resume",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=baseline",
+          "quality": {
+            "functional": "unverified",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "fail",
+            "independent_evidence_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 953.136518,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 10,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/baseline-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "request_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "cost_amount": {
+              "value": null,
+              "unit": "unknown",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:15:33.145289+00:00",
+            "finished_at": "2026-11-13T08:31:26.281807+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:0",
+                "started_at": "2026-11-13T08:15:45.854499+00:00",
+                "finished_at": "2026-11-13T08:18:49.246408+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:1",
+                "started_at": "2026-11-13T08:18:49.246408+00:00",
+                "finished_at": "2026-11-13T08:18:49.261902+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:2",
+                "started_at": "2026-11-13T08:18:49.261902+00:00",
+                "finished_at": "2026-11-13T08:18:49.274338+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:3",
+                "started_at": "2026-11-13T08:18:49.274338+00:00",
+                "finished_at": "2026-11-13T08:19:13.420351+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:4",
+                "started_at": "2026-11-13T08:19:13.420351+00:00",
+                "finished_at": "2026-11-13T08:21:40.880874+00:00"
+              },
+              {
+                "skill": "question-analysis",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:5",
+                "started_at": "2026-11-13T08:21:40.880874+00:00",
+                "finished_at": "2026-11-13T08:25:44.499703+00:00"
+              },
+              {
+                "skill": "qa-workflow",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:6",
+                "started_at": "2026-11-13T08:25:44.499703+00:00",
+                "finished_at": "2026-11-13T08:26:00.912575+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:7",
+                "started_at": "2026-11-13T08:26:00.912575+00:00",
+                "finished_at": "2026-11-13T08:26:00.945475+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:8",
+                "started_at": "2026-11-13T08:26:00.945475+00:00",
+                "finished_at": "2026-11-13T08:26:00.975204+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "baseline-interrupted_resume-2:skill-run:9",
+                "started_at": "2026-11-13T08:26:00.975204+00:00",
+                "finished_at": "2026-11-13T08:31:26.281807+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-interrupted_resume-2/session1.jsonl",
+                "revision": "log"
+              },
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/baseline-interrupted_resume-2/session2.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/baseline-interrupted_resume-2/session1.jsonl",
+              "trials/baseline-interrupted_resume-2/session2.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": "trials/baseline-interrupted_resume-2/session1.jsonl"
+          }
+        }
+      ],
+      "candidate": [
+        {
+          "trial_ref": "candidate-interrupted_resume-1",
+          "run_ref": "run:candidate-interrupted_resume-1",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#interrupted_resume",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.interrupted_resume",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "pass",
+            "quality": "pass",
+            "safety": "fail",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 567.923836,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 9,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 3,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 8,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-1/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "request_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "cost_amount": {
+              "value": null,
+              "unit": "unknown",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:45:16.262621+00:00",
+            "finished_at": "2026-11-13T08:54:44.186457+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:0",
+                "started_at": "2026-11-13T08:45:22.035378+00:00",
+                "finished_at": "2026-11-13T08:45:32.803848+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:1",
+                "started_at": "2026-11-13T08:45:32.803848+00:00",
+                "finished_at": "2026-11-13T08:45:33.771710+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:2",
+                "started_at": "2026-11-13T08:45:33.771710+00:00",
+                "finished_at": "2026-11-13T08:45:34.716457+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:3",
+                "started_at": "2026-11-13T08:45:34.716457+00:00",
+                "finished_at": "2026-11-13T08:45:35.686944+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:4",
+                "started_at": "2026-11-13T08:45:35.686944+00:00",
+                "finished_at": "2026-11-13T08:50:39.653781+00:00"
+              },
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:5",
+                "started_at": "2026-11-13T08:50:39.653781+00:00",
+                "finished_at": "2026-11-13T08:50:52.910016+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:6",
+                "started_at": "2026-11-13T08:50:52.910016+00:00",
+                "finished_at": "2026-11-13T08:50:53.859436+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:7",
+                "started_at": "2026-11-13T08:50:53.859436+00:00",
+                "finished_at": "2026-11-13T08:51:00.908329+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "candidate-interrupted_resume-1:skill-run:8",
+                "started_at": "2026-11-13T08:51:00.908329+00:00",
+                "finished_at": "2026-11-13T08:54:44.186457+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-interrupted_resume-1/session1.jsonl",
+                "revision": "log"
+              },
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-interrupted_resume-1/session2.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-interrupted_resume-1/session1.jsonl",
+              "trials/candidate-interrupted_resume-1/session2.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": "trials/candidate-interrupted_resume-1/session1.jsonl"
+          }
+        },
+        {
+          "trial_ref": "candidate-interrupted_resume-2",
+          "run_ref": "run:candidate-interrupted_resume-2",
+          "product_commit": "2a8bcf57ff091e84a8b3bf7b123568e967000d88",
+          "source_revisions": [
+            {
+              "ref": "product",
+              "revision": "2a8bcf57ff091e84a8b3bf7b123568e967000d88"
+            },
+            {
+              "ref": "docs/spec/features/cart.md",
+              "revision": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216"
+            },
+            {
+              "ref": "src/application/contracts/common.ts",
+              "revision": "81dfe51b242351a5c55777a38ee2d6ddf58c4b337db4b5cf7ba767884148bf2f"
+            }
+          ],
+          "scope_refs": [
+            "cart"
+          ],
+          "qa_goal_ref": "cart-qa:analysis-to-conditions",
+          "expectation_ref": "efficiency/checklists.json#interrupted_resume",
+          "test_set_ref": "efficiency/harness.py#PROMPTS.interrupted_resume",
+          "environment_ref": "wsl2-linux;claude-code 2.1.323 (Claude Code);model=claude-haiku-5-5",
+          "agent_config_ref": "claude-code;claude-haiku-5-5;skills=candidate",
+          "quality": {
+            "functional": "fail",
+            "quality": "fail",
+            "safety": "pass",
+            "traceability": "pass",
+            "independent_evidence_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json"
+          },
+          "metrics": {
+            "wall_seconds": {
+              "value": 417.544154,
+              "unit": "seconds",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_call_count": {
+              "value": 11,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "skill_restart_count": {
+              "value": 5,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "human_review_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間のレビュー時間は無人のAgent実行では測定していない"
+            },
+            "human_approval_seconds": {
+              "value": null,
+              "unit": "seconds",
+              "source_ref": null,
+              "unmeasured_reason": "人間の承認時間は無人のAgent実行では測定していない"
+            },
+            "reanalyze_count": {
+              "value": 4,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "retry_count": {
+              "value": 1,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "reused_artifact_count": {
+              "value": 0,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "regenerated_artifact_count": {
+              "value": 6,
+              "unit": "count",
+              "source_ref": "efficiency/trials/candidate-interrupted_resume-2/trial.json",
+              "unmeasured_reason": null
+            },
+            "token_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "request_count": {
+              "value": null,
+              "unit": "count",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            },
+            "cost_amount": {
+              "value": null,
+              "unit": "unknown",
+              "source_ref": null,
+              "unmeasured_reason": "中断したsessionにresult eventが無い"
+            }
+          },
+          "execution_evidence": {
+            "started_at": "2026-11-13T08:44:01.088140+00:00",
+            "finished_at": "2026-11-13T08:50:58.632294+00:00",
+            "skill_runs": [
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:0",
+                "started_at": "2026-11-13T08:44:06.279800+00:00",
+                "finished_at": "2026-11-13T08:44:44.842899+00:00"
+              },
+              {
+                "skill": "spec-analysis",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:1",
+                "started_at": "2026-11-13T08:44:44.842899+00:00",
+                "finished_at": "2026-11-13T08:44:45.902181+00:00"
+              },
+              {
+                "skill": "question-analysis",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:2",
+                "started_at": "2026-11-13T08:44:45.902181+00:00",
+                "finished_at": "2026-11-13T08:44:46.857529+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:3",
+                "started_at": "2026-11-13T08:44:46.857529+00:00",
+                "finished_at": "2026-11-13T08:44:47.858196+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:4",
+                "started_at": "2026-11-13T08:44:47.858196+00:00",
+                "finished_at": "2026-11-13T08:44:48.771092+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:5",
+                "started_at": "2026-11-13T08:44:48.771092+00:00",
+                "finished_at": "2026-11-13T08:48:06.270496+00:00"
+              },
+              {
+                "skill": "qa-workflow",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:6",
+                "started_at": "2026-11-13T08:48:06.270496+00:00",
+                "finished_at": "2026-11-13T08:48:22.890974+00:00"
+              },
+              {
+                "skill": "test-analysis",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:7",
+                "started_at": "2026-11-13T08:48:22.890974+00:00",
+                "finished_at": "2026-11-13T08:48:23.768421+00:00"
+              },
+              {
+                "skill": "test-requirement-design",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:8",
+                "started_at": "2026-11-13T08:48:23.768421+00:00",
+                "finished_at": "2026-11-13T08:48:24.669387+00:00"
+              },
+              {
+                "skill": "test-condition-design",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:9",
+                "started_at": "2026-11-13T08:48:24.669387+00:00",
+                "finished_at": "2026-11-13T08:48:25.530382+00:00"
+              },
+              {
+                "skill": "question-analysis",
+                "run_ref": "candidate-interrupted_resume-2:skill-run:10",
+                "started_at": "2026-11-13T08:48:25.530382+00:00",
+                "finished_at": "2026-11-13T08:50:58.632294+00:00"
+              }
+            ],
+            "owner_artifacts": [
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-interrupted_resume-2/session1.jsonl",
+                "revision": "log"
+              },
+              {
+                "owner": "agent-session",
+                "artifact_ref": "trials/candidate-interrupted_resume-2/session2.jsonl",
+                "revision": "log"
+              }
+            ],
+            "attempt_refs": [
+              "trials/candidate-interrupted_resume-2/session1.jsonl",
+              "trials/candidate-interrupted_resume-2/session2.jsonl"
+            ],
+            "runner_refs": [],
+            "cleanup_refs": [],
+            "interruption_ref": "trials/candidate-interrupted_resume-2/session1.jsonl"
+          }
+        }
+      ]
+    }
+  ]
+}

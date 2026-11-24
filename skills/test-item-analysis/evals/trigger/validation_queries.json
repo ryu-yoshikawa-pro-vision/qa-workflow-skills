@@ -1,0 +1,22 @@
+[
+  {
+    "query": "APIエンドポイント、バッチジョブ、イベントconsumerを別々のテストアイテム候補として安定IDと共通feature refsで管理したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "テストアイテム階層に循環がないか、複数機能への参照と旧source revisionの影響を調べてください。",
+    "should_trigger": true
+  },
+  {
+    "query": "既存ITEMの名前が変わった場合にIDを維持するか、意味が分割された場合に新IDを採番するか履歴へ残したい。",
+    "should_trigger": true
+  },
+  {
+    "query": "未実装の画面と予定中のAPIをテスト対象一覧へ追加し、機能インベントリの不足も示してください。",
+    "should_trigger": true
+  },
+  { "query": "境界値、権限、状態遷移の共通条件候補を、正式TCNから独立して識別してください。", "should_trigger": false },
+  { "query": "画面の期待動作とアクセス制御を仕様Authorityとして記録してください。", "should_trigger": false },
+  { "query": "既存のテストケースIDと手順、具体的な期待結果を作成してください。", "should_trigger": false },
+  { "query": "登録済みのテストを実行し、結果とcleanupを確定してください。", "should_trigger": false }
+]

@@ -3,6 +3,7 @@ from __future__ import annotations
 from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     MULTI_USE_SKILL_TARGETS,
+    WORKFLOW_VERIFIED_SKILLS,
     add_allowed_assertion,
     add_duplicate_assertion,
     clean,
@@ -123,11 +124,16 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     in_progress = [
         clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "実行中"
     ]
+    # 未開始の行は「要求されず未実行」か「要求されたが未実行」かを表せないため、
+    # 完了時に残すと必須工程の省略を見逃す。要求外のSkillは「省略」と記録する。
+    not_started = [
+        clean(r.get("Skill", "")) for r in rows if clean(r.get("状態", "")) == "未開始"
+    ]
     result.add(
         "WF-D004",
-        not (overall == "完了" and (blocked or in_progress)),
-        "ブロック中または実行中が残る場合はワークフローを完了にできないこと",
-        evidence=blocked + in_progress or None,
+        not (overall == "完了" and (blocked or in_progress or not_started)),
+        "ブロック中・実行中・未開始の行が残る場合はワークフローを完了にできないこと",
+        evidence=blocked + in_progress + not_started or None,
     )
     result.add(
         "WF-D005",
@@ -328,7 +334,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         runtime_status = clean(row.get("Runtime Status", ""))
         required = clean(row.get("Runtime Required", ""))
         deterministic = clean(row.get("Deterministic Generated", ""))
-        if key[0] not in CANONICAL_SKILLS or not key[1]:
+        if key[0] not in WORKFLOW_VERIFIED_SKILLS or not key[1]:
             runtime_issues.append({"row": key, "reason": "identity"})
         if (
             support not in SUPPORT_STATUSES

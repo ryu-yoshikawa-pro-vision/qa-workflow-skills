@@ -75,6 +75,7 @@ class MigrationPreflightTests(unittest.TestCase):
         value["v2_baseline"] = {
             "qa_workflow_verification_valid": True,
             "qa_workflow_can_complete": True,
+            "qa_workflow_scope_set_declared": True,
         }
         with self.assertRaises(InvalidInput):
             evaluate(value)
@@ -108,6 +109,7 @@ class MigrationPreflightTests(unittest.TestCase):
         value["v2_baseline"] = {
             "qa_workflow_verification_valid": True,
             "qa_workflow_can_complete": True,
+            "qa_workflow_scope_set_declared": True,
         }
         self.assertEqual(
             evaluate(value)["migration_status"], "ui_target_migration_required"
@@ -119,6 +121,7 @@ class MigrationPreflightTests(unittest.TestCase):
         value["v2_baseline"] = {
             "qa_workflow_verification_valid": True,
             "qa_workflow_can_complete": True,
+            "qa_workflow_scope_set_declared": True,
         }
         value["ui_target_package"] = {
             "present": True,
@@ -146,6 +149,7 @@ class MigrationPreflightTests(unittest.TestCase):
         value["v2_baseline"] = {
             "qa_workflow_verification_valid": True,
             "qa_workflow_can_complete": True,
+            "qa_workflow_scope_set_declared": True,
         }
         value["ui_target_package"] = {
             "present": True,
@@ -172,6 +176,7 @@ class MigrationPreflightTests(unittest.TestCase):
         value["v2_baseline"] = {
             "qa_workflow_verification_valid": True,
             "qa_workflow_can_complete": True,
+            "qa_workflow_scope_set_declared": True,
         }
         value["ui_target_package"] = {
             "present": True,
@@ -190,6 +195,47 @@ class MigrationPreflightTests(unittest.TestCase):
         self.assertEqual(
             evaluate(value)["migration_status"], "partial_progression_ready"
         )
+
+
+class MigrationScopeDeclarationTests(unittest.TestCase):
+    def _complete_request(self) -> dict:
+        value = request()
+        value["runtime_inventory"] = inventory(
+            "current_valid", "current_valid", "current_valid"
+        )
+        value["v2_baseline"] = {
+            "qa_workflow_verification_valid": True,
+            "qa_workflow_can_complete": True,
+        }
+        return value
+
+    def test_can_complete_without_declared_scope_set_is_not_a_completed_baseline(
+        self,
+    ) -> None:
+        # 過去契約v1のcan_complete=trueは要求集合が未宣言のため完了扱いしない。
+        result = evaluate(self._complete_request())
+        self.assertEqual(result["migration_status"], "runtime_v2_cutover_required")
+        self.assertEqual(
+            result["cutover_next_action"], {"skill": "qa-workflow", "phase": None}
+        )
+
+    def test_declared_false_scope_set_is_not_a_completed_baseline(self) -> None:
+        value = self._complete_request()
+        value["v2_baseline"]["qa_workflow_scope_set_declared"] = False
+        result = evaluate(value)
+        self.assertEqual(result["migration_status"], "runtime_v2_cutover_required")
+
+    def test_declared_scope_set_completes_the_baseline(self) -> None:
+        value = self._complete_request()
+        value["v2_baseline"]["qa_workflow_scope_set_declared"] = True
+        result = evaluate(value)
+        self.assertEqual(result["migration_status"], "ui_target_migration_required")
+
+    def test_non_boolean_scope_set_declaration_is_rejected(self) -> None:
+        value = self._complete_request()
+        value["v2_baseline"]["qa_workflow_scope_set_declared"] = "yes"
+        with self.assertRaises(InvalidInput):
+            evaluate(value)
 
 
 if __name__ == "__main__":

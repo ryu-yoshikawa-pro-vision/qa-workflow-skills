@@ -1,0 +1,16 @@
+成果物を `cases/TCN-SEM-014/candidate-output.md` に書き込みました。ただし、Skillのruntimeは実行できていません。
+
+**runtimeの状況**
+- Bashが「don't ask」モードで権限拒否され、`condition_structure.py` などのscriptを起動できませんでした。権限を回避する手段は取っていません。
+- 仮に実行できたとしても、入力にはruntimeが要求するcanonical Machine Entity（TR、model、disposition、CI-001 mapping）やtest_conditions／modelsのdraftがなく、推測で補うと機械証拠を創作することになるため、どのみち実行しない判断でした。
+- そのため、runtime結果、materialize結果、最終のruntime evidence gate判定は存在しません。成果物にもその旨を明記し、「契約適合済み・完成済み」とは扱っていません。
+
+**成果物の内容**
+- TR-ORDERS-014をTCN-014へ展開し、coverage itemとしてTCN-014-CI01（target B、CI-001に接続済み）とTCN-014-CI02（target C、未接続）を置きました。
+- target Aは「重複」とし、カバー先をBにしました。SPEC-ORD-014の条件（Bのcurrent mappingとCI-001の`execution_fingerprint`の一致、self reference／cycleなし）は入力記述どおりに満たすと判断しています。
+- 充足状況は2/3 closedで、model completionは未達成としました。
+
+**判断に迷った点**
+- 専用の技法は適用していません。target集合の網羅はcoverage-techniques.mdのどの技法規則にも対応しないため、技法名を付けませんでした。
+- TR-ORDERS-014の優先度とプロダクトリスクは入力にないので未確定のままにしました。
+- 停止条件には該当しないと判断し、ブロック中にはしていません。

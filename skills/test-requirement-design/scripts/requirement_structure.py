@@ -49,6 +49,60 @@ def _refs(value: object, name: str) -> list[str]:
     return sorted(value)
 
 
+def _resolve_test_level_evidence(value: object) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) != {
+        "explicit",
+        "architecture",
+        "default",
+    }:
+        raise InvalidInput("test_level_evidence schemaが不正です")
+    explicit = value["explicit"]
+    architecture = value["architecture"]
+    default = value["default"]
+    if explicit is not None:
+        if not isinstance(explicit, dict) or set(explicit) != {"level", "source_ref"}:
+            raise InvalidInput("explicit test level evidenceが不正です")
+        return {
+            "test_level": ensure_nonempty_string(
+                explicit["level"], "explicit test level"
+            ),
+            "test_level_source": "explicit",
+            "test_level_source_ref": ensure_nonempty_string(
+                explicit["source_ref"], "explicit source_ref"
+            ),
+        }
+    if architecture is not None:
+        if (
+            not isinstance(architecture, dict)
+            or set(architecture) != {"level", "source_ref", "approved"}
+            or not isinstance(architecture["approved"], bool)
+        ):
+            raise InvalidInput("architecture test level evidenceが不正です")
+        if architecture["approved"]:
+            return {
+                "test_level": ensure_nonempty_string(
+                    architecture["level"], "architecture test level"
+                ),
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": ensure_nonempty_string(
+                    architecture["source_ref"], "architecture source_ref"
+                ),
+            }
+    if (
+        not isinstance(default, dict)
+        or set(default) != {"level", "source_ref"}
+        or default["level"] != "system"
+    ):
+        raise InvalidInput("default test levelはsystemである必要があります")
+    return {
+        "test_level": "system",
+        "test_level_source": "default",
+        "test_level_source_ref": ensure_nonempty_string(
+            default["source_ref"], "default source_ref"
+        ),
+    }
+
+
 def _state(rows: object) -> list[dict]:
     result = []
     seen = set()
@@ -131,7 +185,7 @@ def generate(input_value: dict, metadata: dict) -> dict:
         "inactive_tr_history",
         "zero_scope_terminal",
     }
-    reject_unknown(input_value, required, {"legacy_tr_ids"})
+    reject_unknown(input_value, required, {"legacy_tr_ids", "test_level_evidence"})
     authority_ids = set()
     for row in ensure_list(input_value["authorities"], "authorities"):
         if not isinstance(row, dict) or set(row) != {"authority_id"}:
@@ -380,6 +434,36 @@ def generate(input_value: dict, metadata: dict) -> dict:
         ):
             raise InvalidInput("TR priorityが不正です")
         drafts.append(canonicalize(row))
+    if "test_level_evidence" in input_value:
+        evidence_rows = ensure_list(
+            input_value["test_level_evidence"], "test_level_evidence"
+        )
+        evidence_by_key: dict[str, dict[str, str]] = {}
+        for index, row in enumerate(evidence_rows):
+            if not isinstance(row, dict) or set(row) != {"draft_key", "evidence"}:
+                raise InvalidInput(f"test_level_evidence[{index}] schemaが不正です")
+            key = ensure_nonempty_string(
+                row["draft_key"], "test_level_evidence.draft_key"
+            )
+            if key in evidence_by_key:
+                raise InvalidInput("test_level_evidence draft_keyが重複しています")
+            evidence_by_key[key] = _resolve_test_level_evidence(row["evidence"])
+        if set(evidence_by_key) != seen_drafts:
+            raise InvalidInput(
+                "test_level_evidenceとtest_requirementsのdraft_key集合が一致しません"
+            )
+        for draft in drafts:
+            resolved = evidence_by_key[draft["draft_key"]]
+            if draft["test_level"] != resolved["test_level"]:
+                raise InvalidInput(
+                    "TR test_levelが明示指示／approved architecture／既定値の優先解決と一致しません"
+                )
+            draft.update(
+                {
+                    "test_level_source": resolved["test_level_source"],
+                    "test_level_source_ref": resolved["test_level_source_ref"],
+                }
+            )
     if metadata["input_mode"] == "direct":
         referenced_ac_ids = {
             ac_id for draft in drafts for ac_id in draft["acceptance_refs"]
@@ -506,6 +590,9 @@ def generate(input_value: dict, metadata: dict) -> dict:
                 "observation_method",
             )
         }
+        for field in ("test_level_source", "test_level_source_ref"):
+            if field in draft:
+                content[field] = draft[field]
         ref_identities = [
             ("spec-analysis", "authority", ref)
             for ref in draft["authority_refs"]

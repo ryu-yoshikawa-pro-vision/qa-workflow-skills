@@ -11,6 +11,57 @@ _SECRET = re.compile(
 )
 
 
+def _is_ref(value: Any) -> bool:
+    """Same rule as exploratory_runtime._is_ref: a non-empty string."""
+    return isinstance(value, str) and bool(value)
+
+
+def _ref_list(value: Any) -> bool:
+    """Same rule as exploratory_runtime._ref_list: a non-empty list of refs."""
+    return isinstance(value, list) and bool(value) and all(_is_ref(v) for v in value)
+
+
+def _text(value: Any) -> bool:
+    """Same rule as exploratory_runtime._text: a non-blank string."""
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _text_list(value: Any) -> bool:
+    """Same rule as exploratory_runtime._text_list: a non-empty list of non-blank text."""
+    return isinstance(value, list) and bool(value) and all(_text(v) for v in value)
+
+
+def _usable_origin(value: Any) -> bool:
+    """Same rule as exploratory_runtime.validate_charter: a non-blank string."""
+    return isinstance(value, str) and bool(value.strip())
+
+
+# Keep in step with exploratory_runtime.INVESTIGATION_ORIGIN_KEYS. The validator
+# does not import the runtime so the Skill stays isolated when it is packaged.
+_ORIGIN_KEYS = (
+    "symptom_ref",
+    "hypothesis_ref",
+    "unresolved_finding_ref",
+    "symptom",
+    "hypothesis",
+)
+# Starting an exploration needs the keys, not their contents: a Charter may have no
+# source yet (the Finding hand-off is what needs a source), no focus, nothing more
+# to exclude and no extra block condition (origin / operation / side-effect / cleanup
+# safety are separate required fields); a read-only exploration has no side effect
+# operations. in_scope is the fixed target and must not be empty. Same as
+# exploratory_runtime.validate_charter.
+_MAY_BE_EMPTY_LIST = {
+    "source_refs",
+    "focus_refs",
+    "side_effect_operations",
+    "out_of_scope",
+    "block_conditions",
+}
+_MODES = {"exploration", "investigation"}
+_STATES = {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
+
+
 def _document(text: str) -> tuple[dict[str, Any] | None, list[str]]:
     matches = re.findall(
         r"```json\s*\n(.*?)\n```", text, flags=re.DOTALL | re.IGNORECASE
@@ -39,12 +90,20 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     )
     if doc is None:
         return result
+    # Any JSON value can appear in a graded output: a wrong type is a failed check,
+    # never an exception in the evaluator.
     charter = doc.get("charter", {})
+    if not isinstance(charter, dict):
+        charter = {}
+    mode = doc.get("mode")
+    state = doc.get("state")
+    in_scope = charter.get("in_scope")
     required = {
         "purpose",
         "in_scope",
         "out_of_scope",
         "source_refs",
+        "focus_refs",
         "timebox_or_exit_condition",
         "allowed_origins",
         "allowed_operations",
@@ -62,60 +121,73 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         if key not in charter
         or charter[key] is None
         or charter[key] == ""
-        or (key != "side_effect_operations" and charter[key] == [])
+        or (key not in _MAY_BE_EMPTY_LIST and charter[key] == [])
     )
+    if "in_scope" not in missing and not _text_list(in_scope):
+        missing = sorted([*missing, "in_scope"])
     result.add(
         "EXP-D002",
-        doc.get("mode") in {"exploration", "investigation"} and not missing,
+        isinstance(mode, str) and mode in _MODES and not missing,
         "modeとCharter必須項目が揃うこと",
-        evidence={"mode": doc.get("mode"), "missing": missing},
+        evidence={"mode": mode if isinstance(mode, str) else None, "missing": missing},
     )
-    inv_ok = doc.get("mode") != "investigation" or bool(
-        charter.get("symptom_ref")
-        or charter.get("hypothesis_ref")
-        or charter.get("symptom")
-        or charter.get("hypothesis")
+    inv_ok = mode != "investigation" or any(
+        _usable_origin(charter.get(key)) for key in _ORIGIN_KEYS
     )
     result.add(
-        "EXP-D003", inv_ok, "investigationはsymptomまたはhypothesisを起点にすること"
+        "EXP-D003",
+        inv_ok,
+        "investigationはsymptom・hypothesis・unresolved Findingのいずれかを起点にすること",
     )
     observations, findings = doc.get("observations"), doc.get("findings")
     separated = isinstance(observations, list) and isinstance(findings, list)
-    obs_refs = (
-        [item.get("observation_ref") for item in observations if isinstance(item, dict)]
-        if isinstance(observations, list)
-        else []
-    )
-    finding_refs = (
-        [item.get("finding_ref") for item in findings if isinstance(item, dict)]
-        if isinstance(findings, list)
-        else []
-    )
+    observations = observations if isinstance(observations, list) else []
+    findings = findings if isinstance(findings, list) else []
+    # Refs are compared only after they are known to be non-empty strings.
+    obs_refs = [
+        item.get("observation_ref") for item in observations if isinstance(item, dict)
+    ]
+    finding_refs = [
+        item.get("finding_ref") for item in findings if isinstance(item, dict)
+    ]
     refs_valid = (
-        len(obs_refs) == len(set(obs_refs))
+        len(obs_refs) == len(observations)
+        and len(finding_refs) == len(findings)
+        and all(_is_ref(ref) for ref in obs_refs)
+        and all(_is_ref(ref) for ref in finding_refs)
+        and len(obs_refs) == len(set(obs_refs))
         and len(finding_refs) == len(set(finding_refs))
-        and all(obs_refs)
-        and all(finding_refs)
     )
-    obs_set = set(obs_refs)
+    obs_set = {ref for ref in obs_refs if _is_ref(ref)}
+    observation_evidence = all(
+        isinstance(item, dict)
+        and _ref_list(item.get("evidence_refs"))
+        and _text(item.get("observed_fact"))
+        and _text(item.get("action_or_observation"))
+        for item in observations
+    )
     finding_links = all(
-        set(item.get("source_observation_refs", [])) <= obs_set
-        and item.get("evidence_refs")
-        and item.get("follow_up_reason")
+        isinstance(item, dict)
+        and _ref_list(item.get("source_observation_refs"))
+        and set(item["source_observation_refs"]) <= obs_set
+        and _ref_list(item.get("evidence_refs"))
+        and bool(item.get("follow_up_reason"))
+        and _is_ref(item.get("recommended_routing"))
         for item in findings
-        if isinstance(item, dict)
     )
     result.add(
         "EXP-D004",
-        separated and refs_valid and finding_links,
+        separated and refs_valid and observation_evidence and finding_links,
         "Observation / Findingを分離し、unique ref・evidence・source / follow-upを閉じること",
     )
     cleanup = doc.get("cleanup", {})
-    complete = doc.get("state") != "完了" or (
+    if not isinstance(cleanup, dict):
+        cleanup = {}
+    complete = state != "完了" or (
         not cleanup.get("required")
-        or cleanup.get("status") in {"成功", "意図的に残した状態"}
+        or cleanup.get("status") in ("成功", "意図的に残した状態")
     )
-    if doc.get("state") == "完了" and doc.get("residual_side_effect"):
+    if state == "完了" and doc.get("residual_side_effect"):
         complete = (
             complete
             and cleanup.get("status") == "意図的に残した状態"
@@ -123,9 +195,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
         )
     result.add(
         "EXP-D005",
-        doc.get("state")
-        in {"未開始", "実行中", "部分完了（ブロック中あり）", "ブロック中", "完了"}
-        and complete,
+        isinstance(state, str) and state in _STATES and complete,
         "required cleanupが未確認 / 失敗なら安全完了にしないこと",
     )
     result.add(
@@ -142,7 +212,7 @@ def validate(text: str, expected: dict[str, Any], eval_id: str) -> EvalResult:
     )
     result.add(
         "EXP-D008",
-        not expected.get("requires_blocked", False) or doc.get("state") == "ブロック中",
+        not expected.get("requires_blocked", False) or state == "ブロック中",
         "fixtureのunsafe / unavailable条件をblockすること",
     )
     return result

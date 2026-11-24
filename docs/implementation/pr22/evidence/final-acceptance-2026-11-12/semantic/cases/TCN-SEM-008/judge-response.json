@@ -1,0 +1,59 @@
+{
+  "criteria": [
+    {
+      "id": "SEM-TCN-001",
+      "evaluable": true,
+      "rating": 2,
+      "reason": "Eval Inputのfactor、制約、strength（全factor pairwise、subset {browser, os, auth} の3-wise）は手計算まで展開されているが、Test Conditionへの展開やcoverage itemの生成には至っていない。Referenceは制約適用後のstrengthごとのfeasible tupleを計算してchild modelへ渡すことを求めているが、候補は実行を保留している。保留理由のうち、coverage_selection_reason、class key、model keyの未提示は、Eval Inputに対応する要求がないため根拠として確定できない。実質的な不足としてHuman Reviewが必要。",
+      "evidence": [
+        "全factor pairwise（16ペア）| 入力の factor 値 | ブロック中 | 16ペアはいずれも制約を単独では満たさないことを手計算で確認しました。",
+        "subset `{browser, os, auth}` の3-wise（制約適用後11 tuple）| 入力の factor 値と制約 | ブロック中 | 全直積12件から成立不能1件を除いた11件が母集団の見込みです。",
+        "## 状態\n\nブロック中。Classification Tree adapterから既存combinatorial child `comb-008` へ展開する正式なruntime結果は作成していません。カバレッジ項目、TCN、Machine Entityは確定していません。",
+        "1. `coverage_selection_reason` が未提示です。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-002",
+      "evaluable": true,
+      "rating": 4,
+      "reason": "全factor pairwiseと、subset {browser, os, auth}の3-wiseという組合せ技法の選択はEval Inputおよびこの問題構造（分類木factorの組合せ）に合っている。制約 Firefox + macOS + SAML を制約として保持し、カバレッジ項目に含めていない点も適切。製品技法の誤付与は見られない。実runtimeは未実行だが、技法選択そのものの誤りはない。",
+      "evidence": [
+        "- 採用基準（入力の指定どおり）: 全factorに対するstrength 2、およびsubset `{browser, os, auth}` に対するstrength 3。",
+        "| Firefox + macOS + SAML | SPEC-CTD-008 | 成立不能 | Authority `SPEC-CTD-008` により成立しないと入力で指定されています。制約として保持し、実行可能なカバレッジ項目には含めません。 | なし |"
+      ]
+    },
+    {
+      "id": "SEM-TCN-003",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "Coverage Criteriaとして、制約を除外した全factor 2-wiseと、subset {browser, os, auth} の3-wiseが明示されており、Eval Inputの方針と意味的に一致する。ただし候補は採用基準を提示するにとどまり、充足判定（成立可能な値ペアが実際にカバーされたか）は未確認としている。criteriaの定義自体は十分だが、充足の確定はされていない。軽微な改善余地として扱う。",
+      "evidence": [
+        "- 制約: `Firefox + macOS + SAML` を除外",
+        "- 採用基準（入力の指定どおり）: 全factorに対するstrength 2、およびsubset `{browser, os, auth}` に対するstrength 3。",
+        "- 成立可能なすべての値ペアをカバレッジ項目でカバー済みか: 未確認"
+      ]
+    },
+    {
+      "id": "SEM-TCN-004",
+      "evaluable": true,
+      "rating": 1,
+      "reason": "Coverage Itemが1件も生成されていない（「該当なし」）。Referenceは制約適用後のfeasible tupleをstrengthごとに計算して採番済みchild modelへ渡すことを求めており、組合せカバレッジの中核成果物が欠落している。候補はブロック理由を挙げるが、それらはEval Inputに対応する根拠がなく、coverage itemが代表・具体化されているとは判断できない。重大な欠落。",
+      "evidence": [
+        "## カバレッジ項目一覧\n\n該当なし（child runtimeを実行していないため、確定したカバレッジ項目はありません）。",
+        "### 生成組合せ\n\n該当なし（runtime child未実行のため）。",
+        "上記1〜3が解消されるまで、child生成、カバレッジ項目、TCN、materializationを保留します。"
+      ]
+    },
+    {
+      "id": "SEM-TCN-005",
+      "evaluable": true,
+      "rating": 3,
+      "reason": "候補は同一の条件やcoverage itemを重複させていない。ただし具体的なcoverage itemを一切生成していないため、冗長性抑制は実質的な検証なしに成立しているにすぎない。重複がないことは確認できるが、抑制の具体的な働きは示されていない。",
+      "evidence": [
+        "| 全factor pairwise（16ペア） | 入力の factor 値 | ブロック中 | ... | なし |",
+        "| subset `{browser, os, auth}` の3-wise（制約適用後11 tuple） | 入力の factor 値と制約 | ブロック中 | ... | なし |",
+        "### 生成組合せ\n\n該当なし（runtime child未実行のため）。"
+      ]
+    }
+  ]
+}

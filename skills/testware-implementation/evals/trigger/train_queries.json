@@ -1,0 +1,50 @@
+[
+  {
+    "query": "確認済みTCに沿ってVitestコンポーネントテストとfixtureを追加してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "API-only Playwright Testをrepoに実装し、軽量検証だけ行ってください。",
+    "should_trigger": true
+  },
+  {
+    "query": "既存バッチ処理のユニットテストをtestwareとして更新してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "テストコードを隔離worktreeで生成し、競合を確認して反映してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "非機能の閾値が定まっている対象を測定する自動testwareを実装してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "イベント処理の既存テストとfixtureを修正してください。",
+    "should_trigger": true
+  },
+  {
+    "query": "既存Vitestを本番に実行し結果を教えて。",
+    "should_trigger": false
+  },
+  {
+    "query": "Playwrightで画面のE2Eを作成してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "手動TCに従いブラウザを操作してください。",
+    "should_trigger": false
+  },
+  {
+    "query": "プロダクト要求書を静的レビューしてください。",
+    "should_trigger": false
+  },
+  {
+    "query": "実行ログから欠陥候補を追跡して。",
+    "should_trigger": false
+  },
+  {
+    "query": "非E2E runnerの失敗原因を分析してください。",
+    "should_trigger": false
+  }
+]

@@ -1,5 +1,7 @@
 [
   { "query": "既存ケースがProduct Riskを十分カバーしているか追跡分析して。", "should_trigger": false },
+  { "query": "どの業務経路をE2E自動化する価値があるか選定して。", "should_trigger": false },
+  { "query": "今回の認証変更に対するProduct Riskと優先すべき回帰テストを整理して。", "should_trigger": true },
   { "query": "新しい権限機能の影響範囲とリスクを見て、テストの深さと優先度を決めたい。", "should_trigger": true },
   { "query": "この変更で何を重点的にテストすべきか、Product Riskを評価して整理してください。", "should_trigger": true },
   { "query": "この機能はシステムテストでどこまで見るべきか、観測方法も含めて分析して。", "should_trigger": true },

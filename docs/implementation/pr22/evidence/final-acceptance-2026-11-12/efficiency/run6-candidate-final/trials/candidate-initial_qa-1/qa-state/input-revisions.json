@@ -1,0 +1,16 @@
+{
+  "revisions": {
+    "product/docs/01_requirements/functional_requirements.md": "e6b5cd9a685c70e5296683cb386d0eb15c21d662e8fef1907e209d1851e0fe9b",
+    "product/docs/03_domain/business_rules.md": "8fe29aa8a481408bfb5aa05665e283a4af45ac54ec2c16856697bd48342f3735",
+    "product/docs/12_quality/acceptance_criteria.md": "cb057739f87894749eab42eb3102afa6c749456e3837c290ab3d393981537343",
+    "product/docs/spec/README.md": "c63c81266b8c131a78d5a4048231e7c6dafceb433802bc18f0164903e220c854",
+    "product/docs/spec/features/cart.md": "385777e56a0d1c7ff52a187d9654a4343c74f88634c1f9b04411eaec897c7216",
+    "product/docs/spec/features/checkout-and-payment.md": "9877302a255eb33e23a0651963930978543f4511a9457ca053e08df8ab859c76",
+    "product/docs/spec/features/storefront.md": "3f77926ad16369ea5091672cf1c165ddf2f7f7f12f01512596d1e2a907c58c4a",
+    "product/docs/spec/roles-and-permissions.md": "519731749c55d9e01602017f9041d7ac9cc7e94e9ea0f86f16fd003dff12224e",
+    "product/docs/spec/screen-catalog.md": "8f30822b3adbfa839334119250051e5179c6a92c2cdba86e931f33afb21fdeb3",
+    "product/docs/spec/state-and-scenarios.md": "ccd0cab4b0bd156ea611c0bfad331b16f023d49acec4d95118d7fab70b8b4b90"
+  },
+  "root": "<scratchpad>/eff8/workspaces/candidate-initial_qa-1",
+  "schema_version": "input-revision-v1"
+}

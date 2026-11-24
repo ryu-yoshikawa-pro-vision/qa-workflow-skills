@@ -35,7 +35,14 @@ def metadata() -> dict:
         "selection_key": None,
         "scope_key": None,
         "input_mode": "direct",
-        "upstream_entities": [],
+        "upstream_entities": [
+            {
+                "skill": "spec-analysis",
+                "entity_type": "authority",
+                "entity_ref": "SPEC-001",
+                "content": {"title": "Checkout contract"},
+            }
+        ],
         "upstream_runtime_units": [],
         "static_data_versions": {},
         "authority_refs": [],
@@ -142,6 +149,108 @@ def valid_input() -> dict:
 
 
 class CaseStructureRuntimeTests(unittest.TestCase):
+    def test_case_expected_result_matches_current_formal_candidate(self) -> None:
+        value = valid_input()
+        candidates = [
+            {
+                "candidate_ref": "ER-001",
+                "text": "注文状態が確定済みになる",
+                "authority_refs": ["SPEC-001"],
+                "observation_method": "current order readback",
+                "side_effects": "在庫確保イベントを1件発行",
+                "revision": "fd1.1",
+            },
+            {
+                "candidate_ref": "ER-002",
+                "text": "注文状態が保留になる",
+                "authority_refs": ["SPEC-001"],
+                "observation_method": "current order readback",
+                "side_effects": "在庫確保イベントを発行しない",
+                "revision": "fd1.1",
+            },
+        ]
+        value["test_conditions"][0].update(
+            {
+                "item_ref": "TI-001",
+                "condition_ref": "COND-001",
+                "formal_design_ref": "FD-001",
+                "formal_design_revision": 1,
+                "expected_result_candidate_refs": ["ER-001", "ER-002"],
+                "expected_result_candidates": candidates,
+                "test_level": "integration",
+                "test_level_source": "approved_architecture",
+                "test_level_source_ref": "ARCH-001",
+            }
+        )
+        value["test_cases"][0]["expected_results"] = [
+            {
+                "number": 1,
+                "text": "注文状態が確定済みになる",
+                "authority_refs": ["SPEC-001"],
+                "candidate_ref": "ER-001",
+                "observation_method": "current order readback",
+                "side_effects": "在庫確保イベントを1件発行",
+                "candidate_revision": "fd1.1",
+            }
+        ]
+        result = run(value)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertEqual(result["result_status"], "ready", result)
+        tc = next(
+            row for row in result["payload"]["entities"] if row["entity_type"] == "tc"
+        )
+        self.assertEqual(
+            tc["content"]["expected_results"][0]["candidate_ref"], "ER-001"
+        )
+
+        value["test_cases"][0]["expected_results"][0]["side_effects"] = "副作用なし"
+        mismatched = run(value)
+        self.assertEqual(mismatched["runtime_status"], "invalid_input", mismatched)
+
+    def test_formal_candidate_refs_require_candidate_payloads(self) -> None:
+        value = valid_input()
+        value["test_conditions"][0].update(
+            {
+                "item_ref": "TI-001",
+                "condition_ref": "COND-001",
+                "formal_design_ref": "FD-001",
+                "formal_design_revision": 1,
+                "expected_result_candidate_refs": ["ER-001"],
+                "test_level": "system",
+                "test_level_source": "default",
+                "test_level_source_ref": "default-policy",
+            }
+        )
+        value["test_cases"][0]["expected_results"] = [
+            {
+                "number": 1,
+                "text": "result one",
+                "authority_refs": ["SPEC-001"],
+                "candidate_ref": "ER-001",
+                "observation_method": "readback",
+                "side_effects": "none",
+                "candidate_revision": "fd1.1",
+            }
+        ]
+
+        result = run(value)
+
+        self.assertEqual(result["runtime_status"], "invalid_input", result)
+        self.assertIn("candidate本文", result["issues"][0]["message"])
+
+    def test_expected_result_requires_current_authority(self) -> None:
+        no_authority = valid_input()
+        no_authority["test_cases"][0]["expected_results"][0]["authority_refs"] = []
+        result = run(no_authority)
+        self.assertEqual(result["runtime_status"], "invalid_input")
+
+        unknown_authority = valid_input()
+        unknown_authority["test_cases"][0]["expected_results"][0]["authority_refs"] = [
+            "SPEC-UNKNOWN"
+        ]
+        result = run(unknown_authority)
+        self.assertEqual(result["runtime_status"], "invalid_input")
+
     def test_case_scope_is_derived_from_tcn_and_ci_and_inactive_id_reactivates(
         self,
     ) -> None:

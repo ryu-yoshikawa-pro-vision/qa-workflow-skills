@@ -1,0 +1,21 @@
+{
+  "skill": "project-context",
+  "cases": [
+    {
+      "id": "PC-SEM-001",
+      "input": "cases/pc-sem-001/input.md",
+      "reference": "cases/pc-sem-001/reference.md",
+      "criteria": [
+        "PC-SEM-001"
+      ]
+    },
+    {
+      "id": "PC-SEM-002",
+      "input": "cases/pc-sem-002/input.md",
+      "reference": "cases/pc-sem-002/reference.md",
+      "criteria": [
+        "PC-SEM-002"
+      ]
+    }
+  ]
+}

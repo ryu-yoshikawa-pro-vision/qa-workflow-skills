@@ -290,6 +290,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         evidence=testability_mismatch,
     )
 
+    # Retain read/validation compatibility for legacy test-analysis selections.
     selection_table = find_table(
         tables,
         section_contains="E2E対象選定",
@@ -301,7 +302,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
     result.add(
         "RISK-D016",
         not selection_requested or selection_table is not None,
-        "E2E対象選定時に自動化目的・候補範囲・技術非依存の判断基準 / 根拠が存在すること",
+        "legacy E2E対象選定時に既存テーブルを保持すること",
         evidence={"missing_table": "E2E対象選定"}
         if selection_requested and selection_table is None
         else None,
@@ -317,7 +318,7 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
         result.add(
             "RISK-D017",
             bool(selection_rows) and not missing_selection,
-            "E2E対象選定に自動化目的・候補範囲・技術非依存の判断基準 / 根拠を持つ有効行があること",
+            "legacy E2E対象選定が技術非依存の必須fieldを保つこと",
             evidence={
                 "missing_rows": not selection_rows,
                 "invalid_rows": missing_selection,
@@ -325,4 +326,5 @@ def validate(text: str, expected: dict, eval_id: str) -> EvalResult:
             if not selection_rows or missing_selection
             else None,
         )
+
     return result

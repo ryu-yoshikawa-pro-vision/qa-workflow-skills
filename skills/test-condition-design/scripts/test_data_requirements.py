@@ -13,7 +13,6 @@ from runtime_contract import (
     UnsupportedInput,
     canonical_json_text,
     canonicalize,
-    compare_versions,
     constraint_intersection_compatible,
     ensure_key,
     ensure_list,
@@ -26,6 +25,7 @@ from runtime_contract import (
     typed_value,
     typed_value_compare,
     validate_upstream_entities,
+    validate_version_range,
 )
 
 SKILL = "test-condition-design"
@@ -156,12 +156,7 @@ def _normalize(
             row.get("minimum_inclusive"),
             row.get("maximum_inclusive"),
         )
-        if (
-            not isinstance(normalized["minimum_inclusive"], bool)
-            or not isinstance(normalized["maximum_inclusive"], bool)
-            or compare_versions(normalized["minimum"], normalized["maximum"]) > 0
-        ):
-            raise InvalidInput("test-data version rangeが不正です")
+        validate_version_range(normalized, "test-data version range")
     else:
         if not isinstance(row.get("value"), bool):
             raise InvalidInput("test-data booleanが不正です")

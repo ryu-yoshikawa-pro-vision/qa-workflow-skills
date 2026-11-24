@@ -1,0 +1,17 @@
+[
+  { "query": "QA要求と重要品質特性を、component/API/systemの検証分担に割り当ててください。", "should_trigger": true },
+  {
+    "query": "明示されたAPI levelと承認済みsystem architectureが競合します。優先を整理したい。",
+    "should_trigger": true
+  },
+  { "query": "API、batch、非UI機能を含めた全体テスト方式と環境を設計してください。", "should_trigger": true },
+  { "query": "非機能品質特性の測定方法、必要環境、データ、制約をarchitectureへ反映したい。", "should_trigger": true },
+  { "query": "複数テストlevelの責務と、既存testwareの検証分担を整理してください。", "should_trigger": true },
+  { "query": "環境変更で影響するテスト方式だけ再評価し、current成果物を維持してください。", "should_trigger": true },
+  { "query": "stakeholderからのQA目的と品質目標を文書化してください。", "should_trigger": false },
+  { "query": "仕様変更からProduct Riskと設計深度を評価してください。", "should_trigger": false },
+  { "query": "有効な仕様から正式TR、TCN、CI、TCを順に作成してください。", "should_trigger": false },
+  { "query": "E2E自動化するべき画面を価値と保守性で選定してください。", "should_trigger": false },
+  { "query": "Regression対象のTCを選び、今回のRun scopeを作ってください。", "should_trigger": false },
+  { "query": "workflow stateの停止・再開を記録し、依存Skillをroutingしてください。", "should_trigger": false }
+]

@@ -6,6 +6,7 @@ from scripts.skills.evals.deterministic.common import (
     CANONICAL_SKILLS,
     ID_PATTERNS,
     MULTI_USE_SKILL_TARGETS,
+    RUNTIME_UNIT_SKILLS,
     add_allowed_assertion,
     add_duplicate_assertion,
     add_required_fields_assertion,
@@ -18,7 +19,7 @@ from scripts.skills.evals.deterministic.result import EvalResult
 CLASSIFICATIONS = {"ブロッカー", "要確認", "仮定可能", "提案・任意"}
 NORMALIZATIONS = {"SPEC", "DECISION", "ASM", "未確定"}
 ASSUMPTION_STATES = {"提案", "承認済み", "撤回", "置換済み"}
-RUNTIME_SKILLS = CANONICAL_SKILLS
+RUNTIME_SKILLS = RUNTIME_UNIT_SKILLS
 RUNTIME_STATUSES = {
     "ok",
     "invalid_input",

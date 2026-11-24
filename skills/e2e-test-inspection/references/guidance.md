@@ -2,7 +2,7 @@
 
 ## 入力と対象決定
 
-必須入力は、対象repo / workspaceと、詳細TC、明示E2E対象、既存E2E実装参照のいずれかです。未指定で具体対象を決める場合は、利用可能な`test-analysis`（対象: `E2E対象選定`）とTCの追跡を照合します。候補を機械的に全採用せず、既存E2E重複、データ準備、外部依存、不可逆操作を確認します。
+必須入力は、対象repo / workspaceと、詳細TC、明示E2E対象、既存E2E実装参照のいずれかです。未指定で具体対象を決める場合は、`e2e-test-selection`の選定結果（`E2ESEL-xxx`とrevision）を使います。選定結果は`skills/e2e-test-selection/scripts/selection_contract.py`の`inspection_handoff()`で検証し、`usable=true`のとき、そのtargetsにある`selected`の候補だけを対象にします。対象決定の決定根拠へ選定refとrevision（例：`E2ESEL-004@2`）と候補IDを記録します。`deferred`・`not_selected`・`blocked`の候補は実装対象にしません。選定がstaleまたはsource不明、母集団不完全、blockerありで`usable=false`なら、その選定を根拠に実装対象とせず、該当対象を`ブロック中`または`要再判断`にして`e2e-test-selection`へ戻します。旧`test-analysis`（対象: `E2E対象選定`）の成果物は既存記録として読み取れますが、新規の選定には使いません。TC直接指定、既存E2Eの実行、有効な既存選定がある場合は、選定を再実行しません。いずれの場合も、候補を機械的に全採用せず、既存E2E重複、データ準備、外部依存、不可逆操作を確認します。
 
 TCが存在しない対象では、対象説明・既存test file / title path・仕様根拠で識別します。存在しないTC IDを作りません。
 

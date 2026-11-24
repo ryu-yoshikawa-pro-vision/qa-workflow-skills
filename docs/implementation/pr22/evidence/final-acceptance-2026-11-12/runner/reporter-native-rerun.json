@@ -1,0 +1,96 @@
+{
+  "numFailedTestSuites": 0,
+  "numFailedTests": 0,
+  "numPassedTestSuites": 1,
+  "numPassedTests": 4,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 4,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1794484802567,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 395,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen recovers from an initial load error after retry",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "recovers from an initial load error after retry"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 195,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen disables every cart mutation button while one mutation is pending",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 10,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "disables every cart mutation button while one mutation is pending"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 17,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen disables quantity increase and preserves the quantity at the maximum",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "disables quantity increase and preserves the quantity at the maximum"
+        },
+        {
+          "ancestorTitles": ["NativeCartScreen"],
+          "duration": 15,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "NativeCartScreen exposes a hydration boundary, badge count, and stable product variant IDs",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "exposes a hydration boundary, badge count, and stable product variant IDs"
+        }
+      ],
+      "endTime": 1794484804309,
+      "message": "",
+      "name": "<scratchpad>/qts/tests/component/native/native-cart-screen.test.tsx",
+      "startTime": 1794484802846,
+      "status": "passed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}

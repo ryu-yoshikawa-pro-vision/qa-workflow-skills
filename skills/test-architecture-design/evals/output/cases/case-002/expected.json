@@ -1,0 +1,6 @@
+{
+  "known_sources": ["REQUEST-UNKNOWN@unknown", "ARCH-OLD@rev-1"],
+  "expected_levels": {
+    "billing.authorization": ["未確定"]
+  }
+}

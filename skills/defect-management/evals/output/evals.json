@@ -1,0 +1,41 @@
+{
+  "skill": "defect-management",
+  "canonical_output": true,
+  "cases": [
+    {
+      "id": "DEF-OUT-001",
+      "input": "cases/def-out-001/input.md",
+      "expected": "cases/def-out-001/expected.json"
+    },
+    {
+      "id": "DEF-OUT-002",
+      "input": "cases/def-out-002/input.md",
+      "expected": "cases/def-out-002/expected.json"
+    },
+    {
+      "id": "DEF-OUT-003",
+      "input": "cases/def-out-003/input.md",
+      "expected": "cases/def-out-003/expected.json"
+    },
+    {
+      "id": "DEF-OUT-004",
+      "input": "cases/def-out-004/input.md",
+      "expected": "cases/def-out-004/expected.json"
+    },
+    {
+      "id": "DEF-OUT-005",
+      "input": "cases/def-out-005/input.md",
+      "expected": "cases/def-out-005/expected.json"
+    },
+    {
+      "id": "DEF-OUT-006",
+      "input": "cases/def-out-006/input.md",
+      "expected": "cases/def-out-006/expected.json"
+    },
+    {
+      "id": "DEF-OUT-007",
+      "input": "cases/def-out-007/input.md",
+      "expected": "cases/def-out-007/expected.json"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "skill": "test-requirements-analysis",
+  "criteria": [
+    {
+      "id": "SEM-QRA-001",
+      "title": "QA要求と製品要求の分離",
+      "description": "QA活動の目標・品質条件を記述し、製品仕様や個別TRを複製していない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-QRA-002",
+      "title": "根拠とcurrentness",
+      "description": "要求元・source ref・revision・scopeを保持し、未取得／staleをcurrentや対象外と誤認しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-QRA-003",
+      "title": "承認と未決事項",
+      "description": "提案・合意・承認・未回答を区別し、必要な承認証拠と担当／再開条件を保持する。",
+      "critical": true
+    }
+  ]
+}

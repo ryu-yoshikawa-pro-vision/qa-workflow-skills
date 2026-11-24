@@ -166,7 +166,18 @@ def _normalize_tcn(rows: Any) -> dict[str, dict[str, Any]]:
     for index, row in enumerate(ensure_list(rows, "test_conditions")):
         if not isinstance(row, dict):
             raise InvalidInput(f"test_conditions[{index}]が不正です")
-        reject_unknown(row, {"tcn_id", "tr_refs", "priority", "scope_refs"})
+        optional = {
+            "item_ref",
+            "condition_ref",
+            "formal_design_ref",
+            "formal_design_revision",
+            "expected_result_candidate_refs",
+            "expected_result_candidates",
+            "test_level",
+            "test_level_source",
+            "test_level_source_ref",
+        }
+        reject_unknown(row, {"tcn_id", "tr_refs", "priority", "scope_refs"}, optional)
         tcn_id = row["tcn_id"]
         if (
             not isinstance(tcn_id, str)
@@ -174,14 +185,86 @@ def _normalize_tcn(rows: Any) -> dict[str, dict[str, Any]]:
             or tcn_id in result
         ):
             raise InvalidInput("TCN identityが不正または重複しています")
-        result[tcn_id] = canonicalize(
-            {
-                "tcn_id": tcn_id,
-                "tr_refs": _refs(row["tr_refs"], "TCN tr_refs"),
-                "scope_refs": _scope_refs(row["scope_refs"], "TCN scope_refs"),
-                "priority": row["priority"],
-            }
-        )
+        normalized = {
+            "tcn_id": tcn_id,
+            "tr_refs": _refs(row["tr_refs"], "TCN tr_refs"),
+            "scope_refs": _scope_refs(row["scope_refs"], "TCN scope_refs"),
+            "priority": row["priority"],
+        }
+        for field in optional:
+            if field in row:
+                normalized[field] = row[field]
+        if "expected_result_candidate_refs" in normalized:
+            refs = _refs(
+                normalized["expected_result_candidate_refs"],
+                "expected_result_candidate_refs",
+            )
+            if not refs or refs != sorted(refs):
+                raise InvalidInput("expected_result_candidate_refsが不正です")
+            normalized["expected_result_candidate_refs"] = refs
+        if "expected_result_candidate_refs" in normalized and (
+            "expected_result_candidates" not in normalized
+        ):
+            raise InvalidInput(
+                "expected_result_candidate_refsにはcandidate本文が必要です"
+            )
+        if "expected_result_candidates" in normalized:
+            candidates = normalized["expected_result_candidates"]
+            if not isinstance(candidates, list) or not candidates:
+                raise InvalidInput("expected_result_candidatesが不正です")
+            candidate_refs = []
+            normalized_candidates = []
+            for candidate in candidates:
+                if not isinstance(candidate, dict) or set(candidate) != {
+                    "candidate_ref",
+                    "text",
+                    "authority_refs",
+                    "observation_method",
+                    "side_effects",
+                    "revision",
+                }:
+                    raise InvalidInput("expected_result_candidate schemaが不正です")
+                candidate_ref = ensure_nonempty_string(
+                    candidate["candidate_ref"], "candidate_ref"
+                )
+                if (
+                    not re.fullmatch(r"ER-\d{3,}", candidate_ref)
+                    or candidate_ref in candidate_refs
+                ):
+                    raise InvalidInput(
+                        "expected_result_candidate_refが不正または重複です"
+                    )
+                candidate_refs.append(candidate_ref)
+                ensure_nonempty_string(
+                    candidate["text"], "expected result candidate text"
+                )
+                ensure_nonempty_string(
+                    candidate["observation_method"], "observation_method"
+                )
+                ensure_nonempty_string(candidate["side_effects"], "side_effects")
+                ensure_nonempty_string(candidate["revision"], "candidate revision")
+                authority_refs = _refs(
+                    candidate["authority_refs"], "candidate authority_refs"
+                )
+                if not authority_refs:
+                    raise InvalidInput("expected result candidateにAuthorityが必要です")
+                normalized_candidates.append(
+                    canonicalize(
+                        {
+                            **candidate,
+                            "authority_refs": authority_refs,
+                        }
+                    )
+                )
+            if (
+                candidate_refs != sorted(candidate_refs)
+                or normalized.get("expected_result_candidate_refs") != candidate_refs
+            ):
+                raise InvalidInput(
+                    "expected_result_candidatesとcandidate refsが一致しません"
+                )
+            normalized["expected_result_candidates"] = normalized_candidates
+        result[tcn_id] = canonicalize(normalized)
     return result
 
 
@@ -194,8 +277,19 @@ def _normalize_steps(
         if not isinstance(row, dict):
             raise InvalidInput(f"{name}[{index}]が不正です")
         if expected:
-            reject_unknown(row, {"number", "text", "authority_refs"})
+            reject_unknown(
+                row,
+                {"number", "text", "authority_refs"},
+                {
+                    "candidate_ref",
+                    "observation_method",
+                    "side_effects",
+                    "candidate_revision",
+                },
+            )
             refs = _refs(row["authority_refs"], "expected result authority_refs")
+            if not refs:
+                raise InvalidInput("expected resultにcurrent Authority参照が必要です")
         else:
             reject_unknown(row, {"number", "text"})
             refs = None
@@ -208,6 +302,16 @@ def _normalize_steps(
         normalized = {"number": index, "text": row["text"]}
         if refs is not None:
             normalized["authority_refs"] = refs
+            if "candidate_ref" in row:
+                normalized["candidate_ref"] = ensure_nonempty_string(
+                    row["candidate_ref"], "expected result candidate_ref"
+                )
+                for field in (
+                    "observation_method",
+                    "side_effects",
+                    "candidate_revision",
+                ):
+                    normalized[field] = ensure_nonempty_string(row.get(field), field)
         result.append(normalized)
     return result
 
@@ -513,13 +617,29 @@ def generate(input_value: dict, metadata: dict) -> dict:
         )
     for tcn_id, row in tcn_map.items():
         entity = current_tcn_entities.get(tcn_id)
-        if entity is not None and (
-            entity["content"].get("tr_refs") != row["tr_refs"]
-            or entity["content"].get("scope_refs") != row["scope_refs"]
-        ):
-            raise InvalidInput(
-                "test_conditions scope_refsがcurrent TCN Entityと一致しません"
-            )
+        if entity is not None:
+            if (
+                entity["content"].get("tr_refs") != row["tr_refs"]
+                or entity["content"].get("scope_refs") != row["scope_refs"]
+            ):
+                raise InvalidInput(
+                    "test_conditions scope_refsがcurrent TCN Entityと一致しません"
+                )
+            for field in (
+                "item_ref",
+                "condition_ref",
+                "formal_design_ref",
+                "formal_design_revision",
+                "expected_result_candidate_refs",
+                "expected_result_candidates",
+                "test_level",
+                "test_level_source",
+                "test_level_source_ref",
+            ):
+                if entity["content"].get(field) != row.get(field):
+                    raise InvalidInput(
+                        f"test_conditions {field}がcurrent TCN Entityと一致しません"
+                    )
     for ci_id, entity in ci_map.items():
         tcn_id = entity["content"].get("tcn_id")
         if (
@@ -612,6 +732,62 @@ def generate(input_value: dict, metadata: dict) -> dict:
         seen_drafts.add(draft["draft_key"])
         drafts.append(draft)
     drafts.sort(key=lambda row: row["draft_key"])
+    current_authority_refs = {
+        entity["entity_ref"]
+        for entity in current_entities
+        if entity["skill"] == "spec-analysis" and entity["entity_type"] == "authority"
+    }
+    for tcn in tcn_map.values():
+        for candidate in tcn.get("expected_result_candidates", []):
+            if set(candidate["authority_refs"]) - current_authority_refs:
+                raise InvalidInput(
+                    "expected result candidateがcurrent Authority以外を参照しています"
+                )
+    for draft in drafts:
+        candidate_refs = {
+            ref
+            for tcn_ref in draft["tcn_refs"]
+            for ref in tcn_map[tcn_ref].get("expected_result_candidate_refs", [])
+        }
+        for expected in draft["expected_results"]:
+            unknown = set(expected["authority_refs"]) - current_authority_refs
+            if unknown:
+                raise InvalidInput(
+                    "expected resultがcurrent Authority以外を参照しています"
+                )
+            if candidate_refs:
+                if expected.get("candidate_ref") not in candidate_refs:
+                    raise InvalidInput(
+                        "formal TCNのexpected resultはcurrent candidate_refへ接続する必要があります"
+                    )
+                candidate = next(
+                    candidate
+                    for tcn_ref in draft["tcn_refs"]
+                    for candidate in tcn_map[tcn_ref].get(
+                        "expected_result_candidates", []
+                    )
+                    if candidate["candidate_ref"] == expected["candidate_ref"]
+                )
+                actual_candidate = {
+                    "text": expected["text"],
+                    "authority_refs": expected["authority_refs"],
+                    "observation_method": expected.get("observation_method"),
+                    "side_effects": expected.get("side_effects"),
+                    "revision": expected.get("candidate_revision"),
+                }
+                expected_candidate = {
+                    "text": candidate["text"],
+                    "authority_refs": candidate["authority_refs"],
+                    "observation_method": candidate["observation_method"],
+                    "side_effects": candidate["side_effects"],
+                    "revision": candidate["revision"],
+                }
+                if actual_candidate != expected_candidate:
+                    raise InvalidInput(
+                        "TC expected resultがcurrent expected-result candidateと不一致です"
+                    )
+            elif "candidate_ref" in expected:
+                raise InvalidInput("candidate_refを参照するformal TCNがありません")
     if zero_scope_terminal and (
         tcn_map
         or ci_map

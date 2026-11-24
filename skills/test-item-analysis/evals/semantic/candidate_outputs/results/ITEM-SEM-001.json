@@ -1,0 +1,72 @@
+{
+  "skill": "test-item-analysis",
+  "eval_id": "ITEM-SEM-001",
+  "verdict": "pass",
+  "criteria": [
+    {
+      "id": "ITEM-SEM-001",
+      "title": "\u72ec\u7acb\u3057\u305fitem identity",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "\u5019\u88dc\u3092\u8a18\u8ff0\u7528\u306e\u66ab\u5b9a\u30e9\u30d9\u30eb\u3068\u3057\u3066\u660e\u793a\u3057\u3001stable ID\u3084\u691c\u8a3c\u6e08\u307f\u6210\u679c\u7269\u3092\u634f\u9020\u3057\u3066\u3044\u306a\u3044\u3002\u691c\u7d22API\u3082checkout\u3068refund\u3092\u652f\u3048\u308b\u5358\u4e00\u5019\u88dc\u3068\u3057\u3066\u4fdd\u6301\u3057\u3066\u3044\u308b\u3002",
+      "evidence": [
+        "These are descriptive labels only; no stable IDs, hierarchy, formal feature links, or currentness are established.",
+        "Supports both checkout and refund; retain as one shared candidate",
+        "No candidate artifact was materialized or saved; no fingerprint or stable-ID history is asserted."
+      ]
+    },
+    {
+      "id": "ITEM-SEM-002",
+      "title": "\u69cb\u9020\u3068\u72b6\u614b",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "\u5404\u5019\u88dc\u306ekind\u3068\u6839\u62e0\u306e\u3042\u308b\u72b6\u614b\u3092\u533a\u5225\u3057\u3001UI\u306f\u4e88\u5b9a\u30fb\u672a\u5b9f\u88c5\u3001API\u306f\u5b9f\u88c5\u6e08\u307f\u3001batch\u306f\u4e88\u5b9a\u3068\u3057\u3066\u3044\u308b\u3002API\u306e\u8907\u6570feature\u3068\u306e\u95a2\u9023\u3092\u4fdd\u6301\u3057\u3001\u51fa\u529b\u6d88\u8cbb\u304b\u3089\u89aa\u5b50\u95a2\u4fc2\u3092\u63a8\u5b9a\u3057\u3066\u3044\u306a\u3044\u3002",
+      "evidence": [
+        "Checkout UI | UI | Planned; not implemented",
+        "Existing search API | API | Implemented",
+        "Nightly batch | Batch | Planned",
+        "Consumes API output; producer\u2013consumer relationship, not hierarchy",
+        "Confirmed workflow; implementation status unknown"
+      ]
+    },
+    {
+      "id": "ITEM-SEM-003",
+      "title": "\u5c65\u6b74\u3068\u5909\u66f4\u5f71\u97ff",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "\u65e7Checkout\u3092\u72ec\u7acb\u3057\u305f\u672a\u89e3\u6c7a\u306e\u5c65\u6b74\u53c2\u7167\u3068\u3057\u3066\u4fdd\u6301\u3057\u3001\u540c\u540d\u3060\u3051\u3067\u540c\u4e00\u6027\u3084currentness\u3092\u78ba\u5b9a\u3057\u3066\u3044\u306a\u3044\u3002\u5fc5\u8981\u306asnapshot\u3001report\u3001source\u60c5\u5831\u3001ID\u5c65\u6b74\u3001provider revision\u3068\u3001\u305d\u308c\u305e\u308c\u306e\u518d\u78ba\u8a8d\u4e8b\u9805\u3092\u5217\u6319\u3057\u3066\u3044\u308b\u3002",
+      "evidence": [
+        "The reviewer-supplied older item \u201cCheckout\u201d remains separate as an unresolved historical reference.",
+        "Its kind, ID, implementation status, currentness, and relationship to the provisional workflow or UI are unknown.",
+        "Do not merge, reuse, split, retire, or rename it based on its title.",
+        "Source refs, revisions, and hashes | Attach verifiable evidence and assess currentness and change impact",
+        "Prior D item artifact and full retained ID/history",
+        "Exact B feature-inventory snapshot and separate analysis report",
+        "Provider revision",
+        "reassess affected candidates when their sources change"
+      ]
+    },
+    {
+      "id": "ITEM-SEM-004",
+      "title": "owner\u5883\u754c\u3068\u5206\u6bcd",
+      "critical": true,
+      "rating": 4,
+      "status": "pass",
+      "reason": "\u672a\u78ba\u5b9a\u306efeature\u6bcd\u96c6\u56e3\u304b\u3089\u5b8c\u5168\u306a\u7387\u3084100%\u3092\u7b97\u51fa\u3057\u3066\u3044\u306a\u3044\u3002\u6210\u679c\u7269\u3092\u5019\u88dc\u8b58\u5225\u306e\u7bc4\u56f2\u306b\u7559\u3081\u3001\u6761\u4ef6\u63a1\u5426\u3001\u6b63\u5f0fTCN/CI\u3001\u671f\u5f85\u7d50\u679c\u3001\u5b9f\u884c\u3092\u78ba\u5b9a\u3057\u3066\u3044\u306a\u3044\u3002",
+      "evidence": [
+        "Candidate identification rates and unrepresented known-feature counts are not calculable without the validated feature population.",
+        "No formal test conditions or expected results are created.",
+        "No candidate artifact was materialized or saved"
+      ]
+    }
+  ],
+  "summary": {
+    "pass": 4,
+    "needs_review": 0,
+    "fail": 0,
+    "not_evaluable": 0
+  }
+}

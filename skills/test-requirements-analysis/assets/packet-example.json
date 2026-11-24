@@ -1,0 +1,105 @@
+{
+  "approval": {
+    "not_required_reason": "社内の下書き段階で承認を求めない（fixture）",
+    "record": null,
+    "state": "不要"
+  },
+  "artifact_ref": "fixture://requirements/orders-q4",
+  "downstream": [
+    {
+      "artifact_ref": "fixture://architecture/orders-q4",
+      "owner": "test-architecture-design",
+      "requirement_ids": [
+        "QAR-001"
+      ],
+      "revision": "arch-r1",
+      "scope": "orders-release-q4"
+    }
+  ],
+  "history": [
+    {
+      "change_reason": "初回作成（fixture）",
+      "impact_scope": [
+        "orders-release-q4"
+      ],
+      "rechecks": [],
+      "replaces_ref": null,
+      "replaces_revision": null,
+      "revision": 1
+    }
+  ],
+  "open_items": [],
+  "owner": "test-requirements-analysis",
+  "purpose": {
+    "basis": [
+      "spec-analysis の authority r3",
+      "test-analysis の risk matrix r2"
+    ],
+    "in_scope": [
+      "注文作成から決済確定までの画面・API",
+      "決済失敗時の再試行"
+    ],
+    "out_of_scope": [
+      "管理者向けレポートの性能評価"
+    ],
+    "qa_purpose": "注文確定までの主要経路が、リリース判定に必要な品質水準を満たすことを確認する",
+    "quality_goals": [
+      "主要業務フローの機能的正しさ",
+      "障害時の注文データの整合性"
+    ],
+    "success_conditions": [
+      "主要経路のテスト結果が確認され、未解決の重大欠陥がないこと"
+    ]
+  },
+  "requirements": [
+    {
+      "basis": "リリース判定の出口条件",
+      "open_item_id": null,
+      "priority": "高",
+      "requester": "QA責任者（fixture）",
+      "requirement_id": "QAR-001",
+      "scope": "orders-release-q4",
+      "source_ref": "fixture://spec/orders/authority",
+      "source_revision": "spec-r3",
+      "state": "合意済み",
+      "statement": "主要経路の受入確認を実施する"
+    },
+    {
+      "basis": "リスク評価で低リスクと判定され、別リリースで扱う",
+      "open_item_id": null,
+      "priority": "低",
+      "requester": "QA責任者（fixture）",
+      "requirement_id": "QAR-002",
+      "scope": "orders-release-q4",
+      "source_ref": "fixture://analysis/orders/risk-matrix",
+      "source_revision": "risk-r2",
+      "state": "対象外",
+      "statement": "管理者向けレポートの性能評価は今回の対象外とする"
+    }
+  ],
+  "revision": 1,
+  "schema": "test-requirements-analysis-v1",
+  "scope": "orders-release-q4",
+  "sources": [
+    {
+      "acquisition": "取得済",
+      "artifact_ref": "fixture://spec/orders/authority",
+      "content_hash": "62f9d302fa1387678f486c130a5bbe2ae050d0346953aa0960913159f375cbd7",
+      "owner": "spec-analysis",
+      "revision": "spec-r3",
+      "scope": "orders-release-q4",
+      "unacquired_reason": null
+    },
+    {
+      "acquisition": "取得済",
+      "artifact_ref": "fixture://analysis/orders/risk-matrix",
+      "content_hash": "83b19b0c655b395602e401f6d1adc436943bc9f324600f171a0ecf76b001ab04",
+      "owner": "test-analysis",
+      "revision": "risk-r2",
+      "scope": "orders-release-q4",
+      "unacquired_reason": null
+    }
+  ],
+  "status": "草案",
+  "target_period": "orders release q4 / build 2026.10 以降（fixture）"
+}

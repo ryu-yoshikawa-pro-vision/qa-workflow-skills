@@ -1,0 +1,11 @@
+{
+  "skill": "test-condition-analysis",
+  "cases": [
+    {
+      "id": "COND-SEM-001",
+      "input": "cases/case-001/input.md",
+      "reference": "cases/case-001/reference.md",
+      "criteria": ["COND-SEM-001", "COND-SEM-002", "COND-SEM-003", "COND-SEM-004"]
+    }
+  ]
+}

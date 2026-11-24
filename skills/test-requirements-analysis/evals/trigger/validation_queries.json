@@ -1,0 +1,13 @@
+[
+  { "query": "新規プロジェクトのQA目的、品質条件、範囲を合意可能な形にしてください。", "should_trigger": true },
+  {
+    "query": "QA目標のsourceを再取得できず、要求の一部が未確定です。影響scopeとresume条件を整理したい。",
+    "should_trigger": true
+  },
+  { "query": "対象外とするQA範囲の理由と承認revisionを確認してください。", "should_trigger": true },
+  { "query": "計画作成前に、今回のQA活動の成果目標とstakeholder要求をまとめたい。", "should_trigger": true },
+  { "query": "テストレベルを複数割り当て、明示指定の優先順位を確認してください。", "should_trigger": false },
+  { "query": "品質要求から検証責務TRを安定ID付きで設計してください。", "should_trigger": false },
+  { "query": "承認済みテスト計画と実績の差異を確認してください。", "should_trigger": false },
+  { "query": "要求元文書の現行revisionから製品仕様Authorityを確定してください。", "should_trigger": false }
+]

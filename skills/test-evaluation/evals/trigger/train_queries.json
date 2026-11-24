@@ -1,0 +1,66 @@
+[
+  {
+    "query": "今回のQA活動を追跡性・品質・効率・プロセス・再利用性の5軸で評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "作業時間が短縮したが、品質も改善したと言えるか指標から判断して。",
+    "should_trigger": true
+  },
+  {
+    "query": "採用された改善が計画の改版・実施・次回測定まで進んでいるか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "前回の改善の効果を、同じ測定条件の今回の活動と比較して判定して。",
+    "should_trigger": true
+  },
+  {
+    "query": "測定できなかった指標と、比較条件が違って比較できない指標を区別して示して。",
+    "should_trigger": true
+  },
+  {
+    "query": "承認済みだが未実施の改善が達成件数に含まれていないか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "QA成果物の保管と引継ぎが受領者の確認まで完了しているか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "評価で見つかった改善案を、計画の担当ownerへ改版依頼として引き継いで。",
+    "should_trigger": true
+  },
+  {
+    "query": "Agent Skillの出力品質をEVALSのrubricで評価して。",
+    "should_trigger": false
+  },
+  {
+    "query": "統合テスト報告を計画と照合して集計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "欠陥候補を外部Issueへ登録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Regressionの今回のRun範囲を選んで。",
+    "should_trigger": false
+  },
+  {
+    "query": "プロジェクトを終了してよいか決定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "テストケースを設計して。",
+    "should_trigger": false
+  },
+  {
+    "query": "再利用できる知識をQA knowledgeに保存して。",
+    "should_trigger": false
+  },
+  {
+    "query": "Playwrightテストを実装して。",
+    "should_trigger": false
+  }
+]
