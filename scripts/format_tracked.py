@@ -102,6 +102,7 @@ def run_ruff(command: str, paths: Sequence[str]) -> int:
     if not paths:
         return 0
 
+    verify_ruff_version()
     arguments = ["ruff"]
     if command == "ruff-check":
         arguments.extend(["check", "--config", str(RUFF_CONFIG)])
@@ -119,6 +120,39 @@ def run_ruff(command: str, paths: Sequence[str]) -> int:
     result = run_process([*arguments, "--", *paths])
     show_result(result)
     return result.returncode
+
+
+def verify_ruff_version() -> None:
+    """Require the Ruff version pinned in the lint requirements before use."""
+    requirements_path = REPOSITORY_ROOT / "requirements-dev-lint.txt"
+    try:
+        requirements = requirements_path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise FormatError(
+            f"could not read Ruff version pin from {requirements_path}: {error}"
+        ) from error
+
+    pins = []
+    for requirement in requirements:
+        requirement = requirement.split("#", 1)[0].strip()
+        if requirement and requirement.lower().startswith("ruff=="):
+            pins.append(requirement.partition("==")[2].strip())
+    if len(pins) != 1 or not pins[0]:
+        raise FormatError(
+            "requirements-dev-lint.txt must contain exactly one non-empty Ruff == pin"
+        )
+
+    result = run_process(["ruff", "--version"])
+    if result.returncode != 0:
+        show_result(result)
+        raise FormatError(f"ruff --version failed with exit code {result.returncode}")
+
+    output = result.stdout[:-1] if result.stdout.endswith("\n") else result.stdout
+    expected = f"ruff {pins[0]}"
+    if output != expected:
+        raise FormatError(
+            f"expected {expected!r} from ruff --version, received {output!r}"
+        )
 
 
 def normalized_dprint_path(path: str) -> str:

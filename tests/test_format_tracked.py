@@ -40,24 +40,39 @@ class FormatterInvocationTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp(prefix="formatter fixture with spaces "))
         self.ruff_config = self.root / "ruff.toml"
         self.dprint_config = self.root / "dprint.json"
+        self.write_ruff_requirement()
+
+    def write_ruff_requirement(self, version: str = "0.16.8") -> None:
+        (self.root / "requirements-dev-lint.txt").write_text(
+            f"ruff=={version}\n", encoding="utf-8"
+        )
 
     def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self.root)
 
-    def run_with_paths(self, command: str, paths: list[str], side_effect):
+    def run_with_paths(
+        self,
+        command: str,
+        paths: list[str],
+        side_effect,
+        ruff_output: str = "ruff 0.16.8\n",
+    ):
+        def runner(args, input_text=None):
+            if args == ["ruff", "--version"]:
+                return completed(args, ruff_output)
+            return side_effect(args, input_text)
+
         with (
             patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
             patch.object(format_tracked, "RUFF_CONFIG", self.ruff_config),
             patch.object(format_tracked, "DPRINT_CONFIG", self.dprint_config),
             patch.object(format_tracked, "tracked_paths", return_value=paths),
-            patch.object(
-                format_tracked, "run_process", side_effect=side_effect
-            ) as runner,
+            patch.object(format_tracked, "run_process", side_effect=runner) as calls,
         ):
             result = format_tracked.execute(command)
-        return result, runner
+        return result, calls
 
     def test_every_ruff_command_uses_absolute_root_config_and_explicit_paths(
         self,
@@ -79,7 +94,7 @@ class FormatterInvocationTests(unittest.TestCase):
                 ruff_calls = [
                     call.args[0]
                     for call in runner.call_args_list
-                    if call.args[0][0] == "ruff"
+                    if call.args[0][0] == "ruff" and call.args[0][1] != "--version"
                 ]
                 self.assertTrue(ruff_calls)
                 for args in ruff_calls:
@@ -97,6 +112,24 @@ class FormatterInvocationTests(unittest.TestCase):
                         args[args.index("--config") + 1], str(self.ruff_config)
                     )
                     self.assertEqual(args[-2:], ["--", "src/module.py"])
+
+    def test_ruff_version_mismatch_stops_before_the_requested_operation(self) -> None:
+        calls = []
+
+        def runner(args, input_text=None):
+            calls.append(args)
+            return completed(args, "ruff 0.15.2\n")
+
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "run_process", side_effect=runner),
+        ):
+            with self.assertRaisesRegex(
+                format_tracked.FormatError, "expected 'ruff 0.16.8'"
+            ):
+                format_tracked.run_ruff("import-fix", ["src/module.py"])
+
+        self.assertEqual(calls, [["ruff", "--version"]])
 
     def test_format_and_check_pin_dprint_config_discovery_and_ignore_behavior(
         self,
@@ -207,9 +240,15 @@ class FormatterInvocationTests(unittest.TestCase):
                     patch.object(
                         format_tracked,
                         "run_process",
-                        side_effect=lambda args, input_text=None: completed(args),
+                        side_effect=lambda args, input_text=None: completed(
+                            args,
+                            "ruff 0.16.8\n" if args == ["ruff", "--version"] else "",
+                        ),
                     ) as runner,
                 ):
+                    (root / "requirements-dev-lint.txt").write_text(
+                        "ruff==0.16.8\n", encoding="utf-8"
+                    )
                     self.assertEqual(format_tracked.execute(command), 0)
                 self.assertFalse(
                     any(call.args[0][0] == "dprint" for call in runner.call_args_list)
@@ -237,6 +276,8 @@ class FormatterInvocationTests(unittest.TestCase):
         for call in calls.call_args_list:
             args = call.args[0]
             if args[0] == "ruff":
+                if args[1] == "--version":
+                    continue
                 self.assertEqual(
                     args[args.index("--config") + 1], str(self.ruff_config)
                 )

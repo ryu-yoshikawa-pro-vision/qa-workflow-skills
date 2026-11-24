@@ -10,7 +10,7 @@ Pythonのformatter/lint・決定論的評価ツールをローカルで使う場
 python -m pip install -r requirements-dev-lint.txt -r requirements-dev-evals.txt
 ```
 
-開発時はRuff `0.16.8`とdprint `0.55.2`を使用します。通常のformat / lint入口はGit tracked fileを対象にする共通scriptです。
+Ruffのversion pinは`requirements-dev-lint.txt`を正本とし、共通scriptが実行前にCLI versionを照合します。dprintは`0.55.2`を使用します。通常のformat / lint入口はGit tracked fileを対象にする共通scriptです。
 
 ```bash
 ruff --version
@@ -20,6 +20,8 @@ python scripts/format_tracked.py import-fix
 python scripts/format_tracked.py format
 python scripts/format_tracked.py check
 ```
+
+Pythonの開発・CI依存関係は`requirements-dev-lint.txt`と`requirements-dev-evals.txt`で管理します。DependabotはGitHub Actionsとpipのsecurity updatesを対象にし、通常のversion-update PRは作成しない設定です。Dependabot security update PRも通常のPRとしてreviewとCIを通してからmergeします。GitHub側でDependabot security updatesが有効であることを確認してください。
 
 Codex開発ハーネスとexecpolicyは特定のCodex CLI versionに固定していません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、使用versionを記録したうえで実CLIの機能と安全contractを検証します。静的contractは次で確認できます。実runtime受入の条件と保証範囲は[`docs/reference/codex-safety-harness.md`](docs/reference/codex-safety-harness.md)を参照してください。
 
