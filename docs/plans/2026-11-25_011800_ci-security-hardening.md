@@ -23,13 +23,13 @@ PR #22で導入されたQA workflow、Skill、runtime、validator、評価基盤
 
 `.github/workflows/`には5件あり、main HEAD `a37b155…`上の直近push runはすべてsuccess。CodeQL default setupのrunもsuccess。
 
-| Workflow / scan | run | URL |
-| --- | ---: | --- |
-| Code Quality | `45431363663` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363663 |
-| Codex Harness | `45431363456` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363456 |
-| Validate Agent Skills | `45431363902` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363902 |
-| Validate Deterministic Output Evals | `45431363541` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363541 |
-| Validate Semantic Output Evals | `45431363728` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363728 |
+| Workflow / scan                         |           run | URL                                                                                     |
+| --------------------------------------- | ------------: | --------------------------------------------------------------------------------------- |
+| Code Quality                            | `45431363663` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363663 |
+| Codex Harness                           | `45431363456` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363456 |
+| Validate Agent Skills                   | `45431363902` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363902 |
+| Validate Deterministic Output Evals     | `45431363541` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363541 |
+| Validate Semantic Output Evals          | `45431363728` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363728 |
 | CodeQL (dynamic default-setup workflow) | `45431362292` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431362292 |
 
 - `code-quality.yml`と`codex-harness.yml`にはworkflow-level `contents: read`がある。ほかの3 workflowには明示`permissions`がない。
@@ -172,21 +172,21 @@ PR #22で導入されたQA workflow、Skill、runtime、validator、評価基盤
 
 ### ローカルvalidation
 
-| 検証 | 結果 |
-| --- | --- |
-| `test_ci_security_contract.py` | PASS。5 workflowの`contents: read`とjob override不存在、Dependabot ecosystemと整数0を検証。 |
-| `test_format_tracked.py` | PASS。11 tests。Ruff mismatchがformat/import-fix実行前に停止するtestを追加。 |
-| `test_ci_patch_whitespace.py` | PASS。3 tests。 |
-| Deterministic shared runtime tests | PASS。12 tests。 |
-| Semantic dataset validation / shared tests / repository tests | PASS。37 skills・210 cases、27 tests、14 tests。 |
-| Trigger dataset tests | PASS。17 tests。 |
-| agent-answer-form Python tests / validate-only | PASS。15 tests、2問の検証。 |
-| agent-answer-form Node tests | PASS。Node test runnerで成功。workflowの`python`実行名に合わせるため、`/tmp`に一時symlinkを置きPython 3.12を使用。 |
-| 変更Python filesへの直接Ruff lint/format診断 | PASS。ただしlocal Ruff `0.15.2`でありrequired `0.16.8`そのものの結果ではない。 |
-| `python3 scripts/format_tracked.py ruff-check` / `check` | BLOCKED。local CLIが`0.15.2`のため、requirements由来の厳密なversion guardが`expected ruff 0.16.8`で停止。dprintもlocal未導入。 |
-| Deterministic repository tests | 671 tests中、4 fail・1 error。loopback bindがsandboxに拒否され、`/tmp/.git` markerをancestorと判定するSQLite state testsがblockedになった。 |
-| Runtime unit/integration tests | 1,455 tests中、10 fail・10 errors。確認した主因は同じloopback / `/tmp/.git`制約と、Python 3.12 JSON parserが1,100階層配列を受理する差。 |
-| Codex Harness tests | 58 tests中1 fail、Windows-only 8 tests skipped。testがignored local `.agents/skills`の3 directoryもrepository-ownedとして数えるため。checkout CIには含まれないignored filesで、移動・削除はしていない。 |
+| 検証                                                          | 結果                                                                                                                                                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_ci_security_contract.py`                                | PASS。5 workflowの`contents: read`とjob override不存在、Dependabot ecosystemと整数0を検証。                                                                                                             |
+| `test_format_tracked.py`                                      | PASS。11 tests。Ruff mismatchがformat/import-fix実行前に停止するtestを追加。                                                                                                                            |
+| `test_ci_patch_whitespace.py`                                 | PASS。3 tests。                                                                                                                                                                                         |
+| Deterministic shared runtime tests                            | PASS。12 tests。                                                                                                                                                                                        |
+| Semantic dataset validation / shared tests / repository tests | PASS。37 skills・210 cases、27 tests、14 tests。                                                                                                                                                        |
+| Trigger dataset tests                                         | PASS。17 tests。                                                                                                                                                                                        |
+| agent-answer-form Python tests / validate-only                | PASS。15 tests、2問の検証。                                                                                                                                                                             |
+| agent-answer-form Node tests                                  | PASS。Node test runnerで成功。workflowの`python`実行名に合わせるため、`/tmp`に一時symlinkを置きPython 3.12を使用。                                                                                      |
+| 変更Python filesへの直接Ruff lint/format診断                  | PASS。ただしlocal Ruff `0.15.2`でありrequired `0.16.8`そのものの結果ではない。                                                                                                                          |
+| `python3 scripts/format_tracked.py ruff-check` / `check`      | BLOCKED。local CLIが`0.15.2`のため、requirements由来の厳密なversion guardが`expected ruff 0.16.8`で停止。dprintもlocal未導入。                                                                          |
+| Deterministic repository tests                                | 671 tests中、4 fail・1 error。loopback bindがsandboxに拒否され、`/tmp/.git` markerをancestorと判定するSQLite state testsがblockedになった。                                                             |
+| Runtime unit/integration tests                                | 1,455 tests中、10 fail・10 errors。確認した主因は同じloopback / `/tmp/.git`制約と、Python 3.12 JSON parserが1,100階層配列を受理する差。                                                                 |
+| Codex Harness tests                                           | 58 tests中1 fail、Windows-only 8 tests skipped。testがignored local `.agents/skills`の3 directoryもrepository-ownedとして数えるため。checkout CIには含まれないignored filesで、移動・削除はしていない。 |
 
 `python3.11`、`skills-ref`、`dprint`、`actionlint`はlocalに無い。従ってexact Ruff/dprint formatter、official `skills-ref validate`、Windows transportとGitHub Actions schema/CodeQLはPR CIで確認する。個別test結果をaggregate exit codeで置き換えず、上記のlocal環境由来failureに対してテストや期待値は変更していない。最終staged diffの`git diff --cached --check`は終了コード0。
 
@@ -196,8 +196,11 @@ PR #22で導入されたQA workflow、Skill、runtime、validator、評価基盤
 - reviewで、最初のsecurity testがBaseLoaderによりinteger `0`とquoted stringを区別できない点を確認し、`on`をstringに保つSafeLoaderへ改めてnative integer `0`を検査するよう修正。修正後のsecurity contract testsとlocal Ruff診断は再実行しPASS。
 - 現在、in-scope actionable findingは残っていない。外部review serviceは起動していない。
 
-### PR / GitHub verification pending
+### PR / GitHub verification record
 
-- `main`は`a37b15508dadd17ac0228ac896badb71d6a8f2c7`で再確認済み。remote `fix/ci-security-hardening` refは存在しないため、明示対象ファイルのみcommitし通常pushで作成する。
-- PR作成、最新PR HEADの全workflow/job/step、CodeQL PR check、PR本文更新は未完了。PR作成後に記録する。
-- CodeQL alertの現在のstatus、Dependency graphの現在値、Dependabot config/job errors、repository security settingは接続のendpoint allowlist/権限により未確認。mainでのalert解消、main再scan、GitHub UI受入はmerge後項目として残す。
+- PR #39は`main`向けに作成済み。base `a37b15508dadd17ac0228ac896badb71d6a8f2c7`、初回PR head `0a637aca1afd784d750a2b2163a515812a88f25d`。
+- 初回headのValidate Semantic Output Evals run `45444758252`とValidate Agent Skills run `45444758039`はsuccess。
+- Code Quality run `45444758157`はfailure。security config testを含む前段testsは成功し、`format_tracked.py check`が2つの新規Markdown文書をdprint未整形として検出した。runnerはRuff `0.16.8`、dprint `0.55.2`を記録。CIのdprint差分に合わせて表を整え、この後のheadで再検証する。
+- Validate Deterministic Output Evals run `45444758050`は最終確認時点で実行中で、runtime testsへ進んでいた。Codex Harness run `45444758662`ではLinux `codex-contract` jobがsuccess、Windows `windows-launcher` jobは最終確認時点で実行中。
+- 初回headに対するCodeQL PR checkは取得できなかった。PR triggerのworkflow runsには5件が表示され、combined commit statusは空だったため、PR CodeQL検証済みとは扱わない。
+- Security settings、alert状態、Dependency graph、Dependabot config/update errorsは接続のendpoint allowlist/権限により未確認。mainでのalert解消、main再scan、GitHub UI受入はmerge後に確認する。
