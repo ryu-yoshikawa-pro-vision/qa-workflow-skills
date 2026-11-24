@@ -201,6 +201,10 @@ PR #22で導入されたQA workflow、Skill、runtime、validator、評価基盤
 - PR #39は`main`向けに作成済み。base `a37b15508dadd17ac0228ac896badb71d6a8f2c7`、初回PR head `0a637aca1afd784d750a2b2163a515812a88f25d`。
 - 初回headのValidate Semantic Output Evals run `45444758252`とValidate Agent Skills run `45444758039`はsuccess。
 - Code Quality run `45444758157`はfailure。security config testを含む前段testsは成功し、`format_tracked.py check`が2つの新規Markdown文書をdprint未整形として検出した。runnerはRuff `0.16.8`、dprint `0.55.2`を記録。CIのdprint差分に合わせて表を整え、この後のheadで再検証する。
-- Validate Deterministic Output Evals run `45444758050`は最終確認時点で実行中で、runtime testsへ進んでいた。Codex Harness run `45444758662`ではLinux `codex-contract` jobがsuccess、Windows `windows-launcher` jobは最終確認時点で実行中。
+- 初回headのValidate Deterministic Output Evals run `45444758050`とCodex Harness run `45444758662`（Linux・Windows両job）も最終的にsuccess。
+- dprint形式修正後のhead `358755eea8fb626e0e90ce22dcc325ce0b501d92`に対する全5 workflowはsuccessし、全job/stepが完了、失敗なし。Code Quality `45448003974`、Codex Harness `45448003622`（Linux・Windows）、Validate Agent Skills `45448003320`、Validate Deterministic Output Evals `45448003888`、Validate Semantic Output Evals `45448003817`。
+- 各run URL: [Code Quality](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45448003974)、[Codex Harness](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45448003622)、[Validate Agent Skills](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45448003320)、[Validate Deterministic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45448003888)、[Validate Semantic Output Evals](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45448003817)。Code Quality runではRuff `0.16.8`、dprint `0.55.2`を記録し、formatter・lint・security config regression test・patch whitespaceの全stepがsuccess。
 - 初回headに対するCodeQL PR checkは取得できなかった。PR triggerのworkflow runsには5件が表示され、combined commit statusは空だったため、PR CodeQL検証済みとは扱わない。
+- `main`を再確認し、現在も`a37b15508dadd17ac0228ac896badb71d6a8f2c7`。PR baseは最新mainと一致する。
+- この記録を含むPlan更新はdocumentation-only commitとなり、PR headの5 workflowを再実行する。最終PR headのrun結果はPR checksとPR本文にも記録する。
 - Security settings、alert状態、Dependency graph、Dependabot config/update errorsは接続のendpoint allowlist/権限により未確認。mainでのalert解消、main再scan、GitHub UI受入はmerge後に確認する。
