@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,7 +12,7 @@ sys.path.insert(
         Path(__file__).resolve().parents[3] / "skills" / "feature-analysis" / "scripts"
     ),
 )
-from feature_registry import handle  # noqa: E402
+from feature_registry import LocalArtifactStore, handle, persist_snapshot  # noqa: E402
 
 
 def fixture() -> dict:
@@ -910,6 +911,119 @@ class FeatureRegistryTests(unittest.TestCase):
             handoff["feature_refs"][0]["implementation_refs"], ["src/auth.py"]
         )
         self.assertEqual(handoff["impacted_feature_ids"], ["FEAT-001"])
+
+
+class UserConfirmedReclassificationTests(unittest.TestCase):
+    def test_reclassification_requires_exact_user_confirmation(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        store = LocalArtifactStore(root, root, None, approval_source="user-confirmed")
+        seen: list[dict] = []
+        checked = store.authorize
+
+        def recording(request: dict) -> bool:
+            seen.append(copy.deepcopy(request))
+            return checked(request)
+
+        store.authorize = recording
+
+        def latest(operation: str) -> dict:
+            return next(
+                item for item in reversed(seen) if item["operation"] == operation
+            )
+
+        request = fixture()
+        snapshot = request["snapshot"]
+        snapshot["project_ref"] = "Sample"
+        snapshot["sources"][0].update(kind="spec", ref="specification/checkout")
+        first = persist_snapshot(
+            store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="initial feature review",
+        )
+        self.assertEqual(first["status"], "blocked", first)
+        self.assertIn("access_denied", first["reasons"])
+        store.record_user_confirmation(latest("write"))
+        first = persist_snapshot(
+            store,
+            request,
+            expected_revision=None,
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="initial feature review",
+        )
+        self.assertEqual(first["status"], "stored", first)
+
+        request["previous_snapshot"] = copy.deepcopy(snapshot)
+        snapshot["event"] = "analysis_update"
+        snapshot["event_basis"] = {
+            "source_revision": snapshot["source_revision"],
+            "evidence_ref": "review/second",
+        }
+        snapshot["operation_id"] = "op-v2"
+        snapshot["previous_artifact_revision"] = "art-v1"
+        snapshot["artifact_revision"] = "art-v2"
+        override = copy.deepcopy(snapshot["changes"][0])
+        override.update(
+            id="DIF-002",
+            supersedes_id="DIF-001",
+            classification="no_impact",
+            feature_ids=[],
+            reason="Approved correction after source review",
+            evidence_ref="review/evidence-2",
+            approval_ref="approval/verified",
+            approval_revision="policy-v2",
+        )
+        snapshot["changes"].append(override)
+
+        def correction() -> dict:
+            return persist_snapshot(
+                store,
+                request,
+                expected_revision=first["revision"],
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+                change_reason="approved classification correction",
+            )
+
+        unverified = correction()
+        self.assertEqual(unverified["status"], "blocked", unverified)
+        self.assertIn(
+            "change_reclassification_approval_unverified:DIF-002",
+            unverified["reasons"],
+        )
+        self.assertEqual(
+            store.read_current("feature-inventory", "Sample", "feature-artifact")[
+                "revision"
+            ],
+            first["revision"],
+        )
+
+        altered = copy.deepcopy(latest("reclassify"))
+        altered["reason"] = "a different reason"
+        store.record_user_confirmation(altered)
+        still_unverified = correction()
+        self.assertIn(
+            "change_reclassification_approval_unverified:DIF-002",
+            still_unverified["reasons"],
+        )
+
+        store.record_user_confirmation(latest("reclassify"))
+        write_blocked = correction()
+        self.assertEqual(write_blocked["status"], "blocked", write_blocked)
+        self.assertIn("access_denied", write_blocked["reasons"])
+        store.record_user_confirmation(latest("write"))
+        approved = correction()
+        self.assertEqual(approved["status"], "stored", approved)
+        self.assertEqual(approved["revision"], "r2")
+        historical = store.read_revision(
+            "feature-inventory", "Sample", "feature-artifact", first["revision"]
+        )["content"]
+        self.assertIn('"classification":"impact"', historical)
 
 
 if __name__ == "__main__":

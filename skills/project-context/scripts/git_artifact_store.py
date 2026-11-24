@@ -16,12 +16,22 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from artifact_store import Authorization, StoreError, _check_root, _name
+from artifact_store import (
+    STORE_KINDS,
+    USER_CONFIRMED,
+    Authorization,
+    StoreError,
+    UserConfirmationMixin,
+    _check_root,
+    _name,
+)
 
 COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 BRANCH = re.compile(r"[A-Za-z0-9._/-]+\Z")
 MAX_BYTES = 16 * 1024 * 1024
 # str.splitlines() と Git の行解釈で改行となる文字。commit message の値に含めると別行のtrailerを偽造できる。
+# 読取専用のgit呼出しに付ける環境変数。遅延取得（partial clone）と任意のindex更新lockを抑止する。
+READ_ONLY_GIT_ENV = {"GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"}
 LINE_BREAKS = frozenset("\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
 
 
@@ -30,6 +40,59 @@ def _line(value: Any, label: str) -> str:
     if any(ch in LINE_BREAKS for ch in value):
         raise StoreError(f"{label}_invalid")
     return value
+
+
+def branch_checked_out(repository: Path, ref: str) -> bool:
+    """ref（refs/heads/<branch>）が主ワークツリーまたは任意のlinked worktreeでcheckoutされていればTrue。
+
+    判定は `git symbolic-ref -q HEAD` と `git worktree list --porcelain` の両方で行う。
+    どちらか一方だけでは、detached HEAD の主ワークツリーとlinked worktreeの取り違えを見逃すため。
+    `worktree list --porcelain` は worktree ごとに空行区切りのブロックを出す。`prunable` 行を含む
+    ブロックは、ディレクトリが消えて取り除き待ちの worktree なので checkout 中として扱わない。
+    branch の一致は行全体の完全一致で比べる（部分一致する別branchを取り違えない）。
+    """
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(repository), "symbolic-ref", "-q", "HEAD"],
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env={**os.environ, **READ_ONLY_GIT_ENV},
+        )
+        listing = subprocess.run(
+            ["git", "-C", str(repository), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            check=False,
+            timeout=30,
+            env={**os.environ, **READ_ONLY_GIT_ENV},
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise StoreError("git_provider_unavailable") from exc
+    if listing.returncode != 0:
+        raise StoreError("git_provider_command_failed")
+    if head.returncode == 0 and head.stdout.decode("utf-8", "replace").strip() == ref:
+        return True
+    for block in _worktree_blocks(listing.stdout.decode("utf-8", "replace")):
+        if any(line.startswith("prunable") for line in block):
+            continue
+        if "branch " + ref in block:
+            return True
+    return False
+
+
+def _worktree_blocks(porcelain: str) -> list[list[str]]:
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for line in porcelain.splitlines():
+        if line == "":
+            if current:
+                blocks.append(current)
+            current = []
+        else:
+            current.append(line)
+    if current:
+        blocks.append(current)
+    return blocks
 
 
 def _path(ref: str) -> str:
@@ -48,7 +111,7 @@ def _path(ref: str) -> str:
     return ref
 
 
-class GitArtifactStore:
+class GitArtifactStore(UserConfirmationMixin):
     """Git ref is the canonical owner; commit SHA is its native CAS revision."""
 
     def __init__(
@@ -56,15 +119,14 @@ class GitArtifactStore:
         repository_root: Path,
         authorized_root: Path,
         branch: str,
-        authorize: Authorization,
+        authorize: Authorization | None,
         *,
         author_name: str,
         author_email: str,
+        approval_source: str | None = None,
     ) -> None:
         self.root = _check_root(repository_root, authorized_root)
-        if not callable(authorize):
-            raise StoreError("trusted_authorizer_required")
-        self.authorize = authorize
+        self._init_approval_source(approval_source, authorize)
         # Git ref transactions must not invoke hooks from a source repository.
         self._empty_hooks = tempfile.TemporaryDirectory(prefix="qa-git-no-hooks-")
         self.branch = _name(branch, "branch")
@@ -85,7 +147,12 @@ class GitArtifactStore:
         if not metadata.is_relative_to(self.root):
             raise StoreError("git_metadata_outside_authorized_root")
         self._git("check-ref-format", "--branch", self.branch)
+        self._assert_not_checked_out()
         self._head()
+
+    def _assert_not_checked_out(self) -> None:
+        if branch_checked_out(self.root, self.ref):
+            raise StoreError("branch_checked_out")
 
     def _git(
         self,
@@ -94,7 +161,7 @@ class GitArtifactStore:
         index: Path | None = None,
         allow_failure: bool = False,
     ) -> bytes | None:
-        env = dict(os.environ)
+        env = {**os.environ, **READ_ONLY_GIT_ENV}
         if index is not None:
             env["GIT_INDEX_FILE"] = str(index)
         env["GIT_AUTHOR_NAME"] = self.author_name
@@ -176,7 +243,7 @@ class GitArtifactStore:
             raise StoreError("access_denied")
 
     def _identity(self, kind: str, project_ref: str, artifact_ref: str) -> str:
-        if kind not in {"project-context", "feature-inventory"}:
+        if kind not in STORE_KINDS:
             raise StoreError("artifact_kind_invalid")
         _line(project_ref, "project_ref")
         return _path(artifact_ref)
@@ -380,6 +447,11 @@ class GitArtifactStore:
             f"QA-Approval-Ref: {approval_ref}\n"
             f"QA-Approval-Revision: {approval_revision}\n"
             f"QA-Change-Reason: {change_reason}\n"
+            + (
+                f"QA-Approval-Source: {USER_CONFIRMED}\n"
+                if self.approval_source == USER_CONFIRMED
+                else ""
+            )
         )
         commit_raw = self._git(
             "commit-tree", tree_sha, "-p", head, content=message.encode("utf-8")
@@ -388,6 +460,9 @@ class GitArtifactStore:
         new_sha = commit_raw.decode("ascii").strip()
         if not COMMIT.fullmatch(new_sha):
             raise StoreError("git_commit_invalid")
+        # 構築後に別worktreeでbranchがcheckoutされた場合に備え、参照更新の直前にも再検査する。
+        # 検査と update-ref の間の競合は防げない（data-contract に記載）。
+        self._assert_not_checked_out()
         updated = self._git("update-ref", self.ref, new_sha, head, allow_failure=True)
         if updated is None:
             raise StoreError("revision_conflict")

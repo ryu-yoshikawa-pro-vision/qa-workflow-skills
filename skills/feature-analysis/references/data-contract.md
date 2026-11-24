@@ -56,13 +56,14 @@ Git CLI入口では信頼済みの呼出し元が環境変数`QA_FEATURE_AUTHORI
 
 Gitのgitlink（submodule）は親repositoryの`ls-tree`で確認できるentryですが、内部ファイルは列挙できていません。`git_source_inventory`は`status=incomplete`、`complete_file_listing=false`、`unretrieved=[gitlink:path@commit]`を返し、submoduleを検証済みの別情報源へ登録するまで完全取得とみなしません。PR差分一覧の取得完了は`complete_change_listing`で別途表します。
 
-Git保存時の`authorize`には`approval_ref`だけでなく`approval_revision`、`source_ref`／`source_revision`、`operation_id`、`change_reason`、内容hashが渡されます。認証済み承認のscopeとrevisionの検証は信頼済みproviderの責務です。未確認の承認revisionでは書込みを拒否します。
+Git保存時の`authorize`（承認方式が`trusted-callback`の場合）には`approval_ref`だけでなく`approval_revision`、`source_ref`／`source_revision`、`operation_id`、`change_reason`、内容hashが渡されます。認証済み承認のscopeとrevisionの検証は信頼済みproviderの責務です。未確認の承認revisionでは書込みを拒否します。
+承認方式が`user-confirmed`（既定）の場合は、`authorize`の代わりに、ユーザー確認後にホストが登録した確認記録（reclassifyの決定dictを含む）との完全一致で判定します。未登録または不一致なら`change_reclassification_approval_unverified`で拒否します。確認記録はユーザー確認の自己申告であり、認証ではありません。ホストはユーザーが当該成果物を明示的に確認した後にのみ `record_user_confirmation` を呼ぶ。AIが確認前に呼んではならない。
 
 `feature_registry.handle`は新規DIFの`after_revision`を同じ`source_id`の現在revisionと照合し、PR更新／rebaseでは`before_revision`をbase SHAまたは前回head SHAへ限定します。前回snapshotから保存済みの旧DIFは当時のrevisionを保持でき、今回のsource SHAへ書き換えることはありません。source未取得時は`change_source_incomplete`を残し、completeを返しません。
 
 ## 保存前のGit現在性確認
 
-`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は`git_head_changed`でblockし、信頼済み呼出し元が現在のSHAを取り直します。過去コミットのtreeを現在の情報源として保存しません。
+`git_source_inventory`は指定された`head_sha`がGit内に存在するだけでは受け入れず、許可されたcheckoutの`git rev-parse HEAD`とも一致することを確認します。異なる場合は保存をblockし、信頼済み呼出し元が現在のSHAを取り直します。理由は見つけた段階で異なります。保存前のHEAD再確認（`persist_snapshot`のlock保持・書込み直前の検査）で見つかれば`git_head_changed`です。取得経路（`git_source_inventory`）で見つかった場合は`git_source_listing_incomplete:git_head_changed`に包まれます（`git_source_inventory`単体は`git_head_changed`を返します）。過去コミットのtreeを現在の情報源として保存しません。
 
 `persist_snapshot`はcode sourceを含む機能台帳を保存する際に`git_inventory_requests[]`を必須にします。各entryは`source_id,repository_root,authorized_root,base_sha,head_sha`を持ち、PR更新・rebase時は`previous_head_base_sha`も必要です。repository rootと許可rootは信頼済み呼出し元が指定し、Skillは`git_source_inventory`で実際のGit tree／diffを再取得し、`reconcile_git_coverage`で差分母集団・各revisionとの照合を再実行します。submoduleなど取得未完了、未分類Git path、未照合旧revision、source HEAD不一致の場合は保存をblockedにします。初回でbase SHAがない場合は、Git tree列挙のみ認め、コードDIFを列挙済みとみなして保存しません。非コードsourceの機能台帳は既存の保存経路を維持します。
 
@@ -101,3 +102,7 @@ analysis_updateでは前回保存された現HEADの有効DIFが持つ旧SHAを�
 GitlinkはHEADだけでなく、baseで存在しHEADで削除・置換された旧SHAもgitlink:path@SHAとして未取得に含めます。親sourceのgit_inventory_requests[].gitlink_sourcesにはその文字列をkey、検証対象の子source IDをvalueとして明示します。子sourceの現在HEADまたは認証済みの前回snapshotのrevisionと照合し、未解決なら保存拒否します。解決済みのgitlinkだけを親の完全なGit列挙として扱います。
 
 code sourceを持つ保存では、許可rootのHEADとcheckout先branch refのGitロックを検証から保存まで保持します。競合、refの変更、未許可metadata pathはblockedとします。実Gitの取得失敗理由（git_head_changed等）は保存結果にも保持します。実保存providerのCAS・認可検証も引き続き必須です。
+
+`persist_snapshot`は`hold_source_refs`（既定`True`）を持ちます。`True`では上記のとおりソースrepoのHEADとbranch refのlockfileを作って保持します。`hold_source_refs=False`（ホストCLI `save-snapshot` の既定）では、ソースrepoの`.git`に何も書きません（lockを作らない）。代わりに既存のlockfileがあれば`git_source_ref_lock_unavailable`で拒否し、`store.write`の直前にHEADが観測したheadと一致することを再取得で確認します（不一致は書込み前なので`git_head_changed`で拒否）。読取りのgitは`GIT_NO_LAZY_FETCH=1`と`GIT_OPTIONAL_LOCKS=0`を付けて実行し、遅延取得による書込みや任意のindex更新lockを避けます。
+
+**競合窓**: 直前の確認と`store.write`の間にソースのHEADが動いた場合は書込み前に検出できず、その版が保存されうります。書込み後にHEADが動いたことは検出します。書込み済みの版は取り消さないため、`status`は`stored`のまま`warnings: ["source_head_changed_after_write"]`を付けて返します（書込み後の検査自体が確認できなかった場合は`source_head_unverified_after_write`）。`True`ではこの窓をlockで塞ぎますが、そのためソースrepoの`.git`へ一時的に書込みます。読取専用の製品repoを扱う運用では`False`を既定とし、競合窓を承知のうえで使います。

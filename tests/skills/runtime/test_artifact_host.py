@@ -1,0 +1,2417 @@
+"""Host CLI tests for the user-confirmed Git artifact store.
+
+All repositories are throwaway repositories under a temporary directory. The
+qa-workspace parent repository is never touched.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import copy
+import hashlib
+import io
+import json
+import os
+import stat
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+SKILL_ROOT = Path(__file__).resolve().parents[3] / "skills"
+SCRIPTS = SKILL_ROOT / "project-context" / "scripts"
+HOST = SCRIPTS / "artifact_host.py"
+PROJECT_CONTEXT_CLI = SCRIPTS / "project_context.py"
+sys.path.insert(0, str(SCRIPTS))
+
+import artifact_host  # noqa: E402
+
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+BRANCH = "qa-artifacts/Sample/project-context"
+ARTIFACT = "docs/PROJECT_CONTEXT.md"
+CONFIRMATION = "user confirmed 2026-11-19"
+
+
+def git(repo: Path, *args: str, check: bool = True) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        raise AssertionError(result.stderr)
+    return result.stdout.strip()
+
+
+def run_host(*args: str) -> tuple[int, dict]:
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    completed = subprocess.run(
+        [sys.executable, str(HOST), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    payload = json.loads(lines[-1]) if lines else {}
+    return completed.returncode, payload
+
+
+def run_context(request: dict) -> dict:
+    """The JSON CLI of project_context.py (prepare-* only; it never saves)."""
+    completed = subprocess.run(
+        [sys.executable, str(PROJECT_CONTEXT_CLI)],
+        input=json.dumps(request, ensure_ascii=False).encode("utf-8"),
+        capture_output=True,
+        check=False,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    return json.loads(completed.stdout.decode("utf-8"))
+
+
+class ArtifactHostTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "repo"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("original\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+
+    def common(self) -> list[str]:
+        return [
+            "--repo",
+            str(self.repo),
+            "--branch",
+            BRANCH,
+            "--project-ref",
+            "Sample",
+            "--kind",
+            "project-context",
+            "--artifact-ref",
+            ARTIFACT,
+        ]
+
+    def init(self) -> None:
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+
+    def create_request(self, **overrides: object) -> dict:
+        request: dict = {
+            "operation": "prepare-create",
+            "project_name": "Sample",
+            "enumeration_complete": True,
+            "candidates": [{"ref": ARTIFACT, "status": "absent"}],
+            "artifact_ref": ARTIFACT,
+            "source_ref": "source/1",
+            "source_revision": "r1",
+            "change_reason": "initial",
+        }
+        request.update(overrides)
+        return request
+
+    def update_request(
+        self,
+        markdown: str,
+        expected: str,
+        product: str,
+        *,
+        source_revision: str = "r2",
+    ) -> dict:
+        return {
+            "operation": "prepare-sections",
+            "markdown": markdown,
+            "artifact_ref": ARTIFACT,
+            "expected_revision": expected,
+            "source_ref": "source/2",
+            "source_revision": source_revision,
+            "change_reason": "confirmed product name",
+            "section_updates": {"2": "- 製品: " + product},
+        }
+
+    def save_prepared(
+        self,
+        request: dict | None,
+        *,
+        operation: str | None = "op-1",
+        confirmation: str | None = CONFIRMATION,
+        project: str = "Sample",
+        artifact: str = ARTIFACT,
+        kind: str = "project-context",
+        raw: bytes | None = None,
+    ) -> tuple[int, dict]:
+        path = self.base / "prepared.json"
+        if raw is not None:
+            path.write_bytes(raw)
+        else:
+            path.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
+        args = [
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            BRANCH,
+            "--project-ref",
+            project,
+            "--kind",
+            kind,
+            "--artifact-ref",
+            artifact,
+            "--prepared-file",
+            str(path),
+        ]
+        if operation is not None:
+            args += ["--operation-id", operation]
+        if confirmation is not None:
+            args += ["--user-confirmed-ref", confirmation]
+        return run_host(*args)
+
+    def create(self, operation: str = "op-1") -> dict:
+        code, payload = self.save_prepared(self.create_request(), operation=operation)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        return payload
+
+    def read(
+        self, *extra: str, confirmation: str = "user confirmed read"
+    ) -> tuple[int, dict]:
+        return run_host(
+            "read", *self.common(), "--user-confirmed-ref", confirmation, *extra
+        )
+
+    def head(self) -> str:
+        return git(self.repo, "rev-parse", "refs/heads/" + BRANCH)
+
+    def current_content(self) -> tuple[str, str]:
+        code, current = self.read()
+        self.assertEqual(code, 0, current)
+        return current["content"], current["revision"]
+
+    def test_init_branch_creates_empty_root_commit_and_reports_existing(self) -> None:
+        self.init()
+        self.assertEqual(git(self.repo, "rev-parse", BRANCH + "^{tree}"), EMPTY_TREE)
+        self.assertEqual(
+            git(self.repo, "log", "-1", "--format=%s", BRANCH), "qa artifact: init"
+        )
+        self.assertEqual(git(self.repo, "rev-list", "--count", BRANCH), "1")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "exists"))
+
+    def test_init_branch_refuses_unborn_branch_that_is_checked_out(self) -> None:
+        git(self.repo, "checkout", "-q", "--orphan", BRANCH)
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", BRANCH
+        )
+        self.assertEqual((code, payload["reason"]), (1, "branch_checked_out"))
+        missing = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.repo),
+                "show-ref",
+                "--verify",
+                "--quiet",
+                "refs/heads/" + BRANCH,
+            ],
+            check=False,
+        )
+        self.assertNotEqual(missing.returncode, 0)
+
+    def test_init_branch_rejects_invalid_branch_name(self) -> None:
+        for name in ["../escape", "-x", "bad branch", "a..b/..c"]:
+            with self.subTest(name=name):
+                code, payload = run_host(
+                    "init-branch", "--repo", str(self.repo), "--branch", name
+                )
+                self.assertEqual((code, payload["status"]), (1, "blocked"))
+
+    def test_init_branch_does_not_run_source_repository_hooks(self) -> None:
+        marker = self.base / "hook-ran"
+        hook = self.repo / ".git" / "hooks" / "reference-transaction"
+        hook.write_text(
+            "#!/bin/sh\ntouch '" + str(marker) + "'\nexit 0\n", encoding="utf-8"
+        )
+        os.chmod(hook, 0o755)
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+        self.assertFalse(marker.exists())
+
+    def test_init_branch_rejects_author_with_line_break_or_control_character(
+        self,
+    ) -> None:
+        cases = [
+            ("QA\nSigned-off-by: x", "qa@example.invalid", "author_name_invalid"),
+            ("QA\x07", "qa@example.invalid", "author_name_invalid"),
+            ("QA", "qa@example.invalid\n", "author_email_invalid"),
+            ("QA", "no-at-sign", "author_email_invalid"),
+        ]
+        for name, email, reason in cases:
+            with self.subTest(name=repr(name), email=repr(email)):
+                code, payload = run_host(
+                    "init-branch",
+                    "--repo",
+                    str(self.repo),
+                    "--branch",
+                    BRANCH,
+                    "--author-name",
+                    name,
+                    "--author-email",
+                    email,
+                )
+                self.assertEqual(
+                    (code, payload), (1, {"status": "blocked", "reason": reason})
+                )
+        self.assertNotEqual(
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(self.repo),
+                    "show-ref",
+                    "--verify",
+                    "--quiet",
+                    "refs/heads/" + BRANCH,
+                ],
+                check=False,
+            ).returncode,
+            0,
+        )
+
+    def test_save_prepared_stores_with_confirmation_and_records_trailer(self) -> None:
+        self.init()
+        saved = self.create()
+        message = git(self.repo, "log", "-1", "--format=%B", BRANCH)
+        self.assertIn("QA-Approval-Source: user-confirmed", message.splitlines())
+        self.assertIn("QA-Approval-Ref: " + CONFIRMATION, message.splitlines())
+        self.assertEqual(saved["revision"], "git:" + self.head())
+
+    def test_prepared_file_from_project_context_cli_is_saved(self) -> None:
+        self.init()
+        request = self.create_request()
+        prepared = run_context(request)
+        self.assertEqual(prepared["status"], "draft", prepared)
+        self.assertIn("# 案件コンテキスト", prepared["artifact_markdown"])
+        code, payload = self.save_prepared(request)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        content, revision = self.current_content()
+        self.assertEqual(content, prepared["artifact_markdown"])
+        self.assertEqual(revision, payload["revision"])
+
+    def test_save_prepared_without_or_with_invalid_confirmation_is_rejected(
+        self,
+    ) -> None:
+        self.init()
+        before = self.head()
+        cases = [
+            ("", "user_confirmed_ref_required"),
+            ("   ", "user_confirmed_ref_required"),
+            ("line one\nline two", "user_confirmed_ref_invalid"),
+            ("a b", "user_confirmed_ref_invalid"),
+            ("x" * 1025, "user_confirmed_ref_invalid"),
+            ("tab\tinside", "user_confirmed_ref_invalid"),
+        ]
+        for value, reason in cases:
+            with self.subTest(value=repr(value)):
+                code, payload = self.save_prepared(
+                    self.create_request(), confirmation=value
+                )
+                self.assertEqual(
+                    (code, payload), (1, {"status": "blocked", "reason": reason})
+                )
+        code, payload = self.save_prepared(self.create_request(), confirmation=None)
+        self.assertEqual((code, payload["reason"]), (1, "arguments_invalid"))
+        self.assertEqual(self.head(), before)
+
+    def test_confirmation_reference_of_1024_characters_is_accepted(self) -> None:
+        self.init()
+        code, payload = self.save_prepared(
+            self.create_request(), confirmation="x" * 1024
+        )
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+
+    def test_save_prepared_rejects_branch_checked_out_in_main_worktree(self) -> None:
+        self.init()
+        git(self.repo, "switch", "-q", BRANCH)
+        code, payload = self.save_prepared(self.create_request())
+        self.assertEqual((code, payload["reason"]), (1, "branch_checked_out"))
+
+    def test_save_prepared_with_detached_head_writes_branch_not_checked_out(
+        self,
+    ) -> None:
+        self.init()
+        git(self.repo, "checkout", "-q", "--detach")
+        code, payload = self.save_prepared(self.create_request())
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(git(self.repo, "symbolic-ref", "-q", "HEAD", check=False), "")
+
+    def test_save_prepared_works_in_repository_path_with_spaces(self) -> None:
+        self.repo = self.base / "my repo with spaces"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("x\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        self.init()
+        code, payload = self.save_prepared(self.create_request())
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+
+    def test_same_operation_resend_is_idempotent(self) -> None:
+        self.init()
+        first = self.create("op-1")
+        code, again = self.save_prepared(self.create_request(), operation="op-1")
+        self.assertEqual((code, again["status"]), (0, "idempotent"), again)
+        self.assertEqual(again["revision"], first["revision"])
+        self.assertEqual(git(self.repo, "rev-list", "--count", BRANCH), "2")
+
+        content, _ = self.current_content()
+        second_request = self.update_request(content, first["revision"], "Sample App")
+        code, second = self.save_prepared(second_request, operation="op-2")
+        self.assertEqual((code, second["status"]), (0, "stored"), second)
+        code, resent = self.save_prepared(second_request, operation="op-2")
+        self.assertEqual((code, resent["status"]), (0, "idempotent"), resent)
+        self.assertEqual(resent["revision"], second["revision"])
+        self.assertEqual(git(self.repo, "rev-list", "--count", BRANCH), "3")
+
+    def test_stale_expected_revision_is_a_revision_conflict(self) -> None:
+        self.init()
+        first = self.create("op-1")
+        first_content, _ = self.current_content()
+        code, second = self.save_prepared(
+            self.update_request(first_content, first["revision"], "Sample App"),
+            operation="op-2",
+        )
+        self.assertEqual((code, second["status"]), (0, "stored"), second)
+        code, payload = self.save_prepared(
+            self.update_request(first_content, first["revision"], "Other App"),
+            operation="op-3",
+        )
+        self.assertEqual((code, payload["reason"]), (1, "revision_conflict"), payload)
+        self.assertEqual(self.head(), second["revision"][4:])
+
+    def test_save_readback_returns_exact_content_and_hash(self) -> None:
+        self.init()
+        saved = self.create()
+        code, current = self.read()
+        self.assertEqual(code, 0, current)
+        self.assertIn("- プロジェクト: Sample", current["content"])
+        self.assertEqual(
+            current["sha256"],
+            hashlib.sha256(current["content"].encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(current["revision"], saved["revision"])
+
+    def test_read_current_and_history_revisions(self) -> None:
+        self.init()
+        first = self.create("op-1")
+        first_content, _ = self.current_content()
+        second = self.save_prepared(
+            self.update_request(first_content, first["revision"], "Sample App"),
+            operation="op-2",
+        )[1]
+        code, current = self.read()
+        self.assertEqual((code, current["revision"]), (0, second["revision"]))
+        self.assertIn("- 製品: Sample App", current["content"])
+        code, old = self.read("--revision", first["revision"])
+        self.assertEqual(
+            (code, old["content"], old["revision"]),
+            (0, first_content, first["revision"]),
+        )
+        # init -> v1 -> v2 の順。init（成果物を含まないroot commit）は履歴から読めない。
+        init_revision = "git:" + git(self.repo, "rev-parse", BRANCH + "~2")
+        code, absent = self.read("--revision", init_revision)
+        self.assertEqual((code, absent["status"]), (1, "absent"))
+
+    def test_export_is_byte_exact_read_only_and_atomic_into_existing_directory(
+        self,
+    ) -> None:
+        self.init()
+        self.create()
+        content, _ = self.current_content()
+        out = self.repo / "projections" / "PROJECT_CONTEXT.md"
+        out.parent.mkdir()
+        code, payload = run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        self.assertEqual((code, payload["status"]), (0, "exported"), payload)
+        self.assertEqual(out.read_bytes(), content.encode("utf-8"))
+        self.assertEqual(
+            payload["sha256"], hashlib.sha256(content.encode("utf-8")).hexdigest()
+        )
+        self.assertEqual(stat.S_IMODE(out.stat().st_mode), 0o444)
+
+    def test_export_refuses_missing_parent_directory(self) -> None:
+        self.init()
+        self.create()
+        out = self.base / "missing" / "PROJECT_CONTEXT.md"
+        code, payload = run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        self.assertEqual((code, payload["reason"]), (1, "out_parent_missing"))
+        self.assertFalse(out.parent.exists())
+
+    def test_export_refuses_hand_edited_projection_without_force(self) -> None:
+        self.init()
+        self.create()
+        out = self.repo / "PROJECT_CONTEXT.md"
+        run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        os.chmod(out, 0o644)
+        edited = out.read_bytes() + b"hand edit\n"
+        out.write_bytes(edited)
+        code, payload = run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        self.assertEqual(
+            (code, payload), (1, {"status": "blocked", "reason": "projection_drifted"})
+        )
+        self.assertEqual(out.read_bytes(), edited)
+
+    def test_export_force_overwrites_drifted_projection_and_reports_it(self) -> None:
+        self.init()
+        self.create()
+        content, _ = self.current_content()
+        out = self.repo / "PROJECT_CONTEXT.md"
+        run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        os.chmod(out, 0o644)
+        out.write_text("hand edit\n", encoding="utf-8")
+        code, payload = run_host(
+            "export",
+            *self.common(),
+            "--out",
+            str(out),
+            "--user-confirmed-ref",
+            "read",
+            "--force",
+        )
+        self.assertEqual((code, payload["status"]), (0, "exported"), payload)
+        self.assertIs(payload.get("overwrote_drifted"), True)
+        self.assertEqual(out.read_bytes(), content.encode("utf-8"))
+
+    def test_export_over_matching_projection_succeeds_without_force(self) -> None:
+        self.init()
+        self.create()
+        out = self.repo / "PROJECT_CONTEXT.md"
+        run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        code, payload = run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        self.assertEqual((code, payload["status"]), (0, "exported"), payload)
+        self.assertNotIn("overwrote_drifted", payload)
+
+    def test_failed_export_never_leaves_a_broken_projection(self) -> None:
+        out = self.base / "projection.md"
+        out.write_bytes(b"previous complete copy\n")
+        with mock.patch.object(
+            artifact_host.os, "fsync", side_effect=OSError("disk full")
+        ):
+            with self.assertRaises(OSError):
+                artifact_host.atomic_write(
+                    out, b"new content that must not be partial\n"
+                )
+        self.assertEqual(out.read_bytes(), b"previous complete copy\n")
+        self.assertEqual(
+            sorted(p.name for p in self.base.iterdir()), ["projection.md", "repo"]
+        )
+
+    def test_failed_rename_removes_temporary_file_and_keeps_target(self) -> None:
+        out = self.base / "projection.md"
+        out.write_bytes(b"previous\n")
+        with mock.patch.object(
+            artifact_host.os, "replace", side_effect=OSError("rename failed")
+        ):
+            with self.assertRaises(OSError):
+                artifact_host.atomic_write(out, b"next\n")
+        self.assertEqual(out.read_bytes(), b"previous\n")
+        self.assertEqual(
+            [
+                p.name
+                for p in self.base.iterdir()
+                if p.name.startswith(".projection.md.")
+            ],
+            [],
+        )
+
+    def test_verify_projection_reports_in_sync_then_drifted(self) -> None:
+        self.init()
+        self.create()
+        out = self.repo / "PROJECT_CONTEXT.md"
+        run_host(
+            "export", *self.common(), "--out", str(out), "--user-confirmed-ref", "read"
+        )
+        code, payload = run_host(
+            "verify-projection",
+            *self.common(),
+            "--out",
+            str(out),
+            "--user-confirmed-ref",
+            "read",
+        )
+        self.assertEqual((code, payload["status"]), (0, "in_sync"), payload)
+        os.chmod(out, 0o644)
+        out.write_text("hand edit\n", encoding="utf-8")
+        code, payload = run_host(
+            "verify-projection",
+            *self.common(),
+            "--out",
+            str(out),
+            "--user-confirmed-ref",
+            "read",
+        )
+        self.assertEqual((code, payload["status"]), (0, "drifted"), payload)
+        self.assertNotEqual(payload["file_sha256"], payload["store_sha256"])
+
+    def test_read_export_and_verify_require_a_confirmation_reference(self) -> None:
+        self.init()
+        self.create()
+        out = self.repo / "PROJECT_CONTEXT.md"
+        for command in ["read", "export", "verify-projection"]:
+            with self.subTest(command=command):
+                extra = ["--out", str(out)] if command != "read" else []
+                code, payload = run_host(command, *self.common(), *extra)
+                self.assertEqual((code, payload["status"]), (1, "blocked"))
+                self.assertEqual(payload["reason"], "arguments_invalid")
+        self.assertFalse(out.exists())
+
+    def test_save_command_is_removed_in_favor_of_save_prepared(self) -> None:
+        self.init()
+        before = self.head()
+        code, payload = run_host(
+            "save",
+            *self.common(),
+            "--content-file",
+            str(self.repo / "README.md"),
+            "--expected-revision",
+            "none",
+            "--operation-id",
+            "op-1",
+            "--source-ref",
+            "s",
+            "--source-revision",
+            "r",
+            "--change-reason",
+            "c",
+            "--user-confirmed-ref",
+            CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload), (1, {"status": "blocked", "reason": "arguments_invalid"})
+        )
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_content_that_is_not_a_16_section_context(
+        self,
+    ) -> None:
+        self.init()
+        before = self.head()
+        request = {
+            "operation": "prepare-sections",
+            "markdown": "# PC\nbody\n",
+            "artifact_ref": ARTIFACT,
+            "expected_revision": "git:" + before,
+            "source_ref": "s",
+            "source_revision": "r",
+            "change_reason": "c",
+            "section_updates": {"2": "- 製品: X"},
+        }
+        code, payload = self.save_prepared(request, operation="op-1")
+        self.assertEqual(
+            (code, payload),
+            (
+                1,
+                {"status": "blocked", "reason": "project_context_16_sections_required"},
+            ),
+        )
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_non_json_prepared_file(self) -> None:
+        self.init()
+        before = self.head()
+        code, payload = self.save_prepared(None, raw=b"{not json")
+        self.assertEqual((code, payload["reason"]), (1, "prepared_file_invalid"))
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_feature_inventory_for_now(self) -> None:
+        self.init()
+        before = self.head()
+        code, payload = self.save_prepared(
+            self.create_request(), kind="feature-inventory"
+        )
+        self.assertEqual((code, payload["reason"]), (1, "unsupported_kind_for_now"))
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_project_that_does_not_match_the_document(
+        self,
+    ) -> None:
+        self.init()
+        before = self.head()
+        code, payload = self.save_prepared(self.create_request(), project="Other")
+        self.assertEqual((code, payload["reason"]), (1, "project_scope_mismatch"))
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_artifact_ref_that_differs_from_the_request(
+        self,
+    ) -> None:
+        self.init()
+        before = self.head()
+        code, payload = self.save_prepared(
+            self.create_request(), artifact="docs/OTHER.md"
+        )
+        self.assertEqual((code, payload["reason"]), (1, "artifact_ref_mismatch"))
+        self.assertEqual(self.head(), before)
+
+    def test_save_prepared_rejects_update_whose_previous_text_is_not_stored(
+        self,
+    ) -> None:
+        self.init()
+        first = self.create("op-1")
+        alternative = run_context(
+            self.create_request(section_updates={"2": "- 製品: Other"})
+        )["artifact_markdown"]
+        before = self.head()
+        code, payload = self.save_prepared(
+            self.update_request(alternative, first["revision"], "Sample App"),
+            operation="op-2",
+        )
+        self.assertEqual((code, payload["reason"]), (1, "previous_document_mismatch"))
+        self.assertEqual(self.head(), before)
+
+    def test_save_leaves_head_index_and_worktree_unchanged(self) -> None:
+        (self.repo / "staged.txt").write_text("staged\n", encoding="utf-8")
+        git(self.repo, "add", "staged.txt")
+        (self.repo / "README.md").write_text("edited but unstaged\n", encoding="utf-8")
+        (self.repo / "untracked.txt").write_text("untracked\n", encoding="utf-8")
+        snapshot = (
+            git(self.repo, "rev-parse", "HEAD"),
+            git(self.repo, "symbolic-ref", "HEAD"),
+            git(self.repo, "ls-files", "-s"),
+            git(self.repo, "diff", "--cached", "--name-status"),
+            git(self.repo, "status", "--porcelain"),
+        )
+        self.init()
+        self.create()
+        after = (
+            git(self.repo, "rev-parse", "HEAD"),
+            git(self.repo, "symbolic-ref", "HEAD"),
+            git(self.repo, "ls-files", "-s"),
+            git(self.repo, "diff", "--cached", "--name-status"),
+            git(self.repo, "status", "--porcelain"),
+        )
+        self.assertEqual(after, snapshot)
+        self.assertEqual(git(self.repo, "rev-list", "--count", BRANCH), "2")
+
+    def test_blocked_output_is_json_with_nonzero_exit_for_bad_arguments(self) -> None:
+        code, payload = run_host("save-prepared", "--repo", str(self.repo))
+        self.assertEqual((code, payload["status"]), (1, "blocked"))
+        self.assertIn("reason", payload)
+
+    def test_project_context_cli_still_cannot_save(self) -> None:
+        self.init()
+        before = self.head()
+        for operation in [
+            "save",
+            "write",
+            "persist",
+            "persist-prepared",
+            "persist_prepared",
+        ]:
+            with self.subTest(operation=operation):
+                request = {
+                    "operation": operation,
+                    "project_ref": "Sample",
+                    "approval_ref": "user confirmed",
+                }
+                completed = subprocess.run(
+                    [sys.executable, str(PROJECT_CONTEXT_CLI)],
+                    input=json.dumps(request).encode("utf-8"),
+                    capture_output=True,
+                    check=False,
+                    env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                )
+                payload = json.loads(completed.stdout.decode("utf-8"))
+                self.assertEqual(payload["status"], "blocked")
+                self.assertEqual(payload["reason"], "operation_invalid")
+        self.assertEqual(self.head(), before)
+
+
+# ---------------------------------------------------------------------------
+# save-snapshot（feature-inventory）。すべて使い捨てのstore repoとsource repoで実行する。
+# ---------------------------------------------------------------------------
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_feature_registry import fixture as feature_fixture  # noqa: E402
+
+FI_BRANCH = "qa-artifacts/Sample/feature-inventory"
+FI_ARTIFACT = "qa/feature-inventory.json"
+
+
+def source_listing(repo: Path) -> dict[str, tuple[int, int]]:
+    base = repo / ".git"
+    listing: dict[str, tuple[int, int]] = {}
+    for current, _dirs, files in os.walk(base):
+        for name in files:
+            path = Path(current) / name
+            stat = path.stat()
+            listing[str(path.relative_to(base))] = (stat.st_size, stat.st_mtime_ns)
+    return listing
+
+
+def source_lock_files(repo: Path) -> list[str]:
+    return sorted(
+        str(p.relative_to(repo / ".git")) for p in (repo / ".git").rglob("*.lock")
+    )
+
+
+def make_source(base: Path) -> tuple[Path, str, str]:
+    source = base / "source"
+    source.mkdir()
+    git(source, "init", "-q", "-b", "main")
+    git(source, "config", "user.email", "qa@example.invalid")
+    git(source, "config", "user.name", "QA")
+    (source / "README.md").write_text("baseline\n", encoding="utf-8")
+    git(source, "add", ".")
+    git(source, "commit", "-qm", "baseline")
+    baseline = git(source, "rev-parse", "HEAD")
+    (source / "src").mkdir()
+    (source / "src" / "auth.py").write_text(
+        "def access(): return True\n", encoding="utf-8"
+    )
+    git(source, "add", "src")
+    git(source, "commit", "-qm", "source change")
+    return source, baseline, git(source, "rev-parse", "HEAD")
+
+
+def evidence_for(source: Path, baseline: str, head: str) -> list:
+    return [
+        {
+            "source_id": "SRC-001",
+            "repository_root": str(source),
+            "authorized_root": str(source),
+            "base_sha": baseline,
+            "head_sha": head,
+        }
+    ]
+
+
+def initial_snapshot(
+    source: Path, baseline: str, head: str, operation: str = "op-1"
+) -> tuple[dict, list]:
+    data = feature_fixture()
+    snap = data["snapshot"]
+    snap["project_ref"] = "Sample"
+    snap["artifact_ref"] = FI_ARTIFACT
+    snap["operation_id"] = operation
+    snap["source_revision"] = head
+    snap["sources"][0]["revision"] = head
+    snap["changes"][0].update(
+        before_revision=baseline, after_revision=head, locator="src/auth.py"
+    )
+    snap["history"][0]["revision"] = head
+    return snap, evidence_for(source, baseline, head)
+
+
+class SaveSnapshotTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "store"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("store\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", FI_BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+        self.source, self.baseline, self.head = make_source(self.base)
+        # 信頼済みの authorized root は、テストのソースrepoだけを指す（入力JSONの値では主張できない）。
+        env_patch = mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.source)}
+        )
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
+        self.counter = 0
+
+    def write_json(self, value: object) -> Path:
+        self.counter += 1
+        path = self.base / f"input-{self.counter}.json"
+        path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+        return path
+
+    def argv(
+        self,
+        snapshot: Path,
+        evidence: object,
+        *,
+        expected: str = "none",
+        previous: Path | None = None,
+        observed: str | None = None,
+        extra: tuple[str, ...] = (),
+        confirmation: str = CONFIRMATION,
+    ) -> list[str]:
+        args = [
+            "save-snapshot",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            FI_BRANCH,
+            "--project-ref",
+            "Sample",
+            "--snapshot-file",
+            str(snapshot),
+            "--git-inventory-requests-file",
+            str(self.write_json(evidence)),
+            "--expected-revision",
+            expected,
+            "--observed-head-revision",
+            observed or self.head,
+            "--change-reason",
+            "initial inventory",
+            "--user-confirmed-ref",
+            confirmation,
+            *extra,
+        ]
+        if previous is not None:
+            args += ["--previous-snapshot-file", str(previous)]
+        return args
+
+    def save(
+        self, snapshot: dict, evidence: list, **kwargs: object
+    ) -> tuple[int, dict]:
+        return run_host(*self.argv(self.write_json(snapshot), evidence, **kwargs))
+
+    def read(self, revision: str | None = None) -> tuple[int, dict]:
+        args = [
+            "read",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            FI_BRANCH,
+            "--project-ref",
+            "Sample",
+            "--kind",
+            "feature-inventory",
+            "--artifact-ref",
+            FI_ARTIFACT,
+            "--user-confirmed-ref",
+            CONFIRMATION,
+        ]
+        if revision:
+            args += ["--revision", revision]
+        return run_host(*args)
+
+    def store_state(self) -> tuple[str, str, str]:
+        return (
+            git(self.repo, "rev-parse", "HEAD"),
+            git(self.repo, "ls-files", "--stage"),
+            git(self.repo, "status", "--porcelain"),
+        )
+
+    def test_first_save_stores_and_reads_back_identical_bytes(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "complete", payload)
+        code, read = self.read()
+        self.assertEqual((code, read["status"]), (0, "read"), read)
+        expected = hashlib.sha256(
+            json.dumps(
+                snap, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(read["sha256"], expected)
+        self.assertEqual(read["sha256"], payload["sha256"])
+        self.assertEqual(read["revision"], payload["revision"])
+
+    def test_save_without_a_user_confirmation_is_refused(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        for value in ("", "   ", "line\nbreak", "x" * 1025):
+            code, payload = self.save(snap, evidence, confirmation=value)
+            self.assertEqual(
+                (code, payload["status"]), (1, "blocked"), (value, payload)
+            )
+        code, payload = run_host(
+            *[
+                a
+                for a in self.argv(self.write_json(snap), evidence)
+                if a not in {"--user-confirmed-ref", CONFIRMATION}
+            ]
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_same_operation_retry_is_idempotent_and_stale_revision_conflicts(
+        self,
+    ) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        code, retry = self.save(snap, evidence)
+        self.assertEqual((code, retry["status"]), (0, "idempotent"), retry)
+        self.assertEqual(retry["revision"], first["revision"])
+
+        update, evidence2 = updated_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+        previous = self.write_json(snap)
+        code, second = self.save(
+            update, evidence2, expected=first["revision"], previous=previous
+        )
+        self.assertEqual((code, second["status"]), (0, "stored"), second)
+        third_op, evidence3 = updated_snapshot(
+            snap, self.head, self.source, self.baseline, operation="op-3"
+        )
+        code, stale = self.save(
+            third_op, evidence3, expected=first["revision"], previous=previous
+        )
+        self.assertEqual((code, stale["status"]), (1, "blocked"), stale)
+        self.assertIn("revision_conflict", stale["reasons"])
+
+    def test_store_head_index_and_worktree_are_unchanged_by_save(self) -> None:
+        before = self.store_state()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        after = self.store_state()
+        self.assertEqual(after[0], before[0])
+        self.assertEqual(after[1], before[1])
+        self.assertEqual(after[2], before[2])
+
+    def test_default_save_writes_no_file_into_the_source_git(self) -> None:
+        before = source_listing(self.source)
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(source_listing(self.source), before)
+        self.assertEqual(list(self.source.joinpath(".git").rglob("*.lock")), [])
+
+    def test_hold_source_refs_takes_locks_during_write_and_releases_them(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        seen: list[list[str]] = []
+        original = artifact_host.GitArtifactStore.write
+
+        def spy(store, **kwargs):
+            seen.append(
+                sorted(
+                    str(p.relative_to(self.source / ".git"))
+                    for p in (self.source / ".git").rglob("*.lock")
+                )
+            )
+            return original(store, **kwargs)
+
+        argv = self.argv(self.write_json(snap), evidence, extra=("--hold-source-refs",))
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(artifact_host.GitArtifactStore, "write", spy),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(argv)
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(len(seen), 1)
+        self.assertIn("HEAD.lock", seen[0])
+        self.assertIn("refs/heads/main.lock", seen[0])
+        self.assertEqual(list(self.source.joinpath(".git").rglob("*.lock")), [])
+
+    def test_invalid_snapshots_are_refused_without_writing(self) -> None:
+        def assert_refused(
+            snap: dict, evidence: list, reasons: tuple[str, ...] | None
+        ) -> dict:
+            code, payload = self.save(snap, evidence)
+            self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+            if reasons:
+                self.assertTrue(set(payload["reasons"]) & set(reasons), payload)
+            self.assertIsNone(self.read()[1].get("revision"))
+            return payload
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        missing = copy.deepcopy(snap)
+        del missing["operation_id"]
+        assert_refused(missing, evidence, None)
+
+        # The snapshot's code source revision differs from the evidence head (the source is at head).
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["sources"][0]["revision"] = self.baseline
+        assert_refused(
+            snap,
+            evidence,
+            (
+                "git_evidence_source_revision_mismatch",
+                "event_primary_code_source_missing",
+                "change_source_revision_mismatch:DIF-001",
+            ),
+        )
+
+        # The evidence names a head that is not the source's current HEAD.
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        evidence[0]["head_sha"] = self.baseline
+        snap["sources"][0]["revision"] = self.baseline
+        assert_refused(
+            snap,
+            evidence,
+            (
+                "git_head_changed",
+                "git_evidence_source_revision_mismatch",
+                "event_primary_code_source_missing",
+                "change_source_revision_mismatch:DIF-001",
+            ),
+        )
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence, observed=self.baseline)
+        self.assertEqual((code, payload["status"]), (1, "stale"), payload)
+        self.assertIn("source_head_changed", payload["reasons"])
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["project_ref"] = "Other"
+        code, payload = self.save(snap, evidence)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "project_ref_mismatch"), payload
+        )
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(
+            snap, evidence, extra=("--operation-id", "not-the-op")
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "operation_id_mismatch")
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence, expected="git:not-a-sha")
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+
+    def test_branch_checked_out_in_the_store_is_refused(self) -> None:
+        git(self.repo, "checkout", "-q", FI_BRANCH)
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "branch_checked_out")
+
+    def test_reclassification_is_stored_only_with_registered_confirmations(
+        self,
+    ) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        previous = self.write_json(snap)
+        update, evidence2 = reclassified_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+
+        # Without the host's registration (no confirmations in this process), the store refuses.
+        store = artifact_host.GitArtifactStore(
+            self.repo,
+            self.repo,
+            FI_BRANCH,
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+            approval_source="user-confirmed",
+        )
+        store.record_user_confirmation(
+            {
+                "operation": "read",
+                "kind": "feature-inventory",
+                "project_ref": "Sample",
+                "artifact_ref": FI_ARTIFACT,
+                "approval_ref": CONFIRMATION,
+            }
+        )
+        feature_registry = artifact_host._feature_registry()
+        unverified = feature_registry.persist_snapshot(
+            store,
+            {
+                "snapshot": update,
+                "previous_snapshot": snap,
+                "observed_head_revision": self.head,
+            },
+            expected_revision=first["revision"],
+            approval_ref="approval/verified",
+            approval_revision="policy-v1",
+            change_reason="approved correction",
+            git_inventory_requests=evidence2,
+        )
+        self.assertEqual(unverified["status"], "blocked", unverified)
+        self.assertIn(
+            "change_reclassification_approval_unverified:DIF-002", unverified["reasons"]
+        )
+
+        table = self.write_json(
+            [
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v2",
+                }
+            ]
+        )
+        code, payload = self.save(
+            update,
+            evidence2,
+            expected=first["revision"],
+            previous=previous,
+            extra=("--confirmed-reclassifications-file", str(table)),
+        )
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "complete", payload)
+
+    def saved_then_reclassified(self) -> tuple[dict, dict, Path, list]:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        previous = self.write_json(snap)
+        update, evidence2 = reclassified_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+        return first, update, previous, evidence2
+
+    def confirmation_table(self, *rows: dict) -> str:
+        return str(self.write_json(list(rows)))
+
+    def test_reclassification_without_confirmation_table_is_refused(self) -> None:
+        first, update, previous, evidence2 = self.saved_then_reclassified()
+        code, payload = self.save(
+            update, evidence2, expected=first["revision"], previous=previous
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "reclassification_not_confirmed", payload)
+        self.assertEqual(
+            payload["unconfirmed"],
+            [{"change_id": "DIF-002", "reason": "not_listed"}],
+            payload,
+        )
+        self.assertEqual(
+            payload["reasons"], ["reclassification_not_confirmed:DIF-002:not_listed"]
+        )
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_reclassification_with_mismatched_confirmation_is_refused(self) -> None:
+        first, update, previous, evidence2 = self.saved_then_reclassified()
+        cases = {
+            "other_change": (
+                {
+                    "change_id": "DIF-009",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v2",
+                },
+                "not_listed",
+            ),
+            "other_ref": (
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/other",
+                    "approval_revision": "policy-v2",
+                },
+                "approval_ref_mismatch",
+            ),
+            "other_revision": (
+                {
+                    "change_id": "DIF-002",
+                    "approval_ref": "approval/verified",
+                    "approval_revision": "policy-v1",
+                },
+                "approval_revision_mismatch",
+            ),
+        }
+        for name, (row, reason) in cases.items():
+            table = self.confirmation_table(row)
+            code, payload = self.save(
+                update,
+                evidence2,
+                expected=first["revision"],
+                previous=previous,
+                extra=("--confirmed-reclassifications-file", table),
+            )
+            self.assertEqual((code, payload["status"]), (1, "blocked"), (name, payload))
+            self.assertEqual(payload["reason"], "reclassification_not_confirmed", name)
+            self.assertEqual(
+                payload["unconfirmed"],
+                [{"change_id": "DIF-002", "reason": reason}],
+                (name, payload),
+            )
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_malformed_confirmation_tables_are_refused_before_writing(self) -> None:
+        valid = {
+            "change_id": "DIF-002",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v2",
+        }
+        bad_tables: dict[str, object] = {
+            "object_not_array": valid,
+            "missing_key": {k: v for k, v in valid.items() if k != "approval_ref"},
+            "extra_key": {**valid, "note": "x"},
+            "not_object": ["DIF-002"],
+            "duplicate_change_id": [valid, dict(valid)],
+            "control_character": {**valid, "approval_ref": "approval\u0007"},
+            "line_break": {**valid, "approval_revision": "policy\nv2"},
+            "too_long": {**valid, "approval_ref": "x" * 1025},
+            "empty": {**valid, "change_id": "  "},
+        }
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        for name, table in bad_tables.items():
+            code, payload = self.save(
+                snap,
+                evidence,
+                extra=("--confirmed-reclassifications-file", self.write_json(table)),
+            )
+            self.assertEqual((code, payload["status"]), (1, "blocked"), (name, payload))
+            self.assertTrue(payload["reason"].startswith("confirmed_"), (name, payload))
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_confirmation_table_is_harmless_for_an_initial_snapshot(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        table = self.confirmation_table(
+            {
+                "change_id": "DIF-777",
+                "approval_ref": "approval/unused",
+                "approval_revision": "policy-unused",
+            }
+        )
+        code, payload = self.save(
+            snap,
+            evidence,
+            extra=("--confirmed-reclassifications-file", table),
+        )
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["reasons"], [])
+
+    def test_reclassification_without_predecessor_reports_its_reason(self) -> None:
+        _first, update, _previous, evidence2 = self.saved_then_reclassified()
+        code, payload = self.save(update, evidence2)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "change_supersession_without_predecessor")
+        self.assertIn("先行するDIF", payload["detail"])
+
+    def test_artifact_ref_extension_error_names_the_rule(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["artifact_ref"] = "qa/feature-inventory.txt"
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "snapshot_invalid:git_artifact_ref_invalid")
+        self.assertIn("相対パス", payload["detail"])
+        self.assertIn(".md", payload["detail"])
+        self.assertIn(".json", payload["detail"])
+
+    def test_non_finite_numbers_in_the_snapshot_are_refused(self) -> None:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+            snap["probe_value"] = value
+            code, payload = self.save(snap, evidence)
+            self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+            self.assertEqual(payload["reason"], "snapshot_invalid:nonfinite_number")
+            self.assertIn("NaN", payload["detail"])
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_lone_surrogate_is_refused_and_u2028_round_trips(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["probe_text"] = "\ud800"
+        # ensure_ascii keeps the lone surrogate as an escape so that the file itself is valid UTF-8.
+        path = self.base / "surrogate.json"
+        path.write_text(json.dumps(snap), encoding="utf-8")
+        code, payload = self.save_file(path, evidence)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "snapshot_invalid:text_not_utf8")
+
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        snap["probe_text"] = "line\u2028separator"
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        code, read = self.read()
+        self.assertEqual(read["sha256"], payload["sha256"])
+        self.assertIn("\u2028", json.loads(read["content"])["probe_text"])
+
+    def test_stored_output_carries_reasons_and_no_warning_by_default(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["reasons"], [])
+        self.assertNotIn("warnings", payload)
+
+    def test_snapshot_size_boundary_is_16_mib(self) -> None:
+        limit = artifact_host._feature_registry().MAX_INPUT
+        prefix = b'{"p":"'
+        suffix = b'"}'
+        for size, expect_error in ((limit, False), (limit + 1, True)):
+            path = self.base / f"size-{size}.json"
+            body = prefix + b"a" * (size - len(prefix) - len(suffix)) + suffix
+            path.write_bytes(body)
+            self.assertEqual(len(body), size)
+            if expect_error:
+                with self.assertRaises(artifact_host.HostError) as raised:
+                    artifact_host._json_file(str(path), "snapshot")
+                self.assertEqual(str(raised.exception), "snapshot_too_large")
+            else:
+                loaded = artifact_host._json_file(str(path), "snapshot")
+                self.assertEqual(len(loaded["p"]), size - len(prefix) - len(suffix))
+
+    def save_file(self, snapshot_path: Path, evidence: list) -> tuple[int, dict]:
+        return run_host(*self.argv(snapshot_path, evidence))
+
+    def test_default_save_holds_no_lock_while_writing(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        seen: list[tuple[list[str], dict]] = []
+        original = artifact_host.GitArtifactStore.write
+
+        def spy(store, **kwargs):
+            seen.append((source_lock_files(self.source), source_listing(self.source)))
+            return original(store, **kwargs)
+
+        before = source_listing(self.source)
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(artifact_host.GitArtifactStore, "write", spy),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0], ([], before))
+
+    def test_head_moved_before_the_save_is_refused_as_git_head_changed(self) -> None:
+        # The snapshot is consistent with the source HEAD, but the evidence names an older commit
+        # that exists in the repository and is not the checked-out HEAD.
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        evidence[0]["head_sha"] = self.baseline
+        evidence[0]["base_sha"] = None
+        code, payload = self.save(snap, evidence, observed=self.head)
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reasons"], ["git_head_changed"], payload)
+
+    def test_inventory_path_wraps_a_head_mismatch_as_listing_incomplete(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        artifact_host._feature_registry()
+        import git_source_inventory
+
+        blocked = {"status": "blocked", "reason": "git_head_changed"}
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(git_source_inventory, "handle", return_value=blocked),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(
+            payload["reasons"],
+            ["git_source_listing_incomplete:git_head_changed"],
+            payload,
+        )
+
+    def test_previous_snapshot_that_is_not_the_stored_one_is_refused(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, first = self.save(snap, evidence)
+        self.assertEqual(code, 0, first)
+        update, evidence2 = updated_snapshot(
+            snap, self.head, self.source, self.baseline
+        )
+        altered = copy.deepcopy(snap)
+        altered["probe_note"] = "not the stored revision"
+        code, payload = self.save(
+            update,
+            evidence2,
+            expected=first["revision"],
+            previous=self.write_json(altered),
+        )
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertIn("previous_snapshot_not_current", payload["reasons"])
+        self.assertEqual(self.read()[1]["revision"], first["revision"])
+
+    def test_confirmation_record_with_a_different_sha256_is_refused(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        feature_registry = artifact_host._feature_registry()
+        content = feature_registry.snapshot_content(snap)
+        store = artifact_host.GitArtifactStore(
+            self.repo,
+            self.repo,
+            FI_BRANCH,
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+            approval_source="user-confirmed",
+        )
+        store.record_user_confirmation(
+            {
+                "operation": "read",
+                "kind": "feature-inventory",
+                "project_ref": "Sample",
+                "artifact_ref": FI_ARTIFACT,
+                "approval_ref": CONFIRMATION,
+            }
+        )
+        store.record_user_confirmation(
+            {
+                "operation": "write",
+                "kind": "feature-inventory",
+                "project_ref": "Sample",
+                "artifact_ref": FI_ARTIFACT,
+                "expected_revision": None,
+                "sha256": "0" * 64,
+                "source_ref": "Sample",
+                "source_revision": snap["source_revision"],
+                "approval_ref": CONFIRMATION,
+                "approval_revision": "sha256:" + "0" * 64,
+                "operation_id": snap["operation_id"],
+                "change_reason": "initial inventory",
+            }
+        )
+        result = feature_registry.persist_snapshot(
+            store,
+            {
+                "snapshot": snap,
+                "previous_snapshot": None,
+                "observed_head_revision": self.head,
+            },
+            expected_revision=None,
+            approval_ref=CONFIRMATION,
+            approval_revision="sha256:"
+            + hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            change_reason="initial inventory",
+            git_inventory_requests=evidence,
+        )
+        self.assertEqual(result["status"], "blocked", result)
+        self.assertIsNone(
+            store.read_current("feature-inventory", "Sample", FI_ARTIFACT)
+        )
+
+    def test_save_is_refused_when_the_store_is_the_source_repository(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(self.source, snap, evidence))
+        self.assertEqual((code, payload["status"]), (1, "blocked"), payload)
+        self.assertEqual(payload["reason"], "store_repo_is_source_repo")
+
+    def test_save_is_refused_when_the_store_is_inside_the_source_repository(
+        self,
+    ) -> None:
+        (self.source / "sub").mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(
+            *self.argv_for_repo(self.source / "sub", snap, evidence)
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_allowed_when_the_source_is_an_independent_repo_inside_the_store(
+        self,
+    ) -> None:
+        # 実際の配置の再現: store の作業ツリーの配下に、独自の .git を持つ別repoのソースがある。
+        nested_source, baseline, head = make_source(self.repo)
+        nested_git = source_listing(nested_source)
+        main_before = git(self.repo, "rev-parse", "main")
+        snap, evidence = initial_snapshot(nested_source, baseline, head)
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(nested_source)}
+        ):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(git(self.repo, "rev-parse", "main"), main_before)
+        self.assertEqual(source_listing(nested_source), nested_git)
+
+    def test_save_is_refused_when_the_source_is_a_plain_directory_of_the_store(
+        self,
+    ) -> None:
+        # 独自の .git を持たない。store と同じrepoの作業ツリーの単なるサブディレクトリ（同一repo）。
+        plain = self.repo / "plain-src"
+        plain.mkdir()
+        (plain / "auth.py").write_text("def access(): return True\n", encoding="utf-8")
+        snap, evidence = initial_snapshot(plain, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(plain)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_source_and_store_are_worktrees_of_one_repository(
+        self,
+    ) -> None:
+        # 作業ツリーのtoplevelは異なるが、同じGitリポジトリ（common git dir が一致）。
+        linked = self.base / "linked-worktree"
+        git(self.repo, "worktree", "add", "-q", "--detach", str(linked), "main")
+        snap, evidence = initial_snapshot(linked, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(linked)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.repo)}
+        ):
+            code, payload = run_host(*self.argv_for_repo(linked, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_the_store_is_an_independent_repo_inside_the_source(
+        self,
+    ) -> None:
+        inner_store = self.source / "store-inside"
+        inner_store.mkdir()
+        git(inner_store, "init", "-q", "-b", "main")
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(inner_store, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_save_is_refused_when_either_side_is_reached_through_a_symlink(
+        self,
+    ) -> None:
+        link = self.base / "store-link"
+        link.symlink_to(self.repo, target_is_directory=True)
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        # ソースが store への symlink 経由で指される（同一repo）。
+        evidence[0]["repository_root"] = str(link)
+        evidence[0]["authorized_root"] = str(link)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(link)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+        # 保存先が symlink 経由で指される。ソースは store の実パス（同一repo）。
+        snap, evidence = initial_snapshot(self.repo, self.baseline, self.head)
+        with mock.patch.dict(
+            os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(self.repo)}
+        ):
+            code, payload = run_host(*self.argv_for_repo(link, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "store_repo_is_source_repo"), payload
+        )
+
+    def test_undeterminable_store_source_relation_is_refused(self) -> None:
+        not_repo = self.base / "not-a-repo"
+        not_repo.mkdir()
+        snap, evidence = initial_snapshot(not_repo, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(not_repo)}):
+            code, payload = run_host(*self.argv_for_repo(self.repo, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+
+        plain_store = self.base / "plain-store"
+        plain_store.mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = run_host(*self.argv_for_repo(plain_store, snap, evidence))
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+
+    def test_failed_git_judgement_is_refused_fail_closed(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(artifact_host, "_git_path_option", return_value=None),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual(
+            (code, payload["reason"]),
+            (1, "store_source_relation_unverifiable"),
+            payload,
+        )
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_unrelated_source_repository_is_allowed(self) -> None:
+        # setUp の store と source は兄弟（無関係）。同じ権限で保存できる。
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+
+    def test_save_with_code_source_requires_the_trusted_root_variable(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("QA_FEATURE_AUTHORIZED_ROOT", None)
+            code, payload = self.save(snap, evidence)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "trusted_authorized_root_missing"), payload
+        )
+
+    def test_trusted_root_variable_must_match_the_request_root(self) -> None:
+        other = self.base / "other-root"
+        other.mkdir()
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        with mock.patch.dict(os.environ, {"QA_FEATURE_AUTHORIZED_ROOT": str(other)}):
+            code, payload = self.save(snap, evidence)
+        self.assertEqual(
+            (code, payload["reason"]), (1, "trusted_authorized_root_mismatch"), payload
+        )
+        self.assertIsNone(self.read()[1].get("revision"))
+
+    def test_save_reports_a_head_moved_after_the_write_as_a_warning(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        original = artifact_host.GitArtifactStore.write
+
+        def write_then_move_head(store, **kwargs):
+            written = original(store, **kwargs)
+            (self.source / "src" / "auth.py").write_text(
+                "def access(): return 0\n", encoding="utf-8"
+            )
+            git(self.source, "commit", "-qam", "moved after write")
+            return written
+
+        buffer = io.StringIO()
+        with (
+            mock.patch.object(
+                artifact_host.GitArtifactStore, "write", write_then_move_head
+            ),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        payload = json.loads(buffer.getvalue().splitlines()[-1])
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["warnings"], ["source_head_changed_after_write"])
+        self.assertEqual(self.read()[1]["revision"], payload["revision"])
+
+    def test_read_only_git_calls_from_the_host_carry_the_environment(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        seen: list[dict] = []
+        real_run = subprocess.run
+
+        def recording_run(args, **kwargs):
+            if args and args[0] == "git":
+                seen.append(kwargs.get("env") or {})
+            return real_run(args, **kwargs)
+
+        buffer = io.StringIO()
+        with (
+            mock.patch("subprocess.run", recording_run),
+            contextlib.redirect_stdout(buffer),
+        ):
+            code = artifact_host.main(self.argv(self.write_json(snap), evidence))
+        self.assertEqual(code, 0, buffer.getvalue())
+        self.assertGreater(len(seen), 0)
+        for env in seen:
+            self.assertEqual(env.get("GIT_NO_LAZY_FETCH"), "1", env)
+            self.assertEqual(env.get("GIT_OPTIONAL_LOCKS"), "0", env)
+
+    def argv_for_repo(self, repo: Path, snap: dict, evidence: list) -> list[str]:
+        args = self.argv(self.write_json(snap), evidence)
+        args[args.index("--repo") + 1] = str(repo)
+        return args
+
+    def test_read_export_and_verify_work_for_feature_inventory(self) -> None:
+        snap, evidence = initial_snapshot(self.source, self.baseline, self.head)
+        code, payload = self.save(snap, evidence)
+        self.assertEqual(code, 0, payload)
+        out = self.base / "projection.json"
+        code, exported = run_host(
+            "export",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            FI_BRANCH,
+            "--project-ref",
+            "Sample",
+            "--kind",
+            "feature-inventory",
+            "--artifact-ref",
+            FI_ARTIFACT,
+            "--out",
+            str(out),
+            "--user-confirmed-ref",
+            CONFIRMATION,
+        )
+        self.assertEqual((code, exported["status"]), (0, "exported"), exported)
+        self.assertEqual(exported["sha256"], payload["sha256"])
+        code, verified = run_host(
+            "verify-projection",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            FI_BRANCH,
+            "--project-ref",
+            "Sample",
+            "--kind",
+            "feature-inventory",
+            "--artifact-ref",
+            FI_ARTIFACT,
+            "--out",
+            str(out),
+            "--user-confirmed-ref",
+            CONFIRMATION,
+        )
+        self.assertEqual((code, verified["status"]), (0, "in_sync"), verified)
+
+    def test_save_prepared_still_refuses_feature_inventory(self) -> None:
+        prepared = self.write_json(
+            {"operation": "prepare-create", "artifact_ref": FI_ARTIFACT}
+        )
+        code, payload = run_host(
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            FI_BRANCH,
+            "--project-ref",
+            "Sample",
+            "--kind",
+            "feature-inventory",
+            "--artifact-ref",
+            FI_ARTIFACT,
+            "--prepared-file",
+            str(prepared),
+            "--user-confirmed-ref",
+            CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "unsupported_kind_for_now"), payload
+        )
+        self.assertIn("save-snapshot", payload["hint"])
+
+
+def updated_snapshot(
+    previous: dict, head: str, source: Path, baseline: str, operation: str = "op-2"
+) -> tuple[dict, list]:
+    snap = copy.deepcopy(previous)
+    snap["event"] = "analysis_update"
+    snap["event_basis"] = {
+        "source_revision": head,
+        "evidence_ref": "review/" + operation,
+    }
+    snap["operation_id"] = operation
+    snap["previous_artifact_revision"] = previous["artifact_revision"]
+    snap["artifact_revision"] = "art-" + operation
+    return snap, evidence_for(source, baseline, head)
+
+
+def reclassified_snapshot(
+    previous: dict, head: str, source: Path, baseline: str
+) -> tuple[dict, list]:
+    snap, evidence = updated_snapshot(previous, head, source, baseline)
+    override = copy.deepcopy(snap["changes"][0])
+    override.update(
+        id="DIF-002",
+        supersedes_id="DIF-001",
+        classification="no_impact",
+        feature_ids=[],
+        reason="Approved correction after source review",
+        evidence_ref="review/evidence-2",
+        approval_ref="approval/verified",
+        approval_revision="policy-v2",
+    )
+    snap["changes"].append(override)
+    return snap, evidence
+
+
+# save-document（spec-analysis）。使い捨てのstore repoだけで実行する。
+from test_spec_document_validator import VALID as SPEC_DOCUMENT  # noqa: E402
+
+DOC_BRANCH = "qa-artifacts/project-a/spec-analysis"
+DOC_ARTIFACT = "spec-analysis/scope-1.md"
+DOC_CONFIRMATION = "user confirmed the document 2026-11-22"
+
+
+class SaveDocumentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "store"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("store\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", DOC_BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+
+    def document(self, text: str, name: str = "document.md") -> Path:
+        path = self.base / name
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def head(self) -> str:
+        return git(self.repo, "rev-parse", DOC_BRANCH)
+
+    def save_argv(
+        self,
+        path: Path,
+        *,
+        expected: str | None = None,
+        confirmation: str = DOC_CONFIRMATION,
+        operation: str | None = None,
+    ) -> list[str]:
+        args = [
+            "save-document",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--document-file",
+            str(path),
+            "--source-ref",
+            "issue/1",
+            "--source-revision",
+            "source-1",
+            "--change-reason",
+            "approved change",
+            "--user-confirmed-ref",
+            confirmation,
+            "--author-name",
+            "QA",
+            "--author-email",
+            "qa@example.invalid",
+        ]
+        if expected is not None:
+            args += ["--expected-revision", expected]
+        if operation is not None:
+            args += ["--operation-id", operation]
+        return args
+
+    def read_argv(self, *extra: str) -> list[str]:
+        return [
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "spec-analysis",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            *extra,
+        ]
+
+    def test_create_then_read_returns_the_same_document(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "valid")
+        code, read = run_host("read", *self.read_argv())
+        self.assertEqual((code, read["status"]), (0, "read"), read)
+        self.assertEqual(read["content"], SPEC_DOCUMENT)
+        self.assertEqual(read["revision"], payload["revision"])
+
+    def test_create_when_the_artifact_exists_is_refused(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        # The same content with the same derived operation id is an idempotent retry (exit 0).
+        code, again = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual((code, again["status"]), (0, "idempotent"), again)
+        code, payload = run_host(
+            *self.save_argv(self.document(SPEC_DOCUMENT), operation="op-other")
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "create_if_absent_conflict"), payload
+        )
+
+    def test_update_needs_the_current_revision(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        updated = SPEC_DOCUMENT.replace("item one", "item one revised", 1)
+        code, second = run_host(
+            *self.save_argv(
+                self.document(updated, "v2.md"),
+                expected=first["revision"],
+                operation="op-2",
+            )
+        )
+        self.assertEqual((code, second["status"]), (0, "stored"), second)
+        code, stale = run_host(
+            *self.save_argv(
+                self.document(updated, "v3.md"),
+                expected=first["revision"],
+                operation="op-3",
+            )
+        )
+        self.assertEqual((code, stale["reason"]), (1, "revision_conflict"), stale)
+
+    def test_invalid_document_is_not_written_and_no_confirmation_is_needed(
+        self,
+    ) -> None:
+        head = self.head()
+        broken = SPEC_DOCUMENT.replace("## 後続Skillへの補足", "## 後続", 1)
+        code, payload = run_host(*self.save_argv(self.document(broken)))
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(
+            payload["reason"], "spec_document_invalid:section_missing:後続Skillへの補足"
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_missing_or_oversized_document_file_is_refused(self) -> None:
+        head = self.head()
+        code, payload = run_host(*self.save_argv(self.base / "absent.md"))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "document_file_unavailable"), payload
+        )
+        big = self.base / "big.md"
+        big.write_bytes(b"x" * (16 * 1024 * 1024 + 1))
+        code, payload = run_host(*self.save_argv(big))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "document_file_too_large"), payload
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_confirmation_must_be_one_line(self) -> None:
+        path = self.document(SPEC_DOCUMENT)
+        code, payload = run_host(*self.save_argv(path, confirmation="a\nb"))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "user_confirmed_ref_invalid"), payload
+        )
+        code, payload = run_host(*self.save_argv(path, confirmation="   "))
+        self.assertEqual(
+            (code, payload["reason"]), (1, "user_confirmed_ref_required"), payload
+        )
+
+    def test_export_and_verify_projection_follow_the_store(self) -> None:
+        code, saved = run_host(*self.save_argv(self.document(SPEC_DOCUMENT)))
+        self.assertEqual(code, 0, saved)
+        out = self.base / "projection.md"
+        code, exported = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, exported["status"]), (0, "exported"), exported)
+        self.assertEqual(out.read_text(encoding="utf-8"), SPEC_DOCUMENT)
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "in_sync"), verified)
+        out.chmod(0o644)
+        out.write_text(SPEC_DOCUMENT + "\nhand edit\n", encoding="utf-8")
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "drifted"), verified)
+        code, refused = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, refused["reason"]), (1, "projection_drifted"), refused)
+        code, forced = run_host("export", *self.read_argv("--out", str(out), "--force"))
+        self.assertEqual((code, forced["status"]), (0, "exported"), forced)
+        self.assertTrue(forced["overwrote_drifted"])
+
+    def test_save_prepared_still_refuses_spec_analysis(self) -> None:
+        code, payload = run_host(
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            DOC_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "spec-analysis",
+            "--artifact-ref",
+            DOC_ARTIFACT,
+            "--prepared-file",
+            str(self.base / "unused.json"),
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "unsupported_kind_for_now"), payload
+        )
+
+
+# save-document（question-analysis）。使い捨てのstore repoだけで実行する。
+from test_question_document_validator import VALID as QUESTION_DOCUMENT  # noqa: E402
+
+QUESTION_BRANCH = "qa-artifacts/project-a/question-analysis"
+QUESTION_ARTIFACT = "question-analysis/scope-1.md"
+QUESTION_REVISION = "rev-source-1"
+
+
+class QuestionSaveDocumentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "store"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("store\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", QUESTION_BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+
+    def document(self, text: str, name: str = "document.md") -> Path:
+        path = self.base / name
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def head(self) -> str:
+        return git(self.repo, "rev-parse", QUESTION_BRANCH)
+
+    def save_argv(
+        self,
+        path: Path,
+        *,
+        expected: str | None = None,
+        artifact: str = QUESTION_ARTIFACT,
+        operation: str | None = None,
+    ) -> list[str]:
+        args = [
+            "save-document",
+            "--kind",
+            "question-analysis",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            QUESTION_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            artifact,
+            "--document-file",
+            str(path),
+            "--source-ref",
+            "issue/1",
+            "--source-revision",
+            QUESTION_REVISION,
+            "--change-reason",
+            "approved change",
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            "--author-name",
+            "QA",
+            "--author-email",
+            "qa@example.invalid",
+        ]
+        if expected is not None:
+            args += ["--expected-revision", expected]
+        if operation is not None:
+            args += ["--operation-id", operation]
+        return args
+
+    def read_argv(self, *extra: str) -> list[str]:
+        return [
+            "--kind",
+            "question-analysis",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            QUESTION_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            QUESTION_ARTIFACT,
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            *extra,
+        ]
+
+    def test_create_then_read_returns_the_same_document(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(QUESTION_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "valid")
+        code, read = run_host("read", *self.read_argv())
+        self.assertEqual((code, read["status"]), (0, "read"), read)
+        self.assertEqual(read["content"], QUESTION_DOCUMENT)
+        self.assertEqual(read["revision"], payload["revision"])
+
+    def test_default_operation_id_uses_the_question_prefix(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(QUESTION_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        trailer = git(self.repo, "log", "-1", "--format=%B", QUESTION_BRANCH)
+        self.assertIn("QA-Operation-Id: question-", trailer)
+
+    def test_update_needs_the_current_revision(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(QUESTION_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        updated = QUESTION_DOCUMENT.replace(
+            "通知の既定値は何か", "表示順の既定値は何か", 1
+        )
+        code, refused = run_host(*self.save_argv(self.document(updated, "updated.md")))
+        self.assertEqual(
+            (code, refused["reason"]), (1, "create_if_absent_conflict"), refused
+        )
+        code, saved = run_host(
+            *self.save_argv(
+                self.document(updated, "updated.md"),
+                expected=first["revision"],
+                operation="op-2",
+            )
+        )
+        self.assertEqual((code, saved["status"]), (0, "stored"), saved)
+
+    def test_invalid_document_is_not_written_and_no_confirmation_is_needed(
+        self,
+    ) -> None:
+        head = self.head()
+        broken = QUESTION_DOCUMENT.replace("## 仮定候補", "## 別の見出し", 1)
+        code, payload = run_host(*self.save_argv(self.document(broken)))
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(
+            payload["reason"], "question_document_invalid:section_missing:仮定候補"
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_artifact_ref_of_another_kind_is_refused_by_validation(self) -> None:
+        head = self.head()
+        code, payload = run_host(
+            *self.save_argv(
+                self.document(QUESTION_DOCUMENT), artifact="spec-analysis/scope-1.md"
+            )
+        )
+        self.assertEqual(code, 1, payload)
+        self.assertIn("question_document_invalid:scope_id_invalid", payload["reasons"])
+        self.assertEqual(self.head(), head)
+
+    def test_export_and_verify_projection_follow_the_store(self) -> None:
+        code, saved = run_host(*self.save_argv(self.document(QUESTION_DOCUMENT)))
+        self.assertEqual(code, 0, saved)
+        out = self.base / "projection.md"
+        code, exported = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, exported["status"]), (0, "exported"), exported)
+        self.assertEqual(out.read_text(encoding="utf-8"), QUESTION_DOCUMENT)
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "in_sync"), verified)
+
+    def test_save_prepared_still_refuses_question_analysis(self) -> None:
+        code, payload = run_host(
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            QUESTION_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "question-analysis",
+            "--artifact-ref",
+            QUESTION_ARTIFACT,
+            "--prepared-file",
+            str(self.base / "unused.json"),
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "unsupported_kind_for_now"), payload
+        )
+
+
+# save-document（test-analysis）。使い捨てのstore repoだけで実行する。
+from test_test_analysis_document_validator import VALID as TEST_DOCUMENT  # noqa: E402
+
+TEST_BRANCH = "qa-artifacts/project-a/test-analysis"
+TEST_ARTIFACT = "test-analysis/scope-1.md"
+TEST_REVISION = "rev-source-1"
+
+
+class TestAnalysisSaveDocumentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.repo = self.base / "store"
+        self.repo.mkdir()
+        git(self.repo, "init", "-q", "-b", "main")
+        git(self.repo, "config", "user.email", "qa@example.invalid")
+        git(self.repo, "config", "user.name", "QA")
+        (self.repo / "README.md").write_text("store\n", encoding="utf-8")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "baseline")
+        code, payload = run_host(
+            "init-branch", "--repo", str(self.repo), "--branch", TEST_BRANCH
+        )
+        self.assertEqual((code, payload["status"]), (0, "created"), payload)
+
+    def document(self, text: str, name: str = "document.md") -> Path:
+        path = self.base / name
+        path.write_bytes(text.encode("utf-8"))
+        return path
+
+    def head(self) -> str:
+        return git(self.repo, "rev-parse", TEST_BRANCH)
+
+    def save_argv(
+        self,
+        path: Path,
+        *,
+        expected: str | None = None,
+        artifact: str = TEST_ARTIFACT,
+        operation: str | None = None,
+    ) -> list[str]:
+        args = [
+            "save-document",
+            "--kind",
+            "test-analysis",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            TEST_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            artifact,
+            "--document-file",
+            str(path),
+            "--source-ref",
+            "issue/1",
+            "--source-revision",
+            TEST_REVISION,
+            "--change-reason",
+            "approved change",
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            "--author-name",
+            "QA",
+            "--author-email",
+            "qa@example.invalid",
+        ]
+        if expected is not None:
+            args += ["--expected-revision", expected]
+        if operation is not None:
+            args += ["--operation-id", operation]
+        return args
+
+    def read_argv(self, *extra: str) -> list[str]:
+        return [
+            "--kind",
+            "test-analysis",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            TEST_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--artifact-ref",
+            TEST_ARTIFACT,
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+            *extra,
+        ]
+
+    def test_create_then_read_returns_the_same_document(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(TEST_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        self.assertEqual(payload["analysis_status"], "valid")
+        code, read = run_host("read", *self.read_argv())
+        self.assertEqual((code, read["status"]), (0, "read"), read)
+        self.assertEqual(read["content"], TEST_DOCUMENT)
+        self.assertEqual(read["revision"], payload["revision"])
+
+    def test_default_operation_id_uses_the_test_prefix(self) -> None:
+        code, payload = run_host(*self.save_argv(self.document(TEST_DOCUMENT)))
+        self.assertEqual((code, payload["status"]), (0, "stored"), payload)
+        trailer = git(self.repo, "log", "-1", "--format=%B", TEST_BRANCH)
+        self.assertIn("QA-Operation-Id: test-", trailer)
+
+    def test_update_needs_the_current_revision(self) -> None:
+        code, first = run_host(*self.save_argv(self.document(TEST_DOCUMENT)))
+        self.assertEqual(code, 0, first)
+        updated = TEST_DOCUMENT.replace(
+            "表示順の既定値が誤って表示される", "表示順の既定値の確認", 1
+        )
+        code, refused = run_host(*self.save_argv(self.document(updated, "updated.md")))
+        self.assertEqual(
+            (code, refused["reason"]), (1, "create_if_absent_conflict"), refused
+        )
+        code, saved = run_host(
+            *self.save_argv(
+                self.document(updated, "updated.md"),
+                expected=first["revision"],
+                operation="op-2",
+            )
+        )
+        self.assertEqual((code, saved["status"]), (0, "stored"), saved)
+
+    def test_invalid_document_is_not_written_and_no_confirmation_is_needed(
+        self,
+    ) -> None:
+        head = self.head()
+        broken = TEST_DOCUMENT.replace("## 残存リスク", "## 別の見出し", 1)
+        code, payload = run_host(*self.save_argv(self.document(broken)))
+        self.assertEqual(code, 1, payload)
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(
+            payload["reason"],
+            "test_analysis_document_invalid:section_missing:残存リスク",
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_artifact_ref_of_another_kind_is_refused_by_validation(self) -> None:
+        head = self.head()
+        code, payload = run_host(
+            *self.save_argv(
+                self.document(TEST_DOCUMENT), artifact="spec-analysis/scope-1.md"
+            )
+        )
+        self.assertEqual(code, 1, payload)
+        self.assertIn(
+            "test_analysis_document_invalid:scope_id_invalid", payload["reasons"]
+        )
+        self.assertEqual(self.head(), head)
+
+    def test_export_and_verify_projection_follow_the_store(self) -> None:
+        code, saved = run_host(*self.save_argv(self.document(TEST_DOCUMENT)))
+        self.assertEqual(code, 0, saved)
+        out = self.base / "projection.md"
+        code, exported = run_host("export", *self.read_argv("--out", str(out)))
+        self.assertEqual((code, exported["status"]), (0, "exported"), exported)
+        self.assertEqual(out.read_text(encoding="utf-8"), TEST_DOCUMENT)
+        code, verified = run_host(
+            "verify-projection", *self.read_argv("--out", str(out))
+        )
+        self.assertEqual((code, verified["status"]), (0, "in_sync"), verified)
+
+    def test_save_prepared_still_refuses_test_analysis(self) -> None:
+        code, payload = run_host(
+            "save-prepared",
+            "--repo",
+            str(self.repo),
+            "--branch",
+            TEST_BRANCH,
+            "--project-ref",
+            "project-a",
+            "--kind",
+            "test-analysis",
+            "--artifact-ref",
+            TEST_ARTIFACT,
+            "--prepared-file",
+            str(self.base / "unused.json"),
+            "--user-confirmed-ref",
+            DOC_CONFIRMATION,
+        )
+        self.assertEqual(
+            (code, payload["reason"]), (1, "unsupported_kind_for_now"), payload
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

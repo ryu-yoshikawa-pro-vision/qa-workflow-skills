@@ -1,7 +1,9 @@
 """Local SQLite provider for Project Context and feature-inventory artifacts.
 
-The trusted host selects an explicitly authorized local root and supplies a real
-authorization callback. Neither JSON inputs nor approval_ref strings grant access.
+The trusted host selects an explicitly authorized local root. Approval comes either
+from the user-confirmed records the host registers (default) or from a real
+authorization callback injected by a trusted host. Neither JSON inputs nor
+approval_ref strings grant access.
 The SQLite transaction provides native create-if-absent and revision CAS.
 """
 
@@ -12,20 +14,125 @@ import json
 import os
 import sqlite3
 import stat
+from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
 from typing import Any, Callable
 
-KINDS = frozenset({"project-context", "feature-inventory"})
+# 保存できる kind の単一定義。local store・Git store・ホストCLIはここを参照する。
+STORE_KINDS = frozenset(
+    {
+        "project-context",
+        "feature-inventory",
+        "spec-analysis",
+        "question-analysis",
+        "test-analysis",
+    }
+)
+KINDS = STORE_KINDS
 MAX_BYTES = 16 * 1024 * 1024
 MAX_REF = 1024
 DB_DIR = ".qa-context-feature"
 DB_FILE = "artifacts.sqlite3"
 Authorization = Callable[[dict[str, str | None]], bool]
+# 承認の出所（approval_source）。未指定（None）は authorize の有無で解決する。
+# user-confirmed（既定）: 呼出し元が明示的に渡した確認記録との完全一致で判定する。ユーザー確認の自己申告であり、認証ではない。
+# trusted-callback: 信頼済みhostが注入した authorize callbackが操作ごとに承認を判定する（より強い追加検証。任意）。
+TRUSTED_CALLBACK = "trusted-callback"
+USER_CONFIRMED = "user-confirmed"
+APPROVAL_SOURCES = frozenset({TRUSTED_CALLBACK, USER_CONFIRMED})
+CONFIRMABLE_OPERATIONS = frozenset({"read", "write", "reclassify"})
 
 
 class StoreError(ValueError):
     pass
+
+
+def _approval_source(approval_source: Any, authorize: Any) -> str:
+    if approval_source is None:
+        # 未指定: callback があれば従来どおり trusted-callback、なければ既定の user-confirmed。
+        return USER_CONFIRMED if authorize is None else TRUSTED_CALLBACK
+    if not isinstance(approval_source, str) or approval_source not in APPROVAL_SOURCES:
+        raise StoreError("approval_source_invalid")
+    # 渡された callback と確認記録は併用しない。
+    if approval_source == USER_CONFIRMED and authorize is not None:
+        raise StoreError("approval_source_conflict")
+    return approval_source
+
+
+def _canonical_request(request: Any) -> str | None:
+    try:
+        return json.dumps(
+            request,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+class UserConfirmationMixin:
+    """user-confirmed モードの確認記録と照合を両providerで共有する。
+
+    確認記録は「ユーザーが当該操作を明示的に確認した」というホストの自己申告であり、
+    認証ではない。ホストはユーザーが当該成果物を明示的に確認した後にだけ
+    record_user_confirmation を呼ぶこと。AIが確認前に呼んではならない。
+    """
+
+    approval_source: str
+    authorize: Any
+
+    def _init_approval_source(self, approval_source: Any, authorize: Any) -> None:
+        mode = _approval_source(approval_source, authorize)
+        self.approval_source = mode
+        if mode == TRUSTED_CALLBACK:
+            if not callable(authorize):
+                raise StoreError("trusted_authorizer_required")
+            self.authorize = authorize
+            return
+        self._confirmations: set[str] = set()
+        self._confirmed_projects: set[str] = set()
+        self.authorize = self._confirmed_authorize
+
+    def record_user_confirmation(self, authorization: Mapping[str, Any]) -> None:
+        """ユーザー確認済みの操作レコードを登録する。登録済みの完全一致だけを許可する。
+
+        authorization は、trusted-callbackモードでcallbackに渡される要求と同じキーを持つdict。
+        write は operation, kind, project_ref, artifact_ref, expected_revision, sha256,
+        source_ref, source_revision, approval_ref, approval_revision, operation_id,
+        change_reason を持つ。reclassify は feature_registry が authorize に渡す決定dict
+        そのものを使う。どの operation の確認記録でも、登録された案件の読取scopeが開く。書込み後の独立readbackはこの挙動に依存する。read の記録は案件scopeだけを登録し、読取の個別承認にはならず、書込みを許可しない。
+        """
+        if self.approval_source != USER_CONFIRMED:
+            raise StoreError("approval_source_required")
+        if not isinstance(authorization, dict):
+            raise StoreError("confirmation_record_invalid")
+        operation = authorization.get("operation")
+        project = authorization.get("project_ref")
+        if operation not in CONFIRMABLE_OPERATIONS or not isinstance(project, str):
+            raise StoreError("confirmation_record_invalid")
+        _name(project, "project_ref")
+        canonical = _canonical_request(authorization)
+        if canonical is None:
+            raise StoreError("confirmation_record_invalid")
+        self._confirmed_projects.add(project)
+        if operation != "read":
+            self._confirmations.add(canonical)
+
+    def _confirmed_authorize(self, request: Any) -> bool:
+        """user-confirmed時の authorize。確認記録と完全一致した書込み／再分類だけ True。
+
+        読取は登録済み案件scope内なら確認記録なしで True（他案件・未登録案件は False）。
+        """
+        if not isinstance(request, dict):
+            return False
+        if request.get("operation") == "read":
+            project = request.get("project_ref")
+            return isinstance(project, str) and project in self._confirmed_projects
+        canonical = _canonical_request(request)
+        return canonical is not None and canonical in self._confirmations
 
 
 def _name(value: Any, label: str) -> str:
@@ -54,19 +161,19 @@ def _check_root(root: Path, authorized_root: Path) -> Path:
     return resolved
 
 
-class LocalArtifactStore:
+class LocalArtifactStore(UserConfirmationMixin):
     """Provider-native SQLite CAS; not a substitute for an unselected remote store."""
 
     def __init__(
         self,
         root: Path,
         authorized_root: Path,
-        authorize: Authorization,
+        authorize: Authorization | None = None,
+        *,
+        approval_source: str | None = None,
     ) -> None:
         self.root = _check_root(root, authorized_root)
-        if not callable(authorize):
-            raise StoreError("trusted_authorizer_required")
-        self.authorize = authorize
+        self._init_approval_source(approval_source, authorize)
         directory = self.root / DB_DIR
         try:
             directory.mkdir(mode=0o700, exist_ok=True)
@@ -304,10 +411,15 @@ class LocalArtifactStore:
             "approval_ref": approval_ref,
             "approval_revision": approval_revision,
         }
+        # user-confirmed の確認記録は操作単位で照合するため、冪等キーと変更理由も含める。
+        # trusted-callbackモードのcallbackへ渡す要求の形は変えない。
+        authorization = dict(approval_request)
+        if self.approval_source == USER_CONFIRMED:
+            authorization.update(operation_id=operation_id, change_reason=change_reason)
         try:
             with closing(self._connect()) as conn, conn:
                 conn.execute("BEGIN IMMEDIATE")
-                self._authorized(approval_request)
+                self._authorized(authorization)
                 receipt = conn.execute(
                     """SELECT fingerprint, version FROM artifact_receipts
                        WHERE kind=? AND project_ref=? AND artifact_ref=?

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -194,6 +195,22 @@ class GitArtifactStoreTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(StoreError, "revision_conflict"):
             self.write(content="changed", expected=first["revision"], operation="op-2")
+
+    def test_reused_operation_id_under_current_head_is_a_new_operation(self) -> None:
+        # 文書化された挙動: git store の operation_id 冪等性は、同一 expected_revision（直前版）の
+        # 再送に限る。現在のheadを expected とする書込みでは、既存の operation_id を再利用しても
+        # 新規操作として保存される（SQLite版は operation_id_reused で拒否する）。呼出し側の一意性責務。
+        first = self.write(content="first", operation="op-1")
+        second = self.write(
+            content="second", expected=first["revision"], operation="op-2"
+        )
+        self.assertEqual(second["status"], "stored", second)
+        third = self.write(
+            content="third", expected=second["revision"], operation="op-2"
+        )
+        self.assertEqual(third["status"], "stored", third)
+        messages = git(self.root, "log", "--format=%B", "qa-artifacts")
+        self.assertEqual(messages.count("QA-Operation-Id: op-2"), 2)
 
     def test_native_ref_cas_detects_concurrent_edits(self) -> None:
         first = self.write()
@@ -1432,6 +1449,482 @@ class GitArtifactStoreTests(unittest.TestCase):
             git_inventory_requests=evidence,
         )
         self.assertEqual(saved2["status"], "stored", saved2)
+
+
+class UserConfirmedGitArtifactStoreTests(unittest.TestCase):
+    """user-confirmed モード。既存のsetUpとnew_storeの形を再利用する。"""
+
+    REF = "docs/PROJECT_CONTEXT.md"
+
+    def setUp(self) -> None:
+        GitArtifactStoreTests.setUp(self)
+        self.store = self.new_store(approval_source="user-confirmed")
+
+    def new_store(
+        self, *, approval_source: str = "trusted-callback"
+    ) -> GitArtifactStore:
+        if approval_source == "trusted-callback":
+            return GitArtifactStoreTests.new_store(self)
+        return GitArtifactStore(
+            self.root,
+            self.root,
+            "qa-artifacts",
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+            approval_source=approval_source,
+        )
+
+    def args(self, **overrides: object) -> dict:
+        base: dict = {
+            "kind": "project-context",
+            "project_ref": "Sample",
+            "artifact_ref": self.REF,
+            "content": "first",
+            "expected_revision": None,
+            "operation_id": "op-1",
+            "source_ref": "issue/1",
+            "source_revision": "source-1",
+            "approval_ref": "approval/verified",
+            "approval_revision": "policy-v1",
+            "change_reason": "approved change",
+        }
+        base.update(overrides)
+        return base
+
+    def record(
+        self, store: GitArtifactStore | None = None, **overrides: object
+    ) -> dict:
+        request = self.args(**overrides)
+        confirmation = {
+            "operation": "write",
+            **{key: value for key, value in request.items() if key != "content"},
+            "sha256": hashlib.sha256(request["content"].encode("utf-8")).hexdigest(),
+        }
+        (store or self.store).record_user_confirmation(confirmation)
+        return confirmation
+
+    def test_omitted_authorize_resolves_to_user_confirmed(self) -> None:
+        store = GitArtifactStore(
+            self.root,
+            self.root,
+            "qa-artifacts",
+            None,
+            author_name="QA",
+            author_email="qa@example.invalid",
+        )
+        self.assertEqual(store.approval_source, "user-confirmed")
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            store.write(**self.args())
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_authorize_only_resolves_to_trusted_callback(self) -> None:
+        store = self.new_store()
+        self.assertEqual(store.approval_source, "trusted-callback")
+        self.assertEqual(store.write(**self.args())["status"], "stored")
+        message = git(self.root, "log", "-1", "--format=%B", "qa-artifacts")
+        self.assertNotIn("QA-Approval-Source", message)
+
+    def test_approval_source_combinations(self) -> None:
+        with self.assertRaisesRegex(StoreError, "approval_source_conflict"):
+            GitArtifactStore(
+                self.root,
+                self.root,
+                "qa-artifacts",
+                self.authorize,
+                author_name="QA",
+                author_email="qa@example.invalid",
+                approval_source="user-confirmed",
+            )
+        with self.assertRaisesRegex(StoreError, "trusted_authorizer_required"):
+            GitArtifactStore(
+                self.root,
+                self.root,
+                "qa-artifacts",
+                None,
+                author_name="QA",
+                author_email="qa@example.invalid",
+                approval_source="trusted-callback",
+            )
+
+    def test_legacy_mode_trailer_commit_remains_readable(self) -> None:
+        # 旧版の QA-Approval-Mode trailer を持つ commit も、件名と QA-Project-Ref で案件を照合して読める。
+        self.record()
+        first = self.store.write(**self.args())
+        self.assertEqual(first["status"], "stored", first)
+        head = git(self.root, "rev-parse", "qa-artifacts")
+        tree = git(self.root, "rev-parse", f"{head}^{{tree}}")
+        parent = git(self.root, "rev-parse", f"{head}^")
+        legacy_message = git(self.root, "log", "-1", "--format=%B", head).replace(
+            "QA-Approval-Source: ", "QA-Approval-Mode: "
+        )
+        legacy = subprocess.run(
+            ["git", "-C", str(self.root), "commit-tree", tree, "-p", parent],
+            input=legacy_message,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        git(self.root, "update-ref", "refs/heads/qa-artifacts", legacy, head)
+        self.assertIn(
+            "QA-Approval-Mode: user-confirmed",
+            git(self.root, "log", "-1", "--format=%B", "qa-artifacts").splitlines(),
+        )
+        self.assertEqual(self.trusted_read_content(), "first")
+        self.assertEqual(
+            self.store.read_current("project-context", "Sample", self.REF)["content"],
+            "first",
+        )
+
+    def test_source_trailer_is_written_only_for_user_confirmed_commits(self) -> None:
+        self.record()
+        first = self.store.write(**self.args())
+        self.assertEqual(first["status"], "stored", first)
+        message = git(self.root, "log", "-1", "--format=%B", "qa-artifacts")
+        self.assertIn("QA-Approval-Source: user-confirmed", message.splitlines())
+        # trailer付きcommitは従来どおり案件ownerとして読める（_assert_owner の後方互換）。
+        self.assertEqual(self.trusted_read_content(), "first")
+        trusted = self.new_store()
+        second = trusted.write(
+            **self.args(
+                content="second",
+                expected_revision=first["revision"],
+                operation_id="op-2",
+            )
+        )
+        self.assertEqual(second["status"], "stored", second)
+        trusted_message = git(self.root, "log", "-1", "--format=%B", "qa-artifacts")
+        self.assertNotIn("QA-Approval-Source", trusted_message)
+        self.assertEqual(
+            trusted.read_current("project-context", "Sample", self.REF)["content"],
+            "second",
+        )
+
+    def trusted_read_content(self) -> str:
+        return self.new_store().read_current("project-context", "Sample", self.REF)[
+            "content"
+        ]
+
+    def test_write_requires_exact_confirmation(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args())
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+        cases = [
+            ("content", "changed"),
+            ("approval_revision", "policy-v2"),
+            ("operation_id", "op-other"),
+            ("project_ref", "Other"),
+            ("artifact_ref", "docs/OTHER.md"),
+            ("change_reason", "changed reason"),
+        ]
+        for field, changed in cases:
+            with self.subTest(field=field):
+                store = self.new_store(approval_source="user-confirmed")
+                self.record(store)
+                with self.assertRaisesRegex(StoreError, "access_denied"):
+                    store.write(**self.args(**{field: changed}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_exact_confirmation_stores_and_resend_is_idempotent(self) -> None:
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        self.record()
+        self.assertEqual(self.store.write(**self.args())["status"], "idempotent")
+
+    def test_cas_conflict_and_readback_mismatch_keep_history(self) -> None:
+        self.record()
+        first = self.store.write(**self.args())
+        self.record(
+            content="second", expected_revision=first["revision"], operation_id="op-2"
+        )
+        second = self.store.write(
+            **self.args(
+                content="second",
+                expected_revision=first["revision"],
+                operation_id="op-2",
+            )
+        )
+        self.assertEqual(second["status"], "stored", second)
+        self.record(
+            content="stale", expected_revision=first["revision"], operation_id="op-3"
+        )
+        with self.assertRaisesRegex(StoreError, "revision_conflict"):
+            self.store.write(
+                **self.args(
+                    content="stale",
+                    expected_revision=first["revision"],
+                    operation_id="op-3",
+                )
+            )
+
+        self.record(
+            content="third", expected_revision=second["revision"], operation_id="op-4"
+        )
+        original_read = self.store.read_revision
+
+        def tampered(kind: str, project_ref: str, artifact_ref: str, revision: str):
+            row = original_read(kind, project_ref, artifact_ref, revision)
+            if row is not None:
+                row = {**row, "content": row["content"] + " tampered"}
+            return row
+
+        self.store.read_revision = tampered
+        with self.assertRaisesRegex(StoreError, "independent_readback_mismatch"):
+            self.store.write(
+                **self.args(
+                    content="third",
+                    expected_revision=second["revision"],
+                    operation_id="op-4",
+                )
+            )
+        del self.store.read_revision
+        reader = self.new_store()
+        self.assertEqual(
+            reader.read_revision(
+                "project-context", "Sample", self.REF, first["revision"]
+            )["content"],
+            "first",
+        )
+        self.assertEqual(
+            reader.read_revision(
+                "project-context", "Sample", self.REF, second["revision"]
+            )["content"],
+            "second",
+        )
+
+    def test_reads_are_limited_to_confirmed_project_scope(self) -> None:
+        self.record()
+        self.store.write(**self.args())
+        self.assertEqual(
+            self.store.read_current("project-context", "Sample", self.REF)["content"],
+            "first",
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", self.REF)
+        fresh = self.new_store(approval_source="user-confirmed")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.read_current("project-context", "Sample", self.REF)
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertEqual(
+            fresh.read_current("project-context", "Sample", self.REF)["content"],
+            "first",
+        )
+
+    def test_every_confirmed_field_mismatch_is_denied(self) -> None:
+        # SQLite側の11項目と揃える。既存テストが扱う6項目以外を検証する。
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        cases = [
+            ("kind", "feature-inventory"),
+            ("source_ref", "issue/2"),
+            ("source_revision", "source-2"),
+            ("approval_ref", "approval/other"),
+            ("expected_revision", "git:" + "0" * 40),
+        ]
+        for field, changed in cases:
+            with self.subTest(field=field):
+                store = self.new_store(approval_source="user-confirmed")
+                self.record(store)
+                with self.assertRaisesRegex(StoreError, "access_denied"):
+                    store.write(**self.args(**{field: changed}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_read_record_never_promotes_to_write(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        fresh = self.new_store(approval_source="user-confirmed")
+        fresh.record_user_confirmation({"operation": "read", "project_ref": "Sample"})
+        self.assertIsNone(fresh.read_current("project-context", "Sample", self.REF))
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            fresh.write(**self.args())
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+    def test_write_record_opens_project_read_scope_for_other_artifacts(self) -> None:
+        # 仕様: どの operation の確認記録でも、登録された案件の読取scopeが開く。
+        self.record()
+        self.assertIsNone(
+            self.store.read_current("project-context", "Sample", "docs/OTHER.md")
+        )
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.read_current("project-context", "Other", "docs/OTHER.md")
+
+    def test_recorded_confirmation_is_a_snapshot_not_a_live_reference(self) -> None:
+        confirmation = self.record()
+        confirmation["sha256"] = hashlib.sha256(b"changed").hexdigest()
+        confirmation["change_reason"] = "changed reason"
+        self.assertEqual(self.store.write(**self.args())["status"], "stored")
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(content="changed"))
+        with self.assertRaisesRegex(StoreError, "access_denied"):
+            self.store.write(**self.args(change_reason="changed reason"))
+
+    def test_approval_source_is_exact_string_match(self) -> None:
+        for value in ("User-Confirmed", " user-confirmed", "user-confirmed ", "GATED"):
+            with self.subTest(approval_source=value):
+                with self.assertRaisesRegex(StoreError, "approval_source_invalid"):
+                    GitArtifactStore(
+                        self.root,
+                        self.root,
+                        "qa-artifacts",
+                        None,
+                        author_name="QA",
+                        author_email="qa@example.invalid",
+                        approval_source=value,
+                    )
+
+    def test_confirmed_metadata_cannot_inject_commit_trailers(self) -> None:
+        before = git(self.root, "rev-parse", "qa-artifacts")
+        injections = [
+            ("change_reason", "reviewed\nQA-Approval-Ref: approval/forged"),
+            ("change_reason", "reviewed\rQA-Approval-Ref: approval/forged"),
+            ("change_reason", "reviewed QA-Approval-Ref: approval/forged"),
+            ("operation_id", "op-1\nQA-Project-Ref: Other"),
+            ("operation_id", "op-1\rQA-Project-Ref: Other"),
+            ("operation_id", "op-1 QA-Project-Ref: Other"),
+            ("approval_ref", "approval/verified\nQA-Approval-Source: forged"),
+            ("approval_ref", "approval/verified\rQA-Approval-Source: forged"),
+            ("approval_ref", "approval/verified QA-Approval-Source: forged"),
+        ]
+        for field, value in injections:
+            with self.subTest(field=field, value=repr(value)):
+                store = self.new_store(approval_source="user-confirmed")
+                # 確認記録が完全一致しても、trailerを偽造できる値はストアの検証で拒否する。
+                self.record(store, **{field: value})
+                with self.assertRaisesRegex(StoreError, f"{field}_invalid"):
+                    store.write(**self.args(**{field: value}))
+        self.assertEqual(git(self.root, "rev-parse", "qa-artifacts"), before)
+
+
+class CheckedOutBranchGuardTests(unittest.TestCase):
+    """保存先branchが主ワークツリーまたはlinked worktreeでcheckoutされている場合の拒否。"""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.root = self.base / "repo"
+        self.root.mkdir()
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "qa@example.invalid")
+        git(self.root, "config", "user.name", "QA")
+        (self.root / "README.md").write_text("original\n", encoding="utf-8")
+        git(self.root, "add", ".")
+        git(self.root, "commit", "-qm", "baseline")
+
+    @staticmethod
+    def authorize(request: dict) -> bool:
+        return True
+
+    def store(self, branch: str, root: Path | None = None) -> GitArtifactStore:
+        return GitArtifactStore(
+            root or self.root,
+            root or self.root,
+            branch,
+            self.authorize,
+            author_name="QA",
+            author_email="qa@example.invalid",
+        )
+
+    def test_branch_checked_out_in_main_worktree_is_rejected(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        git(self.root, "switch", "-q", "qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_branch_checked_out_in_linked_worktree_is_rejected(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        # 主ワークツリーはmainのままでも、linked worktreeでcheckout中なら拒否する。
+        self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), "refs/heads/main")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_linked_worktree_checkout_rejected_even_when_main_is_detached(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        git(self.root, "checkout", "-q", "--detach")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            self.store("qa-artifacts")
+
+    def test_branch_not_checked_out_is_accepted(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+        self.assertEqual(git(self.root, "symbolic-ref", "HEAD"), "refs/heads/main")
+
+    def test_other_branch_checked_out_does_not_block_store(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "linked"
+        git(self.root, "worktree", "add", "-q", "-b", "feature/other", str(linked))
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+
+    def test_missing_branch_still_reports_existing_error(self) -> None:
+        with self.assertRaisesRegex(StoreError, "git_provider_command_failed"):
+            self.store("qa-artifacts")
+
+    def test_checkout_after_construction_is_rejected_before_ref_update(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        store = self.store("qa-artifacts")
+        linked = self.base / "late-linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        before = git(self.root, "rev-parse", "refs/heads/qa-artifacts")
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            store.write(
+                kind="project-context",
+                project_ref="Sample",
+                artifact_ref="docs/PROJECT_CONTEXT.md",
+                content="late",
+                expected_revision=None,
+                operation_id="op-late",
+                source_ref="issue/1",
+                source_revision="source-1",
+                approval_ref="approval/verified",
+                approval_revision="policy-v1",
+                change_reason="approved change",
+            )
+        self.assertEqual(git(self.root, "rev-parse", "refs/heads/qa-artifacts"), before)
+
+    def test_prunable_worktree_whose_directory_is_gone_does_not_block(self) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "vanished"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        shutil.rmtree(linked)
+        listing = git(self.root, "worktree", "list", "--porcelain")
+        self.assertIn("prunable", listing)
+        store = self.store("qa-artifacts")
+        self.assertEqual(store.branch, "qa-artifacts")
+
+    def test_live_linked_worktree_still_blocks_when_another_worktree_is_prunable(
+        self,
+    ) -> None:
+        git(self.root, "branch", "qa-artifacts")
+        gone = self.base / "gone"
+        git(self.root, "worktree", "add", "-q", str(gone), "qa-artifacts")
+        shutil.rmtree(gone)
+        git(self.root, "branch", "other")
+        live = self.base / "live"
+        git(self.root, "worktree", "add", "-q", str(live), "other")
+        self.assertIn("prunable", git(self.root, "worktree", "list", "--porcelain"))
+        with self.assertRaisesRegex(StoreError, "branch_checked_out"):
+            GitArtifactStore(
+                self.root,
+                self.root,
+                "other",
+                self.authorize,
+                author_name="QA",
+                author_email="qa@example.invalid",
+            )
+
+    def test_branch_name_prefix_of_checked_out_branch_is_not_confused(self) -> None:
+        git(self.root, "branch", "qa")
+        git(self.root, "branch", "qa-artifacts")
+        linked = self.base / "prefix-linked"
+        git(self.root, "worktree", "add", "-q", str(linked), "qa-artifacts")
+        store = self.store("qa")
+        self.assertEqual(store.branch, "qa")
 
 
 if __name__ == "__main__":
