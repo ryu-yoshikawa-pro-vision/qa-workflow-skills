@@ -3,7 +3,8 @@
 - 基準: main `a37b15508dadd17ac0228ac896badb71d6a8f2c7`（2026-11-25確認、添付「QAワークフロー 詳細設計書：横断的法則性抽出・コンテキスト補完（基本設計確定版）」と一致）
 - 実装branch: `feat/context-rule-synthesis`
 - 状態: Plan作成済み・実装未着手。実装と受入を同一branchで行う。
-- 添付設計の1〜14章を対象とし、付録の別課題は対象外。
+- [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は原文保存のみで実装対象外。原文（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0）は変更しない。詳細な例・表・JSON例も実装・検証の参照先とする。
+- 本Planは基本設計の具体化。以下の完全性、scope具体化、配置、採用条件は実装前レビューで明確化した契約とし、原文の曖昧な箇所より優先する。他の設計要件は省略しない。
 
 ## 目的
 
@@ -17,6 +18,22 @@
 
 詳細文書は各担当領域の実装契約。本書は共通方針と依存順序の正本。個々の関数名・ファイル分割は実装で調整してよい。根拠のある変更はPlanへ理由を記録し、目的・必須要件は無断で縮小しない。
 
+## 設計要件と検証の対応
+
+以下の節番号は[元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の番号。設計書と対応するPlanを併読し、設計13.2の全項目をPlan 03の受入結果へ対応付ける。Planの要約だけを理由に詳細な例外・状態・入力フィールドを省略しない。
+
+- 1.1〜1.3、2、3.1〜3.2: 親Planの目的・対象・方針、03 §4・5（構成比較と対象外の維持）。
+- 4.1〜4.2、5.1〜5.3: 02 §1〜5、01 §2・3、03 A・C・E（入出力、起動、モード、要求集合・完了）。
+- 6の全11手順: 02 §3、01 §3・4、03 C・D（取得、独立性、複数仮説、5分類、意味条件、Authority、反例6分類、過去回答・却下、owner分類、調査、保存）。
+- 7.1〜7.5: 01 §2〜4、02 §5、03 A・B・E（4種identity、3成果物、完全性、7状態、関係、予定・readback）。
+- 8.1〜8.4: 01 §1・4、02 §3・4、03 B・C・D・E（4層経路、共有CAS、再開、2段階検索、新機能、変更伝播）。
+- 9.1〜9.2: 02 §3の調査ルーティングと全判定結果、01 §3・4、03 B・D（no_new_info、再開、owner・質問・冪等性）。
+- 10、11: 親Planの対象・順序、01 §4、02 §1・5、03 §1〜3（変更範囲、全異常系、並行処理と再開）。
+- 12: 01 §1・5、02 §3〜5、03 B・D・E（認可、全データ保護、回答転用）。
+- 13.1〜13.3: 03 §2〜5（A〜E全チェック、CI、3構成、補助評価、採用条件）。
+- 14: 親Planの着手条件、01 §1、02 §3、03 §4（確定済みの契約と実環境依存の確認を区別）。
+- 付録: 別課題。今回の実装・評価に追加しない。
+
 ## 現行実装の確認
 
 - [artifact_store.py](../../skills/project-context/scripts/artifact_store.py): LocalArtifactStoreのKINDSはproject-context/feature-inventory。SQLiteの履歴・current・receipt、BEGIN IMMEDIATE、authorize、revision CASを再利用可能。再送fingerprintにexpected revisionとmetadataを含む。
@@ -29,9 +46,9 @@
 
 ## 並行PRと認可の着手条件
 
-[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)（確認head d7b691b40fefe3bf84ccd7c57d4b5a2fbb5b89d7）はuser-confirmed保存mode、artifact_host.py、spec/question/test-analysis保存契約を追加中。artifact_host.pyは--user-confirmed-refを自己申告の確認記録として扱い、認証ではないと明記。これをqa_artifact_writeの証明に転用しない。STORE_KINDS一元化やbranch分割・CLIの構成は再利用候補。mainに未統合なので、本branchへの無断取り込みはしない。実装時に最新mainとPR #38の確定契約を照合し、同一変更を二重実装しない。依存が必要なら利用者と取り込み方法を決める。PR #39（CI権限）・#17（Agent評価runner）も競合箇所のみ確認。
+[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)（確認head d7b691b40fefe3bf84ccd7c57d4b5a2fbb5b89d7）はuser-confirmed保存mode、artifact_host.py、spec/question/test-analysis保存契約を追加中。artifact_host.pyは--user-confirmed-refを自己申告の確認記録として扱い、認証ではないと明記。これをqa_artifact_writeの証明に転用しない。STORE_KINDS一元化やbranch分割・CLIの構成は再利用候補。mainに未統合なので、本branchへの無断取り込みはしない。実装時に最新mainとPR #38の確定契約を照合し、同一変更を二重実装しない。依存が必要なら利用者と取り込み方法を決める。PR #39（CI権限）はPlan作成後にmainへマージ済み（main 197f1e0e1abe870b0cc793355e7abf73bf241d87、PR #40作成時確認）。#17（Agent評価runner）も競合箇所のみ確認。基準設計のSHAと実装開始時のmainを区別する。
 
-現時点でmain内に実運用のqa_artifact_write発行主体・認証済みhost接続・失効照合は確認できていない。実装担当は01の手順で実hostを確認し、認可経路が成立するまで本番保存・正式完了を開始しない。認可に依存しないSkill本文、構造検証、読取可能な範囲の分析・評価fixture設計は進めてよい。保存不足を理由に分析全体を止めない。test fixtureでの認可成功を本番接続済みと報告しない。
+現時点でリポジトリ内に実運用のqa_artifact_write発行主体・認証済みhost接続・失効照合は確認できていない。実装着手前に01の確認手順を実hostのコード・設定で実施する。利用hostが不明の場合は依存する正式保存・完了経路のみ着手条件未充足とし、信頼境界の前提を利用者と確認する。認可に依存しないSkill本文、構造検証、読取可能な範囲の分析・評価fixture設計は進めてよい。保存不足を理由に分析全体を止めない。test fixtureでの認可成功を本番接続済みと報告しない。配置・共有境界・パス・owner照合の共通契約は01・02で定義済みとし、案件固有の値や外部サービスの能力は推測で設定しない。
 
 ## 対象・変更境界
 

@@ -23,6 +23,7 @@
 - [ ] 4種identityとbatch/run派生identity再計算、signal hash/直接source ref、canonical bytes/top-level ref、project/root境界、意味条件・極性・要求scope/調査条件の違い、検索タグ追加不変。
 - [ ] 7状態＋解決/鮮度/完全性軸、rejected/deferred/blocked/resolvedからの再評価、部分coverageと独立仮説、比較関係の相互参照可/自己・後継循環不可。B 0件runの完了理由と未実行の区別。
 - [ ] workflow stateのA試行全状態、保存自己申告・hash改変・別refのverifier拒否。
+- [ ] 初回要求A+Bで実取得Aのpartialバッチを今回Aに再利用し、現在の完全性を検証して完了できる。逆に過去completeでも今回の広い要求を満たさない場合は未完了。元バッチの本文・初回metadataは不変。同一内容hashでも観測条件・source ref・範囲が異なる場合は誤再利用しない。
 
 ### B. provider・並行・認可（設計13.2 B）
 
@@ -30,27 +31,28 @@
 - [ ] 2 workflowの同時handoffとowner CAS競合後の意味的再確認、既存ref reuse、結果不明の冪等未保証操作を停止。正常な異なるscopeは継続。
 - [ ] 候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。
 - [ ] B runのin_progress保存後、候補1件目/途中/全件後、handoff後、保存成功readback失敗の各中断点でplanned_payload/hash/metadataから再開。再認可・CAS競合で変更した新操作と完全再送を区別。Git自身のrun保存と候補複数保存でHEAD進行、外部変更/依存変更は再判断、後続commit後の復元。新規createの確認時HEAD条件もテスト。
-- [ ] 実運用hostの認証済み発行・認可・失効・実provider readback・workflow証拠受渡しを確認。fixture callbackと実hostを別判定し、PR #38のuser-confirmed自己申告を認証済みとしない。
+- [ ] 実運用hostの認証済み発行・認可・失効・実provider readback・workflow証拠受渡しを確認。fixture callbackと実hostを別判定し、PR #38のuser-confirmed自己申告を認証済みとしない。Section 14/12と実host設定の配置・承認・共有境界の一致、別DB・別clone・別branch、kind/owner不一致、未設定や置換された配置方針を確認する。
 
 ### C. 横断発見・鮮度（設計13.2 C）
 
 - [ ] A complete 0件でB不要、通常観察を蓄積、重大反例で即時、下流直前の未処理not_checkedを処理、処理済みnot_checkedでループしない。要求範囲/観点違いの過去batch再利用。
 - [ ] 新機能/別workflowで既存scope外の候補・導入前仕様/DEC/ASM・Knowledge・Qを発見、適用/鮮度をownerで判断。完全性は検索手順の完了。取得不能と空検索を分離。直接参照snapshotから根拠集合を復元。
 - [ ] 自分の候補更新のconfirmed hashと外部更新の区別、独立支持・新規反例/取得可能化/Authority失効・置換/環境build権限/Entity変更で再評価。分析中反例追加は旧runを履歴として保持、質問省略/PASS/FAILに採用しない。同一観察再取得は独立根拠に数えない。
-- [ ] 却下された範囲以外は再評価し、個別の必要質問を維持。
+- [ ] 却下された範囲以外は再評価し、個別の必要質問を維持。deferred論点の合否必須化や一時障害解消をrevision不変でも検知する。過去回答のscope/revision/承認状態の変化を検知する。
 
 ### D. 意味品質・owner・変更伝播（設計13.2 D）
 
-- [ ] A semantic: 抽出漏れ、誤抽出、重複、反例検知、not_checked、未承認回答区別。B semantic: 共通法則/差異条件、権限vs復元可能性の競合仮説、独立根拠、局所仕様の過一般化、5分類と6反例分類（unclassified含む）、部分解決。
-- [ ] 有効SPEC/DECを維持し実装適合/不一致/未確認を別に管理。確定不一致だけdefectへ、コード推論は調査へ。未承認回答のみの昇格/却下なし、回答受領≠解決。ASM/PROJECT_CONTEXT/PRODUCT_RISK/KNOWLEDGEと正式仕様を区別。
+- [ ] A semantic: 抽出漏れ（最優先）、誤抽出、重複、反例検知、not_checked、未承認回答区別。B semantic: 共通法則/差異条件、権限vs復元可能性の競合仮説、独立根拠、局所仕様の過一般化、5分類と6反例分類（unclassified含む）、部分解決。同じ観察を複数候補へ異なる評価で紐付け、元batchを変更しない。
+- [ ] 元設計9.2の全判定結果を確認。有効SPEC/DECが全範囲を裏付ける場合は実装の一致・不一致・未確認にかかわらずresolvedを維持し、conforms/confirmed_mismatch/unverifiedを区別する。確定不一致だけdefectへ、コード推論は調査へ。部分裏付けはinvestigatingまたは安全な分割、実装観察のみはINFERENCE、Authority競合はUNKNOWN、任意確認はunknown_ref=null。承認済みASM/PROJECT_CONTEXTによる解決、INSPECTION、PRODUCT_RISK/KNOWLEDGEと正式仕様を区別。未承認回答のみの昇格/却下なし、回答受領≠解決。
 - [ ] 既存UNKNOWN/Qの参照と4分類、任意確認、調査owner/exploratory investigationへの接続、no_new_info終了と一時障害解消再開。既存ownerの確定成果物を再利用して重複質問・知識登録を防ぐ。
-- [ ] 候補更新のみでテスト設計を再生成しない。正式Authority/Knowledge/Risk変更から既存Machine Entity依存経路で局所再検証。
+- [ ] 候補更新のみでテスト設計を再生成しない。正式Authority/承認済みASM/PROJECT_CONTEXT/Knowledge/Product Risk・正式テスト重点の変更から既存Machine Entity依存経路で局所再検証。別workflowで同じ候補を調査した際は、適用・鮮度が確認できる既存根拠・回答・調査結果・handoffを再利用し、必要な質問のみ行う。
 
 ### E. workflow・セキュリティ・回帰（設計13.2 E）
 
 - [ ] 無効/無指定でA/B呼出し・保存なし、補助not_configured/失敗で既存完了維持、必須未設定をscopeから除外せずblocked、単体実行。複数入力全件とB全予定集合・実readback・取得完全性・引継ぎ成立を確認。未回答でも調査/質問の到達確認が成立すれば分析完了可能。
-- [ ] owner CLIの保存本文/target/hash/revision/identity/範囲検証、未登録/偽造証拠・partial・未完了・必須handoff pendingを拒否、v2保存済みworkflowの再開、既存v1互換・runtime copy同期。現行scope完了判定を弱めない。
-- [ ] 全metadata/本文/ログ/Git履歴/評価fixtureにsecret・PIIを混入させない。悪意ある資料内命令を実行しない。既存単体・複合workflowの結果/再開/変更伝播が回帰しない。
+- [ ] owner CLIの保存本文/target/hash/revision/identity/範囲検証、未登録/偽造証拠・今回の取得不完全・未完了・必須handoff pendingを拒否、v2保存済みworkflowの再開、既存v1互換・runtime copy同期。現行scope完了判定を弱めない。
+- [ ] Aの複数要求・Bの要求について開始時hash未確定でも要求を保持し、仮targetの重複・誤完了を防ぎ、取得後の実batch/run refへ対応付ける。広い既存batchを複数要求で再利用する場合も全要求を個別に確認する。要求の消失・未確定入力の無断除外・範囲縮小・別refへのすり替え・並行更新・再開時の元要求不一致を検知し、他の正当なscopeを継続する。
+- [ ] 全metadata/本文/ログ/Git履歴/評価fixtureにsecret・PIIを混入させない。悪意ある資料内命令を実行しない。過去回答のscope/revision/承認状態を確認し、別scope・失効済み・未承認回答の誤転用による質問省略や正式仕様確定を防止する。既存単体・複合workflowの結果/再開/変更伝播が回帰しない。
 
 ## 3. CI・独立検証手順
 
@@ -81,12 +83,13 @@ Python 3.11、既存requirements-dev-lint.txt、requirements-dev-evals.txt、CI�
 - 機密漏えい・認可違反・未承認仮説の誤採用・必要質問の誤省略: 全試行0件の絶対条件。
 - 抽出/共通法則/差異条件/反例の評価セットごとの正解率は導入前より改善、2 Skillは1 Skill以上。既存品質が満点なら同等維持可。評価対象集合と分母は事前固定し、絶対条件の失敗を平均で隠さない。
 - 蓄積後の補助評価で必要質問を維持し、重複質問数を導入前より削減（導入前0件なら0件維持）。2 Skillが1 Skillより増やさない。
-- 2 Skillの最大1ターン入力token中央値は1 Skillの90%以下を目標とし、導入前を超えないことを採用条件とする。総token・wall_seconds・request_count・skill_call_countの全シナリオ合計中央値は導入前の120%以下かつ1 Skillの115%以下、各シナリオは導入前の150%以下。reanalyze_countは導入前・1 Skill以下（変更なし再依頼で不要な再分析0）。上限は今回の提案であり過去の実測値ではない。baselineが0のcountはその項目の目的に照らし不要呼出し0、必要A/B呼出しは総request/skill計測で評価。最大1ターンtokenが取得不能なら採用条件の未検証とする。
-- 2 Skillが品質を満たすが総負荷・時間の上限超過、または分離の効果が見られない場合は1 Skill構成と比較して統合を選ぶ。1 Skillも品質・効率基準を満たさない場合は原因を修正して再評価し、未達を本採用としない。候補構成の途中評価を最終結果と混同しない。
+- 1ターン最大入力tokenは各試行の全model requestのinput token（cache hit分も含む同一計測定義）から最大値を求め、5シナリオそれぞれの中央値および5シナリオの中央値の中央値を比較する。2 Skillの全体中央値が1 Skillの90%以下、かつ導入前を超えないことを採用条件とする。個別シナリオの増加も報告する。1 Skillの採用は導入前を超えない1ターン負荷を条件とする。取得不能な指標を推定値でPASSにしない。
+- 総token・wall_seconds・request_count・skill_call_countは各シナリオの試行中央値を合計して比較する。2 Skillは導入前の120%以下かつ1 Skillの115%以下、各シナリオは導入前の150%以下。1 Skillも導入前の120%以下・各シナリオ150%以下とする。reanalyze_countは導入前以下（2 Skillは1 Skill以下も条件、変更なし再依頼で不要な再分析0）。baselineが0のcountは不要呼出し0、必要な新規A/B呼出しは総request/skill計測で評価する。数値は提案値であり実測結果ではない。候補構成の測定前に導入前の実測値と上限の実数を記録する。
+- 2 Skillが品質を満たすが1ターン負荷の削減条件、総負荷・時間の上限、その他の採用条件を満たさない場合は、品質・安全性・効率条件を満たす1 Skillへ統合する。1 Skillも条件を満たさない場合は原因を修正して再評価し、未達を本採用としない。候補構成の途中評価を最終結果と混同しない。
 
 ## 5. 完了条件・記録
 
-- 受入A〜Eの全項目、3構成比較、最終構成のSkill仕様・実Agent発火/意味評価・実provider保存/再開・workflow完了、既存回帰を独立判定できる。
+- 元の基本設計13.2 A〜Eの全項目と本Planの補足ケースについて、実装箇所・テスト/評価・実行結果を対応付け、欠落・未実施を識別できる。3構成比較、最終構成のSkill仕様・実Agent発火/意味評価・実provider保存/再開・workflow完了、既存回帰を独立判定できる。
 - README/EVALS、必要なSkill references/registry、Project Contextの配置、運用時の認可・未設定・再開方法を同期する。資料に実案件識別子や秘密を残さない。
 - 検証結果をdocs/implementation/等の既存規約に従う文書へ記録し、実行条件・commit・コマンド・測定値・失敗・未実施・対象外の承認を分離する。Planのチェック欄を根拠付きで更新。
 - 認証済みhostや実Agent・実provider、比較計測の未確認が残る場合は当該条件をblocked/未実施として報告。通常の分析は可能な範囲で完了させるが、全実装の受入完了とは呼ばない。
