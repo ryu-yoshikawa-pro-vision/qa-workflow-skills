@@ -3,8 +3,14 @@
 - 基準: main `a37b15508dadd17ac0228ac896badb71d6a8f2c7`（2026-11-25確認、添付「QAワークフロー 詳細設計書：横断的法則性抽出・コンテキスト補完（基本設計確定版）」と一致）
 - 実装branch: `feat/context-rule-synthesis`
 - 状態: Plan作成済み・実装未着手。実装と受入を同一branchで行う。
-- [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は保存のみで実装対象外。添付原文は[保存時commitの文書](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/799b776b4708a3b97aa6a6fc018212d00ac15d09/docs/plans/2026-11-25_123000_context-rule-synthesis_design.md)（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0、Git blob: ec436defa085308b90cd7688d375c5730ecb55c5）で保持する。現行文書はCIのdprint提示差分による書式整形版（Git blob: c642c87948acf8e8da0f756f849761d596b17de3）。整形前後の非空白本文・表の内容・3 JSON例の構造と値を照合し、設計内容は変更しない。詳細な例・表・JSON例も実装・検証の参照先とする。
+- [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は保存のみで実装対象外。添付原文は[保存時commitの文書](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/799b776b4708a3b97aa6a6fc018212d00ac15d09/docs/plans/2026-11-25_123000_context-rule-synthesis_design.md)（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0、Git blob: ec436defa085308b90cd7688d375c5730ecb55c5）で保持する。直前の書式整形版（Git blob: c642c87948acf8e8da0f756f849761d596b17de3）は履歴に保持する。今回の利用者決定により保存・責務・identityに関する設計を変更した。原文・旧設計は履歴参照とし、変更後の基本設計と詳細Planを実装の正本とする。詳細な例・表・JSON例も実装・検証の参照先とする。
 - 本Planは基本設計の具体化。以下のレビューで合意した具体化は原文の対応箇所より優先する。他の設計要件は省略しない。
+
+## 利用者決定：責務の適正化（最優先）
+
+2026-11-25 利用者決定：成果物は指定ディレクトリで統一管理する。Skillに案件識別・探索・切替・保存先決定・Provider選択・ブランチ管理・認証方式選択を持たせない。必要な案件境界・root・実行条件・権限はハーネスが入力として提供し、不要な管理は移管せず削除する。SkillはQAの意味判断、成果物の意味・形式・相対配置、必要な質問・引継ぎに集中する。Helperは決定論的識別・検証・保存を担当する。ハーネスの特定製品への依存、新しい汎用管理基盤、既存案件の移行は本PRの対象外。
+
+既存の安全性、正式仕様のAuthority、履歴、根拠、実readback、冪等性、scope完全性は維持する。実保存境界の能力不足は局所blockedとし、分析そのものは可能な範囲で継続する。新規3成果物の正本は指定ディレクトリ内のcanonical JSONとし、案件IDを意味的identityや本文必須fieldにしない。別rootの同一相対refは同一成果物とみなさない。保存先をまたぐ共有・移行は対象外。
 
 ## 目的
 
@@ -12,7 +18,7 @@
 
 ## Planの構成
 
-- [01 保存・認可・データ契約](2026-11-25_123000_context-rule-synthesis_01_storage-and-contracts.md): provider、identity、保存・中断再開、並行整合。
+- [01 保存・認可・データ契約](2026-11-25_123000_context-rule-synthesis_01_storage-and-contracts.md): ディレクトリ契約、identity、保存・中断再開、並行整合。
 - [02 Skill・workflow・owner連携](2026-11-25_123000_context-rule-synthesis_02_skills-and-workflow.md): A/Bの責務、横断発見、帰納、質問、完了判定。
 - [03 評価・実装順序・受入](2026-11-25_123000_context-rule-synthesis_03_validation.md): 検証マトリクス、3構成比較、完了条件。
 
@@ -21,10 +27,10 @@
 ## 原設計からの具体化・変更
 
 - 取得完全性は初回保存と今回要求で分離。構造化範囲と複数batchの照合、元要求と実成果物scopeの対応を定義する。鮮度フラグはrevalidation_requiredに統一。確認済みの抽出漏れ・誤抽出は同じkindの不変訂正版で補正し、旧版は履歴として保持する（01 §2・3、02 §4・5）。
-- GitはPR #38に合わせ案件・kind別branchへ変更。SQLiteは既存native transaction内の関連revision照合を追加。別kindの保存順序はrunとreadbackで証明し、branch間atomicityは要求しない。再送fingerprintの構成要素が変われば新operation_idを用いる。handoffはownerの実際の一意性保証単位を確認し、別refへのCASだけで重複防止済みとしない（01 §1・4、02 §3）。
+- 成果物の分類・保存・発見は指定root配下のkindディレクトリで統一。旧kind別branch案と案件単位のSkill判断は撤回する。保存層の実revisionと対象/依存内容hashは分離し、安全な条件付き更新・create-if-absent・履歴・独立readbackを要求する。別成果物間の原子性を推測しない。再送fingerprintの変更は新operation_id、handoffは実ownerの一意性保証を確認（01 §1・4、02 §3）。
 - Bはworkflow_refとidentity算出元の開始時入力をrunに保持する。実行中に取得した根拠はsnapshotへ追加し、開始時入力と分ける。本文不変での再評価は実際の関連条件・取得状態の変化を開始時入力に含め、過去の実行完了は当時のrevision、現在の採用は最新根拠で検証する。永続的handoffの前に反映意図を記録し、共通候補を更新する分割runは直列を基本とする。全文planned_payloadは復元用に維持し、helperによる選択読取・必要時の範囲分割で負荷を抑える（01 §2〜4、02 §3・4）。
-- 認可入口は信頼されたPython接続契約を使用。利用hostと認可能力の実確認は正式保存の着手条件。既存ownerのAuthorityや認可水準は変えない。64 KiBのJSON文字列上限と保存本文の受渡し・再開の整合を実装初期に検証し、必要な経路だけを修正する（01 §1、02 §5、03 §1・2）。
-- 効率評価は導入前比120%の最大入力token上限と2 Skillの対1 Skill削減を両立させ、既存比較器の判定と本Planの採用判定を分離する。正式比較前にスモークテストを行う。基準値0の指標は実数で扱い、意味品質は共通の期待結果で比較する。1 Skill採用時は配置ownerと認可も同期する（01 §1、03 §4）。
+- 認可入口はハーネスが供給する信頼境界と既存の決定論的保存入口を使用。利用環境で許可root・操作権限・条件付き保存・履歴・独立readbackを確認することが正式保存の着手条件。既存ownerのAuthorityや認可水準は変えない。64 KiBのJSON文字列上限と保存本文の受渡し・再開の整合を実装初期に検証し、必要な経路だけを修正する（01 §1、02 §5、03 §1・2）。
+- 効率評価は導入前比120%の最大入力token上限と2 Skillの対1 Skill削減を両立させ、既存比較器の判定と本Planの採用判定を分離する。正式比較前にスモークテストを行う。基準値0の指標は実数で扱い、意味品質は共通の期待結果で比較する。1 Skill採用時はkindの相対配置を維持しowner登録・認可を必要範囲で同期する（01 §1、03 §4）。
 
 ## 設計要件と検証の対応
 
@@ -55,27 +61,27 @@
 
 ## 並行PRと認可の着手条件
 
-[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)（確認head d7b691b40fefe3bf84ccd7c57d4b5a2fbb5b89d7）はuser-confirmed保存mode、artifact_host.py、spec/question/test-analysis保存契約を追加中。artifact_host.pyは--user-confirmed-refを自己申告の確認記録として扱い、認証ではないと明記。これをqa_artifact_writeの証明に転用しない。STORE_KINDS一元化・CLIの構成は再利用候補。案件・kind別branchを本Planで採用し、PR #38の方針に合わせる。mainに未統合なので、本branchへの無断取り込みはしない。実装時に最新mainとPR #38の確定契約を照合し、同一変更を二重実装しない。依存が必要なら利用者と取り込み方法を決める。PR #39（CI権限）はPlan作成後にmainへマージ済み（main 197f1e0e1abe870b0cc793355e7abf73bf241d87、PR #40作成時確認）。#17（Agent評価runner）も競合箇所のみ確認。基準設計のSHAと実装開始時のmainを区別する。
+[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)（確認head d7b691b40fefe3bf84ccd7c57d4b5a2fbb5b89d7）のuser-confirmed保存mode、artifact_host.py、既存ownerの保存契約を確認する。これは既存実装の調査対象であり、旧kind別branch構造を新Skillへ継承しない。user-confirmedは呼出し側の確認記録であって認証ではない。既存ownerを無断変更せず、接続に必要な場合だけ境界で変換する。PR #39のCI最小権限・formatter規約、PR #17の評価契約も最新統合結果で確認する。
 
-現時点でリポジトリ内に実運用のqa_artifact_write発行主体・認証済みhost接続・失効照合は確認できていない。実装着手前に01の確認手順を実hostのコード・設定で実施する。利用hostが不明または認可能力を満たさない場合は、01の共通Python入口へ接続できる実行環境と信頼境界を利用者と確認する。正式保存・完了経路のみ着手条件未充足とする。user-confirmed方式への変更は認可水準の変更に当たるため、このPlanでは承認しない。認可に依存しないSkill本文、構造検証、読取可能な範囲の分析・評価fixture設計は進めてよい。保存不足を理由に分析全体を止めない。test fixtureでの認可成功を本番接続済みと報告しない。配置・共有境界・パス・owner照合の共通契約は01・02で定義済みとし、案件固有の値や外部サービスの能力は推測で設定しない。
+利用環境における信頼された認可入口・許可root・保存能力は未確認。詳細01の最小確認をハーネス/保存層の担当として行う。Skillに認証方式、案件、保存技術を選ばせない。条件を満たさなければ正式保存・外部副作用・それを必要とする完了だけ停止する。user-confirmed自己申告やfixture callbackを本番認可の証拠にしない。認可に依存しない分析・構造検証・評価は継続可。保存機構の全面改修や特定ハーネスの実装は本PRの範囲外。
 
 ## 対象・変更境界
 
-新規2 Skill（context-signal-audit、context-rule-synthesis）と3成果物、既存provider拡張、qa-workflowのrouting・state・owner verifier、必要なownerとの接続、README/EVALS・評価・回帰検証を対象とする。添付設計の比較に基づき1 Skillとの実測を行い、品質・効率条件で最終構成を決める。評価用の1 Skill構成は本番3つ目のSkillとして配布しない。
+新規2 Skill（context-signal-audit、context-rule-synthesis）と3成果物、指定ディレクトリへの最小保存接続、qa-workflowのrouting・state・owner verifier、必要なownerとの接続、README/EVALS・評価・回帰検証を対象とする。添付設計の比較に基づき1 Skillとの実測を行い、品質・効率条件で最終構成を決める。評価用の1 Skill構成は本番3つ目のSkillとして配布しない。
 
-対象外: 新Authority、DEC/ASMの別正本、別DB・embedding・中央index・独自CAS・分散transaction・全体lock・常駐監視・特定harness強制・案件間共有、別課題の専門テストSkill、既存製品の変更。
+対象外: 新Authority、DEC/ASMの別正本、別DB・embedding・中央index・独自CAS・分散transaction・全体lock・常駐監視・特定harness強制・rootを越える共有・既存保存方式の全面移行・案件管理・ブランチ管理、別課題の専門テストSkill、既存製品の変更。
 
 ## 実装方針
 
 - AIには観察・仮説・根拠の意味評価・表現ゆれ・調査要否・owner判断を任せる。語彙の固定辞書、強制的な仮説件数、全成果物の毎回読み込み、固定retry数、機械的な信頼度点数を新設しない。
 - helperはidentity、保存構造、範囲、CAS、readback、鮮度差分など機械的に確定できる項目を担当。通常入力の不足は未確認として扱い、影響部分のみ停止する。権限境界・根拠消失・必須完了の虚偽は許容しない。
 - 既存ownerと標準ライブラリを優先。Skill単体配布を維持し、production helperはevalsに置かない。必要な依存Skillと非接続時の動作を明記する。全Skillへの重複規則追加は行わない。
-- 既存案件は無指定で無効。新規3 kindを作成しない、stateに不要な欄を要求しない。既存形式の移行は不要。既存providerを無断切替しない。
+- 無指定で無効。新規3 kindや不要なstate欄を事前作成しない。既存形式・配置を無断移行しない。rootや機能有効化は外部から渡される条件で解決する。
 
 ## 実装順序
 
-1. 最新差分、配置・認可host、既存CI baseline、ownerの意味的冪等照合を確認。既存runtimeによる仮target・複数batch・再開、64 KiB超の成果物本文の受渡しとサイズ上限の検証を最初に行い、比較条件を事前固定。
-2. 3成果物のcanonical契約、identity、純粋検証・fixture、providerの列挙/履歴/保存入口を実装。実host未接続なら接続部分のみ保留。
+1. 最新差分、指定root・認可/保存境界、既存CI baseline、ownerの意味的冪等照合を確認。既存runtimeによる仮target・複数batch・再開、64 KiB超の成果物本文の受渡しとサイズ上限の検証を最初に行い、比較条件を事前固定。
+2. 3成果物のcanonical契約、identity、純粋検証・fixture、指定ディレクトリの列挙/履歴/条件付き保存入口を実装。既存helperを優先し、能力未確認なら接続部分のみ保留。
 3. Aの抽出・不変バッチとworkflow試行state、Bの検索・帰納・候補/run保存・再開を接続。
 4. 既存ownerへの調査/質問/確定知識のhandoff、鮮度・変更伝播、workflowの補助/必須/単体実行・verifierを接続。
 5. 評価・ドキュメント・実provider/Agent受入・全回帰、各構成のスモークテスト後に3構成の正式比較を実施。結果による構成変更も本branchで検証する。

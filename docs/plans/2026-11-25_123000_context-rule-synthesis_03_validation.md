@@ -4,9 +4,9 @@
 
 ## 1. 実装タスクと依存関係
 
-- [ ] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、配置・認可経路、ownerの実保存/CAS/照合点を記録。認可host未選定なら依存部分を明示し、読み取り・分析・純粋契約の実装は進める。
+- [ ] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、指定root・認可/保存境界、ownerの実保存/CAS/照合点を記録。認可host未選定なら依存部分を明示し、読み取り・分析・純粋契約の実装は進める。
 - [ ] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応、64 KiB超の保存本文の搬送・再開を早期検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperを実装し、機械契約テストを追加。既存canonical規則と一致させる。
-- [ ] artifact_store/git_artifact_storeに3 kind、list/history、path/認可、native CASを追加。host入口、独立readback、Aのimmutable batch、Bのrun計画・保存・再開を縦に接続。実providerで正常・競合を確認。
+- [ ] 指定rootの3 kindディレクトリ、list/history、相対ref/権限、条件付き保存を既存helper優先で接続。独立readback、Aのimmutable batch、Bのrun計画・保存・再開を縦に接続。実保存先で正常・競合・能力不足を確認する。特定Providerの拡張を合格条件としない。
 - [ ] 2 Skillの本文/参照/assetを実装し、A/Bの相互責務、横断検索、既存owner routingを接続。追加調査と質問、既存Knowledge/Authority再利用を実Agentで確認。
 - [ ] workflow routing/state/owner verifier・runtime_contractコピー、README/EVALS、各registryを同期。無効/補助/必須/単体と既存再開・依存伝播を検証。
 - [ ] trigger/deterministic/semantic/runtime/実provider・実Agent、各構成のスモークテスト後に3構成の正式比較を実施。結果に応じて本採用構成を決定し、最終構成で全受入を確認する。
@@ -30,12 +30,12 @@
 
 ### B. provider・並行・認可（設計13.2 B）
 
-- [ ] 実SQLiteと実Git repo/refそれぞれで3 kindの作成・一覧・履歴・readback・失敗・再開。既存2 kindの回帰、別案件/別kind/別root/別clone、symlink・非blob/非canonical ref、権限/失効、CAS未選択・自己申告認可・ダミーauthorize拒否。正式変更承認とQA書込み認可の分離。
+- [ ] 実ディレクトリで3 kindの作成・一覧・履歴・readback・失敗・再開。既存ownerの回帰、別rootの同名ref/identity/証拠混在拒否、symlink・非canonical ref、権限/失効、共有CAS未確認・自己申告認可・ダミーauthorize拒否。正式仕様変更承認とQA書込み認可の分離。Skillが案件/ブランチ/Providerを選ばずに同一意味成果物を生成すること。
 - [ ] 2 workflowの同時handoffとowner CAS競合後の意味的再確認、既存ref reuse、結果不明の冪等未保証操作を停止。正常な異なるscopeは継続。同一意図を異なるartifact_refへ同時に初回作成するケースを実ownerの保証単位で検証し、両方のCAS成功だけを重複防止成功としない。既存の同一保存単位/atomic dedupe/確認済み単一writerで収束すること、保証不能な外部create・異なるworkflowの並行実行で無条件の二重反映をせず必要な承認・調査は続けることを確認。
-- [ ] 実SQLiteの関連revision照合付きnative transactionと実Gitのcandidate branch CASで、通常の統合/分割が成立することを確認。候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。SQLiteでは本文不変でも継承先・関連候補の前提revision/hash変更後に同じoperation_idを使うと拒否され、新IDで再照合後に成立すること、完全同一再送は既存receiptを再利用することを確認。
-- [ ] B runのin_progress保存後、候補1件目/途中/全件後、handoff後、保存成功readback失敗の各中断点でplanned_payload/hash/metadataから再開。再認可・CAS競合で変更した新操作と完全再送を区別。Gitはkind別branchを使用し、Aのbatch保存・Bのrun保存でcandidate branch HEADが進まないこと、同kindの自前保存によるHEAD進行で不要な自己競合が起きないことを確認。別kind/外部ownerの依存変化は完了・採用前に検知し再評価し、後続commit後も実readbackで復元。新規createの確認時HEAD条件もテスト。
+- [ ] 実保存層の関連revision照合付き条件更新または実保証された単一writer境界で、通常の統合/分割が成立することを確認。候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。実保存層では本文不変でも継承先・関連候補の前提revision/hash変更後に同じoperation_idを使うと拒否され、新IDで再照合後に成立すること、完全同一再送は既存receiptを再利用することを確認。
+- [ ] B runのin_progress保存後、候補1件目/途中/全件後、handoff後、保存成功readback失敗の各中断点でplanned_payload/hash/metadataから再開。再認可・CAS競合で変更した新操作と完全再送を区別。同一rootの異なるkind/成果物の更新、対象/依存への真の競合、無関係更新による不要再分析なしを確認する。新規create時の不存在条件と関連依存の整合、後続更新後の履歴readback、完了・採用前の依存変化検知を確認。能力未確認なら局所block。
 - [ ] 永続handoff前のpending/反映意図保存、owner側成功直後かつ結果記録前の中断、再認可・再開・並行実行時のsemantic_handoff_key/実owner照合で二重質問・二重課題作成を防ぐ。読み取り専用調査に事前保存を強制しない。
-- [ ] 実運用hostの認証済み発行・認可・失効・実provider readback・workflow証拠受渡しを確認。fixture callbackと実hostを別判定し、PR #38のuser-confirmed自己申告を認証済みとしない。Section 14/12と実host設定の配置・承認・共有境界の一致、別DB・別clone・別branch、kind/owner不一致、未設定や置換された配置方針を確認する。
+- [ ] ハーネス/保存層の認証済み発行・認可・失効・実保存先readback・workflow証拠受渡しを確認。fixtureと実運用を別判定しPR #38のuser-confirmed自己申告を認証済みとしない。rootの実体・許可範囲・kind/owner不一致・別root・設定なし・許可変更を確認。Skillによる案件探索・ブランチ選択・Provider選択・認証方式選択・配置承認の再質問が不要であることを確認。
 
 ### C. 横断発見・鮮度（設計13.2 C）
 
@@ -60,7 +60,7 @@
 - [ ] 無効/無指定でA/B呼出し・保存なし、補助not_configured/失敗で既存完了維持、必須未設定をscopeから除外せずblocked、単体実行。複数入力全件とB全予定集合・実readback・取得完全性・引継ぎ成立を確認。未回答でも調査/質問の到達確認が成立すれば分析完了可能。
 - [ ] owner CLIの保存本文/target/hash/revision/identity/範囲検証、未登録/偽造証拠・今回の取得不完全・未完了・必須handoff pendingを拒否、v2保存済みworkflowの再開、既存v1互換・runtime copy同期。現行scope完了判定を弱めない。
 - [ ] Aの複数要求・Bの要求について開始時hash未確定でも要求を保持し、仮targetの重複・誤完了を防ぎ、取得後の実batch/run refへ対応付ける。広い既存batchを複数要求で再利用する場合も全要求を個別に確認する。複数部分batchの和集合および複数run分割が全要求を満たす場合と不足する場合、対応の消失、異なるhash/観測条件の混在を検証する。要求の消失・未確定入力の無断除外・範囲縮小・別refへのすり替え・並行更新・再開時の元要求不一致を検知し、他の正当なscopeを継続する。
-- [ ] 64 KiB未満・境界・超過の正常なcanonical成果物（日本語・JSONエスケープ、A batch・B run・候補本文を含む）を実SQLite/Gitへ保存し、独立readback、owner verifier、workflow_runtimeの正式完了、downstream_stateの凍結済みinput/resultからの再開まで検証する。複数scopeの集約サイズ、通常入力・集約入力・provider・owner subprocessの上限も確認。本文のhash/revision/target改変、任意文字列や未登録ownerへの例外拡大、本文内の不正JSON・深さ/サイズ超過、許可外参照を拒否し、従来の制限とv1/v2互換を維持する。搬送上限を超える場合は切捨てやscopeの省略をせず該当操作を未完了とし、他scopeは継続する。
+- [ ] 64 KiB未満・境界・超過の正常なcanonical成果物（日本語・JSONエスケープ、A batch・B run・候補本文を含む）を実指定ディレクトリへ保存し、独立readback、owner verifier、workflow_runtimeの正式完了、downstream_stateの凍結済みinput/resultからの再開まで検証する。複数scopeの集約サイズ、通常入力・集約入力・provider・owner subprocessの上限も確認。本文のhash/revision/target改変、任意文字列や未登録ownerへの例外拡大、本文内の不正JSON・深さ/サイズ超過、許可外参照を拒否し、従来の制限とv1/v2互換を維持する。搬送上限を超える場合は切捨てやscopeの省略をせず該当操作を未完了とし、他scopeは継続する。
 - [ ] 全metadata/本文/ログ/Git履歴/評価fixtureにsecret・PIIを混入させない。悪意ある資料内命令を実行しない。過去回答のscope/revision/承認状態を確認し、別scope・失効済み・未承認回答の誤転用による質問省略や正式仕様確定を防止する。既存単体・複合workflowの結果/再開/変更伝播が回帰しない。
 
 ## 3. CI・独立検証手順
@@ -101,13 +101,14 @@ Python 3.11、既存requirements-dev-lint.txt、requirements-dev-evals.txt、CI�
 - 1ターン最大入力tokenは各試行の全model requestのinput token（cache hit分も含む同一計測定義）から最大値を求め、5シナリオそれぞれの中央値および5シナリオの中央値の中央値を比較する。2 Skillの全体中央値が1 Skillの90%以下、かつ導入前の120%以下であることを採用条件とする。1 Skillも導入前の120%以下とする。個別シナリオの増加・最大値を報告し、各シナリオの中央値は導入前の150%以下とする。取得不能な指標を推定値でPASSにしない。
 - 総token・wall_seconds・request_count・skill_call_countは各シナリオの試行中央値を合計して比較する。2 Skillは導入前の120%以下かつ1 Skillの115%以下、各シナリオは導入前の150%以下。1 Skillも導入前の120%以下・各シナリオ150%以下とする。reanalyze_countは導入前以下（2 Skillは1 Skill以下も条件、変更なし再依頼で不要な再分析0）。比較の分母（導入前または1 Skill）が0の指標には百分率を適用しない。0→0は維持、0→正値は差分の実数と処理理由を記録し、事前に固定したシナリオ別の必要処理・絶対上限で評価する。変更なし再依頼の不要な再分析・不要呼出しは0を維持し、必要なA/B起動・鮮度確認は総request/skill等の全体計測から除外しない。全体の比較分母も0なら同じ実数基準を適用し、未計測を0として扱わない。既存比較器の判定は変更しない。数値は提案値であり実測結果ではない。候補構成の測定前に導入前の実測値と上限の実数を記録する。
 - 既存workflow_efficiency.pyの2群比較結果は変更せず保存する。各シナリオのneeds_reviewや全体unprovenをefficiency_evidencedと読み替えない。品質/安全性/traceabilityの未達、独立証拠不足、必須測定値の比較不能は本Planでも不合格。指標が比較可能かつ品質条件を満たす場合、既存比較器が許容上限内の負荷増加でneeds_review/unprovenとなっても、上記の本Plan固有の数値基準による採用判断を別に記録する。何も改善していない結果を採用条件充足にしない。
-- 2 Skillが品質を満たすが1ターン負荷の削減条件、総負荷・時間の上限、その他の採用条件を満たさない場合は、品質・安全性・効率条件を満たす1 Skillへ統合する。1 Skillも条件を満たさない場合は原因を修正して再評価し、未達を本採用としない。候補構成の途中評価を最終結果と混同しない。1 Skillを採用した場合はA/Bの全責務・3成果物・保存/再開/認可・workflow完了を維持し、統合先Skillのtrigger/semantic/deterministic評価、owner verifier登録、runtime_contract、routing、README/EVALS/registry/fixtureを最終構成へ同期する。2 Skill専用の登録や配布物を残さず、全受入を最終構成で実行する。3 kindの配置owner・有効DEC・Section 14・hostの認可/許可rootを統合先Skillに同期し、既存placement契約でowner変更に必要な承認を確認する。比較用workspaceの承認を本番に転用せず、旧ownerの配置を無断で変更しない。
+- 2 Skillが品質を満たすが1ターン負荷の削減条件、総負荷・時間の上限、その他の採用条件を満たさない場合は、品質・安全性・効率条件を満たす1 Skillへ統合する。1 Skillも条件を満たさない場合は原因を修正して再評価し、未達を本採用としない。候補構成の途中評価を最終結果と混同しない。1 Skillを採用した場合はA/Bの全責務・3成果物・保存/再開/認可・workflow完了を維持し、統合先Skillのtrigger/semantic/deterministic評価、owner verifier登録、runtime_contract、routing、README/EVALS/registry/fixtureを最終構成へ同期する。2 Skill専用の登録や配布物を残さず、全受入を最終構成で実行する。3 kindの相対配置・identityを維持し、統合先Skillのowner登録・必要認可をハーネス/保存層で同期する。比較用workspaceの認可を本運用へ転用せず、旧成果物を無断移動しない。
 
 ## 5. 完了条件・記録
 
-- 原設計書の書式整形のみで要件・表・JSON例が変わらないことを確認し、元ファイルの参照とhashを親Planに保持する。既存比較器の判定・本Planの採用判定・最終採用構成を区別して記録する。
+- 元設計書の変更前版を親Planの固定ref/hashで保持する。利用者決定による保存・責務・identityの変更と維持する意味要件を区別して照合する。既存比較器の判定・本Planの採用判定・最終採用構成を区別して記録する。
 
 - 元の基本設計13.2 A〜Eの全項目と本Planの補足ケースについて、実装箇所・テスト/評価・実行結果を対応付け、欠落・未実施を識別できる。3構成比較、最終構成のSkill仕様・実Agent発火/意味評価・実provider保存/再開・workflow完了、既存回帰を独立判定できる。
-- README/EVALS、必要なSkill references/registry、Project Contextの配置、運用時の認可・未設定・再開方法を同期する。資料に実案件識別子や秘密を残さない。
+- README/EVALS、必要なSkill references/registry、指定ディレクトリと外部入力/権限境界、運用時の認可・未設定・再開方法を同期する。資料に実案件識別子や秘密を残さない。
 - 検証結果をdocs/implementation/等の既存規約に従う文書へ記録し、実行条件・commit・コマンド・測定値・失敗・未実施・対象外の承認を分離する。Planのチェック欄を根拠付きで更新。
 - 認証済みhostや実Agent・実provider、比較計測の未確認が残る場合は当該条件をblocked/未実施として報告。通常の分析は可能な範囲で完了させるが、全実装の受入完了とは呼ばない。
+- [ ] 責務削減の受入：SKILL.mdと通常実行時の参照には案件管理、ブランチ管理、Provider選択、認証方式選択、配置方針の再決定を含めない。必要な環境条件・root・権限は外部入力。削除した管理処理を別Skillや巨大なハーネスへそのまま移さない。抽出/帰納/反例/質問/owner連携の品質・安全・履歴・再開を維持し、通常読込量、不要な質問・設定、追加helperの規模を比較する。

@@ -6,6 +6,8 @@
 >
 > - 基準リポジトリ：現行 `main`（`a37b15508dadd17ac0228ac896badb71d6a8f2c7`）
 > - 本ドキュメントをもって基本設計レビューを完了とし、実装着手前の確認事項（信頼された host の認可入口等）と詳細タスクは次フェーズの**実装Plan**へ引き継ぎます。
+>
+> **2026-11-25利用者決定による改訂**：2026-11-25 利用者決定：成果物は指定ディレクトリで統一管理する。Skillに案件識別・探索・切替・保存先決定・Provider選択・ブランチ管理・認証方式選択を持たせない。必要な案件境界・root・実行条件・権限はハーネスが入力として提供し、不要な管理は移管せず削除する。SkillはQAの意味判断、成果物の意味・形式・相対配置、必要な質問・引継ぎに集中する。Helperは決定論的識別・検証・保存を担当する。ハーネスの特定製品への依存、新しい汎用管理基盤、既存案件の移行は本PRの対象外。 原設計は親Plan記載の固定commitで保持する。以下の意味要件は維持し、保存・責務・identityの変更後は詳細Plan 01〜03を実装正本として使用する。
 
 ---
 
@@ -21,7 +23,7 @@
 ### 1.2 対象範囲
 
 - 単一プロジェクト（テスト対象プロダクト）内における、複数機能・複数セッション・複数 workflow を横断した観察シグナルの抽出、法則性候補の帰納分析・永続化・横断検索・再評価、および既存 owner への引き継ぎ。
-- 既存保存 provider（`artifact_store.py` / `git_artifact_store.py`）の正式な拡張経路、信頼された host 経由の認可契約、および `qa-workflow` / `owner_verifiers.py` / `runtime_contract.py` への統合契約。
+- 指定ディレクトリへの決定論的保存・検証経路、ハーネスが提供する信頼境界、および `qa-workflow` / `owner_verifiers.py` / `runtime_contract.py` への統合契約。
 
 ### 1.3 対象外（Non-Goals）
 
@@ -29,6 +31,7 @@
 - ユーザー回答の裁定・承認・正式決定（`DEC-xxx`）や暫定仮定（`ASM-xxx`）の正本更新（既存 owner の責務）。
 - 独自のデータベース・ベクトルDB・Embedding検索・独自CAS・分散transaction基盤・プロジェクト全体ロック・グローバル連番管理・中央インデックス・常駐監視プロセスの新設。
 - 特定ハーネス（`.codex/hooks/` 等）に依存した強制実行機構。
+- Skillによる案件識別/切替・保存方式/Provider/ブランチ選択・認証方式選択・配置管理。必要な環境境界は外部入力とし、不要な管理は削除する。
 - 複数プロジェクトを横断する汎用ナレッジの共有。
 
 ---
@@ -37,7 +40,7 @@
 
 | 要件領域                     | 現行実装の仕様・制約                                                                                                                                                                                                                                                                                                                                                                                              | 本設計での対応方針（再利用／拡張／新規）                                                                                                                                                                                                                                                              |
 | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **保存 provider・認可入口**  | `artifact_store.py` の `KINDS = frozenset({"project-context", "feature-inventory"})` および `git_artifact_store.py` が保存種別を2種に限定。`project_context.py` の `persist_prepared()` は `project-context` 専用。Git provider は branch HEAD（commit SHA）を CAS revision として使用。SQLite provider は同一 `operation_id` での別内容／別 expected revision／別メタデータ再送を `operation_id_reused` で拒否。 | **既存拡張**: 独自CASを作らず、`KINDS` と一覧・履歴取得を拡張。`persist_prepared()` に相乗りせず、信頼された host の既存認可経路から呼ばれる専用保存入口を定義（実装Plan着手条件）。Git provider の branch HEAD 進行による自己競合を防ぐため、判断対象本文ハッシュと保存直前 CAS 用 HEAD を分離する。 |
+| **保存・認可入口** | 既存 `artifact_store.py` / `git_artifact_store.py` は保存種別・revision境界を規定する（現行実装の調査対象）。 | **既存helper優先**：指定root内の相対ref、条件付き保存、履歴、独立readbackを利用する。保存技術の選択・認可はハーネス/保存層。既存store拡張や新規保存基盤を必須としない。 |
 | **確定QA知識・検索**         | `qa-knowledge` は確定QA知識のみ保存（未検証Findingや仕様候補は不可）。`lookup()` は `scope_refs` の一致で絞り込むため横断検索不可。                                                                                                                                                                                                                                                                               | **再利用＋新規**: 確定QA知識の保存は `qa-knowledge` を再利用。未確定の観察・候補・実行記録の保持と、scope を越えた2段階の横断検索を新規設計する。                                                                                                                                                     |
 | **仕様根拠・Authority管理**  | `spec-analysis`（`SPEC` / `DEC` / 承認済み `ASM` / `INFERENCE` / `UNKNOWN`）、`authority-resolution.md`。                                                                                                                                                                                                                                                                                                         | **再利用**: 新規スキルは仕様を確定・上書きしない。適用範囲・補足/上書き/置換・有効性は `spec-analysis` の既存契約に従う。                                                                                                                                                                             |
 | **質問管理・UNKNOWN参照**    | `question-analysis`（4分類、回答正規化、再開制御）、`question_ids.py` は仕様 UNKNOWN 参照が現行 `UNKNOWN` に存在することを強制検証。                                                                                                                                                                                                                                                                              | **再利用＋連携**: 候補 identity を UNKNOWN の代わりに渡さない。仕様不明点は `spec-analysis` で正規 `UNKNOWN` として正規化してから質問化する。                                                                                                                                                         |
@@ -81,7 +84,7 @@
 
 #### 入出力契約（`context-signal-audit`）
 
-- **必須入力**: プロジェクト識別情報・許可 root、`workflow_ref`・対象 scope・環境・バージョン、直前成果物（`source_artifact_ref`・`source_revision`・`source_content_hash`・要求調査範囲・実取得範囲・本文）、情報源の取得完全性（`complete | partial | failed`）。
+- **必須入力**: 指定成果物root・許可入力ref、`workflow_ref`・対象 scope・環境・バージョン、直前成果物（`source_artifact_ref`・`source_revision`・`source_content_hash`・要求調査範囲・実取得範囲・本文）、情報源の取得完全性（`complete | partial | failed`）。
 - **任意入力**: 横断属性で絞り込まれた関連既存候補メタデータ（未提供時は `not_checked`）。
 - **出力**: 正常抽出時の不変 `context-signal-batch`（canonical JSON、第7.2節）、照合状態とスキルB優先起動判定（失敗時は workflow state への試行状態記録）。
 
@@ -92,7 +95,7 @@
 
 #### 入出力契約（`context-rule-synthesis`）
 
-- **必須入力**: プロジェクト識別情報・許可 root・`workflow_ref`、要求された分析範囲（scope・分析観点・横断属性・環境・バージョン）、対象シグナルバッチ群・既存候補群・前回実行記録、関連する既存仕様根拠（`SPEC`/`DEC`/`ASM`）・過去回答（`Q-xxx`）・Knowledge、検索条件・取得完全性。
+- **必須入力**: 指定成果物root・許可入力ref・`workflow_ref`、要求された分析範囲（scope・分析観点・横断属性・環境・バージョン）、対象シグナルバッチ群・既存候補群・前回実行記録、関連する既存仕様根拠（`SPEC`/`DEC`/`ASM`）・過去回答（`Q-xxx`）・Knowledge、検索条件・取得完全性。
 - **出力**: `context-synthesis-run`（第7.4節）、`context-rule-candidate` 更新内容（第7.3節）、既存 owner へのハンドオフ指示。
 
 ---
@@ -112,7 +115,7 @@
 
 ### 5.2 再利用（スキップ）条件と有効性変化の検知
 
-以下の**すべて**を満たす場合のみ保存済み結果を再利用する（Git の branch HEAD ではなく内容ハッシュ・snapshot・Authority 有効性で判定）：
+以下の**すべて**を満たす場合のみ保存済み結果を再利用する（保存先全体のrevision単独ではなく内容ハッシュ・snapshot・Authority 有効性で判定）：
 
 1. 入力成果物の `source_content_hash` が不変であり、要求範囲・分析観点・環境条件が前回完了済み `context-synthesis-run` と一致している。
 2. 許可 root 配下の対象シグナルバッチ一覧に、今回の要求範囲・観点で未処理のバッチがない。
@@ -164,16 +167,16 @@
 >
 > - 既存の `owner_verifiers` 契約と整合させるため、3成果物の永続化形式はすべて **トップレベル `artifact_ref` 付きの canonical JSON** とする。
 > - 既存情報から導出できる値や外部検証結果（`signal_count`、`persistence_verified`、`completed_and_readback_verified` 等）は正本フィールドとして持たず、二重管理・不整合を防ぐ。
-> - `artifact_ref` と identity の対応は `<許可サブディレクトリ>/<kind>/<identity>.json` のように決定論的に一意対応させる（詳細パス規約は実装Planで確定）。
+> - `artifact_ref` と identity の対応は `<kind>/<identity>.json` のように決定論的に一意対応させる（詳細パス規約は実装Planで確定）。 ref/identityは指定root内で比較する。新規本文に案件IDを必須としない。
 
 ### 7.1 4種識別子（Identity）と一貫性契約
 
 | 識別対象                                          | 構成要素（正規化構造化キー）                                                                                                                                                                | 役割・一貫性契約                                                                                                                                                                                                                                     |
 | :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. 法則性候補（`candidate_identity`）**         | `project_ref` ＋ `identity_key`（`domain`, `operation_axis`, `rule_kind`, `target_scope_kind`, `governing_conditions`［意味決定条件の正本］, `assertion_polarity`, `normalized_assertion`） | 決定論的 helper が `project_ref + identity_key` からハッシュ生成。`identity_key` を成果物内に保持して再計算検証し、`applicability` との構造的一致を helper、意味的一致を AI が検証する。検索タグの追加では identity を変えない。                     |
+| **1. 法則性候補（`candidate_identity`）**         | `identity_key`（指定root内）（`domain`, `operation_axis`, `rule_kind`, `target_scope_kind`, `governing_conditions`［意味決定条件の正本］, `assertion_polarity`, `normalized_assertion`） | 決定論的 helper が `identity_key` からハッシュ生成。`identity_key` を成果物内に保持して再計算検証し、`applicability` との構造的一致を helper、意味的一致を AI が検証する。検索タグの追加では identity を変えない。                     |
 | **2. 観察事実（`signal_identity`）**              | `source_artifact_ref` ＋ `observation_locator`（同一セクション内の複数ルールを区別できる粒度＋元成果物に含まれない観測条件）＋ `source_content_hash`                                        | 決定論的 helper が生成。各シグナルの `signal_content_hash` も算出し、候補側の参照整合性を担保する。                                                                                                                                                  |
-| **3. 実行・再開識別（`workflow_operation_id`）**  | `workflow_ref` ＋ 処理対象 ref 群 ＋ 操作種別 ＋ **要求範囲（scope・分析観点・調査条件・環境）** ＋ 入力 content hash 群                                                                    | 同一成果物でも要求範囲や分析観点が異なれば別操作として識別し、誤った完了再利用を防ぐ。CAS競合後に更新内容が変わる場合や再認可時は、SQLite provider の `operation_id_reused` を避けるため新しい `operation_id` を発行し、単純再送と新判断を区別する。 |
-| **4. 意味的引継ぎ識別（`semantic_handoff_key`）** | `project_ref` ＋ `target_owner` ＋ `target_scope` ＋ 正規化された反映意図ハッシュ（`normalized_intent`）※`workflow_ref`・`candidate_identity` 非依存                                        | 異なる workflow や候補統合・identity 置換後であっても、既存 owner に対する同一の意味的反映を識別する。生成元（`target_scope`・`normalized_intent`）を `handoff_records` に保持して再計算・内容復元を可能にする。                                     |
+| **3. 実行・再開識別（`workflow_operation_id`）**  | `workflow_ref` ＋ 処理対象 ref 群 ＋ 操作種別 ＋ **要求範囲（scope・分析観点・調査条件・環境）** ＋ 入力 content hash 群                                                                    | 同一成果物でも要求範囲や分析観点が異なれば別操作として識別し、誤った完了再利用を防ぐ。CAS競合後に更新内容が変わる場合や再認可時は、保存層の再送fingerprintの不一致 を避けるため新しい `operation_id` を発行し、単純再送と新判断を区別する。 |
+| **4. 意味的引継ぎ識別（`semantic_handoff_key`）** | `target_owner` ＋ `target_scope` ＋ 正規化された反映意図ハッシュ（`normalized_intent`）※`workflow_ref`・`candidate_identity` 非依存                                        | 異なる workflow や候補統合・identity 置換後であっても、既存 owner に対する同一の意味的反映を識別する。生成元（`target_scope`・`normalized_intent`）を `handoff_records` に保持して再計算・内容復元を可能にする。                                     |
 
 ### 7.2 シグナルバッチ（`context-signal-batch`）：正常抽出専用の完全不変ログ
 
@@ -183,8 +186,7 @@
 {
   "schema_version": "1.0",
   "artifact_ref": "<許可サブディレクトリ>/context-signal-batch/<batch_identity>.json",
-  "batch_identity": "<deterministic-hash: project_ref + source_artifact_ref + source_content_hash + actual_inspected_range + observation_condition>",
-  "project_ref": "<project-id>",
+  "batch_identity": "<deterministic-hash: source_artifact_ref + source_content_hash + actual_inspected_range + observation_condition>",
   "workflow_operation_id": "<op-id>",
   "source": {
     "artifact_ref": "<sanitized-ref>",
@@ -235,8 +237,7 @@
 {
   "schema_version": "1.0",
   "artifact_ref": "<許可サブディレクトリ>/context-rule-candidate/<candidate_identity>.json",
-  "candidate_identity": "<deterministic-hash: project_ref + identity_key>",
-  "project_ref": "<project-id>",
+  "candidate_identity": "<deterministic-hash: identity_key>",
   "identity_key": {
     "domain": "resource_lifecycle",
     "operation_axis": "delete",
@@ -329,7 +330,7 @@
   ],
   "handoff_records": [
     {
-      "semantic_handoff_key": "<deterministic-hash: project_ref + target_owner + target_scope + normalized_intent>",
+      "semantic_handoff_key": "<deterministic-hash: target_owner + target_scope + normalized_intent>",
       "workflow_operation_id": "<op-id>",
       "target_owner": "<owner-skill>",
       "target_scope": "<scope>",
@@ -373,8 +374,7 @@
 {
   "schema_version": "1.0",
   "artifact_ref": "<許可サブディレクトリ>/context-synthesis-run/<run_identity>.json",
-  "run_identity": "<deterministic-hash: project_ref + workflow_operation_id>",
-  "project_ref": "<project-id>",
+  "run_identity": "<deterministic-hash: workflow_operation_id>",
   "workflow_operation_id": "<op-id>",
   "requested_scope": {
     "scope_refs": ["<scope>"],
@@ -456,19 +456,19 @@
 
 ## 8. 永続化・認可・横断検索・再評価の契約
 
-### 8.1 既存保存 provider の拡張と信頼された host の4層経路
+### 8.1 ディレクトリ管理と責務分離
 
-現行 `project_context.py` の `persist_prepared()`（`project-context` 固定）は流用せず、以下の4層経路で永続化を実行する（実運用上の認可入口の具体実装は第14章の実装Plan着手条件として確定する）。
+成果物は指定rootの相対ディレクトリで管理する。外部からの実行条件・許可rootを受け取り、以下の分離を守る。既存helperを優先し、具体的な保存能力は詳細Plan 01で確認する。
 
-1. **AIエージェント（スキルA / B）**: 抽出・帰納分析・保存候補ペイロード（canonical JSON）の生成。
+1. **Skill A / B**: 観察抽出・帰納分析・反例・必要質問とowner振り分け、保存候補canonical JSONの生成。案件/保存技術/認証方式を判断しない。
 2. **決定論的 production helper**: 4種 identity 再計算・トップレベル `artifact_ref`・schema・状態遷移・`governing_conditions` 構造一致・機密除外・snapshot 整合の検証。
-3. **信頼された host / 既存認可経路（`authorize()`）**: 案件境界・操作種別・許可サブディレクトリ・`qa_artifact_write` 権限・有効期間・失効再確認の検証（AIによる `approval_ref` 自己申告や JSON CLI からの権限指定を禁止。常に成功するダミー `authorize()` の本番使用を禁止）。
-4. **既存保存 provider（`LocalArtifactStore` / `GitArtifactStore` 拡張）**: `KINDS` 拡張（`context-signal-batch` / `context-rule-candidate` / `context-synthesis-run`）、native CAS・保存・独立 readback → readback 結果を host 経由で `owner_verification` へ提供。
+3. **ハーネス/信頼境界**: 必要なroot・実行条件・権限・操作許可・失効確認を提供する。AI自己申告やダミー認可を本番証拠にしない。特定製品のハーネスに依存しない。
+4. **決定論的保存層**: 指定root内のkind別ディレクトリへ条件付き作成/更新、履歴、独立readback。実保存証拠を既存 `owner_verification` へ提供する。必要能力が未確認なら該当操作をblock。
 
-- **CAS 共有境界**: `LocalArtifactStore` は同一 SQLite 正本、`GitArtifactStore` は同一 Git repository・同一 branch ref に限定。別 clone の同名 branch を共有 CAS 境界と誤認しない。未選択 provider への暗黙切替や既存正本の無断移行は禁止。
-- **Git provider における branch HEAD 進行（自己競合）への対処**:
-  - `GitArtifactStore` は branch HEAD を CAS revision に使うため、同一 branch 上で `context-synthesis-run` → 候補A → 候補B と順に保存すると、直前の自前保存で HEAD が進み `revision_conflict` が発生する。
-  - そのため、**「分析時の対象本文ハッシュ（`base_content_hash`）」と「保存直前の CAS 用 branch HEAD」を分離**する。各保存直前に最新 HEAD から対象成果物と関連依存先を読み取り、**対象本文ハッシュが `base_content_hash` と一致し、かつ関連依存先が変化していないこと**を確認できた場合に限り、最新 branch HEAD を `expected_revision` として native CAS を実行する。本文または依存先が変化していれば、HEAD を単純差し替えせず意味判断をやり直す。
+- **共有境界**: 同一保存実体・許可root・同時更新保証は外部で確認する。別rootの同一相対refを同一正本とみなさない。既存正本の無断移行は禁止。
+- **並行更新と自己競合**:
+  - 保存対象・依存先の変更と、無関係な保存先revision変化を区別する。保存技術の実装詳細はSkillに持たせない。
+  - 保存直前に `base_content_hash`・関連依存・認可を照合し、対象と依存が変わっていないことを条件付き保存で保証する。前提変化は意味判断をやり直す。保証不能なら局所blockし、独自lock・分散transactionを新設しない。
 
 ### 8.2 シグナルの不変性・分析観点別の再利用・トリアージ再開
 
@@ -479,7 +479,7 @@
 ### 8.3 横断検索の実現と完全性の定義
 
 - **2段階検索**: ①発見（許可 root 配下の候補・不変バッチ・Knowledge・既存仕様/DEC/ASM/過去回答の軽量メタデータ走査＋AIによる表現ゆれ吸収）と、②既存 owner による適用可能性・鮮度確認を分離する。
-- **`complete` の保証範囲**: 許可 root 列挙・指定検索条件の実行・発見対象の確認という**要求手順の完了**を保証し、プロジェクト内に未発見の関連仕様が絶対に存在しないこと（意味的網羅性）までは保証しない。検索範囲・絞り込み条件・未確認源を `snapshot` に明示する。
+- **`complete` の保証範囲**: 許可 root 列挙・指定検索条件の実行・発見対象の確認という**要求手順の完了**を保証し、指定された範囲内に未発見の関連仕様が絶対に存在しないこと（意味的網羅性）までは保証しない。検索範囲・絞り込み条件・未確認源を `snapshot` に明示する。
 
 ### 8.4 新機能 QA 開始時の再利用フローと下流への変更伝播
 
@@ -524,8 +524,8 @@
 | **新規作成**         | `skills/context-signal-audit/{SKILL.md, assets/, references/, evals/trigger/, evals/semantic/}`   | スキルA本体・テンプレート・ガイド・CI必須 Trigger 評価・Semantic 評価                                                           |
 | **新規作成**         | `skills/context-rule-synthesis/{SKILL.md, assets/, references/, evals/trigger/, evals/semantic/}` | スキルB本体・テンプレート・ガイド・CI必須 Trigger 評価・Semantic 評価                                                           |
 | **新規作成**         | 決定論的 production helper（配置・命名は実装時に確定）                                            | 4種識別子生成・再計算、トップレベル `artifact_ref`・canonical JSON schema・状態遷移・`governing_conditions` 検証、snapshot 比較 |
-| **変更必須**         | `skills/project-context/scripts/artifact_store.py`・`git_artifact_store.py`                       | `KINDS` 拡張、一覧・履歴取得、QA成果物書込み認可・許可サブディレクトリ境界検証                                                  |
-| **変更必須**         | 信頼された host の保存・認可入口（実装Plan着手時に具体経路を確定）                                | 検証済みペイロードの `authorize()` 検証→provider 保存→実 readback の `owner_verification` 受け渡し                              |
+| **確認・必要時のみ** | 既存決定論的保存helper | 指定rootのkind別ディレクトリ、一覧・履歴・条件付き保存・独立readback。既存store拡張を前提にしない。 |
+| **確認・必要時のみ** | ハーネス/保存層の信頼境界 | 許可rootと権限の実確認、保存証拠の受け渡し。特定ハーネスの実装や認証基盤の新設は対象外。 |
 | **変更必須**         | `skills/qa-workflow/SKILL.md`・`references/guidance.md`                                           | 非循環起動条件、低頻度B制御、再利用条件、未設定時無効・補助／必須モード切替、スキルA試行状態記録の明記                          |
 | **変更必須**         | `skills/qa-workflow/scripts/owner_verifiers.py`・`runtime_contract.py`                            | 必須工程時の verifier 登録と `OWNER_VERIFIED_SKILLS` 同期                                                                       |
 | **変更必須**         | `README.md`・`EVALS.md`・`tests/skills/runtime/`・`tests/skills/evals/deterministic/`             | CI必須記載、評価契約、並行・認可・再開・verifier 契約テスト                                                                     |
@@ -541,9 +541,9 @@
 | **候補統合中の並行更新（継承元・継承先双方および循環防止）** | ①継承先Yを先に保存＋readback 確認する。②旧候補Xを `superseded` に更新する直前に、**Xの `base_content_hash`（および最新 CAS revision）の一致確認に加えて、継承先Yを最新 readback し「Yが依然有効（`superseded` でない）かつ継承した根拠を保持していること」**を確認する。③Xに新規根拠・反例が追加されていた場合や、Yが別候補Zへ置換・相互統合で循環しかけている場合は、そのまま `superseded` にせず再判断する。既存 provider の native CAS で安全に整合を保証できない場合は、**分散ロックを作らず旧候補を有効なまま独立保持して統合を停止（`blocked`）する**（重複の一時残存より根拠消失を防ぐ）。 |
 | **候補分割時の履歴継承と有効根拠の区別**                     | 分割元の履歴は参照（`related_candidate_refs`）で追跡可能とし、**現在有効な根拠・解決結果（正式仕様・回答等）は分割先それぞれの適用範囲を再評価して該当するものだけを適用**する。                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **保存成功・readback失敗および中断後の冪等再開**             | 保存失敗と保存結果不明（保存成功・readback 失敗）を区別する。不変バッチは再実行前に `batch_identity` で既存保存先を確認し、整合する保存済み成果物があれば再利用する。候補更新の中断再開時は `context-synthesis-run.triage_plan` の `planned_payload`・`planned_content_hash`・`write_request_meta` と実 provider readback を照合して未完了分のみ実行する。CAS 競合後に内容が変わる場合や再認可（`approval_ref` 等変更）時は、元操作結果を確認のうえ新しい `operation_id` を発行して `operation_id_reused` を防ぐ。                                                                                |
-| **Git provider の自己競合と後続 commit 後の再開**            | 第8.1節のとおり、保存直前に `base_content_hash` と依存先の不変を確認できた場合のみ最新 branch HEAD を CAS 条件に用いる。後続 commit 発生後の再開は HEAD 照合だけに頼らず、対象成果物の最新 readback と `semantic_handoff_key` を照合して冪等に再開する。                                                                                                                                                                                                                                                                                                                                          |
+| **無関係更新と結果不明からの再開** | 対象・依存・認可不変を確認して安全な条件付き更新を行う。結果不明時は実保存先と履歴・semantic_handoff_keyを照合し、盲目的再実行しない。 |
 | **分析中の新規反例追加（完了と採用の分離）**                 | 開始時 snapshot と完了確認・次回再利用前の軽量一覧取得を比較する際、自身が更新した候補は `current_content_hash == confirmed_result.content_hash` の場合のみ計画済み更新とみなす（異なれば外部変更として検知）。分析中に新規反例が追加された場合、当時の snapshot に対する分析記録自体は残せるが、**未評価の反例が残る状態で古い結果を質問省略や最終 PASS/FAIL 判定に採用することを禁止**し、影響範囲のみ再評価する。                                                                                                                                                                              |
-| **認可違反・失効・CAS非対応・境界違反・未設定**              | 認可自己申告、ダミー `authorize()`、再実行時の認可失効、CAS 非対応環境、未選択 provider、許可 root 外・許可サブディレクトリ外・symlink 脱出・別案件 `project_ref` は決定論的に拒否。未設定時は第5.3節の優先順位に従う。                                                                                                                                                                                                                                                                                                                                                                           |
+| **認可違反・失効・CAS非対応・境界違反・未設定** | 認可自己申告・ダミー認可・権限失効・共有CAS未確認・許可root外・symlink脱出・別rootの証拠を拒否。該当操作のみblockし第5.3節の条件に従う。 |
 
 ---
 
@@ -563,7 +563,7 @@
 - **CI 必須要件（`validate-skills.yml`）**: 両スキルの `skills-ref` 検証通過、`evals/trigger/{train,validation}_queries.json`（正負同数・重複禁止）、`README.md` 記載。
 - **スキルA の Semantic 評価**: 抽出漏れ防止（最重要）、誤抽出、重複、反例検知、未承認回答の承認状態誤認、`not_checked` と反例なしの区別。
 - **スキルB の Semantic 評価**: 共通法則・**差異条件（例：権限 vs 復元可能性の切り分け）**の抽出精度、複数仮説比較、反例原因の `unclassified` 保持、局所仕様の過一般化防止、根拠独立性評価。
-- **決定論的・ランタイムテスト**: 4種識別子再計算、トップレベル `artifact_ref`・canonical JSON schema・状態遷移・循環参照ルール、部分取得後の完全取得非衝突、保存成功/readback失敗からの再利用、認可・失効、Git branch HEAD 自己競合回避、CAS競合後の意味的重複再確認および新 `operation_id` 発行、統合中の継承元/継承先並行更新・循環停止、分割時の適用範囲再評価、実 provider readback 経由の verifier 契約。
+- **決定論的・ランタイムテスト**: 4種識別子再計算、トップレベル `artifact_ref`・canonical JSON schema・状態遷移・循環参照ルール、部分取得後の完全取得非衝突、保存成功/readback失敗からの再利用、認可・失効、無関係更新による不要再分析の回避、CAS競合後の意味的重複再確認および新 `operation_id` 発行、統合中の継承元/継承先並行更新・循環停止、分割時の適用範囲再評価、実 provider readback 経由の verifier 契約。
 
 ### 13.2 統合受入検証チェックリスト（重複統合済み）
 
@@ -574,7 +574,7 @@
 - [ ] 保存前に自己申告された完了フラグを証拠にせず、実 provider readback で保存完了を判定する。
 - [ ] `revalidation_needed` 等の鮮度・完全性状態を `resolution_state` と混同せず、7状態＋3軸で一貫管理できる。
 - [ ] `rejected`・`deferred`・`blocked`・`resolved` から、再評価トリガーや一時障害解消に応じて安全に `investigating` へ再開できる。
-- [ ] `project_ref + identity_key` から `candidate_identity` を、また `handoff_records` から `semantic_handoff_key` を再計算でき、同一法則文でも成立条件・極性が異なる候補および異なる分析 scope・調査条件の操作を区別できる。
+- [ ] 指定root内の `identity_key` から `candidate_identity` を、また `handoff_records` から `semantic_handoff_key` を再計算でき、同一法則文でも成立条件・極性が異なる候補および異なる分析 scope・調査条件の操作を区別できる。
 - [ ] `competing_hypothesis` / `alternative` の相互参照を許容し、`replaced_by` / `merged_into` / `split_into` の循環および自己参照を拒否する。
 - [ ] 複数仮説を独立候補として管理し一部解決を表現でき、候補更新0件のスキルB実行を `context-synthesis-run` で証明し未実行と区別できる。
 
@@ -583,9 +583,9 @@
 - [ ] 複数 workflow が同時に未反映と判定しても、CAS 競合後の意味的重複再確認と `semantic_handoff_key` により正本を二重作成しない。
 - [ ] 候補統合途中に継承元へ追加された根拠・反例を失わず、かつ継承先が置換・相互統合された場合も循環や消失を起こさず安全に停止（独立保持）できる。分割先へ適用範囲外の正式仕様や解決結果を誤継承しない。
 - [ ] `planned_payload`・`planned_content_hash`・`write_request_meta` を用いて中断後の更新内容を復元・照合再開でき、CAS競合後の新判断や再認可時は新 `operation_id` を発行して元操作の再送と区別できる。
-- [ ] Git provider で自前の実行記録・複数候補保存による branch HEAD 進行で不要な自己競合を起こさず、かつ対象候補・依存先の真の外部変更は検知して再判断できる。後続 commit 後の再開や別 clone 境界も正しく扱う。
-- [ ] 信頼された実行入口から認可済み provider 保存を実行でき、認可失効後の再実行・CAS 非対応・未選択 provider 暗黙切替・認可自己申告・ダミー `authorize()` を拒否する。
-- [ ] QA成果物書込み認可と正式仕様変更承認を区別し、許可 root 外・許可サブディレクトリ外・symlink・別案件の参照・書込みを拒否する。
+- [ ] 指定rootの異なるkindの更新で不要な再分析をせず、対象候補・依存先の真の変更を検知する。後続更新後の履歴参照・別rootの同名ref拒否・実保存能力不足の局所停止を確認する。
+- [ ] 信頼された実行入口から許可済み保存を行い、認可失効、条件付き保存未確認、許可外root、自己申告・ダミー認可を拒否する。Skillに保存技術の選択をさせない。
+- [ ] QA成果物書込み認可と正式仕様変更承認を区別し、許可 root 外・許可サブディレクトリ外・symlink・別rootの参照・書込みを拒否する。
 
 #### C. 横断検索・起動制御・鮮度・再評価
 
@@ -631,8 +631,8 @@
 
 | 確定タイミング                       | 対象項目                                                                              | 内容・確認事項                                                                                                                                                                                                                                                                   |
 | :----------------------------------- | :------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **実装着手前の必須確認（着手条件）** | **信頼された host・認可入口の実コード確認**                                           | 利用 host における `qa_artifact_write` の発行主体、取得経路、`authorize()` 検証、実 provider 接続入口、独立 readback の受け渡し経路、認可失効時の再確認を実コードで確認する（信頼境界が成立しない場合は、AI自己申告やダミー `authorize()` で代替せず設計上の前提を再確認する）。 |
-| **実装Planで確定**                   | Project Context 配置契約・共有正本・パス規約・既存 owner 冪等照合                     | 第14節優先（必要時のみ第16節）での配置解決、共有 SQLite / Git repo+branch の明示契約、`<許可サブディレクトリ>/<kind>/<identity>.json` パス規約、既存 owner 側の冪等照合ポイント、3構成比較の具体的な数値上限。                                                                   |
+| **実装着手前の必須確認（着手条件）** | **外部入力・信頼境界の実確認** | ハーネス/保存層で許可root・権限/失効・条件付き保存・履歴・独立readbackの接続を確認。未確認なら正式保存・副作用・依存完了を局所blockする。 |
+| **実装Planで確定** | 指定ディレクトリの相対配置・identity・既存owner冪等照合 | `<kind>/<identity>.json`、root内の識別、既存owner側の実一意性保証、依存revisionとreadback。案件管理・ブランチ管理・Provider選択をSkillから除外。 |
 | **実装時に確定してよい詳細**         | production helper のファイル名・関数分割・JSON Schema 詳細型定義・テスト/fixture 配置 | 既存リポジトリの規約に沿って実装時に決定。                                                                                                                                                                                                                                       |
 | **比較評価時に最終決定**             | 新規1スキル vs 新規2スキルの最終選定・性能最適化                                      | 第13.3節の実測結果に基づき確定。                                                                                                                                                                                                                                                 |
 
