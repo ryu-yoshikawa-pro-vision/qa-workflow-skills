@@ -8,7 +8,7 @@
 
 調査対象は、5つのGitHub Actions workflow、そこから起動するscripts/tests、Python requirements、Dependabot、dprint CLI/plugin、skills-ref、Codex CLI、GitHub側のsecurity設定である。mainのコード、PR #22・#36・#37 metadata、GitHub Actions runs、main ruleset、GitHub公式仕様を照合した。
 
-GitHub app接続ではmainのworkflow runs・ruleset・repository metadataは取得できた一方、code scanning / Dependabot alerts、Dependency graph内容、SettingsのSecurity and analysis / Actions permissions、Dependabotのupdate job・config errorは許可対象外だった。依頼者の指示によりgh CLIも利用し、PR #39の現head b5ba32330658b12ee30e41d5683336ff32f6b4d3の全5 workflowとCodeQL aggregate / Analyze checksがsuccessであることを確認した。依頼者が同日にUIで確認した設定・Dependency graph 15 referencesは提供された背景情報として記録し、今回のCLI直接確認とは区別する。
+GitHub app接続ではmainのworkflow runs・ruleset・repository metadataは取得できた一方、code scanning / Dependabot alerts、Dependency graph内容、SettingsのSecurity and analysis / Actions permissions、Dependabotのupdate job・config errorは許可対象外だった。依頼者の指示によりgh CLIも利用し、PR #39のhead 62f443b27968369784ab69fe4008ed514b17bda1の全5 workflowとCodeQL aggregate / Analyze checksがsuccessであることを確認した。依頼者が同日にUIで確認した設定・Dependency graph 15 referencesは提供された背景情報として記録し、今回のCLI直接確認とは区別する。
 
 ## 現在のCI経路とGitHub token権限
 
@@ -37,7 +37,7 @@ main HEAD `a37b155…`への2026-11-24 pushに対する5 workflowは全てsucces
 | Validate Semantic Output Evals      | `45431363728` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431363728 |
 | CodeQL default setup                | `45431362292` | https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/actions/runs/45431362292 |
 
-`gh ruleset view 24843922`でactive `protect-main`がdefault branchに適用されることを確認した。bypass不可で、PR、required linear history、`validate` / `deterministic-output-evals` / `semantic-output-evals`の3 required statusを設定。required approving review countは0、required review thread resolutionは有効、strict status checksは無効。CodeQL、Code Quality、Codex Harnessはrequired statusではない。PR #39のhead `b5ba32330658b12ee30e41d5683336ff32f6b4d3`ではCodeQL aggregate checkおよびAnalyze (actions / javascript-typescript / python) がsuccess。mainのscan successも確認済みだが、main上のalertのOpen/Closed状態は別途未確認。
+`gh ruleset view 24843922`でactive `protect-main`がdefault branchに適用されることを確認した。bypass不可で、PR、required linear history、`validate` / `deterministic-output-evals` / `semantic-output-evals`の3 required statusを設定。required approving review countは0、required review thread resolutionは有効、strict status checksは無効。CodeQL、Code Quality、Codex Harnessはrequired statusではない。PR #39のhead `62f443b27968369784ab69fe4008ed514b17bda1`ではCodeQL aggregate checkおよびAnalyze (actions / javascript-typescript / python) がsuccess。mainのscan successも確認済みだが、main上のalertのOpen/Closed状態は別途未確認。
 
 `gh repo view`ではrepository visibilityがpublic、default branchが`main`、`isSecurityPolicyEnabled`がfalseであることを確認した。security policy文書の有効化判断は今回のscope外で、設定変更は行っていない。
 
