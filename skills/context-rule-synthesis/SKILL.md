@@ -9,7 +9,7 @@ description: 複数workflowのcontext-signal-batch、既存候補、仕様Author
 
 ## 実行手順
 
-1. `references/guidance.md`と`references/data-contract.md`を読みます。`assets/candidate-example.json`と`assets/run-example.json`は構造例です。
+1. `references/guidance.md`、`references/data-contract.md`、`assets/output-template.md`を読みます。`assets/candidate-example.json`と`assets/run-example.json`は構造例です。
 2. 開始時の`workflow_ref`、対象ref/content hash、要求scope・観点・調査条件・環境、現行Authority・取得可否等から`operation_input`を固定し、`workflow_operation_id` / `run_identity`を再計算できる形で保持します。自己更新、後から追加した根拠、時刻、無関係なHEAD/tokenはidentityに混ぜません。
 3. 実行環境が渡す指定root内のlistと軽量projectionから必要本文だけを選択取得します。scopeが異なるという理由だけで候補を落としません。機械tag不一致や一覧取得不能は無関係の証明ではありません。
 4. snapshotへ検索root・条件・取得完全性・直接参照した全ref/revision/hash・Authority fingerprint・取得不能/除外範囲を記録します。取得不能を空検索と扱いません。
@@ -34,5 +34,6 @@ description: 複数workflowのcontext-signal-batch、既存候補、仕様Author
 - batch/candidate/run schema・identity・完了: `references/data-contract.md`
 - 候補例: `assets/candidate-example.json`
 - run例: `assets/run-example.json`
+- 出力形式: `assets/output-template.md`
 - 共通pure contract helper: `skills/project-context/scripts/context_artifacts.py`
 - 単一sourceのsignal抽出: `skills/context-signal-audit/SKILL.md`
