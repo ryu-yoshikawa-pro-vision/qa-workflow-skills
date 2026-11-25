@@ -1,6 +1,6 @@
 # QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。
+設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。 コード・Skill・文書は有効な正本に同期し、不要な旧実装・旧記述を残しません。
 
 新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
@@ -34,8 +34,6 @@ node --check .codex/hooks/pre_tool_use_policy.mjs
 ```
 
 ## Skill構成
-
-以下の構成・責務一覧および既存契約は現行実装の説明です。新規・改修では冒頭の共通原則を適用し、旧案件配置・保存方式・検証機構の必要性を対象Planで評価します。未改修の現行契約は維持し、必要な保証を検証してから置き換えます。
 
 ```text
 skills/
@@ -129,9 +127,9 @@ skills/
 
 ## QA運用・利用者向けガイド
 
-- [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・checkpoint・停止再開の責務とタイミング。
-- [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): 全37 QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
-- [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 案件初期化、依頼、回答、承認、編集、再開と結果確認。
+- [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・再開・完了の責務とタイミング。
+- [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
+- [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 依頼、回答、承認、編集、再開と結果確認。
 - [運用改善候補（2026-11-25）](docs/reports/2026-11-25_qa-workflow-operating-improvements.md): 現行制約と未実装の改善候補。承認済みPlanとは区別する。
 
 ## テスト分析・設計フロー

@@ -4,7 +4,9 @@
 
 ## 確定前提と適用範囲
 
-[共通原則](../reference/qa-skill-design-principles.md)（PRN-01〜08、Q01〜12）が設計の正本。利用者合意済みであり、再承認不要。OPS-18を先に適用し、Skill・Runtime・validator・Helper・呼出し側の不要な責務・過剰防衛を削減する。以下の「現状」は調査時点の旧契約・制約であり、「改善」「受入」は新方針の候補。現行の未改修契約を文書だけで解消したことにしない。PR #40完了後に実装証拠を確認し、対応済みの再実装や不要になった受入を除く。
+[共通原則](../reference/qa-skill-design-principles.md)（PRN-01〜09、Q01〜12）が設計の正本。利用者合意済みであり、再承認不要。OPS-18を先に適用し、Skill・Runtime・validator・Helper・呼出し側の不要な責務・過剰防衛を削減する。以下の「現状」は調査時点の旧契約・制約であり、「改善」「受入」は新方針の候補。現行の未改修契約を文書だけで解消したことにしない。PR #40完了後に実装証拠を確認し、対応済みの再実装や不要になった受入を除く。 PRN-09に従い関連コード・Skill・文書・テスト・設定を同期し、不要な実装・記述・重複だけを除去する。
+
+調査・レビューで使用したG1〜G5、CP01〜10、配置区分等の詳細は、[調査時の共通運用契約](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-operating-contract.md)、[調査時の成果物マトリクス](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-artifact-matrix.md)、[調査時の利用者ガイド](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-user-guide.md)を参照する。これらはレビュー根拠の履歴であり、運用上の正本ではない。保存・承認・配置等の必要な実行条件は担当Skill・Runtimeと適用される契約を確認する。
 
 ## A. 質問・承認・checkpoint
 
@@ -14,7 +16,7 @@
 
 現状: [workflow guidance](../../skills/qa-workflow/references/guidance.md)はstate・再利用・再開を、[question guidance](../../skills/question-analysis/references/guidance.md)はQ ID・回答正規化を規定する。質問提示直後・回答反映後・工程間の保存を全owner横断で自動保証する受入は確認できなかった。
 
-改善: Q09で成果物作成依頼を原則保存対象とし、明示の非保存指示を優先する。Q02の5契機（処理完了、質問前、回答反映後、中断、引継ぎ前）で必要な成果物だけ自動保存する。Q ID、根拠、停止scope、再開先、完了成果物参照は既存成果物から取得できるものを重複保存しない。専用stateは必要情報が復元できない場合だけ利用する。単発相談・レビュー・調査は原則対話回答のみ。旧CP01〜10は現行baselineであり、新しい全Skill共通checkpointを実装しない。
+改善: Q09で成果物作成依頼を原則保存対象とし、明示の非保存指示を優先する。Q02の5契機（処理完了、質問前、回答反映後、中断、引継ぎ前）で必要な成果物だけ自動保存する。Q ID、根拠、停止scope、再開先、完了成果物参照は既存成果物から取得できるものを重複保存しない。専用stateは必要情報が復元できない場合だけ利用する。単発相談・レビュー・調査は原則対話回答のみ。調査時のCP01〜10は履歴参照であり、新しい全Skill共通checkpointを実装しない。
 
 受入: 質問提示直後の中断・別session再開、部分回答・保留、保存未設定/失敗、source改版を試験し、解決済み論点・完了済み工程の反復と未保存の成功表示を防ぐ。
 
