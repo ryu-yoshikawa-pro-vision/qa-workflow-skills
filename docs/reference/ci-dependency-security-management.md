@@ -62,17 +62,17 @@ GitHubのdevelopment-scoped low-impact presetは、`ecosystem:npm`および`scop
 
 ### Ruff
 
-| 項目                                 | 記録                                                                                                                                                                                            |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 正式名 / 用途                        | Ruff。repository内tracked Pythonのlint/import/format。                                                                                                                                          |
-| 現在のversion / 正本                 | `0.16.8`。唯一pinは`requirements-dev-lint.txt`。version表示とlint/import/formatは共通script経由。Ruff対象fileがある処理前にpinを照合する。                                                                 |
-| Dependency graph                     | 依頼者がmainのgraphで認識済み1件を確認。pipのrequirements manifestで宣言。                                                                                                                      |
-| Dependabot alerts / security updates | pip manifest対象。通常のversion-update PRはlimit 0。npm開発presetの対象外。toggleの最新状態は未確認。                                                                                            |
-| 現在のリスク                         | npm向けpresetはRuffに非適用。別ruleや手動却下の有無は未確認。                                                                                                                                  |
-| 推奨対応 / 変更先                    | pin正本はrequirements、実行入口は共通scriptとする。                                                                                                                                            |
-| 検証                                 | pin / CLI照合の回帰test、Code Quality CI。                                                                                                                                                     |
-| 優先度                               | P1。CI lint直接依存。                                                                                                                                                                           |
-| 未確認                               | graphの現行画面・alert状態、auto-dismissの現在値、最新Dependabot status。                                                                                                                       |
+| 項目                                 | 記録                                                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 正式名 / 用途                        | Ruff。repository内tracked Pythonのlint/import/format。                                                                                     |
+| 現在のversion / 正本                 | `0.16.8`。唯一pinは`requirements-dev-lint.txt`。version表示とlint/import/formatは共通script経由。Ruff対象fileがある処理前にpinを照合する。 |
+| Dependency graph                     | 依頼者がmainのgraphで認識済み1件を確認。pipのrequirements manifestで宣言。                                                                 |
+| Dependabot alerts / security updates | pip manifest対象。通常のversion-update PRはlimit 0。npm開発presetの対象外。toggleの最新状態は未確認。                                      |
+| 現在のリスク                         | npm向けpresetはRuffに非適用。別ruleや手動却下の有無は未確認。                                                                              |
+| 推奨対応 / 変更先                    | pin正本はrequirements、実行入口は共通scriptとする。                                                                                        |
+| 検証                                 | pin / CLI照合の回帰test、Code Quality CI。                                                                                                 |
+| 優先度                               | P1。CI lint直接依存。                                                                                                                      |
+| 未確認                               | graphの現行画面・alert状態、auto-dismissの現在値、最新Dependabot status。                                                                  |
 
 ### PyYAML
 
@@ -81,7 +81,7 @@ GitHubのdevelopment-scoped low-impact presetは、`ecosystem:npm`および`scop
 | 正式名 / 用途                        | PyYAML。Deterministic Output Evalがeval YAMLを読み込む。                                                                           |
 | 現在のversion / 正本                 | `6.0.3`。`requirements-dev-evals.txt`。`EVALS.md`の有効な導入例はversionを直接記載していた。今回、例をmanifest installへそろえる。 |
 | Dependency graph                     | 依頼者がmainのgraphで認識済み1件を確認。Dependabot docsはpipの`.txt` manifestを対象とする。                                        |
-| Dependabot alerts / security updates | pip security-only config対象。通常PRはlimit 0。npm開発preset対象外。状態未確認。                                                    |
+| Dependabot alerts / security updates | pip security-only config対象。通常PRはlimit 0。npm開発preset対象外。状態未確認。                                                   |
 | 現在のリスク                         | 明示pinはある。lockfileではないため、推移依存の完全な固定はrequirementsだけでは保証しない。                                        |
 | 推奨対応 / 変更先                    | 既存requirementsを正本とし、`EVALS.md`から同versionの直接指定を除く。PyYAMLのversionは変更しない。                                 |
 | 検証                                 | requirements参照、Deterministic Eval validation/test、YAML parse。                                                                 |
@@ -186,7 +186,7 @@ GitHubのdevelopment-scoped low-impact presetは、`ecosystem:npm`および`scop
 | Grouped security updates                                 | 依頼者確認ではOFF。現在値未確認。                                                                                                                                                                       | 同Settingsのgroupingを確認。依頼ではOFFを推奨。                                                                                                                                                               |
 | Automatic dependency submission                          | 依頼者確認ではDisabled。現在値未確認。PythonはGitHub docs上Dependabot graph jobsが自動submissionに優先し、dependency graphを有効にすればPython graph jobが使われる。                                    | 同Settingsで設定値を確認。今回変更しない。                                                                                                                                                                    |
 | Malware alerts / dismiss malware alerts                  | 前回malware alerts OFF、dismiss package malware alerts Disabledとの申告。最新値未確認。推奨はMalware alerts ON、dismiss Disabled。                                                                      | Security analysis settingsで両方を確認。                                                                                                                                                                      |
-| Dismiss low-impact dev-scoped alerts                     | 前回Enabledとの申告。現況未確認。presetは条件を満たすnpm dev alert向け。Ruff/PyYAMLはpipのため対象外。                                                                                               | 設定とcustom ruleをUI確認。今回変更しない。                                                                                                                                                                   |
+| Dismiss low-impact dev-scoped alerts                     | 前回Enabledとの申告。現況未確認。presetは条件を満たすnpm dev alert向け。Ruff/PyYAMLはpipのため対象外。                                                                                                  | 設定とcustom ruleをUI確認。今回変更しない。                                                                                                                                                                   |
 | Auto-triage rules                                        | 現在のrule一覧にアクセス不可、最新値未確認。                                                                                                                                                            | [Dependabot alerts](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/security/dependabot)からRulesを開き、auto-dismiss/ignore設定を確認。Alert listの`resolution:auto-dismissed` filterを確認。 |
 | Secret Protection / push protection                      | 依頼者の推奨状態はON。今回未確認。                                                                                                                                                                      | Security analysis settingsからSecret Protection、push protectionを確認。                                                                                                                                      |
 | CodeQL analysis                                          | main HEAD `a37b155…`のCodeQL default-setup run `45431362292`はsuccess。Alerts状態は未確認。                                                                                                             | [Code scanning alerts](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/security/code-scanning)でAlert #1/#2/#3の状態を確認。                                                                   |
