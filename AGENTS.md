@@ -4,7 +4,7 @@
 
 ## 全体の設計原則（常時適用）
 
-- [QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)（PRN-01〜09、Q01〜12）を新規・改修・Plan・レビューの共通前提とします。不要な責務・処理・防御を先に削減し、SkillだけでなくRuntime・validator・Helper・ハーネスも必要性から評価します。
+- [QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)（PRN-01〜09、Q01〜12）を新規・改修・Plan・レビューの共通前提とします。不要な責務・処理・防御を先に削減し、SkillだけでなくRuntime・validator・Helper・ハーネスも必要性から評価します。 設計原則の採用は個別の実行契約や権限を無条件に置き換えるものではありません。
 - コード・Skill・文書・テスト・設定は有効な正本に同期し、不要な旧実装・旧記述・重複を残しません（PRN-09）。開発用Git保護・実行権限を維持し、変更範囲と必要な互換性・検証は対象Planに従います。共通原則の詳細は正本を参照します。
 
 ## 常時必要な契約
@@ -19,7 +19,6 @@
 - file delete、rename、moveは、ユーザーが明示した対象範囲だけで行います。
 - formatter、lint、関連test、CI契約を完了前に確認します。完了判定に使う独立validationは個別に実行・判定し、複数commandをまとめたaggregate exit codeだけでPASSにしません。
 - Codex CLIは特定versionへ固定せず、利用中のversionを記録します。実runtimeの受入ではversion一致ではなく、対象tool modeでrepository-owned `PreToolUse` / execpolicyが機能することを確認します。Direct modeではdirect `exec_command`、Code Mode / CodeModeOnlyではnested `tools.exec_command()`を対象にします。required safety capabilityを確認できない範囲は未検証とし、Hook、execpolicy、sandbox、protected branch保護の拒否を維持して拒否を迂回しません。state-changing Gitは、ユーザーが明示した作業範囲とPlanが許可する場合だけ実行します。commandはcanonical repository rootへの移動とdirectなGit commandを同一command内に含めるPlan所定の形式を使います。ただし通常のfetchに限り、`docs/reference/codex-safety-harness.md`で定める`git -C '<absolute repository path>' fetch origin`形式も利用できます。この形式はセッションのリポジトリと同一のGit管理対象（linked worktreeを含む）にのみ許可します。
-- PR #18の`chore/formatter-lint` branchでは、今回の明示依頼に基づき、改訂Main Planの検証・差分確認を満たした後、選択した対象ファイルのstage、commit、同branchへの通常pushを許可します。この例外はPR #18だけに適用し、他のbranchや作業へ広げません。`git add -A`、force push、merge、branch削除、権限拒否の迂回は禁止です。
 - runtime受入はcodex --no-daemon --strict-configのembedded / non-shared runtimeに限ります。managed/shared app-serverを検証済み扱いしません。
 - Codexのdisconnect / reconnect、recovered queue、別session由来と疑われるapprovalやoutputが出た場合は承認せず、新しいfresh sessionで作業状態を再確認します。
 - root AGENTS.mdはCodex標準のcompact復元へ委ねます。独自SessionStart Hookや重複する指示再注入を追加しません。
