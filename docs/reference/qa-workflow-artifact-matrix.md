@@ -2,7 +2,13 @@
 
 [共通運用契約](qa-workflow-operating-contract.md)の別表。対象はskills/配下37 Skill（.agents/skillsの開発用3 Skillは対象外）。成果物名は論理名。固定ファイルパス・全Skillの自動永続化を保証しない。各ownerの正本契約と案件の配置・認可に従う。CP/G番号は共通運用契約を参照。各行は現行の論理成果物・配置と運用上の引継ぎを示し、自動保存実装済みとは限らない。ユーザー欄は固有介入のみ。全行共通で必要なG1/G4の配置・正式保存・操作承認とgatedの進行指示は別途必要。
 
-## Skill別
+## 今後の設計方針（現行調査と区別）
+
+2026-11-25 利用者決定（今後の設計に適用）：成果物は指定root配下のディレクトリで統一管理する。案件識別・探索・切替、ブランチ管理、保存技術/Provider・認証方式の選択、配置の都度決定はSkillの責務外。必要な環境条件・許可root・権限をハーネスが提供し、不要な管理は移管せず削除する。Skillは専門的なQAの意味判断、成果物の内容・形式・相対配置、質問・引継ぎに集中し、Helperは決定論的な採番・計算・検証・保存を担当する。案件管理や特定ハーネスの実装、新たな保存基盤を改善の必須要件にしない。
+
+以下の37 Skillは調査baselineであり、PR #40完了後の採用構成（1または2 Skill追加）を確定していない。既存の案件/branch/provider関連欄は現行制約の記録で、今後の必須責務ではない。全ownerの相対配置・成果物形式・保存要否を再確認し、外部rootと最小入力に統一する。project-contextはQAに必要な前提・用語・決定・仮定の意味管理を残し、案件/保存管理を除外する。独立Skillとしての必要性は全体評価後に決める。新規3 kindの相対配置はPR #40の改訂Planを優先し、その最終実装に追従する。
+
+## Skill別（現行baseline）
 
 配置区分：固定＝指定root内の既存命名/構造を確認、部分＝root/ref・既存repo・一時出力例・条件付き構造あり、未統一＝今回の静的確認で標準物理path/命名を確認できない。rootの存在・認可・実provider接続は別。単発読取・任意証跡の永続化は要求時または案件条件に限る。将来の標準配置はOPS-12〜17の改善候補。
 
@@ -47,7 +53,7 @@
 | [usability-inspection](../../skills/usability-inspection/SKILL.md) | Live Web UI使用性・測定 | 観測、測定、証跡、cleanup | 観測後、明示安全な保存先・必要handoff | URL・scope・操作/保存許可 | 未統一：観測・証跡形式、安全な指定先 |
 | [wcag-conformance-evaluation](../../skills/wcag-conformance-evaluation/SKILL.md) | formal WCAG評価依頼 | Plan、sample、結果、report、EARL | Plan登録、観測handoff、closure/readback後、指定先/対応SQLite state | 対象、版、level、評価責任・scope | 部分：対応local SQLite stateは固定、外部report/EARL配置は別途指定 |
 
-## 保存先の解決
+## 保存先の解決（現行baseline）
 
 [Project Context template](../../skills/qa-workflow/assets/project-context-template.md)の既存キーのみを使い、未設定値を自動生成しない。
 
