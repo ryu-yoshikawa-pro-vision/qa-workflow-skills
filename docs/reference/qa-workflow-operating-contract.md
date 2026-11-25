@@ -17,6 +17,10 @@
 
 固定ディレクトリ構造は成果物の分類・発見のための契約とする。rootは外部指定。正式成果物・継続作業・保護証跡・テストコードは必要な境界だけ分け、同一構造の事前作成を強制しない。別rootの同名refを同じ正本としない。認可、条件付き更新、履歴、独立readback、冪等性、依存・scope完全性は維持し、保証不能な操作だけ停止する。Skillが不足能力を補うための管理機構を作らない。PR #40の最終構成と実装証拠を確認してから既存Skillを改修する。
 
+## Q01〜08の確定と保存の基本動作
+
+[共通原則](qa-skill-design-principles.md)を今後の正本とする。特定ハーネスに依存せず直接利用時も明示入力と権限で実行する。通常の許可済み保存は都度承認なしで自動化する。処理完了、質問前、回答反映後、中断、引継ぎの必要分を保存し単発相談・読取は原則保存しない。候補保存と正式内容承認は別。未承認候補は未承認と明示する。正式決定、仮定採用、承認済み仕様の意味変更、破壊的変更・削除、必要な外部操作に承認を限定する。形式・履歴・qa-workflow/project-context/Helperの責務はQ04〜08に従う。下記の旧G1/G4や正式保存承認は現行baselineの記録であり、新設計の都度承認要件ではない。
+
 ## 適用範囲と正本
 
 各SKILL.mdとそのreferenceが工程固有契約の正本。[qa-workflow](../../skills/qa-workflow/SKILL.md)と[詳細契約](../../skills/qa-workflow/references/guidance.md)が全体routingの正本。[保存・承認契約](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)と[人間編集契約](../plans/2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)を維持する。本書のcheckpointとゲートは運用上の整理であり、全Skillで自動化済みという意味ではない。差異は正本・実装を確認し報告する。
