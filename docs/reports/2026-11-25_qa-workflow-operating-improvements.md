@@ -28,11 +28,11 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 現状: continuous/gated、Q06配置合意、Git既定承認方式は既存。複数成果物の提示単位・部分承認の横断保証は未確認。ゲートグループ欄は実動作保証ではない。
 
-改善: 既存approval refs、scope/revision、失効条件で独立承認可能な項目をまとめる。回答、進行、配置、保存、外部副作用を区別し承認条件を緩めない。
+改善: 既存approval refs、scope/revision、失効条件で独立承認可能な項目をまとめる。回答、進行、正式保存、外部副作用を区別し承認条件を緩めない。保存root・実行条件は外部入力とし、配置・保存技術・認証方式についてSkillが利用者へ再質問しない。
 
 受入: 部分承認・拒否・保留・revision変更・権限不足・有効合意再利用・モード変更で未承認操作を拒否し、重複質問を抑える。承認単位の変更は別途合意。
 
-追加要件：RV-03/08/16：配置合意、仕様決定、計画承認、進行、正式保存、作業領域許可、操作認可、リスク受容を区別。Git既定方式・対象scope/ref/revision・差分・actor・失効条件を維持。中間保存の初回許可範囲は別途合意し正式保存を包括許可しない。受入：gated停止、continuousの不要介入削減、設計工程の必要正式保存承認、承認後revision変更、部分拒否。
+追加要件：RV-03/08/16：仕様決定、計画承認、進行、正式保存、作業領域許可、操作認可、リスク受容を区別。対象scope/ref/revision・差分・権限・失効条件を維持。実認可は外部境界の責務。中間保存の許可は正式保存を包括許可しない。受入：gated停止、continuousの不要介入削減、必要正式保存承認、承認後revision変更、部分拒否。
 
 ## B. 保存・承認・完了証拠
 
@@ -42,7 +42,7 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 現状: [project-context](../../skills/project-context/SKILL.md)には明示選択local/Git provider、候補ownerにはwrite preconditionがあるが全ownerの実保存・履歴・readbackは未確立。
 
-改善: 案件の正本・provider・承認方式を先に選び、既存adapterを利用可能なownerから接続。候補→正式保存→current引継ぎのref/revision/hashを実証する。
+改善: 指定rootと必要な保存能力を外部から受け、既存の決定論的保存helperを必要なownerから接続。候補→正式保存→current引継ぎのref/revision/hashを実証する。案件・Provider・承認方式をSkillが選ばない。特定storeの全ownerへの拡張は必須としない。
 
 受入: 同一revisionの並行更新、create-if-absent、履歴、readback不一致、権限失効、応答消失、中断復帰を実providerで確認。fixtureだけで遠隔先を保証しない。
 
@@ -54,11 +54,11 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 現状: [保存・承認契約](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)には対話同意・通常push・activity照合があるが、excluded_by_approvalの真正性照合が未定義。F 3 Skillのvalidatorは本人性を証明しない。
 
-改善: 案件の承認元・信頼境界を選び、scope/revision/actor/権限/期限を実照合して必要ownerと既存exclusion判定へ接続。
+改善: 外部から供給される信頼境界・操作認可によりscope/revision/actor/権限/期限を実照合し、必要ownerと既存exclusion判定へ接続。認証方式をSkillが選ばない。
 
-受入: 正しいactor/before/afterのみ許可、別actor・scope・revision・失効・activity遅延・取得不能をblock。未承認除外で完了分母を縮小しない。
+受入: 正しい主体・操作・scope・revisionのみ許可、別主体・scope・revision・失効・認可結果不明をblock。未承認除外で完了分母を縮小しない。
 
-追加要件：承認対象に操作種別、scope/ref/revision、差分、build/source、役割、理由、有効期間・失効条件を束縛。直前のrevision・権限確認、activity遅延中の未確定状態、独立readbackを検証。対話同意・作業branch push・形式validatorだけで正式承認にしない。未接続excluded_by_approvalは必須scopeのまま。
+追加要件：承認対象に操作種別、scope/ref/revision、差分、build/source、役割、理由、有効期間・失効条件を束縛。直前のrevision・権限確認、認可確認遅延中の未確定状態、独立readbackを検証。対話同意・編集提出・形式validatorだけで正式承認にしない。未接続excluded_by_approvalは必須scopeのまま。
 
 ### OPS-05 Owner verifier未登録scope (P0)
 
@@ -80,11 +80,11 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 現状: claimの原子的作成・読戻しはあるがrecover_claimの安全な条件付き解放と外部reservation実readback/releaseは未接続。結果不明時は再実行不可。
 
-改善: 案件選定providerと元ownerの実開始・結果・cleanup取得を接続。旧claim/予約を無断削除・移行しない。複数host/network filesystemは個別実証。
+改善: 外部で保証される共有資源・操作境界と元ownerの実開始・結果・cleanup取得を接続。旧claim/予約を無断削除・移行しない。必要な場合に限り既存helperを用いる。複数writer/hostの能力未確認は局所blockし、新しい汎用排他基盤を作らない。
 
 受入: 二重受付、開始前中断、応答消失、cleanup失敗、権限失効、並行workflow隔離、解放競合。状態不明では再実行しない。
 
-追加要件：RV-01/12：正式保存・外部Issue更新等のmutable operationも対象。既存ownerの原子的claim/冪等開始を優先。応答消失時は実開始・実保存・cleanup・claim revisionを独立取得し結果不明なら再実行しない。外部CAS/認可をclaimで代用しない。実分離/予約・解放確認まで同一案件の並列運用は既存制約を維持。
+追加要件：RV-01/12：正式保存・外部Issue更新等のmutable operationも対象。既存ownerの原子的claim/冪等開始を優先。応答消失時は実開始・実保存・cleanup・claim revisionを独立取得し結果不明なら再実行しない。外部CAS/認可をclaimで代用しない。実分離/予約・解放確認まで同一資源を共有する並列運用は既存制約を維持。
 
 ### OPS-07 実行・証跡・報告の横断受入 (P1)
 
@@ -112,17 +112,17 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 追加要件：現行文書・コード・schema・否定試験を再取得し正規owner内部実行経路に合わせ局所修正する。今回の運用文書改訂ではSkill本体・guidance修正や実runtime試験は行わず、OPS-08は未着手。
 
-### OPS-09 案件初期化・配置・人間編集の受入 (P1)
+### OPS-09 QAコンテキスト・人間編集の受入 (P1)
 
 対象: project-context、feature-analysis、ui-target-analysis、spec-analysis、qa-workflow。
 
 現状: Q06と既存writerはあるが実案件の配置合意・人間編集から正式保存までの横断受入には未達が残る。
 
-改善: 既存template・writerを用い、必要時の不足field確認・既存合意再利用を実案件で検証。機能別物理分割を強制しない。
+改善: QA目的・用語・業務制約・DEC/ASMなどの意味管理と人間編集の受入に集中する。既存template・writerで必要なQA情報の不足確認・有効な判断の再利用を検証。案件初期化・配置決定をSkillから除外し、必要な入力を外部から受ける。
 
-受入: 既存配置維持、候補重複・アクセス不能、新規配置未承認、正本直接改変、手動ID・行削除、競合、承認済み採用、局所変更伝播。
+受入: 指定rootの既存正本再利用、候補重複・アクセス不能、正本直接改変、手動ID・行削除、競合、承認済み採用、局所変更伝播。案件探索・配置承認の再質問なし。
 
-追加要件：RV-10/14/15/17：配置・発見規則はOPS-14/15、移行はOPS-17を根拠とし、ここでは初期化・人間編集の横断受入を担当。UI package固有生成領域・draft key・retire・snapshot・writerを他ownerへ無条件流用しない。作業branch pushと正式反映承認を分離。直接改変時は編集案と元revision保全、無断復旧なし。過去対象外（実Q06等）は維持し再検証は別途合意。
+追加要件：RV-10/14/15/17：配置・発見規則はOPS-14/15、移行はOPS-17を根拠とし、ここではQAコンテキスト・人間編集の横断受入を担当。UI package固有生成領域・draft key・retire・snapshot・writerを他ownerへ無条件流用しない。編集提出と正式反映承認を分離。直接改変時は編集案と元revision保全、無断復旧なし。過去対象外（実Q06等）は維持し再検証は別途合意。
 
 ### OPS-10 外部起動・製品CI接続 (P2)
 
@@ -130,7 +130,7 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 現状: PR/merge/release/資料改版の起動は呼出し側責務。実成果物取得・承認元未選定なら製品CI統合はblocked。
 
-改善: 案件の起動・受渡し方式を合意し既存ci_handoff.pyを接続。Skillに監視基盤やCI Agent起動を新設しない。
+改善: 呼出し側が起動・入力/結果受渡しを管理し、既存ci_handoff.pyは必要な場合に利用する。Skillに案件運用・監視基盤・CI Agent起動を新設しない。
 
 受入: PR追加commit、merge、release、外部資料改版、旧build結果、未分類差分、必須artifact欠落。未設定とfailを区別。
 
@@ -150,19 +150,19 @@ OPS-01〜17の従来提案は調査時点の課題・受入候補として保持
 
 ## E. 成果物の標準配置・命名・発見
 
-追加調査: 作業branchの 412cabf22710b6b4abccfa6330fc7be538c6dbbf を基準に全37 SkillのSKILL.md、主要reference、関連Plan、一部保存helperを静的確認した。成果物の論理schema、保存先root、物理配置、命名、永続化能力は別々に評価する。既存配置を優先する[Q06](../plans/2026-11-07_122247_development-qa-traceability.md)は維持する。以下は新規案件の既定案と解決規則の不足に対する改善候補であり、現行の固定パス仕様ではない。
+追加調査: 作業branchの 412cabf22710b6b4abccfa6330fc7be538c6dbbf を基準に全37 SkillのSKILL.md、主要reference、関連Plan、一部保存helperを静的確認した。成果物の論理schema、保存先root、物理配置、命名、永続化能力は別々に評価する。既存配置を優先する[Q06](../plans/2026-11-07_122247_development-qa-traceability.md)は維持する。以下は指定root配下の標準相対配置案。旧案件別配置判断は撤回し、既存配置への互換対応が必要なら外部境界で行う。現行実装の固定パス仕様ではない。
 
 ### OPS-12 標準ディレクトリ構造と保存粒度 (P1)
 
-対象: project-context、qa-workflow、全成果物owner。
+対象: 全成果物owner、既存Helper、ハーネスとの入力境界。
 
 現状: [Project Context template](../../skills/qa-workflow/assets/project-context-template.md)のSection 14は既存成果物の場所・範囲・鮮度を記録し、Section 16には一部rootのstable keyがある。新規案件全体の標準配置と案件・機能・scope・Run単位の保存粒度は未統一。特に計画、設計、質問、レビュー、報告は内容の形式と物理配置が別である。
 
-改善: 既存配置がないと確認された場合に提示する標準構成を定義し、案件別overrideを許す。全37 Skillの成果物についてowner、正本形式、保存要否、論理scope、保存粒度、標準相対path、例外、既存writerとの対応を明確にする。案件単位の共通条件や機能横断成果物を機能別に重複保存しない。次のqa/構成は検討用であり、全ディレクトリの事前作成や採用を強制しない。
+改善: 指定root配下の標準相対配置を定義する。最終Skill構成の成果物についてowner、正本形式、保存要否、論理scope、保存粒度、標準相対path、例外、既存writerとの対応を明確にする。共通条件や機能横断成果物を機能別に複製しない。rootは外部入力とし、案件別の配置決定・初回配置承認をSkillに要求しない。以下は相対配置の検討案であり、必要なディレクトリだけ作る。
 
 ```text
-qa/
-├── context/          # Project Context / DEC / ASM
+<指定成果物root>/
+├── context/          # QA前提 / DEC / ASM
 ├── features/         # 機能台帳
 ├── specifications/   # 仕様分析 / ui-target/
 ├── questions/        # Q / 回答履歴 / 必要時のform参照
@@ -175,17 +175,21 @@ qa/
 ├── regression/       # baseline / run / activity
 ├── exploration/      # charter / session / finding
 ├── knowledge/        # 既存entry形式
+├── cross-context/    # PR #40の指定rootとして利用する配置案
+│   ├── context-signal-batch/
+│   ├── context-rule-candidate/
+│   └── context-synthesis-run/
 ├── defects/          # 欠陥候補 / 外部Issue参照
 ├── usability/        # 評価 / 観測 / WCAG
 ├── reports/          # 報告 / QA活動評価
-└── state/            # 既存workflow state / claim / baseline
+└── state/            # 必要な永続stateのみ。ハーネス側で別rootに分離可
 ```
 
-実テストコードは対象repoの既存構成、機密raw証跡や一時作業物は別の許可済み保護領域を優先する。providerがディレクトリを持たない場合は同等の論理refを定義し、物理pathをIDにしない。
+実テストコードは対象repoの既存構成、機密raw証跡・高頻度state・一時作業物は外部指定の安全な領域を利用できる。管理対象の正式成果物はディレクトリで分類・発見する。保存技術による別論理配置をSkillに設計させない。物理rootや案件名を意味identityにしない。
 
-受入: 新規案件で一度の配置合意後に必要な成果物を同じ規則で配置、別session/agentでも一致、全37 Skillについて保存対象と非対象・粒度・例外を説明可能。既存ui-target-v1の構造、knowledge entry、state、runnerの保存契約を変更せず、必要な場所だけ生成する。
+受入: 外部指定rootから同一相対配置を解決し、別session/agentでも一致。最終Skill構成について保存対象・非対象・粒度・例外を説明可能。既存ui-target-v1、knowledge entry、state、runnerの必要な形式・安全契約を維持し、必要な場所だけ生成する。
 
-追加要件：RV-02/18：案件、機能/scope、共通条件、論点、Workflow、Run、Attempt、Entry、Snapshotの論理粒度を区別。論点単位のID管理は1論点1ファイルを意味しない。正本・派生表示物・raw・履歴と参照整合/一体更新境界をowner別に明示。全37 Skillの標準配置/既存固定名/例外/保存不要/未接続を一覧化。標準path採用は別途合意。
+追加要件：RV-02/18：root内の共通成果物、機能/scope、共通条件、論点、Workflow、Run、Attempt、Entry、Snapshotの論理粒度を区別。論点単位のID管理は1論点1ファイルを意味しない。正本・派生表示物・raw・履歴と参照整合/一体更新境界をowner別に明示。最終Skill構成の標準配置/既存固定名/例外/保存不要/未接続を一覧化。標準path採用は別途合意。
 
 ### OPS-13 成果物の命名規則と正本・表示物の識別 (P1)
 
@@ -199,17 +203,17 @@ qa/
 
 追加要件：RV-09：安定正本名・scope識別・Run/Attempt ID・immutable snapshot・作業領域を分離。日時/版を一律付与しない。フォーム元定義/revisionと回答を対応付け旧HTML/質問履歴を保持。改版後の旧回答自動適用禁止。命名変更で論理ID・履歴・依存を失わない。
 
-### OPS-14 保存先解決と案件設定 (P1)
+### OPS-14 外部指定root・相対ref解決 (P1)
 
-対象: project-context、qa-workflow、各保存owner。
+対象: 全成果物owner、決定論的保存Helper、外部入力境界。
 
 現状: Section 16にはqa.workflow_state_root、qa.knowledge_root、qa.feature_artifact_root、qa.reservation_root等がある。その他の成果物は主にSection 14や明示refに依存し、標準配置と案件別設定の横断解決規則が不足する。専用stable keyのないこと自体を欠陥とせず、既存の契約を維持する。
 
-改善: 明示された依頼scope・操作許可を確認し、既存正本と有効な配置合意を優先する。矛盾する明示指定は配置変更候補として扱い、無断上書きしない。既存がないと確認できた場合は承認済み案件設定を適用し、なければ標準案を提示して初回合意を得る。未解決・重複・アクセス不能は不存在と区別し、正式保存をblockする。Section 14/16と既存prepare-placementを再利用し、全Skill専用keyや新中央台帳は必須としない。
+改善: 指定root・許可入力ref・操作可否をハーネスから受け、標準相対pathを決定論的に解決する。Skillに案件探索・既存配置policy選択・Provider選択・初回配置合意・専用stable key追加を要求しない。既存正本との矛盾、重複、アクセス不能、root未設定を不存在と区別し正式保存をblock。旧配置との互換・移行は必要な場合だけ外部側で別途判断する。
 
-受入: 明示指定、既存配置、案件override、標準案、設定なし、矛盾、重複、アクセス不能を個別に確認。別sessionで解決結果が一致し、有効な合意が変わらなければ再質問しない。保存先が解決してもnative CAS、権限、承認、readbackが不足すれば正式保存しない。
+受入: 指定root、root未設定、相対ref違反、異なるrootの同名ref、重複、アクセス不能を区別。別sessionで同一入力・同一rootの解決結果が一致。案件/配置/保存方式の再質問なし。条件付き保存、権限、承認、readbackが不足すれば正式保存しない。
 
-追加要件：RV-14：Project Context自身の初回発見をbootstrapとし、案件、許可探索入口、候補ref、権限、案件一致、列挙完全性を確認。未取得を不存在とみなさない。既存Context取得後にSection 12/14/16を利用。矛盾する明示指定は変更候補。未設定時の読取継続と正式保存停止を分ける。
+追加要件：RV-14：旧Project Context bootstrap案は撤回する。QAに必要なコンテキストは外部指定の入力・相対refから取得し、未取得を不存在とみなさない。案件識別・初回探索入口の決定・Section 12/14/16の運用設定解決はSkillの責務外。入力不足時の分析継続と正式保存停止を分ける。
 
 ### OPS-15 保存済み成果物の発見・再利用 (P1)
 
@@ -217,11 +221,11 @@ qa/
 
 現状: [workflow guidance](../../skills/qa-workflow/references/guidance.md)は既存state・input revisionの再利用、[project-context guidance](../../skills/project-context/references/guidance.md)は許可範囲の列挙と候補判定を定めるが、全ownerの正本発見と重複検出の共通受入は未確認。
 
-改善: 承認済みroot/direct ref、owner、scope、artifact identity、provider revision、source依存、既存stateを使って発見・currentnessを確認する。固定root scanは既存ownerの許可範囲・完全性・型検証に従い、無制限の再帰探索やpath/ファイル名だけの推定を避ける。重複・一覧取得不全・不明参照は明示し、新規作成や自動選択を止める。
+改善: 外部指定root/許可direct ref、owner、scope、artifact identity、保存revision、source依存、既存stateを使って発見・currentnessを確認する。固定root scanは既存ownerの許可範囲・完全性・型検証に従い、無制限の再帰探索やpath/ファイル名だけの推定を避ける。重複・一覧取得不全・不明参照は明示し、新規作成や自動選択を止める。
 
 受入: 別agent/sessionから同一正本を発見、変更なしの再依頼で不要再生成なし、部分改版では影響scopeのみ再検証。重複・欠落・stale・読取不能・列挙打切りを区別し、既存正本を保全する。OPS-01/03/05と接続する。
 
-追加要件：RV-02/05/14：入力revision一致に加え入力母集団完全性、利用Context field、依存source/ownerのcurrentness・scope・意味契約を確認。input_revision.pyのsameだけで再利用しない。bootstrapはOPS-14、部分保存整合はOPS-03。受入：未列挙入力改版、外部資料改版、未使用Context変更、重複・一覧不全・別workflow混在。
+追加要件：RV-02/05/14：入力revision一致に加え入力母集団完全性、利用Context field、依存source/ownerのcurrentness・scope・意味契約を確認。input_revision.pyのsameだけで再利用しない。root入力・ref解決はOPS-14、部分保存整合はOPS-03。受入：未列挙入力改版、外部資料改版、未使用Context変更、重複・一覧不全・別workflow混在。
 
 ### OPS-16 永続成果物・一時作業物・機密証跡の分離 (P0)
 
@@ -229,7 +233,7 @@ qa/
 
 現状: [test-target-inspection](../../skills/test-target-inspection/references/guidance.md)は指定先・秘密情報の保存制約、[testware-execution](../../skills/testware-execution/references/guidance.md)はrepo外の保護された成果物先を定める。agent-answer-formはSkill外作業dirを使用する。全owner横断の保存区分・保持・cleanup・共有範囲は未統一。
 
-改善: 正本、再生成可能な派生物、再開に必要なdraft、短期一時物、raw実行証跡、機密証跡を区別する。保存可否、許可root、アクセス範囲、保持・cleanup方針、参照の有効期限と非保存理由を案件条件で明確にする。rawの無断commit・共有を禁止し、安全な要約/参照のみを渡す場合も元証跡の取得可能性を偽らない。保存不能なら未保存と完了条件への影響を明示する。
+改善: 正本、再生成可能な派生物、再開に必要なdraft、短期一時物、raw実行証跡、機密証跡を区別する。保存可否、許可root、アクセス範囲、保持・cleanup方針、参照の有効期限と非保存理由を外部から提供された保存・実行条件で確認する。rawの無断保存・共有を禁止し、安全な要約/参照のみを渡す場合も元証跡の取得可能性を偽らない。保存不能なら未保存と完了条件への影響を明示する。
 
 受入: secretを含む証跡、安全な保存先なし、誤ったroot、別Runの証跡、保持期限切れ、一時物cleanup失敗、再開に必要な候補の保全を確認する。既存runnerの保護領域と安全契約を維持し、正式履歴をcleanupで削除しない。
 
@@ -241,9 +245,9 @@ qa/
 
 現状: Q06は既存配置優先、初回合意、物理分割の必要性判断、無断移動禁止を定める。標準案導入時に既存案件の混在構成・個別overrideを横断検証する必要がある。
 
-改善: 有効な既存配置を優先し、標準化のみを理由とする移動・改名・分割・再保存を行わない。変更が必要な場合だけ、移行対象・旧新ref・依存関係・履歴・権限・互換読取・条件付き切替・rollback・レビュー範囲を明示して別途合意する。現行writer/schemaを尊重し、二重正本を作らない。OPS-09の案件初期化・人間編集受入と接続する。
+改善: 標準化のみを理由に既存正本を移動・改名・分割・再保存しない。移行が必要ならSkill外の作業として対象・旧新ref・依存・履歴・権限・互換読取・条件付き切替・rollback・レビュー範囲を別途合意する。既存writer/schemaを尊重し二重正本を作らない。OPS-09の人間編集受入と接続。
 
-受入: 既存案件の無変更再利用、異なるprovider/配置の混在、部分override、変更未承認、移行途中の競合・失敗、旧revisionの参照、rollbackを確認。標準構造が既存データの消失・二重正本・ID変更を生まないことを示す。
+受入: 許可済み既存成果物の無変更再利用、別rootの同名ref分離、未承認移行拒否、必要な外部移行時の競合・失敗、旧revision参照・rollback。標準構造が既存データ消失・二重正本・ID変更を生まないことを示す。
 
 追加要件：RV-10：配置変更と人間編集採用を区別。OPS-09の編集受入を再利用しowner別schema・生成領域・ID・履歴を保全。移行中の新旧参照、部分失敗、旧revision・rollback条件、複数owner参照整合を検証し、条件不成立なら自動切替・自動rollbackなし。
 
