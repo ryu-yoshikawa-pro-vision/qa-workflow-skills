@@ -2,15 +2,13 @@
 
 [共通運用契約](qa-workflow-operating-contract.md)の別表。対象はskills/配下37 Skill（.agents/skillsの開発用3 Skillは対象外）。成果物名は論理名。固定ファイルパス・全Skillの自動永続化を保証しない。各ownerの正本契約と案件の配置・認可に従う。CP/G番号は共通運用契約を参照。各行は現行の論理成果物・配置と運用上の引継ぎを示し、自動保存実装済みとは限らない。ユーザー欄は固有介入のみ。全行共通で必要なG1/G4の配置・正式保存・操作承認とgatedの進行指示は別途必要。
 
-## 今後の設計方針（現行調査と区別）
+## 今後の設計方針
 
-2026-11-25 利用者決定（今後の設計に適用）：成果物は指定root配下のディレクトリで統一管理する。案件識別・探索・切替、ブランチ管理、保存技術/Provider・認証方式の選択、配置の都度決定はSkillの責務外。必要な環境条件・許可root・権限をハーネスが提供し、不要な管理は移管せず削除する。Skillは専門的なQAの意味判断、成果物の内容・形式・相対配置、質問・引継ぎに集中し、Helperは決定論的な採番・計算・検証・保存を担当する。案件管理や特定ハーネスの実装、新たな保存基盤を改善の必須要件にしない。
+[共通原則](qa-skill-design-principles.md)を改修の正本とする。本表以下は37 Skillの現行調査記録であり、新設計の保存・承認・検証要求ではない。PR #40完了後に実際のSkill構成と対応済み契約を確認し、必要な成果物の相対配置・形式・保存要否・ownerを再評価する。単発レビュー・調査の保存は原則不要。既存の固定名・意味契約は必要性を評価して維持する。
 
-以下の37 Skillは調査baselineであり、PR #40完了後の採用構成（1または2 Skill追加）を確定していない。既存の案件/branch/provider関連欄は現行制約の記録で、今後の必須責務ではない。全ownerの相対配置・成果物形式・保存要否を再確認し、外部rootと最小入力に統一する。project-contextはQAに必要な前提・用語・決定・仮定の意味管理を残し、案件/保存管理を除外する。独立Skillとしての必要性は全体評価後に決める。新規3 kindの相対配置はPR #40の改訂Planを優先し、その最終実装に追従する。
+## 現行baseline（調査記録）
 
-[共通原則](qa-skill-design-principles.md) Q01〜08により、許可済み通常保存は自動、内容承認は別とする。以下の保存承認欄は現行実装の記録。改修時は保存時点を必要分だけ統一し、人間向け文書は読みやすさ、機械状態/証跡は構造化の必要性に応じて形式を決める。Skill単体利用、安定ID・必要履歴、責務の最小化を維持する。
-
-## Skill別（現行baseline）
+### Skill別
 
 配置区分：固定＝指定root内の既存命名/構造を確認、部分＝root/ref・既存repo・一時出力例・条件付き構造あり、未統一＝今回の静的確認で標準物理path/命名を確認できない。rootの存在・認可・実provider接続は別。単発読取・任意証跡の永続化は要求時または案件条件に限る。将来の標準配置はOPS-12〜17の改善候補。
 
@@ -35,8 +33,8 @@
 | [test-case-design](../../skills/test-case-design/SKILL.md) | TCN/CI後 | TC、前提、データ、手順、期待結果 | 設計・runtime検証後、指定先 | 固有の進行承認は原則不要、根拠不足ならG2 | 未統一：TC・runtime契約 |
 | [e2e-test-selection](../../skills/e2e-test-selection/SKILL.md) | 自動化対象選定・価値変更 | 選定record、理由、履歴 | 選定検証後、指定先 | 自動化目的・対象 | 未統一：選定record/履歴、実保存providerは別 |
 | [coverage-analysis](../../skills/coverage-analysis/SKILL.md) | 設計/実装後、変更/修正後 | coverage、閉鎖性、gap、修正先 | 検証後、指定先 | 対象外・残存risk判断時 | 未統一：coverage出力契約 |
-| [adversarial-review](../../skills/adversarial-review/SKILL.md) | 成果物・コードの独立レビュー | 指摘、重大度、根拠、処置状態 | レビュー後、指定先 | 判断を要する指摘への回答 | 未統一：レビュー出力契約 |
-| [e2e-test-inspection](../../skills/e2e-test-inspection/SKILL.md) | E2E実装前、条件不足時 | repo、実効設定、安全条件、実装可否 | 調査後、指定先、コード変更なし | URL・認証・データ・副作用 | 未統一：調査出力契約、実装・実行なし |
+| [adversarial-review](../../skills/adversarial-review/SKILL.md) | 成果物・コードの独立レビュー | 指摘、重大度、根拠、処置状態 | 保存依頼・継続利用時はレビュー後、指定先。単発は対話回答可 | 判断を要する指摘への回答 | 未統一：レビュー出力契約 |
+| [e2e-test-inspection](../../skills/e2e-test-inspection/SKILL.md) | E2E実装前、条件不足時 | repo、実効設定、安全条件、実装可否 | 必要な調査成果物のみ指定先。コード変更なし | URL・認証・データ・副作用 | 未統一：調査出力契約、実装・実行なし |
 | [e2e-test-implementation](../../skills/e2e-test-implementation/SKILL.md) | inspection済み実装依頼 | Playwrightコード、実装参照、静的/軽量検証 | 変更許可・検証後、対象repo既存構成 | 変更範囲・必要正式反映承認 | 部分：対象repo既存構成。実装記録の標準path未確認 |
 | [e2e-test-execution](../../skills/e2e-test-execution/SKILL.md) | 既存/実装済みE2E実行 | Run、primary、attempt、raw、cleanup | preflight前提固定、実行後証跡・結果、指定先 | 実行条件・副作用上限許可 | 未統一：実効reporter/output設定・指定先。Runの共通命名未確認 |
 | [e2e-test-result-analysis](../../skills/e2e-test-result-analysis/SKILL.md) | 異常・未実行・cleanup問題・分析依頼 | 原因分析、追加証拠、修正routing | 検証済みrawを参照し分析後、指定先 | 必要な原因情報 | 未統一：分析出力契約、raw参照 |
@@ -55,7 +53,7 @@
 | [usability-inspection](../../skills/usability-inspection/SKILL.md) | Live Web UI使用性・測定 | 観測、測定、証跡、cleanup | 観測後、明示安全な保存先・必要handoff | URL・scope・操作/保存許可 | 未統一：観測・証跡形式、安全な指定先 |
 | [wcag-conformance-evaluation](../../skills/wcag-conformance-evaluation/SKILL.md) | formal WCAG評価依頼 | Plan、sample、結果、report、EARL | Plan登録、観測handoff、closure/readback後、指定先/対応SQLite state | 対象、版、level、評価責任・scope | 部分：対応local SQLite stateは固定、外部report/EARL配置は別途指定 |
 
-## 保存先の解決（現行baseline）
+### 保存先の解決（現行baseline）
 
 [Project Context template](../../skills/qa-workflow/assets/project-context-template.md)の既存キーのみを使い、未設定値を自動生成しない。
 
@@ -75,10 +73,10 @@
 
 初回Project Context探索は案件・許可範囲・候補ref・read権限を確認し列挙完了時だけ不存在と判断。既存配置・合意を優先し未設定rootを自動作成しない。保存先・承認policy・provider能力が不明なら正式保存をblockする。既存Git正本を無断SQLite移行しない。ローカルSQLiteは明示された対応用途限定。遠隔保存能力をローカルfixtureから推定しない。
 
-## UI target package
+### UI target package
 
 [既存schema](../../skills/spec-analysis/references/ui-test-target-analysis.md)の必須payloadはREADME.md、00、01、02、06、07、09、CHANGELOG.md。MANIFEST.mdは必須control file。03/04/05/08はTriggerに応じた条件付きfile。10以降は00で宣言した案件固有extensionのみ。09はAuthorityとtraceabilityの正本。spec-analysisとui-target-analysisは論理ownerを分離し、既存ui_target_package.py materializeを単一writerとする。
 
-## 引継ぎの最低情報
+### 引継ぎの最低情報
 
 担当owner、scope、artifact ref、保存revision、content hash（必要時）、source refs/revisions、依存先、意味上の状態、検証結果、承認要否/参照、未解決理由、再開ownerを既存成果物・stateで引き継ぐ。新しい中央台帳を作らない。表示Markdownでcanonical JSONやraw結果を代替せず、validator成功だけで承認・readback・実開始を証明しない。複数成果物の依存ref/revision・commit/snapshot境界を固定し、部分保存時は依存する下流をcurrentとして渡さない。readback失敗で外部先が旧版のままと断定しない。
