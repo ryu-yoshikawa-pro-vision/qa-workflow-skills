@@ -15,7 +15,7 @@
 
 ### 実施状態
 
-このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。2026-11-25時点で純粋contract/helper、2 Skillの文書・evaluation fixture、workflow routing/owner verifier/runtime transportの一部を実装し、対象helper suite 24件とdeterministic eval repository suite 675件をPASSした。全runtime回帰1,475件は実行したが、環境起因のSQLite 18件とPython 3.12境界差1件を含むFAIL。SQLite履歴moduleの隔離tmpfsでの再実行は20件PASS。詳細は検証記録を参照する。
+このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。2026-11-25時点で純粋contract/helper、2 Skillの文書・evaluation fixture、workflow routing/owner verifier/runtime transportの一部を実装し、対象helper suite 24件、deterministic eval repository suite 675件、CI指定Python 3.11.18でのruntime回帰1,475件をPASSした。ローカルPython 3.12.3での全runtime suiteは環境起因のSQLite 18件とPython parser境界差1件を含むFAIL。SQLite履歴moduleの隔離tmpfsでの再実行は20件PASS。GitHubのtracked formatter/whitespace/security、Skill、semantic、deterministic、Codex Harness workflowは対象headでsuccess。詳細は検証記録を参照する。
 
 正式保存の認可host/rootは未選定。実保存・list/history・独立readback・共有writer/CAS・Agent縦断受入/独立Judge・3構成比較は未実施またはBLOCKEDである。既存trigger runnerはClaude Code専用のため起動せず、Codex CLI 0.172.0で新規2 Skillのpositive queryを各1件、target-only条件で実行し対象`SKILL.md`読込を観測した。これはformal trigger rateではなく、実行時にproject-local configが未信頼として無効化されたためrepository Hook/execpolicyも未検証。全39 Skill同時評価は自動承認審査が対象Skill限定または宛先・送信内容の明示承認を要求して拒否したため再試行していない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
