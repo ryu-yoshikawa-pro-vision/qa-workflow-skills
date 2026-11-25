@@ -69,4 +69,4 @@
 
 [専用schema](../../skills/spec-analysis/references/ui-test-target-analysis.md)の必須payloadはREADME.md、00、01、02、06、07、09、CHANGELOG.md。MANIFEST.mdは必須control file。03/04/05/08はTriggerに応じた条件付きfile。10以降は00で宣言した案件固有extensionのみ。09はAuthorityとtraceabilityの正本。spec-analysisとui-target-analysisは論理ownerを分離し、既存ui_target_package.py materializeを単一writerとする。
 
-引継ぎの最低情報・依存整合・保存結果不明時の扱いは[共通運用契約](qa-workflow-operating-contract.md#中断再開引継ぎ)を参照する。
+引継ぎの最低情報・依存整合・保存結果不明時の扱いは[共通運用契約](qa-workflow-operating-contract.md)を参照する。
