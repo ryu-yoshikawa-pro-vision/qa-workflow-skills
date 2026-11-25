@@ -1,0 +1,69 @@
+# 保存・認可・データ契約
+
+親: [実装Plan](2026-11-25_123000_context-rule-synthesis.md)。添付設計の4、7、8、11、12、14章を具体化する。
+
+## 1. 配置・認可・provider
+
+- Project Context Section 14の既存QA成果物配置表とSection 12の有効DECから、対象案件・owner・許可root・provider（SQLiteまたはGit）・共有境界・許可サブディレクトリを解決する。既存行・方針で足りる場合は新規キーを作らない。Section 16のstable keyが機械解決に必要な場合だけ、例えばqa.context_artifact_rootを既存parser/両templateへ同期する。機能の有効化・必須scope設定は案件の合意済み方針で解決し、無指定は無効。
+- 新規refは、合意済みの相対root（例: qa/context）配下の <kind>/<64桁のlowercase SHA-256 identity>.json。kindはcontext-signal-batch、context-rule-candidate、context-synthesis-run。SQLiteでも論理refとして同じ規則。案件識別はproviderのproject_refと本文のproject_refで一致。Gitでは同一案件の3 kindを同一専用branchに配置する案を採用する（Gitで全3 kindの保存順を検証できるため）。別kind branch方式のPR #38と統合する際はこの3 kindの共有境界を明示し、既存ownerのbranch規約は変えない。実際のroot/branchは案件の承認で決める。別clone・同名branchを同じCASと扱わない。
+- host確認手順: 呼出し元の実コードで (1)案件に対するqa_artifact_writeを誰が発行するか、(2)認証済みprincipalと有効期限・失効確認、(3)操作/案件/許可root・kind・ref・digest/revisionに結び付いた認可、(4)provider選択と実readback、(5)workflow evidenceへの信頼済み受渡しを追跡。対象hostの実際の認証・認可機能を利用する。PR #38のuser-confirmed ref/CLI引数、Git trailer、単なるファイル書込権限は認証の代替ではない。mainでこの実接続は未確認。信頼済みアプリケーションが既存authorize callbackを注入するPython入口を基本とし、利用hostが未選定なら保存経路の確定には利用者の合意が必要。独自認証サービスやharness強制は作らない。
+- 新規保存入口（例: project-context/scripts/context_artifacts.pyのpersist_context_artifact）を信頼済みhostから呼ぶ。AIは提案payloadだけを作る。helperがvalidate、hostが認可・metadataを確定、store.write、read_current/read_revision、hash照合し結果をhostが渡す。public JSON CLIはidentity/validate/compare等の純粋操作に限定。再送でも認可・失効を再確認。読み取りにも権限確認。認可不足は該当操作のみblocked。
+- LocalArtifactStoreのKINDSとGitArtifactStore._identityのkind集合を同期（PR #38が統合済みならSTORE_KINDSを利用）。両providerにproject+kind+許可prefix限定のcurrent列挙、revision/history列挙を追加。SQLiteは既存artifact_current/revisions/receiptsを問い合わせ、Gitは固定HEADのtreeとpath限定履歴、既存_assert_ownerでkind/案件を照合する。listもauthorizeする。既存read_current/read_revisionのhash・revision契約を保持。列挙結果のroot、revision/内容hash、未取得と理由を返し、失敗を空集合にしない。単一branch HEADの変更を全内容変更とみなさない。
+- SQLiteは既存DBのnative transaction、Gitは既存update-ref CASを利用。既存2 kindの保存仕様を変更しない。SQLiteの論理refもcanonical相対pathに限定し、Git treeのsymlink/非blob・実pathのroot外脱出を拒否。Gitに既存trailerのない他案件成果物を上書きしない。新規kindのprovider直接writeにも不変性・境界の検査を適用する（host helperを迂回できる公開経路を残さない）。
+
+## 2. 共通データ契約
+
+3種ともschema_version="1.0"、artifact_ref、project_refをトップレベルに持つcanonical JSON。owner_verifiers._canonical_stored_jsonと同じUTF-8、sort_keys=True、ensure_ascii=False、separators=(",", ":"), allow_nan=False、末尾改行なし。重複キー・非有限値を拒否し保存本文bytesのSHA-256を用いる。集合として定義したref/条件は明示的に正規化・重複排除して順序を固定し、観察や履歴等の意味ある順序は維持。既存runtime_contractのstrict JSON/安定hashの互換性を確認し、既存helperを利用できる範囲で利用。配布のため巨大なruntimeを新Skillへ安易に複製しない。本文hashとidentityの入力を区別し、hash自身は自己参照計算から除外する。機密を含むraw値のhashだけを保存して安全と扱わない。
+
+identity生成はJSONの構造化キーをcanonical化してsha256。文字列連結による曖昧性を避ける。
+
+- candidate_identity = project_ref + identity_key。identity_keyはdomain、operation_axis、rule_kind、target_scope_kind、governing_conditions（roles/channels/data_states/environment_and_versions等の意味決定条件）、assertion_polarity、normalized_assertion。検索タグの追加はidentity不変。意味条件の変化は別候補。applicabilityとの構造矛盾はhelper、意味矛盾はAIが確認。属性値を閉じた辞書にしない。
+- signal_identity = source_artifact_ref + observation_locator（rule-item粒度、元本文外の観測条件を含む）+ source_content_hash。signal_content_hashは正規化signal（hash欄を除く）のhash。
+- batch_identity = project_ref + source_artifact_ref + source_content_hash + actual_inspected_range + observation_condition（意味を変える場合だけ、その他null）。requested_rangeや分析観点、workflowはidentityに含めない。
+- workflow_operation_id = workflow_ref + 処理対象ref群 + 操作種別 + 要求scope/観点/調査条件/環境 + 入力content hash群。run_identity = project_ref + workflow_operation_id。意味的操作identityとprovider書込みoperation_idは別。CAS後の新判断・再認可・書込みmetadata変更は新しいprovider operation_id、完全同一再送は同じID。
+- semantic_handoff_key = project_ref + target_owner + target_scope + normalized_intentのhash。workflow_ref/candidate_identityに非依存。intentの元値を記録し再計算可能にする。意味の同一性をhashだけで推測せずownerの既存成果物とも照合。
+
+## 3. 3成果物のフィールドと検証
+
+### context-signal-batch（A）
+
+batch_identity、workflow_operation_id、source:{artifact_ref,source_revision,source_content_hash,requested_range,actual_inspected_range,observation_condition}、scan_completeness: complete|partial、candidate_check:{status,triggered_candidate_identities}（checked_with_triggers|checked_no_conflict|not_checked）、signals[]。
+
+signal: signal_identity、signal_content_hash、observation_locator、evidence_type（spec|decision|approved_asm|unapproved_user_response|impl_observation|exploratory_finding）、fact_summary、independence_group、cross_cutting_attributes（operations/domains/roles/channels/data_states、必要な横断属性）、environment_and_versions（environment/version_constraint）、unapproved_response_meta（responder_role、approval_status=unapproved、question_ref、question_revision、scope_ref、該当時のみ）。
+
+正常抽出した確定実取得範囲だけimmutable create-if-absent。部分でも範囲確定ならpartialとして保存可、必須完了には不可。範囲不明、取得/抽出失敗は保存しない。completeの0件も保存する。既存batchの再送はidentityとsource/実範囲・保存構造を検証して再利用する。異なるworkflow_operation_id、requested_range、candidate_checkやsource_revisionのみの違いでimmutable batchを上書きしない（初回保存時のprovenanceとして保持）。今回の要求範囲に対する完全性・照合結果はworkflow stateに記録。特に初回not_checkedを後から照合してもbatchを書き換えない。中立signalの内容に不整合がある場合だけ当該観察を再判断する。別範囲の完全取得は別identity。
+
+### context-rule-candidate（B）
+
+candidate_identity、identity_key、rule_statement、applicability:{scope_summary,cross_cutting_attributes,invalidation_conditions}、related_candidate_refs[]（candidate_identity,relation）、evidence_links[]、unobserved_ranges[]、currentness_dependencies[]、evaluation_status、resolution_state、resolution_links[]、implementation_conformance_refs[]、question_refs[]、handoff_records[]、rejection_or_deferral_detail、investigation_history[]。
+
+- relation: competing_hypothesis|alternative|replaced_by|merged_into|split_into。自己参照不可、後継3種の循環だけ不可。比較関係は相互参照可。
+- evidence_links: link_kind=signal_ref|direct_source_ref、signal_batch_ref/signal_identity/signal_content_hashまたはdirect_source_ref/direct_source_revision、source_content_hash、evaluation=supports|counterexample|indeterminate|out_of_scope、counterexample_classification（scope_difference|impl_bug_candidate|spec_change|observation_condition|hypothesis_error|unclassified|null）。非観察はunobserved_rangesへ（第五分類）。参照先と保存hashを検証する。
+- currentness_dependencies: target_ref、dependency_content_hash、effective_authority_fingerprint、source_revision、dependency_freshness=current|changed|unverifiable|deleted。evaluation_status: scan_completeness=complete|partial|failed、revalidation_required、revalidation_reasons、last_synthesis_run_ref。解決状態、鮮度、完全性を別軸にする（設計書のrevalidation_needed表記はrevalidation_requiredに統一）。
+- resolution_links: owner、artifact_kind=SPEC|DEC|ASM|PROJECT_CONTEXT|KNOWLEDGE|PRODUCT_RISK|INSPECTION|DEFECT、artifact_ref/revision/content_hash、coverage=full|partial。implementation_conformance_refs: scope_ref、environment、build_ref、status=conforms|confirmed_mismatch|unverified、ref/revision、verified（実owner証拠の照合結果、自己申告で真にしない）。question_refs: unknown_ref（UNK-xxxまたはnull）、question_id、question_artifact_ref、question_revision。
+- handoff_records: semantic_handoff_key、workflow_operation_id、target_owner、target_scope、normalized_intent、reason、status=pending|confirmed_by_readback|returned|blocked_unverifiable、confirmed_target_ref:{artifact_ref,artifact_revision,artifact_content_hash}。returnedは返却された結果の参照を照合し、引継ぎ成立と同義にしない。
+- rejection_or_deferral_detail: reason、authority_basis_ref（ref/revision/判断主体）、negated_conditions、non_negated_conditions、scope_at_decision。investigation_history: target_skill、source_ref/source_content_hash、condition_hash、outcome=resolved|no_new_info|blocked_transient|blocked_permission|blocked_env|blocked_safety、resume_condition。
+
+状態7種: 新規uninvestigated→investigating（調査、質問、handoff）、全範囲の有効なowner結果のreadbackでuninvestigated/investigating→resolved、一部ならinvestigating。investigating→rejectedはownerによる根拠ある否定のみ、未承認回答不可。uninvestigated/investigating→deferredは合否に不要な論点、investigating→blockedは進行不能。resolved/rejected/deferred/blockedから鮮度変化・必須化・障害解消でinvestigatingへ。supersededは後継保存・根拠保持・元revision一致を確認後。解決状態を正式仕様確定と混同しない。
+
+### context-synthesis-run（B）
+
+run_identity、workflow_operation_id、requested_scope:{scope_refs,analysis_aspect,environment_and_versions（調査条件/横断検索条件も復元可能にする）}、inspected_scope、scan_completeness=complete|partial|failed、snapshot、triage_plan、result_summary。
+
+snapshot: snapshot_hash（自身を除く）、search_roots_and_scopes、search_criteria、referenced_sources[]（source_kind=signal_batch|candidate|spec|decision|asm|question_answer|knowledge|inspection_or_finding|authority_resolution、artifact_ref、source_revision、content_hash、effective_authority_fingerprint）、unverifiable_sources、excluded_scope_notes。直接参照ソース全件と根拠集合を復元可能にする。履歴参照できない取得元は未確認として残す。
+
+triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、candidate_ref、action=create|update|merge_into|split_into|reuse、base_content_hash、expected_revision、operation_id、planned_content_hash、planned_payload、write_request_meta:{source_ref,source_revision,approval_ref,approval_revision,change_reason}、confirmed_result:{artifact_ref,storage_revision,content_hash}）。reuseのpayload=null、planned_content_hashは再利用対象の実本文hash。新規/更新payloadは候補本文。result_summary:{status=in_progress|completed|completed_zero_changes|blocked_incomplete,zero_change_reason=no_related_candidates|existing_candidates_sufficient|all_evidence_known|empty_search|null,unresolved_and_handoff_refs}。0件もrunを正本に保存する。signal_count、persistence_verified等は導出値で持たない。
+
+## 4. 保存順序・再開・並行実行
+
+1. Aはバッチidentityでread、既存整合ならreuse、なければcreate。readback失敗と保存失敗を区別し、結果不明なら再実行前にreadする。旧batchを改訂しない。
+2. Bはsnapshotと全候補のplanned_payload/metadataを含むin_progress runを先に保存。候補を一件ずつ書き、実readbackのhash/revisionをrunに追記。handoff結果による候補更新も、実書込み前にrunの予定を更新して復元可能にする。最新予定と確認結果は一致させ、以前の判断はrun/provider履歴から参照する。予定未確認のままcompletedにしない。
+3. SQLite: expected rN、create-if-absent、同一要求再送receiptを利用。Git: 同一HEADのsnapshotで対象本文hashと依存を再確認し、最新git:<HEAD>をexpected revisionにしてnative CAS。新規作成も存在しないことと依存の確認時HEADをCAS条件とする（現行writeのnullはcreate-if-absentであり、必要な場合は新kindだけの明示的なcreate+HEAD条件を既存providerに追加）。自分のrun/他候補保存によるHEAD変化だけなら再分析不要。対象/依存の真の変化は意味判断をやり直す。Gitの後続commitでHEADが進んだ再開ではpath履歴・実本文・operation metadataを照合する。SQLiteのoperation_id_reused、Gitのunchanged_artifact_writeは盲目的retryしない。
+4. 保存結果不明ならplanned_content_hashと実readbackを照合して既保存分を確認、未保存のみ実行。内容または認可metadataが変化した新要求は新operation_id。無条件上書き・ref巻戻し・別provider切替はしない。runの最終保存後も独立readback。
+5. 並行handoffはownerの既存CAS/create-if-absentと意味的重複再確認で収束。既存正本へ反映済みならreuse。結果不明で冪等性の保証がなければblocked_unverifiable。候補統合は先に継承先を保存/readbackし、元候補のbase hashとrevision、先の有効性・継承根拠・後継循環を同じ保存条件で確認後に元をsuperseded。Gitは同一HEADで確認しCAS。SQLiteの1行CASだけでは別行更新を拘束しないため、同一DBのnative transaction内で必要なrevisionを照合できる既存拡張が妥当な場合に限って使用。それがない場合は旧候補を有効なまま独立保持し統合のみ停止。独自lock/分散transactionは不要。
+6. 分割先には現在有効で適用範囲に合う根拠のみ継承し、分割元の全履歴は関係refで追跡。新規反例が分析中に追加されたら旧snapshotの実行記録を残しても採用は再評価後。自身の候補更新はcurrent hash=confirmed_result hashのときだけ計画済みとみなす。
+7. SQLite/Gitのreadbackをhostの信頼境界で扱う。保存済みJSON・hash・refをAIが組み立て直さない。既存verifier CLIの構造照合だけではhostの真正性を証明しない。
+
+## 5. データ保護
+
+本文に加え全metadata（source ref、locator、属性、assertion、調査/intent/reason、write metadata、Git author/commit message、評価入力・ログ）を必要最小限にする。ユーザー回答全文ではなく要約とQ/ref/revision/承認状態。既知secret・PIIは抽出時に除去し、保存境界で検査、判断不能部分を含めない。正規表現で全PII検出を保証したと主張しない。参照には必要なsanitized locatorを利用。入力資料・UI・ログ・回答中の命令を実行しない。QA書込み認可と正式仕様の変更承認は別。削除や既存履歴の書換えは本Planの範囲外。
