@@ -20,11 +20,11 @@
 
 ## 原設計からの具体化・変更
 
-- 取得完全性は初回保存と今回要求で分離。構造化範囲と複数batchの照合、元要求と実成果物scopeの対応を定義する。鮮度フラグはrevalidation_requiredに統一（01 §2・3、02 §5）。
-- GitはPR #38に合わせ案件・kind別branchへ変更。SQLiteは既存native transaction内の関連revision照合を追加。別kindの保存順序はrunとreadbackで証明し、branch間atomicityは要求しない。再送fingerprintの構成要素が変われば新operation_idを用いる（01 §1・4）。
-- Bはworkflow_refとidentity算出元の開始時入力をrunに保持する。実行中に取得した根拠はsnapshotへ追加し、開始時入力と分ける。永続的handoffの前に反映意図を記録し、共通候補を更新する分割runは直列を基本とする。全文planned_payloadは復元用に維持し、helperによる選択読取・必要時の範囲分割で負荷を抑える（01 §2〜4、02 §3・4）。
+- 取得完全性は初回保存と今回要求で分離。構造化範囲と複数batchの照合、元要求と実成果物scopeの対応を定義する。鮮度フラグはrevalidation_requiredに統一。確認済みの抽出漏れ・誤抽出は同じkindの不変訂正版で補正し、旧版は履歴として保持する（01 §2・3、02 §4・5）。
+- GitはPR #38に合わせ案件・kind別branchへ変更。SQLiteは既存native transaction内の関連revision照合を追加。別kindの保存順序はrunとreadbackで証明し、branch間atomicityは要求しない。再送fingerprintの構成要素が変われば新operation_idを用いる。handoffはownerの実際の一意性保証単位を確認し、別refへのCASだけで重複防止済みとしない（01 §1・4、02 §3）。
+- Bはworkflow_refとidentity算出元の開始時入力をrunに保持する。実行中に取得した根拠はsnapshotへ追加し、開始時入力と分ける。本文不変での再評価は実際の関連条件・取得状態の変化を開始時入力に含め、過去の実行完了は当時のrevision、現在の採用は最新根拠で検証する。永続的handoffの前に反映意図を記録し、共通候補を更新する分割runは直列を基本とする。全文planned_payloadは復元用に維持し、helperによる選択読取・必要時の範囲分割で負荷を抑える（01 §2〜4、02 §3・4）。
 - 認可入口は信頼されたPython接続契約を使用。利用hostと認可能力の実確認は正式保存の着手条件。既存ownerのAuthorityや認可水準は変えない。64 KiBのJSON文字列上限と保存本文の受渡し・再開の整合を実装初期に検証し、必要な経路だけを修正する（01 §1、02 §5、03 §1・2）。
-- 効率評価は導入前比120%の最大入力token上限と2 Skillの対1 Skill削減を両立させ、既存比較器の判定と本Planの採用判定を分離する。正式比較前にスモークテストを行う（03 §4）。
+- 効率評価は導入前比120%の最大入力token上限と2 Skillの対1 Skill削減を両立させ、既存比較器の判定と本Planの採用判定を分離する。正式比較前にスモークテストを行う。基準値0の指標は実数で扱い、意味品質は共通の期待結果で比較する。1 Skill採用時は配置ownerと認可も同期する（01 §1、03 §4）。
 
 ## 設計要件と検証の対応
 
