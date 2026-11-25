@@ -123,6 +123,13 @@ skills/
 | `usability-inspection`        | 既存Playwright経路でlive Web UIを観測し、fixed probe・measurement・general accessibilityを扱う |
 | `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL      |
 
+## QA運用・利用者向けガイド
+
+- [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・checkpoint・停止再開の責務とタイミング。
+- [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): 全37 QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
+- [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 案件初期化、依頼、回答、承認、編集、再開と結果確認。
+- [運用改善候補（2026-11-25）](docs/reports/2026-11-25_qa-workflow-operating-improvements.md): 現行制約と未実装の改善候補。承認済みPlanとは区別する。
+
 ## テスト分析・設計フロー
 
 以下は、このSkill群が扱う全体ワークフローの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。
