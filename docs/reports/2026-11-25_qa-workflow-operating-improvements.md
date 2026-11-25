@@ -120,6 +120,93 @@
 
 受入: 既存比較器、独立試行、同条件・品質/安全PASS、測定不能の明示。介入削減のため承認や品質を弱めない。
 
+## E. 成果物の標準配置・命名・発見
+
+追加調査: 作業branchの 412cabf22710b6b4abccfa6330fc7be538c6dbbf を基準に全37 SkillのSKILL.md、主要reference、関連Plan、一部保存helperを静的確認した。成果物の論理schema、保存先root、物理配置、命名、永続化能力は別々に評価する。既存配置を優先する[Q06](../plans/2026-11-07_122247_development-qa-traceability.md)は維持する。以下は新規案件の既定案と解決規則の不足に対する改善候補であり、現行の固定パス仕様ではない。
+
+### OPS-12 標準ディレクトリ構造と保存粒度 (P1)
+
+対象: project-context、qa-workflow、全成果物owner。
+
+現状: [Project Context template](../../skills/qa-workflow/assets/project-context-template.md)のSection 14は既存成果物の場所・範囲・鮮度を記録し、Section 16には一部rootのstable keyがある。新規案件全体の標準配置と案件・機能・scope・Run単位の保存粒度は未統一。特に計画、設計、質問、レビュー、報告は内容の形式と物理配置が別である。
+
+改善: 既存配置がないと確認された場合に提示する標準構成を定義し、案件別overrideを許す。全37 Skillの成果物についてowner、正本形式、保存要否、論理scope、保存粒度、標準相対path、例外、既存writerとの対応を明確にする。案件単位の共通条件や機能横断成果物を機能別に重複保存しない。次のqa/構成は検討用であり、全ディレクトリの事前作成や採用を強制しない。
+
+```text
+qa/
+├── context/          # Project Context / DEC / ASM
+├── features/         # 機能台帳
+├── specifications/   # 仕様分析 / ui-target/
+├── questions/        # Q / 回答履歴 / 必要時のform参照
+├── planning/         # QA要求 / 方式 / 計画
+├── analysis/         # Risk / ITEM / COND候補
+├── design/           # TR / TCN・CI / TC
+├── reviews/          # coverage / adversarial review
+├── automation/       # E2E選定 / inspection / 実装参照
+├── execution/        # 直接TC / E2E / 非E2EのRunと結果参照
+├── regression/       # baseline / run / activity
+├── exploration/      # charter / session / finding
+├── knowledge/        # 既存entry形式
+├── defects/          # 欠陥候補 / 外部Issue参照
+├── usability/        # 評価 / 観測 / WCAG
+├── reports/          # 報告 / QA活動評価
+└── state/            # 既存workflow state / claim / baseline
+```
+
+実テストコードは対象repoの既存構成、機密raw証跡や一時作業物は別の許可済み保護領域を優先する。providerがディレクトリを持たない場合は同等の論理refを定義し、物理pathをIDにしない。
+
+受入: 新規案件で一度の配置合意後に必要な成果物を同じ規則で配置、別session/agentでも一致、全37 Skillについて保存対象と非対象・粒度・例外を説明可能。既存ui-target-v1の構造、knowledge entry、state、runnerの保存契約を変更せず、必要な場所だけ生成する。
+
+### OPS-13 成果物の命名規則と正本・表示物の識別 (P1)
+
+対象: 全成果物owner、qa-workflow、project-context。
+
+現状: [ui-target-v1](../../skills/spec-analysis/references/ui-test-target-analysis.md)は標準file群、[knowledge](../../skills/qa-knowledge/references/data-contract.md)はentry-ref.md、[artifact_graph.py](../../skills/qa-workflow/scripts/artifact_graph.py)はUUID.json・digestによるsnapshot等、[testware runner](../../skills/testware-execution/scripts/runner.py)はmanifest.json・attempt log等を規定する。一方、多くの計画・設計・報告ownerのテンプレートは出力内容を規定するが、共通の保存ファイル名は確認できない。
+
+改善: ownerごとにcanonical名、表示用Markdown等の派生物、draft・一時物、履歴、Run/attemptの命名と拡張子・schemaの対応を定める。既存の固定名・writer・安定IDを優先する。論理artifact refとprovider revisionを正本識別に使い、pathや日時だけを識別・currentnessの根拠にしない。単なる再出力で正本を複製せず、Run/attemptの証跡は独立したidentityで保持する。
+
+受入: 同一成果物の再依頼は既存正本を解決し、異なるscope・Run・attemptは衝突しない。正本と表示物・draftの誤認を拒否。大文字小文字、禁止文字、path traversal、名前衝突、既存固定名との互換性を対象providerで検証。
+
+### OPS-14 保存先解決と案件設定 (P1)
+
+対象: project-context、qa-workflow、各保存owner。
+
+現状: Section 16にはqa.workflow_state_root、qa.knowledge_root、qa.feature_artifact_root、qa.reservation_root等がある。その他の成果物は主にSection 14や明示refに依存し、標準配置と案件別設定の横断解決規則が不足する。専用stable keyのないこと自体を欠陥とせず、既存の契約を維持する。
+
+改善: 明示された依頼scope・操作許可を確認し、既存正本と有効な配置合意を優先する。矛盾する明示指定は配置変更候補として扱い、無断上書きしない。既存がないと確認できた場合は承認済み案件設定を適用し、なければ標準案を提示して初回合意を得る。未解決・重複・アクセス不能は不存在と区別し、正式保存をblockする。Section 14/16と既存prepare-placementを再利用し、全Skill専用keyや新中央台帳は必須としない。
+
+受入: 明示指定、既存配置、案件override、標準案、設定なし、矛盾、重複、アクセス不能を個別に確認。別sessionで解決結果が一致し、有効な合意が変わらなければ再質問しない。保存先が解決してもnative CAS、権限、承認、readbackが不足すれば正式保存しない。
+
+### OPS-15 保存済み成果物の発見・再利用 (P1)
+
+対象: qa-workflow、project-context、feature-analysis、全成果物owner。
+
+現状: [workflow guidance](../../skills/qa-workflow/references/guidance.md)は既存state・input revisionの再利用、[project-context guidance](../../skills/project-context/references/guidance.md)は許可範囲の列挙と候補判定を定めるが、全ownerの正本発見と重複検出の共通受入は未確認。
+
+改善: 承認済みroot/direct ref、owner、scope、artifact identity、provider revision、source依存、既存stateを使って発見・currentnessを確認する。固定root scanは既存ownerの許可範囲・完全性・型検証に従い、無制限の再帰探索やpath/ファイル名だけの推定を避ける。重複・一覧取得不全・不明参照は明示し、新規作成や自動選択を止める。
+
+受入: 別agent/sessionから同一正本を発見、変更なしの再依頼で不要再生成なし、部分改版では影響scopeのみ再検証。重複・欠落・stale・読取不能・列挙打切りを区別し、既存正本を保全する。OPS-01/03/05と接続する。
+
+### OPS-16 永続成果物・一時作業物・機密証跡の分離 (P0)
+
+対象: qa-workflow、project-context、agent-answer-form、test-target-inspection、各実行・評価owner。
+
+現状: [test-target-inspection](../../skills/test-target-inspection/references/guidance.md)は指定先・秘密情報の保存制約、[testware-execution](../../skills/testware-execution/references/guidance.md)はrepo外の保護された成果物先を定める。agent-answer-formはSkill外作業dirを使用する。全owner横断の保存区分・保持・cleanup・共有範囲は未統一。
+
+改善: 正本、再生成可能な派生物、再開に必要なdraft、短期一時物、raw実行証跡、機密証跡を区別する。保存可否、許可root、アクセス範囲、保持・cleanup方針、参照の有効期限と非保存理由を案件条件で明確にする。rawの無断commit・共有を禁止し、安全な要約/参照のみを渡す場合も元証跡の取得可能性を偽らない。保存不能なら未保存と完了条件への影響を明示する。
+
+受入: secretを含む証跡、安全な保存先なし、誤ったroot、別Runの証跡、保持期限切れ、一時物cleanup失敗、再開に必要な候補の保全を確認する。既存runnerの保護領域と安全契約を維持し、正式履歴をcleanupで削除しない。
+
+### OPS-17 既存配置との互換性・変更管理 (P1)
+
+対象: project-context、qa-workflow、全成果物owner。
+
+現状: Q06は既存配置優先、初回合意、物理分割の必要性判断、無断移動禁止を定める。標準案導入時に既存案件の混在構成・個別overrideを横断検証する必要がある。
+
+改善: 有効な既存配置を優先し、標準化のみを理由とする移動・改名・分割・再保存を行わない。変更が必要な場合だけ、移行対象・旧新ref・依存関係・履歴・権限・互換読取・条件付き切替・rollback・レビュー範囲を明示して別途合意する。現行writer/schemaを尊重し、二重正本を作らない。OPS-09の案件初期化・人間編集受入と接続する。
+
+受入: 既存案件の無変更再利用、異なるprovider/配置の混在、部分override、変更未承認、移行途中の競合・失敗、旧revisionの参照、rollbackを確認。標準構造が既存データの消失・二重正本・ID変更を生まないことを示す。
+
 ## 進め方の候補
 
-OPS-08の文書整合確認とOPS-01/02の運用受入から開始。実provider・承認者が決まり次第OPS-03/04/06を優先し、OPS-05/07/09へ接続する。OPS-10/11は案件接続と品質確保後に評価。正式な実装Plan・優先順位は別途合意する。
+OPS-12〜17を一つの配置・発見契約グループとして詳細化し、OPS-08の文書整合確認、OPS-01/02の運用受入と並行して検討する。配置・命名・正本識別・保護境界を決めてから実provider接続（OPS-03）を具体化する。OPS-16の安全制約は先行して維持し、実provider・承認者が決まり次第OPS-03/04/06を優先、OPS-05/07/09へ接続する。OPS-10/11は案件接続と品質確保後に評価。正式な実装Plan・優先順位・標準pathの採用は別途合意する。
