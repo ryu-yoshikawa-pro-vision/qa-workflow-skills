@@ -3,8 +3,8 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87。実装commit `e5643535b1ddc61f36188cb7c25cc7680a2badbb`と検証記録/Plan同期commit `480033d27c8a9097d5e691220fef476f4a503465`を対象branchへpushし、PR #40へ反映した。
-- 実装commit `e5643535`と文書同期commit `480033d2`は、それぞれValidate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harnessの5 workflowすべてsuccess。
+- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87。実装commit `e5643535b1ddc61f36188cb7c25cc7680a2badbb`、検証記録/Plan同期commit `480033d27c8a9097d5e691220fef476f4a503465`、CI結果同期commit `c58a14f501501e1303154f7e16b775df353a2e85`を対象branchへpushし、PR #40へ反映した。
+- 3 commitそれぞれでValidate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harnessの5 workflowすべてsuccess。
 - 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
@@ -90,7 +90,7 @@
 | Ruff 0.16.8                                                       | PASS                                   | `format_tracked.py`で追跡Python 327 filesのlint/formatを確認し、新規common helper 3 filesも個別lint/format check PASS。                                                                                    |
 | dprint / tracked format aggregate                                 | PARTIAL                                | `format_tracked.py check`はRuff PASS後、今回対象外の既存tracked files 18件のline-ending差でexit 20。今回変更したMarkdown/JSON/YAML 17 filesはpinned dprintで個別check PASS。既存ファイルは変更していない。 |
 | git diff --cached --check                                         | PASS                                   | staged PR #40差分にwhitespace errorなし。                                                                                                                                                                  |
-| GitHub Actions CI                                                 | PASS at 480033d2                       | Validate Agent Skills (2360)、Deterministic Output Evals (2358)、Semantic Output Evals (2323)、Code Quality (1053)、Codex Harness (1053)の5 workflow。                                                     |
+| GitHub Actions CI                                                 | PASS at c58a14f5                       | Validate Agent Skills (2361)、Deterministic Output Evals (2359)、Semantic Output Evals (2324)、Code Quality (1054)、Codex Harness (1054)の5 workflow。                                                     |
 | Code Quality契約tests                                             | PASS: 24 tests                         | formatter 19、patch whitespace 3、CI security configuration 2。                                                                                                                                            |
 
 ## 実環境依存・未実施
@@ -109,4 +109,4 @@
 - qa-workflow guidance.mdに残る共有resource reservation provider未選定時のblockは、複数workflowの外部共有resource排他の契約であり、通常context artifact保存の制限ではないため維持した。
 - workflow-state-template.mdのSQLite local-filesystem制約は既存qa.workflow_state_root providerの制約で、context artifactの通常filesystem保存とは別経路。JSON-only legacy stateは自動移行しないが、そのstate更新blockで通常artifact save/独立分析を停止しない。
 - Python 3.12.3とCI Python 3.11.18の既存JSON nestingテスト差は、stdlib parserのRecursionError発生有無に依存していた。既存runtime契約と同じ深さ64の明示scannerで拒否するよう修正し、文字列内の括弧を深さと誤認しないtestを追加した。`test_ci_handoff` 28件と全runtime 1495件がPASS。
-- formatter契約testはPASS。全tracked checkのRuffはPASSだが、dprint集約checkは作業環境の今回対象外の既存tracked file 18件の改行差でexit 20となった。今回変更したMarkdown/JSON/YAML 17 filesはpinned dprintで個別checkし、既存の対象外ファイルや未stageのuser `.gitattributes` を変更していない。clean GitHub Actions後の結果も確認する。
+- formatter契約testとRuffはPASS。dprint集約checkは作業環境の今回対象外の既存tracked file 18件の改行差でexit 20だが、今回変更したMarkdown/JSON/YAML 17 filesはpinned dprintで個別check PASS。既存の対象外ファイルや未stageのuser `.gitattributes` は変更せず、CI formatter/lint checksもPASSした。
