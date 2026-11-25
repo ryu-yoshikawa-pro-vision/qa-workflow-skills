@@ -3,8 +3,8 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87、origin/feat/context-rule-synthesis = 21134c966ca0dfaac68fdd7efd71530a9fbffef7。local branchはremoteと一致し、mainはbranchの祖先。fetchでmain・PR branchに更新はなく、別の文書branchだけ更新された。
-- PR #40の現head 21134c96では、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harnessの5 workflowがsuccess。これは以下の追加作業より前のCI結果。追加commit後のCIはpush後に再確認する。
+- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87、origin/feat/context-rule-synthesis = 21134c966ca0dfaac68fdd7efd71530a9fbffef7。commit直前fetchでPR branchの新規更新はなく、mainはbranchの祖先だった。実装commit `e5643535b1ddc61f36188cb7c25cc7680a2badbb`をpushし、PR #40へ反映した。
+- 実装commit `e5643535`のGitHub ActionsはValidate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harnessの5 workflowすべてsuccess。後続の文書同期commitでもPR checksを確認する。
 - 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
@@ -90,7 +90,7 @@
 | Ruff 0.16.8                                                       | PASS                                   | `format_tracked.py`で追跡Python 327 filesのlint/formatを確認し、新規common helper 3 filesも個別lint/format check PASS。                                                                                    |
 | dprint / tracked format aggregate                                 | PARTIAL                                | `format_tracked.py check`はRuff PASS後、今回対象外の既存tracked files 18件のline-ending差でexit 20。今回変更したMarkdown/JSON/YAML 17 filesはpinned dprintで個別check PASS。既存ファイルは変更していない。 |
 | git diff --cached --check                                         | PASS                                   | staged PR #40差分にwhitespace errorなし。                                                                                                                                                                  |
-| GitHub Actions CI                                                 | PASS at 21134c96, before local changes | Validate Agent Skills、Deterministic Output Evals、Semantic Output Evals、Code Quality、Codex Harnessの5 workflow。new local diff後のCIはpush後に確認。                                                    |
+| GitHub Actions CI                                                 | PASS at e5643535                       | Validate Agent Skills (2359)、Deterministic Output Evals (2357)、Semantic Output Evals (2322)、Code Quality (1052)、Codex Harness (1052)の5 workflow。文書同期commit後もPR checksを再確認する。            |
 | Code Quality契約tests                                             | PASS: 24 tests                         | formatter 19、patch whitespace 3、CI security configuration 2。                                                                                                                                            |
 
 ## 実環境依存・未実施
