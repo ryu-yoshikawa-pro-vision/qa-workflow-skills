@@ -3,7 +3,7 @@
 ## 共通規則
 
 - `schema_version`は`"1.0"`、canonical JSONはUTF-8、sort済みkey、compact separators、`ensure_ascii=false`、`allow_nan=false`、末尾改行なしです。重複keyと非有限値は拒否します。
-- 成果物の唯一の参照はroot相対refです。`artifact_ref`は`context-signal-batch/<64桁lowercase SHA-256>.json`です。rootはハーネスから別に渡され、Skillは案件ID・保存先・Provider・認証方式を決めません。別rootの同じ相対refは別成果物として扱います。
+- 成果物の唯一の参照はroot相対refです。`artifact_ref`は`context-signal-batch/<64桁lowercase SHA-256>.json`です。実行条件で許可されたrootを使い、Skillは案件ID・保存先・Provider・認証方式を選びません。別rootの同じ相対refは別成果物として扱います。
 - `batch_identity = SHA256(canonical({source_artifact_ref, source_content_hash, actual_inspected_range, observation_condition}))`です。意味を変える観測条件だけidentityに含みます。`requested_range`、workflow、分析観点、source revisionは含めません。
 - `signal_identity = SHA256(canonical({source_artifact_ref, observation_locator, source_content_hash}))`です。`signal_content_hash`はidentity/hash欄を除くsignal bodyのcanonical SHA-256です。
 - `actual_inspected_range`と`requested_range`は`{"kind":"all"}`または`{"kind":"sections|paths|...","items":[...]}`です。itemsは重複なし・昇順に正規化します。部分rangeのkindと要素はsource ownerの安定IDに合わせます。
@@ -26,4 +26,6 @@ helperは`identity`, `validate`, `project`, `select_batch_signals`, `batch_cover
 
 ## 完了証拠
 
-初回保存本文の`scan_completeness`だけでは今回の要求完了を表しません。owner/hostは現在のsource ref/hash、今回requested range、観測条件、保存batchの実range、正常抽出、独立readbackを照合します。partial batchも今回の狭い要求を包含すれば再利用できます。複数batchの和集合はsource/hash/condition一致を確認したhost gateが照合します。root bindingとreadbackはcanonical batch本文の外で受け渡し、Skillやartifactに案件IDを記録しません。単体scopeの`execution_range`は要求rangeのcanonical JSON文字列です。
+初回保存本文の`scan_completeness`だけでは今回の要求完了を表しません。ownerは現在のsource ref/hash、今回requested range、観測条件、保存batchの実range、正常抽出、独立readbackを照合します。source revision番号が変化してもref/hash/Authorityが同一ならbatchを再利用できます。partial batchも今回の狭い要求を包含すれば再利用できます。複数batchの和集合はsource/hash/condition一致を確認したactive batchだけで照合します。root bindingとreadbackはcanonical batch本文の外で受け渡し、Skillやartifactに案件IDを記録しません。単体scopeの`execution_range`はそのbatchが今回要求のために担当する`assigned_range`のcanonical JSON文字列です。`normalized_input.context_request`はworkflow ref、current source ref/revision/hash、元のrequested range、assigned range、観測条件を保持します。ownerはselected batchがassigned rangeを満たし、証拠batch集合の和集合が元requested range全域を満たすことを独立readbackで確認します。
+
+指定rootの`write`は`context_artifact_store.py`でcreate-if-absentを行い、保存後の独立`read`で同じrevision/hash/contentを検証します。訂正対象は`history`とexact revision readbackで再取得します。許可済みroot内の通常保存に専用認証hostは必要ありません。

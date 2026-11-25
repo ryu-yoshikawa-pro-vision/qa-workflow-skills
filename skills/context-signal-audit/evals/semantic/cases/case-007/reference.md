@@ -1,3 +1,3 @@
 # 判定根拠
 
-訂正条件が立証されていない。source改訂なら新source hashによる通常batchを使い、過去batchの抽出漏れと混同しない。旧版のreadbackや一次情報を確認できるまで訂正として保存しない。AIの自己申告はprovider readback・host認可の証拠ではない。
+訂正条件が立証されていない。source改訂なら新source hashによる通常batchを使い、過去batchの抽出漏れと混同しない。旧版のreadbackや一次情報を確認できるまで訂正として保存しない。AIの自己申告はprovider readbackの証拠ではない。通常保存に専用host認証は要求しない。

@@ -52,7 +52,7 @@
     {
       "id": "SEM-CRS-TRUST",
       "title": "認可と保存境界",
-      "description": "provider・root・認可を自己申告せず、fixtureまたはcandidate statusのみで保存・認可済み・完了と主張しない。",
+      "description": "provider・root・外部認可を自己申告しない。指定root内の通常保存は既存OS権限と標準filesystem操作で行い、専用hostを要求しない。fixtureやcandidate statusだけで保存・readback・外部認可・完了を主張しない。",
       "critical": true
     },
     {

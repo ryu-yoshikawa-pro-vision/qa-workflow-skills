@@ -9,10 +9,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(ROOT / "skills" / "project-context" / "scripts"))
+sys.path.insert(0, str(ROOT))
 
-import context_artifacts  # noqa: E402
-
+from scripts import context_artifacts  # noqa: E402
 from scripts.skills.evals.deterministic.loader import load_validator  # noqa: E402
 
 
@@ -56,8 +55,33 @@ class ContextRuleContractFixtureTests(unittest.TestCase):
 
     def test_zero_change_run_needs_exact_provider_readback(self) -> None:
         run = load_example("context-rule-synthesis", "run-example.json")
+        source_content = "Example payment refund specification.\n"
+        source_hash = hashlib.sha256(source_content.encode("utf-8")).hexdigest()
+        source = run["operation_input"]["input_sources"][0]
+        source["content_hash"] = source_hash
+        snapshot_source = run["snapshot"]["referenced_sources"][0]
+        snapshot_source["content_hash"] = source_hash
+        run["snapshot"]["snapshot_hash"] = context_artifacts.snapshot_hash(
+            run["snapshot"]
+        )
+        operation_id = context_artifacts.workflow_operation_id(
+            run["workflow_ref"], run["operation_input"], run["requested_scope"]
+        )
+        run["workflow_operation_id"] = operation_id
+        run["run_identity"] = context_artifacts.run_identity(operation_id)
+        run["artifact_ref"] = context_artifacts.artifact_ref(
+            "context-synthesis-run", run["run_identity"]
+        )
         content = context_artifacts.canonical_bytes(run).decode("utf-8")
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        source_readback = {
+            "kind": "spec",
+            "root_binding": "fixture-root:context-artifacts",
+            "artifact_ref": source["artifact_ref"],
+            "revision": source["source_revision"],
+            "sha256": source_hash,
+            "content": source_content,
+        }
         readback = {
             "kind": "context-synthesis-run",
             "root_binding": "fixture-root:context-artifacts",
@@ -69,14 +93,16 @@ class ContextRuleContractFixtureTests(unittest.TestCase):
         verified = context_artifacts.completion_check(
             run,
             root_binding="fixture-root:context-artifacts",
-            provider_readbacks={run["artifact_ref"]: readback},
+            provider_readbacks=[source_readback, readback],
+            run_readback_revision="fixture:revision-1",
         )
         self.assertTrue(verified["complete"], verified)
         altered = dict(readback, sha256="0" * 64)
         rejected = context_artifacts.completion_check(
             run,
             root_binding="fixture-root:context-artifacts",
-            provider_readbacks={run["artifact_ref"]: altered},
+            provider_readbacks=[source_readback, altered],
+            run_readback_revision="fixture:revision-1",
         )
         self.assertFalse(rejected["complete"], rejected)
 

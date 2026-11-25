@@ -243,6 +243,17 @@ class CiHandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "nesting"):
             handoff._read_json(input_path)
 
+    def test_json_brackets_inside_strings_do_not_count_as_nesting(self) -> None:
+        input_path = self.root / "brackets-in-string.json"
+        input_path.write_text(
+            json.dumps({"value": "[" * (handoff.MAX_JSON_NESTING + 10)}),
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            handoff._read_json(input_path),
+            {"value": "[" * (handoff.MAX_JSON_NESTING + 10)},
+        )
+
     def test_cli_output_escapes_invalid_unicode_in_failure_report(self) -> None:
         expected = self.root / "expected.json"
         manifest = self.root / "manifest.json"

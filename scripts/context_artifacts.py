@@ -408,6 +408,7 @@ def workflow_operation_id(
             "artifact_ref",
             "content_hash",
             "effective_authority_fingerprint",
+            "source_revision",
         }:
             _fail("operation_input_source_schema_invalid")
         artifact_ref_value = _text(
@@ -415,6 +416,7 @@ def workflow_operation_id(
         )
         content_hash = source["content_hash"]
         authority = source["effective_authority_fingerprint"]
+        _text(source["source_revision"], "operation_input_source.source_revision")
         if not isinstance(content_hash, str) or not SHA256_RE.fullmatch(content_hash):
             _fail("operation_input_source_hash_invalid")
         if authority is not None and (
@@ -1247,6 +1249,30 @@ def _validate_run(run: dict[str, Any]) -> None:
         auth = source["effective_authority_fingerprint"]
         if auth is not None and not SHA256_RE.fullmatch(auth):
             _fail("effective_authority_fingerprint_invalid")
+    snapshot_keys = [
+        (source["artifact_ref"], source["source_revision"])
+        for source in snapshot["referenced_sources"]
+    ]
+    if len(snapshot_keys) != len(set(snapshot_keys)):
+        _fail("snapshot_referenced_source_duplicated")
+    for input_source in run["operation_input"]["input_sources"]:
+        snapshot_source = next(
+            (
+                source
+                for source in snapshot["referenced_sources"]
+                if source["artifact_ref"] == input_source["artifact_ref"]
+                and source["source_revision"] == input_source["source_revision"]
+            ),
+            None,
+        )
+        if (
+            snapshot_source is None
+            or snapshot_source["source_revision"] != input_source["source_revision"]
+            or snapshot_source["content_hash"] != input_source["content_hash"]
+            or snapshot_source["effective_authority_fingerprint"]
+            != input_source["effective_authority_fingerprint"]
+        ):
+            _fail("operation_input_snapshot_mismatch")
     plan = _object(run["triage_plan"], "triage_plan")
     if set(plan) != {"target_batch_refs", "planned_candidate_ops"}:
         _fail("triage_plan_schema_invalid")
@@ -1258,6 +1284,31 @@ def _validate_run(run: dict[str, Any]) -> None:
         _validate_kind_ref(ref, "context-signal-batch", "target_batch_ref")
     if plan["target_batch_refs"] != sorted(set(plan["target_batch_refs"])):
         _fail("target_batch_refs_not_canonical")
+    operation_sources = {
+        source["artifact_ref"]: source
+        for source in run["operation_input"]["input_sources"]
+    }
+    for batch_ref in plan["target_batch_refs"]:
+        operation_source = operation_sources.get(batch_ref)
+        snapshot_source = next(
+            (
+                source
+                for source in snapshot["referenced_sources"]
+                if source["artifact_ref"] == batch_ref
+                and source["source_kind"] == "signal_batch"
+                and operation_source is not None
+                and source["source_revision"] == operation_source["source_revision"]
+            ),
+            None,
+        )
+        if snapshot_source is None or operation_source is None:
+            _fail("target_batch_input_snapshot_mismatch")
+        if (
+            snapshot_source["content_hash"] != operation_source["content_hash"]
+            or snapshot_source["effective_authority_fingerprint"]
+            != operation_source["effective_authority_fingerprint"]
+        ):
+            _fail("target_batch_input_snapshot_mismatch")
     operation_identities: list[str] = []
     for operation in plan["planned_candidate_ops"]:
         operation = _object(operation, "planned_candidate_op")
@@ -1551,7 +1602,8 @@ def completion_check(
     run: dict[str, Any],
     *,
     root_binding: str,
-    provider_readbacks: dict[str, dict[str, Any]] | None = None,
+    provider_readbacks: list[dict[str, Any]] | None = None,
+    run_readback_revision: str | None = None,
 ) -> dict[str, Any]:
     """Check persisted evidence against readbacks bound to the supplied root context."""
     try:
@@ -1564,12 +1616,52 @@ def completion_check(
         return {"complete": False, "status": "incomplete", "reason": summary["status"]}
     if run["scan_completeness"] != "complete":
         return {"complete": False, "status": "incomplete", "reason": "scan_incomplete"}
-    if provider_readbacks is None:
+    if not isinstance(provider_readbacks, list):
         return {
             "complete": False,
             "status": "unverifiable",
             "reason": "provider_readbacks_required",
         }
+
+    readback_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for value in provider_readbacks:
+        if (
+            not isinstance(value, dict)
+            or not isinstance(value.get("artifact_ref"), str)
+            or not value["artifact_ref"]
+            or not isinstance(value.get("revision"), str)
+            or not value["revision"]
+            or not isinstance(value.get("sha256"), str)
+            or not SHA256_RE.fullmatch(value["sha256"])
+            or not isinstance(value.get("content"), str)
+        ):
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "provider_readback_invalid",
+            }
+        key = (value["artifact_ref"], value["revision"])
+        if key in readback_index:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "provider_readback_revision_duplicated",
+            }
+        try:
+            content_hash = hashlib.sha256(value["content"].encode("utf-8")).hexdigest()
+        except UnicodeEncodeError:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "provider_readback_content_invalid",
+            }
+        if content_hash != value["sha256"]:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "provider_readback_hash_mismatch",
+            }
+        readback_index[key] = value
 
     def exact_readback(
         ref: str,
@@ -1577,38 +1669,131 @@ def completion_check(
         expected_hash: str | None = None,
         *,
         context_artifact: bool = False,
+        expected_kind: str | None = None,
     ) -> dict[str, Any] | None:
-        value = provider_readbacks.get(ref)
+        value = readback_index.get((ref, revision))
         if (
             not isinstance(value, dict)
             or value.get("artifact_ref") != ref
             or value.get("revision") != revision
             or (context_artifact and value.get("root_binding") != root_binding)
+            or (expected_kind is not None and value.get("kind") != expected_kind)
             or not isinstance(value.get("sha256"), str)
             or not SHA256_RE.fullmatch(value["sha256"])
             or not isinstance(value.get("content"), str)
-            or hashlib.sha256(value["content"].encode("utf-8")).hexdigest()
-            != value["sha256"]
             or (expected_hash is not None and value["sha256"] != expected_hash)
         ):
             return None
+        if context_artifact:
+            try:
+                stored = parse_canonical_json(value["content"])
+                validate_artifact(stored, expected_kind or value.get("kind"))
+            except ContractError:
+                return None
+            if stored.get("artifact_ref") != ref:
+                return None
         return value
 
+    snapshot_sources: dict[str, list[dict[str, Any]]] = {}
     for source in run["snapshot"]["referenced_sources"]:
+        snapshot_sources.setdefault(source["artifact_ref"], []).append(source)
+    for source in run["snapshot"]["referenced_sources"]:
+        kind = (
+            "context-signal-batch"
+            if source["source_kind"] == "signal_batch"
+            else "context-rule-candidate"
+            if source["source_kind"] == "candidate"
+            else None
+        )
         if (
             exact_readback(
                 source["artifact_ref"],
                 source["source_revision"],
                 source["content_hash"],
                 context_artifact=source["source_kind"] in {"signal_batch", "candidate"},
+                expected_kind=kind,
             )
             is None
         ):
             return {
                 "complete": False,
                 "status": "unverifiable",
-                "reason": "snapshot_source_provider_readback_mismatch",
+                "reason": (
+                    "target_batch_readback_missing"
+                    if source["artifact_ref"] in run["triage_plan"]["target_batch_refs"]
+                    else "snapshot_source_provider_readback_mismatch"
+                ),
             }
+    for source in run["operation_input"]["input_sources"]:
+        matching_sources = [
+            snapshot_source
+            for snapshot_source in snapshot_sources.get(source["artifact_ref"], [])
+            if snapshot_source["source_revision"] == source["source_revision"]
+            and snapshot_source["content_hash"] == source["content_hash"]
+            and snapshot_source["effective_authority_fingerprint"]
+            == source["effective_authority_fingerprint"]
+        ]
+        if len(matching_sources) != 1:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "operation_input_snapshot_mismatch",
+            }
+    for batch_ref in run["triage_plan"]["target_batch_refs"]:
+        input_source = next(
+            (
+                value
+                for value in run["operation_input"]["input_sources"]
+                if value["artifact_ref"] == batch_ref
+            ),
+            None,
+        )
+        matching_sources = [
+            source
+            for source in snapshot_sources.get(batch_ref, [])
+            if input_source is not None
+            and source["source_kind"] == "signal_batch"
+            and source["source_revision"] == input_source["source_revision"]
+            and source["content_hash"] == input_source["content_hash"]
+            and source["effective_authority_fingerprint"]
+            == input_source["effective_authority_fingerprint"]
+        ]
+        if len(matching_sources) != 1:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "target_batch_snapshot_missing",
+            }
+        source = matching_sources[0]
+        readback = exact_readback(
+            batch_ref,
+            source["source_revision"],
+            source["content_hash"],
+            context_artifact=True,
+            expected_kind="context-signal-batch",
+        )
+        if readback is None:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "target_batch_readback_missing",
+            }
+        try:
+            batch = parse_canonical_json(readback["content"])
+            validate_artifact(batch, "context-signal-batch")
+        except ContractError:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "target_batch_readback_invalid",
+            }
+        if batch["artifact_ref"] != batch_ref:
+            return {
+                "complete": False,
+                "status": "unverifiable",
+                "reason": "target_batch_readback_mismatch",
+            }
+
     for operation in run["triage_plan"]["planned_candidate_ops"]:
         result = operation["confirmed_result"]
         if not all(
@@ -1626,16 +1811,14 @@ def completion_check(
                 "status": "incomplete",
                 "reason": "candidate_readback_hash_mismatch",
             }
-        readback = provider_readbacks.get(result["artifact_ref"])
-        if (
-            not isinstance(readback, dict)
-            or readback.get("kind") != "context-rule-candidate"
-            or readback.get("root_binding") != root_binding
-            or readback.get("artifact_ref") != result["artifact_ref"]
-            or readback.get("revision") != result["storage_revision"]
-            or readback.get("sha256") != result["content_hash"]
-            or not isinstance(readback.get("content"), str)
-        ):
+        readback = exact_readback(
+            result["artifact_ref"],
+            result["storage_revision"],
+            result["content_hash"],
+            context_artifact=True,
+            expected_kind="context-rule-candidate",
+        )
+        if readback is None:
             return {
                 "complete": False,
                 "status": "unverifiable",
@@ -1663,6 +1846,36 @@ def completion_check(
                 "status": "unverifiable",
                 "reason": "candidate_readback_content_mismatch",
             }
+        if operation["expected_revision"] is not None:
+            base_readback = exact_readback(
+                operation["candidate_ref"],
+                operation["expected_revision"],
+                operation["base_content_hash"],
+                context_artifact=True,
+                expected_kind="context-rule-candidate",
+            )
+            if base_readback is None:
+                return {
+                    "complete": False,
+                    "status": "unverifiable",
+                    "reason": "candidate_base_readback_mismatch",
+                }
+        for precondition in operation["related_preconditions"]:
+            if (
+                exact_readback(
+                    precondition["candidate_ref"],
+                    precondition["expected_revision"],
+                    precondition["content_hash"],
+                    context_artifact=True,
+                    expected_kind="context-rule-candidate",
+                )
+                is None
+            ):
+                return {
+                    "complete": False,
+                    "status": "unverifiable",
+                    "reason": "related_candidate_readback_mismatch",
+                }
         if operation["planned_payload"] is not None and readback[
             "content"
         ] != canonical_bytes(operation["planned_payload"]).decode("utf-8"):
@@ -1687,41 +1900,50 @@ def completion_check(
                         "reason": "direct_evidence_readback_mismatch",
                     }
             else:
-                signal_batch_evidence = provider_readbacks.get(link["signal_batch_ref"])
-                signal_batch_readback = (
-                    exact_readback(
+                signal_batch_readback = None
+                signal_batch: dict[str, Any] | None = None
+                for batch_source in snapshot_sources.get(link["signal_batch_ref"], []):
+                    if batch_source["source_kind"] != "signal_batch":
+                        continue
+                    selected_readback = exact_readback(
                         link["signal_batch_ref"],
-                        signal_batch_evidence.get("revision", ""),
+                        batch_source["source_revision"],
+                        batch_source["content_hash"],
                         context_artifact=True,
+                        expected_kind="context-signal-batch",
                     )
-                    if isinstance(signal_batch_evidence, dict)
-                    else None
-                )
-                if (
-                    not isinstance(signal_batch_readback, dict)
-                    or not isinstance(signal_batch_readback.get("content"), str)
-                    or signal_batch_readback.get("artifact_ref")
-                    != link["signal_batch_ref"]
-                    or hashlib.sha256(
-                        signal_batch_readback["content"].encode("utf-8")
-                    ).hexdigest()
-                    != signal_batch_readback.get("sha256")
-                ):
+                    if selected_readback is None:
+                        continue
+                    try:
+                        selected_batch = parse_canonical_json(
+                            selected_readback["content"]
+                        )
+                        validate_artifact(selected_batch, "context-signal-batch")
+                    except ContractError:
+                        continue
+                    selected_signal = next(
+                        (
+                            item
+                            for item in selected_batch["signals"]
+                            if item["signal_identity"] == link["signal_identity"]
+                            and item["signal_content_hash"]
+                            == link["signal_content_hash"]
+                        ),
+                        None,
+                    )
+                    if (
+                        selected_signal is not None
+                        and selected_batch["source"]["source_content_hash"]
+                        == link["source_content_hash"]
+                    ):
+                        signal_batch_readback = selected_readback
+                        signal_batch = selected_batch
+                        break
+                if signal_batch_readback is None or signal_batch is None:
                     return {
                         "complete": False,
                         "status": "unverifiable",
                         "reason": "signal_batch_readback_mismatch",
-                    }
-                try:
-                    signal_batch = parse_canonical_json(
-                        signal_batch_readback["content"]
-                    )
-                    validate_artifact(signal_batch, "context-signal-batch")
-                except ContractError:
-                    return {
-                        "complete": False,
-                        "status": "unverifiable",
-                        "reason": "signal_batch_readback_invalid",
                     }
                 signal = next(
                     (
@@ -1784,19 +2006,7 @@ def completion_check(
                 }
         for conformance in candidate["implementation_conformance_refs"]:
             if conformance["verified"]:
-                evidence_readback = provider_readbacks.get(conformance["ref"])
-                if (
-                    not isinstance(evidence_readback, dict)
-                    or evidence_readback.get("artifact_ref") != conformance["ref"]
-                    or evidence_readback.get("revision") != conformance["revision"]
-                    or not isinstance(evidence_readback.get("sha256"), str)
-                    or not SHA256_RE.fullmatch(evidence_readback["sha256"])
-                    or not isinstance(evidence_readback.get("content"), str)
-                    or hashlib.sha256(
-                        evidence_readback["content"].encode("utf-8")
-                    ).hexdigest()
-                    != evidence_readback["sha256"]
-                ):
+                if exact_readback(conformance["ref"], conformance["revision"]) is None:
                     return {
                         "complete": False,
                         "status": "unverifiable",
@@ -1811,34 +2021,36 @@ def completion_check(
                 }
             if handoff["status"] == "confirmed_by_readback":
                 target = handoff["confirmed_target_ref"]
-                target_readback = provider_readbacks.get(target["artifact_ref"])
                 if (
-                    not isinstance(target_readback, dict)
-                    or target_readback.get("artifact_ref") != target["artifact_ref"]
-                    or target_readback.get("revision") != target["artifact_revision"]
-                    or target_readback.get("sha256") != target["artifact_content_hash"]
-                    or not isinstance(target_readback.get("content"), str)
-                    or hashlib.sha256(
-                        target_readback["content"].encode("utf-8")
-                    ).hexdigest()
-                    != target["artifact_content_hash"]
+                    exact_readback(
+                        target["artifact_ref"],
+                        target["artifact_revision"],
+                        target["artifact_content_hash"],
+                    )
+                    is None
                 ):
                     return {
                         "complete": False,
                         "status": "unverifiable",
                         "reason": "handoff_provider_readback_mismatch",
                     }
-    run_readback = provider_readbacks.get(run["artifact_ref"])
+    if not isinstance(run_readback_revision, str) or not run_readback_revision:
+        return {
+            "complete": False,
+            "status": "unverifiable",
+            "reason": "run_readback_revision_required",
+        }
     expected_run_hash = hashlib.sha256(canonical_bytes(run)).hexdigest()
-    if (
-        not isinstance(run_readback, dict)
-        or run_readback.get("kind") != "context-synthesis-run"
-        or run_readback.get("root_binding") != root_binding
-        or run_readback.get("artifact_ref") != run["artifact_ref"]
-        or not run_readback.get("revision")
-        or run_readback.get("sha256") != expected_run_hash
-        or run_readback.get("content") != canonical_bytes(run).decode("utf-8")
-    ):
+    run_readback = exact_readback(
+        run["artifact_ref"],
+        run_readback_revision,
+        expected_run_hash,
+        context_artifact=True,
+        expected_kind="context-synthesis-run",
+    )
+    if run_readback is None or run_readback.get("content") != canonical_bytes(
+        run
+    ).decode("utf-8"):
         return {
             "complete": False,
             "status": "unverifiable",
@@ -1848,7 +2060,7 @@ def completion_check(
         "complete": True,
         "status": "complete",
         "readback_required": True,
-        "reason": "run_contract_valid_host_readback_required",
+        "reason": "provider_readbacks_verified",
     }
 
 
@@ -2065,6 +2277,11 @@ def handle(request: Any) -> dict[str, Any]:
                     request.get("current_sources", []), request.get("saved_sources", [])
                 ),
             }
+        if operation == "normalize_range":
+            return {
+                "status": "ok",
+                "range": normalize_range(request.get("range")),
+            }
         if operation == "batch_covers":
             complete = batch_covers_request(
                 request.get("batch", {}),
@@ -2115,6 +2332,7 @@ def handle(request: Any) -> dict[str, Any]:
                 request.get("run"),
                 root_binding=request.get("root_binding"),
                 provider_readbacks=request.get("provider_readbacks"),
+                run_readback_revision=request.get("run_readback_revision"),
             )
         _fail("operation_invalid")
     except (ContractError, KeyError, TypeError, ValueError) as exc:

@@ -40,7 +40,7 @@
     {
       "id": "SEM-CSA-TRUST",
       "title": "保存と信頼境界",
-      "description": "許可root/providerを自己選択せず、認可済みhostと独立readbackなしに正式保存・完了を主張しない。",
+      "description": "許可root/providerを自己選択しない。指定root内の通常保存は既存OS権限と標準filesystem操作で行い、専用hostを要求しない。独立readbackなしに保存・完了を主張せず、共有更新・外部操作には既存ownerの認可を適用する。",
       "critical": true
     },
     {

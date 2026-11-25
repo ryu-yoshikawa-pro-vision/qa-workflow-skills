@@ -7,9 +7,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-PROJECT_CONTEXT_SCRIPTS = PROJECT_ROOT / "skills" / "project-context" / "scripts"
+COMMON_SCRIPTS = PROJECT_ROOT / "scripts"
 QA_WORKFLOW_SCRIPTS = PROJECT_ROOT / "skills" / "qa-workflow" / "scripts"
-sys.path.insert(0, str(PROJECT_CONTEXT_SCRIPTS))
+sys.path.insert(0, str(COMMON_SCRIPTS))
 sys.path.insert(0, str(QA_WORKFLOW_SCRIPTS))
 
 from context_artifacts import (  # noqa: E402
@@ -42,7 +42,8 @@ from context_artifacts import (  # noqa: E402
 
 ROOT_BINDING = "fixture-root:context-artifacts"
 SOURCE_REF = "project/specifications/payment.md"
-SOURCE_HASH = "a" * 64
+SOURCE_CONTENT = "Specification revision 3: eligible purchases can be refunded."
+SOURCE_HASH = hashlib.sha256(SOURCE_CONTENT.encode("utf-8")).hexdigest()
 
 
 def operation_input() -> dict:
@@ -53,6 +54,7 @@ def operation_input() -> dict:
                 "artifact_ref": SOURCE_REF,
                 "content_hash": SOURCE_HASH,
                 "effective_authority_fingerprint": None,
+                "source_revision": "r3",
             }
         ],
         "investigation_conditions": {"environment": "staging"},
@@ -163,7 +165,15 @@ def build_run() -> dict:
     snapshot = {
         "search_roots_and_scopes": ["designated context root"],
         "search_criteria": "payment refund rules, candidates and authority",
-        "referenced_sources": [],
+        "referenced_sources": [
+            {
+                "source_kind": "spec",
+                "artifact_ref": SOURCE_REF,
+                "source_revision": "r3",
+                "content_hash": SOURCE_HASH,
+                "effective_authority_fingerprint": None,
+            }
+        ],
         "unverifiable_sources": [],
         "excluded_scope_notes": "No excluded scope.",
     }
@@ -257,6 +267,16 @@ class ContextArtifactContractTests(unittest.TestCase):
             ),
             workflow_operation_id(
                 "workflow:ctx-001", changed_authority, requested_scope()
+            ),
+        )
+        changed_revision_only = operation_input()
+        changed_revision_only["input_sources"][0]["source_revision"] = "r4"
+        self.assertEqual(
+            workflow_operation_id(
+                "workflow:ctx-001", operation_input(), requested_scope()
+            ),
+            workflow_operation_id(
+                "workflow:ctx-001", changed_revision_only, requested_scope()
             ),
         )
 
@@ -598,18 +618,22 @@ class ContextArtifactContractTests(unittest.TestCase):
         candidate = build_candidate()
         candidate_content = canonical_bytes(candidate).decode("utf-8")
         candidate_hash = hashlib.sha256(candidate_content.encode("utf-8")).hexdigest()
+        updated_candidate = copy.deepcopy(candidate)
+        updated_candidate["rule_statement"] = "Updated wording for the same hypothesis."
+        updated_content = canonical_bytes(updated_candidate).decode("utf-8")
+        updated_hash = hashlib.sha256(updated_content.encode("utf-8")).hexdigest()
         run = build_run()
         run["triage_plan"]["planned_candidate_ops"] = [
             {
                 "candidate_identity": candidate["candidate_identity"],
                 "candidate_ref": candidate["artifact_ref"],
-                "action": "reuse",
+                "action": "update",
                 "base_content_hash": candidate_hash,
                 "expected_revision": "r1",
                 "related_preconditions": [],
                 "operation_id": "provider-op-1",
-                "planned_content_hash": candidate_hash,
-                "planned_payload": None,
+                "planned_content_hash": updated_hash,
+                "planned_payload": updated_candidate,
                 "write_request_meta": {
                     "source_ref": SOURCE_REF,
                     "source_revision": "r3",
@@ -619,16 +643,26 @@ class ContextArtifactContractTests(unittest.TestCase):
                 },
                 "confirmed_result": {
                     "artifact_ref": candidate["artifact_ref"],
-                    "storage_revision": "r1",
-                    "content_hash": candidate_hash,
+                    "storage_revision": "r2",
+                    "content_hash": updated_hash,
                 },
             }
         ]
+        run["result_summary"]["status"] = "completed"
+        run["result_summary"]["zero_change_reason"] = None
         self.assertTrue(validate_artifact(run, "context-synthesis-run"))
         run_content = canonical_bytes(run).decode("utf-8")
         run_hash = hashlib.sha256(run_content.encode("utf-8")).hexdigest()
-        readbacks = {
-            candidate["artifact_ref"]: {
+        readbacks = [
+            {
+                "kind": "spec",
+                "root_binding": ROOT_BINDING,
+                "artifact_ref": SOURCE_REF,
+                "revision": "r3",
+                "sha256": SOURCE_HASH,
+                "content": SOURCE_CONTENT,
+            },
+            {
                 "kind": "context-rule-candidate",
                 "root_binding": ROOT_BINDING,
                 "artifact_ref": candidate["artifact_ref"],
@@ -636,28 +670,129 @@ class ContextArtifactContractTests(unittest.TestCase):
                 "sha256": candidate_hash,
                 "content": candidate_content,
             },
-            run["artifact_ref"]: {
+            {
+                "kind": "context-rule-candidate",
+                "root_binding": ROOT_BINDING,
+                "artifact_ref": candidate["artifact_ref"],
+                "revision": "r2",
+                "sha256": updated_hash,
+                "content": updated_content,
+            },
+            {
                 "kind": "context-synthesis-run",
                 "root_binding": ROOT_BINDING,
                 "artifact_ref": run["artifact_ref"],
-                "revision": "r2",
+                "revision": "r3",
                 "sha256": run_hash,
                 "content": run_content,
             },
-        }
+        ]
         self.assertTrue(
             completion_check(
-                run, root_binding=ROOT_BINDING, provider_readbacks=readbacks
+                run,
+                root_binding=ROOT_BINDING,
+                provider_readbacks=readbacks,
+                run_readback_revision="r3",
             )["complete"]
         )
         self.assertFalse(
             completion_check(
-                run, root_binding="another-root", provider_readbacks=readbacks
+                run,
+                root_binding="another-root",
+                provider_readbacks=readbacks,
+                run_readback_revision="r3",
             )["complete"]
         )
-        readbacks[candidate["artifact_ref"]]["content"] = candidate_content + " "
+        readbacks[2]["content"] = updated_content + " "
         self.assertFalse(
             completion_check(
-                run, root_binding=ROOT_BINDING, provider_readbacks=readbacks
+                run,
+                root_binding=ROOT_BINDING,
+                provider_readbacks=readbacks,
+                run_readback_revision="r3",
             )["complete"]
         )
+
+    def test_target_batches_bind_start_input_snapshot_and_exact_readback(self) -> None:
+        batch = build_batch()
+        batch_content = canonical_bytes(batch).decode("utf-8")
+        batch_hash = hashlib.sha256(batch_content.encode("utf-8")).hexdigest()
+        batch_revision = "batch-r1"
+        run = build_run()
+        run["operation_input"]["input_sources"].append(
+            {
+                "artifact_ref": batch["artifact_ref"],
+                "content_hash": batch_hash,
+                "effective_authority_fingerprint": None,
+                "source_revision": batch_revision,
+            }
+        )
+        run["operation_input"]["input_sources"].sort(
+            key=lambda item: item["artifact_ref"]
+        )
+        run["snapshot"]["referenced_sources"].append(
+            {
+                "source_kind": "signal_batch",
+                "artifact_ref": batch["artifact_ref"],
+                "source_revision": batch_revision,
+                "content_hash": batch_hash,
+                "effective_authority_fingerprint": None,
+            }
+        )
+        run["snapshot"]["referenced_sources"].sort(
+            key=lambda item: (item["artifact_ref"], item["source_revision"])
+        )
+        run["snapshot"]["snapshot_hash"] = snapshot_hash(run["snapshot"])
+        run["triage_plan"]["target_batch_refs"] = [batch["artifact_ref"]]
+        operation_id = workflow_operation_id(
+            run["workflow_ref"], run["operation_input"], run["requested_scope"]
+        )
+        run["workflow_operation_id"] = operation_id
+        run["run_identity"] = run_identity(operation_id)
+        run["artifact_ref"] = artifact_ref("context-synthesis-run", run["run_identity"])
+        run_content = canonical_bytes(run).decode("utf-8")
+        run_hash = hashlib.sha256(run_content.encode("utf-8")).hexdigest()
+        readbacks = [
+            {
+                "kind": "spec",
+                "root_binding": ROOT_BINDING,
+                "artifact_ref": SOURCE_REF,
+                "revision": "r3",
+                "sha256": SOURCE_HASH,
+                "content": SOURCE_CONTENT,
+            },
+            {
+                "kind": "context-signal-batch",
+                "root_binding": ROOT_BINDING,
+                "artifact_ref": batch["artifact_ref"],
+                "revision": batch_revision,
+                "sha256": batch_hash,
+                "content": batch_content,
+            },
+            {
+                "kind": "context-synthesis-run",
+                "root_binding": ROOT_BINDING,
+                "artifact_ref": run["artifact_ref"],
+                "revision": "run-r1",
+                "sha256": run_hash,
+                "content": run_content,
+            },
+        ]
+
+        self.assertTrue(validate_artifact(run, "context-synthesis-run"))
+        self.assertTrue(
+            completion_check(
+                run,
+                root_binding=ROOT_BINDING,
+                provider_readbacks=readbacks,
+                run_readback_revision="run-r1",
+            )["complete"]
+        )
+        without_target = [readbacks[0], readbacks[2]]
+        result = completion_check(
+            run,
+            root_binding=ROOT_BINDING,
+            provider_readbacks=without_target,
+            run_readback_revision="run-r1",
+        )
+        self.assertEqual(result["reason"], "target_batch_readback_missing")

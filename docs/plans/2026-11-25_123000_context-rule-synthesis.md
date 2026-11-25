@@ -2,7 +2,7 @@
 
 - 基準: main `a37b15508dadd17ac0228ac896badb71d6a8f2c7`（2026-11-25確認、添付「QAワークフロー 詳細設計書：横断的法則性抽出・コンテキスト補完（基本設計確定版）」と一致）
 - 実装branch: `feat/context-rule-synthesis`
-- 状態: 実装・ローカル検証とPR #40 CIを実施。対象head `e96d4863`のdeterministic/runtime/semantic/Skill/Code Quality/Codex Harness workflowはPASS。受入全体は未完了。認可host/root未選定のため実保存・Agent縦断受入・独立Judge・3構成実測は未実施。新規SkillのCodex CLI positive trigger smoke 2件は観測したがformal評価ではない。実績と13.2対応は[PR #40検証記録](../implementation/pr40/verification.md)を参照し、残件を完了扱いしない。
+- 状態（2026-11-26）: PR #40の既存head `21134c96`までのCIはsuccess。追加実装では通常root保存・list/read/history・条件付き更新、独立readback、A/B stateの永続化・再開を既存filesystem操作とSQLite providerへ接続し、隔離rootで実テストした。受入全体は未完了。実運用rootと共有writer/外部owner接続は未指定・未確認だが、通常保存に専用認証hostは不要で、これを理由にローカル作業を止めない。正式trigger、実Agent縦断、独立Judge、3構成実測は未実施。Codex等の外部評価サービスへrepository由来データを送る許可が未確定のため、当該評価は保留。実績と13.2対応は[PR #40検証記録](../implementation/pr40/verification.md)を参照し、残件を完了扱いしない。
 - [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は保存のみで実装対象外。添付原文は[保存時commitの文書](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/799b776b4708a3b97aa6a6fc018212d00ac15d09/docs/plans/2026-11-25_123000_context-rule-synthesis_design.md)（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0、Git blob: ec436defa085308b90cd7688d375c5730ecb55c5）で保持する。直前の書式整形版（Git blob: c642c87948acf8e8da0f756f849761d596b17de3）は履歴に保持する。今回の利用者決定により保存・責務・identityに関する設計を変更した。原文・旧設計は履歴参照とし、変更後の基本設計と詳細Planを実装の正本とする。詳細な例・表・JSON例も実装・検証の参照先とする。
 - 本Planは基本設計の具体化。以下のレビューで合意した具体化は原文の対応箇所より優先する。他の設計要件は省略しない。
 

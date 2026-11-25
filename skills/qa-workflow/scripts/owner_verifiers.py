@@ -4,8 +4,11 @@ A Skill without runtime-v2 roots can complete a workflow scope only when its
 *owner's own production CLI* verifies the stored artifact. This module registers
 those verification entry points. It never judges process semantics itself.
 The evidence (the stored text and its readback) is supplied by the caller; this
-module does not read the storage provider again to confirm it. The trusted host
-must acquire the provider readback and protect the handoff. Each registered
+module does not read the storage provider again to confirm it. The trusted call
+site must acquire the readback from the selected root/store and protect the
+handoff. Ordinary local filesystem saves rely on existing OS permissions and do
+not require a dedicated authentication host. Shared or external providers still
+use their existing authorization boundary. Each registered
 verifier checks that the supplied text's hash matches the readback, runs the
 owner's script as a subprocess (JSON on stdin, JSON on stdout) to validate the
 readback and the identity the scope claims, and checks source currentness where
@@ -23,8 +26,8 @@ e2e-test-selection, test-reporting, test-requirements-analysis,
 test-architecture-design, test-management, context-signal-audit and
 context-rule-synthesis. The two context owners validate canonical batch/run
 content, consistency of supplied provider readbacks, and their completion
-contracts. Fixtures exercise this interface; they do not establish a production
-host or provider connection. For the three stored-artifact
+contracts. Fixtures exercise this interface; they do not establish the selected
+operational root, its OS permissions, or an external provider connection. For the three stored-artifact
 Skills (requirements, architecture, management) the owner script must pass
 ``validate``, ``validate_readback`` (provider readback = canonical stored text),
 ``impact`` (``current``) and ``completion_check`` (``complete``). A current
@@ -37,8 +40,9 @@ report ``approval_authenticity: "not_established_by_this_validator"``; this modu
 records the same value in every verified record and never establishes who
 approved. Approval evidence (architecture) and the source revisions are caller
 supplied; they are not re-read from the approval authority or the source provider
-here. The provider readback is likewise caller supplied and not authenticated by
-this verifier; this registry never substitutes for host authorization.
+here. The provider readback is likewise caller supplied and this verifier only
+checks its consistency; it does not establish which root was permitted or the
+authorization of an external owner.
 """
 
 from __future__ import annotations
@@ -126,6 +130,26 @@ def _evidence(scope: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(scope.get("target"), str) or not scope["target"].strip():
         raise VerificationFailed("scope_target_required")
     return value
+
+
+def _context_request(scope: dict[str, Any]) -> dict[str, Any]:
+    normalized = scope.get("normalized_input")
+    request = (
+        normalized.get("context_request") if isinstance(normalized, dict) else None
+    )
+    if not isinstance(request, dict):
+        raise VerificationFailed("context_request_missing")
+    return request
+
+
+def _context_range(value: Any) -> dict[str, Any]:
+    result = _run_owner(
+        "../scripts/context_artifacts.py",
+        {"operation": "normalize_range", "range": value},
+    )
+    if result.get("status") != "ok" or not isinstance(result.get("range"), dict):
+        raise VerificationFailed("context_range_invalid")
+    return result["range"]
 
 
 def _verify_candidates(script: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -444,8 +468,9 @@ def _stored_identity(
 def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """Validate context-owner canonical bytes and caller-supplied provider evidence.
 
-    This verifies consistency of supplied readback evidence. The trusted host must
-    obtain the readback directly from the selected provider and protect the handoff.
+    This verifies consistency of supplied readback evidence. The trusted call site
+    must obtain it directly from the selected root/store and protect the handoff.
+    A dedicated authentication host is not required for ordinary local saves.
     """
 
     def verify(scope: dict[str, Any]) -> dict[str, Any]:
@@ -498,7 +523,7 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
         if len(parts) != 2 or parts[0] != kind or not parts[1].endswith(".json"):
             raise VerificationFailed("artifact_ref_invalid")
         valid = _run_owner(
-            "project-context/scripts/context_artifacts.py",
+            "../scripts/context_artifacts.py",
             {
                 "operation": "validate",
                 "kind": kind,
@@ -508,6 +533,17 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
         if valid.get("status") != "valid" or valid.get("artifact_ref") != target:
             raise VerificationFailed("owner_verification_schema_invalid")
         if kind == "context-signal-batch":
+            context_request = _context_request(scope)
+            if set(context_request) != {
+                "workflow_ref",
+                "source_artifact_ref",
+                "source_revision",
+                "source_content_hash",
+                "requested_range",
+                "assigned_range",
+                "observation_condition",
+            }:
+                raise VerificationFailed("context_request_invalid")
             source = artifact.get("source", {})
             current = evidence["current_source"]
             if (
@@ -521,8 +557,28 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
                 != evidence["requested_source_content_hash"]
                 or current.get("artifact_ref") != source.get("artifact_ref")
                 or current.get("content_hash") != source.get("source_content_hash")
+                or not isinstance(context_request.get("workflow_ref"), str)
+                or not context_request.get("workflow_ref", "").strip()
+                or context_request.get("source_artifact_ref")
+                != evidence["requested_source_ref"]
+                or context_request.get("source_revision")
+                != current.get("source_revision")
+                or context_request.get("source_content_hash")
+                != evidence["requested_source_content_hash"]
+                or _context_range(context_request.get("requested_range"))
+                != _context_range(evidence["requested_range"])
+                or context_request.get("observation_condition")
+                != evidence["observation_condition"]
             ):
                 raise VerificationFailed("source_not_current")
+            assigned_range = _context_range(context_request.get("assigned_range"))
+            if scope.get("execution_range") != json.dumps(
+                assigned_range,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ):
+                raise VerificationFailed("execution_range_differs_from_request")
             batch_readbacks = evidence["batch_readbacks"]
             if not isinstance(batch_readbacks, list) or not batch_readbacks:
                 raise VerificationFailed("batch_readbacks_required")
@@ -559,7 +615,7 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
                 batch_readback_by_ref[batch_ref] = batch_readback
                 batch_by_ref[batch_ref] = batch
                 batch_valid = _run_owner(
-                    "project-context/scripts/context_artifacts.py",
+                    "../scripts/context_artifacts.py",
                     {
                         "operation": "validate",
                         "kind": kind,
@@ -602,16 +658,21 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
                         raise VerificationFailed("correction_target_readback_mismatch")
             if selected_range is None:
                 raise VerificationFailed("selected_batch_missing_from_readbacks")
-            expected_range = json.dumps(
-                selected_range,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
+            selected_covers_assigned = _run_owner(
+                "../scripts/context_artifacts.py",
+                {
+                    "operation": "batch_covers",
+                    "batch": batch_by_ref[target],
+                    "source_ref": evidence["requested_source_ref"],
+                    "source_content_hash": evidence["requested_source_content_hash"],
+                    "requested_range": assigned_range,
+                    "observation_condition": evidence["observation_condition"],
+                },
             )
-            if scope.get("execution_range") != expected_range:
-                raise VerificationFailed("execution_range_differs_from_batch")
+            if selected_covers_assigned.get("covers_request") is not True:
+                raise VerificationFailed("batch_does_not_cover_assigned_range")
             coverage = _run_owner(
-                "project-context/scripts/context_artifacts.py",
+                "../scripts/context_artifacts.py",
                 {
                     "operation": "batch_union_covers",
                     "batches": batches,
@@ -624,24 +685,51 @@ def _verify_context_artifact(kind: str) -> Callable[[dict[str, Any]], dict[str, 
             if coverage.get("covers_request") is not True:
                 raise VerificationFailed("batch_does_not_cover_requested_range")
         else:
+            context_request = _context_request(scope)
+            if set(context_request) != {
+                "workflow_ref",
+                "operation_input",
+                "requested_scope",
+                "target_batch_refs",
+            } or (
+                context_request.get("workflow_ref") != artifact.get("workflow_ref")
+                or context_request.get("operation_input")
+                != artifact.get("operation_input")
+                or context_request.get("requested_scope")
+                != artifact.get("requested_scope")
+                or context_request.get("target_batch_refs")
+                != artifact.get("triage_plan", {}).get("target_batch_refs")
+            ):
+                raise VerificationFailed("run_start_request_mismatch")
             if scope.get("execution_range") != "run:" + artifact.get(
                 "run_identity", ""
             ):
                 raise VerificationFailed("run_identity_differs_from_scope")
             provider_readbacks = evidence["provider_readbacks"]
-            if not isinstance(provider_readbacks, dict):
+            if not isinstance(provider_readbacks, list):
                 raise VerificationFailed("owner_verification_schema_invalid")
-            readbacks = dict(provider_readbacks)
+            readbacks = list(provider_readbacks)
             if not isinstance(readback, dict):
                 raise VerificationFailed("run_provider_readback_missing")
-            readbacks[target] = readback
+            matching_run_readbacks = [
+                item
+                for item in readbacks
+                if isinstance(item, dict)
+                and item.get("artifact_ref") == target
+                and item.get("revision") == expected_revision
+            ]
+            if matching_run_readbacks and matching_run_readbacks != [readback]:
+                raise VerificationFailed("run_provider_readback_mismatch")
+            if not matching_run_readbacks:
+                readbacks.append(readback)
             completion = _run_owner(
-                "project-context/scripts/context_artifacts.py",
+                "../scripts/context_artifacts.py",
                 {
                     "operation": "completion_check",
                     "run": artifact,
                     "root_binding": root_binding,
                     "provider_readbacks": readbacks,
+                    "run_readback_revision": expected_revision,
                 },
             )
             if (

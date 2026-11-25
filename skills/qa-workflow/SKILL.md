@@ -27,7 +27,7 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 - 別workflowのsignal・候補・Authority・回答・Knowledgeを横断する法則性分析、新機能QA開始時の再利用、重大反例や下流設計前の再評価は`context-rule-synthesis`へroutingします。A実行のたびにBを自動起動しません。
 - 両Skillの候補は仮説であり、期待仕様・正式Product Risk・テスト期待結果へ昇格させません。Authorityは`spec-analysis`、未知事項は`question-analysis`、調査は対応する既存調査ownerへ渡します。
 - モードが無効 / 未指定なら起動しません。補助モードの未設定・失敗は既存workflow完了を破壊せず、必須モードの未設定・不完全・認可不足はrequested scopeに残して該当範囲をblockedにします。単体実行も既存owner verifierと保存・認可条件を満たした範囲だけ正式完了とします。
-- A試行とB run refは既存workflow stateへ記録します。信頼済みのcontext保存・認可境界が未接続なら、正式保存・owner完了は成立せず、読み取り可能な調査だけを保存未完了として扱います。
+- A試行とB run refは既存workflow stateへ記録します。指定されたrootにOS権限でアクセスできる場合、通常保存は既存ファイル操作で行い、専用認証hostや保存ごとの承認を要求しません。root不明・書込権限不足・必要な共有/外部owner認可の不足は該当scopeだけを未完了にし、独立した調査を続けます。
 
 ## 決定論的runtime統合
 
@@ -62,9 +62,9 @@ candidate qa-workflow artifactの`verify_runtime_evidence.valid=true`とruntime 
 
 ### 新設Skillのowner verifier
 
-runtime-v2 rootを持たないSkillのscopeは、`scripts/owner_verifiers.py`に登録されたowner validatorが保存済み成果物を検証できた場合だけ、`workflow_runtime.py`が完了対象（`verified_owner_scopes`）にします。登録済みownerは`test-item-analysis`、`test-condition-analysis`（保存本文のhash、owner validator、source currentness）、`e2e-test-selection`（owner validator、保存本文のhash）、`test-reporting`（入力からの再計算との一致、完全性、currentness）です。F 3 Skillの`test-requirements-analysis`・`test-architecture-design`・`test-management`も登録済みで、canonical JSON packetの保存本文を`validate`・`validate_readback`・`impact`・`completion_check`で検証します。`context-signal-audit`はcanonical batch、current source、要求範囲に対するreadback batchの和集合を検証し、`context-rule-synthesis`はrun identity、planned candidate、直接根拠、handoffと保存readback一式を検証します。後二者の入口は渡されたreadbackとの整合性をfixtureで確認していますが、実保存先からのreadback、host認可と承認主体の真正性は未確立です。未検証・stale・未完了は完了扱いしません。
+runtime-v2 rootを持たないSkillのscopeは、`scripts/owner_verifiers.py`に登録されたowner validatorが保存済み成果物を検証できた場合だけ、`workflow_runtime.py`が完了対象（`verified_owner_scopes`）にします。登録済みownerは`test-item-analysis`、`test-condition-analysis`（保存本文のhash、owner validator、source currentness）、`e2e-test-selection`（owner validator、保存本文のhash）、`test-reporting`（入力からの再計算との一致、完全性、currentness）です。F 3 Skillの`test-requirements-analysis`・`test-architecture-design`・`test-management`も登録済みで、canonical JSON packetの保存本文を`validate`・`validate_readback`・`impact`・`completion_check`で検証します。`context-signal-audit`はcanonical batch、current source、要求範囲に対するreadback batchの和集合を検証し、`context-rule-synthesis`はrun identity、planned candidate、直接根拠、handoffと保存readback一式を検証します。新規2 ownerのverifierは渡されたreadbackの整合性を検証し、独立してproviderへ接続する機能は持ちません。通常の指定root保存はローカル実filesystem上の保存/readbackを含むテストで確認済みですが、運用rootは未指定で、共有writerと外部owner認可は未検証です。未検証・stale・未完了は完了扱いしません。
 
-証拠は`normalized_input.owner_verification`に、保存境界がhashした**保存本文そのもの（JSON文字列）**で渡します。runtimeは構造化入力を並べ替えるため、構造化データではhashの元のbytesを保てません。本文のhash、ownerのvalidator、source currentnessのどれかが確認できない、ownerのscriptが無い・失敗する、scopeのtargetと成果物のrefが違う場合は未検証のままで、自己申告の`verified`や`can_complete`は証拠になりません。登録されていないSkill（`defect-management`、`test-evaluation`、`feature-analysis`、`project-context`、`ui-target-analysis`など）はowner入口が無いため、`unverified_scopes`として完了不可のままです。fixture成功は実運用host接続の証明ではありません。
+証拠は`normalized_input.owner_verification`に、保存境界がhashした**保存本文そのもの（JSON文字列）**で渡します。runtimeは構造化入力を並べ替えるため、構造化データではhashの元のbytesを保てません。本文のhash、ownerのvalidator、source currentnessのどれかが確認できない、ownerのscriptが無い・失敗する、scopeのtargetと成果物のrefが違う場合は未検証のままで、自己申告の`verified`や`can_complete`は証拠になりません。登録されていないSkill（`defect-management`、`test-evaluation`、`feature-analysis`、`project-context`、`ui-target-analysis`など）はowner入口が無いため、`unverified_scopes`として完了不可のままです。fixtureだけでは運用rootの権限や外部owner認可を証明しません。
 保存済みv2 workflowを再開するときは、runtime-v2 rootのscopeの`current_structure_state`を従来どおり検証します。owner完了scopeは`current_structure_state=null`で、保存済みresultの`verified_owner_scopes`の記録と1対1に対応し、登録Skill、記録の`verified_artifact`（artifact_ref・artifact_revision・content_hash）、保存済み証拠の本文のsha256、targetが一致する場合だけ受理します。root以外のscopeに非nullの構造stateがある場合、rootのscopeにnullがある場合は拒否します。v1は従来の検査のままで（owner scopeのnullは従来どおり拒否）、新しい完了baselineにしません。この照合は保存された記録を信頼する境界の内側の整合性確認で、保存本文・記録・証拠を一式で偽造された場合は検出できません（残る制約）。
 
 ## 継続管理workflowの決定論的処理

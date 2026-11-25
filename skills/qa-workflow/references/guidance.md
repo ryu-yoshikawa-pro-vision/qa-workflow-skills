@@ -125,7 +125,17 @@ Project ContextのSection 12 / 13が案件の決定事項・仮定の正本owner
 
 モードは既存のrequested scope契約に従います。無効 / 未指定はA/Bを起動せず、補助モードの未設定・失敗は既存完了を維持し、必須モードは未設定・不完全・認可不足でも要求から除外せず該当範囲だけ未完了にします。単体実行も正式保存・readback・owner verifierの条件を満たす範囲だけ完了します。Aの各試行状態は既存`state.context_signal_attempts`、Bのrun refは`state.context_synthesis_run_refs`へ記録します。第4 storeや独自workflow engineは追加しません。
 
-正式保存には信頼済みhostからの案件・操作・root/kind/ref/hash/revisionに結び付いた認可、既存providerと独立readback、失効再確認が必要です。hostが未選定・未検証ならprovider選択、共有root、ownerの一意性を推測せず、read-only調査は続けても正式保存・完了は未成立として扱います。fixture verifierは実運用認可や実provider readbackを証明しません。
+#### context stateとreadback
+
+許可された指定root内の通常保存は`context_artifact_store.py`で標準filesystem操作を使います。専用認証host、保存ごとの承認、案件管理用DBは要求しません。既存OS権限で書けるrootに対する`write`、`list`、`read`、`history`を使い、更新には保存時の`expected_revision`を渡します。`write`の返却readbackに加えて同じrevisionを`read`し、ref・root binding・hash・canonical本文を照合します。conditional updateは既知のlocal filesystemに限り、filesystem条件を確認できない場合は当該更新だけをblockします。既存ownerの共有更新、外部操作、正式仕様変更には、それぞれの認可・承認・履歴・独立readbackを適用します。
+
+`context_workflow_state.py`は既存`qa.workflow_state_root/workflow-state.sqlite3`のSQLite providerを使い、providerのrevision/CAS/historyを利用します。Aの`context_signal_attempts[]`にはattempt ID、開始時operation/source/requested range、actual range、各batch ref/revision/hashと担当range、candidate check、状態、失敗理由、再開条件を記録します。Bの`context_synthesis_run_refs[]`には元の開始時operation input/requested scopeとrun ref/revision/hash、runごとの実scope/target batch、元要求への対応状況を保持します。分割runは各実scopeをsubsetとして照合し、全開始時source×scopeの対応がそろうまでmappingをincompleteにします。再開時はstateとexact artifact revisionをreadbackし、自己更新後の内容hashで開始時inputを置換しません。
+
+新しいworkflow stateは`context_workflow_state.py initialize`で既存providerへ初期化できます。JSON-onlyのlegacy stateは自動移行・上書きしません。SQLite recordがない既存JSON stateで更新要求があれば、stateだけを`legacy_json_workflow_state_update_unavailable`としてblockし、通常成果物の保存や独立分析は継続します。共有root・複数host・SQLite providerの利用可否は別に確認し、ローカルfixtureの成功を実運用providerの証拠にしません。
+
+A owner scopeの`normalized_input.context_request`は`workflow_ref`、元source ref/revision/hash、全`requested_range`、当該batchの`assigned_range`、`observation_condition`を含みます。`execution_range`はassigned rangeのcanonical JSONです。ownerは選択batchが担当範囲を包含し、独立readbackされたactive batchの和集合が元要求全域を満たすことを確認します。actual inspected rangeが要求より広いbatchも、範囲外signalを完了根拠に使わず再利用できます。
+
+B owner scopeの`normalized_input.context_request`は`workflow_ref`、開始時`operation_input` / `requested_scope`、`target_batch_refs`を含み、保存runと完全一致させます。provider readbackはrefごとの辞書ではなく`{artifact_ref, revision, sha256, content}`の配列で渡し、同一refの更新前後revisionをそれぞれ照合します。runのsnapshot、開始時入力、target batch、予定候補のbase/result、run本体を正確なrevisionで読めない場合は完了しません。fixture verifierは実運用root許可や実provider接続を証明しません。
 
 ### その他の工程固有ロジックへの依存
 

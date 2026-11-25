@@ -15,10 +15,10 @@ description: 複数workflowのcontext-signal-batch、既存候補、仕様Author
 4. snapshotへ検索root・条件・取得完全性・直接参照した全ref/revision/hash・Authority fingerprint・取得不能/除外範囲を記録します。取得不能を空検索と扱いません。
 5. sourceの独立性、訂正batch、適用scopeを照合してから、共通則と差異条件、独立仮説、支持/反例/未観察/判定不能/対象外を区別します。反例原因を特定できなければ`unclassified`を保持します。
 6. 有効SPEC/DEC/承認済みASM、回答、Knowledge、implementation evidenceと照合し、`references/guidance.md`のrouting表に従います。観察数、候補score、実装推論で有効仕様を上書きしません。
-7. 全候補の予定payload・hash・base revision/hash・関連候補前提・書込metadataを含む`in_progress` runの保存を依頼し、信頼済み境界の独立readbackを確認します。read-only調査は予定保存前に実行できます。質問・外部課題・他owner成果物などの副作用前にはhandoff intentをpendingで保存します。
-8. 条件付き保存、readback、既存ownerの冪等性は決定論的な保存/owner境界で確認します。競合後は再readbackと意味的重複確認が必要です。Skillは保存技術や認証方式を選びません。異なるrefへのCAS、事前検索、commit metadata、AIのreadback申告を重複防止や認証の証拠にしません。
+7. 全候補の予定payload・hash・base revision/hash・関連候補前提・書込metadataを含む`in_progress` runを`context_artifact_store.py`で指定rootに保存し、返却readback後に同一revisionを独立readbackします。read-only調査は予定保存前に実行できます。質問・外部課題・他owner成果物などの副作用前にはhandoff intentをpendingで保存します。
+8. candidate createはcreate-if-absent、更新は保存時に確認した`expected_revision`で条件付き更新し、historyから更新前revisionも再読取します。許可済み通常保存に専用認証hostは必要ありません。共有更新・外部操作・正式仕様変更は既存ownerの認可・承認・履歴・独立readbackを維持します。異なるrefへのCAS、事前検索、commit metadata、AIのreadback申告を重複防止や認可の証拠にしません。
 9. 保存済み予定から再開し、既保存分を当時のrevision/readbackで照合します。予定・metadata・前提が変わるなら新operation idで再計画します。run完了後のcurrentness/adoptionは、履歴上の完了と分けて最新候補・Authorityから判定します。
-10. すべての予定、readback、必要handoff、完全性を確認した後にrunを完了します。0件の場合も今回の検索を証明するrunを保存します。helper/provider/認可hostが未接続なら正式保存・完了はblockedのまま、独立して可能な読み取り・分析・owner調査は継続します。
+10. すべての予定、readback、必要handoff、完全性を確認した後にrunを完了します。0件の場合も今回の検索を証明するrunを保存します。Bの開始要求と実行scopeの対応、run ref/revisionは`context_workflow_state.py`からqa-workflowの既存stateへ保存し、再開時は同じrunと開始時inputをreadbackします。通常の許可済みroot保存に専用認証hostは要求しません。必要な共有認可・外部owner証拠が未確認の場合は該当scopeだけを未完了にし、独立して可能な読み取り・分析・owner調査は継続します。
 
 ## 判断境界
 
@@ -26,7 +26,7 @@ description: 複数workflowのcontext-signal-batch、既存候補、仕様Author
 - 実装観察のみは`INFERENCE`として保持し、正式仕様・PASS/FAILへ昇格しません。未承認回答だけで候補を解決・却下しません。
 - 同一観察の再取得、同じcomponent/document由来のsignal、訂正前後のsignalを独立根拠として重複計上しません。
 - mergeが安全にできない場合、候補を無理に統合せず独立保持します。分割先へ正式根拠・解決結果を範囲再評価なしに継承しません。
-- 信頼済みreadback証拠のないfixture成功を正式完了としません。実行環境の保存境界が未接続の場合、別の保存先へ切り替えません。
+- 信頼済みreadback証拠のないfixture成功を正式完了としません。許可rootへの通常保存は`context_artifact_store.py`で実行し、共有更新・外部操作・正式仕様変更は各ownerの既存認可境界へ渡します。
 
 ## リソース
 
@@ -35,5 +35,7 @@ description: 複数workflowのcontext-signal-batch、既存候補、仕様Author
 - 候補例: `assets/candidate-example.json`
 - run例: `assets/run-example.json`
 - 出力形式: `assets/output-template.md`
-- 共通pure contract helper: `skills/project-context/scripts/context_artifacts.py`
+- 共通pure contract helper: `scripts/context_artifacts.py`
+- 指定rootの保存・list/read/history: `scripts/context_artifact_store.py`
+- qa-workflow stateの試行・run参照: `skills/qa-workflow/scripts/context_workflow_state.py`
 - 単一sourceのsignal抽出: `skills/context-signal-audit/SKILL.md`

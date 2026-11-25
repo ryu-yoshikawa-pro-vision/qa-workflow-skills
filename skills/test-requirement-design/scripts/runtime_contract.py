@@ -395,14 +395,12 @@ def _owner_transport_paths(value: Any) -> frozenset[tuple[str | int, ...]]:
                 ):
                     paths.add(base + ("batch_readbacks", item_index, "content"))
         provider_readbacks = evidence.get("provider_readbacks")
-        if isinstance(provider_readbacks, dict):
-            for ref, readback in provider_readbacks.items():
-                if (
-                    isinstance(ref, str)
-                    and isinstance(readback, dict)
-                    and isinstance(readback.get("content"), str)
+        if isinstance(provider_readbacks, list):
+            for item_index, readback in enumerate(provider_readbacks):
+                if isinstance(readback, dict) and isinstance(
+                    readback.get("content"), str
                 ):
-                    paths.add(base + ("provider_readbacks", ref, "content"))
+                    paths.add(base + ("provider_readbacks", item_index, "content"))
 
     def visit(node: Any, path: tuple[str | int, ...]) -> None:
         if isinstance(node, dict):

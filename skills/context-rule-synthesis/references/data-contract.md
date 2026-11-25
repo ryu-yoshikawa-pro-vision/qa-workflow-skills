@@ -17,11 +17,11 @@
 
 ## context-synthesis-run
 
-`workflow_operation_id = SHA256(canonical({workflow_ref, operation_input, requested_scope}))`、`run_identity = workflow_operation_id`です。`operation_input`は`operation_type`, `input_sources[]`（artifact ref/content hash/effective Authority fingerprintの対応）, `investigation_conditions`を持ちます。要求scope・観点・environment/versionはrunの`requested_scope`に一度だけ保存し、helperは開始時の値からidentityを再計算します。rootやproject identityは含めません。開始後にidentity算出元を変更しません。
+`workflow_operation_id = SHA256(canonical({workflow_ref, operation_input, requested_scope}))`、`run_identity = workflow_operation_id`です。`operation_input`は`operation_type`, `input_sources[]`（artifact ref/source revision/content hash/effective Authority fingerprintの対応）, `investigation_conditions`を持ちます。source revisionは開始時readbackのprovenanceとして保持しますが、identityにはartifact ref/content hash/effective Authority fingerprintを使用するため、同じ内容・Authorityのrevision番号だけが変わってもoperation identityは変わりません。要求scope・観点・environment/versionはrunの`requested_scope`に一度だけ保存し、helperは開始時の値からidentityを再計算します。rootやproject identityは含めません。開始後にidentity算出元を変更しません。
 
 必須fields: `schema_version`, `artifact_ref`, `run_identity`, `workflow_ref`, `workflow_operation_id`, `operation_input`, `requested_scope`, `inspected_scope`, `scan_completeness`, `snapshot`, `triage_plan`, `result_summary`。
 
-- snapshotは`snapshot_hash`（self除外）、検索root/scope、条件、直接参照source ref/revision/content hash/authority fingerprint、取得不能一覧、除外範囲を保持します。実行中に得た根拠は開始時inputと分けて追加し、snapshot hashだけを再計算します。
+- snapshotは`snapshot_hash`（self除外）、検索root/scope、条件、直接参照source ref/revision/content hash/authority fingerprint、取得不能一覧、除外範囲を保持します。開始時`operation_input.input_sources[]`は同じref/revision/hash/authorityをsnapshotにも持ち、開始時inputとreadbackで一対一に照合します。実行中に追加した根拠は開始時inputと分けてsnapshotへ追加し、snapshot hashだけを再計算します。target batch refは開始時input sourceとsnapshotの同一revision/hashに存在しなければなりません。
 - `triage_plan.target_batch_refs`と`planned_candidate_ops`は候補全件を持ちます。各opはcandidate identity/ref、action、base hash/revision、related preconditions、operation id、planned content hash/payload、write metadata、confirmed resultを保持します。各候補payload自体もcandidate schemaでvalidateします。reuseのpayloadはnullでplanned hash=既存本文hashです。
 - `result_summary.status`は`in_progress|completed|completed_zero_changes|blocked_incomplete`です。zero reasonは`no_related_candidates|existing_candidates_sufficient|all_evidence_known|empty_search`です。partial/failed scan、予定未確認、必須handoff未解決は完了できません。
 - zero-change runも今回の要求・検索・readbackを証明するrunです。過去workflowのrunは今回の完了証拠になりません。
@@ -30,4 +30,8 @@
 
 helperは`project`でref/revision/hash・scope・状態・短い抜粋だけのprojectionを返し、`select_run_operations`で指定candidate identityのplanned payloadだけを返します。全runの候補payloadを常時AIへ渡しません。候補identity、本文hash、base revision/hash、関連候補のpreconditionが変われば同じ書込operation idを再使用しません。
 
-信頼済みhostはroot bindingに結び付いたreadbackの`artifact_ref`, `revision`, `sha256`, exact stored `content`と予定`confirmed_result`を照合します。snapshot source、候補、候補のsignal/direct evidence、resolution link、currentness dependency、質問、verified implementation evidence、confirmed handoffもそれぞれref/revision/hashを同じ実行の証拠として確認します。root bindingはcanonical JSONへ入れず、異なるrootの同じ相対refを同一成果物として扱いません。完了記録は当時の保存revisionで確認し、現在採用する候補は最新read_currentと現行Authorityでもう一度評価します。保存された自己申告だけでcompleteにしません。
+readbackは`[{artifact_ref, revision, sha256, content, kind?, root_binding?}, ...]`です。同じrefの異なるrevisionを同時に渡せます。helperは`(artifact_ref, revision)`の組で索引し、更新前baseと更新後resultを別々に照合します。run本体のreadback revisionは`run_readback_revision`として明示し、run自身の本文に含む自己申告値で代用しません。snapshot source、target batch、候補、候補のsignal/direct evidence、resolution link、currentness dependency、質問、verified implementation evidence、confirmed handoffもそれぞれref/revision/hashを同じ実行の証拠として確認します。context artifactはroot bindingとkindを確認し、異なるrootの同じ相対refを同一成果物として扱いません。完了記録は当時の保存revisionで確認し、現在採用する候補は最新read_currentと現行Authorityでもう一度評価します。保存された自己申告だけでcompleteにしません。
+
+`context_request`はowner scopeの`normalized_input`に含めます。Bでは`workflow_ref`、開始時`operation_input`、開始時`requested_scope`、`target_batch_refs`を正確にrun本文と一致させます。分割runではqa-workflow stateのrequest recordに開始時要求と各runの実scope対応を保持し、全要求source×scopeがrun集合で覆われるまでmappingをincompleteとします。
+
+指定rootへの保存・列挙・読取・履歴・conditional updateは共通の`scripts/context_artifact_store.py`で行います。通常保存はOS権限と標準filesystem操作で成立し、専用認証hostは不要です。共有rootや外部owner操作の安全条件は各owner境界で別途満たします。

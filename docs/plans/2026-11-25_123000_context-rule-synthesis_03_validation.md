@@ -4,9 +4,9 @@
 
 ## 1. 実装タスクと依存関係
 
-- [ ] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、指定root・認可/保存境界、ownerの実保存/CAS/照合点を記録。認可host未選定なら依存部分を明示し、読み取り・分析・純粋契約の実装は進める。
-- [ ] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応、64 KiB超の保存本文の搬送・再開を早期検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperを実装し、機械契約テストを追加。既存canonical規則と一致させる。
-- [ ] 指定rootの3 kindディレクトリ、list/history、相対ref/権限、条件付き保存を既存helper優先で接続。独立readback、Aのimmutable batch、Bのrun計画・保存・再開を縦に接続。実保存先で正常・競合・能力不足を確認する。特定Providerの拡張を合格条件としない。
+- [x] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、保存/認可境界、既存ownerの保存/CAS/照合点を記録。実運用root・共有writer・owner一意性の未確認範囲は依存条件として分離し、通常root保存をhost未選定扱いで停止していない。[検証記録](../implementation/pr40/verification.md)
+- [x] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応、64 KiB超の保存本文の搬送・再開を検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperと機械契約テストを実装し、既存canonical規則に合わせた。[検証記録](../implementation/pr40/verification.md)
+- [x] 指定rootを受け取る3 kindのdirectory store、list/history、相対ref、条件付き保存、独立readback、Aのimmutable batch、Bのrun保存・state記録・再開を既存ファイル/SQLite操作へ接続。隔離ローカルfilesystemの実保存先で作成、競合、履歴、symlink拒否、再開を確認した。実運用root・共有writer能力の確認は別途未完了であり、特定Provider拡張は要求しない。[検証記録](../implementation/pr40/verification.md)
 - [ ] 2 Skillの本文/参照/assetを実装し、A/Bの相互責務、横断検索、既存owner routingを接続。追加調査と質問、既存Knowledge/Authority再利用を実Agentで確認。
 - [ ] workflow routing/state/owner verifier・runtime_contractコピー、README/EVALS、各registryを同期。無効/補助/必須/単体と既存再開・依存伝播を検証。
 - [ ] trigger/deterministic/semantic/runtime/実provider・実Agent、各構成のスモークテスト後に3構成の正式比較を実施。結果に応じて本採用構成を決定し、最終構成で全受入を確認する。
@@ -15,9 +15,9 @@
 
 ### 実施状態
 
-このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。2026-11-25時点で純粋contract/helper、2 Skillの文書・evaluation fixture、workflow routing/owner verifier/runtime transportの一部を実装し、対象helper suite 24件、deterministic eval repository suite 675件、CI指定Python 3.11.18でのruntime回帰1,475件をPASSした。ローカルPython 3.12.3での全runtime suiteは環境起因のSQLite 18件とPython parser境界差1件を含むFAIL。SQLite履歴moduleの隔離tmpfsでの再実行は20件PASS。GitHubのtracked formatter/whitespace/security、Skill、semantic、deterministic、Codex Harness workflowは対象headでsuccess。詳細は検証記録を参照する。
+このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。2026-11-26のローカル作業では保存・owner contract・runtime state・runtime transportの対象unit suite 62件がPASSし、65,535/65,536/65,537 byteの3 kindを実保存からowner verifier、workflow_runtime完了、凍結結果のdownstream再開まで検証した。repository deterministic suiteは675件PASS、新規2 Skillのdeterministic output runnerは各1 eval・計6 assertions PASS、semantic datasetは39 Skill/227 cases・14 tests PASS、trigger contractは17件PASS、deterministic runnerは12件PASS、ci_handoffは28件PASS、変更後runtime全suiteはPython 3.12.3で1,495 testsすべてPASS。既存のci_handoff nesting testがPython parserのRecursionError差に依存していたため、既存runtime契約と同じ深さ64の明示拒否を追加した。追跡ファイルのRuff checkはPASS、dprint集約checkは今回対象外の既存tracked file 18件のline-ending差でexit 20だったが、今回変更したMarkdown/JSON/YAML 17 filesは個別check PASS。既存PR head `21134c96`のCIは追加実装前の結果であり、追加実装後のCIはpush後に確認する。
 
-正式保存の認可host/rootは未選定。実保存・list/history・独立readback・共有writer/CAS・Agent縦断受入/独立Judge・3構成比較は未実施またはBLOCKEDである。既存trigger runnerはClaude Code専用のため起動せず、Codex CLI 0.172.0で新規2 Skillのpositive queryを各1件、target-only条件で実行し対象`SKILL.md`読込を観測した。これはformal trigger rateではなく、実行時にproject-local configが未信頼として無効化されたためrepository Hook/execpolicyも未検証。全39 Skill同時評価は自動承認審査が対象Skill限定または宛先・送信内容の明示承認を要求して拒否したため再試行していない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
+通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較は未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。Codex等の外部サービスへのrepository data送信許可は未確定のため、formal evaluationを実行しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
 ## 2. テストの配置と受入マトリクス
 

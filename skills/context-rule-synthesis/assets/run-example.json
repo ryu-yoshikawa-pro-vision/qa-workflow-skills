@@ -6,7 +6,8 @@
       {
         "artifact_ref": "project/specifications/payment.md",
         "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "effective_authority_fingerprint": null
+        "effective_authority_fingerprint": null,
+        "source_revision": "git:example-v1"
       }
     ],
     "investigation_conditions": {
@@ -36,12 +37,20 @@
   "schema_version": "1.0",
   "snapshot": {
     "excluded_scope_notes": "No excluded scope.",
-    "referenced_sources": [],
+    "referenced_sources": [
+      {
+        "artifact_ref": "project/specifications/payment.md",
+        "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_authority_fingerprint": null,
+        "source_kind": "spec",
+        "source_revision": "git:example-v1"
+      }
+    ],
     "search_criteria": "payment refund rules, candidates and authority",
     "search_roots_and_scopes": [
       "designated context root"
     ],
-    "snapshot_hash": "b3c8986f251a8075e5ac8aacbabd24cc51dcb37a4b44e90c2b13a6adc0a23068",
+    "snapshot_hash": "01b27cf57ef340b68db5484063e13dc8eca5d9ef3530644ac108deff3a577e17",
     "unverifiable_sources": []
   },
   "triage_plan": {

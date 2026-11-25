@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tests" / "skills" / "runtime"))
 sys.path.insert(0, str(ROOT / "skills" / "qa-workflow" / "scripts"))
-sys.path.insert(0, str(ROOT / "skills" / "project-context" / "scripts"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 import context_artifacts as contracts  # noqa: E402
 import owner_verifiers  # noqa: E402
@@ -63,6 +63,64 @@ def ranged_batch(section: str) -> dict:
 
 
 class ContextOwnerVerifierTests(unittest.TestCase):
+    def test_signal_owner_reuses_a_broader_batch_for_the_requested_range(self) -> None:
+        batch = ranged_batch("SEC-1")
+        broad = {"kind": "sections", "items": ["SEC-1", "SEC-2"]}
+        batch["source"]["requested_range"] = broad
+        batch["source"]["actual_inspected_range"] = broad
+        batch["batch_identity"] = contracts.batch_identity(
+            fixtures.SOURCE_REF,
+            fixtures.SOURCE_HASH,
+            broad,
+            batch["source"]["observation_condition"],
+        )
+        batch["artifact_ref"] = contracts.artifact_ref(
+            "context-signal-batch", batch["batch_identity"]
+        )
+        contracts.validate_artifact(batch, "context-signal-batch")
+        selected = provider_readback("context-signal-batch", batch, "file-v1-1-2")
+        requested = {"kind": "sections", "items": ["SEC-1"]}
+        evidence = {
+            "stored_content": selected["content"],
+            "readback": selected,
+            "expected_revision": selected["revision"],
+            "root_binding": fixtures.ROOT_BINDING,
+            "requested_source_ref": fixtures.SOURCE_REF,
+            "requested_source_content_hash": fixtures.SOURCE_HASH,
+            "requested_range": requested,
+            "observation_condition": {"locale": "ja"},
+            "current_source": {
+                "artifact_ref": fixtures.SOURCE_REF,
+                "source_revision": "r3",
+                "content_hash": fixtures.SOURCE_HASH,
+            },
+            "batch_readbacks": [selected],
+        }
+        scope = {
+            "skill": "context-signal-audit",
+            "target": batch["artifact_ref"],
+            "execution_range": json.dumps(
+                requested, sort_keys=True, separators=(",", ":")
+            ),
+            "normalized_input": {
+                "owner_verification": evidence,
+                "context_request": {
+                    "workflow_ref": "workflow-test-2",
+                    "source_artifact_ref": fixtures.SOURCE_REF,
+                    "source_revision": "r3",
+                    "source_content_hash": fixtures.SOURCE_HASH,
+                    "requested_range": requested,
+                    "assigned_range": requested,
+                    "observation_condition": {"locale": "ja"},
+                },
+            },
+        }
+
+        verified = owner_verifiers.VERIFIERS["context-signal-audit"](scope)
+
+        self.assertEqual(verified["artifact_ref"], batch["artifact_ref"])
+        self.assertNotEqual(batch["source"]["actual_inspected_range"], requested)
+
     def test_signal_owner_accepts_two_readbacks_covering_one_requested_range(
         self,
     ) -> None:
@@ -90,11 +148,28 @@ class ContextOwnerVerifierTests(unittest.TestCase):
             "skill": "context-signal-audit",
             "target": first["artifact_ref"],
             "execution_range": json.dumps(
-                first["source"]["actual_inspected_range"],
+                {"kind": "sections", "items": ["SEC-1"]},
                 sort_keys=True,
                 separators=(",", ":"),
             ),
-            "normalized_input": {"owner_verification": evidence},
+            "normalized_input": {
+                "owner_verification": evidence,
+                "context_request": {
+                    "workflow_ref": "workflow-test-1",
+                    "source_artifact_ref": fixtures.SOURCE_REF,
+                    "source_revision": "r3",
+                    "source_content_hash": fixtures.SOURCE_HASH,
+                    "requested_range": {
+                        "kind": "sections",
+                        "items": ["SEC-1", "SEC-2"],
+                    },
+                    "assigned_range": {
+                        "kind": "sections",
+                        "items": ["SEC-1"],
+                    },
+                    "observation_condition": {"locale": "ja"},
+                },
+            },
         }
 
         verified = owner_verifiers.VERIFIERS["context-signal-audit"](scope)
@@ -131,7 +206,21 @@ class ContextOwnerVerifierTests(unittest.TestCase):
                 sort_keys=True,
                 separators=(",", ":"),
             ),
-            "normalized_input": {"owner_verification": evidence},
+            "normalized_input": {
+                "owner_verification": evidence,
+                "context_request": {
+                    "workflow_ref": "workflow-test-1",
+                    "source_artifact_ref": fixtures.SOURCE_REF,
+                    "source_revision": "r3",
+                    "source_content_hash": fixtures.SOURCE_HASH,
+                    "requested_range": {
+                        "kind": "sections",
+                        "items": ["SEC-1", "SEC-2"],
+                    },
+                    "assigned_range": first["source"]["actual_inspected_range"],
+                    "observation_condition": {"locale": "ja"},
+                },
+            },
         }
         with self.assertRaisesRegex(
             owner_verifiers.VerificationFailed, "batch_does_not_cover"
@@ -178,7 +267,18 @@ class ContextOwnerVerifierTests(unittest.TestCase):
         )
         scope.update(
             target=corrected["artifact_ref"],
-            normalized_input={"owner_verification": evidence},
+            normalized_input={
+                "owner_verification": evidence,
+                "context_request": {
+                    "workflow_ref": "workflow-test-1",
+                    "source_artifact_ref": fixtures.SOURCE_REF,
+                    "source_revision": "r3",
+                    "source_content_hash": fixtures.SOURCE_HASH,
+                    "requested_range": first["source"]["actual_inspected_range"],
+                    "assigned_range": first["source"]["actual_inspected_range"],
+                    "observation_condition": {"locale": "ja"},
+                },
+            },
         )
         with self.assertRaisesRegex(
             owner_verifiers.VerificationFailed, "correction_target_readback"
@@ -189,18 +289,34 @@ class ContextOwnerVerifierTests(unittest.TestCase):
         run = fixtures.build_run()
         run_content = canonical_text(run)
         run_readback = provider_readback("context-synthesis-run", run, "sqlite:r1")
+        source_readback = {
+            "kind": "spec",
+            "root_binding": fixtures.ROOT_BINDING,
+            "artifact_ref": fixtures.SOURCE_REF,
+            "revision": "r3",
+            "sha256": fixtures.SOURCE_HASH,
+            "content": fixtures.SOURCE_CONTENT,
+        }
         evidence = {
             "stored_content": run_content,
             "readback": run_readback,
             "expected_revision": run_readback["revision"],
             "root_binding": fixtures.ROOT_BINDING,
-            "provider_readbacks": {run["artifact_ref"]: run_readback},
+            "provider_readbacks": [source_readback],
         }
         scope = {
             "skill": "context-rule-synthesis",
             "target": run["artifact_ref"],
             "execution_range": "run:" + run["run_identity"],
-            "normalized_input": {"owner_verification": evidence},
+            "normalized_input": {
+                "owner_verification": evidence,
+                "context_request": {
+                    "workflow_ref": run["workflow_ref"],
+                    "operation_input": run["operation_input"],
+                    "requested_scope": run["requested_scope"],
+                    "target_batch_refs": run["triage_plan"]["target_batch_refs"],
+                },
+            },
         }
 
         verified = owner_verifiers.VERIFIERS["context-rule-synthesis"](scope)
