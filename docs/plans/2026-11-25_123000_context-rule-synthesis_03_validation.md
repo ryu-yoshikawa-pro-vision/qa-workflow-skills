@@ -5,7 +5,7 @@
 ## 1. 実装タスクと依存関係
 
 - [ ] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、配置・認可経路、ownerの実保存/CAS/照合点を記録。認可host未選定なら依存部分を明示し、読み取り・分析・純粋契約の実装は進める。
-- [ ] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応を早期検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperを実装し、機械契約テストを追加。既存canonical規則と一致させる。
+- [ ] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応、64 KiB超の保存本文の搬送・再開を早期検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperを実装し、機械契約テストを追加。既存canonical規則と一致させる。
 - [ ] artifact_store/git_artifact_storeに3 kind、list/history、path/認可、native CASを追加。host入口、独立readback、Aのimmutable batch、Bのrun計画・保存・再開を縦に接続。実providerで正常・競合を確認。
 - [ ] 2 Skillの本文/参照/assetを実装し、A/Bの相互責務、横断検索、既存owner routingを接続。追加調査と質問、既存Knowledge/Authority再利用を実Agentで確認。
 - [ ] workflow routing/state/owner verifier・runtime_contractコピー、README/EVALS、各registryを同期。無効/補助/必須/単体と既存再開・依存伝播を検証。
@@ -30,7 +30,7 @@
 
 - [ ] 実SQLiteと実Git repo/refそれぞれで3 kindの作成・一覧・履歴・readback・失敗・再開。既存2 kindの回帰、別案件/別kind/別root/別clone、symlink・非blob/非canonical ref、権限/失効、CAS未選択・自己申告認可・ダミーauthorize拒否。正式変更承認とQA書込み認可の分離。
 - [ ] 2 workflowの同時handoffとowner CAS競合後の意味的再確認、既存ref reuse、結果不明の冪等未保証操作を停止。正常な異なるscopeは継続。
-- [ ] 実SQLiteの関連revision照合付きnative transactionと実Gitのcandidate branch CASで、通常の統合/分割が成立することを確認。候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。
+- [ ] 実SQLiteの関連revision照合付きnative transactionと実Gitのcandidate branch CASで、通常の統合/分割が成立することを確認。候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。SQLiteでは本文不変でも継承先・関連候補の前提revision/hash変更後に同じoperation_idを使うと拒否され、新IDで再照合後に成立すること、完全同一再送は既存receiptを再利用することを確認。
 - [ ] B runのin_progress保存後、候補1件目/途中/全件後、handoff後、保存成功readback失敗の各中断点でplanned_payload/hash/metadataから再開。再認可・CAS競合で変更した新操作と完全再送を区別。Gitはkind別branchを使用し、Aのbatch保存・Bのrun保存でcandidate branch HEADが進まないこと、同kindの自前保存によるHEAD進行で不要な自己競合が起きないことを確認。別kind/外部ownerの依存変化は完了・採用前に検知し再評価し、後続commit後も実readbackで復元。新規createの確認時HEAD条件もテスト。
 - [ ] 永続handoff前のpending/反映意図保存、owner側成功直後かつ結果記録前の中断、再認可・再開・並行実行時のsemantic_handoff_key/実owner照合で二重質問・二重課題作成を防ぐ。読み取り専用調査に事前保存を強制しない。
 - [ ] 実運用hostの認証済み発行・認可・失効・実provider readback・workflow証拠受渡しを確認。fixture callbackと実hostを別判定し、PR #38のuser-confirmed自己申告を認証済みとしない。Section 14/12と実host設定の配置・承認・共有境界の一致、別DB・別clone・別branch、kind/owner不一致、未設定や置換された配置方針を確認する。
@@ -42,6 +42,8 @@
 - [ ] 対象batch/候補/既存成果物が増えたfixtureで軽量投影→本文の選択取得が機能し、同義概念や属性不足を機械的に除外せず、全本文をAI入力にしない。runの未完了予定・個別payloadの選択読取と必要時の分割、保存サイズ/読取tokenを記録する。
 - [ ] 自分の候補更新のconfirmed hashと外部更新の区別、独立支持・新規反例/取得可能化/Authority失効・置換/環境build権限/Entity変更で再評価。分析中反例追加は旧runを履歴として保持、質問省略/PASS/FAILに採用しない。同一観察再取得は独立根拠に数えない。
 - [ ] Bの開始時のrun identity/snapshotを自己更新後も復元し、同一operationの中断・完全再送は新runを作らない。別workflowで補助実行のスキップと必須実行の0件runを区別し、過去の分析結果を今回の完了証拠に偽装しない。外部変更は該当範囲のみ再評価する。
+- [ ] runに保存したworkflow_ref・開始時入力からidentityを独立再計算し、state記録前の中断でも同一workflowのrunを特定する。別workflow/別要求の誤再開、算出元欠落・改変を拒否する。同一runの途中で追加調査・owner連携から取得した根拠をsnapshotへ追加し、snapshot_hash・予定・最終結果を更新しても開始時identityが変わらず、全直接参照根拠を復元できる。古い根拠を現在有効な根拠として誤採用しない。
+- [ ] 共通候補を更新する分割runは先行run完了・readback後に後続snapshotを取得し、不要な自己競合を避ける。独立runと別workflowの並行実行、共通候補への途中の外部更新では既存CAS・再照合で整合する。
 - [ ] 却下された範囲以外は再評価し、個別の必要質問を維持。deferred論点の合否必須化や一時障害解消をrevision不変でも検知する。過去回答のscope/revision/承認状態の変化を検知する。
 
 ### D. 意味品質・owner・変更伝播（設計13.2 D）
@@ -56,6 +58,7 @@
 - [ ] 無効/無指定でA/B呼出し・保存なし、補助not_configured/失敗で既存完了維持、必須未設定をscopeから除外せずblocked、単体実行。複数入力全件とB全予定集合・実readback・取得完全性・引継ぎ成立を確認。未回答でも調査/質問の到達確認が成立すれば分析完了可能。
 - [ ] owner CLIの保存本文/target/hash/revision/identity/範囲検証、未登録/偽造証拠・今回の取得不完全・未完了・必須handoff pendingを拒否、v2保存済みworkflowの再開、既存v1互換・runtime copy同期。現行scope完了判定を弱めない。
 - [ ] Aの複数要求・Bの要求について開始時hash未確定でも要求を保持し、仮targetの重複・誤完了を防ぎ、取得後の実batch/run refへ対応付ける。広い既存batchを複数要求で再利用する場合も全要求を個別に確認する。複数部分batchの和集合および複数run分割が全要求を満たす場合と不足する場合、対応の消失、異なるhash/観測条件の混在を検証する。要求の消失・未確定入力の無断除外・範囲縮小・別refへのすり替え・並行更新・再開時の元要求不一致を検知し、他の正当なscopeを継続する。
+- [ ] 64 KiB未満・境界・超過の正常なcanonical成果物（日本語・JSONエスケープ、A batch・B run・候補本文を含む）を実SQLite/Gitへ保存し、独立readback、owner verifier、workflow_runtimeの正式完了、downstream_stateの凍結済みinput/resultからの再開まで検証する。複数scopeの集約サイズ、通常入力・集約入力・provider・owner subprocessの上限も確認。本文のhash/revision/target改変、任意文字列や未登録ownerへの例外拡大、本文内の不正JSON・深さ/サイズ超過、許可外参照を拒否し、従来の制限とv1/v2互換を維持する。搬送上限を超える場合は切捨てやscopeの省略をせず該当操作を未完了とし、他scopeは継続する。
 - [ ] 全metadata/本文/ログ/Git履歴/評価fixtureにsecret・PIIを混入させない。悪意ある資料内命令を実行しない。過去回答のscope/revision/承認状態を確認し、別scope・失効済み・未承認回答の誤転用による質問省略や正式仕様確定を防止する。既存単体・複合workflowの結果/再開/変更伝播が回帰しない。
 
 ## 3. CI・独立検証手順

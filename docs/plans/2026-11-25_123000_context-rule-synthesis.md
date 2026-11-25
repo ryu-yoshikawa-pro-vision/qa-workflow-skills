@@ -21,9 +21,9 @@
 ## 原設計からの具体化・変更
 
 - 取得完全性は初回保存と今回要求で分離。構造化範囲と複数batchの照合、元要求と実成果物scopeの対応を定義する。鮮度フラグはrevalidation_requiredに統一（01 §2・3、02 §5）。
-- GitはPR #38に合わせ案件・kind別branchへ変更。SQLiteは既存native transaction内の関連revision照合を追加。別kindの保存順序はrunとreadbackで証明し、branch間atomicityは要求しない（01 §1・4）。
-- Bの開始時入力・run識別を固定し、永続的handoffの前に反映意図を記録。全文planned_payloadは復元用に維持し、helperによる選択読取・必要時の範囲分割で負荷を抑える（01 §3・4、02 §3・4）。
-- 認可入口は信頼されたPython接続契約を使用。利用hostと認可能力の実確認は正式保存の着手条件。既存ownerのAuthorityや認可水準は変えない（01 §1）。
+- GitはPR #38に合わせ案件・kind別branchへ変更。SQLiteは既存native transaction内の関連revision照合を追加。別kindの保存順序はrunとreadbackで証明し、branch間atomicityは要求しない。再送fingerprintの構成要素が変われば新operation_idを用いる（01 §1・4）。
+- Bはworkflow_refとidentity算出元の開始時入力をrunに保持する。実行中に取得した根拠はsnapshotへ追加し、開始時入力と分ける。永続的handoffの前に反映意図を記録し、共通候補を更新する分割runは直列を基本とする。全文planned_payloadは復元用に維持し、helperによる選択読取・必要時の範囲分割で負荷を抑える（01 §2〜4、02 §3・4）。
+- 認可入口は信頼されたPython接続契約を使用。利用hostと認可能力の実確認は正式保存の着手条件。既存ownerのAuthorityや認可水準は変えない。64 KiBのJSON文字列上限と保存本文の受渡し・再開の整合を実装初期に検証し、必要な経路だけを修正する（01 §1、02 §5、03 §1・2）。
 - 効率評価は導入前比120%の最大入力token上限と2 Skillの対1 Skill削減を両立させ、既存比較器の判定と本Planの採用判定を分離する。正式比較前にスモークテストを行う（03 §4）。
 
 ## 設計要件と検証の対応
@@ -48,6 +48,7 @@
 - [git_artifact_store.py](../../skills/project-context/scripts/git_artifact_store.py): _identityにも独立した2種制限。_assert_ownerはpathの最終変更commitの件名・案件trailerを検査。_head / writeはbranch HEAD、update-refの旧SHAをnative CASに使う。same_operationはHEADのmessageを見るため後続commit後は独立readbackが必要。現行providerはローカルrefであり遠隔共有CASを自動保証しない。
 - [project_context.py](../../skills/project-context/scripts/project_context.py): persist_preparedはproject-context専用、CLIのhandleには認証済み保存入口がない。prepare_placementでSection 12/14の方針を扱い、外部の信頼済み認可が必要。
 - [owner_verifiers.py](../../skills/qa-workflow/scripts/owner_verifiers.py): _stored_owner_artifactはcanonical JSON文字列、hash、target、owner CLIのvalidate/validate_readbackを照合する。providerを自ら読まない。[runtime_contract.py](../../skills/qa-workflow/scripts/runtime_contract.py)のOWNER_VERIFIED_SKILLSと登録集合が一致する。workflow_runtimeのscopeはskill/target/execution_rangeで識別し、非runtime-v2 ownerのcurrent_structure_stateはnull。downstream_stateの再開契約も維持。
+- [runtime_contract.py](../../skills/qa-workflow/scripts/runtime_contract.py)のstrict_loadsは通常入力2 MiB、集約入力16 MiB、個別JSON文字列64 KiB。verify_runtime_evidenceの例外はartifact_markdown/previous_artifact_markdownのトップレベル文字列のみ。downstream_state.pyの_check_treeにも64 KiB制限がある。両保存providerの本文上限は16 MiB、owner_verifiers._run_ownerの出力上限は8 MiB。保存できるサイズと完了・再開で搬送できるサイズは異なる（02 §5）。
 - [qa-workflow](../../skills/qa-workflow/SKILL.md)は要求集合v2、局所blocked、既存入力revision再利用を持つ。補助工程は要求scopeに加えない。workflow stateはworkflow_refごとの既存envelope、local exact-content tokenだけではCASではない。
 - [knowledge_runtime.py](../../skills/qa-knowledge/scripts/knowledge_runtime.py)にはread_root_entries、scan_knowledge_root、lookup/lookup_root、compare_currentness、plan_create/update/replacementがある。lookupはscope一致が必要。既存Knowledgeの適用規則は緩めない。
 - [workflow_efficiency.py](../../scripts/skills/evals/workflow_efficiency.py)は5シナリオ、2群のschema。最大1ターン入力token・重複質問の計測は別評価にする。
@@ -73,7 +74,7 @@
 
 ## 実装順序
 
-1. 最新差分、配置・認可host、既存CI baseline、ownerの意味的冪等照合を確認。既存runtimeによる仮target・複数batch・再開の検証を最初に行い、比較条件を事前固定。
+1. 最新差分、配置・認可host、既存CI baseline、ownerの意味的冪等照合を確認。既存runtimeによる仮target・複数batch・再開、64 KiB超の成果物本文の受渡しとサイズ上限の検証を最初に行い、比較条件を事前固定。
 2. 3成果物のcanonical契約、identity、純粋検証・fixture、providerの列挙/履歴/保存入口を実装。実host未接続なら接続部分のみ保留。
 3. Aの抽出・不変バッチとworkflow試行state、Bの検索・帰納・候補/run保存・再開を接続。
 4. 既存ownerへの調査/質問/確定知識のhandoff、鮮度・変更伝播、workflowの補助/必須/単体実行・verifierを接続。
