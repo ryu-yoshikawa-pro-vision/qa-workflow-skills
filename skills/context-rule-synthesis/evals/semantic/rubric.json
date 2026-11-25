@@ -1,0 +1,65 @@
+{
+  "skill": "context-rule-synthesis",
+  "criteria": [
+    {
+      "id": "SEM-CRS-LAW",
+      "title": "共通法則と差異条件",
+      "description": "共通観察から法則とscope/role/environment/version等の差異条件を分け、局所仕様を過一般化しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-HYPOTHESIS",
+      "title": "独立した競合仮説",
+      "description": "競合説明を別候補として保持し、相互関係・独立根拠・反例を比較する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-EVIDENCE",
+      "title": "証拠分類と独立性",
+      "description": "5種のevidence_type、support/counterexample/indeterminate/out_of_scope、6種のcounterexample_classificationとunclassifiedを正しく使い、同一観察を重複加算しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-SCOPE",
+      "title": "適用範囲・部分解決",
+      "description": "未観測rangeと部分coverageを明示し、候補ごとに解決状態を分け、一部だけを安全にresolveする。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-AUTHORITY",
+      "title": "Authorityとconformance",
+      "description": "有効SPEC/DEC/承認済みASMを既存ownerで確認し、conforms/confirmed_mismatch/unverifiedを区別する。候補はAuthorityにならない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-ROUTING",
+      "title": "owner routingと質問",
+      "description": "未解決仕様はUNKNOWN/Q owner、調査は調査owner、confirmed defectだけdefect ownerへ渡し、同一質問・Knowledge重複を避ける。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-CURRENTNESS",
+      "title": "currentness・再評価",
+      "description": "Authority、source、Environment、回答承認、Entity、訂正版等の変化だけを該当範囲へ伝播し、履歴runと現在の採用可能性を分ける。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-RUN",
+      "title": "run identity・再開・完了",
+      "description": "開始時入力からidentityを再計算し、planned payload・exact readbacks・handoffの成立を確認。0件完了、未実行、未完了を区別する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-TRUST",
+      "title": "認可と保存境界",
+      "description": "provider・root・認可を自己申告せず、fixtureまたはcandidate statusのみで保存・認可済み・完了と主張しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CRS-DOWNSTREAM",
+      "title": "変更伝播の境界",
+      "description": "候補更新だけでテスト設計をstaleにせず、正式Authority・承認済みcontext・Product Riskの変更は既存依存経路へ渡す。",
+      "critical": false
+    }
+  ]
+}

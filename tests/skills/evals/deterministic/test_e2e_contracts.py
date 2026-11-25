@@ -2726,8 +2726,8 @@ class E2EContractTests(unittest.TestCase):
         )
         cases = json.loads(cases_path.read_text(encoding="utf-8"))
         candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-        self.assertEqual(len(cases), 83)
-        self.assertEqual(len(candidates), 83)
+        self.assertEqual(len(cases), 87)
+        self.assertEqual(len(candidates), 87)
         self.assertEqual(
             {case["id"] for case in cases},
             {candidate["id"] for candidate in candidates},

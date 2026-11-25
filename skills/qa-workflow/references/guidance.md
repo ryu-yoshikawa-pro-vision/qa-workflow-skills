@@ -45,6 +45,8 @@
 - `e2e-test-selection`
 - `feature-analysis`
 - `project-context`
+- `context-signal-audit`
+- `context-rule-synthesis`
 - `test-architecture-design`
 - `test-condition-analysis`
 - `test-evaluation`
@@ -68,6 +70,8 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | 工程固有ロジック                                            | 担当Skill                    |
 | ----------------------------------------------------------- | ---------------------------- |
 | 案件Project Context / 成果物配置・編集方針の合意            | `project-context`            |
+| 単一sourceから中立signalを抽出・訂正・再利用                | `context-signal-audit`       |
+| 複数workflowの横断法則・差異条件・候補run                   | `context-rule-synthesis`     |
 | 製品機能ID / 情報源母集団 / 開発差分分類                    | `feature-analysis`           |
 | 現在有効な仕様根拠の解決                                    | `spec-analysis`              |
 | UI構造・画面・操作・状態・遷移、human editing               | `ui-target-analysis`         |
@@ -110,6 +114,18 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 `qa-workflow`自身は、SPEC / DECISION / ASMの優先関係、バージョン選択、情報源優先順位、仕様根拠の競合解消を行いません。
 
 Project ContextのSection 12 / 13が案件の決定事項・仮定の正本ownerである場合、DEC / ASMのstable IDと履歴は`project_context_ids.py`でmaterialize / validate-historyします。別の正本ownerが明示されている場合はProject Contextへ複製・再採番しません。runtime-v1からの移行順序、UI target package migration、scope ownership normalizationの次工程は`migration_preflight.py`のstatusと`cutover_next_action`を正本とし、Agentがartifact versionやscope readinessから再判断しません。
+
+### 横断コンテキスト分析
+
+単一のsourceから後のworkflowでも参照する中立な観察事実を抽出する要求、範囲確定済みbatchの再利用、一次情報で確認した抽出漏れ・誤抽出の訂正は`context-signal-audit`へroutingします。1回のA実行は単一sourceに限定し、別sourceや候補を横断した法則判断はしません。
+
+複数workflowのsignal・既存候補・Authority・回答・調査・Knowledgeの横断検索と分析、新機能QA開始時の再利用、重大な反例・競合、下流設計や仕様根拠を確定する直前の未処理signal確認、明示的な法則分析要求は`context-rule-synthesis`へroutingします。通常のA実行ごとには起動しません。complete 0件batchだけでBを起動せず、必須または明示要求のB実行が変更0件でも`completed_zero_changes` runとreadbackで今回の分析を区別します。
+
+候補は独立仮説として保存し、正式仕様・Product Risk・テスト期待結果にはしません。Authorityの有効性は`spec-analysis`、未解決の仕様質問は`question-analysis`、実対象の調査は既存の`exploratory-testing`や適切なinspection ownerへ戻します。過去回答はQ / UNKNOWN、scope、revision、承認状態と現行Authorityをownerで確認し、回答受領だけで候補を解決しません。Knowledge・Risk・Project Context・defectは各既存ownerのread/lookup、意味的重複確認、承認経路、保存/readbackを使います。
+
+モードは既存のrequested scope契約に従います。無効 / 未指定はA/Bを起動せず、補助モードの未設定・失敗は既存完了を維持し、必須モードは未設定・不完全・認可不足でも要求から除外せず該当範囲だけ未完了にします。単体実行も正式保存・readback・owner verifierの条件を満たす範囲だけ完了します。Aの各試行状態は既存`state.context_signal_attempts`、Bのrun refは`state.context_synthesis_run_refs`へ記録します。第4 storeや独自workflow engineは追加しません。
+
+正式保存には信頼済みhostからの案件・操作・root/kind/ref/hash/revisionに結び付いた認可、既存providerと独立readback、失効再確認が必要です。hostが未選定・未検証ならprovider選択、共有root、ownerの一意性を推測せず、read-only調査は続けても正式保存・完了は未成立として扱います。fixture verifierは実運用認可や実provider readbackを証明しません。
 
 ### その他の工程固有ロジックへの依存
 

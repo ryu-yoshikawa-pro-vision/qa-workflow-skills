@@ -13,6 +13,8 @@ from .result import EvalResult
 CANONICAL_SKILLS = {
     "qa-workflow",
     "project-context",
+    "context-signal-audit",
+    "context-rule-synthesis",
     "feature-analysis",
     "spec-analysis",
     "ui-target-analysis",

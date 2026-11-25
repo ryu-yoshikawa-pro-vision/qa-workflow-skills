@@ -1,0 +1,54 @@
+{
+  "artifact_ref": "context-signal-batch/87831ca679c3b7565c49a8158fac7bf1152dde004fc198d519715e0f28f69f6a.json",
+  "batch_identity": "87831ca679c3b7565c49a8158fac7bf1152dde004fc198d519715e0f28f69f6a",
+  "candidate_check": {
+    "status": "checked_no_conflict",
+    "triggered_candidate_identities": []
+  },
+  "scan_completeness": "complete",
+  "schema_version": "1.0",
+  "signals": [
+    {
+      "cross_cutting_attributes": {
+        "channel": "web",
+        "operation": "refund"
+      },
+      "environment_and_versions": [
+        {
+          "environment": "staging",
+          "version_constraint": "v1"
+        }
+      ],
+      "evidence_type": "spec",
+      "fact_summary": "Refund requests are accepted for eligible purchases.",
+      "independence_group": "spec:payment",
+      "observation_locator": {
+        "item": "refund-window",
+        "section_id": "SEC-1"
+      },
+      "signal_content_hash": "1e60198745dc359b85db47e924a5674e6828533c08f446ac7010aaac48ef74a9",
+      "signal_identity": "3eb29812c171b9e0686fd0b7373fef062c2bde12f6d9b1d83fef81ada555db80"
+    }
+  ],
+  "source": {
+    "actual_inspected_range": {
+      "items": [
+        "SEC-1"
+      ],
+      "kind": "sections"
+    },
+    "artifact_ref": "project/specifications/payment.md",
+    "observation_condition": {
+      "locale": "ja"
+    },
+    "requested_range": {
+      "items": [
+        "SEC-1"
+      ],
+      "kind": "sections"
+    },
+    "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "r3"
+  },
+  "workflow_operation_id": "7953375a7f2652f51631392454ef5f310e1adeee18cb852ae508b63aad859f06"
+}

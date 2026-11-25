@@ -2,7 +2,7 @@
 
 - 基準: main `a37b15508dadd17ac0228ac896badb71d6a8f2c7`（2026-11-25確認、添付「QAワークフロー 詳細設計書：横断的法則性抽出・コンテキスト補完（基本設計確定版）」と一致）
 - 実装branch: `feat/context-rule-synthesis`
-- 状態: Plan作成済み・実装未着手。実装と受入を同一branchで行う。
+- 状態: 実装とローカル検証を一部実施。受入未完了。認可host/root未選定のため実保存・Agent縦断受入・独立Judge・3構成実測は未実施。新規SkillのCodex CLI positive trigger smoke 2件は観測したがformal評価ではない。実績と13.2対応は[PR #40検証記録](../implementation/pr40/verification.md)を参照し、残件を完了扱いしない。
 - [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は保存のみで実装対象外。添付原文は[保存時commitの文書](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/799b776b4708a3b97aa6a6fc018212d00ac15d09/docs/plans/2026-11-25_123000_context-rule-synthesis_design.md)（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0、Git blob: ec436defa085308b90cd7688d375c5730ecb55c5）で保持する。直前の書式整形版（Git blob: c642c87948acf8e8da0f756f849761d596b17de3）は履歴に保持する。今回の利用者決定により保存・責務・identityに関する設計を変更した。原文・旧設計は履歴参照とし、変更後の基本設計と詳細Planを実装の正本とする。詳細な例・表・JSON例も実装・検証の参照先とする。
 - 本Planは基本設計の具体化。以下のレビューで合意した具体化は原文の対応箇所より優先する。他の設計要件は省略しない。
 
@@ -92,4 +92,4 @@
 4. 既存ownerへの調査/質問/確定知識のhandoff、鮮度・変更伝播、workflowの補助/必須/単体実行・verifierを接続。
 5. 評価・ドキュメント・実provider/Agent受入・全回帰、各構成のスモークテスト後に3構成の正式比較を実施。結果による構成変更も本branchで検証する。
 
-03の受入条件すべてを独立に確認する。計測不能・未接続・失敗はPASSにしない。既存の未達はbaselineと今回の差を区別して報告する。今回のPlan作成ではコードやCI実行、実host認可、性能計測は行っていない。
+03の受入条件すべてを独立に確認する。計測不能・未接続・失敗はPASSにしない。既存の未達はbaselineと今回の差を区別して報告する。現時点では独立helper/owner/transport契約・Skill文書と評価fixture・一部runtime変更を実装し、host依存・実Agent・Judge・構成比較は未完了。最新結果を検証記録に同期し、全受入が終わるまで本Planを完了にしない。

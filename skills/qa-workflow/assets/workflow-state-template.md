@@ -23,6 +23,8 @@
     "overall_state": "実行中",
     "started_source_refs": [],
     "knowledge_entry_refs": [],
+    "context_signal_attempts": [],
+    "context_synthesis_run_refs": [],
     "project_context_ref": "",
     "project_context_revision": "",
     "used_project_context_fields": [
@@ -52,6 +54,8 @@
 | Skill                       | 対象 / 実行範囲                                                       | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
 | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
 | project-context             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| context-signal-audit        | 単一sourceのsignal抽出 / 訂正 / 再利用                                | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| context-rule-synthesis      | 横断検索 / 候補分析 / 再評価run                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | feature-analysis            |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | spec-analysis               |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | ui-target-analysis          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
