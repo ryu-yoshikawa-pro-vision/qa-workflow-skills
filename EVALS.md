@@ -198,10 +198,10 @@ Pairwiseフィクスチャでは、2-wiseカバレッジ計算の前に生成組
 
 Agent実行と出力保存は評価プログラムの責務外です。
 
-`test-execution`のdeterministic evalはMarkdown内の実行前YAMLを`yaml.safe_load`で検証します。依存は評価環境だけで`PyYAML==6.0.3`を使用し、Skill runtimeや今回run用Playwrightコードの依存にはしません。ローカルでdeterministic evalを実行する場合は、評価用環境へ次を入れてください。
+`test-execution`のdeterministic evalはMarkdown内の実行前YAMLを`yaml.safe_load`で検証します。PyYAMLは`requirements-dev-evals.txt`で固定し、評価環境だけに導入します。Skill runtimeや今回run用Playwrightコードの依存にはしません。ローカルでdeterministic evalを実行する場合は、評価用環境へ次を入れてください。
 
 ```bash
-python -m pip install "PyYAML==6.0.3"
+python -m pip install -r requirements-dev-evals.txt
 ```
 
 ```bash

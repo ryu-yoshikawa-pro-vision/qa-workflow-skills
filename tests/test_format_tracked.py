@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import os
 import subprocess
 import tempfile
@@ -40,24 +41,39 @@ class FormatterInvocationTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp(prefix="formatter fixture with spaces "))
         self.ruff_config = self.root / "ruff.toml"
         self.dprint_config = self.root / "dprint.json"
+        self.write_ruff_requirement()
+
+    def write_ruff_requirement(self, version: str = "0.16.8") -> None:
+        (self.root / "requirements-dev-lint.txt").write_text(
+            f"ruff=={version}\n", encoding="utf-8"
+        )
 
     def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self.root)
 
-    def run_with_paths(self, command: str, paths: list[str], side_effect):
+    def run_with_paths(
+        self,
+        command: str,
+        paths: list[str],
+        side_effect,
+        ruff_output: str = "ruff 0.16.8\n",
+    ):
+        def runner(args, input_text=None):
+            if args == ["ruff", "--version"]:
+                return completed(args, ruff_output)
+            return side_effect(args, input_text)
+
         with (
             patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
             patch.object(format_tracked, "RUFF_CONFIG", self.ruff_config),
             patch.object(format_tracked, "DPRINT_CONFIG", self.dprint_config),
             patch.object(format_tracked, "tracked_paths", return_value=paths),
-            patch.object(
-                format_tracked, "run_process", side_effect=side_effect
-            ) as runner,
+            patch.object(format_tracked, "run_process", side_effect=runner) as calls,
         ):
             result = format_tracked.execute(command)
-        return result, runner
+        return result, calls
 
     def test_every_ruff_command_uses_absolute_root_config_and_explicit_paths(
         self,
@@ -79,7 +95,7 @@ class FormatterInvocationTests(unittest.TestCase):
                 ruff_calls = [
                     call.args[0]
                     for call in runner.call_args_list
-                    if call.args[0][0] == "ruff"
+                    if call.args[0][0] == "ruff" and call.args[0][1] != "--version"
                 ]
                 self.assertTrue(ruff_calls)
                 for args in ruff_calls:
@@ -97,6 +113,144 @@ class FormatterInvocationTests(unittest.TestCase):
                         args[args.index("--config") + 1], str(self.ruff_config)
                     )
                     self.assertEqual(args[-2:], ["--", "src/module.py"])
+
+    def test_ruff_version_mismatch_stops_before_the_requested_operation(self) -> None:
+        calls = []
+
+        def runner(args, input_text=None):
+            calls.append(args)
+            return completed(args, "ruff 0.15.2\n")
+
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "run_process", side_effect=runner),
+        ):
+            with self.assertRaisesRegex(
+                format_tracked.FormatError, "expected 'ruff 0.16.8'"
+            ):
+                format_tracked.run_ruff("import-fix", ["src/module.py"])
+
+        self.assertEqual(calls, [["ruff", "--version"]])
+
+    def test_ruff_version_command_reports_the_checked_version(self) -> None:
+        self.write_ruff_requirement("0.17.3")
+
+        def runner(args, input_text=None):
+            return completed(args, "ruff 0.17.3\n")
+
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "run_process", side_effect=runner),
+            patch.object(format_tracked, "tracked_paths") as tracked,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            self.assertEqual(format_tracked.execute("ruff-version"), 0)
+
+        self.assertEqual(stdout.getvalue(), "ruff 0.17.3\n")
+        tracked.assert_not_called()
+
+    def test_ruff_version_follows_the_current_requirements_pin(self) -> None:
+        self.write_ruff_requirement("0.17.3")
+        calls = []
+
+        def runner(args, input_text=None):
+            calls.append(args)
+            if args == ["ruff", "--version"]:
+                return completed(args, "ruff 0.17.3\n")
+            return completed(args)
+
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "RUFF_CONFIG", self.ruff_config),
+            patch.object(format_tracked, "run_process", side_effect=runner),
+        ):
+            self.assertEqual(
+                format_tracked.run_ruff("ruff-check", ["src/module.py"]), 0
+            )
+
+        self.assertEqual(calls[0], ["ruff", "--version"])
+        self.assertEqual(calls[1][-2:], ["--", "src/module.py"])
+
+    def test_missing_ruff_pin_fails_before_querying_cli(self) -> None:
+        (self.root / "requirements-dev-lint.txt").write_text(
+            "PyYAML==6.0.3\n", encoding="utf-8"
+        )
+        self.assert_invalid_ruff_pin()
+
+    def test_duplicate_ruff_pins_fail_before_querying_cli(self) -> None:
+        (self.root / "requirements-dev-lint.txt").write_text(
+            "ruff==0.16.8\nruff==0.17.3\n", encoding="utf-8"
+        )
+        self.assert_invalid_ruff_pin()
+
+    def test_empty_ruff_pin_fails_before_querying_cli(self) -> None:
+        (self.root / "requirements-dev-lint.txt").write_text(
+            "ruff==  # pin pending\n", encoding="utf-8"
+        )
+        self.assert_invalid_ruff_pin()
+
+    def assert_invalid_ruff_pin(self) -> None:
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "run_process") as process,
+        ):
+            with self.assertRaisesRegex(
+                format_tracked.FormatError,
+                "exactly one non-empty Ruff == pin",
+            ):
+                format_tracked.run_ruff("ruff-check", ["src/module.py"])
+
+        process.assert_not_called()
+
+    def test_ruff_version_command_failure_stops_before_the_operation(self) -> None:
+        calls = []
+
+        def runner(args, input_text=None):
+            calls.append(args)
+            return completed(args, returncode=127)
+
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(format_tracked, "run_process", side_effect=runner),
+        ):
+            with self.assertRaisesRegex(
+                format_tracked.FormatError,
+                "ruff --version failed with exit code 127",
+            ):
+                format_tracked.run_ruff("ruff-check", ["src/module.py"])
+
+        self.assertEqual(calls, [["ruff", "--version"]])
+
+    def test_unavailable_ruff_version_command_stops_before_the_operation(
+        self,
+    ) -> None:
+        with (
+            patch.object(format_tracked, "REPOSITORY_ROOT", self.root),
+            patch.object(
+                format_tracked.subprocess,
+                "run",
+                side_effect=FileNotFoundError("ruff"),
+            ) as process,
+        ):
+            with self.assertRaisesRegex(
+                format_tracked.FormatError, "could not start ruff"
+            ):
+                format_tracked.run_ruff("ruff-check", ["src/module.py"])
+
+        self.assertEqual(process.call_count, 1)
+        self.assertEqual(process.call_args.args[0], ["ruff", "--version"])
+
+    def test_no_tracked_python_targets_do_not_query_ruff_version(self) -> None:
+        result, process = self.run_with_paths(
+            "ruff-check",
+            ["docs/guide.md"],
+            lambda args, input_text=None: self.fail(
+                f"no Ruff process should run: {args!r}"
+            ),
+        )
+
+        self.assertEqual(result, 0)
+        process.assert_not_called()
 
     def test_format_and_check_pin_dprint_config_discovery_and_ignore_behavior(
         self,
@@ -207,9 +361,15 @@ class FormatterInvocationTests(unittest.TestCase):
                     patch.object(
                         format_tracked,
                         "run_process",
-                        side_effect=lambda args, input_text=None: completed(args),
+                        side_effect=lambda args, input_text=None: completed(
+                            args,
+                            "ruff 0.16.8\n" if args == ["ruff", "--version"] else "",
+                        ),
                     ) as runner,
                 ):
+                    (root / "requirements-dev-lint.txt").write_text(
+                        "ruff==0.16.8\n", encoding="utf-8"
+                    )
                     self.assertEqual(format_tracked.execute(command), 0)
                 self.assertFalse(
                     any(call.args[0][0] == "dprint" for call in runner.call_args_list)
@@ -237,6 +397,8 @@ class FormatterInvocationTests(unittest.TestCase):
         for call in calls.call_args_list:
             args = call.args[0]
             if args[0] == "ruff":
+                if args[1] == "--version":
+                    continue
                 self.assertEqual(
                     args[args.index("--config") + 1], str(self.ruff_config)
                 )
