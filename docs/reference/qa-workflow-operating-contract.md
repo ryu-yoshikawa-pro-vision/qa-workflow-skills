@@ -8,6 +8,15 @@
 
 [成果物マトリクス](qa-workflow-artifact-matrix.md)、[利用者マニュアル](qa-workflow-user-guide.md)を併用する。実装改善候補は[改善一覧](../reports/2026-11-25_qa-workflow-operating-improvements.md)に分離する。
 
+## 記述の状態
+
+- 現行契約：正本Skill・Planに規定がある。実provider・実Agentで検証済みという意味ではない。
+- 部分実装：helper・validator等の入口が存在するが、全ownerへの接続や真正性等が未確立。
+- 運用指針：既存契約の範囲で行う確認手順。未実装の保存・承認・状態遷移を成立させない。
+- 改善候補：OPS-01〜17に記録する。採用・実装・実環境受入は別途合意し、現行のblocked条件を緩めない。
+
+単発読取は継続保存・配置合意を前提にしない。継続利用の要求がある場合の必要なstate・保存契約は省略しない。利用者は依頼・必要な判断/承認・環境提供・gatedの進行・結果判断を担当し、許可済み範囲の発見・検証・採番・引継ぎはAgentが担当する。
+
 ## 責務と進行モード
 
 <!-- dprint-ignore -->
@@ -31,22 +40,38 @@ G1〜G5は運用上の分類であり固定実行順序や新しいruntime state
 | ID | タイミング | Agentが提示 | 利用者の対応 | 継続条件 |
 | --- | --- | --- | --- | --- |
 | G1 | 初回正式書込み前・配置/設定変更時 | 既存正本、配置維持案、owner、編集範囲、保存先、権限、未決事項 | 案件設定・配置合意 | 合意と必要provider能力。独立読取は先行可 |
-| G2 | 任意工程の未解決事項 | Q ID、根拠、影響、回答なしの扱い、再開先 | 仕様回答、正式決定、暫定仮定承認 | owner正規化・根拠反映 |
+| G2 | 任意工程で回答が必要な未解決事項 | Q ID、根拠、影響、回答なしの扱い、再開先 | 仕様回答、正式決定、暫定仮定承認 | owner正規化・根拠反映 |
 | G3 | QA要求・方式・計画の確定/改版前 | 目的、品質目標、方式、計画、基準、対象revision | 権限者の承認 | 各ownerの保存・承認契約 |
-| G4 | 正式保存・外部書込み・副作用開始前 | 操作、scope、保存先、before revision、差分、権限、上限、cleanup | 必要な承認・認証・条件提供 | 認可、preflight、claim、必要予約。保存後readback |
+| G4 | 正式保存・外部書込み・副作用開始前 | 操作、scope、保存先、before revision、差分、権限、上限、cleanup | 必要な承認・認証・条件提供 | 認可、必要preflight、ownerの原子的開始契約またはclaim、必要予約。保存後readback |
 | G5 | 報告・改善採用・引継ぎ | 実測、未実行、残存risk、終了基準、改善案 | 必要時にリスク受容、リリース判断、採否、受領 | 正本ownerの記録と必要な認証済み承認 |
 
-gatedによる停止は別途必要。質問・承認をまとめる場合は独立した回答単位、対象scope/revision、保留、拒否、失効を区別する。集約の自動化は未実証。承認対象を勝手に拡張しない。
+gatedによる停止は別途必要。質問・承認をまとめる場合は独立した回答単位、対象scope/revision、保留、拒否、失効を区別する。集約の自動化は未実証。承認対象を勝手に拡張しない。初回配置合意・工程進行は個々の正式保存を包括承認しない。承認は操作種別、対象scope/ref/revision、差分、build/source、承認者、理由、必要な有効期間・失効条件に束縛する。
 
 ## 質問から再開まで
 
 1. 担当Skillが情報源優先順位、既存DEC/ASM、既存質問・回答を確認する。解消済みの論点を再質問せず、期待仕様が確定した実装差異を仕様質問へ戻さない。
 2. [question-analysis](../../skills/question-analysis/references/guidance.md)がQ ID、関連UNKNOWN、根拠、影響、停止範囲、正規化先、再開ownerを確定する。
 3. ブロッカーは影響scope停止。要確認は可視化して継続。仮定可能はドラフト等で継続できるが正式PASS/FAILには権限者の明示承認とASM正本への反映が必要。提案・任意は継続。
-4. 単発は対話/Markdownで提示。複数質問をHTMLで渡す必要がある場合だけ[agent-answer-form](../../skills/agent-answer-form/SKILL.md)を利用する。Skill外の作業dirにquestions.jsonとanswer-form.htmlを生成しQ IDを保持。保留や推奨案は承認ではない。
-5. 質問で中断する前に、許可された保存先へ分析済み成果物、未解決質問、停止scope、入力revision、再開先を記録する運用とする。保存できない場合は未保存を明示し候補・再開情報を返す。これは横断checkpointの運用指針であり、全ownerの自動永続化を保証しない。
-6. 回答受領後、元Q IDと照合し、更新された仕様はSPEC、正式決定はDEC、暫定合意は承認済みASMへ正規化。意味が不明なら再確認。担当正本へ反映し、回答文をそのまま期待結果にしない。
-7. 解決済みQ IDの履歴を保持し、別論点へ流用しない。同一論点の再開は既存IDを使用。qa-workflowが意味が変わる最も早い担当工程に戻し、依存scopeだけ再検証する。
+4. 単発は対話/Markdownで提示。複数質問をHTMLで渡す必要がある場合だけ[agent-answer-form](../../skills/agent-answer-form/SKILL.md)を利用する。Skill外の許可済み作業dirにquestions.jsonとanswer-form.htmlを生成し、Q ID・元質問成果物を維持して双方を利用者へ渡す。質問ID・選択肢の意味が変わる場合は旧HTMLを保管し、旧ブラウザ回答を新定義へ自動適用しない。秘密情報を含めない。保留や推奨案は承認ではない。
+5. 質問で中断する前に分析済み成果物、未解決質問、停止scope、入力revision、再開先を保全する運用指針とする。既に許可された作業領域がある場合に限り候補・質問・再開情報を中間保存できる。正式保存はG4の必要な承認・保存条件を満たす場合だけ行い、draftをcurrentとしない。安全な作業領域が未設定、保存未承認・失敗の場合は質問自体を止めず、未保存範囲と安全な候補・再開情報を利用者に返す。別session復元は保証しない。横断自動化と中間保存の許可範囲の整備はOPS-01/02/16の改善候補。
+6. 回答受領後、元Q ID・元質問定義・根拠を照合し、意味や根拠が変わった旧回答は再確認する（revisionとの機械的束縛はOPS-01/13の改善候補）。更新された権威ある仕様はSPEC、権限者の正式決定はDEC、明示承認された暫定合意は承認済みASMへ正規化。有効なSPEC/DECISIONをASMで上書きしない。意味が不明なら再確認。担当正本へ反映し、回答文をそのまま期待結果にしない。
+7. current質問一覧は未解決のみ。使用済みQ IDは履歴へ残し別論点へ流用しない。意味同一性を担当Skillが判断し、既存question_ids.py materializeで前回成果物を用いて更新する。qa-workflowが意味が変わる最も早い担当工程に戻し、依存scopeだけ再検証する。
+
+## 保存先・保存領域
+
+現行配置は[Q06](../plans/2026-11-07_122247_development-qa-traceability.md)に従う。初回は対象案件・許可された探索入口・既存Project Context候補・読取権限を確認し、候補列挙が完全な場合だけ不存在と判断する。重複・アクセス不能・案件不一致は未解決とし、勝手に新規正本を作らない。既存配置・正本・有効な配置合意を優先し、初回または変更時だけ合意する。Section 12/14・16と各ownerの保存契約を利用する。標準root・命名がない成果物の現状は[マトリクス](qa-workflow-artifact-matrix.md)を参照。
+
+次の4領域は混同防止のための論理分類（運用指針）。新規root/provider/権限を自動作成しない。横断的な標準配置・命名・発見・初期化契約はOPS-09/12〜17の改善候補。
+
+<!-- dprint-ignore -->
+| 領域 | 内容 | 扱い |
+| --- | --- | --- |
+| 正式成果物 | 正本、確定判断、正式報告、継続資産 | ownerの保存・承認・履歴・readback |
+| 継続作業 | draft、未解決Q、フォーム、編集案、再開情報 | 明示許可された領域のみ。正本としない |
+| 保護証跡 | rawログ、trace、動画、snapshot、runner出力 | 保存可否・機密性・アクセス・保持・cleanupを確認 |
+| テストコード | Playwright、非E2E testware、fixture、設定 | 対象repoの既存構成・変更権限 |
+
+Skill記述はsandbox・hook・OS/provider権限の代替ではない。PR #22の運用制約に従い、必要な書込み・読取・認証・実行境界を環境側でも確認する。必要な境界を確認できない操作は止める。横断的な強制・受入は未実証（OPS-16）。一時物cleanupで正式履歴や未解決の再開情報を消さない。
 
 ## 保存・承認・履歴
 
@@ -54,38 +79,56 @@ Project ContextのSection 4/12〜14/16を確認する。既存正本と配置を
 
 - 新規はnative atomic create-if-absent、更新は期待revisionを条件にしたnative CAS。必要な履歴・独立readback・認可が不足すれば正式保存をblockする。read-compare-unconditional-writeはCASではない。
 - 保存前にowner、scope、artifact ref、source refs/revisions、変更理由、期待revision、必要承認・権限、再開ownerを確定。保存後は独立読戻しで本文/hash・revisionを確認する。実際に取得した参照のみ下流へ渡す。
-- draft、形式valid、意味上の完成候補、保存済みcurrent、承認済み、workflow完了を別々に扱う。競合やreadback失敗時は候補と旧currentを保全し、無条件上書き・無断別保存先作成をしない。
-- Git案件の既定承認は2026-11-12利用者決定に従う。操作・scope・ref/branch・before SHA・差分提示 → 対話で明示同意 → 合意した認証済みアカウントで通常push（force禁止）→ repository activity APIのactor/before/after照合。取得遅延は共通契約に従い再取得し、確認不能なら未承認・blocked。commit author・PRコメント・LLM approvedだけでは認可証拠にならない。別方式は案件で合意。全ownerの実接続は未実証。
+- draft、形式valid、意味上の完成候補、実保存状態、認証済み承認、currentness、workflow完了を別々に扱う。書込み応答消失・readback不一致・承認照合不能では外部先が旧revisionのままと断定しない。最後の検証済みbaselineと候補を保全し、実ref/revision/hash/操作結果・承認を独立再取得するまで新成果物をcurrentとして引き渡さない。同一副作用の盲目的再試行、無条件上書き、無断rollback・別正本作成をしない。
+- 複数owner・複数ファイルの個別CASは一括整合の証明ではない。commit/snapshot境界と依存ref/revisionを固定し、部分保存・中断時は実際に確定したものと未確定を分けて保持する。必要な参照整合・owner検証が成立するまで依存する下流をcurrentにしない。独立scopeは継続可能。一体更新を要求する既存packageのwriter境界を守る。汎用分散transactionや自動rollbackは前提としない。
+- Git案件の既定承認は2026-11-12利用者決定に従う。操作・scope・ref/branch・before SHA・差分提示 → 対話で明示同意 → 保存直前のrevision・権限確認後、合意したwrite権限のある利用者の認証済みアカウントで通常push（force禁止）→ repository activity APIのactor/before/after照合と保存本文の独立readback。取得遅延は共通契約に従い再取得し、確認不能なら正式保存・承認確定はblocked（物理的書込みの成否は別途確認）。commit author・PRコメント・LLM approvedだけでは認可証拠にならない。別方式は案件で合意。全ownerの実接続は未実証。
 - secret・cookie・token・個人情報等のraw証跡を無断永続化・共有しない。必要最小限の事実・参照と非保存理由を記録する。
 
 ## Checkpoint
 
-以下は既存契約を横断する運用指針。永続化を要求しない単発読取まで保存を強制しない。保存先未合意はG1へ戻す。各ownerの正式writerを使う。
+以下は既存契約を横断する運用指針。永続化を要求しない単発読取まで保存を強制しない。正式保存先未合意はG1へ戻す。各ownerの正式writerを使う。状態欄は主な実装境界を示し、全ownerの自動化・実環境PASSを意味しない。
 
 <!-- dprint-ignore -->
-| ID | イベント | owner | 記録・保存内容 | 失敗時 |
-| --- | --- | --- | --- | --- |
-| CP01 | 開始・再開 | qa-workflow | 要求scope、入力revision、既存state、再利用/再実行判断 | 未取得scope明示、旧baseline保持 |
-| CP02 | 案件設定合意・更新 | project-context | Context、DEC/ASM、配置参照、revision | draft保持・正式保存block |
-| CP03 | 質問提示・中断前 | question-analysis / qa-workflow | Q/UNKNOWN、候補、停止scope、再開先、完了済み参照 | 未保存明示・再開情報提示 |
-| CP04 | 回答反映後 | 仕様・決定・仮定owner | SPEC/DEC/ASM、質問履歴、影響refs | 未解決として保持 |
-| CP05 | 工程引継ぎ前 | 担当Skill | 成果物、ID、依存revision、validator、必要な保存結果 | stale/未保存/不適合を区別 |
-| CP06 | mutable operation開始直前 | 実行owner / qa-workflow | 対象、認可、期待revision、claim、必要予約、上限・cleanup | 実操作を開始しない |
-| CP07 | 実行後・異常停止 | 実行owner | raw結果、attempt、観測、実開始、cleanup、未実行・判定不能 | 元証跡保持、盲目的再試行禁止 |
-| CP08 | 上流変更・中断再開 | qa-workflow / owner | affected scopes、source差分、要再検証、旧revision | 関連範囲のみ停止 |
-| CP09 | 正式保存後 | owner/provider | 独立readback、hash、revision、認可証拠、引継ぎref | 成功とせず旧current保持 |
-| CP10 | 完了判定 | qa-workflow | 全要求scope検証、残存risk、必要レビュー、完了baseline | blocked/部分完了/未検証を明示 |
+| ID | イベント | owner | 記録・保存内容 | 失敗時 | 状態・制約 |
+| --- | --- | --- | --- | --- | --- |
+| CP01 | 開始・再開 | qa-workflow | 元依頼・要求成果物・要求scope、入力母集団/revision、既存state、再利用/再実行判断 | 未取得scope明示、旧baseline保持 | 現行＋指針：宣言・列挙完全性は呼出し側 |
+| CP02 | 案件設定合意・更新 | project-context | Context、DEC/ASM、配置参照、revision | draft保持・正式保存block | 部分：対応providerのみ |
+| CP03 | 質問提示・中断前 | question-analysis / qa-workflow | Q/UNKNOWN、元質問定義、候補、停止scope、再開先、完了済み参照 | 未保存明示・再開情報提示 | 指針：許可中間保存と正式保存を区別 |
+| CP04 | 回答反映後 | 仕様・決定・仮定owner | SPEC/DEC/ASM、質問履歴、影響refs | 未解決として保持 | 現行の正規化＋指針：横断保存未実証 |
+| CP05 | 工程引継ぎ前 | 担当Skill | 成果物、ID、依存revision、validator、必要な保存結果 | stale/未保存/不適合を区別 | 部分：owner別保存・検証 |
+| CP06 | mutable operation開始直前 | 操作owner / qa-workflow | 対象、認可、期待revision、owner開始契約/claim、必要予約、上限・cleanup | 実操作を開始しない | 部分：予約・claim回復未接続あり |
+| CP07 | 実行後・異常停止 | 実行owner | raw結果、attempt、観測、実開始、cleanup、未実行・判定不能 | 元証跡保持、盲目的再試行禁止 | 現行owner契約＋部分：保存接続 |
+| CP08 | 上流変更・中断再開 | qa-workflow / owner | affected scopes、source差分、要再検証、旧revision | 関連範囲のみ停止 | 現行＋指針：入力完全性を確認 |
+| CP09 | 正式保存後 | owner/provider | 独立readback、hash、revision、認可証拠、引継ぎref | 結果不明を再取得、最後の検証済みbaseline保持 | 部分：実provider・承認真正性 |
+| CP10 | 完了判定 | qa-workflow | 元依頼とのscope照合、全要求scope検証、残存risk、必要レビュー、完了baseline | blocked/部分完了/未検証を明示 | 部分：未登録owner・要求集合完全性 |
 
 ## State・変更・人間編集
 
 persisted workflow stateはqa.workflow_state_root配下のcanonical UUID.json。claimは同rootのclaims/<identity digest>.json。input-revisions.jsonは指定成果物保存先に置く。Regression/Exploration履歴rootとは別。WCAG固有stateの対応local SQLiteは汎用保存providerではない。
 
-入力revision同一でcurrentなら再利用し、changed/added/removedは依存範囲だけ再実行。途中中断はstateの次工程から再開。claimは認可・実行成功の証明ではない。実状態、cleanup、保存revisionを独立取得できない場合は同一identityの副作用を自動再実行しない。安全な解放・予約provider未接続はblock。
+再利用前に要求scope、入力母集団・依存関係の列挙完全性、source revision、利用したProject Contextのused fields、担当ownerの意味契約・currentness・追跡情報を確認する。input_revision.pyは渡されたpathだけを比較し、sameだけでは完全性を証明しない。変更・追加・削除は依存scopeを要再検証とし、無関係な成果物を再生成しない。途中中断は有効なstateと検証済み成果物から再開し、前提が変われば影響scopeへ戻る。要求された継続stateの保存先未解決はblockする。入力完全性の横断受入はOPS-05/15。
 
-PR/merge/release/外部仕様改版は呼出し側が起動し、変更元ownerが差分を扱う。人間は承認済み作業用branch/copyで編集し、canonical packageを直接置換しない。元snapshot・差分・根拠・レビュー承認を別々に追跡し、ownerの意味検証と既存writerを経て反映。MANIFEST、生成metadata、CHANGELOG、Machine Entity、標準heading/file名を手編集しない。手動IDや行削除を正式採番・廃止にしない。
+mutable operation（正式保存・外部Issue更新・副作用操作等）の前は同一identity向けownerの原子的claimまたは冪等開始契約を優先し、存在しない場合は既存qa-workflow claim契約に従う。claimは認可・実行成功・遠隔CASの証明ではない。実開始・実保存・cleanup・claim revisionを独立取得できない場合は同一identityの副作用を自動再実行しない。実分離を確認できない共有resourceは必要な予約・解放providerが未接続ならblock。同一案件の並列workflowはPR #22の運用制約に従い共有予約・分離の確認まで避ける。
+
+PR/merge/release/外部仕様改版は呼出し側が起動し、変更元ownerが差分を扱う。人間は配置・編集合意に従い作業用branch/copyで編集し、未確定差分をcanonical rootへ直接反映しない。元revision・差分・根拠・編集者・レビュー承認を別々に追跡し、ownerの意味検証と既存writerを経て反映。作業branchへのpushは編集提出であり正本更新承認とは別。
+
+ui-target-v1固有の規則としてMANIFEST、生成README metadata、機械生成CHANGELOG、Machine Entity、標準heading/file名を手編集しない。新規行はdraft keyで提案し、手動IDや行削除を正式採番・廃止にしない。正本直接改変時は元snapshotと編集案を保全し、元revision・復旧権限がなければblocked。他成果物は各ownerの編集・履歴・validator契約を使用し、UI package固有制約を一律流用しない。
 
 ## 完了・制約
 
-要求集合・必要レビュー・最終runtime gate・owner verifierに従う。未検証scopeや承認真正性を確認できない除外は完了不可。FAILが残っても要求された実行・分析・報告・cleanupが完了すればworkflow完了とは別に扱う。リリース判断は人間。
+開始時に元依頼・要求成果物・必須scope・除外候補の対応を確認し、完了時に元依頼と宣言済みrequested_scopesを再照合する（運用指針）。最終runtime gateは宣言済み集合の欠落・未検証を検出するが宣言自体の完全性は保証しない。除外は現行runtimeでは承認真正性の照合が未接続のため必須scopeのまま残り完了不可。未登録ownerはunverified_scopes。最終gate・owner検証・必要レビューに従い、can_completeだけで完了を宣言しない。runtime-v2の最終baselineは既存immutable snapshot・exact refetch・state CAS契約を使用し、失敗時は最後の検証済みbindingを維持する。
 
-[PR #22マージ判断](../implementation/pr22/merge-decision-2026-11-14.md)の最終受入未達を維持する。実provider・承認・製品CI・reservation/claim回復・owner verifierの未接続と効率改善未実証を、文書追加で解消済みとしない。
+<!-- dprint-ignore -->
+| 判定軸 | 意味 |
+| --- | --- |
+| 成果物完成 | 担当Skillの意味・形式契約と必要検証 |
+| 正式保存・承認 | provider保存・独立readback・認証済み承認。各状態は別 |
+| 実行完了 | 実開始、予定母集団、観測、収集、必要cleanup |
+| テスト合否 | PASS/FAIL/未実行/判定不能等を実測で判定 |
+| 報告・終了基準 | 取得完全性、計画母集団、指標、終了基準を独立判定。母集団不明なら全体率・終了判定はundetermined |
+| Workflow完了 | 元依頼・要求scope、必要owner検証・currentness・実行・報告・保存・cleanup等の充足 |
+| リリース承認 | 権限者が残存リスクを判断。Workflow完了やFAILの有無と別 |
+
+FAILは必要工程の完了と両立し得る。FAILだけでWorkflow未完了とせず、必要な未実行・判定不能・cleanup未確認等が残る場合は該当scopeを完了としない。
+
+[PR #22マージ判断](../implementation/pr22/merge-decision-2026-11-14.md)の最終受入未達を維持する。実provider・承認・製品CI・reservation/claim回復・owner verifierの未接続と効率改善未実証を、文書追加で解消済みとしない。過去に承認された対象外は維持し、今回の改善で検証を追加する場合は新しい実装・受入範囲として合意する。

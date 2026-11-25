@@ -1,49 +1,51 @@
 # Skill別成果物・保存・利用者対応マトリクス
 
-[共通運用契約](qa-workflow-operating-contract.md)の別表。対象はskills/配下37 Skill（.agents/skillsの開発用3 Skillは対象外）。成果物名は論理名。固定ファイルパス・全Skillの自動永続化を保証しない。各ownerの正本契約と案件の配置・認可に従う。CP/G番号は共通運用契約を参照。
+[共通運用契約](qa-workflow-operating-contract.md)の別表。対象はskills/配下37 Skill（.agents/skillsの開発用3 Skillは対象外）。成果物名は論理名。固定ファイルパス・全Skillの自動永続化を保証しない。各ownerの正本契約と案件の配置・認可に従う。CP/G番号は共通運用契約を参照。各行は現行の論理成果物・配置と運用上の引継ぎを示し、自動保存実装済みとは限らない。ユーザー欄は固有介入のみ。全行共通で必要なG1/G4の配置・正式保存・操作承認とgatedの進行指示は別途必要。
 
 ## Skill別
 
+配置区分：固定＝指定root内の既存命名/構造を確認、部分＝root/ref・既存repo・一時出力例・条件付き構造あり、未統一＝今回の静的確認で標準物理path/命名を確認できない。rootの存在・認可・実provider接続は別。単発読取・任意証跡の永続化は要求時または案件条件に限る。将来の標準配置はOPS-12〜17の改善候補。
+
 <!-- dprint-ignore -->
-| Skill | 開始・更新 | 正本・成果物 | 保存・引継ぎタイミング / 場所 | 利用者の対応 |
-| --- | --- | --- | --- | --- |
-| [qa-workflow](../../skills/qa-workflow/SKILL.md) | 開始、工程移行、中断、再開、完了 | state、input revision、baseline | CP01/03/06/08/10、state root | 目的・scope・成果物、必要時判断 |
-| [project-context](../../skills/project-context/SKILL.md) | 初回、設定・配置変更 | Context、DEC/ASM（ownerの場合）、配置参照 | 合意後CP02/09、既存正本/指定先 | 保存先・編集範囲・権限合意 |
-| [feature-analysis](../../skills/feature-analysis/SKILL.md) | 初回、PR/merge/release/改版 | 機能ID、機能台帳、source inventory、差分・履歴 | 分類検証後、feature root | source・基準ref・必要な除外承認 |
-| [spec-analysis](../../skills/spec-analysis/SKILL.md) | 仕様分析、変更、回答後 | Authority、US/UC/Behavior/AC、UNKNOWN、業務ルール | 分析・回答反映後、指定先またはui-target-v1 | 仕様回答・DEC/ASM承認 |
-| [ui-target-analysis](../../skills/ui-target-analysis/SKILL.md) | UI分析、変更、人間編集 | UI構造、操作、状態、遷移、編集差分 | 検証後既存materialize writer、package root | 資料、任意編集、必要承認 |
-| [question-analysis](../../skills/question-analysis/SKILL.md) | 任意工程の不明点、回答後 | Q ID、UNK、分類、履歴、再開先 | CP03/04、案件指定先 | 必須回答・決定・仮定承認 |
-| [agent-answer-form](../../skills/agent-answer-form/SKILL.md) | 複数質問のHTML提示時 | questions.json、answer-form.html | 提示前、Skill外作業dir。回答Markdown回収 | HTML回答・Markdown返却 |
-| [test-requirements-analysis](../../skills/test-requirements-analysis/SKILL.md) | QA目的・品質目標設定/改版 | QA要求canonical JSON packet、表示Markdown | 草案・承認・保存検証、指定provider | 目的・品質目標・scope承認 |
-| [test-architecture-design](../../skills/test-architecture-design/SKILL.md) | QA要求後、方式改版 | Architecture canonical JSON packet、表示Markdown | 承認後正本保存、指定provider | 方式・環境・分担承認 |
-| [test-management](../../skills/test-management/SKILL.md) | 計画策定・改版・進捗 | 計画canonical JSON packet、母集団、進捗、是正・履歴 | 計画確定/改版/monitoring、指定provider | 計画・資源・終了基準承認 |
-| [test-analysis](../../skills/test-analysis/SKILL.md) | 対象理解後、Risk変更 | Product Risk、重点・深度・技法候補 | 分析確定・局所変更後、指定先 | 必要時業務影響・リスク受容 |
-| [test-item-analysis](../../skills/test-item-analysis/SKILL.md) | 機能/仕様理解後、item変更 | ITEM候補、階層、履歴 | 候補確定後、指定provider CAS/readback | 根拠不足・保存承認 |
-| [test-condition-analysis](../../skills/test-condition-analysis/SKILL.md) | 共通条件候補識別、根拠変更 | COND候補、履歴、候補照合 | 候補確定後、指定provider CAS/readback | 根拠不足・保存承認 |
-| [test-requirement-design](../../skills/test-requirement-design/SKILL.md) | 仕様・Risk分析後 | TR、検証責務、上流追跡 | 設計・runtime検証後、指定先 | 原則不要、未決仕様はG2 |
-| [test-condition-design](../../skills/test-condition-design/SKILL.md) | TR後 | TCN、CI、技法、適用判断、期待結果候補 | 設計・runtime検証後、指定先 | 原則不要、必要な除外/仮定承認 |
-| [test-case-design](../../skills/test-case-design/SKILL.md) | TCN/CI後 | TC、前提、データ、手順、期待結果 | 設計・runtime検証後、指定先 | 原則不要、根拠不足ならG2 |
-| [e2e-test-selection](../../skills/e2e-test-selection/SKILL.md) | 自動化対象選定・価値変更 | 選定record、理由、履歴 | 選定検証後、指定先 | 自動化目的・対象 |
-| [coverage-analysis](../../skills/coverage-analysis/SKILL.md) | 設計/実装後、変更/修正後 | coverage、閉鎖性、gap、修正先 | 検証後、指定先 | 対象外・残存risk判断時 |
-| [adversarial-review](../../skills/adversarial-review/SKILL.md) | 成果物・コードの独立レビュー | 指摘、重大度、根拠、処置状態 | レビュー後、指定先 | 判断を要する指摘への回答 |
-| [e2e-test-inspection](../../skills/e2e-test-inspection/SKILL.md) | E2E実装前、条件不足時 | repo、実効設定、安全条件、実装可否 | 調査後、指定先、コード変更なし | URL・認証・データ・副作用 |
-| [e2e-test-implementation](../../skills/e2e-test-implementation/SKILL.md) | inspection済み実装依頼 | Playwrightコード、実装参照、静的/軽量検証 | 変更許可・検証後、対象repo既存構成 | 変更範囲・必要正式反映承認 |
-| [e2e-test-execution](../../skills/e2e-test-execution/SKILL.md) | 既存/実装済みE2E実行 | Run、primary、attempt、raw、cleanup | preflight前提固定、実行後証跡・結果、指定先 | 実行条件・副作用上限許可 |
-| [e2e-test-result-analysis](../../skills/e2e-test-result-analysis/SKILL.md) | 異常・未実行・cleanup問題・分析依頼 | 原因分析、追加証拠、修正routing | 検証済みrawを参照し分析後、指定先 | 必要な原因情報 |
-| [e2e-test-reporting](../../skills/e2e-test-reporting/SKILL.md) | E2E実行・必要分析後 | 人間向けE2E報告 | 報告後、指定先。raw再判定なし | 結果確認 |
-| [test-target-inspection](../../skills/test-target-inspection/SKILL.md) | Live UI事実・鮮度確認 | 対象資料、任意snapshot | snapshot保存・identity確認後資料更新、指定先のみ | URL・操作許可・証跡制約 |
-| [test-execution](../../skills/test-execution/SKILL.md) | 詳細TCのAI直接実行 | 実行前YAML、Run、観測、TC結果、cleanup | 実行前条件固定、実行後Markdown/証跡、指定先 | 環境・準備・操作許可 |
-| [testware-implementation](../../skills/testware-implementation/SKILL.md) | 非E2Eコード/fixture/設定実装 | testware、実装参照、軽量検証 | 隔離作業・検証・認可後、対象repo | 変更範囲・必要保存承認 |
-| [testware-execution](../../skills/testware-execution/SKILL.md) | 非E2E runner/静的解析実行 | Run、raw参照、attempt、診断、cleanup | preflight・実行後、指定先。分析/raw分離 | 環境・操作・必要予約許可 |
-| [regression-testing](../../skills/regression-testing/SKILL.md) | baseline更新、変更、定期実行依頼 | Baseline、membership、Run、Activity、履歴 | 選定・Activity確定時、Section 14/明示root | 初回方針、必要実行条件 |
-| [exploratory-testing](../../skills/exploratory-testing/SKILL.md) | 探索・owner不明hypothesis | Charter、Session、Finding、Observation | Charter固定後、観測/終了時、Section 14/明示root | 目的・scope・timebox・操作許可 |
-| [qa-knowledge](../../skills/qa-knowledge/SKILL.md) | candidate triage、再検証、更新 | entry、根拠、適用範囲、履歴 | entry単位CAS/readback、knowledge root | 必要時保存・採否判断 |
-| [defect-management](../../skills/defect-management/SKILL.md) | FAIL/Finding/Observation後 | 欠陥候補、Issue参照、修正確認依頼 | 候補整理・認可済み操作後、指定先/Issue tracker | 外部Issue操作認可 |
-| [test-reporting](../../skills/test-reporting/SKILL.md) | 統合報告、終了基準確認 | 読取専用snapshot、母集団、完全性 | 集計検証後、指定先。元結果不変 | 結果・リリース判断 |
-| [test-evaluation](../../skills/test-evaluation/SKILL.md) | QA活動終了・改善効果確認 | 5軸評価、改善状態、効果測定、引継ぎ | 評価・状態移行後、指定先 | 改善採否・受領 |
-| [usability-evaluation](../../skills/usability-evaluation/SKILL.md) | 保存済みUI資料のUX評価 | 評価、根拠、改善案 | 評価後必要時指定先、browser操作なし | 資料・目的 |
-| [usability-inspection](../../skills/usability-inspection/SKILL.md) | Live Web UI使用性・測定 | 観測、測定、証跡、cleanup | 観測後、明示安全な保存先・必要handoff | URL・scope・操作/保存許可 |
-| [wcag-conformance-evaluation](../../skills/wcag-conformance-evaluation/SKILL.md) | formal WCAG評価依頼 | Plan、sample、結果、report、EARL | Plan登録、観測handoff、closure/readback後、指定先/対応SQLite state | 対象、版、level、評価責任・scope |
+| Skill | 開始・更新 | 正本・成果物 | 保存・引継ぎタイミング / 場所 | 利用者の対応 | 現行配置区分・根拠 |
+| --- | --- | --- | --- | --- | --- |
+| [qa-workflow](../../skills/qa-workflow/SKILL.md) | 開始、工程移行、中断、再開、完了 | state、input revision、baseline | CP01/03/06/08/10、state rootと指定成果物保存先 | 目的・scope・成果物、必要時判断 | 固定：state root内の`<uuid>.json`、`claims/<digest>.json`、`artifacts/<uuid>/qa-workflow/<digest>.md`、対応SQLiteはworkflow-state.sqlite3。input-revisions.jsonは指定保存先 |
+| [project-context](../../skills/project-context/SKILL.md) | 初回、設定・配置変更 | Context、DEC/ASM（ownerの場合）、配置参照 | 合意後CP02/09、既存正本/指定先 | 保存先・編集範囲・権限合意 | 部分：既存正本ref/path。docs/PROJECT_CONTEXT.md等は例 |
+| [feature-analysis](../../skills/feature-analysis/SKILL.md) | 初回、PR/merge/release/改版 | 機能ID、機能台帳、source inventory、差分・履歴 | 分類検証後、feature root | source・基準ref・必要な除外承認 | 部分：qa.feature_artifact_root、選定provider。統一名未確認 |
+| [spec-analysis](../../skills/spec-analysis/SKILL.md) | 仕様分析、変更、回答後 | Authority、US/UC/Behavior/AC、UNKNOWN、業務ルール | 分析・回答反映後、指定先またはui-target-v1 | 仕様回答・DEC/ASM承認 | 部分：通常分析は未統一、ui-target-v1利用時は既存構造 |
+| [ui-target-analysis](../../skills/ui-target-analysis/SKILL.md) | UI分析、変更、人間編集 | UI構造、操作、状態、遷移、編集差分 | 検証後既存materialize writer、package root | 資料、任意編集、必要承認 | 固定：ui-target-v1内部構造。rootは案件指定 |
+| [question-analysis](../../skills/question-analysis/SKILL.md) | 任意工程の不明点、回答後 | Q ID、UNK、分類、履歴、再開先 | CP03/04、案件指定先 | 必須回答・決定・仮定承認 | 未統一：質問一覧/履歴形式。指定先、横断永続化未実証 |
+| [agent-answer-form](../../skills/agent-answer-form/SKILL.md) | 複数質問のHTML提示時 | questions.json、answer-form.html | 提示前、Skill外許可作業dir。JSON/HTML提示、回答Markdown照合 | HTML回答・Markdown返却 | 部分：Skill外許可作業dir。questions.json / answer-form.htmlはCLI例。旧HTML保管・旧回答自動適用禁止 |
+| [test-requirements-analysis](../../skills/test-requirements-analysis/SKILL.md) | QA目的・品質目標設定/改版 | QA要求canonical JSON packet、表示Markdown | 草案・承認・保存検証、指定provider | 目的・品質目標・scope承認 | 未統一：canonical JSON packetと表示Markdown。実provider未確立 |
+| [test-architecture-design](../../skills/test-architecture-design/SKILL.md) | QA要求後、方式改版 | Architecture canonical JSON packet、表示Markdown | 承認後正本保存、指定provider | 方式・環境・分担承認 | 未統一：canonical JSON packetと表示Markdown。実provider未確立 |
+| [test-management](../../skills/test-management/SKILL.md) | 計画策定・改版・進捗 | 計画canonical JSON packet、母集団、進捗、是正・履歴 | 計画確定/改版/monitoring、指定provider | 計画・資源・終了基準承認 | 未統一：canonical JSON packetと表示Markdown。実provider未確立 |
+| [test-analysis](../../skills/test-analysis/SKILL.md) | 対象理解後、Risk変更 | Product Risk、重点・深度・技法候補 | 分析確定・局所変更後、指定先 | 必要時業務影響・リスク受容 | 未統一：Machine Entity/Runtime形式 |
+| [test-item-analysis](../../skills/test-item-analysis/SKILL.md) | 機能/仕様理解後、item変更 | ITEM候補、階層、履歴 | 候補確定後、指定provider CAS/readback | 根拠不足・保存承認 | 未統一：test-item-candidates-v1、指定provider |
+| [test-condition-analysis](../../skills/test-condition-analysis/SKILL.md) | 共通条件候補識別、根拠変更 | COND候補、履歴、候補照合 | 候補確定後、指定provider CAS/readback | 根拠不足・保存承認 | 未統一：test-condition-candidates-v1、指定provider |
+| [test-requirement-design](../../skills/test-requirement-design/SKILL.md) | 仕様・Risk分析後 | TR、検証責務、上流追跡 | 設計・runtime検証後、指定先 | 固有の進行承認は原則不要、未決仕様はG2 | 未統一：TR・runtime契約 |
+| [test-condition-design](../../skills/test-condition-design/SKILL.md) | TR後 | TCN、CI、技法、適用判断、期待結果候補 | 設計・runtime検証後、指定先 | 固有の進行承認は原則不要、必要な除外/仮定承認 | 未統一：TCN/CI・runtime契約 |
+| [test-case-design](../../skills/test-case-design/SKILL.md) | TCN/CI後 | TC、前提、データ、手順、期待結果 | 設計・runtime検証後、指定先 | 固有の進行承認は原則不要、根拠不足ならG2 | 未統一：TC・runtime契約 |
+| [e2e-test-selection](../../skills/e2e-test-selection/SKILL.md) | 自動化対象選定・価値変更 | 選定record、理由、履歴 | 選定検証後、指定先 | 自動化目的・対象 | 未統一：選定record/履歴、実保存providerは別 |
+| [coverage-analysis](../../skills/coverage-analysis/SKILL.md) | 設計/実装後、変更/修正後 | coverage、閉鎖性、gap、修正先 | 検証後、指定先 | 対象外・残存risk判断時 | 未統一：coverage出力契約 |
+| [adversarial-review](../../skills/adversarial-review/SKILL.md) | 成果物・コードの独立レビュー | 指摘、重大度、根拠、処置状態 | レビュー後、指定先 | 判断を要する指摘への回答 | 未統一：レビュー出力契約 |
+| [e2e-test-inspection](../../skills/e2e-test-inspection/SKILL.md) | E2E実装前、条件不足時 | repo、実効設定、安全条件、実装可否 | 調査後、指定先、コード変更なし | URL・認証・データ・副作用 | 未統一：調査出力契約、実装・実行なし |
+| [e2e-test-implementation](../../skills/e2e-test-implementation/SKILL.md) | inspection済み実装依頼 | Playwrightコード、実装参照、静的/軽量検証 | 変更許可・検証後、対象repo既存構成 | 変更範囲・必要正式反映承認 | 部分：対象repo既存構成。実装記録の標準path未確認 |
+| [e2e-test-execution](../../skills/e2e-test-execution/SKILL.md) | 既存/実装済みE2E実行 | Run、primary、attempt、raw、cleanup | preflight前提固定、実行後証跡・結果、指定先 | 実行条件・副作用上限許可 | 未統一：実効reporter/output設定・指定先。Runの共通命名未確認 |
+| [e2e-test-result-analysis](../../skills/e2e-test-result-analysis/SKILL.md) | 異常・未実行・cleanup問題・分析依頼 | 原因分析、追加証拠、修正routing | 検証済みrawを参照し分析後、指定先 | 必要な原因情報 | 未統一：分析出力契約、raw参照 |
+| [e2e-test-reporting](../../skills/e2e-test-reporting/SKILL.md) | E2E実行・必要分析後 | 人間向けE2E報告 | 報告後、指定先。raw再判定なし | 結果確認 | 未統一：人間向け報告形式 |
+| [test-target-inspection](../../skills/test-target-inspection/SKILL.md) | Live UI事実・鮮度確認 | 対象資料、任意snapshot | snapshotを永続保存する場合は先に保存・identity確認後資料更新、指定先のみ | URL・操作許可・証跡制約 | 部分：明示保存先。snapshotは任意、保存要求時のみ完了条件 |
+| [test-execution](../../skills/test-execution/SKILL.md) | 詳細TCのAI直接実行 | 実行前YAML、Run、観測、TC結果、cleanup | 実行前条件固定、実行後Markdown/証跡、指定先 | 環境・準備・操作許可 | 未統一：最終Markdownに実行前YAMLを保持 |
+| [testware-implementation](../../skills/testware-implementation/SKILL.md) | 非E2Eコード/fixture/設定実装 | testware、実装参照、軽量検証 | 隔離作業・検証・認可後、対象repo | 変更範囲・必要保存承認 | 部分：対象repo既存構成・許可範囲 |
+| [testware-execution](../../skills/testware-execution/SKILL.md) | 非E2E runner/静的解析実行 | Run、raw参照、attempt、診断、cleanup | preflight・実行後、指定先。分析/raw分離 | 環境・操作・必要予約許可 | 固定：repo外の保護された指定artifact root、manifest.json、attempt log等 |
+| [regression-testing](../../skills/regression-testing/SKILL.md) | baseline更新、変更、定期実行依頼 | Baseline、membership、Run、Activity、履歴 | 選定・Activity確定時、Section 14/明示root | 初回方針、必要実行条件 | 部分：Section 14/明示root/direct ref、baseline/run/activity形式 |
+| [exploratory-testing](../../skills/exploratory-testing/SKILL.md) | 探索・owner不明hypothesis | Charter、Session、Finding、Observation | Charter固定後、観測/終了時、Section 14/明示root | 目的・scope・timebox・操作許可 | 部分：Section 14/明示root/direct ref、Charter/Session形式 |
+| [qa-knowledge](../../skills/qa-knowledge/SKILL.md) | candidate triage、再検証、更新 | entry、根拠、適用範囲、履歴 | entry単位CAS/readback、knowledge root | 必要時保存・採否判断 | 固定：qa.knowledge_root/`<entry-ref>.md`。更新にはnative CAS |
+| [defect-management](../../skills/defect-management/SKILL.md) | FAIL/Finding/Observation後 | 欠陥候補、Issue参照、修正確認依頼 | 候補整理・認可済み操作後、指定先/Issue tracker | 外部Issue操作認可 | 部分：qa.defect_issue_tracker_ref。候補文書pathは未統一 |
+| [test-reporting](../../skills/test-reporting/SKILL.md) | 統合報告、終了基準確認 | 読取専用snapshot、母集団、完全性 | 集計検証後、指定先。元結果不変 | 結果・リリース判断 | 未統一：immutable snapshot_ref。指定providerにcreate-if-absent |
+| [test-evaluation](../../skills/test-evaluation/SKILL.md) | QA活動終了・改善効果確認 | 5軸評価、改善状態、効果測定、引継ぎ | 評価・状態移行後、指定先 | 改善採否・受領 | 未統一：評価・改善・引継ぎ形式 |
+| [usability-evaluation](../../skills/usability-evaluation/SKILL.md) | 保存済みUI資料のUX評価 | 評価、根拠、改善案 | 評価後必要時指定先、browser操作なし | 資料・目的 | 未統一：資料評価形式、保存は要求・案件条件に従う |
+| [usability-inspection](../../skills/usability-inspection/SKILL.md) | Live Web UI使用性・測定 | 観測、測定、証跡、cleanup | 観測後、明示安全な保存先・必要handoff | URL・scope・操作/保存許可 | 未統一：観測・証跡形式、安全な指定先 |
+| [wcag-conformance-evaluation](../../skills/wcag-conformance-evaluation/SKILL.md) | formal WCAG評価依頼 | Plan、sample、結果、report、EARL | Plan登録、観測handoff、closure/readback後、指定先/対応SQLite state | 対象、版、level、評価責任・scope | 部分：対応local SQLite stateは固定、外部report/EARL配置は別途指定 |
 
 ## 保存先の解決
 
@@ -63,7 +65,7 @@
 | Section 14 | 既存QA成果物、Regression/Exploration履歴のrootまたはref、範囲、鮮度 |
 | Section 4 | 実行環境、認証取得方法、共有resource、許可上限、cleanup、証跡制約 |
 
-保存先・承認policy・provider能力が不明なら正式保存をblockする。既存Git正本を無断SQLite移行しない。ローカルSQLiteは明示された対応用途限定。遠隔保存能力をローカルfixtureから推定しない。
+初回Project Context探索は案件・許可範囲・候補ref・read権限を確認し列挙完了時だけ不存在と判断。既存配置・合意を優先し未設定rootを自動作成しない。保存先・承認policy・provider能力が不明なら正式保存をblockする。既存Git正本を無断SQLite移行しない。ローカルSQLiteは明示された対応用途限定。遠隔保存能力をローカルfixtureから推定しない。
 
 ## UI target package
 
@@ -71,4 +73,4 @@
 
 ## 引継ぎの最低情報
 
-担当owner、scope、artifact ref、保存revision、content hash（必要時）、source refs/revisions、依存先、意味上の状態、検証結果、承認要否/参照、未解決理由、再開ownerを既存成果物・stateで引き継ぐ。新しい中央台帳を作らない。表示Markdownでcanonical JSONやraw結果を代替せず、validator成功だけで承認・readback・実開始を証明しない。
+担当owner、scope、artifact ref、保存revision、content hash（必要時）、source refs/revisions、依存先、意味上の状態、検証結果、承認要否/参照、未解決理由、再開ownerを既存成果物・stateで引き継ぐ。新しい中央台帳を作らない。表示Markdownでcanonical JSONやraw結果を代替せず、validator成功だけで承認・readback・実開始を証明しない。複数成果物の依存ref/revision・commit/snapshot境界を固定し、部分保存時は依存する下流をcurrentとして渡さない。readback失敗で外部先が旧版のままと断定しない。
