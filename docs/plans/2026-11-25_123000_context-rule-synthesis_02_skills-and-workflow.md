@@ -5,7 +5,7 @@
 ## 1. 実装配置と責務
 
 - skills/context-signal-audit/{SKILL.md,assets/,references/,scripts/,evals/}、skills/context-rule-synthesis/{SKILL.md,assets/,references/,scripts/,evals/}を追加。SKILL.mdは選択条件・責務・入出力・短い手順、詳細のdata-contract/guidanceとサンプルJSONはreferences/assetsに置く。必要時だけ読み込む。通常出力には人が確認できる短い要約を付け、保存JSONと重複する第二の正本を作らない。
-- production helperの候補: Aのbatch identity/validate、Bのcandidate/run identity/validate/impact/completion_checkを各Skill scriptsに置く。共通のcanonical処理が必要なら既存のSkill-local copy同期規約を使うか、保存ownerの共通helperを明示依存として利用する。単体Skillで参照先がない場合は分析案作成を続け、保存・完了のみ未確認とする。全共通runtime複製やeval validatorの本番利用は不要。関数/CLIの分割は実際の処理量に従う。
+- production helperの候補: Aのbatch identity/validate、Bのcandidate/run identity/validate/impact/completion_checkを各Skill scriptsに置く。共通のcanonical処理が必要なら既存のSkill-local copy同期規約を使うか、保存ownerの共通helperを明示依存として利用する。単体Skillで参照先がない場合は正式実行を未完了とし、別途読み取り・分析案を求められた範囲で対応する（§4）。全共通runtime複製やeval validatorの本番利用は不要。関数/CLIの分割は実際の処理量に従う。
 - qa-workflow/SKILL.md、references/guidance.md、assets/workflow-state-template.mdへ起動・試行state・局所停止・再利用を追加。owner_verifiers.py、runtime_contract.py（Skill-localコピー同期）、READMEのcatalog、EVALS、必要な固定registry/fixtureを更新。workflow_runtime.pyやdownstream_state.pyは既存共通処理で成立するなら変更しない。
 - runtimeの機械検証とAIの意味判断を分離。意味的な抽出漏れ、表現ゆれ、仮説の比較、反例分類、owner選択のために固定語彙・固定スコア・全資料の再取得を要求しない。
 
@@ -24,15 +24,15 @@
 
 ### 分析手順
 
-1. 許可rootの候補・batch・過去回答・仕様/DEC/ASM・Knowledge等を軽量発見する。provider listと既存ownerのread/scanを使い、scopeだけで除外しない。横断属性、同義概念、対象操作、条件等で絞り、必要な本文だけを取得。qa-knowledge.lookupの正式適用scopeを緩めず、read_root_entries/scan_knowledge_rootの発見後、既存lookup/compare_currentness等で適用可能性を確認する。中央indexは作らない。導入前の既存根拠も対象。
+1. 許可rootの候補・batch・過去回答・仕様/DEC/ASM・Knowledge等を軽量発見する。provider listと既存ownerのread/scanを使い、scopeだけで除外しない。横断属性、同義概念、対象操作、条件等で絞り、必要な本文だけを取得。qa-knowledge.lookupの正式適用scopeを緩めず、read_root_entries/scan_knowledge_rootの発見後、既存lookup/compare_currentness等で適用可能性を確認する。中央indexは作らない。導入前の既存根拠も対象。第1段階は既存保存JSONやownerの既存成果物からhelperで、ref/revision/hash、scope、操作・横断属性、成立条件、候補の短い主張/観察要約、状態・鮮度・必要参照を投影する。providerの列挙や既存ownerの一覧が不足する場合は許可範囲内の本文をhelper側で読んで投影し、全本文をAIへ渡さない。AIは表現ゆれ・同義概念から必要な対象を選ぶ。第2段階で選択した本文と直接参照根拠を取得して既存ownerで適用性/鮮度を確認する。絞り込みに必要な情報を得られない資料は未確認または必要な追加取得として扱い、機械的なタグ不一致だけで除外しない。固定の候補件数上限や別indexは設けない。
 2. 直接参照全ソースと検索条件、取得完全性をsnapshotへ記録。completeは指定した列挙・検索・確認手順が終わったことを表す。未知の根拠が絶対に存在しないとは主張しない。取得失敗を空検索としない。
 3. 同一コンポーネント、同一仕様書、改訂再取得による同一観察をindependence_groupでまとめる。観察件数だけで根拠の強度を決めない。
 4. 共通法則と差異条件を比較。例: 「管理者」対「復元不能な削除」など相関する複数仮説は独立候補にし、competing_hypothesis/alternativeを関係づけ、必要な判別調査を特定。1候補1独立仮説、関係数・候補数の固定上限は設けない。
 5. 候補ごとに支持、反例、未観察、判定不能、対象外を区別。未観察を反証にしない。反例原因6分類（01参照）で根拠不足はunclassified。governing_conditionsへ意味条件を構造化しapplicabilityと整合させる。
 6. 有効なSPEC/DEC/承認済みASMと照合。spec-analysis/references/authority-resolution.mdの適用範囲、補足/上書き/置換、失効・現在性の契約に従う。観察多数で有効仕様を上書きしない。未承認ユーザー回答は正式決定にも確定却下にも昇格させない。
 7. 過去の候補・回答・却下範囲を照合し、同義重複は01の並行安全な手順で統合する。安全に統合できない場合は独立候補として保持し他分析を続ける。
-8. 追加調査の必要性を判断し、既存ownerへ局所handoff。既に確認した同じsource hash/条件でno_new_infoなら再調査せず質問/保留へ。一時障害は認証/権限/環境/安全承認の解消でrevision不変でも再開可能。必要な調査を回数だけで打切らない。実観測はexploratory-testingのinvestigationと既存成果物を使い、exploratory_runtime.pyの既存handoff先制約は変更しない。
-9. 予定集合をrunへ保存し候補更新/readback、必要handoffの到達確認、run完了。候補0件もrunを保存。候補の未解決自体は分析失敗ではない。調査/質問handoffが成立していれば分析工程は完了できる。
+8. 追加調査の必要性と既存ownerへの局所handoffの反映意図を決める。読み取り専用調査はこの段階で実行可。永続的な副作用を伴う操作は手順9の予定保存後に実行する。既に確認した同じsource hash/条件でno_new_infoなら再調査せず質問/保留へ。一時障害は認証/権限/環境/安全承認の解消でrevision不変でも再開可能。必要な調査を回数だけで打切らない。実観測はexploratory-testingのinvestigationと既存成果物を使い、exploratory_runtime.pyの既存handoff先制約は変更しない。
+9. 予定集合をrunへ保存し候補更新/readbackを確認、必要なhandoffのpending・反映意図を保存してから実行し、実ownerのreadback・到達確認を候補/runへ反映する（01 §4）。全予定を確認後run完了。候補0件もrunを保存。候補の未解決自体は分析失敗ではない。調査/質問handoffが成立していれば分析工程は完了できる。
 
 ### 既存ownerの振り分けと冪等照合
 
@@ -66,19 +66,27 @@
 
 ## 4. workflow起動・再利用・モード
 
-起動判定の純粋helperは既存state、入力hash、保存batch、完了run、要求範囲を比較し、Aの未実行/失敗/変更を判断する。BはAごとの自動起動をしない。重大な反例/競合、新機能QA開始時、下流テスト設計/仕様根拠確定の直前、案件に適した蓄積契機、明示指示で起動する。complete 0件のみではBを起動しない。未処理not_checkedを下流直前まで放置しない。Bの対象バッチ集合は要求scope・観点・環境が一致する最新完了runのtarget_batch_refsと比較する。別観点では過去batchも再利用可能。最新runだけで処理済み集合が失われるなら対象集合を累積して保存し、毎回全本文を再読しない。処理済みnot_checkedの無限起動を防ぐ。
+起動判定の純粋helperは既存state、入力hash、保存batch、完了run、要求範囲を比較し、Aの未実行/失敗/変更を判断する。BはAごとの自動起動をしない。重大な反例/競合、新機能QA開始時、下流テスト設計/仕様根拠確定の直前、案件に適した蓄積契機、明示指示で起動する。complete 0件のみではBを起動しない。未処理not_checkedを下流直前まで放置しない。Bの対象バッチ集合は要求scope・観点・調査条件・環境が一致する最新完了runのtarget_batch_refsと比較する。別観点では過去batchも再利用可能。最新runだけで処理済み集合が失われるなら対象集合を累積して保存し、毎回全本文を再読しない。処理済みnot_checkedの無限起動を防ぐ。
 
 再利用は要求範囲/観点/調査条件/環境/入力内容hash不変、関連未処理batchなし、候補・全直接参照ソース・Authority有効性/Entity fingerprint不変、取得可能化や新規反例・独立支持根拠なしの全条件で判断する。Git HEAD単独では判定しない。本文hashが同じでも上位DECによる上書き、ASM失効、Knowledge置換、build・環境・権限変更、過去回答のscope/revision/承認状態の変化、Machine Entity fingerprint変化を再評価する。新規反例や独立支持は軽量一覧の差分から検知し、同一観察の再取得は独立支持に数えない。deferredの論点が後続QAで合否必須化された場合、一時障害が解消した場合もrevision不変でinvestigatingへ戻す。候補更新のみでは既存テスト設計をstaleにしない。正式SPEC/DEC/承認済みASM/PROJECT_CONTEXT/Knowledge、test-analysisの正式Product Risk・テスト重点が変化した場合のみ既存artifact_graph.compare_used_context・Machine Entity dependencyで影響範囲を再検証する。
+
+### Bの起動・再利用・再開
+
+- Bの開始時に正規化した入力ref/hash群、要求条件、run refを確定し、保存済みrun参照を既存workflow stateへ記録する。中断後は先にstateとrunをreadbackして開始時入力・予定・確認済みhashを復元する。state記録前の中断は同一workflowのrun一覧/開始条件から復元可能な記録を確認し、現在の自己更新後hashだけで新runを生成しない。
+- 同一operationの自己更新は実readbackのcurrent hashとconfirmed_result（結果記録前の中断は予定hashと実readback・operation履歴）の一致で確認し、既保存分を再書込みしない。外部変更・権限失効・新規根拠があれば影響範囲の判断をやり直す。開始時入力を上書きせず、変更した入力/要求で新しいoperationを開始する場合は旧runの履歴と確認済みhandoffを再利用する。
+- 補助モード等で今回Bの実行が不要かつ再利用条件を満たす場合は既存完了runを参照して起動を省略できる。別workflowの既存runは分析根拠であり、今回の実行を証明するものではない。Bの実行が明示要求/必須scopeの場合、今回のworkflowで最新の根拠と既存結果を照合し、再分析不要ならreuseの予定と実readback・理由を含むcompleted_zero_changes runを保存する。同一workflowの同一完了operationの完全再送は既存runを再検証して再利用し、重複実行しない。
+- payloadや分析範囲が大きい場合は、まずhelperの選択読取でAIへの入力を抑える。独立した範囲・観点・条件に分割できる場合のみ複数runに分け、開始時の全要求範囲と各runへの対応をstateに保持する。各runは自らの予定集合を確定保存し、必須工程は全要求への対応と全run完了を確認する。分割で共通仮説の比較や直接参照根拠が欠落しないよう、横断的な比較が必要な範囲は同一分析で扱う。
 
 新機能開始時: 対象決定→横断発見→hashとAuthority鮮度確認→spec-analysisのAuthority解決→残存不明点をquestion-analysis→下流へ。未承認仮説は探索/調査/観点候補として渡し、PASS/FAIL期待値には使わない。未評価反例が出た場合は当該判断のみ再評価する。
 
 モード:
+
 - 無効/無指定: A/Bを起動せず既存state、要求集合、処理負荷を変えない。
 - 補助: requested_scopes/workflow_scopesに含めない。未設定not_configured、失敗/partialは補助未完了と記録し既存工程の完了を破壊しない。利用できる候補や根拠を表示する。
 - 必須: 明示要求または案件必須設定を開始時requested_scopesに記録。未設定・不完全・認可不足でも要求から除外しない。該当scopeを未完了/blocked、他scopeは継続。
 - 単体: 指定Skillだけを起動。保存先・認可等の実行条件不足時は正式な単体実行を停止し、同じverifierを利用する。利用者が別途読み取り・分析案を求める場合は可能な範囲で対応し、正式保存・正式完了とは区別する。
 
-A試行stateは既存workflow_refごとのstate envelopeに必要時のみ追加（例: state.context_signal_attempts）。operation ID/入力ref/hash、要求/実取得範囲、batch ref/revision、candidate_check、status=unexecuted|fetch_failed|partial|extract_failed|persist_failed|completed、失敗理由、再開条件。補助not_configuredは設定状態として別記録。既存native CAS state providerで更新。exact-content tokenをCASと誤認せず、未設定ならセッション内の試行結果を保存済みと称さない。Bのrun refと再開先を既存stateに参照として保持。第4成果物storeは作らない。
+A試行stateは既存workflow_refごとのstate envelopeに必要時のみ追加（例: state.context_signal_attempts）。operation ID/入力ref/hash、要求/実取得範囲、batch ref/revision（複数batchなら各ref/revisionと担当範囲）、candidate_check、status=unexecuted|fetch_failed|partial|extract_failed|persist_failed|completed、失敗理由、再開条件。補助not_configuredは設定状態として別記録。既存state保存経路で更新する。共有先はnative CASまたは実hostで確認済みの単一writerの範囲を使用し、exact-content tokenをCASと誤認しない。共有先で整合を保証できない更新は該当操作を未完了とし、未設定ならセッション内の試行結果を保存済みと称さない。Bのrun refと再開先を既存stateに参照として保持。第4成果物storeは作らない。
 
 ## 5. owner verifierと完了
 
@@ -88,15 +96,17 @@ runtime-v2 rootを新設せず、owner_verifiers.VERIFIERSおよびruntime_contr
 
 - Aは開始時に要求された全入力を一件ずつ、Bは要求された分析範囲・観点・調査条件ごとに記録する。要求入力の元refまたは明示された対象識別、要求範囲、観測/分析条件、workflow_refを保存し、内容hash確定前でも要求を区別する。識別できない集合は未確定要求として残し、空集合として完了させない。
 - 開始時点で実成果物refが確定している要求は既存のrequested_scopesへ直接記録する。未確定の場合は、同じworkflow内の要求識別から決定論的に作る一意の仮target（例: `request:<sha256>`）をrequiredとして記録し、既存workflow stateの要求記録に対応する元入力・範囲を保持する。仮targetは成果物refではなく、owner verifierの完了証拠にはしない。未確定scopeはworkflow_scopesへ完了scopeとして渡さず、既存のrequired_scope_missingで未完了にする。
-- 入力hashと実取得範囲・観測条件が決まったらAの保存batch ref（過去の広いbatchを再利用する場合も実際のref）またはBのrun refに対応付け、元の要求と現在の実行範囲を維持したrequested_scopesへ具体化する。Aのexecution_rangeは今回要求した範囲のcanonical表現とする。Bは今回要求した分析範囲・観点・条件を区別する。内容hashを得ただけで要求範囲を狭めない。複数要求が同一batchを参照する場合は個別の要求範囲・条件を全件照合し、同一の最終scope identityになる本当に同じ要求のみ重複排除する。
-- 元の要求集合と確定後scopeの対応、未確定・未取得・失敗の要求を既存workflow stateに保持する。stateの既存native CASで対応付けと要求集合を更新し、競合時は再読取。要求追加・変更とref具体化を区別し、具体化で元要求を削除しない。条件変更は新しいoperationとして扱う。元要求との対応が欠ける場合は該当要求をrequiredのまま残す。新しい要求管理ストアは作らない。
+- 入力hashと実取得範囲・観測条件が決まったらAの保存batch ref（過去の広いbatchを再利用する場合も実際のref）またはBのrun refに対応付け、元の要求と現在の実行範囲を維持したrequested_scopesへ具体化する。Aのexecution_rangeは今回要求のうち当該batchが担う範囲のcanonical表現とする。単一batchで全域を包含すれば従来どおり一scope、複数batchで補う場合は実batch refごとのscopeを宣言し、元要求→実scope群の対応と担当範囲の和集合を検証する。Bは今回要求した分析範囲・観点・条件を区別し、分割時は全runへの対応を保持する。内容hashを得ただけで要求範囲を狭めない。複数要求が同一batchを参照する場合は個別の要求範囲・条件を全件照合し、同一scopeが複数要求の証拠になる場合も元要求の対応を消さない。同一の最終scope identityで同一証拠を検証する場合のみscopeを重複排除する。
+- 元の要求集合と確定後scopeの対応、未確定・未取得・失敗の要求を既存workflow stateに保持する。stateの既存保存経路（共有先はnative CASまたは確認済み単一writer）で対応付けと要求集合を更新し、競合時は再読取。要求追加・変更とref具体化を区別し、具体化で元要求を削除しない。条件変更は新しいoperationとして扱う。元要求との対応が欠ける場合は該当要求をrequiredのまま残す。新しい要求管理ストアは作らない。
 - hostはruntimeへ渡すrequested_scopes/normalized_input.owner_verificationが元要求を全件網羅し、確定ref・範囲と実readbackが対応することを確認する。owner verifierは当該scopeの範囲、元入力、観測条件、実readbackを検証し、既存runtimeは最終scope集合の全件完了を検証する。再開時も保存済みの元要求と対応、凍結済みruntime証拠・verified_owner_scopesを照合する。現在の共通処理で元要求の消失を検知できない場合のみ、共通gate/再開処理を必要範囲で修正する。新runtime-v2 rootや別workflowエンジンは作らない。
+
+実装初期に既存 `test_integration_required_scopes.py`、`test_owner_scope_resume.py`、`test_workflow_runtime.py` を使い、仮targetが未完了の間の挙動、元要求を保持した実refへの具体化、複数batch/runへの対応、凍結済みinput/resultとstate再開の整合を検証する。既存runtimeへ渡すのは確定したscopeと残存する未確定scopeであり、元要求の同一性はstateの対応で維持する。既存共通処理で成立しない場合だけ要求集合の検証・再開経路を修正し、既存のv1/v2記録は移行なしで扱えることを確認する。
 
 ### 完了証拠
 
-Aは全要求入力について、保存本文の初回 `scan_completeness` と今回の取得完全性を区別し、01 §3の範囲包含・source hash・観測条件・正常抽出・実readbackで今回のcompleteを再計算する。過去partialでも今回の要求全域を満たす場合は完了可能。逆に初回completeだけを根拠に今回の広い要求を完了としない。必要に応じて既存バッチの再利用を優先し、不足分を取得する。単一バッチで全件完了を自己申告しない。
+Aは全要求入力について、保存本文の初回 `scan_completeness` と今回の取得完全性を区別し、01 §3の範囲包含・source hash・観測条件・正常抽出・実readbackで今回のcompleteを再計算する。過去partialでも今回の要求全域を満たす場合は完了可能。逆に初回completeだけを根拠に今回の広い要求を完了としない。必要に応じて既存バッチの再利用を優先し、不足分を取得する。複数batchの組み合わせは各batchのcanonical本文/実readbackと担当範囲を個別scopeで検証し、hostの完了gateで同一source/hash/観測条件における範囲の和集合が元要求全域を満たすことを確認する。未取得範囲があれば元要求を未完了のまま維持する。単一バッチで全件完了を自己申告しない。
 
-Bのtargetはrun ref。候補全件のreadback・予定hash・snapshot・必要handoffを実providerからhostが取得し、owner helperのcompletion_checkへ渡す。候補単体もvalidate/validate_readbackを提供。
+Bのtargetは今回のrun ref（独立範囲に分割した場合は各run ref）。候補全件のreadback・予定hash・snapshot・必要handoffを実providerからhostが取得し、owner helperのcompletion_checkへ渡す。候補単体もvalidate/validate_readbackを提供。
 
 normalized_input.owner_verificationは保存本文のcanonical JSON文字列、expected_revision、readback（content_hash等）、要求入力集合/根拠/候補/handoffの照合に必要な実readbackを受ける。正確なフィールドは既存verifierのkeysと再開記録のverified_artifactに合わせる。owner CLIは保存本文・identity/ref/path・project・hash/範囲・完全性・0件理由・予定集合・currentness/引継ぎを確認する。hostが実readbackを供給し、AIによる同形JSONの自己申告では正式完了しない。既存runtimeが信頼済みhost入力と任意CLI入力を区別できない点は、host内で完了検証を実行し証拠受渡しを管理する。独立readbackを取得しない任意CLI呼出しの結果を正式完了として採用しない。
 
