@@ -4,7 +4,7 @@
 
 ## 全体の設計原則（常時適用）
 
-- [QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)（PRN-01〜08、Q01〜08）を新規・改修・Plan・レビューの共通前提とします。不要な責務・処理・防御を先に削減し、SkillだけでなくRuntime・validator・Helper・ハーネスも必要性から評価します。
+- [QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)（PRN-01〜08、Q01〜12）を新規・改修・Plan・レビューの共通前提とします。不要な責務・処理・防御を先に削減し、SkillだけでなくRuntime・validator・Helper・ハーネスも必要性から評価します。
 - 既存の開発用Git保護・実行権限は維持します。未改修の契約との差異は対象Planで明示し、必要な保証を検証します。共通原則の詳細は正本文書を参照し、重複記載を増やしません。
 
 ## 常時必要な契約

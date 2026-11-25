@@ -35,6 +35,8 @@ node --check .codex/hooks/pre_tool_use_policy.mjs
 
 ## Skill構成
 
+以下の構成・責務一覧および既存契約は現行実装の説明です。新規・改修では冒頭の共通原則を適用し、旧案件配置・保存方式・検証機構の必要性を対象Planで評価します。未改修の現行契約は維持し、必要な保証を検証してから置き換えます。
+
 ```text
 skills/
 ├── qa-workflow/
