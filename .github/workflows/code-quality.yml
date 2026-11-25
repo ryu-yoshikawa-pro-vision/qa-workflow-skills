@@ -35,7 +35,7 @@ jobs:
 
       - name: Record tool versions
         run: |
-          ruff --version
+          python scripts/format_tracked.py ruff-version
           dprint --version
 
       - name: Test tracked formatter contracts

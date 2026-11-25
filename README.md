@@ -10,18 +10,18 @@ Pythonのformatter/lint・決定論的評価ツールをローカルで使う場
 python -m pip install -r requirements-dev-lint.txt -r requirements-dev-evals.txt
 ```
 
-Ruffのversion pinは`requirements-dev-lint.txt`を正本とし、共通scriptが実行前にCLI versionを照合します。dprintは`0.55.2`を使用します。通常のformat / lint入口はGit tracked fileを対象にする共通scriptです。
+Ruffのversion pinは`requirements-dev-lint.txt`を唯一の正本とし、version表示を含む通常のlint / import整理 / formatは`scripts/format_tracked.py`から実行します。`ruff-version`はCLI versionを照合して表示します。各Ruff処理もtracked Python fileへ操作を行う直前に、requirements内の唯一の空でない`ruff==` pinとCLIの`ruff --version`出力全体を照合します。Ruff処理の対象となるtracked Python fileがない場合はCLI version照合を行いません。この保証は共通scriptが起動するRuffに対するもので、専用仮想環境の強制や、script外でのRuff直接実行を禁止・防止するものではありません。dprintは`0.55.2`を使用します。
 
 ```bash
-ruff --version
 dprint --version
+python scripts/format_tracked.py ruff-version
 python scripts/format_tracked.py ruff-check
 python scripts/format_tracked.py import-fix
 python scripts/format_tracked.py format
 python scripts/format_tracked.py check
 ```
 
-Pythonの開発・CI依存関係は`requirements-dev-lint.txt`と`requirements-dev-evals.txt`で管理します。DependabotはGitHub Actionsとpipのsecurity updatesを対象にし、通常のversion-update PRは作成しない設定です。Dependabot security update PRも通常のPRとしてreviewとCIを通してからmergeします。GitHub側でDependabot security updatesが有効であることを確認してください。
+Pythonの開発・CI依存関係は`requirements-dev-lint.txt`と`requirements-dev-evals.txt`で管理します。Dependabotの`weekly`は通常のversion updatesに対するチェックscheduleです。両ecosystemの`open-pull-requests-limit: 0`で通常のversion-update PRは作成しません。security updatesは脆弱性advisoryに起因するDependabot alertで起動し、このweekly scheduleでは周期を定めません。security update PRもreviewとCIを通してからmergeします。GitHub側でDependabot security updatesが有効であることを確認してください。presetの対象範囲は[CI依存関係の調査文書](docs/reference/ci-dependency-security-management.md)に記録しています。
 
 Codex開発ハーネスとexecpolicyは特定のCodex CLI versionに固定していません。Codex Harness CIはnpmの`latest` stable tagからCLIを導入し、使用versionを記録したうえで実CLIの機能と安全contractを検証します。静的contractは次で確認できます。実runtime受入の条件と保証範囲は[`docs/reference/codex-safety-harness.md`](docs/reference/codex-safety-harness.md)を参照してください。
 

@@ -61,6 +61,38 @@ PR #22で導入されたQA workflow、Skill、runtime、validator、評価基盤
 - セキュリティ修正以外のGitHub UI設定、Alert、rulesetは変更しない。
 - PR作成後、mainへmergeしない。既存PR #10/#17/#22のbranchや変更には触れない。
 
+## PR #39 final adjustment plan (2026-11-25)
+
+### Start state and goal
+
+- 作業開始時のPR #39はopen、base `main` (`a37b15508dadd17ac0228ac896badb71d6a8f2c7`)、head `d18485fb5d72f5d1a1314cd82008f37bf6464d87`。作業branch `fix/ci-security-hardening`のworking treeはclean。`gh pr checks 39`では開始時headの5 workflowとCodeQL aggregate / 3 Analyze jobsがsuccess、CodeRabbitはskipped。
+- 有効な開発経路を検索したところ、Ruffの実処理は`format_tracked.py`経由だが、READMEの`ruff --version`とCode Quality workflowのversion記録stepにscript外の直接呼出が残る。
+- Ruffのversion正本を`requirements-dev-lint.txt`、lint/import/formatの正規実行経路を`scripts/format_tracked.py`に統一し、requirements pinの変更追従、pin欠落・重複・空値、Ruff version取得失敗を回帰testで確認する。
+- Dependabot公式仕様に基づき、development-scoped low-impact presetは対象metadata等の条件を満たすnpm dependencyのalert向けであり、pip ecosystemのRuff / PyYAMLには適用されないことを調査文書へ明記する。また`weekly`は通常version updatesのscheduleであり、security updatesの周期はadvisoryにより起動する別動作だとPR本文と関連文書に明記する。
+
+### Scope and exclusions
+
+- README、`.github/workflows/code-quality.yml`、`scripts/format_tracked.py`、`tests/test_format_tracked.py`、このPlan、`docs/reference/ci-dependency-security-management.md`。
+- `requirements-dev-lint.txt`のRuff pin、`ruff.toml`（`required-version`を追加しない）、他dependency versions、QA仕様、CI triggers / 検証対象、安全ハーネスは変更しない。
+- 専用venvを強制しない。script外からのRuff直接実行を禁止・検出する独自機構、設定自動生成は導入しない。通常のRuff処理でtracked Python fileが未対象ならCLI version checkを行わず、明示的な`ruff-version` commandは対象fileの有無にかかわらず照合・表示する保証範囲を明記する。
+
+### Implementation and validation order
+
+1. CIのversion記録を`python scripts/format_tracked.py ruff-version`経由にし、READMEのversion表示とlint/import/format手順を同scriptへ揃える。scriptはtracked Pythonが対象になる実処理前に、唯一のnon-empty `ruff==` pinと`ruff --version`全出力を照合する契約を保つ。
+2. Formatter testsにpin変更への追従、不一致、pin欠落・重複・空値、versionコマンドの非zero終了と起動失敗を追加する。いずれもRuff処理が呼ばれる前に停止することを確認する。
+3. READMEと本Planに正規入口と保証範囲を記載する。調査文書はGitHub presetの適用対象をnpm development dependencyの条件付きalertに限定し、Ruff / PyYAMLを対象外と明示する。weekly scheduleの意味も関連文書とPR本文へ反映する。
+4. formatter、lint、formatter regression tests、関連CI契約test、YAML、`git diff --check`を個別に実施する。既存環境でformatter実行不能ならCIで確認し、成功扱いしない。
+5. Code Review Skillに従い、PR差分・呼出経路・保証記述・tests・既存仕様をレビューし、指摘があれば修正して再検証する。
+6. 対象ファイルのみを作業branchへcommit・通常pushし、PR本文を現況へ置換する。最新PR headの全workflow / job / stepとCodeQL aggregate / Analyze jobsを`gh`で確認し、PlanとPR本文へHEAD・結果・URLを反映する。mainへmergeしない。
+
+### Completion criteria
+
+- 有効なCI / scripts / READMEのRuff実行入口は共通scriptに統一され、依存versionは不変、`ruff.toml`の`required-version`は未追加。
+- pin変更追従、不一致、欠落・重複・空値、version取得の非zero終了・起動失敗testがpassし、Ruff operationより前にvalidation errorとなる。
+- READMEとPlanがversion正本、正規実行経路、照合される条件と対象がない場合の未照合を説明する。
+- Dependabot調査文書とPR本文がweekly version-update scheduleとadvisory-triggered security updatesを区別し、npm development presetがRuff / PyYAMLをdismissしないと説明する。
+- 対象ローカル検証とreviewが実施済み、PR更新後の最新HEADで全CIとCodeQLが結果付きで記録済み。mainにはmergeしていない。
+
 ## Scope
 
 ### Included

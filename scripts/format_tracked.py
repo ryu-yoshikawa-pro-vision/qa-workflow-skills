@@ -25,7 +25,7 @@ DPRINT_EXTENSIONS = {
     ".mjs",
     ".jsx",
 }
-COMMANDS = ("ruff-check", "import-fix", "format", "check")
+COMMANDS = ("ruff-version", "ruff-check", "import-fix", "format", "check")
 
 
 class FormatError(Exception):
@@ -122,8 +122,8 @@ def run_ruff(command: str, paths: Sequence[str]) -> int:
     return result.returncode
 
 
-def verify_ruff_version() -> None:
-    """Require the Ruff version pinned in the lint requirements before use."""
+def verify_ruff_version() -> str:
+    """Require and return the Ruff version pinned in the lint requirements."""
     requirements_path = REPOSITORY_ROOT / "requirements-dev-lint.txt"
     try:
         requirements = requirements_path.read_text(encoding="utf-8").splitlines()
@@ -153,6 +153,7 @@ def verify_ruff_version() -> None:
         raise FormatError(
             f"expected {expected!r} from ruff --version, received {output!r}"
         )
+    return output
 
 
 def normalized_dprint_path(path: str) -> str:
@@ -244,6 +245,10 @@ def run_dprint(command: str, paths: Sequence[str]) -> int:
 
 def execute(command: str, paths: Sequence[str] | None = None) -> int:
     """Execute a formatter entry point over the current tracked file set."""
+    if command == "ruff-version":
+        print(verify_ruff_version())
+        return 0
+
     python_paths, dprint_paths = select_targets(
         paths if paths is not None else tracked_paths()
     )
