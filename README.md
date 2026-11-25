@@ -1,5 +1,7 @@
 # QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
+設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。
+
 新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
 ## Formatter / lintとCodex開発ハーネス

@@ -4,6 +4,8 @@
 
 ## 1. 実装配置と責務
 
+[共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。
+
 - skills/context-signal-audit/{SKILL.md,assets/,references/,scripts/,evals/}、skills/context-rule-synthesis/{SKILL.md,assets/,references/,scripts/,evals/}を追加。SKILL.mdは選択条件・責務・入出力・短い手順、詳細のdata-contract/guidanceとサンプルJSONはreferences/assetsに置く。必要時だけ読み込む。通常出力には人が確認できる短い要約を付け、保存JSONと重複する第二の正本を作らない。
 - 2026-11-25 利用者決定：成果物は指定ディレクトリで統一管理する。Skillに案件識別・探索・切替・保存先決定・Provider選択・ブランチ管理・認証方式選択を持たせない。必要な案件境界・root・実行条件・権限はハーネスが入力として提供し、不要な管理は移管せず削除する。SkillはQAの意味判断、成果物の意味・形式・相対配置、必要な質問・引継ぎに集中する。Helperは決定論的識別・検証・保存を担当する。ハーネスの特定製品への依存、新しい汎用管理基盤、既存案件の移行は本PRの対象外。
 - production helperの候補: Aのbatch identity/validate、Bのcandidate/run identity/validate/impact/completion_checkを各Skill scriptsに置く。共通のcanonical処理が必要なら既存のSkill-local copy同期規約を使うか、保存ownerの共通helperを明示依存として利用する。単体Skillで参照先がない場合は正式実行を未完了とし、別途読み取り・分析案を求められた範囲で対応する（§4）。全共通runtime複製やeval validatorの本番利用は不要。関数/CLIの分割は実際の処理量に従う。
@@ -63,13 +65,13 @@
 - test-target-inspection: `references/guidance.md` の対象/要素/状態キー、確認条件、build、保存ref/revision、immutable証跡。ui-target-analysis: `scripts/human_editing.py` のcurrent package・stable IDと既存scope、source ref/revision。正本の同一構造を再利用する。
 - defect-management: `scripts/defect_runtime.py` の `candidate_ref`、`operation_id`、`assess_candidate`、`plan_external_operation` と既存FAIL/Finding・defect ref/revision。既存外部課題の反映結果を確認し、同じ不一致を再登録しない。
 
-各handoffで、既存ownerのread/lookup→意味的重複判定→既存承認経路→native CASまたは既存の一意性保証→readbackを使用する。着手時にownerごとのsemantic_handoff_keyと実保存単位（許可root・scope・正本ref・外部サービスの冪等キー等）の対応、並行初回作成時の保証を確認・記録する。question-analysisのquestion_ids.pyは既存質問artifact内のQ IDを採番するが別artifact間の意味的一意性は保証しない。defect_runtime.pyのplan_external_operationはatomic_dedupe非対応時に自動retryを抑止するが並行初回createの一意性とは異なる。異なるrefへのCASが独立して成功する経路は01 §4の保証単位で収束させ、実際に利用できる既存ownerの経路だけを使う。CAS競合後は必ず再読取して同一意図の反映済みを再確認する。PR #38の3 owner保存契約が統合された場合はその正式経路と照合する。各ownerの具体的な保存API・実host/外部providerのCAS・承認接続は着手前に確認し、未確認の経路を既存APIとして扱わない。新Skillは既存ownerを肩代わりしない。結果不明で冪等性が保証できないhandoffのみblocked_unverifiableとし、他候補を継続する。
+各handoffで、既存ownerのread/lookup→意味的重複判定→必要な場合だけ内容承認/操作認可→実保存先に必要な条件付き更新または一意性保証→readbackを使用する。着手時にownerごとのsemantic_handoff_keyと実保存単位（許可root・scope・正本ref・外部サービスの冪等キー等）の対応、並行初回作成時の保証を確認・記録する。question-analysisのquestion_ids.pyは既存質問artifact内のQ IDを採番するが別artifact間の意味的一意性は保証しない。defect_runtime.pyのplan_external_operationはatomic_dedupe非対応時に自動retryを抑止するが並行初回createの一意性とは異なる。異なるrefへのCASが独立して成功する経路は01 §4の保証単位で収束させ、実際に利用できる既存ownerの経路だけを使う。CAS競合後は必ず再読取して同一意図の反映済みを再確認する。PR #38の3 owner保存契約が統合された場合はその正式経路と照合する。各ownerの具体的な保存API・実host/外部providerのCAS・承認接続は着手前に確認し、未確認の経路を既存APIとして扱わない。新Skillは既存ownerを肩代わりしない。結果不明で冪等性が保証できないhandoffのみblocked_unverifiableとし、他候補を継続する。
 
 ## 4. workflow起動・再利用・モード
 
 起動判定の純粋helperは既存state、入力hash、保存batch、完了run、要求範囲を比較し、Aの未実行/失敗/変更を判断する。BはAごとの自動起動をしない。重大な反例/競合、新機能QA開始時、下流テスト設計/仕様根拠確定の直前、実行条件に適した蓄積契機、明示指示で起動する。complete 0件のみではBを起動しない。未処理not_checkedを下流直前まで放置しない。Bの対象バッチ集合は要求scope・観点・調査条件・環境が一致する最新完了runのtarget_batch_refsと比較する。別観点では過去batchも再利用可能。最新runだけで処理済み集合が失われるなら対象集合を累積して保存し、毎回全本文を再読しない。処理済みnot_checkedの無限起動を防ぐ。訂正版・確認済み抽出誤りは対象範囲の再取得と再評価の契機とし、正常な旧0件batchを永続的な未処理なしの証拠にしない。訂正前後で重複した観察を新たな独立支持として数えない。
 
-再利用は要求範囲/観点/調査条件/環境/入力内容hash不変、関連未処理batchなし、候補・全直接参照ソース・Authority有効性/Entity fingerprint不変、取得可能化や新規反例・独立支持根拠なしの全条件で判断する。Git HEAD単独では判定しない。本文hashが同じでも上位DECによる上書き、ASM失効、Knowledge置換、build・環境・権限変更、過去回答のscope/revision/承認状態の変化、Machine Entity fingerprint変化を再評価する。新規反例や独立支持は軽量一覧の差分から検知し、同一観察の再取得は独立支持に数えない。deferredの論点が後続QAで合否必須化された場合、一時障害が解消した場合もrevision不変でinvestigatingへ戻す。開始時の関連状態を01 §2・3のoperation_inputへ含め、完了済みrunと今回の状態が変わった場合は新operationとして再評価する。未完了runの同一要求を再開する際は開始時identityを維持し、復旧・追加根拠の情報はsnapshotと予定に反映する。完全同一再送では新runを作らない。候補更新のみでは既存テスト設計をstaleにしない。正式SPEC/DEC/承認済みASM/PROJECT_CONTEXT/Knowledge、test-analysisの正式Product Risk・テスト重点が変化した場合のみ既存artifact_graph.compare_used_context・Machine Entity dependencyで影響範囲を再検証する。
+再利用は要求範囲/観点/調査条件/環境/入力内容hash不変、関連未処理batchなし、候補・全直接参照ソース・Authority有効性/Entity fingerprint不変、取得可能化や新規反例・独立支持根拠なしの全条件で判断する。保存先全体のrevision単独では判定しない。本文hashが同じでも上位DECによる上書き、ASM失効、Knowledge置換、build・環境・権限変更、過去回答のscope/revision/承認状態の変化、Machine Entity fingerprint変化を再評価する。新規反例や独立支持は軽量一覧の差分から検知し、同一観察の再取得は独立支持に数えない。deferredの論点が後続QAで合否必須化された場合、一時障害が解消した場合もrevision不変でinvestigatingへ戻す。開始時の関連状態を01 §2・3のoperation_inputへ含め、完了済みrunと今回の状態が変わった場合は新operationとして再評価する。未完了runの同一要求を再開する際は開始時identityを維持し、復旧・追加根拠の情報はsnapshotと予定に反映する。完全同一再送では新runを作らない。候補更新のみでは既存テスト設計をstaleにしない。正式SPEC/DEC/承認済みASM/PROJECT_CONTEXT/Knowledge、test-analysisの正式Product Risk・テスト重点が変化した場合のみ既存artifact_graph.compare_used_context・Machine Entity dependencyで影響範囲を再検証する。
 
 ### Bの起動・再利用・再開
 
@@ -85,7 +87,7 @@
 - 無効/無指定: A/Bを起動せず既存state、要求集合、処理負荷を変えない。
 - 補助: requested_scopes/workflow_scopesに含めない。未設定not_configured、失敗/partialは補助未完了と記録し既存工程の完了を破壊しない。利用できる候補や根拠を表示する。
 - 必須: 明示要求または外部から提供された必須設定を開始時requested_scopesに記録。未設定・不完全・認可不足でも要求から除外しない。該当scopeを未完了/blocked、他scopeは継続。
-- 単体: 指定Skillだけを起動。保存先・認可等の実行条件不足時は正式な単体実行を停止し、同じverifierを利用する。利用者が別途読み取り・分析案を求める場合は可能な範囲で対応し、正式保存・正式完了とは区別する。
+- 単体: 指定Skillだけを起動。必要入力があれば特定ハーネスなしで分析・設計を実行する。保存が要求される場合だけroot・許可・必要保存能力を確認し、未設定/未許可なら保存および保存必須の完了を未達とする。対話質問・分析案は可能範囲で提供し、保存済みと偽らない。
 
 A試行stateは既存workflow_refごとのstate envelopeに必要時のみ追加（例: state.context_signal_attempts）。operation ID/入力ref/hash、要求/実取得範囲、batch ref/revision（複数batchなら各ref/revisionと担当範囲）、candidate_check、status=unexecuted|fetch_failed|partial|extract_failed|persist_failed|completed、失敗理由、再開条件。補助not_configuredは設定状態として別記録。既存state保存経路で更新する。共有先はnative CASまたは実hostで確認済みの単一writerの範囲を使用し、exact-content tokenをCASと誤認しない。共有先で整合を保証できない更新は該当操作を未完了とし、未設定ならセッション内の試行結果を保存済みと称さない。Bのrun refと再開先を既存stateに参照として保持。第4成果物storeは作らない。
 

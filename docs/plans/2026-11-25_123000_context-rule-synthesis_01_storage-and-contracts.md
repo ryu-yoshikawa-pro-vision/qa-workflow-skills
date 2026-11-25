@@ -4,15 +4,17 @@
 
 ## 1. ディレクトリ配置・信頼境界・保存能力
 
+[共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。
+
 2026-11-25 利用者決定：成果物は指定ディレクトリで統一管理する。Skillに案件識別・探索・切替・保存先決定・Provider選択・ブランチ管理・認証方式選択を持たせない。必要な案件境界・root・実行条件・権限はハーネスが入力として提供し、不要な管理は移管せず削除する。SkillはQAの意味判断、成果物の意味・形式・相対配置、必要な質問・引継ぎに集中する。Helperは決定論的識別・検証・保存を担当する。ハーネスの特定製品への依存、新しい汎用管理基盤、既存案件の移行は本PRの対象外。
 - 新規3 kindは指定成果物root直下の `context-signal-batch/`、`context-rule-candidate/`、`context-synthesis-run/` に分類する。各kind内のファイル名は64桁lowercase SHA-256 identity + `.json`。A/Bのowner関係を保持する。1 Skill採用時もパス・kind・identityを変えず、必要なowner登録と認可を外部で同期する。既存正本の移動・別コピー作成を行わない。ディレクトリは必要時のみ作成する。
-- rootはハーネスが明示する。Skillは案件ID、Repository、ブランチ、Providerを探索・選択せず、root配下の相対refのみを扱う。保存実体の同一性、共有/隔離、許可範囲をハーネス/保存層で確認する。異なるrootの同名refや同じパス文字列だけでは共有・同一正本・CASを保証しない。rootの変更・既存成果物移行・既存保存契約の互換変換はSkillの責務外。
+- rootはハーネスまたは直接利用時の明示入力で与える。Skillは案件ID、Repository、ブランチ、Providerを探索・選択せず、root配下の相対refのみを扱う。保存実体の同一性、共有/隔離、許可範囲をハーネス/保存層で確認する。異なるrootの同名refや同じパス文字列だけでは共有・同一正本・CASを保証しない。rootの変更・既存成果物移行・既存保存契約の互換変換はSkillの責務外。
 - 有効化・補助/必須・単体実行条件は明示依頼またはハーネスから提供される設定で解決。無指定は無効。Project Contextの配置DEC/Section 14/16を新Skillが探索・更新することは要求せず、新規stable keyも追加しない。必要な既存設定の解決は外部境界で行う。
 - artifact_refは `<kind>/<64桁のlowercase SHA-256 identity>.json` のroot相対ref。kindはcontext-signal-batch、context-rule-candidate、context-synthesis-run。新規canonical本文/意味identityにproject_refを必須としない。refの解決・同一性・一意性は指定root内に限定し、別rootの参照・receipt・証拠を混ぜない。既存ownerのschemaに案件識別が必要な場合だけ外部接続で供給し、新Skillの意味判断へ持ち込まない。runとcandidate/batchの保存順は予定とrevision付き実readbackで確認する。
-- 着手前にハーネス/保存層で (1)指定rootの実体と許可範囲、(2)信頼された書込み・読取・外部操作権限、有効性/失効、(3)操作・kind・ref・digest/revisionへの認可束縛、(4)条件付き作成/更新・履歴・独立readback、(5)workflow evidenceへの信頼済み受渡しを実コード・設定・接続試験で確認する。PR #38のuser-confirmed自己申告、Git trailer、単なる書込み権限を認証の代替にしない。結果を実行環境の契約として記録し、Skillは方式を選択しない。
-- 信頼境界はハーネスから渡される実行条件と決定論的保存/検証入口。既存helperを優先し、必要な接続のみ追加する。特定ハーネス専用hook、認証基盤、汎用Provider抽象化、中央DBを新設しない。任意AI入力やダミーauthorizeを認証済みとみなさない。安全な保存能力が未確認なら正式保存/外部副作用をblockし、読み取り・分析案は継続可。
+- 実行環境で指定root・許可範囲・実書込み/読取・必要な履歴/readbackを確認。通常保存には都度承認、認証サービス、操作ごとの認可発行を追加しない。実際の共有writer、外部操作、権限失効等が関係する場合だけ必要な条件付き保存・一意性・操作/対象/権限の確認を既存経路で実証する。PR #38のuser-confirmed自己申告を認証済みとしない。
+- 信頼境界は呼出し元の許可と既存実行/保存環境。既存helper・標準ファイル操作を優先し、専用hook、認証基盤、汎用Provider抽象化、中央DBを新設しない。任意AI入力やダミーauthorizeを認証済みとみなさない。保存能力不足は該当操作のみblock、分析・対話質問は継続可。
 - root内のkind限定列挙、相対refによるcurrent/history読取、独立readbackを既存helperから利用する。既存の保存技術はディレクトリ契約と安全要件を満たす場合のみ外部で再利用し、既存storeのKINDS拡張を必須としない。新規DB・Git保存専用分岐・独自CASを追加しない。列挙の完全性、未取得理由、revision/content hashを明示する。
-- 決定論的保存層はroot外脱出、symlink、非canonical ref、許可外kind、別rootの証拠を拒否する。atomic create-if-absent、期待revisionによる条件付き更新、必要な履歴、独立readbackを満たす既存手段を使用する。通常のファイル書込みやatomic renameだけで共有CASを証明しない。実際に隔離された単一writerの条件は外部で保証し、複数writer・複数hostで保証できない操作はblockする。既存正本・旧保存契約の全面改変は不要。
+- 決定論的保存層は許可root外脱出・symlink逸脱・非canonical ref・別root証拠を拒否。必要なreadbackと履歴を維持し、単一writerの隔離が実際に保証される場合は最小ファイル処理で成立させる。共有更新時は既存条件付き更新/create-if-absent等で安全性を確認。通常書込みやatomic renameだけで共有CASを証明しない。全環境向け独自排他機構を新設しない。
 
 ## 2. 共通データ契約
 
@@ -78,7 +80,7 @@ triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、
 ## 4. 保存順序・再開・並行実行
 
 1. Aはバッチidentityでread、既存整合ならreuse、なければcreate。readback失敗と保存失敗を区別し、結果不明なら再実行前にreadする。旧batchを改訂しない。
-2. Bは固定した開始時入力と分析時点のsnapshot、全候補のplanned_payload/metadata・関連候補の前提を含むin_progress runを先に保存。実行中に追加の直接根拠を用いる場合は、該当候補の新しい予定を保存する前にsnapshotへ反映する。候補を一件ずつ書き、実readbackのhash/revisionをrunに追記。永続的な副作用（質問発行・owner成果物保存・外部課題作成等）に先立ち、予定候補のhandoff_recordsへsemantic_handoff_key・反映意図・target・pendingを記録し、runの予定本文および必要な候補の保存を確認する。read-only調査には事前保存を強制しない。handoffの開始前/再開時にownerで既存反映を照合し、実行結果を実readbackで確認してから候補更新の予定をrunへ保存し、候補とrunを更新する。最新予定と確認結果は一致させ、以前の判断はrun/provider履歴から参照する。予定未確認のままcompletedにしない。
+2. Bは固定した開始時入力と分析時点のsnapshot、全候補のplanned_payload/metadata・関連候補の前提を含むin_progress runを先に保存。実行中に追加の直接根拠を用いる場合は、該当候補の新しい予定を保存する前にsnapshotへ反映する。候補を一件ずつ書き、実readbackのhash/revisionをrunに追記。永続的な副作用（質問発行・owner成果物保存・外部課題作成等）に先立ち、予定候補のhandoff_recordsへsemantic_handoff_key・反映意図・target・pendingを記録し、runの予定本文および必要な候補の保存を確認する。read-only調査には事前保存を強制しない。handoffの開始前/再開時にownerで既存反映を照合し、実行結果を実readbackで確認してから候補更新の予定をrunへ保存し、候補とrunを更新する。最新予定と確認結果は一致させ、以前の判断はrun/provider履歴から参照する。予定未確認のままcompletedにしない。 対話質問は保存不能でも提示可。永続的handoffの成立と区別し、許可済み通常保存に都度承認を要求しない。
 3. 保存直前に対象本文hash・期待revision・関連依存ref/revision/hashを取得し、条件付き更新またはcreate-if-absentを行う。内容・依存・認可が不変と確認できる無関係な更新では不要な意味再分析をしない。真の対象変更・依存変更・承認失効は再判断する。条件付き保存のrevision更新や同時性は保存層に閉じ込め、Skillは保存技術を判断しない。別成果物の保存順はrunと独立readbackで確認し、複数ファイルの原子性は推測しない。
 4. 保存結果不明ならplanned_content_hashと実readbackを照合して既保存分を確認、未保存のみ実行。再送fingerprintの構成要素（本文、expected revision、関連候補の前提revision/hash、認可・書込みmetadata等）が変化した新要求は、元操作の結果を確認して新operation_idを発行する。元操作が既に成功していればそのreceipt/readbackを確認し、現在の結果が採用可能かを別途照合する。無条件上書き・ref巻戻し・別rootへの無断保存はしない。runの最終保存後も独立readback。完了済みrunの保存結果はconfirmed_result.storage_revisionのread_revisionとcontent hashで検証し、最新候補が後続runで更新されたことだけを理由に過去runを未完了に戻さない。未完了の再開では過去revision/operation履歴で既保存分を識別し、現在の候補・依存の変化は別に再評価する。現在の採用可能性は最新read_current・Authorityで判定する。過去revisionが取得不能なら当時の完了証明は未確認とし、最新本文で代替しない。
 5. 並行handoffはownerの既存CAS/create-if-absentと意味的重複再確認で収束させる。同一semantic_handoff_keyに対する実際の一意性保証をownerごとに確認し、同じ正本へのCAS、既存の一意性制約、外部サービスのatomic dedupe等を用いる。異なるartifact_refへのCASや事前の重複検索だけでは初回作成の重複を保証できない。既存ownerで反映先を同じ保存単位に正規化できる場合はその経路を使用し、保証単位が異なる場合は既存owner/hostの承認・単一writer等の実行経路で、当該同一意図の操作を順序付けて直前に再照合する。単に別workflowのローカルで直列実行しても共有先の排他を保証したとしない。実際の保証がない外部サービスでは、他の操作と同様に可能な範囲の調査・反映案・既存ownerへの承認依頼を続けるが、同一意図の無条件の並行createは実行しない。既存正本へ反映済みならreuse。結果不明で冪等性の保証がなければblocked_unverifiableとし、該当操作だけ停止する。候補統合は先に継承先を保存/readbackし、元候補のbase hashとrevision、先の有効性・継承根拠・後継循環を同じ保存条件で確認後に元をsuperseded。元/先と必要な後継経路のrevision/hash・有効性を、既存保存層の条件付き更新または実保証された単一writer境界で更新対象と一体確認する。意味判断は境界外、前提の不変確認は更新境界内。関連refの許可root・権限を検証し、前提集合を再送fingerprintに含める。関連候補の前提変更では本文不変でも再照合・新operation_id。安全に保証できない個別操作は旧候補を有効なまま独立保持し再判断する。独自lock・分散transactionを新設しない。

@@ -15,6 +15,10 @@
 
 ## 2. テストの配置と受入マトリクス
 
+[共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。
+
+許可済み通常保存・質問/回答保存が個別承認なしで成立、未承認候補をAuthorityへ昇格させない、直接利用・保存先未指定でも可能な分析を継続することを確認する。専用認証hostや新汎用防御機構の存在を合格条件にしない。
+
 既存 tests/skills/runtime/test_pr24_artifact_store.py、test_pr24_git_artifact_store.py、test_owner_verifier_registry.py、test_owner_scope_resume.py、test_integration_required_scopes.py、test_workflow_runtime.py、test_workflow_efficiency.py、test_question_ids.pyを拡張または既存パターンに沿う新規テストに分割。tests/skills/evals/deterministic/test_context_rule_contracts.py等、Skill-local eval validator/fixtureは既存manifest方式。ファイル名は実装時に調整可。実際のprovider保存経路を通す統合テストを含め、モックの成功だけで受入としない。
 
 ### A. 不変ログ・identity・状態（設計13.2 A）
@@ -35,7 +39,7 @@
 - [ ] 実保存層の関連revision照合付き条件更新または実保証された単一writer境界で、通常の統合/分割が成立することを確認。候補統合の元/先それぞれへの並行追加、先の置換・相互統合、根拠保持・後継循環の確認、安全でないとき元を独立保持、分割先の適用範囲外根拠を除外。実保存層では本文不変でも継承先・関連候補の前提revision/hash変更後に同じoperation_idを使うと拒否され、新IDで再照合後に成立すること、完全同一再送は既存receiptを再利用することを確認。
 - [ ] B runのin_progress保存後、候補1件目/途中/全件後、handoff後、保存成功readback失敗の各中断点でplanned_payload/hash/metadataから再開。再認可・CAS競合で変更した新操作と完全再送を区別。同一rootの異なるkind/成果物の更新、対象/依存への真の競合、無関係更新による不要再分析なしを確認する。新規create時の不存在条件と関連依存の整合、後続更新後の履歴readback、完了・採用前の依存変化検知を確認。能力未確認なら局所block。
 - [ ] 永続handoff前のpending/反映意図保存、owner側成功直後かつ結果記録前の中断、再認可・再開・並行実行時のsemantic_handoff_key/実owner照合で二重質問・二重課題作成を防ぐ。読み取り専用調査に事前保存を強制しない。
-- [ ] ハーネス/保存層の認証済み発行・認可・失効・実保存先readback・workflow証拠受渡しを確認。fixtureと実運用を別判定しPR #38のuser-confirmed自己申告を認証済みとしない。rootの実体・許可範囲・kind/owner不一致・別root・設定なし・許可変更を確認。Skillによる案件探索・ブランチ選択・Provider選択・認証方式選択・配置承認の再質問が不要であることを確認。
+- [ ] 許可済みディレクトリで通常保存・readback・再開が都度承認や専用認証hostなしで成立する。権限外、必要な外部認可の失効、別root、自己申告による権限昇格を拒否。実共有writerと単一writer隔離を区別し、fixtureと実環境を別判定する。
 
 ### C. 横断発見・鮮度（設計13.2 C）
 
@@ -110,5 +114,5 @@ Python 3.11、既存requirements-dev-lint.txt、requirements-dev-evals.txt、CI�
 - 元の基本設計13.2 A〜Eの全項目と本Planの補足ケースについて、実装箇所・テスト/評価・実行結果を対応付け、欠落・未実施を識別できる。3構成比較、最終構成のSkill仕様・実Agent発火/意味評価・実provider保存/再開・workflow完了、既存回帰を独立判定できる。
 - README/EVALS、必要なSkill references/registry、指定ディレクトリと外部入力/権限境界、運用時の認可・未設定・再開方法を同期する。資料に実案件識別子や秘密を残さない。
 - 検証結果をdocs/implementation/等の既存規約に従う文書へ記録し、実行条件・commit・コマンド・測定値・失敗・未実施・対象外の承認を分離する。Planのチェック欄を根拠付きで更新。
-- 認証済みhostや実Agent・実provider、比較計測の未確認が残る場合は当該条件をblocked/未実施として報告。通常の分析は可能な範囲で完了させるが、全実装の受入完了とは呼ばない。
+- 実Agent・実保存先・必要な認可/共有更新能力・比較計測の未確認は該当条件をblocked/未実施として報告する。通常分析・許可済み通常保存は可能範囲で継続し、未実施の全受入を完了としない。
 - [ ] 責務削減の受入：SKILL.mdと通常実行時の参照には案件管理、ブランチ管理、Provider選択、認証方式選択、配置方針の再決定を含めない。必要な環境条件・root・権限は外部入力。削除した管理処理を別Skillや巨大なハーネスへそのまま移さない。抽出/帰納/反例/質問/owner連携の品質・安全・履歴・再開を維持し、通常読込量、不要な質問・設定、追加helperの規模を比較する。

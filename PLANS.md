@@ -2,6 +2,10 @@
 
 一般的なrepository調査、曖昧さの扱い、Planの構成は[`feature-plan Skill`](.agents/skills/feature-plan/SKILL.md)を正本とします。
 
+## 共通設計前提
+
+すべての新規・改修Planは[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)に従います。目的、必要な責務、既存手段の不足、削減・維持・委譲の判断を必要範囲で記録し、過剰設計・過剰防衛を避けます。既存のPlan・レビュー・評価経路に統合し、未改修の既存契約との変更境界を対象Planで明示します。
+
 ## PR #22関連のQA全工程Plan
 
 開発連動QAとQA全工程の追加責務について、Planの目的・責務・依存関係は[Planインデックス](docs/plans/2026-11-07_170134_qa-full-process-implementation_00_index.md)で整理します。索引は実装Planではなく、本文・完了条件の正本は各Planとその詳細文書です。過去のPlan全件を置き換えるものではありません。
