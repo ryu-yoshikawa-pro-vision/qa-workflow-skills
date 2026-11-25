@@ -25,7 +25,7 @@ DPRINT_EXTENSIONS = {
     ".mjs",
     ".jsx",
 }
-COMMANDS = ("ruff-check", "import-fix", "format", "check")
+COMMANDS = ("ruff-version", "ruff-check", "import-fix", "format", "check")
 
 
 class FormatError(Exception):
@@ -102,6 +102,7 @@ def run_ruff(command: str, paths: Sequence[str]) -> int:
     if not paths:
         return 0
 
+    verify_ruff_version()
     arguments = ["ruff"]
     if command == "ruff-check":
         arguments.extend(["check", "--config", str(RUFF_CONFIG)])
@@ -119,6 +120,40 @@ def run_ruff(command: str, paths: Sequence[str]) -> int:
     result = run_process([*arguments, "--", *paths])
     show_result(result)
     return result.returncode
+
+
+def verify_ruff_version() -> str:
+    """Require and return the Ruff version pinned in the lint requirements."""
+    requirements_path = REPOSITORY_ROOT / "requirements-dev-lint.txt"
+    try:
+        requirements = requirements_path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise FormatError(
+            f"could not read Ruff version pin from {requirements_path}: {error}"
+        ) from error
+
+    pins = []
+    for requirement in requirements:
+        requirement = requirement.split("#", 1)[0].strip()
+        if requirement and requirement.lower().startswith("ruff=="):
+            pins.append(requirement.partition("==")[2].strip())
+    if len(pins) != 1 or not pins[0]:
+        raise FormatError(
+            "requirements-dev-lint.txt must contain exactly one non-empty Ruff == pin"
+        )
+
+    result = run_process(["ruff", "--version"])
+    if result.returncode != 0:
+        show_result(result)
+        raise FormatError(f"ruff --version failed with exit code {result.returncode}")
+
+    output = result.stdout[:-1] if result.stdout.endswith("\n") else result.stdout
+    expected = f"ruff {pins[0]}"
+    if output != expected:
+        raise FormatError(
+            f"expected {expected!r} from ruff --version, received {output!r}"
+        )
+    return output
 
 
 def normalized_dprint_path(path: str) -> str:
@@ -210,6 +245,10 @@ def run_dprint(command: str, paths: Sequence[str]) -> int:
 
 def execute(command: str, paths: Sequence[str] | None = None) -> int:
     """Execute a formatter entry point over the current tracked file set."""
+    if command == "ruff-version":
+        print(verify_ruff_version())
+        return 0
+
     python_paths, dprint_paths = select_targets(
         paths if paths is not None else tracked_paths()
     )
