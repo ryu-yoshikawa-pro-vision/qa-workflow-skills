@@ -104,6 +104,180 @@ def _normalize_requested_scopes(value: Any) -> list[dict[str, Any]]:
     )
 
 
+def _normalize_context_request_contract(
+    value: Any, workflow_ref: str
+) -> dict[str, Any]:
+    """Freeze the source and scope details represented by one initial request."""
+    if not isinstance(value, dict):
+        _fail("context_request_contract_invalid")
+    skill = value.get("skill")
+    if skill == "context-signal-audit":
+        if set(value) != {
+            "skill",
+            "source",
+            "requested_range",
+            "observation_condition",
+        }:
+            _fail("signal_request_contract_invalid")
+        source = value["source"]
+        if not isinstance(source, dict) or set(source) != {
+            "artifact_ref",
+            "source_revision",
+            "content_hash",
+        }:
+            _fail("signal_request_contract_source_invalid")
+        _text(source["artifact_ref"], "source_artifact_ref")
+        if source["source_revision"] is not None:
+            _text(source["source_revision"], "source_revision")
+        if source["content_hash"] is not None:
+            _hash(source["content_hash"], "source_content_hash")
+        if (source["source_revision"] is None) != (source["content_hash"] is None):
+            _fail("signal_request_contract_source_version_incomplete")
+        requested_range = context_artifacts.normalize_range(value["requested_range"])
+        observation = value["observation_condition"]
+        if observation is not None and not isinstance(observation, dict):
+            _fail("signal_request_contract_observation_condition_invalid")
+        contract = {
+            "skill": skill,
+            "source": copy.deepcopy(source),
+            "requested_range": requested_range,
+            "observation_condition": copy.deepcopy(observation),
+        }
+        identity = {
+            "workflow_ref": workflow_ref,
+            "skill": skill,
+            "source_artifact_ref": source["artifact_ref"],
+            "source_content_hash": source["content_hash"],
+            "requested_range": requested_range,
+            "observation_condition": observation,
+        }
+        return {
+            **contract,
+            "request_scope": {
+                "skill": skill,
+                "target": "request:" + _canonical_hash(identity),
+                "execution_range": json.dumps(
+                    requested_range,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "requirement": "required",
+            },
+        }
+    if skill == "context-rule-synthesis":
+        if set(value) != {
+            "skill",
+            "requested_operation_input",
+            "requested_scope",
+            "target_batch_refs",
+        }:
+            _fail("synthesis_request_contract_invalid")
+        operation_input = value["requested_operation_input"]
+        requested_scope = value["requested_scope"]
+        try:
+            context_artifacts.workflow_operation_id(
+                workflow_ref, operation_input, requested_scope
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("synthesis_request_contract_invalid") from exc
+        target_batch_refs = value["target_batch_refs"]
+        if (
+            not isinstance(target_batch_refs, list)
+            or not all(
+                isinstance(ref, str) and ref.strip() for ref in target_batch_refs
+            )
+            or target_batch_refs != sorted(set(target_batch_refs))
+        ):
+            _fail("synthesis_request_contract_target_batches_invalid")
+        input_refs = {
+            source["artifact_ref"] for source in operation_input["input_sources"]
+        }
+        if not set(target_batch_refs).issubset(input_refs):
+            _fail("synthesis_request_contract_target_batches_unrequested")
+        contract = {
+            "skill": skill,
+            "requested_operation_input": copy.deepcopy(operation_input),
+            "requested_scope": copy.deepcopy(requested_scope),
+            "target_batch_refs": copy.deepcopy(target_batch_refs),
+        }
+        identity = {
+            "workflow_ref": workflow_ref,
+            **contract,
+            "requested_operation_input": _operation_input_identity(operation_input),
+        }
+        return {
+            **contract,
+            "request_scope": {
+                "skill": skill,
+                "target": "request:" + _canonical_hash(identity),
+                "execution_range": "analysis:" + _canonical_hash(requested_scope),
+                "requirement": "required",
+            },
+        }
+    _fail("context_request_contract_skill_invalid")
+
+
+def build_request_scope(request: dict[str, Any]) -> dict[str, Any]:
+    workflow_ref = _text(request["workflow_ref"], "workflow_ref")
+    contract = _normalize_context_request_contract(request["contract"], workflow_ref)
+    return {
+        "status": "built",
+        "request_scope": contract["request_scope"],
+        "contract": contract,
+    }
+
+
+def _normalize_context_request_contracts(
+    value: Any, requested_scopes: list[dict[str, Any]], workflow_ref: str
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        _fail("context_request_contracts_invalid")
+    requested_by_identity = {
+        _scope_identity(row): row
+        for row in requested_scopes
+        if row["skill"] in _CONTEXT_SKILLS
+    }
+    contracts: dict[tuple[str, str, str, str, str | None], dict[str, Any]] = {}
+    for row in value:
+        if not isinstance(row, dict) or "request_scope" not in row:
+            _fail("context_request_contract_invalid")
+        scope = _normalize_requested_scopes([row["request_scope"]])[0]
+        identity = _scope_identity(scope)
+        expected = requested_by_identity.get(identity)
+        if expected != scope:
+            _fail("context_request_contract_scope_unregistered")
+        normalized = _normalize_context_request_contract(
+            {key: item for key, item in row.items() if key != "request_scope"},
+            workflow_ref,
+        )
+        if normalized["request_scope"] != scope:
+            _fail("context_request_contract_scope_mismatch")
+        if identity in contracts:
+            _fail("context_request_contract_duplicated")
+        contracts[identity] = normalized
+    return [contracts[key] for key in sorted(contracts)]
+
+
+def _context_request_contract(
+    state: dict[str, Any], request_scope: dict[str, Any], workflow_ref: str
+) -> dict[str, Any] | None:
+    contracts = _normalize_context_request_contracts(
+        state.get("context_request_contracts", []),
+        _normalize_requested_scopes(state.get("requested_scopes", [])),
+        workflow_ref,
+    )
+    identity = _scope_identity(request_scope)
+    return next(
+        (
+            contract
+            for contract in contracts
+            if _scope_identity(contract["request_scope"]) == identity
+        ),
+        None,
+    )
+
+
 def _scope_identity(scope: Any) -> tuple[str, str, str, str, str | None]:
     normalized = _normalize_requested_scopes([scope])[0]
     return (
@@ -474,6 +648,7 @@ def _update_state(
     field: str,
     update: Any,
     artifact_root_binding: str,
+    update_state: Any = None,
 ) -> dict[str, Any]:
     current = artifact_graph.read_sqlite_workflow_state(workflow_root, workflow_ref)
     if current.get("status") != "current":
@@ -505,7 +680,10 @@ def _update_state(
     if not isinstance(rows, list):
         return {"status": "blocked", "reason": f"{field}_state_corrupt"}
     action = update(rows)
-    if action == "reused" and not binding_changed:
+    state_changed = False
+    if update_state is not None:
+        state_changed = update_state(state) is True
+    if action == "reused" and not binding_changed and not state_changed:
         return {
             "status": "reused",
             "workflow_ref": workflow_ref,
@@ -535,8 +713,9 @@ def _update_state(
 def record_signal_attempt(request: dict[str, Any]) -> dict[str, Any]:
     store = context_artifact_store.DirectoryArtifactStore(request["artifact_root"])
     record = _normalize_signal_record(request["record"], store)
+    workflow_ref = _text(request["workflow_ref"], "workflow_ref")
     current = artifact_graph.read_sqlite_workflow_state(
-        request["workflow_state_root"], request["workflow_ref"]
+        request["workflow_state_root"], workflow_ref
     )
     if current.get("status") != "current":
         return {
@@ -548,6 +727,22 @@ def record_signal_attempt(request: dict[str, Any]) -> dict[str, Any]:
         _normalize_requested_scopes([row])[0] for row in requested_scopes
     ]:
         _fail("signal_attempt_start_request_not_registered")
+    contract = _context_request_contract(
+        current["state"], record["request_scope"], workflow_ref
+    )
+    if contract is None:
+        _fail("signal_attempt_start_request_contract_missing")
+    expected_source = contract["source"]
+    if (
+        record["source"]["artifact_ref"] != expected_source["artifact_ref"]
+        or (
+            expected_source["content_hash"] is not None
+            and record["source"]["content_hash"] != expected_source["content_hash"]
+        )
+        or record["requested_range"] != contract["requested_range"]
+        or record["observation_condition"] != contract["observation_condition"]
+    ):
+        _fail("signal_attempt_start_request_mismatch")
 
     def add(rows: list[dict[str, Any]]) -> str | None:
         existing = next(
@@ -589,14 +784,29 @@ def record_synthesis_run(request: dict[str, Any]) -> dict[str, Any]:
         _normalize_requested_scopes([row])[0] for row in requested_scopes
     ]:
         _fail("synthesis_start_request_not_registered")
+    contract = _context_request_contract(
+        current["state"], request_scope, request["workflow_ref"]
+    )
+    if contract is None:
+        _fail("synthesis_start_request_contract_missing")
+    if (
+        _operation_input_identity(request["requested_operation_input"])
+        != _operation_input_identity(contract["requested_operation_input"])
+        or request["requested_scope"] != contract["requested_scope"]
+    ):
+        _fail("synthesis_start_request_contract_mismatch")
     readback = store.read(request["run_ref"], request["run_revision"])
     request_id, run_entry, _ = _run_mapping(
         request["workflow_ref"],
-        request["requested_operation_input"],
-        request["requested_scope"],
+        contract["requested_operation_input"],
+        contract["requested_scope"],
         readback,
         store,
     )
+    if not set(run_entry["target_batch_refs"]).issubset(
+        set(contract["target_batch_refs"])
+    ):
+        _fail("synthesis_run_target_batch_outside_request")
 
     def add(rows: list[dict[str, Any]]) -> str | None:
         group = next(
@@ -607,17 +817,17 @@ def record_synthesis_run(request: dict[str, Any]) -> dict[str, Any]:
                 "request_id": request_id,
                 "request_scopes": [request_scope],
                 "requested_operation_input": copy.deepcopy(
-                    request["requested_operation_input"]
+                    contract["requested_operation_input"]
                 ),
-                "requested_scope": copy.deepcopy(request["requested_scope"]),
+                "requested_scope": copy.deepcopy(contract["requested_scope"]),
                 "run_refs": [],
             }
             rows.append(group)
             request_scope_added = True
         elif (
             _operation_input_identity(group.get("requested_operation_input", {}))
-            != _operation_input_identity(request["requested_operation_input"])
-            or group.get("requested_scope") != request["requested_scope"]
+            != _operation_input_identity(contract["requested_operation_input"])
+            or group.get("requested_scope") != contract["requested_scope"]
         ):
             _fail("synthesis_request_id_conflict")
         else:
@@ -663,12 +873,33 @@ def record_requested_scopes(request: dict[str, Any]) -> dict[str, Any]:
     """Freeze qa-workflow's initial request set in the existing workflow state."""
     store = context_artifact_store.DirectoryArtifactStore(request["artifact_root"])
     requested = _normalize_requested_scopes(request["requested_scopes"])
+    workflow_ref = _text(request["workflow_ref"], "workflow_ref")
+    request_contracts = _normalize_context_request_contracts(
+        request.get("context_request_contracts", []), requested, workflow_ref
+    )
+    requested_context = {
+        _scope_identity(row): row
+        for row in requested
+        if row["skill"] in _CONTEXT_SKILLS
+    }
+    contract_context = {
+        _scope_identity(row["request_scope"]): row for row in request_contracts
+    }
+    if any(
+        scope["requirement"] == "required" and identity not in contract_context
+        for identity, scope in requested_context.items()
+    ):
+        # An unresolved request can still be frozen, but it cannot start an A/B
+        # attempt or establish completion until its original contract is supplied.
+        request_contracts = [
+            contract
+            for contract in request_contracts
+            if _scope_identity(contract["request_scope"]) in requested_context
+        ]
 
     def set_once(rows: list[dict[str, Any]]) -> str | None:
         existing = _normalize_requested_scopes(rows)
-        if existing == requested:
-            return "reused"
-        if existing:
+        if existing and existing != requested:
             _fail("workflow_requested_scopes_conflict")
         current = artifact_graph.read_sqlite_workflow_state(
             request["workflow_state_root"], request["workflow_ref"]
@@ -678,8 +909,36 @@ def record_requested_scopes(request: dict[str, Any]) -> dict[str, Any]:
             "context_synthesis_run_refs"
         ):
             _fail("workflow_requested_scopes_registered_after_context_execution")
-        rows.extend(requested)
-        return None
+        if not existing:
+            rows.extend(requested)
+            return None
+        return "reused"
+
+    def set_contracts(state: dict[str, Any]) -> bool:
+        existing = _normalize_context_request_contracts(
+            state.get("context_request_contracts", []),
+            _normalize_requested_scopes(state.get("requested_scopes", [])),
+            workflow_ref,
+        )
+        by_identity = {_scope_identity(row["request_scope"]): row for row in existing}
+        changed = False
+        for contract in request_contracts:
+            identity = _scope_identity(contract["request_scope"])
+            previous = by_identity.get(identity)
+            if previous is not None:
+                if previous != contract:
+                    _fail("workflow_context_request_contract_conflict")
+                continue
+            if state.get("context_signal_attempts") or state.get(
+                "context_synthesis_run_refs"
+            ):
+                _fail("workflow_context_request_contract_registered_after_execution")
+            by_identity[identity] = contract
+            changed = True
+        state["context_request_contracts"] = [
+            by_identity[key] for key in sorted(by_identity)
+        ]
+        return changed
 
     return _update_state(
         request["workflow_state_root"],
@@ -688,7 +947,27 @@ def record_requested_scopes(request: dict[str, Any]) -> dict[str, Any]:
         "requested_scopes",
         set_once,
         store.root_binding,
+        set_contracts,
     )
+
+
+def read_context_requests(request: dict[str, Any]) -> dict[str, Any]:
+    """Read the frozen A/B start requests through the existing workflow state."""
+    workflow_ref = _text(request["workflow_ref"], "workflow_ref")
+    current = artifact_graph.read_sqlite_workflow_state(
+        request["workflow_state_root"], workflow_ref
+    )
+    if current.get("status") != "current":
+        return current
+    rows = current["state"].get("requested_scopes", [])
+    requested = _normalize_requested_scopes(rows)
+    context_requests = [row for row in requested if row["skill"] in _CONTEXT_SKILLS]
+    return {
+        "status": "current",
+        "workflow_ref": workflow_ref,
+        "state_revision": current["state_revision"],
+        "context_requests": context_requests,
+    }
 
 
 def complete_synthesis_request(request: dict[str, Any]) -> dict[str, Any]:
@@ -748,6 +1027,15 @@ def complete_synthesis_request(request: dict[str, Any]) -> dict[str, Any]:
     workflow_readbacks = request.get("provider_readbacks", [])
     if not isinstance(workflow_readbacks, list):
         _fail("workflow_provider_readbacks_invalid")
+    expected_target_batches = request.get("target_batch_refs")
+    if expected_target_batches is not None and (
+        not isinstance(expected_target_batches, list)
+        or expected_target_batches != sorted(set(expected_target_batches))
+        or not all(
+            isinstance(ref, str) and ref.strip() for ref in expected_target_batches
+        )
+    ):
+        _fail("workflow_target_batch_refs_invalid")
 
     mapping = _mapping_status(
         {
@@ -767,6 +1055,7 @@ def complete_synthesis_request(request: dict[str, Any]) -> dict[str, Any]:
         }
 
     checked: list[dict[str, str]] = []
+    checked_target_batches: set[str] = set()
     for entry in current_refs:
         if not isinstance(entry, dict) or set(entry) != {
             "artifact_ref",
@@ -804,6 +1093,20 @@ def complete_synthesis_request(request: dict[str, Any]) -> dict[str, Any]:
             if key != "current"
         ):
             _fail("synthesis_run_state_mapping_mismatch")
+        entry_target_batches = entry["target_batch_refs"]
+        if (
+            not isinstance(entry_target_batches, list)
+            or entry_target_batches != sorted(set(entry_target_batches))
+            or not all(
+                isinstance(ref, str) and ref.strip() for ref in entry_target_batches
+            )
+            or (
+                expected_target_batches is not None
+                and not set(entry_target_batches).issubset(expected_target_batches)
+            )
+        ):
+            _fail("synthesis_run_target_batch_mapping_mismatch")
+        checked_target_batches.update(entry_target_batches)
         if (
             entry["run_status"] not in {"completed", "completed_zero_changes"}
             or entry["scan_completeness"] != "complete"
@@ -853,6 +1156,20 @@ def complete_synthesis_request(request: dict[str, Any]) -> dict[str, Any]:
                 "content_hash": entry["content_hash"],
             }
         )
+
+    if expected_target_batches is not None and checked_target_batches != set(
+        expected_target_batches
+    ):
+        return {
+            "status": "incomplete",
+            "complete": False,
+            "reason": "synthesis_target_batch_mapping_incomplete",
+            "request_id": request_id,
+            "missing_target_batch_refs": sorted(
+                set(expected_target_batches) - checked_target_batches
+            ),
+            "state_revision": current["state_revision"],
+        }
 
     latest = artifact_graph.read_sqlite_workflow_state(
         request["workflow_state_root"], workflow_ref
@@ -921,7 +1238,6 @@ def _owner_record_matches(
 
 def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
     """Reconcile start-time required scopes with current A/B artifacts and readbacks."""
-    store = context_artifact_store.DirectoryArtifactStore(request["artifact_root"])
     workflow_ref = _text(request["workflow_ref"], "workflow_ref")
     current = artifact_graph.read_sqlite_workflow_state(
         request["workflow_state_root"], workflow_ref
@@ -929,9 +1245,7 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
     if current.get("status") != "current":
         _fail(current.get("reason", "workflow_state_unavailable"))
     state = current["state"]
-    if state.get("context_artifact_root_binding") != store.root_binding:
-        _fail("workflow_artifact_root_mismatch")
-    start_requested = _normalize_requested_scopes(state.get("requested_scopes"))
+    start_requested = _normalize_requested_scopes(state.get("requested_scopes", []))
     runtime_requested = _normalize_requested_scopes(request["requested_scopes"])
     initial_required = [
         row for row in start_requested if row["skill"] in _CONTEXT_SKILLS
@@ -955,6 +1269,23 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
             "mapped_scopes": [],
         }
 
+    context_contracts = _normalize_context_request_contracts(
+        state.get("context_request_contracts", []), start_requested, workflow_ref
+    )
+    contract_by_identity = {
+        _scope_identity(contract["request_scope"]): contract
+        for contract in context_contracts
+    }
+    for required in initial_required:
+        if _scope_identity(required) not in contract_by_identity:
+            return {
+                "status": "incomplete",
+                "complete": False,
+                "reason": "context_start_request_contract_missing",
+                "request_scope": required,
+                "state_revision": current["state_revision"],
+            }
+
     context_scopes = request.get("context_scopes")
     if not isinstance(context_scopes, list):
         _fail("workflow_context_scopes_invalid")
@@ -966,6 +1297,9 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
             "state_revision": current["state_revision"],
             "missing_request_scopes": initial_required,
         }
+    store = context_artifact_store.DirectoryArtifactStore(request["artifact_root"])
+    if state.get("context_artifact_root_binding") != store.root_binding:
+        _fail("workflow_artifact_root_mismatch")
     provider_readbacks = request.get("provider_readbacks", [])
     if not isinstance(provider_readbacks, list):
         _fail("workflow_provider_readbacks_invalid")
@@ -1040,6 +1374,19 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
             # Attempts stay as history. The latest attempt for this exact start
             # request is the only one allowed to establish current completion.
             attempt = _normalize_signal_record(matching[-1], store)
+            contract = contract_by_identity[requested_identity]
+            expected_source = contract["source"]
+            if (
+                attempt["source"]["artifact_ref"] != expected_source["artifact_ref"]
+                or (
+                    expected_source["content_hash"] is not None
+                    and attempt["source"]["content_hash"]
+                    != expected_source["content_hash"]
+                )
+                or attempt["requested_range"] != contract["requested_range"]
+                or attempt["observation_condition"] != contract["observation_condition"]
+            ):
+                _fail("signal_attempt_start_request_mismatch")
             if attempt["status"] != "completed":
                 return {
                     "status": "incomplete",
@@ -1149,12 +1496,19 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
         if len(matching_groups) != 1:
             _fail("synthesis_required_request_group_duplicated")
         group = matching_groups[0]
+        contract = contract_by_identity[requested_identity]
         operation_input = group.get("requested_operation_input")
         requested_scope = group.get("requested_scope")
         if not isinstance(operation_input, dict) or not isinstance(
             requested_scope, dict
         ):
             _fail("synthesis_request_state_invalid")
+        if (
+            _operation_input_identity(operation_input)
+            != _operation_input_identity(contract["requested_operation_input"])
+            or requested_scope != contract["requested_scope"]
+        ):
+            _fail("synthesis_request_start_contract_mismatch")
         group_scopes = [
             value
             for value in context_scopes
@@ -1187,10 +1541,11 @@ def complete_context_workflow(request: dict[str, Any]) -> dict[str, Any]:
                 "workflow_state_root": request["workflow_state_root"],
                 "workflow_ref": workflow_ref,
                 "artifact_root": request["artifact_root"],
-                "requested_operation_input": operation_input,
-                "requested_scope": requested_scope,
+                "requested_operation_input": contract["requested_operation_input"],
+                "requested_scope": contract["requested_scope"],
                 "request_scopes": [requested],
                 "provider_readbacks": provider_readbacks,
+                "target_batch_refs": contract["target_batch_refs"],
             }
         )
         if complete.get("complete") is not True or complete.get("status") != "complete":
@@ -1327,7 +1682,11 @@ def initialize_state(request: dict[str, Any]) -> dict[str, Any]:
         }
     state = copy.deepcopy(initial_state)
     state.setdefault("context_artifact_root_binding", None)
-    for field in ("context_signal_attempts", "context_synthesis_run_refs"):
+    for field in (
+        "context_signal_attempts",
+        "context_synthesis_run_refs",
+        "context_request_contracts",
+    ):
         existing = state.setdefault(field, [])
         if not isinstance(existing, list):
             _fail(f"{field}_state_corrupt")
@@ -1345,6 +1704,8 @@ def handle(request: Any) -> dict[str, Any]:
         operation = request.get("operation")
         if operation == "initialize":
             return initialize_state(request)
+        if operation == "build-request-scope":
+            return build_request_scope(request)
         if operation == "read":
             state = artifact_graph.read_sqlite_workflow_state(
                 request["workflow_state_root"], request["workflow_ref"]
@@ -1356,6 +1717,8 @@ def handle(request: Any) -> dict[str, Any]:
             return record_synthesis_run(request)
         if operation == "register-requested-scopes":
             return record_requested_scopes(request)
+        if operation == "read-context-requests":
+            return read_context_requests(request)
         if operation == "completion-check":
             return complete_synthesis_request(request)
         if operation == "completion-check-workflow":

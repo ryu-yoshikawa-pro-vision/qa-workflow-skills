@@ -397,35 +397,75 @@ class ContextRuntimeTransportTests(unittest.TestCase):
         metadata = workflow_fixtures.metadata()
         scopes: list[dict] = []
         requested: list[dict] = []
-        signal_requests = []
-        synthesis_requests = []
-        for index in range(1, len(sizes) + 1):
-            assigned_range = {"kind": "sections", "items": [f"SEC-{index}"]}
-            execution_range = json.dumps(
-                assigned_range,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-            signal_requests.append(
-                workflow_fixtures.required_scope(
-                    "context-signal-audit",
-                    "request:" + hashlib.sha256(f"signal-{index}".encode()).hexdigest(),
-                    execution_range,
-                )
-            )
-            synthesis_requests.append(
-                workflow_fixtures.required_scope(
-                    "context-rule-synthesis",
-                    "request:"
-                    + hashlib.sha256(f"synthesis-{index}".encode()).hexdigest(),
-                    f"analysis:refund-policy-{index}",
-                )
-            )
+        signal_requests: list[dict] = []
+        synthesis_requests: list[dict] = []
+        request_contracts: list[dict] = []
 
         with tempfile.TemporaryDirectory() as root:
             store = context_artifact_store.DirectoryArtifactStore(root)
             workflow_state_root = str(Path(root) / "workflow-state")
+            prepared = []
+            for index, target_bytes in enumerate(sizes, start=1):
+                batch = _sized_batch(target_bytes, f"SEC-{index}")
+                batch_readback = store.write("context-signal-batch", batch)["readback"]
+                candidate = _sized_candidate(target_bytes, index)
+                candidate_readback = store.write("context-rule-candidate", candidate)[
+                    "readback"
+                ]
+                run = _sized_run(
+                    target_bytes,
+                    candidate,
+                    candidate_readback,
+                    batch,
+                    batch_readback,
+                    index,
+                    workflow_ref,
+                )
+                run_readback = store.write("context-synthesis-run", run)["readback"]
+                signal_start = context_workflow_state.build_request_scope(
+                    {
+                        "workflow_ref": workflow_ref,
+                        "contract": {
+                            "skill": "context-signal-audit",
+                            "source": {
+                                "artifact_ref": batch["source"]["artifact_ref"],
+                                "source_revision": batch["source"]["source_revision"],
+                                "content_hash": batch["source"]["source_content_hash"],
+                            },
+                            "requested_range": batch["source"]["requested_range"],
+                            "observation_condition": batch["source"][
+                                "observation_condition"
+                            ],
+                        },
+                    }
+                )
+                synthesis_start = context_workflow_state.build_request_scope(
+                    {
+                        "workflow_ref": workflow_ref,
+                        "contract": {
+                            "skill": "context-rule-synthesis",
+                            "requested_operation_input": run["operation_input"],
+                            "requested_scope": run["requested_scope"],
+                            "target_batch_refs": run["triage_plan"][
+                                "target_batch_refs"
+                            ],
+                        },
+                    }
+                )
+                signal_requests.append(signal_start["request_scope"])
+                synthesis_requests.append(synthesis_start["request_scope"])
+                request_contracts.extend(
+                    [signal_start["contract"], synthesis_start["contract"]]
+                )
+                prepared.append(
+                    {
+                        "batch": batch,
+                        "batch_readback": batch_readback,
+                        "candidate_readback": candidate_readback,
+                        "run": run,
+                        "run_readback": run_readback,
+                    }
+                )
             initialized = context_workflow_state.handle(
                 {
                     "operation": "initialize",
@@ -435,15 +475,21 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                         "overall_state": "実行中",
                         "context_signal_attempts": [],
                         "context_synthesis_run_refs": [],
+                        "context_request_contracts": request_contracts,
                         "requested_scopes": signal_requests + synthesis_requests,
                     },
                 }
             )
             self.assertEqual(initialized["status"], "created")
             state_revision = initialized["state_revision"]
-            for index, target_bytes in enumerate(sizes, start=1):
-                batch = _sized_batch(target_bytes, f"SEC-{index}")
-                batch_readback = store.write("context-signal-batch", batch)["readback"]
+            for index, (target_bytes, item) in enumerate(
+                zip(sizes, prepared, strict=True), start=1
+            ):
+                batch = item["batch"]
+                batch_readback = item["batch_readback"]
+                candidate_readback = item["candidate_readback"]
+                run = item["run"]
+                run_readback = item["run_readback"]
                 self.assertEqual(
                     len(batch_readback["content"].encode("utf-8")), target_bytes
                 )
@@ -511,23 +557,9 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                     )
                 )
 
-                candidate = _sized_candidate(target_bytes, index)
-                candidate_readback = store.write("context-rule-candidate", candidate)[
-                    "readback"
-                ]
                 self.assertEqual(
                     len(candidate_readback["content"].encode("utf-8")), target_bytes
                 )
-                run = _sized_run(
-                    target_bytes,
-                    candidate,
-                    candidate_readback,
-                    batch,
-                    batch_readback,
-                    index,
-                    workflow_ref,
-                )
-                run_readback = store.write("context-synthesis-run", run)["readback"]
                 self.assertEqual(
                     len(run_readback["content"].encode("utf-8")), target_bytes
                 )
@@ -574,6 +606,7 @@ class ContextRuntimeTransportTests(unittest.TestCase):
 
             value = {
                 "workflow_ref": workflow_ref,
+                "context_workflow_state_root": workflow_state_root,
                 "requested_scopes": requested,
                 "workflow_scopes": scopes,
                 "runtime_units": [],

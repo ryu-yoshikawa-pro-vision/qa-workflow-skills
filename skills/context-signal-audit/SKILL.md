@@ -17,7 +17,7 @@ description: 単一の仕様・決定・承認済みASM・実装確認・探索�
 6. `scripts/context_artifact_store.py`の`list` / `read` / `history`で同一identityのbatchを探し、canonical内容・source・実範囲を照合します。既存batchは再利用し、workflow、requested range、candidate check、source revisionだけの差で書き換えません。
 7. 実取得範囲が確定し抽出が正常なら、complete / partial / 0件を問わず`write`で不変batchをcreate-if-absentします。返却readbackに加え、保存後に`read`で同じref/revisionを再取得し、root binding、canonical本文、revision、hashを確認してから結果を返します。
 8. 一次情報を再照合して抽出誤りが確定した場合だけ訂正版を新規作成します。対象batch全件のref/revision/hash、source、実範囲、条件を履歴readbackで確認し、訂正後の不変batchへつなぎます。旧batchは変更・削除せず、並行した異なる訂正は最新時刻やref順で選びません。
-9. 取得失敗、範囲不明、抽出失敗、保存失敗、readback不一致は区別して記録します。失敗を空signal集合やcompleteへ置き換えません。他の独立sourceは継続できます。必須要求の場合、開始時の`requested_scopes`はA/B実行前にqa-workflowの既存stateへ登録し、`record-signal-attempt`へ元の`request_scope`を含めます。A owner scopeの`normalized_input.context_workflow_state`にはartifact/state rootと同一batchを担当する元`request_scopes`を含め、最終gateが各要求、batch revision/hash、担当range、owner verifier証拠を照合できるようにします。
+9. 取得失敗、範囲不明、抽出失敗、保存失敗、readback不一致は区別して記録します。失敗を空signal集合やcompleteへ置き換えません。他の独立sourceは継続できます。必須要求の場合、開始時に`context_workflow_state.py build-request-scope`で元source ref、既知ならrevision/hash、requested range、observation conditionから要求契約と仮scopeを作り、A/B全要求と`context_request_contracts`をqa-workflowの既存stateへ一括登録します。A attemptのsource ref/hash、全要求range、観測条件はこの開始契約に一致させ、範囲やsourceを後続attemptで縮小・置換しません。`record-signal-attempt`へ元の`request_scope`を含めます。A owner scopeの`normalized_input.context_workflow_state`にはartifact/state rootと同一batchを担当する元`request_scopes`を含め、最終gateが各要求、batch revision/hash、担当range、owner verifier証拠を照合できるようにします。
 
 ## 判断境界
 

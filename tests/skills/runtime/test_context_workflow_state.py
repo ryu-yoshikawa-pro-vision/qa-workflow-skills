@@ -22,6 +22,7 @@ import context_artifacts as contracts  # noqa: E402
 import context_workflow_state  # noqa: E402
 import owner_verifiers  # noqa: E402
 import test_context_artifacts as fixtures  # noqa: E402
+import test_workflow_runtime as workflow_fixtures  # noqa: E402
 import workflow_runtime  # noqa: E402
 
 
@@ -33,23 +34,38 @@ class ContextWorkflowStateTests(unittest.TestCase):
         self.artifact_root = self.base / "context-artifacts"
         self.artifact_root.mkdir()
         self.workflow_ref = str(uuid.uuid4())
-        self.signal_scope_request = {
+        self.signal_request_contract = {
             "skill": "context-signal-audit",
-            "target": "request:" + "a" * 64,
-            "execution_range": json.dumps(
-                {"kind": "sections", "items": ["SEC-1"]},
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-            "requirement": "required",
+            "source": {
+                "artifact_ref": fixtures.SOURCE_REF,
+                "source_revision": "r3",
+                "content_hash": fixtures.SOURCE_HASH,
+            },
+            "requested_range": {"kind": "sections", "items": ["SEC-1"]},
+            "observation_condition": {"locale": "ja"},
         }
-        self.synthesis_scope_request = {
+        signal_request = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": self.signal_request_contract,
+            }
+        )
+        self.signal_scope_request = signal_request["request_scope"]
+        self.signal_request_contract = signal_request["contract"]
+        self.synthesis_request_contract = {
             "skill": "context-rule-synthesis",
-            "target": "request:" + "b" * 64,
-            "execution_range": "analysis:refund-policy",
-            "requirement": "required",
+            "requested_operation_input": fixtures.operation_input(),
+            "requested_scope": fixtures.requested_scope(),
+            "target_batch_refs": [],
         }
+        synthesis_request = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": self.synthesis_request_contract,
+            }
+        )
+        self.synthesis_scope_request = synthesis_request["request_scope"]
+        self.synthesis_request_contract = synthesis_request["contract"]
         created = artifact_graph.create_sqlite_workflow_state(
             self.workflow_root,
             self.workflow_ref,
@@ -59,6 +75,10 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 "existing_owner_data": {"preserve": True},
                 "context_signal_attempts": [],
                 "context_synthesis_run_refs": [],
+                "context_request_contracts": [
+                    self.signal_request_contract,
+                    self.synthesis_request_contract,
+                ],
                 "requested_scopes": [
                     self.signal_scope_request,
                     self.synthesis_scope_request,
@@ -110,6 +130,38 @@ class ContextWorkflowStateTests(unittest.TestCase):
             "resume_condition": None,
         }
 
+    def signal_batch_variant(
+        self,
+        *,
+        source_ref: str = fixtures.SOURCE_REF,
+        requested_range: dict | None = None,
+        observation_condition: dict | None = None,
+    ) -> dict:
+        value = fixtures.build_batch()
+        source = value["source"]
+        actual_range = requested_range or source["actual_inspected_range"]
+        observation = observation_condition or source["observation_condition"]
+        source["artifact_ref"] = source_ref
+        source["requested_range"] = copy.deepcopy(actual_range)
+        source["actual_inspected_range"] = copy.deepcopy(actual_range)
+        source["observation_condition"] = copy.deepcopy(observation)
+        for signal in value["signals"]:
+            signal["signal_identity"] = contracts.signal_identity(
+                source_ref,
+                signal["observation_locator"],
+                source["source_content_hash"],
+            )
+            signal["signal_content_hash"] = contracts.signal_content_hash(signal)
+        identity = contracts.batch_identity(
+            source_ref,
+            source["source_content_hash"],
+            actual_range,
+            observation,
+        )
+        value["batch_identity"] = identity
+        value["artifact_ref"] = contracts.artifact_ref("context-signal-batch", identity)
+        return contracts.validate_artifact(value, "context-signal-batch")
+
     def run_for_current_workflow(
         self, scope: dict | None = None, workflow_ref: str | None = None
     ) -> dict:
@@ -153,10 +205,12 @@ class ContextWorkflowStateTests(unittest.TestCase):
         }
 
     def _new_registered_state(
-        self, requested_scopes: list[dict]
+        self,
+        requested_scopes: list[dict],
+        context_request_contracts: list[dict] | None = None,
     ) -> tuple[Path, str, str]:
         workflow_root = self.base / f"workflow-{uuid.uuid4()}"
-        workflow_ref = str(uuid.uuid4())
+        workflow_ref = self.workflow_ref
         initialized = context_workflow_state.handle(
             {
                 "operation": "initialize",
@@ -178,6 +232,18 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 "expected_revision": initialized["state_revision"],
                 "artifact_root": str(self.artifact_root),
                 "requested_scopes": requested_scopes,
+                "context_request_contracts": copy.deepcopy(
+                    context_request_contracts
+                    if context_request_contracts is not None
+                    else [
+                        contract
+                        for contract in (
+                            self.signal_request_contract,
+                            self.synthesis_request_contract,
+                        )
+                        if contract["request_scope"] in requested_scopes
+                    ]
+                ),
             }
         )
         self.assertEqual(registered["status"], "written", registered)
@@ -368,7 +434,11 @@ class ContextWorkflowStateTests(unittest.TestCase):
         return candidate, operation
 
     def _runtime_context_scope(
-        self, run: dict, run_readback: dict, provider_readbacks: list[dict]
+        self,
+        run: dict,
+        run_readback: dict,
+        provider_readbacks: list[dict],
+        request_scope: dict | None = None,
     ) -> dict:
         return {
             "skill": "context-rule-synthesis",
@@ -380,7 +450,9 @@ class ContextWorkflowStateTests(unittest.TestCase):
                     "workflow_state_root": str(self.workflow_root),
                     "requested_operation_input": copy.deepcopy(run["operation_input"]),
                     "requested_scope": copy.deepcopy(run["requested_scope"]),
-                    "request_scope": copy.deepcopy(self.synthesis_scope_request),
+                    "request_scope": copy.deepcopy(
+                        request_scope or self.synthesis_scope_request
+                    ),
                 },
                 "owner_verification": {
                     "readback": run_readback,
@@ -736,13 +808,35 @@ class ContextWorkflowStateTests(unittest.TestCase):
             **fixtures.requested_scope(),
             "scope_refs": ["feature:cancel", "feature:refund"],
         }
+        built_request = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": fixtures.operation_input(),
+                    "requested_scope": full_scope,
+                    "target_batch_refs": [],
+                },
+            }
+        )
+        request_scope = built_request["request_scope"]
+        self.workflow_root, self.workflow_ref, self.revision = (
+            self._new_registered_state([request_scope], [built_request["contract"]])
+        )
         refund_run = self.run_for_current_workflow(
             {**full_scope, "scope_refs": ["feature:refund"]}
         )
         refund_readback = self.store.write("context-synthesis-run", refund_run)[
             "readback"
         ]
-        first_request = self.synthesis_request(refund_run, refund_readback["revision"])
+        first_request = self.synthesis_request(
+            refund_run,
+            refund_readback["revision"],
+            workflow_ref=self.workflow_ref,
+            workflow_state_root=self.workflow_root,
+            expected_revision=self.revision,
+            request_scope=request_scope,
+        )
         first_request["requested_scope"] = full_scope
         first = context_workflow_state.handle(first_request)
         self.assertEqual(first["status"], "written")
@@ -758,10 +852,16 @@ class ContextWorkflowStateTests(unittest.TestCase):
         cancel_readback = self.store.write("context-synthesis-run", cancel_run)[
             "readback"
         ]
-        second_request = self.synthesis_request(cancel_run, cancel_readback["revision"])
+        second_request = self.synthesis_request(
+            cancel_run,
+            cancel_readback["revision"],
+            workflow_ref=self.workflow_ref,
+            workflow_state_root=self.workflow_root,
+            expected_revision=first["state_revision"],
+            request_scope=request_scope,
+        )
         second_request.update(
             {
-                "expected_revision": first["state_revision"],
                 "requested_scope": full_scope,
             }
         )
@@ -777,10 +877,10 @@ class ContextWorkflowStateTests(unittest.TestCase):
             "content": fixtures.SOURCE_CONTENT,
         }
         refund_scope = self._runtime_context_scope(
-            refund_run, refund_readback, [source_readback]
+            refund_run, refund_readback, [source_readback], request_scope
         )
         cancel_scope = self._runtime_context_scope(
-            cancel_run, cancel_readback, [source_readback]
+            cancel_run, cancel_readback, [source_readback], request_scope
         )
         for scope in (refund_scope, cancel_scope):
             scope["normalized_input"]["context_workflow_state"]["requested_scope"] = (
@@ -826,11 +926,33 @@ class ContextWorkflowStateTests(unittest.TestCase):
             **fixtures.requested_scope(),
             "scope_refs": ["feature:cancel", "feature:refund"],
         }
+        built_request = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": fixtures.operation_input(),
+                    "requested_scope": full_scope,
+                    "target_batch_refs": [],
+                },
+            }
+        )
+        request_scope = built_request["request_scope"]
+        self.workflow_root, self.workflow_ref, self.revision = (
+            self._new_registered_state([request_scope], [built_request["contract"]])
+        )
         first_run = self.run_for_current_workflow(
             {**full_scope, "scope_refs": ["feature:refund"]}
         )
         first = self.store.write("context-synthesis-run", first_run)["readback"]
-        first_request = self.synthesis_request(first_run, first["revision"])
+        first_request = self.synthesis_request(
+            first_run,
+            first["revision"],
+            workflow_ref=self.workflow_ref,
+            workflow_state_root=self.workflow_root,
+            expected_revision=self.revision,
+            request_scope=request_scope,
+        )
         first_request["requested_scope"] = full_scope
 
         partial = context_workflow_state.handle(first_request)
@@ -843,12 +965,26 @@ class ContextWorkflowStateTests(unittest.TestCase):
             group["mapping"]["unmapped_source_scope_pairs"],
             [[fixtures.SOURCE_REF, "feature:cancel"]],
         )
+        partial_scope = self._runtime_context_scope(first_run, first, [], request_scope)
+        partial_scope["normalized_input"]["context_workflow_state"][
+            "requested_scope"
+        ] = copy.deepcopy(full_scope)
+        incomplete = self._complete_synthesis_group(partial_scope)
+        self.assertEqual(incomplete["status"], "incomplete")
+        self.assertEqual(incomplete["reason"], "requested_run_mapping_incomplete")
 
         second_run = self.run_for_current_workflow(
             {**full_scope, "scope_refs": ["feature:cancel"]}
         )
         second = self.store.write("context-synthesis-run", second_run)["readback"]
-        second_request = self.synthesis_request(second_run, second["revision"])
+        second_request = self.synthesis_request(
+            second_run,
+            second["revision"],
+            workflow_ref=self.workflow_ref,
+            workflow_state_root=self.workflow_root,
+            expected_revision=partial["state_revision"],
+            request_scope=request_scope,
+        )
         second_request["expected_revision"] = partial["state_revision"]
         second_request["requested_scope"] = full_scope
 
@@ -869,7 +1005,118 @@ class ContextWorkflowStateTests(unittest.TestCase):
         request["requested_operation_input"] = wrong_input
         result = context_workflow_state.handle(request)
         self.assertEqual(result["status"], "blocked")
-        self.assertEqual(result["reason"], "run_start_input_mismatch")
+        self.assertEqual(result["reason"], "synthesis_start_request_contract_mismatch")
+
+    def test_synthesis_request_and_run_reject_scope_or_source_substitution(
+        self,
+    ) -> None:
+        full_scope = {
+            **fixtures.requested_scope(),
+            "scope_refs": ["feature:cancel", "feature:refund"],
+        }
+        operation_input = fixtures.operation_input()
+        built_request = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": operation_input,
+                    "requested_scope": full_scope,
+                    "target_batch_refs": [],
+                },
+            }
+        )
+        request_scope = built_request["request_scope"]
+        self.workflow_root, self.workflow_ref, self.revision = (
+            self._new_registered_state([request_scope], [built_request["contract"]])
+        )
+
+        substituted_source_run = self.run_for_current_workflow(full_scope)
+        changed_source = substituted_source_run["operation_input"]["input_sources"][0]
+        changed_source["artifact_ref"] = "project/specifications/other.md"
+        snapshot_source = substituted_source_run["snapshot"]["referenced_sources"][0]
+        snapshot_source["artifact_ref"] = changed_source["artifact_ref"]
+        substituted_source_run["snapshot"]["snapshot_hash"] = contracts.snapshot_hash(
+            substituted_source_run["snapshot"]
+        )
+        operation_id = contracts.workflow_operation_id(
+            self.workflow_ref,
+            substituted_source_run["operation_input"],
+            substituted_source_run["requested_scope"],
+        )
+        substituted_source_run["workflow_operation_id"] = operation_id
+        substituted_source_run["run_identity"] = contracts.run_identity(operation_id)
+        substituted_source_run["artifact_ref"] = contracts.artifact_ref(
+            "context-synthesis-run", substituted_source_run["run_identity"]
+        )
+        contracts.validate_artifact(substituted_source_run, "context-synthesis-run")
+        substituted_readback = self.store.write(
+            "context-synthesis-run", substituted_source_run
+        )["readback"]
+        source_request = self.synthesis_request(
+            substituted_source_run,
+            substituted_readback["revision"],
+            workflow_state_root=self.workflow_root,
+            expected_revision=self.revision,
+            request_scope=request_scope,
+        )
+        source_request["requested_operation_input"] = operation_input
+        source_request["requested_scope"] = full_scope
+        source_result = context_workflow_state.handle(source_request)
+        self.assertEqual(source_result["status"], "blocked")
+        self.assertEqual(source_result["reason"], "run_start_input_mismatch")
+
+        changed_condition_run = self.run_for_current_workflow(full_scope)
+        changed_condition_run["operation_input"]["investigation_conditions"][
+            "environment"
+        ] = "production"
+        condition_operation_id = contracts.workflow_operation_id(
+            self.workflow_ref,
+            changed_condition_run["operation_input"],
+            changed_condition_run["requested_scope"],
+        )
+        changed_condition_run["workflow_operation_id"] = condition_operation_id
+        changed_condition_run["run_identity"] = contracts.run_identity(
+            condition_operation_id
+        )
+        changed_condition_run["artifact_ref"] = contracts.artifact_ref(
+            "context-synthesis-run", changed_condition_run["run_identity"]
+        )
+        contracts.validate_artifact(changed_condition_run, "context-synthesis-run")
+        condition_readback = self.store.write(
+            "context-synthesis-run", changed_condition_run
+        )["readback"]
+        condition_request = self.synthesis_request(
+            changed_condition_run,
+            condition_readback["revision"],
+            workflow_state_root=self.workflow_root,
+            expected_revision=self.revision,
+            request_scope=request_scope,
+        )
+        condition_request["requested_operation_input"] = operation_input
+        condition_request["requested_scope"] = full_scope
+        condition_result = context_workflow_state.handle(condition_request)
+        self.assertEqual(condition_result["status"], "blocked")
+        self.assertEqual(condition_result["reason"], "run_start_input_mismatch")
+
+        narrower_scope = {**full_scope, "scope_refs": ["feature:refund"]}
+        narrow_run = self.run_for_current_workflow(narrower_scope)
+        narrow_readback = self.store.write("context-synthesis-run", narrow_run)[
+            "readback"
+        ]
+        narrow_request = self.synthesis_request(
+            narrow_run,
+            narrow_readback["revision"],
+            workflow_state_root=self.workflow_root,
+            expected_revision=self.revision,
+            request_scope=request_scope,
+        )
+        narrow_request["requested_scope"] = narrower_scope
+        narrow_result = context_workflow_state.handle(narrow_request)
+        self.assertEqual(narrow_result["status"], "blocked")
+        self.assertEqual(
+            narrow_result["reason"], "synthesis_start_request_contract_mismatch"
+        )
 
     def test_required_b_request_missing_entirely_from_runtime_is_blocked(self) -> None:
         workflow_root, workflow_ref, _ = self._new_registered_state(
@@ -891,6 +1138,141 @@ class ContextWorkflowStateTests(unittest.TestCase):
             issues[0]["issue_type"],
             "context_required_scopes_missing_from_runtime",
         )
+
+    def test_persisted_a_and_b_requests_cannot_be_hidden_from_final_gate(self) -> None:
+        workflow_root, workflow_ref, _ = self._new_registered_state(
+            [self.signal_scope_request, self.synthesis_scope_request]
+        )
+
+        issues, completions = workflow_runtime._verify_context_synthesis_workflow_state(
+            scopes=[],
+            workflow_ref=workflow_ref,
+            unverified_scopes=[],
+            requested_scopes=[],
+            verified_owner_scopes=[],
+            context_workflow_state_root=str(workflow_root),
+        )
+
+        self.assertEqual(completions, [])
+        self.assertEqual(
+            issues[0]["issue_type"],
+            "context_required_scopes_missing_from_runtime",
+        )
+        self.assertEqual(
+            {row["skill"] for row in issues[0]["requested_scopes"]},
+            {"context-signal-audit", "context-rule-synthesis"},
+        )
+
+        # A standalone or auxiliary invocation without a persisted context
+        # anchor keeps the existing no-context path.
+        self.assertEqual(
+            workflow_runtime._verify_context_synthesis_workflow_state(
+                [], workflow_ref, [], requested_scopes=[], verified_owner_scopes=[]
+            ),
+            ([], []),
+        )
+
+    def test_runtime_keeps_persisted_context_requests_when_final_context_is_dropped(
+        self,
+    ) -> None:
+        workflow_root, workflow_ref, _ = self._new_registered_state(
+            [self.signal_scope_request, self.synthesis_scope_request]
+        )
+        request = workflow_fixtures.WorkflowRuntimeTests()._request()
+        request["input"]["workflow_ref"] = workflow_ref
+        request["input"]["context_workflow_state_root"] = str(workflow_root)
+        # The runtime input retains an unrelated normal scope, but drops all A/B
+        # request scopes and owner scopes. The independent root anchor must still
+        # make the final gate read the persisted request set.
+        request["input"]["requested_scopes"] = [
+            workflow_fixtures.required_scope("test-condition-design")
+        ]
+        result = workflow_fixtures.run(request)
+        self.assertEqual(result["runtime_status"], "ok", result)
+        self.assertFalse(result["payload"]["can_complete"], result)
+        self.assertIn(
+            "context_required_scopes_missing_from_runtime",
+            {issue["issue_type"] for issue in result["issues"]},
+        )
+
+    def test_signal_attempt_must_match_registered_source_range_and_condition(
+        self,
+    ) -> None:
+        original_contract = {
+            key: value
+            for key, value in self.signal_request_contract.items()
+            if key != "request_scope"
+        }
+        broad_contract = copy.deepcopy(original_contract)
+        broad_contract["requested_range"] = {
+            "kind": "sections",
+            "items": ["SEC-1", "SEC-2"],
+        }
+        cases = [
+            (
+                "narrower_range",
+                broad_contract,
+                fixtures.SOURCE_REF,
+                {"kind": "sections", "items": ["SEC-1"]},
+                {"locale": "ja"},
+            ),
+            (
+                "different_source",
+                original_contract,
+                "project/specifications/other.md",
+                {"kind": "sections", "items": ["SEC-1"]},
+                {"locale": "ja"},
+            ),
+            (
+                "different_observation_condition",
+                original_contract,
+                fixtures.SOURCE_REF,
+                {"kind": "sections", "items": ["SEC-1"]},
+                {"locale": "en"},
+            ),
+        ]
+
+        for name, contract, actual_source, actual_range, observation in cases:
+            with self.subTest(name=name):
+                built = context_workflow_state.build_request_scope(
+                    {"workflow_ref": self.workflow_ref, "contract": contract}
+                )
+                workflow_root, workflow_ref, state_revision = (
+                    self._new_registered_state(
+                        [built["request_scope"]], [built["contract"]]
+                    )
+                )
+                batch = self.signal_batch_variant(
+                    source_ref=actual_source,
+                    requested_range=actual_range,
+                    observation_condition=observation,
+                )
+                batch_readback = self.store.write("context-signal-batch", batch)[
+                    "readback"
+                ]
+                record = self.signal_record(
+                    batch_readback,
+                    workflow_ref=workflow_ref,
+                    request_scope=built["request_scope"],
+                )
+                record["source"]["artifact_ref"] = actual_source
+                record["requested_range"] = actual_range
+                record["actual_inspected_range"] = actual_range
+                record["observation_condition"] = observation
+                result = context_workflow_state.handle(
+                    {
+                        "operation": "record-signal-attempt",
+                        "workflow_state_root": str(workflow_root),
+                        "workflow_ref": workflow_ref,
+                        "expected_revision": state_revision,
+                        "artifact_root": str(self.artifact_root),
+                        "record": record,
+                    }
+                )
+                self.assertEqual(result["status"], "blocked", result)
+                self.assertEqual(
+                    result["reason"], "signal_attempt_start_request_mismatch"
+                )
 
     def test_auxiliary_context_scope_without_state_does_not_block_required_a(
         self,
@@ -959,11 +1341,36 @@ class ContextWorkflowStateTests(unittest.TestCase):
         )
 
     def test_final_gate_reconciles_all_a_and_b_requests_across_resume(self) -> None:
-        workflow_root, workflow_ref, state_revision = self._new_registered_state(
-            [self.signal_scope_request, self.synthesis_scope_request]
-        )
         batch = fixtures.build_batch()
         batch_readback = self.store.write("context-signal-batch", batch)["readback"]
+        requested_operation_input = fixtures.operation_input()
+        requested_operation_input["input_sources"].append(
+            {
+                "artifact_ref": batch["artifact_ref"],
+                "content_hash": batch_readback["sha256"],
+                "effective_authority_fingerprint": None,
+                "source_revision": batch_readback["revision"],
+            }
+        )
+        requested_operation_input["input_sources"].sort(
+            key=lambda row: row["artifact_ref"]
+        )
+        synthesis_contract = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": requested_operation_input,
+                    "requested_scope": fixtures.requested_scope(),
+                    "target_batch_refs": [batch["artifact_ref"]],
+                },
+            }
+        )
+        synthesis_request_scope = synthesis_contract["request_scope"]
+        workflow_root, workflow_ref, state_revision = self._new_registered_state(
+            [self.signal_scope_request, synthesis_request_scope],
+            [self.signal_request_contract, synthesis_contract["contract"]],
+        )
         signal_result = context_workflow_state.handle(
             {
                 "operation": "record-signal-attempt",
@@ -1009,7 +1416,7 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 workflow_ref=workflow_ref,
                 workflow_state_root=workflow_root,
                 expected_revision=state_revision,
-                request_scope=self.synthesis_scope_request,
+                request_scope=synthesis_request_scope,
             )
         )
         self.assertEqual(recorded["status"], "written", recorded)
@@ -1034,8 +1441,8 @@ class ContextWorkflowStateTests(unittest.TestCase):
                     "workflow_state_root": str(workflow_root),
                     "requested_operation_input": copy.deepcopy(run["operation_input"]),
                     "requested_scope": copy.deepcopy(run["requested_scope"]),
-                    "request_scope": self.synthesis_scope_request,
-                    "request_scopes": [self.synthesis_scope_request],
+                    "request_scope": synthesis_request_scope,
+                    "request_scopes": [synthesis_request_scope],
                 },
                 "context_request": {
                     "workflow_ref": workflow_ref,
@@ -1104,7 +1511,7 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 workflow_ref=workflow_ref,
                 workflow_state_root=workflow_root,
                 expected_revision=state_revision,
-                request_scope=self.synthesis_scope_request,
+                request_scope=synthesis_request_scope,
             )
         )
         self.assertEqual(recorded["status"], "written", recorded)
@@ -1115,7 +1522,7 @@ class ContextWorkflowStateTests(unittest.TestCase):
             completed_run,
             provider_readbacks,
             workflow_root,
-            [self.synthesis_scope_request],
+            [synthesis_request_scope],
         )
         synthesis_final_scope = {
             "skill": synthesis_scope["skill"],
@@ -1191,7 +1598,7 @@ class ContextWorkflowStateTests(unittest.TestCase):
 
     def test_requested_scope_snapshot_is_saved_once_in_existing_state(self) -> None:
         workflow_root = self.base / "request-snapshot-workflow"
-        workflow_ref = str(uuid.uuid4())
+        workflow_ref = self.workflow_ref
         initialized = context_workflow_state.handle(
             {
                 "operation": "initialize",
@@ -1208,6 +1615,7 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 "expected_revision": initialized["state_revision"],
                 "artifact_root": str(self.artifact_root),
                 "requested_scopes": [self.signal_scope_request],
+                "context_request_contracts": [self.signal_request_contract],
             }
         )
         self.assertEqual(registered["status"], "written", registered)
@@ -1226,13 +1634,14 @@ class ContextWorkflowStateTests(unittest.TestCase):
                 "expected_revision": registered["state_revision"],
                 "artifact_root": str(self.artifact_root),
                 "requested_scopes": [self.signal_scope_request],
+                "context_request_contracts": [self.signal_request_contract],
             }
         )
         self.assertEqual(replay["status"], "reused")
 
     def test_requested_scope_snapshot_matches_runtime_scope_contract(self) -> None:
         workflow_root = self.base / "strict-request-scope-workflow"
-        workflow_ref = str(uuid.uuid4())
+        workflow_ref = self.workflow_ref
         initialized = context_workflow_state.handle(
             {
                 "operation": "initialize",
@@ -1334,38 +1743,9 @@ class ContextWorkflowStateTests(unittest.TestCase):
         workflow_root = self.base / "cli-workflow-state"
         artifact_root = self.base / "cli-context-artifacts"
         artifact_root.mkdir()
-        initialized = self._state_cli(
-            {
-                "operation": "initialize",
-                "workflow_state_root": str(workflow_root),
-                "workflow_ref": self.workflow_ref,
-                "initial_state": {
-                    "overall_state": "実行中",
-                    "context_signal_attempts": [],
-                    "context_synthesis_run_refs": [],
-                    "requested_scopes": [
-                        self.signal_scope_request,
-                        self.synthesis_scope_request,
-                    ],
-                },
-            }
-        )
-        self.assertEqual(initialized["status"], "created")
-
         store = context_artifact_store.DirectoryArtifactStore(artifact_root)
         batch = fixtures.build_batch()
         batch_readback = store.write("context-signal-batch", batch)["readback"]
-        after_signal = self._state_cli(
-            {
-                "operation": "record-signal-attempt",
-                "workflow_state_root": str(workflow_root),
-                "workflow_ref": self.workflow_ref,
-                "expected_revision": initialized["state_revision"],
-                "artifact_root": str(artifact_root),
-                "record": self.signal_record(batch_readback),
-            }
-        )
-        self.assertEqual(after_signal["status"], "written")
 
         run = self.run_for_current_workflow()
         run_source = {
@@ -1398,8 +1778,58 @@ class ContextWorkflowStateTests(unittest.TestCase):
             "context-synthesis-run", run["run_identity"]
         )
         contracts.validate_artifact(run, "context-synthesis-run")
+        synthesis_request_contract = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": run["operation_input"],
+                    "requested_scope": run["requested_scope"],
+                    "target_batch_refs": [batch["artifact_ref"]],
+                },
+            }
+        )
+        synthesis_request_scope = synthesis_request_contract["request_scope"]
+        initialized = self._state_cli(
+            {
+                "operation": "initialize",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": self.workflow_ref,
+                "initial_state": {
+                    "overall_state": "実行中",
+                    "context_signal_attempts": [],
+                    "context_synthesis_run_refs": [],
+                    "context_request_contracts": [
+                        self.signal_request_contract,
+                        synthesis_request_contract["contract"],
+                    ],
+                    "requested_scopes": [
+                        self.signal_scope_request,
+                        synthesis_request_scope,
+                    ],
+                },
+            }
+        )
+        self.assertEqual(initialized["status"], "created")
+
+        after_signal = self._state_cli(
+            {
+                "operation": "record-signal-attempt",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": self.workflow_ref,
+                "expected_revision": initialized["state_revision"],
+                "artifact_root": str(artifact_root),
+                "record": self.signal_record(batch_readback),
+            }
+        )
+        self.assertEqual(after_signal["status"], "written")
+
         run_readback = store.write("context-synthesis-run", run)["readback"]
-        synthesis_request = self.synthesis_request(run, run_readback["revision"])
+        synthesis_request = self.synthesis_request(
+            run,
+            run_readback["revision"],
+            request_scope=synthesis_request_scope,
+        )
         synthesis_request.update(
             {
                 "workflow_state_root": str(workflow_root),

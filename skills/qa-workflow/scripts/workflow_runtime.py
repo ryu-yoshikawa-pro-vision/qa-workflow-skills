@@ -503,6 +503,7 @@ def _verify_context_synthesis_workflow_state(
     unverified_scopes: list[dict[str, Any]],
     requested_scopes: list[dict[str, Any]],
     verified_owner_scopes: list[dict[str, Any]],
+    context_workflow_state_root: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Gate final completion on the persisted A/B request set and runtime scopes."""
     return _verify_context_workflow_completion(
@@ -511,6 +512,7 @@ def _verify_context_synthesis_workflow_state(
         unverified_scopes,
         requested_scopes,
         verified_owner_scopes,
+        context_workflow_state_root,
     )
 
 
@@ -520,6 +522,7 @@ def _verify_context_workflow_completion(
     unverified_scopes: list[dict[str, Any]],
     requested_scopes: list[dict[str, Any]],
     verified_owner_scopes: list[dict[str, Any]],
+    context_workflow_state_root: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     context_scopes = [
         scope
@@ -536,10 +539,76 @@ def _verify_context_workflow_completion(
         and isinstance(scope["normalized_input"].get("context_workflow_state"), dict)
         for scope in context_scopes
     )
-    if not context_requests and not has_persisted_context_state_input:
+    if (
+        not context_requests
+        and not has_persisted_context_state_input
+        and context_workflow_state_root is None
+    ):
         # Standalone/auxiliary owner verification does not require a workflow-state
         # adapter. The aggregate state gate applies when the workflow declared
         # context requests or explicitly supplied the existing state reference.
+        return [], []
+    if (
+        not context_requests
+        and not has_persisted_context_state_input
+        and context_workflow_state_root is not None
+    ):
+        try:
+            import context_workflow_state
+        except ModuleNotFoundError as exc:
+            if exc.name not in {"context_workflow_state", "context_artifact_store"}:
+                raise
+            return (
+                [
+                    {
+                        "issue_type": "context_workflow_state_unavailable",
+                        "blocking": True,
+                        "reason": "context_workflow_state_dependencies_unavailable",
+                    }
+                ],
+                [],
+            )
+        persisted = context_workflow_state.handle(
+            {
+                "operation": "read-context-requests",
+                "workflow_state_root": context_workflow_state_root,
+                "workflow_ref": workflow_ref,
+            }
+        )
+        if persisted.get("status") != "current":
+            return (
+                [
+                    {
+                        "issue_type": "context_workflow_state_unavailable",
+                        "blocking": True,
+                        "reason": persisted.get("reason", "workflow_state_unavailable"),
+                    }
+                ],
+                [],
+            )
+        persisted_requests = persisted.get("context_requests")
+        if not isinstance(persisted_requests, list):
+            return (
+                [
+                    {
+                        "issue_type": "context_workflow_state_unavailable",
+                        "blocking": True,
+                        "reason": "context_start_requests_invalid",
+                    }
+                ],
+                [],
+            )
+        if persisted_requests:
+            return (
+                [
+                    {
+                        "issue_type": "context_required_scopes_missing_from_runtime",
+                        "blocking": True,
+                        "requested_scopes": persisted_requests,
+                    }
+                ],
+                [],
+            )
         return [], []
     if not context_scopes:
         if context_requests:
@@ -659,6 +728,15 @@ def _verify_context_workflow_completion(
         issues.append(
             {
                 "issue_type": "context_workflow_root_mismatch",
+                "blocking": True,
+            }
+        )
+    if context_workflow_state_root is not None and any(
+        state_root != context_workflow_state_root for _, state_root in roots
+    ):
+        issues.append(
+            {
+                "issue_type": "context_workflow_state_root_mismatch",
                 "blocking": True,
             }
         )
@@ -979,9 +1057,14 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             "current_runtime_units",
             "unsupported_item_closures",
         },
-        {"requested_scopes"},
+        {"context_workflow_state_root", "requested_scopes"},
     )
     workflow_ref = ensure_nonempty_string(input_value["workflow_ref"], "workflow_ref")
+    context_workflow_state_root = input_value.get("context_workflow_state_root")
+    if context_workflow_state_root is not None:
+        context_workflow_state_root = ensure_nonempty_string(
+            context_workflow_state_root, "context_workflow_state_root"
+        )
     try:
         parsed_workflow_ref = uuid.UUID(workflow_ref)
     except (AttributeError, ValueError) as exc:
@@ -1123,6 +1206,7 @@ def _build(input_value: dict[str, Any], metadata: dict[str, Any]) -> dict[str, A
             unverified_scopes,
             requested_scopes=requested,
             verified_owner_scopes=verified_owner_scopes,
+            context_workflow_state_root=context_workflow_state_root,
         )
     )
     expected_unit_keys = sorted(

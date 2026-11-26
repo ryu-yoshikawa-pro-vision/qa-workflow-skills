@@ -114,6 +114,10 @@
 
 docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding不足で失敗した。`dcde957d`でその2行を直した後、新たに追加されたレビュー行106のpaddingが残り、`00e4f06d`と`32a1a084`もCode Qualityで失敗した。CI差分の指定どおり38個の空白に合わせた`e154bbc1`でCode QualityがPASSし、そのheadの5 workflowがすべてsuccess。各修正はverification.mdの表幅だけで、コード/testは`7a23afdf`から変更していない。Plan同期head `ce856615`と後続文書同期head `af7b1615`も5 workflowすべてsuccess。
 
+2026-11-26の最終継続再レビューでは、最終runtime inputからA/B要求・scope・nested state参照が一度に消える場合にgateへ入らない共通経路を再確認した。`context_workflow_state_root`をgeneric runtimeのoptional fieldとして追加し、context必須workflowでは最終scope集合から独立して指定する契約とした。永続stateから要求を読み直すため、全context scopeが落ちても開始時要求を検出する。既存の通常QA/単体runtimeはfieldを省略でき、downstreamの凍結済みv2 inputは旧field集合とanchor付き集合の両方を受ける。`context_request_contracts`へAのsource/range/observation conditionとBのoperation input/analysis scope/target batch refsを固定し、実attempt/runのsource・条件・scopeを開始時要求に結ぶ。
+
+この修正の回帰として、`test_context_workflow_state.py` 21件、`test_context_runtime_transport.py` 5件、`test_runtime_portability.py` 3件、`test_workflow_runtime.py` 26件、`test_context_artifact_store.py` 12件、`test_context_artifacts.py` 14件、`test_context_owner_verifiers.py` 4件、`test_owner_scope_resume.py` 41件、`test_integration_required_scopes.py` 24件を各suite個別に実行し、計150件PASS。範囲縮小・別source・観測条件変更・B調査条件変更、分割runの不足mapping、runtimeからA/B全scopeを落とすケース、単体runtime継続、凍結結果からの再開を含む。対象ファイルの`py_compile`とRuff check/format check（環境版0.15.2）もPASS。repository pinはRuff 0.16.8で、local exact pin実行とdprint CLIは未確認。変更後の全runtime suiteは1,513 testsのうち1,512件がPASSし、1件は`127.0.0.1`のHTTP fixture bindをsandboxが拒否してerrorとなった。同テスト単体はloopbackだけを許可した隔離実行でPASS。全suite総合はPASSではなくenvironment-limited errorと記録し、変更後CIで再確認する。
+
 ## 実環境依存・未実施
 
 - 通常root保存・履歴・readback・再開はローカル既存filesystem/SQLiteで接続・検証した。運用rootは指定されていないため、共有writer、複数host、権限外root、外部ownerの一意性・認可・正式承認を実運用環境で受入したとは扱わない。通常保存に専用認証hostを要求しない。
@@ -128,6 +132,7 @@ docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding�
 - 共通context contract helperをproject-context Skill配下からrepository common scriptsへ移し、qa-workflow state adapterだけをqa-workflow scriptsに置いた。これはPRN-03/Q06/Q07/Q08の責務に一致する。旧data-contract相対pathも新配置へ修正した。
 - completion adapterはcontext synthesis scopeでのみ共有helperを読み込む。単体Skillで共通helperが未配置でも通常qa-workflow runtimeを保ち、context scopeだけを明示的にblockedにする。static import allowlistとsingle-copy regressionの範囲を狭く保った。
 - `requested_scopes`の意味が、永続stateに固定する開始時の元要求集合と、最終runtimeへ渡す具体化済みrequired scope集合で異なる点を明記した。前者を変更せず、A/B state mapping・保存readback・owner verificationで対応する後者を作る。runtime入力は`workflow_scopes`とのidentityを保ち、completion gateが集合の不足・余剰を検出する。
+- `workflow_runtime._build`の入力schemaで`context_workflow_state_root`がrequired fields側に置かれており、contextを含まない既存runtimeまで必須となっていた。optional fields側へ移し、context必須workflowだけが独立root anchorを渡す契約に修正。downstream v2は従来のfield集合とanchorを含むfield集合を受理し、旧v1/v2 inputの再開を壊さない。対象runtime/state/transport回帰で確認し、完全受入は変更後CIで再確認する。
 - owner verifierはreadback自体を取得せず、callerから受け取った実保存本文/readbackの整合を検証する。専用host認証を意味しない。外部ownerのreadback/承認主体はこのverifierだけでは確立しない。
 - qa-workflow guidance.mdに残る共有resource reservation provider未選定時のblockは、複数workflowの外部共有resource排他の契約であり、通常context artifact保存の制限ではないため維持した。
 - workflow-state-template.mdのSQLite local-filesystem制約は既存qa.workflow_state_root providerの制約で、context artifactの通常filesystem保存とは別経路。JSON-only legacy stateは自動移行しないが、そのstate更新blockで通常artifact save/独立分析を停止しない。

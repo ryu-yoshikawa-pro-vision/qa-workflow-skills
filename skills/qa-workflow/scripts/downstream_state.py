@@ -50,6 +50,7 @@ _V1_INPUT_KEYS = frozenset(
     }
 )
 _V2_INPUT_KEYS = _V1_INPUT_KEYS | {"requested_scopes"}
+_V2_OPTIONAL_INPUT_KEYS = frozenset({"context_workflow_state_root"})
 _WORKFLOW_CONTRACTS = {_V1: _V1_INPUT_KEYS, _V2: _V2_INPUT_KEYS}
 _V2_PAYLOAD_KEYS = frozenset(
     {
@@ -397,7 +398,10 @@ def _validate_frozen_pair(
     if metadata.get("generator_contract_version") != version:
         raise InvalidInput("historical runtime generator version mismatch")
     # v1とv2はそれぞれ固定のキー集合だけを受理する（版とキー集合の不一致は拒否）。
-    if set(input_value) != _WORKFLOW_CONTRACTS[version]:
+    allowed_input_keys = _WORKFLOW_CONTRACTS[version]
+    if version == _V2 and "context_workflow_state_root" in input_value:
+        allowed_input_keys = allowed_input_keys | _V2_OPTIONAL_INPUT_KEYS
+    if set(input_value) != allowed_input_keys:
         raise InvalidInput("historical workflow input schema is invalid")
     entities = input_value["current_entities"]
     if not isinstance(entities, list):
