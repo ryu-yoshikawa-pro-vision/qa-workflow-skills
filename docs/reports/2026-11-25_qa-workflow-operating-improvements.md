@@ -4,7 +4,7 @@
 
 ## 確定前提と適用範囲
 
-[共通原則](../reference/qa-skill-design-principles.md)（PRN-01〜09、Q01〜12）が設計の正本。利用者合意済みであり、再承認不要。OPS-18を先に適用し、Skill・Runtime・validator・Helper・呼出し側の不要な責務・過剰防衛を削減する。以下の「現状」は調査時点の旧契約・制約であり、「改善」「受入」は新方針の候補。現行の未改修契約を文書だけで解消したことにしない。PR #40完了後に実装証拠を確認し、対応済みの再実装や不要になった受入を除く。 PRN-09に従い関連コード・Skill・文書・テスト・設定を同期し、不要な実装・記述・重複だけを除去する。
+[共通原則](../reference/qa-skill-design-principles.md)（PRN-01〜09、Q01〜12）が設計の正本。利用者合意済みであり、再承認不要。OPS-18を先に適用し、Skill・Runtime・validator・Helper・呼出し側の不要な責務・過剰防衛を削減する。以下の「現状」は調査時点の旧契約・制約であり、「改善」「受入」は新方針の候補。現行の未改修契約を文書だけで解消したことにしない。PR #40完了後に実装証拠を確認し、対応済みの再実装や不要になった受入を除く。 PRN-09に従い関連コード・Skill・文書・テスト・設定を変更の影響範囲で同期し、不要な実装・記述・重複を除去する。QA活動の基本原則と、下記の専門QA判断に関する改善候補も適用する。
 
 調査・レビューで使用したG1〜G5、CP01〜10、配置区分等の詳細は、[調査時の共通運用契約](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-operating-contract.md)、[調査時の成果物マトリクス](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-artifact-matrix.md)、[調査時の利用者ガイド](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-user-guide.md)を参照する。これらはレビュー根拠の履歴であり、運用上の正本ではない。保存・承認・配置等の必要な実行条件は担当Skill・Runtimeと適用される契約を確認する。
 
@@ -297,6 +297,27 @@ PR #40の[検証記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-
 - PR #40: context-signal-auditの単一sourceの中立観察・不変batch・訂正、context-rule-synthesisの独立根拠/反例/差異条件・仮説・handoffは維持する。調査revisionではcontext-synthesis-runに予定payload、base revision/hash、related candidate前提、handoff intentを保持し、[context_workflow_state.py](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/968629b33943570aa7f4654edd29d1cc2546a349/skills/qa-workflow/scripts/context_workflow_state.py)で開始要求、試行、run mapping、完了を扱い、workflow_runtime.pyの_verify_context_synthesis_workflow_stateが照合する。成果物から確実に復元できる情報の二重管理があるか確認する。一方、開始時の要求範囲、0件runと未実行の区別、別run混入防止、関連候補の同一保存境界での条件確認、外部handoffの結果不明からの再開など、成果物単体では証明できない情報や現在の必要保証は残す。通常保存の改善済み部分はOPS-03を参照し、未完了の実owner受入は維持する。
 
 受入の追加ではなく既存AT-21/22/24/25等への具体化として、実際に変更する呼出し経路と契約、除去・維持・委譲する理由を確認する。既存テストで十分な場合は新たな重複試験を要求しない。各具体候補は該当OPSとQ12に従って最新baselineで再判定する。
+
+### QA活動の判断・継続改善
+
+[QA活動の基本原則](../reference/qa-skill-design-principles.md#qa活動の基本原則)を既存Skillの判断に反映する。2026-11-26にPR #41の50f37f4とPR #40の4eebeabを基準に、ISTQB・IVECと主要Skill契約を照合した結果、次の不足または見直し候補を抽出した。既存OPSとの関係を示し、同じ処理や受入を別要件として重複させない。PR #40統合後に実際の不足を確認し、必要な変更・検証を対象Planへ反映する。現行の有効な契約や安全条件は改修まで維持する。
+
+- **合意からの自律判断（OPS-01/02/04/09/18）**: [question-analysisの判断順序](../../skills/question-analysis/references/guidance.md#判断順序)は既存回答・有効な仕様・承認済み仮定の確認を定め、[test-case-design](../../skills/test-case-design/references/guidance.md#複数期待結果複数仕様根拠の対応)は複数根拠による期待結果を許容する。spec-analysisは既存の有効なルールを組み合わせ、適用範囲・例外に照らして今回の判断を導出できるようにする。導出結果は必要な根拠参照で表し、個々の判断の新規DEC/ASM登録や再承認を要求しない。question-analysisはその判断で解決できない重要な論点のみを質問へ送る。テスト技法・観測・リスク評価・許可済み調査・設計など委ねられた専門判断は担当Skillが行う。正式仕様の新規決定・意味変更、未委任のリスク受容や対象外決定、実操作の許可とは区別する。仮説は調査・観点生成に使えるが、未確定の期待挙動を正式仕様として採用しない。根拠: CTFL §1.4〜1.5、IVECデザイナー §4.1.1〜4.1.2。
+- **知識の参照・蓄積・横断分析（OPS-09/15/18）**: [qa-knowledge](../../skills/qa-knowledge/references/guidance.md)はcurrent entryを読むだけならgatewayとしない。PR #40の[横断コンテキスト分析](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/4eebeab7af4b9a25c0ff240116c406fc42380c50/skills/qa-workflow/references/guidance.md#L119-L126)は無効・未指定時に追加2 Skillを起動しない。通常のQAでも、担当Skillが共通処理・類似機能・過去の合意・欠陥・関連Knowledgeを必要な範囲で参照できることを確認する。既存知識の参照を横断分析モードや新規保存の条件にしない。再利用価値のある観察は担当成果物または必要時のcontext-signal-auditへ、横断的な法則候補・反例分析が必要なときはcontext-rule-synthesisへつなぐ。モード・要求scope・承認境界を保ち、毎回の全件検索・2 Skillの強制起動・全判断の蓄積は行わない。根拠: IVECデザイナー §4.1.1・4.1.3、CTFL §1.3〜1.4。
+- **活動・方式・テストレベルの選択（OPS-05/18）**: [qa-workflow](../../skills/qa-workflow/SKILL.md)は要求成果物に応じた開始点を選べる。[test-analysis](../../skills/test-analysis/references/guidance.md#テストレベル)と[test-architecture-design](../../skills/test-architecture-design/references/guidance.md#レベル割当と競合)は明示指定・承認済み割当がない場合にシステムテストを既定とする。目的・リスク・テスト可能性から静的テスト、コンポーネント、統合、システム、受入、探索等の必要な活動を選べるか、現行既定値・下流の依存を確認する。必要な場合は既定値の適用条件を見直す。明示指定・承認済み方式を尊重し、既存の検証分担と必要なカバレッジを維持する。相談・レビュー・観点設計に不要な詳細TCを強制せず、詳細TCが必要な依頼では既存の実行可能性・品質を維持する。方式判断は担当Skill、工程選択はqa-workflowとし、固定手順・全工程の完了証明を目的化しない。根拠: CTFL §1.3〜1.4・§2.2・§3、IVECアーキテクト §4.2.5〜4.2.9、デザイナー §4.2.2。
+- **期待結果と観測方法（OPS-05/07/18）**: [test-case-design](../../skills/test-case-design/references/guidance.md#現在有効な仕様根拠--期待結果の根拠)は期待結果と仕様根拠の対応を、[test-analysis](../../skills/test-analysis/references/guidance.md#テスト可能性)は観測可能性を定める。方式・分析・ケース設計で、対象に適した判定手段を選ぶ。例えば独立した期待値計算、仕様に基づく入出力関係、非同期完了の観測、永続状態・権限の確認などを必要時に利用し、対象実装と同じ誤りを期待値側に持ち込まない。絶対値が得られない場合は有効な関係を根拠とした既存メタモルフィック技法等を検討する。既存の実行・独立レビュー・assertion検証で判定の妥当性を確認し、観測不能をPASSとしない。新しい判定専用Skillや全ケース共通の追加検証は前提にしない。根拠: CTAL-TA v4.0（テスト技法）、IVECデザイナー §4.2.3〜4.2.5。
+- **欠陥予防・テスト資産の有効性（OPS-09/15/18）**: [defect-management](../../skills/defect-management/references/guidance.md)は原因分析を実行ownerへ戻し、[regression-testing](../../skills/regression-testing/references/guidance.md#run-selection--currentness)はリスク・過去Finding・Knowledgeを利用する。欠陥原因・発生条件・関連機能から必要なリスク再評価、設計変更、再利用知識を担当ownerへつなぐ。共通原因の仮説と確認済み欠陥は区別する。廃止仕様、重複検証、新たなリスク、検出力不足など具体的な理由がある場合は、既存テストの選択・方式・設計を見直す。重要な回帰防止テストをPASS継続だけで削除しない。毎回の全件再評価や全欠陥の横断分析は要求しない。根拠: CTFL §1.3（早期テスト・欠陥の偏在・テストのすり減り）、CTAL-TA（欠陥予防）、IVECデザイナー §4.2.7、アーキテクト §4.3。
+- **Agentの活動方法の改善（OPS-11/18）**: [test-evaluation](../../skills/test-evaluation/references/guidance.md#責務境界)は案件QA活動の評価を担当し、Skill自体の評価は[EVALS.md](../../EVALS.md#評価レイヤー)に分離している。この境界を維持する。活動中に同じ質問・設計漏れ・誤った一般化・不要工程・機械処理の誤り等を発見したら、原因に応じて案件の既存知識・計画・設計へ反映するか、Skill・Helper・評価資産の改善候補として既存開発経路へ引き渡す。影響を受ける担当ownerが必要な変更を行い、次回の活動や既存回帰評価で効果を確認する。局所的な教訓は既存成果物や既存の開発記録で足り、毎回の正式評価、専用振り返りSkill、改善台帳、無断のSkill自己改変は不要。根拠: CTAL-TM v3.0（テストプロセス改善）、IVECアーキテクト §4.3.4〜4.3.9。
+
+**受入の整理（OPS-05/11/18、AT-21/22/25）**: [EVALS.md](../../EVALS.md)の既存意味評価・実Agent評価・決定論的出力評価から目的に合うものを利用する。次のケースは既存fixture・rubricで不足するものだけを補う。
+
+- 同一質問の再利用、新機能への有効な共通ルール適用、複数根拠からの導出、例外・適用範囲外・失効・仕様競合、必要な質問、類似欠陥の観点利用を対比し、正しい自律判断・誤判断・必要な質問漏れを評価する。不要質問の削減だけを成果にしない。
+- 目的に合う活動・方式選択、必要なカバレッジ・観測・品質・安全の維持、不要工程の省略、教訓の次回利用を確認する。決定論的生成・必要な形式/参照・実行証拠は既存の仕組みで評価し、専門判断の妥当性は意味評価・実Agent結果で確認する。
+- [既存の効率比較](../../EVALS.md#qa-workflowの効率比較pr-22aの評価基盤)は同一test_set_ref等を要求する。同一テスト集合での実行効率は現行契約で比較する。テスト集合や方式自体を変更する改善は、同じQA目的・検証責務・リスク・独立した品質/安全基準で評価し、同一テスト集合比較の結果と混同しない。既存比較で成立するかを先に確認し、不足する場合のみ比較契約を改修する。固定削減率、新しい比較器・全変更への全体評価は要求しない。
+
+QA原則は[共通原則](../reference/qa-skill-design-principles.md)に、質問・承認境界は[共通運用契約](../reference/qa-workflow-operating-contract.md)に集約する。実装では採番・決定論的技法・必要な参照検証・実行安全・保存境界など機械的に担保できる事項を既存の仕組みに任せ、担当Skillや利用者に同じ確認を繰り返させない。正本・依存の照合は今回の判断・再利用・実行に必要な範囲に限定する。保守性や整合性だけを理由に全件同期、全成果物の検証、専用metadata、追加承認を要求しない。必要な依存・参照・実行結果の不整合を放置せず、影響範囲を修正し、独立した作業は進める。
+
+公式参照: [ISTQB CTFL v4.0.1](https://istqb.org/certifications/certified-tester-foundation-level-ctfl-v4-0/)、[CTAL-TA v4.0](https://istqb.org/certifications/certified-tester-advanced-level-test-analyst/)、[CTAL-TM v3.0](https://istqb.org/certifications/certified-tester-advanced-level-test-management-ctal-tm-v3-0/)、[CT-GenAI v1.1](https://istqb.org/certifications/gen-ai/)（生成結果評価・AI固有リスクの公式概要）、[IVEC v3.2.0](https://www.ivia.or.jp/item43/item38)（テスター・デザイナー・アーキテクトの関連章）。シラバス全文や全評価fixtureの網羅照合、CT-GenAI本文全体、実Agentによる改善効果は未確認。ここでの受入は後続改修の候補であり、完了済みの実証結果ではない。
 
 ### 責務再評価の扱い
 
