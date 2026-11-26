@@ -130,6 +130,8 @@ def _sized_run(
     target_bytes: int,
     candidate: dict,
     candidate_readback: dict,
+    signal_batch: dict,
+    signal_batch_readback: dict,
     index: int,
     workflow_ref: str,
 ) -> dict:
@@ -142,8 +144,15 @@ def _sized_run(
             "content_hash": candidate_readback["sha256"],
             "effective_authority_fingerprint": None,
             "source_revision": candidate_readback["revision"],
-        }
+        },
+        {
+            "artifact_ref": signal_batch["artifact_ref"],
+            "content_hash": signal_batch_readback["sha256"],
+            "effective_authority_fingerprint": None,
+            "source_revision": signal_batch_readback["revision"],
+        },
     ]
+    operation_input["input_sources"].sort(key=lambda source: source["artifact_ref"])
     operation_id = contracts.workflow_operation_id(
         workflow_ref, operation_input, requested_scope
     )
@@ -166,7 +175,14 @@ def _sized_run(
             "source_revision": candidate_readback["revision"],
             "content_hash": candidate_readback["sha256"],
             "effective_authority_fingerprint": None,
-        }
+        },
+        {
+            "source_kind": "signal_batch",
+            "artifact_ref": signal_batch["artifact_ref"],
+            "source_revision": signal_batch_readback["revision"],
+            "content_hash": signal_batch_readback["sha256"],
+            "effective_authority_fingerprint": None,
+        },
     ]
     operation = {
         "candidate_identity": candidate["candidate_identity"],
@@ -191,7 +207,7 @@ def _sized_run(
             "content_hash": candidate_readback["sha256"],
         },
     }
-    run["triage_plan"]["target_batch_refs"] = []
+    run["triage_plan"]["target_batch_refs"] = [signal_batch["artifact_ref"]]
     run["triage_plan"]["planned_candidate_ops"] = [operation]
     run["result_summary"] = {
         "status": "completed_zero_changes",
@@ -212,10 +228,18 @@ def _sized_run(
     return run
 
 
-def _signal_scope(batch: dict, readback: dict, root_binding: str) -> dict:
+def _signal_scope(
+    batch: dict,
+    readback: dict,
+    root_binding: str,
+    workflow_ref: str,
+    artifact_root: str,
+    workflow_state_root: str,
+    request_scope: dict,
+) -> dict:
     source = batch["source"]
     request = {
-        "workflow_ref": "workflow:context-transport-signal",
+        "workflow_ref": workflow_ref,
         "source_artifact_ref": source["artifact_ref"],
         "source_revision": source["source_revision"],
         "source_content_hash": source["source_content_hash"],
@@ -252,6 +276,11 @@ def _signal_scope(batch: dict, readback: dict, root_binding: str) -> dict:
         "normalized_input": {
             "owner_verification": evidence,
             "context_request": request,
+            "context_workflow_state": {
+                "artifact_root": artifact_root,
+                "workflow_state_root": workflow_state_root,
+                "request_scope": request_scope,
+            },
         },
         "current_structure_state": None,
     }
@@ -261,6 +290,7 @@ def _run_scope(
     run: dict,
     run_readback: dict,
     candidate_readback: dict,
+    signal_batch_readback: dict,
     root_binding: str,
     workflow_state_request: dict,
 ) -> dict:
@@ -269,7 +299,11 @@ def _run_scope(
         "readback": run_readback,
         "expected_revision": run_readback["revision"],
         "root_binding": root_binding,
-        "provider_readbacks": [candidate_readback, run_readback],
+        "provider_readbacks": [
+            candidate_readback,
+            signal_batch_readback,
+            run_readback,
+        ],
     }
     request = {
         "workflow_ref": run["workflow_ref"],
@@ -363,6 +397,31 @@ class ContextRuntimeTransportTests(unittest.TestCase):
         metadata = workflow_fixtures.metadata()
         scopes: list[dict] = []
         requested: list[dict] = []
+        signal_requests = []
+        synthesis_requests = []
+        for index in range(1, len(sizes) + 1):
+            assigned_range = {"kind": "sections", "items": [f"SEC-{index}"]}
+            execution_range = json.dumps(
+                assigned_range,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            signal_requests.append(
+                workflow_fixtures.required_scope(
+                    "context-signal-audit",
+                    "request:" + hashlib.sha256(f"signal-{index}".encode()).hexdigest(),
+                    execution_range,
+                )
+            )
+            synthesis_requests.append(
+                workflow_fixtures.required_scope(
+                    "context-rule-synthesis",
+                    "request:"
+                    + hashlib.sha256(f"synthesis-{index}".encode()).hexdigest(),
+                    f"analysis:refund-policy-{index}",
+                )
+            )
 
         with tempfile.TemporaryDirectory() as root:
             store = context_artifact_store.DirectoryArtifactStore(root)
@@ -376,6 +435,7 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                         "overall_state": "実行中",
                         "context_signal_attempts": [],
                         "context_synthesis_run_refs": [],
+                        "requested_scopes": signal_requests + synthesis_requests,
                     },
                 }
             )
@@ -387,7 +447,62 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                 self.assertEqual(
                     len(batch_readback["content"].encode("utf-8")), target_bytes
                 )
-                scopes.append(_signal_scope(batch, batch_readback, store.root_binding))
+                source = batch["source"]
+                signal_request = signal_requests[index - 1]
+                signal_state = context_workflow_state.handle(
+                    {
+                        "operation": "record-signal-attempt",
+                        "workflow_state_root": workflow_state_root,
+                        "workflow_ref": workflow_ref,
+                        "expected_revision": state_revision,
+                        "artifact_root": str(root),
+                        "record": {
+                            "attempt_id": hashlib.sha256(
+                                f"signal-attempt-{index}".encode()
+                            ).hexdigest(),
+                            "workflow_operation_id": hashlib.sha256(
+                                f"signal-operation-{index}".encode()
+                            ).hexdigest(),
+                            "request_scope": signal_request,
+                            "source": {
+                                "artifact_ref": source["artifact_ref"],
+                                "source_revision": source["source_revision"],
+                                "content_hash": source["source_content_hash"],
+                            },
+                            "requested_range": source["requested_range"],
+                            "observation_condition": source["observation_condition"],
+                            "actual_inspected_range": source["actual_inspected_range"],
+                            "batch_refs": [
+                                {
+                                    "artifact_ref": batch_readback["artifact_ref"],
+                                    "revision": batch_readback["revision"],
+                                    "content_hash": batch_readback["sha256"],
+                                    "assigned_range": source["requested_range"],
+                                }
+                            ],
+                            "candidate_check": {
+                                "status": "checked_no_conflict",
+                                "triggered_candidate_identities": [],
+                            },
+                            "status": "completed",
+                            "failure_reason": None,
+                            "resume_condition": None,
+                        },
+                    }
+                )
+                self.assertEqual(signal_state["status"], "written", signal_state)
+                state_revision = signal_state["state_revision"]
+                scopes.append(
+                    _signal_scope(
+                        batch,
+                        batch_readback,
+                        store.root_binding,
+                        workflow_ref,
+                        str(root),
+                        workflow_state_root,
+                        signal_request,
+                    )
+                )
                 requested.append(
                     workflow_fixtures.required_scope(
                         "context-signal-audit",
@@ -407,6 +522,8 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                     target_bytes,
                     candidate,
                     candidate_readback,
+                    batch,
+                    batch_readback,
                     index,
                     workflow_ref,
                 )
@@ -419,6 +536,7 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                     "workflow_state_root": workflow_state_root,
                     "requested_operation_input": run["operation_input"],
                     "requested_scope": run["requested_scope"],
+                    "request_scope": synthesis_requests[index - 1],
                 }
                 state_result = context_workflow_state.handle(
                     {
@@ -431,6 +549,7 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                         "run_revision": run_readback["revision"],
                         "requested_operation_input": run["operation_input"],
                         "requested_scope": run["requested_scope"],
+                        "request_scope": synthesis_requests[index - 1],
                     }
                 )
                 self.assertEqual(state_result["status"], "written", state_result)
@@ -440,6 +559,7 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                         run,
                         run_readback,
                         candidate_readback,
+                        batch_readback,
                         store.root_binding,
                         workflow_state_request,
                     )
