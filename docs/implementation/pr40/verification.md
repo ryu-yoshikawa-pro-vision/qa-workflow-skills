@@ -3,8 +3,8 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- fetch確認時のorigin/mainは`197f1e0e1abe870b0cc793355e7abf73bf241d87`でPR baseと一致。コード・test headは`7a23afdf00dd259f515c11e933d8fb51c98f763f`、最新の全workflow検証headは`ce8566156b91582a35abe3b797ca67bd94856438`。
-- `7a23afdf`ではValidate Agent Skills (2368)、Deterministic Output Evals (2366)、Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。後続のPlan・検証記録同期head `ce856615`でも5 workflowすべてsuccess（Agent Skills 2375、Deterministic 2373、Semantic 2338、Code Quality 1068、Codex Harness 1068）。
+- fetch確認時のorigin/mainは`197f1e0e1abe870b0cc793355e7abf73bf241d87`でPR baseと一致。コード・test headは`7a23afdf00dd259f515c11e933d8fb51c98f763f`。後続の検証記録整形head `e154bbc1`、Plan同期head `ce856615`、文書同期head `af7b1615`も全workflow成功を確認した。
+- `7a23afdf`ではValidate Agent Skills (2368)、Deterministic Output Evals (2366)、Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。`af7b1615`の5 workflowもsuccess（Agent Skills 2376、Deterministic 2374、Semantic 2339、Code Quality 1069、Codex Harness 1069）。
 - 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
@@ -109,7 +109,7 @@
 
 先行head `0d789e1f`ではDeterministic Output Evalsがruntime portability test 2件で失敗した。`workflow_runtime.py`の追加adapter importが静的許可リストになく、単体Skill copyで共通helper不足時にも既存QA runtimeが起動できなかった。最初のテスト修正で共有helperをisolated rootへコピーしたが、自己レビューで親Planの単体Skill portability契約を弱めると判断し、そのfixture変更を戻した。最終実装はcontext scopeでのみadapterを遅延importし、adapter/store/contract不足はcontext scopeだけblocking issueにする。ローカル15件とhead `7a23afdf`のruntime全suiteで再検証した。
 
-docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding不足で失敗した。`dcde957d`でその2行を直した後、新たに追加されたレビュー行106のpaddingが残り、`00e4f06d`と`32a1a084`もCode Qualityで失敗した。CI差分の指定どおり38個の空白に合わせた`e154bbc1`でCode QualityがPASSし、そのheadの5 workflowがすべてsuccess。各修正はverification.mdの表幅だけで、コード/testは`7a23afdf`から変更していない。Plan同期head `ce856615`でも5 workflowすべてsuccess。
+docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding不足で失敗した。`dcde957d`でその2行を直した後、新たに追加されたレビュー行106のpaddingが残り、`00e4f06d`と`32a1a084`もCode Qualityで失敗した。CI差分の指定どおり38個の空白に合わせた`e154bbc1`でCode QualityがPASSし、そのheadの5 workflowがすべてsuccess。各修正はverification.mdの表幅だけで、コード/testは`7a23afdf`から変更していない。Plan同期head `ce856615`と後続文書同期head `af7b1615`も5 workflowすべてsuccess。
 
 ## 実環境依存・未実施
 
