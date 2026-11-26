@@ -44,7 +44,7 @@
 
 ### 実施状態
 
-このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。過去headのCI・検証記録は後続の履歴項目として残す。2026-11-27の最新ローカル結果は[検証記録](../implementation/pr40/verification.md)の「merge条件向け検証スナップショット」を参照する。そこでは指定9 runtime module 153 testsがPASSし、全runtime suiteは1516件中1515件PASS/1 loopback sandbox error、repository Deterministic Output Evalsは675件中674件PASS/1 loopback sandbox errorで、各該当testは隔離loopback許可実行で個別PASSした。ローカルsuiteを全体PASSにしない。変更Pythonのruff check/formatと`py_compile`はPASS、pinned `dprint`/`skills-ref` CLIはローカル未実行。最終headのGitHub Actions 5 workflowはpush後に確認し、この状態記録を更新する。
+このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。過去headのCI・検証記録は後続の履歴項目として残す。2026-11-27の最新ローカル結果は[検証記録](../implementation/pr40/verification.md)の「merge条件向け検証スナップショット」を参照する。そこでは指定9 runtime module 153 testsがPASSし、全runtime suiteは1516件中1515件PASS/1 loopback sandbox error、repository Deterministic Output Evalsは675件中674件PASS/1 loopback sandbox errorで、各該当testは隔離loopback許可実行で個別PASSした。ローカルsuiteを全体PASSにしない。変更Pythonのruff check/formatと`py_compile`はPASS、pinned `dprint`/`skills-ref` CLIはローカル未実行。push済みhead `4fe5738e`ではGitHub Actions 5 workflow中4つがsuccessし、Code Qualityは2 Markdown tableのdprint整形差分でfailureした。CI指定の整形を反映し、修正版headの5 workflowを次のpush後に確認する。merge readiness項目は最終headでの成功確認まで未チェックとする。
 
 通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較はユーザー判断によりmerge後へ移管し、今回未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。今回は外部サービスへrepository dataを送信しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
