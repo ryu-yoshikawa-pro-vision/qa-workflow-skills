@@ -162,9 +162,9 @@ PR #40の[検証記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-
 
 現状: PR #22効率比較はunproven、同一入力再依頼等の悪化と安全/品質未達を保持。
 
-改善: 初回、同一入力再依頼、変更、外部資料改版、中断再開の既存比較条件で質問数、不要再生成、保存漏れ、所要時間、費用/token、品質・安全を測る。
+改善: 変更目的に応じて必要な指標・検証範囲を選ぶ。workflow全体の効率改善を評価する場合は、初回、同一入力再依頼、変更、外部資料改版、中断再開の既存比較条件で質問数、不要再生成、保存漏れ、所要時間、費用/token、品質・安全を測る。
 
-受入: 既存比較器、独立試行、同条件・品質/安全PASS、測定不能の明示。介入削減のため承認や品質を弱めない。
+受入: 局所変更は必要な回帰検証と変更目的に対応する効果を確認する。workflow全体の効率改善は既存比較器の契約に従い、独立試行、同条件・品質/安全PASS、測定不能の明示を維持する。局所検証だけで全体の効率改善を実証したとしない。介入削減のため承認や品質を弱めない。
 
 追加要件：人間の作業・待ち時間、質問/承認回数、再開時再入力、保存漏れを測定候補に追加。人間レビュー・承認時間は過去比較で対象外承認済みのため、新たに測定する場合は計測法・比較母集団・範囲を別途合意し過去測定値に混入させない。品質・安全合格を前提にする。
 
@@ -285,13 +285,13 @@ PR #40の[検証記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-
 
 改善: 共通原則を最初に適用する。全Skillに加えRuntime・validator・Helper・呼出し側の契約を確認し、維持/既存手段への委譲/必要な外部責務/削除に分類する。QA固有の質問・根拠・結果は担当owner、質問への回答の意味・反映先・再開先の判断はquestion-analysis（OPS-01）、次工程・再開・要求された成果物の完了判断はqa-workflow（OPS-05）、必要な実行環境管理は呼出し側（OPS-06/14）。既存成果物で復元可能な情報の重複state、必要性のない保存証拠/validator/metadataを削減する。project-contextの存廃はQA専門責務から判断する。既存保証は必要性を評価し、変更する契約・回帰範囲を対象Planで明示する。不要な管理は別層に移さず削除する。必要な外部責務も既存Agent環境・OS権限・標準機能・明示指示で成立するなら専用機構を要求しない。機械的に確定できる処理は既存Helper・標準機能を優先する。単純な一覧取得や通常のファイル保存だけのために新しいHelperを追加せず、既存手段では不足する具体的なQA上の保証がある場合だけ追加を検討する。決定論的技法、ID割当、参照・構造検証等の必要な処理は維持する。 Q12に従い実装不要・対応済み・外部責務・受入のみ等を再評価し、必要な対応と受入に絞る。
 
-受入: 実際に変更する責務・契約について、(1) 専門外処理・重複の削減理由、(2) 直接利用を含む必要な実行条件でQA品質・根拠追跡・再開が維持されること、(3) 実リスクに応じた必要な保存・権限・履歴・競合・完了検証、(4) 読込・質問・設定・重複処理の削減を既存評価で確認する。全ownerに同一のCAS・保存証拠・state・専用検証基盤を要求しない。未確認は未確認と記録する。
+受入: 実際に変更する責務・契約について、(1) 専門外処理・重複の削減理由、(2) 直接利用を含む必要な実行条件でQA品質・根拠追跡・再開が維持されること、(3) 実リスクに応じた必要な保存・権限・履歴・競合・完了検証、(4) 変更目的に対応する読込・質問・設定・重複処理等の削減効果を必要な範囲で確認する（OPS-11）。全ownerに同一のCAS・保存証拠・state・専用検証基盤を要求しない。未確認は未確認と記録する。
 
 具体的な確認箇所（調査revisionの実装に基づく候補）:
 
 - qa-workflow: [artifact_graph.py](../../skills/qa-workflow/scripts/artifact_graph.py)にはProject Context parse、fixed-root scan、local baseline/history、SQLite workflow state、WCAG評価状態・報告確定、claim/reservationの処理がある。[workflow_runtime.py](../../skills/qa-workflow/scripts/workflow_runtime.py)と合わせて呼出し元ごとに必要な保証を確認し、QA固有の進行・依存・停止/再開・完了と、案件管理・保存技術・実行環境の処理を分ける。WCAG固有の正式評価の保証は必要な担当境界に残す。ファイルの大きさや責務混在だけで全体削除・別Helperへの全移管を決めない。
 - project-context: OPS-09/14の責務削減後、共通QA目的・用語・DEC/ASM・業務制約の意味管理に独立した専門手順が必要か確認する。共通文書の直接参照で同等の意味管理が成立する場合は独立Skillの必要性を再評価する。所有者・参照・再開・既存資産の互換性を確認せず削除しない。
-- 共通自己検証: qa-workflow、spec-analysis、question-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、adversarial-reviewの9 Skillで、出力前の入力/停止条件確認、局所的な契約違反の最大1回修正、再確認、責務外への越境禁止が類似記述になっている。共通部分を短く整理できるか確認し、各Skill固有の品質条件と仕様根拠を創作しない条件は維持する。[EVALS.md](../../EVALS.md)の現行最大1回制約は目的（無限修正・責務越境の防止）に照らして必要性を評価する。採番・形式等の機械的な違反は既存Helperで修正・確認し、意味判断が必要なら担当ownerへ戻し、根拠不足は必要な質問・局所停止とする。改善しない反復は停止し残る違反を報告する。回数増加や無制限修正を目的とせず、変更する場合はEVALS.md・関連Skill・評価資産を同期する。共通reference化は単体配布・直接利用・読み込み経路で利用可能な場合に限り、新たな生成frameworkを前提にしない。
+- 共通自己検証: qa-workflow、spec-analysis、question-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、adversarial-reviewの9 Skillで、出力前の入力/停止条件確認、局所的な契約違反の最大1回修正、再確認、責務外への越境禁止が類似記述になっている。共通部分を短く整理できるか確認し、各Skill固有の品質条件と仕様根拠を創作しない条件は維持する。[EVALS.md](../../EVALS.md)の現行最大1回制約は目的（無限修正・責務越境の防止）に照らして必要性を評価する。採番・形式等の機械的な違反は既存手段で修正・確認する。自Skillの専門責務内の判断・修正と、他ownerの判断が必要な問題の引継ぎを区別し、根拠不足は必要な質問・局所停止とする。改善しない反復は停止し残る違反を報告する。回数増加や無制限修正を目的とせず、変更する場合はEVALS.md・関連Skill・評価資産を同期する。共通reference化は単体配布・直接利用・読み込み経路で利用可能な場合に限り、新たな生成frameworkを前提にしない。
 - Runtime契約と段階的詳細化: test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、qa-workflowの共通envelope・verify_runtime_evidence等の繰返しを確認し、実際の重複とSkill固有のpartial rerun、previous artifact、current_structure_state等を区別する。現行は9 Skill（spec-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、qa-workflow、usability-inspection、wcag-conformance-evaluation）にruntime_contract.pyを配置し、[test_runtime_portability.py](../../tests/skills/runtime/test_runtime_portability.py)で9コピーのバイト一致と代表7 Skillの単体実行を検証している。単体配布のための複製と不要な処理重複を区別し、各Skillで使われない処理や専門外の処理、変更時の同期負担を調べる。既存の一致検証・単体実行検証を優先し、他Skillやrepository全体の常時参照を必須にしない。新しい生成・配布基盤は前提としない。qa-workflow、test-condition-design、usability-evaluation、usability-inspection、wcag-conformance-evaluation等の長い手順では、発火・責務・必要入力・安全上の必須条件をSKILL.mdに残し、該当時だけ必要な詳細を読む構造を検討する。正式WCAG評価のsampling・観測・closure、ブラウザ操作の安全、既存テスト技法と参照検証を削らない。
 - 専門Skillの分割: test-requirements-analysisとtest-requirement-design、test-item-analysisとfeature-analysis、test-condition-analysisとtest-condition-design、coverage-analysisとadversarial-review、test-executionとE2E実行、e2e-test-reportingとtest-reporting、usability-evaluationとusability-inspection、regression-testingとtest-managementは、現行定義上は異なる専門責務を持つ。名称や処理の類似だけでは統合・削除の根拠にならない。全37 Skillの現行定義を確認した段階では安全に削除できるSkillは特定していない。Skill数を削減目標にしない。
 - PR #40: context-signal-auditの単一sourceの中立観察・不変batch・訂正、context-rule-synthesisの独立根拠/反例/差異条件・仮説・handoffは維持する。調査revisionではcontext-synthesis-runに予定payload、base revision/hash、related candidate前提、handoff intentを保持し、[context_workflow_state.py](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/968629b33943570aa7f4654edd29d1cc2546a349/skills/qa-workflow/scripts/context_workflow_state.py)で開始要求、試行、run mapping、完了を扱い、workflow_runtime.pyの_verify_context_synthesis_workflow_stateが照合する。成果物から確実に復元できる情報の二重管理があるか確認する。一方、開始時の要求範囲、0件runと未実行の区別、別run混入防止、関連候補の同一保存境界での条件確認、外部handoffの結果不明からの再開など、成果物単体では証明できない情報や現在の必要保証は残す。通常保存の改善済み部分はOPS-03を参照し、未完了の実owner受入は維持する。
@@ -371,7 +371,7 @@ PR #40完了後に最新baselineで残存課題を選別し、OPS-18を横断原
 | AT-18 | FAILを含む実行 | 合否・母集団・cleanup・終了基準・workflow完了を独立判定 | 07 |
 | AT-19 | 異なるAgentで同一依頼 | 同一正本・配置・命名、別scope/Run衝突なし | 12/13/14/15 |
 | AT-20 | 単発読取・レビュー・調査 | 保存依頼/継続利用目的がなければ対話回答、不要な保存・配置承認なし | 01/02/12 |
-| AT-21 | 責務境界・移植性 | 異なる外部実行条件で案件/成果物branch/Provider管理なく（指定repo等の情報源分析は可）同一意味成果物、許可外拒否 | 18 |
+| AT-21 | 責務境界・移植性 | 異なる外部実行条件でも案件/成果物branch/Provider管理なく（指定repo等の情報源分析は可）同じ要求・入力に対する意味契約と必要品質を満たす。決定論的処理と確定済み仕様・判断の一貫性を維持し、許可外操作を拒否 | 18 |
 | AT-22 | 責務削減と回帰 | 専門外判断・読込・不要質問・重複管理削減、既存QA品質・安全・履歴維持 | 11/18 |
 | AT-23 | 成果物作成・通常保存・内容承認 | 明示の非保存指示がなければ許可範囲で自動保存、依頼者の明示内容承認を採用、必要時のみ追加権限確認、既存承認済み意味を保全 | 01/02/03/04/18 |
 | AT-24 | 直接Skill利用 | 特定ハーネスなし、明示済み作業先利用、必要時のみ保存先確認 | 12/14/18 |
