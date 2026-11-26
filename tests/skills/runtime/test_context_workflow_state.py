@@ -452,6 +452,40 @@ class ContextWorkflowStateTests(unittest.TestCase):
         self.assertEqual(blocked["status"], "blocked")
         self.assertEqual(blocked["reason"], "workflow_artifact_root_mismatch")
 
+    def test_unavailable_context_helper_blocks_only_context_completion(self) -> None:
+        scope = {
+            "skill": "context-rule-synthesis",
+            "target": "context-synthesis-run:unavailable",
+            "normalized_input": {
+                "context_workflow_state": {
+                    "artifact_root": str(self.artifact_root),
+                    "workflow_state_root": str(self.workflow_root),
+                    "requested_operation_input": {},
+                    "requested_scope": {},
+                }
+            },
+        }
+
+        with mock.patch.dict(sys.modules, {"context_workflow_state": None}):
+            issues, completions = (
+                workflow_runtime._verify_context_synthesis_workflow_state(
+                    [scope], self.workflow_ref, []
+                )
+            )
+
+        self.assertEqual(completions, [])
+        self.assertEqual(
+            issues,
+            [
+                {
+                    "issue_type": "context_workflow_state_unavailable",
+                    "blocking": True,
+                    "reason": "context_workflow_state_dependencies_unavailable",
+                    "target": scope["target"],
+                }
+            ],
+        )
+
     def test_final_workflow_gate_requires_every_split_run_to_be_completed(
         self,
     ) -> None:

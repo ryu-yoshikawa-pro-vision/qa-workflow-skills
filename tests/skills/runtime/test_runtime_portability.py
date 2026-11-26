@@ -160,16 +160,6 @@ class RuntimePortabilityTests(unittest.TestCase):
                     root = Path(tmp)
                     copied_skill = root / "skills" / skill
                     shutil.copytree(REPO_ROOT / "skills" / skill, copied_skill)
-                    if skill == "qa-workflow":
-                        # The workflow state adapter's shared context contract/store
-                        # live at the project runtime boundary defined by the plan.
-                        shared_scripts = root / "scripts"
-                        shared_scripts.mkdir()
-                        for name in (
-                            "context_artifact_store.py",
-                            "context_artifacts.py",
-                        ):
-                            shutil.copy2(REPO_ROOT / "scripts" / name, shared_scripts)
                     fixture = json.loads(
                         (
                             REPO_ROOT

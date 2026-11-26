@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import artifact_graph
-import context_workflow_state
 import owner_verifiers
 from runtime_contract import (
     FULL_DIGEST_RE,
@@ -610,6 +609,28 @@ def _verify_context_synthesis_workflow_state(
             group["readbacks"][readback_key] = readback
 
     completed: list[dict[str, Any]] = []
+    if not groups:
+        return issues, completed
+    try:
+        import context_workflow_state
+    except ModuleNotFoundError as exc:
+        if exc.name not in {
+            "context_workflow_state",
+            "context_artifact_store",
+            "context_artifacts",
+        }:
+            raise
+        issues.extend(
+            {
+                "issue_type": "context_workflow_state_unavailable",
+                "blocking": True,
+                "reason": "context_workflow_state_dependencies_unavailable",
+                "target": scope.get("target"),
+            }
+            for group in groups.values()
+            for scope in group["scopes"]
+        )
+        return issues, completed
     for key, group in groups.items():
         if any(scope.get("target") in failed_targets for scope in group["scopes"]):
             continue
