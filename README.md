@@ -1,6 +1,6 @@
 # QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。 コード・Skill・文書は有効な正本に同期し、不要な旧実装・旧記述を残しません。
+設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。コード・Skill・文書は有効な正本に同期し、不要な旧実装・旧記述を残しません。
 
 新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
@@ -80,6 +80,8 @@ skills/
 
 ## 開発原則: 既存ツールと標準機能を優先
 
+- [運用改善候補（2026-11-25）](docs/reports/2026-11-25_qa-workflow-operating-improvements.md): 現行制約と未実装の改善候補。承認済みPlanとは区別する。
+
 変更前に、既存機能で解決できるか、リポジトリ内の処理を再利用できるか、言語標準、browser / platform / framework / SDK、導入済みライブラリ、信頼できる既存ライブラリの順で確認します。それでも現在の要件を満たせない場合だけ、満たせない具体的な契約を説明したうえで必要最小限の独自実装を追加します。同等以上の正確性、安全性、互換性、保守性、検証可能性を保ち、取得できない情報を推測値で埋めず、完了条件に必要な情報が不足するときは未確定・未完了として扱います。
 
 既存ライブラリの導入は自動的に選ばず、必要機能との適合、重複、ライセンス、保守状況、互換性、セキュリティ、CI / 実行環境への影響を確認します。独自実装を避けること自体は目的にしません。テスト技法、成果物ID / traceability、revision / CAS / reservation、state transition、schema validation、WCAG procedure / applicability、WCAG-EM sampling、EARL変換、security boundary、data protection、regression testなど、プロジェクト固有の決定論的契約は、代替ツールがあるだけでは削除しません。
@@ -130,7 +132,6 @@ skills/
 - [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・再開・完了の責務とタイミング。
 - [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
 - [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 依頼、回答、承認、編集、再開と結果確認。
-- [運用改善候補（2026-11-25）](docs/reports/2026-11-25_qa-workflow-operating-improvements.md): 現行制約と未実装の改善候補。承認済みPlanとは区別する。
 
 ## テスト分析・設計フロー
 
