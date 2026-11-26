@@ -22,6 +22,7 @@ import context_artifacts as contracts
 
 MAX_REQUEST_BYTES = contracts.MAX_ARTIFACT_BYTES + 1024 * 1024
 _REVISION_RE = re.compile(r"^file-v1-[0-9a-f]{1,16}-[0-9a-f]{1,16}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _LOCAL_FILESYSTEMS = {
     "ext2",
     "ext3",
@@ -37,6 +38,18 @@ _LOCAL_FILESYSTEMS = {
 
 class StoreError(ValueError):
     """A directory-store operation could not be completed safely."""
+
+
+class _RetryWrite(Exception):
+    """A locked pathname changed before all requested locks were acquired."""
+
+
+class _MissingReference(Exception):
+    """A reference disappeared while a conditional write was being prepared."""
+
+    def __init__(self, ref: str) -> None:
+        super().__init__(ref)
+        self.ref = ref
 
 
 def _fail(code: str) -> None:
@@ -167,21 +180,90 @@ class DirectoryArtifactStore:
     def _history_dir(self, kind_dir: Path, identity: str, *, create: bool) -> Path:
         history_root = kind_dir / ".history"
         identity_dir = history_root / identity
-        if create:
-            try:
-                history_root.mkdir(mode=0o700, exist_ok=True)
-                identity_dir.mkdir(mode=0o700, exist_ok=True)
-            except OSError as exc:
-                raise StoreError("history_directory_unavailable") from exc
-        for path in (history_root, identity_dir):
+        paths = (history_root, identity_dir)
+        # Inspect existing components before creating either directory. In
+        # particular, do not create the identity directory through a preexisting
+        # `.history` symlink that points outside the caller's authorized root.
+        for path in paths:
             try:
                 info = path.lstat()
             except FileNotFoundError:
-                return identity_dir
+                if not create:
+                    return identity_dir
+                break
             except OSError as exc:
                 raise StoreError("history_directory_unavailable") from exc
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
                 _fail("history_directory_not_regular")
+
+        if create:
+            anchored_directory_ops = (
+                os.open in os.supports_dir_fd
+                and os.mkdir in os.supports_dir_fd
+                and bool(getattr(os, "O_NOFOLLOW", 0))
+            )
+            if not anchored_directory_ops:
+                # Windows does not expose dir_fd operations. The initial lstat
+                # pass above still refuses existing symlinks before mkdir; each
+                # created/existing component is checked again before descending.
+                for path in paths:
+                    try:
+                        path.mkdir(mode=0o700, exist_ok=True)
+                        info = path.lstat()
+                    except OSError as exc:
+                        raise StoreError("history_directory_unavailable") from exc
+                    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                        _fail("history_directory_not_regular")
+                return identity_dir
+
+            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            opened: list[int] = []
+            try:
+                kind_fd = os.open(kind_dir, flags)
+                opened.append(kind_fd)
+                kind_info = os.fstat(kind_fd)
+                path_info = kind_dir.lstat()
+                if (
+                    stat.S_ISLNK(path_info.st_mode)
+                    or not stat.S_ISDIR(kind_info.st_mode)
+                    or (kind_info.st_dev, kind_info.st_ino)
+                    != (path_info.st_dev, path_info.st_ino)
+                ):
+                    _fail("history_directory_not_regular")
+
+                parent_fd = kind_fd
+                for name in (".history", identity):
+                    try:
+                        child_fd = os.open(name, flags, dir_fd=parent_fd)
+                    except FileNotFoundError:
+                        try:
+                            os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+                        except FileExistsError:
+                            pass
+                        child_fd = os.open(name, flags, dir_fd=parent_fd)
+                    except OSError as exc:
+                        raise StoreError("history_directory_not_regular") from exc
+                    if not stat.S_ISDIR(os.fstat(child_fd).st_mode):
+                        os.close(child_fd)
+                        _fail("history_directory_not_regular")
+                    opened.append(child_fd)
+                    parent_fd = child_fd
+            except OSError as exc:
+                raise StoreError("history_directory_unavailable") from exc
+            finally:
+                for fd in reversed(opened):
+                    os.close(fd)
+
+            # Consumers below use Path operations; confirm the resulting path
+            # components still resolve to ordinary directories.
+            for path in paths:
+                try:
+                    info = path.lstat()
+                except OSError as exc:
+                    raise StoreError("history_directory_unavailable") from exc
+                if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                    _fail("history_directory_not_regular")
         return identity_dir
 
     @staticmethod
@@ -369,6 +451,122 @@ class DirectoryArtifactStore:
         except FileNotFoundError:
             return None
 
+    @staticmethod
+    def _release_locks(locked: list[tuple[str, str, Path, int]]) -> None:
+        for _, _, _, fd in reversed(locked):
+            try:
+                _unlock(fd)
+            except OSError:
+                pass
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+    def _lock_references(self, refs: set[str]) -> list[tuple[str, str, Path, int]]:
+        locked: list[tuple[str, str, Path, int]] = []
+        try:
+            for ref in sorted(refs):
+                kind, _, path = self._ref_path(ref)
+                try:
+                    fd = self._open_regular(path, os.O_RDONLY)
+                except FileNotFoundError as exc:
+                    raise _MissingReference(ref) from exc
+                locked.append((ref, kind, path, fd))
+                _lock(fd)
+            for _, _, path, fd in locked:
+                opened = os.fstat(fd)
+                try:
+                    current = os.stat(path, follow_symlinks=False)
+                except FileNotFoundError as exc:
+                    raise _RetryWrite from exc
+                if stat.S_ISLNK(current.st_mode) or (opened.st_dev, opened.st_ino) != (
+                    current.st_dev,
+                    current.st_ino,
+                ):
+                    raise _RetryWrite
+            return locked
+        except BaseException:
+            self._release_locks(locked)
+            raise
+
+    def _locked_readback(self, row: tuple[str, str, Path, int]) -> dict[str, Any]:
+        ref, kind, _, fd = row
+        info = os.fstat(fd)
+        data = self._read_fd(fd)
+        artifact = contracts.parse_canonical_json(data)
+        contracts.validate_artifact(artifact, kind)
+        if artifact["artifact_ref"] != ref:
+            _fail("artifact_ref_mismatch")
+        return {
+            "kind": kind,
+            "root_binding": self.root_binding,
+            "artifact_ref": ref,
+            "revision": _revision(info),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "content": data.decode("utf-8", "strict"),
+        }
+
+    def _normalize_related_preconditions(
+        self, value: Any, target_ref: str
+    ) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            _fail("related_preconditions_invalid")
+        normalized: list[dict[str, str]] = []
+        for row in value:
+            if not isinstance(row, dict) or set(row) != {
+                "candidate_ref",
+                "expected_revision",
+                "content_hash",
+            }:
+                _fail("related_precondition_schema_invalid")
+            ref = row["candidate_ref"]
+            kind, _, _ = self._ref_path(ref)
+            if kind != "context-rule-candidate" or ref == target_ref:
+                _fail("related_precondition_ref_invalid")
+            revision = row["expected_revision"]
+            digest = row["content_hash"]
+            if not isinstance(revision, str) or not _REVISION_RE.fullmatch(revision):
+                _fail("related_precondition_revision_invalid")
+            if not isinstance(digest, str) or not _SHA256_RE.fullmatch(digest):
+                _fail("related_precondition_hash_invalid")
+            normalized.append(
+                {
+                    "candidate_ref": ref,
+                    "expected_revision": revision,
+                    "content_hash": digest,
+                }
+            )
+        refs = [row["candidate_ref"] for row in normalized]
+        if refs != sorted(set(refs)):
+            _fail("related_preconditions_not_canonical")
+        return normalized
+
+    def _check_related_preconditions(
+        self,
+        locked: list[tuple[str, str, Path, int]],
+        preconditions: list[dict[str, str]],
+    ) -> dict[str, Any] | None:
+        by_ref = {row[0]: row for row in locked}
+        for precondition in preconditions:
+            ref = precondition["candidate_ref"]
+            row = by_ref.get(ref)
+            if row is None:
+                return {"status": "conflict", "reason": "related_candidate_missing"}
+            current = self._locked_readback(row)
+            if (
+                current["revision"] != precondition["expected_revision"]
+                or current["sha256"] != precondition["content_hash"]
+            ):
+                return {
+                    "status": "conflict",
+                    "reason": "related_precondition_changed",
+                    "candidate_ref": ref,
+                    "current_revision": current["revision"],
+                    "current_content_hash": current["sha256"],
+                }
+        return None
+
     def _create_if_absent(
         self, current_path: Path, kind: str, identity: str, ref: str, data: bytes
     ) -> dict[str, Any]:
@@ -430,6 +628,8 @@ class DirectoryArtifactStore:
         artifact: Any,
         *,
         expected_revision: str | None = None,
+        expected_content_hash: str | None = None,
+        related_preconditions: Any = None,
     ) -> dict[str, Any]:
         if kind not in contracts.KINDS:
             _fail("artifact_kind_invalid")
@@ -441,55 +641,101 @@ class DirectoryArtifactStore:
         selected_kind, identity, current_path = self._ref_path(ref, create=True)
         if selected_kind != kind:
             _fail("artifact_kind_mismatch")
+        preconditions = self._normalize_related_preconditions(
+            [] if related_preconditions is None else related_preconditions, ref
+        )
         if kind == "context-signal-batch":
-            if expected_revision is not None:
+            if (
+                expected_revision is not None
+                or expected_content_hash is not None
+                or preconditions
+            ):
                 _fail("immutable_batch_cannot_be_updated")
             return self._create_if_absent(current_path, kind, identity, ref, data)
         if expected_revision is None:
-            return self._create_if_absent(current_path, kind, identity, ref, data)
+            if expected_content_hash is not None:
+                _fail("expected_content_hash_requires_revision")
+            if not preconditions:
+                return self._create_if_absent(current_path, kind, identity, ref, data)
         if not self.supports_local_conditioned_update:
             _fail("conditional_update_requires_local_filesystem")
-        if not isinstance(expected_revision, str) or not _REVISION_RE.fullmatch(
-            expected_revision
-        ):
-            _fail("expected_revision_invalid")
+        if expected_revision is not None:
+            if not isinstance(expected_revision, str) or not _REVISION_RE.fullmatch(
+                expected_revision
+            ):
+                _fail("expected_revision_invalid")
+            if not isinstance(expected_content_hash, str) or not _SHA256_RE.fullmatch(
+                expected_content_hash
+            ):
+                _fail("expected_content_hash_required")
+        elif expected_content_hash is not None:
+            _fail("expected_content_hash_requires_revision")
+
+        if expected_revision is None:
+            # A create that depends on existing candidates retains their
+            # per-file locks until create-if-absent is complete.
+            related_refs = {row["candidate_ref"] for row in preconditions}
+            while True:
+                try:
+                    locked = self._lock_references(related_refs)
+                except _RetryWrite:
+                    continue
+                except _MissingReference as exc:
+                    return {
+                        "status": "conflict",
+                        "reason": "related_candidate_missing",
+                        "candidate_ref": exc.ref,
+                    }
+                try:
+                    conflict = self._check_related_preconditions(locked, preconditions)
+                    if conflict is not None:
+                        return conflict
+                    return self._create_if_absent(
+                        current_path, kind, identity, ref, data
+                    )
+                finally:
+                    self._release_locks(locked)
+
+        lock_refs = {ref, *(row["candidate_ref"] for row in preconditions)}
         while True:
             try:
-                fd = self._open_regular(current_path, os.O_RDONLY)
-            except FileNotFoundError:
-                return {"status": "conflict", "reason": "expected_revision_missing"}
-            try:
-                _lock(fd)
-                opened = os.fstat(fd)
-                try:
-                    current_info = os.stat(current_path, follow_symlinks=False)
-                except FileNotFoundError:
-                    continue
-                if (opened.st_dev, opened.st_ino) != (
-                    current_info.st_dev,
-                    current_info.st_ino,
-                ):
-                    continue
-                old_revision = _revision(opened)
-                old_data = self._read_fd(fd)
-                old_artifact = contracts.parse_canonical_json(old_data)
-                contracts.validate_artifact(old_artifact, kind)
-                if old_artifact["artifact_ref"] != ref:
-                    _fail("artifact_ref_mismatch")
-                current_readback = {
-                    "kind": kind,
-                    "root_binding": self.root_binding,
-                    "artifact_ref": ref,
-                    "revision": old_revision,
-                    "sha256": hashlib.sha256(old_data).hexdigest(),
-                    "content": old_data.decode("utf-8", "strict"),
+                locked = self._lock_references(lock_refs)
+            except _RetryWrite:
+                continue
+            except _MissingReference as exc:
+                if exc.ref == ref:
+                    return {
+                        "status": "conflict",
+                        "reason": "expected_revision_missing",
+                    }
+                return {
+                    "status": "conflict",
+                    "reason": "related_candidate_missing",
+                    "candidate_ref": exc.ref,
                 }
-                if old_revision != expected_revision:
+            try:
+                locked_by_ref = {row[0]: row for row in locked}
+                target_row = locked_by_ref[ref]
+                _, _, _, fd = target_row
+                current_readback = self._locked_readback(target_row)
+                if current_readback["revision"] != expected_revision:
                     return {
                         "status": "conflict",
                         "reason": "expected_revision_changed",
                         "current": current_readback,
                     }
+                if current_readback["sha256"] != expected_content_hash:
+                    return {
+                        "status": "conflict",
+                        "reason": "expected_content_hash_changed",
+                        "current": current_readback,
+                    }
+                opened = os.fstat(fd)
+                conflict = self._check_related_preconditions(locked, preconditions)
+                if conflict is not None:
+                    return conflict
+                old_revision = current_readback["revision"]
+                old_data = current_readback["content"].encode("utf-8")
                 if old_data == data:
                     return {"status": "reused", "readback": current_readback}
                 self._archive_current(
@@ -524,11 +770,7 @@ class DirectoryArtifactStore:
                     _fail("independent_readback_mismatch")
                 return {"status": "stored", "readback": readback}
             finally:
-                try:
-                    _unlock(fd)
-                except OSError:
-                    pass
-                os.close(fd)
+                self._release_locks(locked)
 
 
 def handle(request: Any) -> dict[str, Any]:
@@ -545,6 +787,8 @@ def handle(request: Any) -> dict[str, Any]:
                 request.get("kind"),
                 request.get("artifact"),
                 expected_revision=request.get("expected_revision"),
+                expected_content_hash=request.get("expected_content_hash"),
+                related_preconditions=request.get("related_preconditions", []),
             )
             return {"root_binding": store.root_binding, **result}
         if operation == "read":

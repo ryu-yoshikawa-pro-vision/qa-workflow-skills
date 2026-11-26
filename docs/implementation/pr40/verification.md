@@ -35,8 +35,8 @@
 | -- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B1 | BLOCKED           | semantic_handoff_keyの再計算と同一artifact_refのcreate-if-absentは検証。別ref・異なるworkflowをまたぐ既存ownerのatomic uniquenessは未接続・未確認。test_context_artifacts.py、test_context_artifact_store.py。                                                                               |
 | B2 | PARTIAL / BLOCKED | 候補関係とcycleを検証し、同一candidate revisionのCAS競合はローカル実filesystemで確認。merge/splitの関連候補一体更新と実owner保証は未実施。                                                                                                                                                   |
-| B3 | PARTIAL           | planned payload/hash/metadataを保持するrun contract、SQLite stateへのrun ref保存、再読込、stale state conflictをテスト。候補更新・handoff各中断点からの実provider再開は未実施。test_context_workflow_state.py、test_context_artifact_store.py。                                              |
-| B4 | PARTIAL           | 3 kindの実create/list/read/history、candidate/run conditional update、old revision readback、同revisionの並行writer、symlink/noncanonical ref拒否を隔離filesystemで確認。workspace 9pでは通常保存継続・conditional update局所blockを実測。本番rootは未指定。test_context_artifact_store.py。 |
+| B3 | PARTIAL           | planned payload/hash/metadataを保持するrunをin_progressで登録し、候補保存前後・confirmed result記録・pendingからreturnedへのhandoff・readback不足後・run完了前の各地点から保存済みrevisionで再開する。外部owner実反映後の縦断再開は未実施。test_context_workflow_state.py。 |
+| B4 | PARTIAL           | 3 kindの実create/list/read/history、target/related revision+hashの同一保存境界照合、同じ境界の競合順序、old revision readback、symlink/noncanonical ref拒否を隔離filesystemで確認。workspace 9pでは通常保存継続・conditional update局所blockを実測。本番root/共有writerは未指定。test_context_artifact_store.py。 |
 | B5 | PARTIAL           | 通常createに専用host/保存ごとの承認を要求しない。ext4で条件付き更新を確認、9pで能力不足時の更新拒否と通常readbackを確認。実運用rootのOS権限失効や共有writer認可は未確認。                                                                                                                    |
 | B6 | PARTIAL           | QA artifact保存と正式Authority承認を分離。owner verifierはreadback整合を検証するが、外部承認主体・既存owner認可を証明しない。symlink/path境界はlocal storeでテスト。test_context_owner_verifiers.py、test_context_artifact_store.py。                                                        |
 
@@ -68,7 +68,7 @@
 | ID | 状態    | 対応・証拠                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E1 | PARTIAL | requested scope、無効/無指定、補助/必須、単体実行のrouting/state契約を実装。全modeの実Agent workflowは未実施。                                                                                                                                                                                                                                                                                                                                |
-| E2 | PARTIAL | owner verifier登録、3 kind readback配列、同一refの複数revision、開始要求/snapshot/target batch対応を確認。65,535/65,536/65,537 byteの各kindを実storeへ保存し、独立readback、登録owner、workflow_runtime完了、凍結input/resultの検証とdownstream_state再開まで通した。外部認可・全v1/v2実workflow再開は未確認。test_context_owner_verifiers.py、test_context_runtime_transport.py、test_context_workflow_state.py、9 runtime_contract copies。 |
+| E2 | PARTIAL | owner verifier登録、3 kind readback配列、同一refの複数revision、開始要求/snapshot/target batch対応を確認。workflow final gateで元要求mapping・全current run完了・必要readbackを統合し、別root証拠、in_progress run、handoff readback不足を拒否する回帰を追加。65,535/65,536/65,537 byte境界の既存受入も対象branchの先行検証にあり。外部認可・実owner一意性・全v1/v2実workflow再開は未確認。test_context_workflow_state.py、test_context_runtime_transport.py、9 runtime_contract copies。 |
 | E3 | PARTIAL | secret-like text拒否と架空fixture、既存runtime regressionを検証。全metadata/log/historyの機密監査、悪意ある資料に対する実Agent試験、3構成比較は未実施。test_context_artifacts.pyおよびsemantic cases。                                                                                                                                                                                                                                        |
 
 ## ローカル検証記録
@@ -92,6 +92,18 @@
 | git diff --cached --check                                         | PASS                                   | staged PR #40差分にwhitespace errorなし。                                                                                                                                                                  |
 | GitHub Actions CI                                                 | PASS at c58a14f5                       | Validate Agent Skills (2361)、Deterministic Output Evals (2359)、Semantic Output Evals (2324)、Code Quality (1054)、Codex Harness (1054)の5 workflow。                                                     |
 | Code Quality契約tests                                             | PASS: 24 tests                         | formatter 19、patch whitespace 3、CI security configuration 2。                                                                                                                                            |
+
+## 2026-11-26 再レビュー指摘の修正・再検証
+
+| 指摘 | 判定 | 修正と局所証拠 |
+| --- | --- | --- |
+| in_progress runの空のconfirmed_resultにもreadbackを要求する | must_fix / 修正済み | confirmed resultが未確定なら候補readbackを省き、予定runを既存SQLite stateへ登録する。候補保存後にconfirmed revisionを記録・再readbackして再開する。test_context_workflow_state.py。 |
+| 関連候補のrevision/hashが対象保存境界で確認されない | must_fix / 修正済み | targetのexpected revision/hashとcanonicalなrelated_preconditionsを同じ保存境界で照合し、既存local file-lockの範囲で依存refを保持する。古い前提は拒否、依存更新が後続操作として直列化される順序をtest_context_artifact_store.pyで確認。後続更新を共有一意性や永続lock保証とは扱わない。 |
+| workflow stateが成果物rootに束縛されていない | must_fix / 修正済み | 最初のA/B state記録時にroot bindingを保存し、異なるrootのrun登録を拒否する。test_context_workflow_state.py。 |
+| 元要求・全run完了・readbackの最終workflow統合gateが不足 | must_fix / 修正済み | workflow_runtimeがrun scope群を要求単位に束ね、completion-checkがsource×scope対応、全current runの完了、root binding、必要readbackを再確認。in_progress split runとreturned handoffのreadback不足を拒否し、readback追加後の再開をtest_context_workflow_state.pyで確認。 |
+| history symlink検査前にidentity dirが作成される | must_fix / 修正済み | 既存path検査後に、対応環境ではdirectory FD/no-follow、未対応環境ではcomponentごとの作成前後検査を用いる。両pathでhistory symlinkの外側に新規ファイル・identity dirを作らず、対象candidateも更新されないことをtest_context_artifact_store.pyで確認。 |
+
+修正後の関連suiteを個別実行し、`test_context_artifact_store` 12件、`test_context_workflow_state` 11件、`test_context_artifacts` 14件、`test_context_owner_verifiers` 4件、runtime transport 64 KiB境界1件の計42件PASS。中断点テストは候補保存前のrun登録、保存成功後readback失敗からの再読取、returned resultのreadback不足からの再開、split run完了gateを含む。初回store suiteで対象revision inode情報の未定義名を検出して修正した。競合testは保存境界後の関連候補更新が直列化されて成功する契約に合わせ、lock保持中は待機し、対象write後の更新となることを確認する期待値へ直した。full runtime regressionと対象branch更新後のCIは後記へ実測後に同期する。
 
 ## 実環境依存・未実施
 

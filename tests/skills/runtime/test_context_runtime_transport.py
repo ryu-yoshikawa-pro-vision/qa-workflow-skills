@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import context_artifact_store  # noqa: E402
 import context_artifacts as contracts  # noqa: E402
+import context_workflow_state  # noqa: E402
 import downstream_state  # noqa: E402
 import runtime_contract as runtime  # noqa: E402
 import test_context_artifacts as context_fixtures  # noqa: E402
@@ -130,9 +131,9 @@ def _sized_run(
     candidate: dict,
     candidate_readback: dict,
     index: int,
+    workflow_ref: str,
 ) -> dict:
     run = context_fixtures.build_run()
-    workflow_ref = f"workflow:context-transport-{index}"
     requested_scope = context_fixtures.requested_scope()
     operation_input = context_fixtures.operation_input()
     operation_input["input_sources"] = [
@@ -257,7 +258,11 @@ def _signal_scope(batch: dict, readback: dict, root_binding: str) -> dict:
 
 
 def _run_scope(
-    run: dict, run_readback: dict, candidate_readback: dict, root_binding: str
+    run: dict,
+    run_readback: dict,
+    candidate_readback: dict,
+    root_binding: str,
+    workflow_state_request: dict,
 ) -> dict:
     evidence = {
         "stored_content": run_readback["content"],
@@ -279,6 +284,7 @@ def _run_scope(
         "input_mode": "artifact",
         "normalized_input": {
             "owner_verification": evidence,
+            "context_workflow_state": workflow_state_request,
             "context_request": request,
         },
         "current_structure_state": None,
@@ -360,6 +366,21 @@ class ContextRuntimeTransportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as root:
             store = context_artifact_store.DirectoryArtifactStore(root)
+            workflow_state_root = str(Path(root) / "workflow-state")
+            initialized = context_workflow_state.handle(
+                {
+                    "operation": "initialize",
+                    "workflow_state_root": workflow_state_root,
+                    "workflow_ref": workflow_ref,
+                    "initial_state": {
+                        "overall_state": "実行中",
+                        "context_signal_attempts": [],
+                        "context_synthesis_run_refs": [],
+                    },
+                }
+            )
+            self.assertEqual(initialized["status"], "created")
+            state_revision = initialized["state_revision"]
             for index, target_bytes in enumerate(sizes, start=1):
                 batch = _sized_batch(target_bytes, f"SEC-{index}")
                 batch_readback = store.write("context-signal-batch", batch)["readback"]
@@ -382,17 +403,45 @@ class ContextRuntimeTransportTests(unittest.TestCase):
                 self.assertEqual(
                     len(candidate_readback["content"].encode("utf-8")), target_bytes
                 )
-                run = _sized_run(target_bytes, candidate, candidate_readback, index)
+                run = _sized_run(
+                    target_bytes,
+                    candidate,
+                    candidate_readback,
+                    index,
+                    workflow_ref,
+                )
                 run_readback = store.write("context-synthesis-run", run)["readback"]
                 self.assertEqual(
                     len(run_readback["content"].encode("utf-8")), target_bytes
                 )
+                workflow_state_request = {
+                    "artifact_root": str(root),
+                    "workflow_state_root": workflow_state_root,
+                    "requested_operation_input": run["operation_input"],
+                    "requested_scope": run["requested_scope"],
+                }
+                state_result = context_workflow_state.handle(
+                    {
+                        "operation": "record-synthesis-run",
+                        "workflow_state_root": workflow_state_root,
+                        "workflow_ref": workflow_ref,
+                        "expected_revision": state_revision,
+                        "artifact_root": str(root),
+                        "run_ref": run["artifact_ref"],
+                        "run_revision": run_readback["revision"],
+                        "requested_operation_input": run["operation_input"],
+                        "requested_scope": run["requested_scope"],
+                    }
+                )
+                self.assertEqual(state_result["status"], "written", state_result)
+                state_revision = state_result["state_revision"]
                 scopes.append(
                     _run_scope(
                         run,
                         run_readback,
                         candidate_readback,
                         store.root_binding,
+                        workflow_state_request,
                     )
                 )
                 requested.append(

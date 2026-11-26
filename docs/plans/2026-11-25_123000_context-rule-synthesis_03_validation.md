@@ -19,6 +19,8 @@
 
 通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較は未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。Codex等の外部サービスへのrepository data送信許可は未確定のため、formal evaluationを実行しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
+2026-11-26の再レビューではin_progress登録時の未確定candidate readback、関連candidateの保存境界precondition、workflow stateのartifact-root binding、全runを統合する最終completion gate、history symlink pathの副作用を再確認した。ローカル修正後にstore 12件、workflow state 11件、contract 14件、owner verifier 4件、runtime transport境界1件の計42 testsがPASSし、runtime gateの中断再開も確認した。実Agent/ownerを介した受入、共有writer/外部owner一意性、実運用rootの認可は未実施で、局所テストで代替していない。再レビュー後のfull runtime rerunは実行中であり、実測完了後に結果を同期する。詳細は[検証記録](../implementation/pr40/verification.md)。
+
 ## 2. テストの配置と受入マトリクス
 
 [共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。

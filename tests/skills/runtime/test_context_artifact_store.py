@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -9,6 +11,7 @@ import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -153,6 +156,7 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
                             "kind": kind,
                             "artifact": changed,
                             "expected_revision": first["revision"],
+                            "expected_content_hash": first["sha256"],
                         }
                     )
                     self.assertEqual(updated["status"], "stored")
@@ -184,7 +188,10 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
         changed = copy.deepcopy(original)
         changed["rule_statement"] = "Updated wording for an unchanged hypothesis."
         second_result = self.store.write(
-            "context-rule-candidate", changed, expected_revision=first["revision"]
+            "context-rule-candidate",
+            changed,
+            expected_revision=first["revision"],
+            expected_content_hash=first["sha256"],
         )
         self.assertEqual(second_result["status"], "stored")
         second = second_result["readback"]
@@ -194,7 +201,10 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
         )
 
         restored = self.store.write(
-            "context-rule-candidate", original, expected_revision=second["revision"]
+            "context-rule-candidate",
+            original,
+            expected_revision=second["revision"],
+            expected_content_hash=second["sha256"],
         )
         self.assertEqual(restored["status"], "stored")
         third = restored["readback"]
@@ -206,10 +216,164 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.history(original["artifact_ref"])), 3)
 
         stale = self.store.write(
-            "context-rule-candidate", changed, expected_revision=first["revision"]
+            "context-rule-candidate",
+            changed,
+            expected_revision=first["revision"],
+            expected_content_hash=first["sha256"],
         )
         self.assertEqual(stale["status"], "conflict")
         self.assertEqual(stale["reason"], "expected_revision_changed")
+
+    def test_conditioned_update_checks_base_hash_even_when_file_revision_is_unchanged(
+        self,
+    ) -> None:
+        candidate = fixtures.build_candidate()
+        first = self.store.write("context-rule-candidate", candidate)["readback"]
+        path = self.root / first["artifact_ref"]
+        externally_changed = copy.deepcopy(candidate)
+        externally_changed["rule_statement"] = "Changed in place outside the store."
+        path.write_bytes(fixtures.canonical_bytes(externally_changed))
+
+        stale = self.store.write(
+            "context-rule-candidate",
+            candidate,
+            expected_revision=first["revision"],
+            expected_content_hash=first["sha256"],
+        )
+
+        self.assertEqual(stale["status"], "conflict")
+        self.assertEqual(stale["reason"], "expected_content_hash_changed")
+        self.assertEqual(
+            self.store.read(candidate["artifact_ref"])["sha256"],
+            hashlib.sha256(fixtures.canonical_bytes(externally_changed)).hexdigest(),
+        )
+
+    def test_related_candidate_revision_and_hash_are_checked_at_update_boundary(
+        self,
+    ) -> None:
+        candidate = fixtures.build_candidate()
+        related = fixtures.build_candidate(role="administrator")
+        target_readback = self.store.write("context-rule-candidate", candidate)[
+            "readback"
+        ]
+        related_readback = self.store.write("context-rule-candidate", related)[
+            "readback"
+        ]
+        precondition = {
+            "candidate_ref": related["artifact_ref"],
+            "expected_revision": related_readback["revision"],
+            "content_hash": related_readback["sha256"],
+        }
+
+        changed_related = copy.deepcopy(related)
+        changed_related["rule_statement"] = "A related candidate changed first."
+        current_related = self.store.write(
+            "context-rule-candidate",
+            changed_related,
+            expected_revision=related_readback["revision"],
+            expected_content_hash=related_readback["sha256"],
+        )["readback"]
+        changed_target = copy.deepcopy(candidate)
+        changed_target["rule_statement"] = (
+            "Merge was planned against an old related revision."
+        )
+        stale = self.store.write(
+            "context-rule-candidate",
+            changed_target,
+            expected_revision=target_readback["revision"],
+            expected_content_hash=target_readback["sha256"],
+            related_preconditions=[precondition],
+        )
+
+        self.assertEqual(stale["status"], "conflict")
+        self.assertEqual(stale["reason"], "related_precondition_changed")
+        self.assertEqual(self.store.read(candidate["artifact_ref"]), target_readback)
+
+        refreshed = {
+            "candidate_ref": related["artifact_ref"],
+            "expected_revision": current_related["revision"],
+            "content_hash": current_related["sha256"],
+        }
+        saved = self.store.write(
+            "context-rule-candidate",
+            changed_target,
+            expected_revision=target_readback["revision"],
+            expected_content_hash=target_readback["sha256"],
+            related_preconditions=[refreshed],
+        )
+        self.assertEqual(saved["status"], "stored")
+
+    def test_related_candidate_remains_locked_until_dependent_update_is_saved(
+        self,
+    ) -> None:
+        candidate = fixtures.build_candidate()
+        related = fixtures.build_candidate(role="administrator")
+        target_readback = self.store.write("context-rule-candidate", candidate)[
+            "readback"
+        ]
+        related_readback = self.store.write("context-rule-candidate", related)[
+            "readback"
+        ]
+        changed_target = copy.deepcopy(candidate)
+        changed_target["rule_statement"] = (
+            "Update that depends on the related candidate."
+        )
+        changed_related = copy.deepcopy(related)
+        changed_related["rule_statement"] = "Concurrent dependency update."
+        entered_archive = threading.Event()
+        allow_archive = threading.Event()
+        related_started = threading.Event()
+        original_archive = self.store._archive_current
+
+        def pause_after_precondition_check(*args: object) -> None:
+            entered_archive.set()
+            if not allow_archive.wait(timeout=5):
+                raise TimeoutError("test archive gate timed out")
+            original_archive(*args)
+
+        with (
+            ThreadPoolExecutor(max_workers=2) as pool,
+            mock.patch.object(
+                self.store,
+                "_archive_current",
+                side_effect=pause_after_precondition_check,
+            ),
+        ):
+            dependent = pool.submit(
+                self.store.write,
+                "context-rule-candidate",
+                changed_target,
+                expected_revision=target_readback["revision"],
+                expected_content_hash=target_readback["sha256"],
+                related_preconditions=[
+                    {
+                        "candidate_ref": related["artifact_ref"],
+                        "expected_revision": related_readback["revision"],
+                        "content_hash": related_readback["sha256"],
+                    }
+                ],
+            )
+            self.assertTrue(entered_archive.wait(timeout=5))
+
+            def update_related() -> dict:
+                related_started.set()
+                return self.store.write(
+                    "context-rule-candidate",
+                    changed_related,
+                    expected_revision=related_readback["revision"],
+                    expected_content_hash=related_readback["sha256"],
+                )
+
+            concurrent = pool.submit(update_related)
+            self.assertTrue(related_started.wait(timeout=5))
+            self.assertFalse(concurrent.done())
+            allow_archive.set()
+            self.assertEqual(dependent.result(timeout=5)["status"], "stored")
+            self.assertEqual(concurrent.result(timeout=5)["status"], "stored")
+        self.assertNotEqual(
+            self.store.read(related["artifact_ref"])["sha256"],
+            related_readback["sha256"],
+        )
 
     def test_signal_batch_is_create_if_absent_and_conflicting_rewrite_is_rejected(
         self,
@@ -244,6 +408,7 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
                 "context-rule-candidate",
                 changed,
                 expected_revision=first["revision"],
+                expected_content_hash=first["sha256"],
             )
 
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -269,6 +434,7 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
                 "context-rule-candidate",
                 changed,
                 expected_revision=created["revision"],
+                expected_content_hash=created["sha256"],
             )
 
         self.assertEqual(self.store.read(candidate["artifact_ref"]), created)
@@ -291,6 +457,55 @@ class ContextArtifactDirectoryStoreTests(unittest.TestCase):
             self.store.read("context-rule-candidate/../outside.json")
         with self.assertRaisesRegex(StoreError, "root_must_be_absolute"):
             DirectoryArtifactStore("relative/root")
+
+    def test_history_symlink_is_rejected_before_any_outside_directory_is_created(
+        self,
+    ) -> None:
+        candidate = fixtures.build_candidate()
+        created = self.store.write("context-rule-candidate", candidate)["readback"]
+        changed = copy.deepcopy(candidate)
+        changed["rule_statement"] = "Attempted history write through a symlink."
+        outside = self.root.parent / (self.root.name + "-history-outside")
+        outside.mkdir()
+        history_root = self.root / "context-rule-candidate" / ".history"
+        try:
+            history_root.symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(StoreError, "history_directory_not_regular"):
+                self.store.write(
+                    "context-rule-candidate",
+                    changed,
+                    expected_revision=created["revision"],
+                    expected_content_hash=created["sha256"],
+                )
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertEqual(self.store.read(candidate["artifact_ref"]), created)
+        finally:
+            history_root.unlink(missing_ok=True)
+            outside.rmdir()
+
+    def test_history_directory_fallback_checks_symlink_before_mkdir(self) -> None:
+        candidate = fixtures.build_candidate()
+        created = self.store.write("context-rule-candidate", candidate)["readback"]
+        outside = self.root.parent / (self.root.name + "-fallback-history-outside")
+        outside.mkdir()
+        history_root = self.root / "context-rule-candidate" / ".history"
+        try:
+            history_root.symlink_to(outside, target_is_directory=True)
+            with mock.patch.object(os, "supports_dir_fd", set()):
+                with self.assertRaisesRegex(
+                    StoreError, "history_directory_not_regular"
+                ):
+                    self.store.write(
+                        "context-rule-candidate",
+                        {**candidate, "rule_statement": "Fallback symlink probe."},
+                        expected_revision=created["revision"],
+                        expected_content_hash=created["sha256"],
+                    )
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertEqual(self.store.read(candidate["artifact_ref"]), created)
+        finally:
+            history_root.unlink(missing_ok=True)
+            outside.rmdir()
 
 
 if __name__ == "__main__":

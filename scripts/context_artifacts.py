@@ -1034,7 +1034,7 @@ def _validate_candidate(candidate: dict[str, Any]) -> None:
             "artifact_content_hash",
         }:
             _fail("confirmed_target_ref_schema_invalid")
-        if handoff["status"] == "confirmed_by_readback":
+        if handoff["status"] in {"confirmed_by_readback", "returned"}:
             for key in ("artifact_ref", "artifact_revision"):
                 _text(confirmed[key], f"confirmed_target_ref.{key}")
             if not SHA256_RE.fullmatch(
@@ -2019,7 +2019,7 @@ def completion_check(
                     "status": "incomplete",
                     "reason": "required_handoff_unresolved",
                 }
-            if handoff["status"] == "confirmed_by_readback":
+            if handoff["status"] in {"confirmed_by_readback", "returned"}:
                 target = handoff["confirmed_target_ref"]
                 if (
                     exact_readback(

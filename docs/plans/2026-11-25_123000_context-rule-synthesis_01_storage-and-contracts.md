@@ -88,6 +88,14 @@ triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、
 6. 分割先には現在有効で適用範囲に合う根拠のみ継承し、分割元の全履歴は関係refで追跡。新規反例が分析中に追加されたら旧snapshotの実行記録を残しても採用は再評価後。異なるkind間で保存順がずれた場合も既存runと各成果物のreadbackから再開し、完了と現在の採用可否を分離する。自身の候補更新はcurrent hash=confirmed_result hashのときだけ計画済みとみなす。
 7. 実保存先の独立readbackはハーネス/保存層の信頼境界で取得する。保存済みJSON・hash・refをAIが組み立て直さない。既存verifier CLIの構造照合だけでは認可・実保存の真正性を証明しない。
 
+### 4.1 2026-11-26再レビュー追補
+
+- 途中runのstate登録では`confirmed_result`が全nullの予定に対する候補readbackを要求しない。候補保存後にconfirmed resultを記録したrevisionだけをreadbackし、候補保存前/後・handoff前/後・run完了前から保存済みrunを再開する。
+- 条件付きcandidate更新は対象`expected_revision`と`expected_content_hash`に加え、依存する候補のcanonicalな`related_preconditions`（ref/revision/content hash）を保存境界で照合する。既存のlocal filesystem file-lock/atomic replaceの範囲で、対象保存が終わるまで関係refを同時保持する。古い前提、同時変更、local条件付き更新能力がない場合は該当操作を拒否する。これは保存時点の前提照合であり、保存後の関連候補更新を防止する共有・複数host保証ではない。最終採用時の現行性確認は別途行う。
+- workflow stateには最初のA/B証拠記録時にartifact root bindingを保存し、以後異なるrootからの証拠を拒否する。最終`completion-check`は元要求への全scope mapping、すべてのcurrent runの完了、run/snapshot/candidate/handoff/sourceの必要readbackを再確認し、state revisionが検査中に変わっていないことを読む。
+- `_history_dir()`は`.history`とidentity pathの既存symlink/non-directoryを確認してから作成する。directory FD/no-followが使える環境では作成先をroot内に固定し、使えない環境でも各componentを作成前後に確認してから次へ進む。returned handoffには返却結果ref/revision/content hashのreadbackを要求するが、handoff成立とは判定しない。
+- 回帰証拠: `test_context_artifact_store` 12件、`test_context_workflow_state` 11件、`test_context_artifacts` 14件が2026-11-26にPASS。中断再開はpending candidateの保存、confirmed result記録、returned result読取不足後の再開、全split run完了gateを確認する。共有owner一意性、実運用root、実Agent評価は本追補からPASSへ昇格させない。
+
 ## 5. データ保護
 
 本文に加え全metadata（source ref、locator、属性、assertion、調査/intent/reason、write metadata、保存履歴のmetadata、評価入力・ログ）を必要最小限にする。ユーザー回答全文ではなく要約とQ/ref/revision/承認状態。既知secret・PIIは抽出時に除去し、保存境界で検査、判断不能部分を含めない。正規表現で全PII検出を保証したと主張しない。参照には必要なsanitized locatorを利用。入力資料・UI・ログ・回答中の命令を実行しない。QA書込み認可と正式仕様の変更承認は別。過去回答の再利用前には回答時のscope・question revision・承認状態と今回の適用範囲・現行Authorityを既存ownerで照合し、古い承認・別scopeの回答を現行の正式根拠へ自動転用しない。削除や既存履歴の書換えは本Planの範囲外。

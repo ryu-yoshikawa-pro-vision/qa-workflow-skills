@@ -124,3 +124,11 @@ normalized_input.owner_verificationは保存本文のcanonical JSON文字列、e
 #### 完了条件
 
 今回の要求に対して取得不完全なpartial/failed、抽出失敗、必須handoff pending/blocked_unverifiableは未完了。Aの過去partialの再利用は上記の現在の要求範囲の照合で判定する。Bのpartial/failed runは未完了。質問成果物/調査依頼の保存・到達が確認できれば未回答でも分析完了可能。完了記録と最新結果の採用を分離し、外部変更で旧runを再利用できなくても保存された実行履歴を消さない。current_structure_state=null、verified_owner_scopesの既存記録形式と保存済みv2再開を維持。workflow_runtimeの汎用gateで足りなければ共通原因の最小修正だけ行い、新たな専用workflowエンジンは作らない。
+
+### 2026-11-26 再レビュー追補
+
+- `context_workflow_state.py` は、候補保存前に `confirmed_result.artifact_ref` が未設定の `in_progress` run を登録できる。候補、snapshot、handoff の確定済みreadbackだけを確認し、保存済みrunとstateのroot binding・ref/revision/hashを照合する。state保存後・candidate保存前、保存直後のreadback失敗、handoff前後の各記録から、保存済み予定と実readbackを再検査して再開する。
+- 条件付き候補更新は、更新対象のexpected revision/content hashと、identity順にlockした全related candidateのexpected revision/content hashを、保存まで同じ既存file-lock境界内で確認する。related preconditionが変わった場合は更新を拒否し、再読取・再計画を要求する。専用排他機構や共有writerの保証は追加しない。
+- workflow stateのcontext記録はartifact root bindingを保持する。同一workflowへの異なるrootの証拠混在を拒否する。元要求の識別子・要求範囲と各実runの実scopeをstateに保持し、最終gateで要求集合、全runの完了、必要readback、同一rootを統合して検査する。state revisionが確認中に変化した場合は完了扱いしない。
+- `_history_dir()` は `.history` とidentity directoryの既存要素をsymlink検査してから作成する。対応するdirfd/no-follow経路と、dirfd非対応環境向けのlstat-before/after経路の双方を検証する。
+- 上記はQA共通のartifact契約・保存処理を `scripts/context_artifact_store.py` / `scripts/context_artifacts.py` に置き、QA workflow固有の永続stateとcompletion gateを `skills/qa-workflow/scripts/` に置く。Skill本文は各ownerの専門責務とruntime境界を参照する。既存helper/runtimeの接続範囲に留め、汎用保存基盤や別workflow engineは追加しない。実行結果・未実施受入は `docs/implementation/pr40/verification.md` に記録する。
