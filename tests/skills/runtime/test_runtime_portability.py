@@ -130,6 +130,10 @@ class RuntimePortabilityTests(unittest.TestCase):
                         if skill == "qa-workflow" and path.name == "workflow_runtime.py"
                         else set()
                     )
+                    # The workflow finalization gate reads persisted QA state
+                    # through the existing context workflow-state adapter.
+                    if skill == "qa-workflow" and path.name == "workflow_runtime.py":
+                        skill_allowed |= {"context_workflow_state"}
                     # This workflow-state adapter reuses the established qa-workflow
                     # SQLite provider and the common context artifact contract/store.
                     # It is not an artifact generator or a standalone Skill payload.
@@ -156,6 +160,16 @@ class RuntimePortabilityTests(unittest.TestCase):
                     root = Path(tmp)
                     copied_skill = root / "skills" / skill
                     shutil.copytree(REPO_ROOT / "skills" / skill, copied_skill)
+                    if skill == "qa-workflow":
+                        # The workflow state adapter's shared context contract/store
+                        # live at the project runtime boundary defined by the plan.
+                        shared_scripts = root / "scripts"
+                        shared_scripts.mkdir()
+                        for name in (
+                            "context_artifact_store.py",
+                            "context_artifacts.py",
+                        ):
+                            shutil.copy2(REPO_ROOT / "scripts" / name, shared_scripts)
                     fixture = json.loads(
                         (
                             REPO_ROOT
