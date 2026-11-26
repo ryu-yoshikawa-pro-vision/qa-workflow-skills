@@ -23,6 +23,7 @@
     "overall_state": "実行中",
     "started_source_refs": [],
     "knowledge_entry_refs": [],
+    "requested_scopes": [],
     "context_signal_attempts": [],
     "context_synthesis_run_refs": [],
     "project_context_ref": "",
@@ -45,7 +46,7 @@
 }
 ```
 
-`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。contextのA試行とB run参照だけは、`context_workflow_state.py`がこのtemplateに定めた2 fieldを検証します。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
+`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。`requested_scopes`は工程開始時の要求集合を保持します。contextのA試行とB run参照、および開始要求との対応は`context_workflow_state.py`がこのtemplateに定めたfieldで検証します。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
@@ -104,7 +105,7 @@
 
 PR #14のWCAG formal report provenanceとcontext A/B stateには、既存の`qa.workflow_state_root/workflow-state.sqlite3`を使う`artifact_graph.py`内のPython標準`sqlite3` providerを使用します。providerは既存workflow envelopeの`state`をnative CASと履歴付きで更新し、同じrootに別storeを作りません。これは汎用handoff reservationやclaimの代替ではありません。対応範囲は同一ホストのlocal filesystemだけです。root未設定、network / multi-host filesystem、DB破損、lock / transaction保証不能では処理をblockします。
 
-既存envelopeは変更せず、`state.wcag_evaluations`へevaluation ref/revision、WCAG version/level、scopeと根拠ref、selected sample identity、variation、process membership、source artifact ref/revision、canonical Plan identity、report進行状態を保存します。Context stateは`state.context_signal_attempts`へAの開始要求・各試行/範囲・batch ref/revision・candidate check・状態/再開条件を、`state.context_synthesis_run_refs`へBの開始時input/requested scope、run ref/revision、target batch、実scopeと元要求の対応を保存します。raw URL、secret、DOM text、scope本文、評価 narrativeは保存しません。state provider revisionはworkflow内のcontext/QA更新とWCAG evaluation revisionの双方と分けてSQLite内で単調管理します。
+既存envelopeは変更せず、`state.wcag_evaluations`へevaluation ref/revision、WCAG version/level、scopeと根拠ref、selected sample identity、variation、process membership、source artifact ref/revision、canonical Plan identity、report進行状態を保存します。Context stateは`state.requested_scopes`へ工程開始時の全要求を保持し、`state.context_signal_attempts`へAの元要求identity・各試行/範囲・batch ref/revision・candidate check・状態/再開条件を、`state.context_synthesis_run_refs`へBの開始時input/requested scope、要求identity、run ref/revision、target batch、実scopeと元要求の対応を保存します。通常完了では最終`requested_scopes`・owner verifier証拠・実readbackとの対応を確認します。raw URL、secret、DOM text、scope本文、評価 narrativeは保存しません。state provider revisionはworkflow内のcontext/QA更新とWCAG evaluation revisionの双方と分けてSQLite内で単調管理します。
 
 `context_workflow_state.py initialize`は新規workflow_refのstateのみ初期化します。JSON-only legacy stateの自動移行や上書きは行いません。既存JSON stateにCAS更新を必要とする場合は当該state操作をblockし、通常成果物の保存可否とは分けて扱います。
 
