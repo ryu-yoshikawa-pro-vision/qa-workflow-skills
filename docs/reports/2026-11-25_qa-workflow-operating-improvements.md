@@ -148,7 +148,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 ## E. 成果物の標準配置・命名・発見
 
-追加調査: 作業branchの 412cabf22710b6b4abccfa6330fc7be538c6dbbf を基準に全37 SkillのSKILL.md、主要reference、関連Plan、一部保存helperを静的確認した。成果物の論理schema、保存先root、物理配置、命名、永続化能力は別々に評価する。既存配置を優先する[開発連動QA Planの旧Q06（配置契約）](../plans/2026-11-07_122247_development-qa-traceability.md)は維持する。以下は指定root配下の標準相対配置案。旧案件別配置判断は撤回し、既存配置への互換対応が必要なら外部境界で行う。現行実装の固定パス仕様ではない。
+追加調査: main 197f1e0e1abe870b0cc793355e7abf73bf241d87 と同一のSkill・Helperを対象に、PR #41の調査時点で全37 SkillのSKILL.md、主要reference、関連Plan、一部保存helperを静的確認した。成果物の論理schema、保存先root、物理配置、命名、永続化能力は別々に評価する。既存配置を優先する[開発連動QA Planの旧Q06（配置契約）](../plans/2026-11-07_122247_development-qa-traceability.md)は維持する。以下は指定root配下の標準相対配置案。旧案件別配置判断は撤回し、既存配置への互換対応が必要なら外部境界で行う。現行実装の固定パス仕様ではない。
 
 ### OPS-12 標準ディレクトリ構造と保存粒度 (P1)
 
@@ -162,14 +162,14 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 <指定成果物root>/
 ├── context/          # QA前提 / DEC / ASM
 ├── features/         # 機能台帳
-├── specifications/   # 仕様分析 / ui-target/
+├── specifications/   # 仕様分析 / ui-target/ / テスト対象資料
 ├── questions/        # Q / 質問定義・回答履歴 / 必要な旧フォーム
 ├── planning/         # QA要求 / 方式 / 計画
 ├── analysis/         # Risk / ITEM / COND候補
 ├── design/           # TR / TCN・CI / TC
 ├── reviews/          # coverage / adversarial review
-├── automation/       # E2E選定 / inspection / 実装参照
-├── execution/        # 直接TC / E2E / 非E2EのRunと結果参照
+├── automation/       # E2E選定 / E2E inspection / E2E・非E2E実装参照
+├── execution/        # 直接TC / E2E / 非E2EのRun・結果参照 / E2E結果分析
 ├── regression/       # baseline / run / activity
 ├── exploration/      # charter / session / finding
 ├── knowledge/        # 既存entry形式
@@ -179,7 +179,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 │   └── context-synthesis-run/
 ├── defects/          # 欠陥候補 / 外部Issue参照
 ├── usability/        # 評価 / 観測 / WCAG
-├── reports/          # 報告 / QA活動評価
+├── reports/          # E2E報告 / 統合報告 / QA活動評価
 └── state/            # 必要な永続stateのみ。ハーネス側で別rootに分離可
 ```
 
@@ -213,11 +213,11 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 対象: qa-workflow、project-context、feature-analysis、全成果物owner。
 
-現状: [workflow guidance](../../skills/qa-workflow/references/guidance.md)は既存state・input revisionの再利用、[project-context guidance](../../skills/project-context/references/guidance.md)は許可範囲の列挙と候補判定を定めるが、全ownerの正本発見と重複検出の共通受入は未確認。
+現状: [workflow guidance](../../skills/qa-workflow/references/guidance.md)は既存state・input revisionの再利用、[project-context guidance](../../skills/project-context/references/guidance.md)は許可範囲の列挙と候補判定を定めるが、全ownerの正本発見と重複検出の共通受入は未確認。[input_revision.py](../../skills/qa-workflow/scripts/input_revision.py)はファイル全体のSHA-256で変更を検知し、[runtime_contract.py](../../skills/qa-workflow/scripts/runtime_contract.py)は正規化入力・Entity単位のfingerprintを扱う。候補欄のみの変更でpath依存の再検証が広がる可能性があるが、全経路の影響は未確認。
 
-改善: 外部指定root/許可direct ref、owner、scope、artifact identity、必要な保存revision・source依存・既存stateを使って発見・currentnessを確認する。必要時の範囲限定探索は既存ownerの許可範囲・完全性・型検証に従い、無制限の再帰探索やpath/ファイル名だけの推定を避ける。重複・一覧取得不全・不明参照は明示し、新規作成や自動選択を止める。入力revisionだけでなく、入力母集団、実際に利用したContext field、依存source/ownerのcurrentness・scope・意味契約を必要範囲で確認する。input_revision.pyのsameだけで再利用しない。root入力・ref解決はOPS-14、部分保存はOPS-03。
+改善: 外部指定root/許可direct ref、owner、scope、artifact identity、必要な保存revision・source依存・既存stateを使って発見・currentnessを確認する。必要時の範囲限定探索は既存ownerの許可範囲・完全性・型検証に従い、無制限の再帰探索やpath/ファイル名だけの推定を避ける。重複・一覧取得不全・不明参照は明示し、新規作成や自動選択を止める。入力revisionだけでなく、入力母集団、実際に利用したContext field、依存source/ownerのcurrentness・scope・意味契約を必要範囲で確認する。input_revision.pyのsameだけで再利用しない。ファイル全体の変更検知と利用した仕様・論理要素の変更を区別する。未承認候補の保存で承認済みの意味が変わらない場合は、既存のEntity単位fingerprintや依存関係、質問・回答正本を活用して再検証範囲を判断する。保存時のrevision・競合保証はOPS-03、root入力・ref解決はOPS-14で扱う。
 
-受入: 別agent/sessionから同一正本を発見、変更なしの再依頼で不要再生成なし、部分改版では影響scopeのみ再検証。重複・欠落・stale・読取不能・列挙打切りを区別し、既存正本を保全する。OPS-01/03/05と接続する。未列挙入力・外部資料の改版、未使用Contextの変更、別workflow混在を確認する。
+受入: 別agent/sessionから同一正本を発見、変更なしの再依頼で不要再生成なし、部分改版では影響scopeのみ再検証。重複・欠落・stale・読取不能・列挙打切りを区別し、既存正本を保全する。OPS-01/03/05と接続する。未列挙入力・外部資料の改版、未使用Contextの変更、別workflow混在を確認する。未承認候補・質問のみの保存で利用中の承認済み根拠や論理要素が変わらない場合は無関係な下流成果物を再生成せず、正式仕様・利用中の根拠が変わった場合は影響scopeを再検証する。
 
 ### OPS-16 永続成果物・一時作業物・機密証跡の分離 (P0)
 
@@ -348,7 +348,7 @@ PR #40完了後に最新baselineで残存課題を選別し、OPS-18を横断原
 | AT-12 | 依存する複数成果物の部分保存 | 必要な参照整合確認まで依存する下流current不可 | 03/12/15 |
 | AT-13 | 正本重複 | 無断選択・新規作成なし、未解決明示 | 14/15 |
 | AT-14 | アクセス不能 | 不存在と区別し正式保存block | 03/14/15 |
-| AT-15 | 承認対象の変更・失効 | 承認の対象・意味・有効性に影響する変更では旧承認の誤再利用を拒否 | 02/04 |
+| AT-15 | 承認対象の変更・失効・必須scope除外 | 承認の対象・意味・有効性に影響する変更では旧承認の誤再利用を拒否。開始後の必須scope除外は有効な明示承認と必要な権限に基づき判定し、未承認除外を拒否 | 02/04 |
 | AT-16 | 機密証跡 | 未許可領域書込み/公開なし、任意・必須保存区別 | 16 |
 | AT-17 | 必須scope宣言漏れ・補助工程 | 必須scopeと依存の不足を検出、独立補助工程の未検証で不要な全体停止なし、誤完了なし | 05/07 |
 | AT-18 | FAILを含む実行 | 合否・母集団・cleanup・終了基準・workflow完了を独立判定 | 07 |
