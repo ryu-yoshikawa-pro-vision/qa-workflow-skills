@@ -3,8 +3,8 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87。最新コード/test head `7a23afdf00dd259f515c11e933d8fb51c98f763f`を対象branchへpushし、PR #40へ反映した。初期実装/Plan同期/CI同期commitは`e5643535`、`480033d2`、`c58a14f5`。
-- `7a23afdf`ではValidate Agent Skills (2368)、Validate Deterministic Output Evals (2366)、Validate Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。
+- fetch確認時のorigin/mainは`197f1e0e1abe870b0cc793355e7abf73bf241d87`でPR baseと一致。コード・test headは`7a23afdf00dd259f515c11e933d8fb51c98f763f`、最新検証済みdocs headは`e154bbc1023e86069fa492a001c7c62a868168ed`。
+- `7a23afdf`ではValidate Agent Skills (2368)、Deterministic Output Evals (2366)、Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。後続のdocs-only `e154bbc1`でも5 workflowすべてsuccess（Agent Skills 2374、Deterministic 2372、Semantic 2337、Code Quality 1067、Codex Harness 1067）。
 - 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
@@ -109,7 +109,7 @@
 
 先行head `0d789e1f`ではDeterministic Output Evalsがruntime portability test 2件で失敗した。`workflow_runtime.py`の追加adapter importが静的許可リストになく、単体Skill copyで共通helper不足時にも既存QA runtimeが起動できなかった。最初のテスト修正で共有helperをisolated rootへコピーしたが、自己レビューで親Planの単体Skill portability契約を弱めると判断し、そのfixture変更を戻した。最終実装はcontext scopeでのみadapterを遅延importし、adapter/store/contract不足はcontext scopeだけblocking issueにする。ローカル15件とhead `7a23afdf`のruntime全suiteで再検証した。
 
-docs-only head `968629b3`のCode Qualityは、この記録内の2行のMarkdown table paddingをdprintが指摘して失敗した。該当行だけをdprint指定幅へ修正した。コードとtestの内容は`7a23afdf`から変更していない。
+docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding不足で失敗した。`dcde957d`でその2行を直した後、新たに追加されたレビュー行106のpaddingが残り、`00e4f06d`と`32a1a084`もCode Qualityで失敗した。CI差分の正確な38-space幅へ合わせた`e154bbc1`でCode QualityがPASSし、そのheadの5 workflowがすべてsuccess。各修正はverification.mdの表幅だけで、コード/testは`7a23afdf`から変更していない。
 
 ## 実環境依存・未実施
 
