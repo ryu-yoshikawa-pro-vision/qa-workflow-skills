@@ -136,3 +136,10 @@ normalized_input.owner_verificationは保存本文のcanonical JSON文字列、e
 - `_history_dir()` は `.history` とidentity directoryの既存要素をsymlink検査してから作成する。対応するdirfd/no-follow経路と、dirfd非対応環境向けのlstat-before/after経路の双方を検証する。
 - 上記はQA共通のartifact契約・保存処理を `scripts/context_artifact_store.py` / `scripts/context_artifacts.py` に置き、QA workflow固有の永続stateとcompletion gateを `skills/qa-workflow/scripts/` に置く。Skill本文は各ownerの専門責務とruntime境界を参照する。既存helper/runtimeの接続範囲に留め、汎用保存基盤や別workflow engineは追加しない。実行結果・未実施受入は `docs/implementation/pr40/verification.md` に記録する。
 - `workflow_runtime.py` は共有context helperをcontext synthesis scopeがある場合だけ読み込む。helperが単体Skill packageにない場合はcontext scopeのみblocking issueとし、既存QA scopeの実行を継続する。単体Skill portabilityと、adapter/store/contractの各欠落による局所blockを回帰テストする。
+
+### 2026-11-27 開始要求の具体化追補
+
+- `register-requested-scopes` は開始時の要求集合を固定する。同一要求・同一契約の再登録は実行履歴が存在しても冪等に許容し、開始時に登録された未確定要求の単調な具体化も許容する。具体化では元`request_scope`と`start_contract`を保持し、既知条件を変更しない。古い開始contractの再送は現在contractを巻き戻さない。
+- Aのsource revision/hashが未確定の場合、同じsource ref・requested range・observation conditionのattemptから取得したrevision/hashを同じCAS更新内で具体化できる。開始時に値が既知だった場合、後続attemptと最終gateでその値を一致させる。
+- Bの開始時には未確定なA生成batchは、後続の具体化時に追加できる。ただし同一workflowのrequired A attemptへ登録済みで、artifact root binding、batch ref、revision、content hashを保存storeから独立readbackできる場合だけ許可する。Bの開始時operation type、既存sourceとversion、調査条件、analysis scope、environment/version条件を維持し、追加できるsourceはそのbatchの正確なreadbackだけとする。
+- A/Bの具体化前に独立した要求を実行した場合、具体化後に別の中断・再開をした場合も、永続stateのCAS revision、`start_contract`、実attempt/run snapshot、保存証拠を再照合する。要求の削除・置換・縮小、別workflow/rootの証拠、初期contractを持たない後付け要求は拒否する。最終gateは開始時の全required要求と現在の最終scope集合を照合し、全要求の実成果物/readback/owner verifierが揃わなければ未完了にする。

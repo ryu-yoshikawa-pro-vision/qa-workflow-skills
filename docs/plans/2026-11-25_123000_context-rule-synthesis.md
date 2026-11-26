@@ -2,7 +2,7 @@
 
 - 基準: main `a37b15508dadd17ac0228ac896badb71d6a8f2c7`（2026-11-25確認、添付「QAワークフロー 詳細設計書：横断的法則性抽出・コンテキスト補完（基本設計確定版）」と一致）
 - 実装branch: `feat/context-rule-synthesis`
-- 状態（2026-11-26）: 継続再レビューでB中心だった完了gateをA/B開始要求・永続attempt/run group・owner/readback・最終required scope集合の統合照合へ修正し、元要求の無断除外、B group全体のruntime欠落、scope集合の欠落/余剰、補助scopeのstate未指定を検出する。CIで見つかった64 KiB統合fixtureの要求scope欠落も修正し、A attempt・B run・target batch readbackを結線した。ローカル関連suite 116件、Ruff check/format、py_compileはPASS。head `46fc0aaf`のGitHub Actions 5 workflowがsuccessし、runtime suite 1,509 tests（227.544秒）がPASS。通常保存は隔離rootで確認済み。受入全体は未完了。実運用root、共有writer、PR #38既存owner横断の一意性、実Agent縦断、正式trigger、独立Judge、3構成比較は未確認または未実施。通常保存に専用認証hostは不要であり、Codex等へのrepository由来データ送信範囲が確定するまで外部評価を保留する。詳細と13.2対応は[PR #40検証記録](../implementation/pr40/verification.md)。残件を完了扱いしない。
+- 状態（2026-11-27）: PR head `4eebeab7`を起点に、既存attempt/run後の未確定要求具体化を修正。Aの既知source/range/条件を保ったrevision/hash確定、Bの同workflow/rootのrequired A batchのみをreadback付きtargetとして追加、start contract/request identity保持、古い再送による巻戻し拒否を実装し、要求変更・別root等の異常系、split runと最終gateを回帰化した。指定9 runtime modules 153 testsがPASS。全runtime suiteは1,516件中1,515件PASSで、1 loopback bind testはsandbox error、単体の隔離loopback実行はPASS。repository deterministic suiteは675件中674件PASSで、1 static-server loopback testはsandbox error、隔離単体はPASS。変更PythonのRuff 0.15.2 check/format、`py_compile`、runtime copy hash一致はPASS。repository pinのRuff 0.16.8、`dprint`、`skills-ref`はローカル未実行。変更前headのGitHub Actions 5 workflowはsuccess。今回変更を含む最終head CIはpush後確認し、本格評価はmerge後に実利用環境・実績に基づいて実施する。実運用root、共有writer、PR #38既存owner横断の一意性は未確認であり、基本設計13.2・Plan 03の複合受入は未完了として追跡する。詳細は[PR #40検証記録](../implementation/pr40/verification.md)。
 - [元の基本設計書](2026-11-25_123000_context-rule-synthesis_design.md)の1〜14章を対象とする。付録は保存のみで実装対象外。添付原文は[保存時commitの文書](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/799b776b4708a3b97aa6a6fc018212d00ac15d09/docs/plans/2026-11-25_123000_context-rule-synthesis_design.md)（SHA-256: 727e784d2faf8741a2f5a199515c060d3abb174658296ac3dbb992ac018270d0、Git blob: ec436defa085308b90cd7688d375c5730ecb55c5）で保持する。直前の書式整形版（Git blob: c642c87948acf8e8da0f756f849761d596b17de3）は履歴に保持する。今回の利用者決定により保存・責務・identityに関する設計を変更した。原文・旧設計は履歴参照とし、変更後の基本設計と詳細Planを実装の正本とする。詳細な例・表・JSON例も実装・検証の参照先とする。
 - 本Planは基本設計の具体化。以下のレビューで合意した具体化は原文の対応箇所より優先する。他の設計要件は省略しない。
 
@@ -15,6 +15,12 @@
 ## 確定した共通前提（Q01〜08）
 
 [共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。
+
+## 2026-11-26〜27 利用者決定：PR #40のmerge範囲
+
+PR #40では現在の`context-signal-audit`と`context-rule-synthesis`の2 Skill構成を維持し、安全に利用を開始できる実装状態をmerge条件とする。これは正式比較による最終構成選定を意味しない。本格利用時の品質確認、実Agent/trigger/Semantic Judge評価、導入前・1 Skill・2 Skill比較、品質/効率実測、最終構成選定、実利用に基づく改善はmerge後に実施する。
+
+設計・Plan 03の評価目的、数値基準、試行条件、シナリオ、rubricは将来評価のために維持する。これらの未実施をPASSにせず、基本設計13.2およびPlan 03の複合受入完了とも区別する。今回のmerge判定はPlan 03「PR #40のmerge条件」を正本とし、実運用root、共有writer、既存owner一意性など確認できない外部条件は対象操作を未完了のまま記録する。mergeは運用認可・共有更新・外部サービスへの送信許可を与えない。
 
 新規3成果物のcanonical JSONは現行verifier・不変batch・機械的再開との整合から採用候補として維持する。人間向けの短い要約を返し二重正本を作らない。より単純な形式で同じ品質・再開・検証を満たせる場合のみ根拠を記録し比較する。処理完了・質問前・回答後・中断・引継ぎの必要分を自動保存する。対話質問の提示と永続的handoffを区別する。
 
@@ -73,7 +79,7 @@
 
 ## 対象・変更境界
 
-新規2 Skill（context-signal-audit、context-rule-synthesis）と3成果物、指定ディレクトリへの最小保存接続、qa-workflowのrouting・state・owner verifier、必要なownerとの接続、README/EVALS・評価・回帰検証を対象とする。添付設計の比較に基づき1 Skillとの実測を行い、品質・効率条件で最終構成を決める。評価用の1 Skill構成は本番3つ目のSkillとして配布しない。
+新規2 Skill（context-signal-audit、context-rule-synthesis）と3成果物、指定ディレクトリへの最小保存接続、qa-workflowのrouting・state・owner verifier、必要なownerとの接続、README/EVALS・評価契約・決定論的回帰検証を対象とする。PR #40では現行の2 Skill構成を維持し、安全に利用開始できる実装状態までをmerge条件とする。1 Skillとの正式比較や最終構成選定は実利用後に実施し、比較条件と採用基準は維持する。評価用の1 Skill構成は本番3つ目のSkillとして配布しない。
 
 対象外: 新Authority、DEC/ASMの別正本、別DB・embedding・中央index・独自CAS・分散transaction・全体lock・常駐監視・特定harness強制・rootを越える共有・既存保存方式の全面移行・案件管理・ブランチ管理、別課題の専門テストSkill、既存製品の変更。
 
@@ -90,6 +96,6 @@
 2. 3成果物のcanonical契約、identity、純粋検証・fixture、指定ディレクトリの列挙/履歴/条件付き保存入口を実装。既存helperを優先し、能力未確認なら接続部分のみ保留。
 3. Aの抽出・不変バッチとworkflow試行state、Bの検索・帰納・候補/run保存・再開を接続。
 4. 既存ownerへの調査/質問/確定知識のhandoff、鮮度・変更伝播、workflowの補助/必須/単体実行・verifierを接続。
-5. 評価・ドキュメント・実provider/Agent受入・全回帰、各構成のスモークテスト後に3構成の正式比較を実施。結果による構成変更も本branchで検証する。
+5. 評価契約・決定論的回帰・CI・必要文書を同期し、現行2 Skillを保った安全な利用開始状態をPR #40のmerge条件まで検証する。実運用root/共有writer/既存owner一意性、実Agent縦断、正式trigger、独立Semantic Judge、3構成比較と最終構成選定はmerge後に実利用環境・利用実績から実施し、PR #40では完了扱いしない。
 
-03の受入条件すべてを独立に確認する。計測不能・未接続・失敗はPASSにしない。既存の未達はbaselineと今回の差を区別して報告する。現在、3 kindの通常root保存・履歴・条件付き更新・独立readback、A/B workflow stateの中断再開と最終gate、owner verifierを接続し、in_progress readback、関連revision/hash、root混在、全run完了、symlink副作用、単体QA runtimeの共有helper依存、開始時要求とruntime最終scopeの対応漏れを修正した。CIで検出した64 KiB統合fixtureの古い要求scope契約も更新した。ローカル関連suite 116件とRuff check/format・py_compileはPASS。head `46fc0aaf`のGitHub Actions 5 workflowがsuccessし、runtime 1,509 testsがPASS。実運用rootと共有writer/外部owner一意性、実Agent、正式trigger、独立Semantic Judge、3構成比較は未完了。最新結果を検証記録に同期し、全受入が終わるまで本Planを完了にしない。
+今回のmerge条件と基本設計13.2/Plan 03全複合受入は区別する。未実施・計測不能・失敗はPASSにしない。3 kindの通常root保存・履歴・条件付き更新・独立readback、A/B stateの中断再開・最終gate、owner verifier、先行レビュー指摘と開始要求の段階的具体化を決定論的回帰で確認する。実運用rootと共有writer/外部owner一意性、実Agent、正式trigger、独立Semantic Judge、3構成比較はmerge後タスクとして未完了のまま残す。最終CI・PRの状態と詳しい検証証拠は[検証記録](../implementation/pr40/verification.md)を参照し、本Planは複合受入が完了するまで完了にしない。

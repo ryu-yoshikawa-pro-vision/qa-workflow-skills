@@ -129,6 +129,8 @@ skills/
 | `usability-inspection`        | 既存Playwright経路でlive Web UIを観測し、fixed probe・measurement・general accessibilityを扱う |
 | `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL      |
 
+PR #40ではこの2 Skill構成を維持します。導入前・1 Skill・2 Skillの正式比較による最終構成選定は、本格利用後に実測して行うため、現在の登録を最適構成の選定結果とはみなしません。
+
 ## テスト分析・設計フロー
 
 以下は、このSkill群が扱う全体ワークフローの代表経路です。実際には要求成果物と有効な既存成果物に応じて開始工程を決め、途中工程からの開始、既存成果物の再利用、不要工程の省略を行います。

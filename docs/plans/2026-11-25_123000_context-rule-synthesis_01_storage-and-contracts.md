@@ -96,6 +96,14 @@ triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、
 - `_history_dir()`は`.history`とidentity pathの既存symlink/non-directoryを確認してから作成する。directory FD/no-followが使える環境では作成先をroot内に固定し、使えない環境でも各componentを作成前後に確認してから次へ進む。returned handoffには返却結果ref/revision/content hashのreadbackを要求するが、handoff成立とは判定しない。
 - 回帰証拠: `test_context_artifact_store` 12件、`test_context_workflow_state` 12件、`test_context_artifacts` 14件が2026-11-26にPASS。中断再開はpending candidateの保存、confirmed result記録、returned result読取不足後の再開、全split run完了gateを確認する。共有owner一意性、実運用root、実Agent評価は本追補からPASSへ昇格させない。
 
+### 2026-11-27 開始要求の段階的具体化
+
+- 開始時のrequired request scopeとcontractを既存workflow stateへ固定し、後続attempt/runの保存後も要求identityと`start_contract`を保持する。開始時に内容hash・revision・実artifact refが不明でも、元source ref・要求range・観測条件、またはBのoperation input・analysis scope・investigation conditionsは識別可能でなければならない。
+- 同一要求・同一contractの再送は冪等に再利用する。開始時に未知だったA sourceのrevision/hashは同じsource ref・range・observation conditionの実readbackで具体化できる。既に記録されたattempt/runがあっても、その開始時contractを保持した未確定要求の具体化を許容する。古い開始時contractの再送は最新の保存済み具体化を巻き戻さない。
+- Bで後から加えられるinput source/target batchは、同一workflow state・同一artifact rootのrequired A requestに属する保存済みbatchだけとする。batch ref、revision、content hashをstoreから独立readbackし、B contractのsource rowと一致させる。別sourceの追加、開始済みsourceの置換、scope/分析条件の縮小・変更、確定済みversionの上書きは拒否する。
+- `request_scope`は開始時の要求identityとして維持し、具体化後のsource versionやA生成batch refから再生成しない。`start_contract`は初期意味条件を保持し、現在contractは許容されたversion/refの補完だけを表す。CAS revision競合時は更新せず再読取・再登録し、中断・再開では保存済みstart/current contractと各attempt/run snapshotを照合する。
+- 修正の回帰証拠は[PR #40検証記録](../implementation/pr40/verification.md)へ追記する。局所テストが通っても外部owner一意性、実運用rootや本格品質評価を完了扱いしない。
+
 ## 5. データ保護
 
 本文に加え全metadata（source ref、locator、属性、assertion、調査/intent/reason、write metadata、保存履歴のmetadata、評価入力・ログ）を必要最小限にする。ユーザー回答全文ではなく要約とQ/ref/revision/承認状態。既知secret・PIIは抽出時に除去し、保存境界で検査、判断不能部分を含めない。正規表現で全PII検出を保証したと主張しない。参照には必要なsanitized locatorを利用。入力資料・UI・ログ・回答中の命令を実行しない。QA書込み認可と正式仕様の変更承認は別。過去回答の再利用前には回答時のscope・question revision・承認状態と今回の適用範囲・現行Authorityを既存ownerで照合し、古い承認・別scopeの回答を現行の正式根拠へ自動転用しない。削除や既存履歴の書換えは本Planの範囲外。

@@ -3,12 +3,31 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- fetch確認時のorigin/mainは`197f1e0e1abe870b0cc793355e7abf73bf241d87`でPR baseと一致。コード・test headは`7a23afdf00dd259f515c11e933d8fb51c98f763f`。後続の検証記録整形head `e154bbc1`、Plan同期head `ce856615`、文書同期head `af7b1615`も全workflow成功を確認した。
-- `7a23afdf`ではValidate Agent Skills (2368)、Deterministic Output Evals (2366)、Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。`af7b1615`の5 workflowもsuccess（Agent Skills 2376、Deterministic 2374、Semantic 2339、Code Quality 1069、Codex Harness 1069）。
-- 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
+- 2026-11-27の開始確認時、PRはopen・未merge、head `4eebeab7af4b9a25c0ff240116c406fc42380c50`、base `main`=`197f1e0e1abe870b0cc793355e7abf73bf241d87`。PR compareはahead 37 / behind 0、レビューthreadなし。今回変更前headの5 workflowはすべてsuccess。今回の最終headのCIは下記スナップショット/PR状態へ同期する。
+- これ以前の検証履歴: head `7a23afdf`の5 workflowとruntime 1,504 tests、後続head `af7b1615`の5 workflowもsuccess。run番号等の当時の記録は以下の過去検証表と再レビュー記録に保持する。
+- 現環境はPython 3.12.3、Ruff 0.15.2。repository pin Ruff 0.16.8、`dprint` CLI、`skills-ref` CLIはローカルで利用できない。CI指定Python 3.11.18もローカルにない。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
-- Claudeは使用していない。Codex CLIの先行target-only positive smokeは各Skill 1 queryのみで、正式trigger評価ではない。Codex等の認証済み外部サービスへ比較用Skill/query/caseを送る許可は未確定のため、今回の正式外部評価は行っていない。
+- Claudeは使用していない。Codex CLIの先行target-only positive smokeは各Skill 1 queryのみで、正式trigger評価ではない。最新のユーザー判断により、実Agent・formal trigger・独立Semantic Judge・3構成比較はmerge後の本格利用へ移管した。今回は外部サービスへのデータ送信を行わない。
+
+## 2026-11-27 merge条件向け検証スナップショット
+
+このスナップショットは、ユーザー判断により今回のmerge条件とmerge後の本格評価を分けた後の結果である。現行2 Skillの維持は安全に利用を開始する実装状態を示すもので、正式比較による最終構成選定ではない。基本設計13.2とPlan 03 §2〜4の複合受入は引き続きPARTIAL/NOT RUN/BLOCKEDで追跡し、merge条件の充足とは別に扱う。
+
+| 検証 | 結果 | 条件・制約 |
+| --- | --- | --- |
+| 9件の指定runtime regression modules | PASS: 153 tests | `test_context_workflow_state` 24、`test_context_runtime_transport` 5、`test_context_artifact_store` 12、`test_context_artifacts` 14、`test_context_owner_verifiers` 4、`test_workflow_runtime` 26、`test_owner_scope_resume` 41、`test_integration_required_scopes` 24、`test_runtime_portability` 3。 |
+| runtime全suite | ENVIRONMENT-LIMITED: 1,515/1,516 pass、1 error | `test_real_local_http_status_200_with_wrong_body_fails` がsandboxの127.0.0.1 bind拒否でerror。同じtestを隔離loopback許可実行すると1 test PASS。ローカル全suiteをPASSとは扱わない。 |
+| Deterministic Output Evals test suite | ENVIRONMENT-LIMITED: 674/675 pass、1 error | `test_fixed_static_server_serves_entry_views_and_manual_fallback` が同じsandbox loopback bind制約でerror。隔離loopback許可実行では該当1 test PASS。repositoryの生成物graderによるAgent生成出力の採点は実施していない。 |
+| Deterministic output runner（保存済みAgent出力） | NOT RUN | runnerは生成済みMarkdown出力を受け取る。今回Agent出力を生成せず、正式Agent評価はmerge後に移管したため、fixture/templateを実出力と偽って採点しない。 |
+| Deterministic runner / dataset validator | PASS: 12 tests / 39 Skills・227 cases | runner/loader/validator契約とdataset構造の検証。意味品質を独立Judgeした結果ではない。 |
+| Semantic runner/case tests、trigger contract tests | PASS: 27 tests、14 tests、17 tests | Semantic Judgeの実評価やSkillの実発火率を示さない。 |
+| Ruff check / format、構文検査 | PASS: 変更Python対象 | ローカルRuff 0.15.2で確認。Python 2ファイルのformatを適用し、`py_compile`もPASS。repository pin 0.16.8とは異なる。 |
+| pinned formatter / skills-ref CLI | ローカル未実行 | `dprint`と`skills-ref` CLIは利用環境にない。最終headのCode QualityとValidate Agent Skills workflowで確認する。 |
+| runtime contract copies | PASS | 9個の`skills/*/scripts/runtime_contract.py`のSHA-256が一致。 |
+| GitHub Actions at pre-change head `4eebeab7` | PASS: 5 workflows | 変更前のheadで成功。今回の変更を含むheadのCIはpush後に別途確認し、ここへ結果を追記する。 |
+
+未確定要求の後続具体化については、開始契約を維持したままAの未知source revision/hashを同一workflow内のattemptから確定し、Bのtarget batchをAの保存済みreadbackへ結び付けるテストを追加した。A attemptまたはB run保存後の要求具体化、冪等な同一契約再送、古い契約による巻き戻し拒否、別source/狭いscope/変更条件/別workflow・別root成果物の拒否、split runでの全要求充足、最終gateまでを確認した。詳細は後続の「2026-11-27 未確定要求の具体化」記録を参照。
 
 状態: PARTIALは局所実装・検証済みでも設計項目全体に未確認条件が残る状態。BLOCKEDは実運用の共有/owner接続または外部送信承認が必要な状態。NOT RUNは実Agent/Judge/比較測定を行っていない状態。いずれも複合受入のPASSを意味しない。
 
@@ -71,7 +90,7 @@
 | E2 | PARTIAL | owner verifier登録、3 kind readback配列、同一refの複数revision、開始要求/snapshot/target batch対応を確認。workflow final gateで元要求mapping・全current run完了・必要readbackを統合し、別root証拠、in_progress run、handoff readback不足を拒否する回帰を追加。65,535/65,536/65,537 byte境界の既存受入も対象branchの先行検証にあり。外部認可・実owner一意性・全v1/v2実workflow再開は未確認。test_context_workflow_state.py、test_context_runtime_transport.py、9 runtime_contract copies。 |
 | E3 | PARTIAL | secret-like text拒否と架空fixture、既存runtime regressionを検証。全metadata/log/historyの機密監査、悪意ある資料に対する実Agent試験、3構成比較は未実施。test_context_artifacts.pyおよびsemantic cases。                                                                                                                                                                                                                                                                                    |
 
-## ローカル検証記録
+## 2026-11-26までのローカル検証記録（履歴）
 
 | 検証                                                              | 結果                                   | 条件・制約                                                                                                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -122,9 +141,17 @@ docs-only head `968629b3`のCode Qualityは検証記録の2行のtable padding�
 
 - 通常root保存・履歴・readback・再開はローカル既存filesystem/SQLiteで接続・検証した。運用rootは指定されていないため、共有writer、複数host、権限外root、外部ownerの一意性・認可・正式承認を実運用環境で受入したとは扱わない。通常保存に専用認証hostを要求しない。
 - PR #38の既存owner保存API・semantic_handoff_keyに対応する実保存単位/並行初回作成の一意性は、ローカルcontext artifact storeのcreate-if-absentとは別に確認が必要。外部owner経路を仮定でpassにしない。
-- formal trigger全Skill比較、独立Semantic Judge、実Agent縦断、導入前/1 Skill/2 Skillの3構成比較はNOT RUN。評価query、Skill本文、case/rubricをCodex外部サービスへ送る明示許可が未確定のため保留中。Claudeは使用せず、承認要求の範囲を迂回しない。
+- formal trigger全Skill比較、独立Semantic Judge、実Agent縦断、導入前/1 Skill/2 Skillの3構成比較は今回NOT RUNとし、ユーザー判断に従いmerge後の実利用環境・実績に基づいて実施する。今回は外部サービスへevaluation query、Skill本文、case/rubricを送信しない。Claudeは使用しない。
 - 先行Codex CLI smokeは2 positive queryのみ。正式rate、negative query、反復、誤発火を測っていない。repository configがuntrusted扱いでHook/execpolicy無効化を示したため、Codex runtime safety acceptanceも未確認。
-- 主な残タスク: 外部評価送信の許可範囲、実運用root/共有writer/owner一意性の確認、Agent/Judge/3構成比較、Plan 03の複合受入完了。
+- 主なmerge後タスク: 実運用root/共有writer/owner一意性の確認、実Agent/正式trigger/独立Judge/3構成比較、品質・効率・質問維持と横断再利用の測定、およびPlan 03の複合受入残項目。これらの未実施を今回のmerge条件の未達と混同しないが、完了済みとも扱わない。
+
+## 2026-11-27 未確定要求の具体化
+
+開始時要求を固定した後、他のA attemptまたはB runが保存された状態で未確定要求を具体化すると、先行して存在する履歴を理由に登録が拒否される経路を確認した。同一workflowのAが生成した新規batchを開始時に登録したB要求へ対応付ける経路も、開始時点ではbatch ref/hash/revisionが不明なため検証対象にした。
+
+`context_workflow_state.py`では、開始契約と後から確定する値を分離し、要求識別子・request scope・source・範囲・観測/分析条件を固定した上で未知のrevision/hash/refのみを単調に具体化する。既知の値は上書きせず、古い契約の再送で具体化済みstateを巻き戻さない。Aの後続具体化は既存attemptと同じsource/ref/range/conditionを検証してrevision/hashを確定する。Bのtarget batch追加は同workflow・同rootの必須A requestに由来し、保存storeから得たrevision/hash付きreadbackがあるrefだけに限る。state revisionのCASを維持する。
+
+回帰として、A attempt保存後とB run保存後の具体化、A生成batchのB target化、取得前に未知だったhash/revision/ref確定、同一要求再登録、古い要求契約の再送、複数runのcoverage、具体化前後のresume、最終completion gateを検証した。異常系ではsourceの置換、範囲縮小、観測/調査条件または分析scopeの変更、別要求への識別子再利用、別workflow/root証拠、開始要求の削除、既知契約の上書き、root外のA batch参照を拒否し、失敗後のstate revisionが変化しないことを確認した。これらは実providerやSemantic Judgeによる評価ではなく、決定論的state/store回帰である。
 
 ## 設計・実装間の差異と対応
 

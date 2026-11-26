@@ -7,17 +7,46 @@
 - [x] 基準commitでCI・テストbaseline、PR #38/#39/#17との差分、保存/認可境界、既存ownerの保存/CAS/照合点を記録。実運用root・共有writer・owner一意性の未確認範囲は依存条件として分離し、通常root保存をhost未選定扱いで停止していない。[検証記録](../implementation/pr40/verification.md)
 - [x] 既存runtimeの要求scope・再開テストで仮target→実ref、複数batch/run、凍結済み記録と元要求の対応、64 KiB超の保存本文の搬送・再開を検証し、必要最小限の共通変更を決める。3成果物のサンプル・data-contract・identity/validate/impact/completion helperと機械契約テストを実装し、既存canonical規則に合わせた。[検証記録](../implementation/pr40/verification.md)
 - [x] 指定rootを受け取る3 kindのdirectory store、list/history、相対ref、条件付き保存、独立readback、Aのimmutable batch、Bのrun保存・state記録・再開を既存ファイル/SQLite操作へ接続。隔離ローカルfilesystemの実保存先で作成、競合、履歴、symlink拒否、再開を確認した。実運用root・共有writer能力の確認は別途未完了であり、特定Provider拡張は要求しない。[検証記録](../implementation/pr40/verification.md)
-- [ ] 2 Skillの本文/参照/assetを実装し、A/Bの相互責務、横断検索、既存owner routingを接続。追加調査と質問、既存Knowledge/Authority再利用を実Agentで確認。
-- [ ] workflow routing/state/owner verifier・runtime_contractコピー、README/EVALS、各registryを同期。無効/補助/必須/単体と既存再開・依存伝播を検証。
-- [ ] trigger/deterministic/semantic/runtime/実provider・実Agent、各構成のスモークテスト後に3構成の正式比較を実施。結果に応じて本採用構成を決定し、最終構成で全受入を確認する。
+- [x] 2 Skillの本文/参照/asset、A/Bの相互責務、横断検索、既存owner routingを実装し、QA workflowと接続。追加調査・質問・既存Knowledge/Authority再利用は決定論的fixture・contract・routingで検証。実Agentによる意味品質確認はmerge後の本格評価へ移管。
+- [x] workflow routing/state/owner verifier・runtime_contract copies、README/EVALS、Skill登録情報を同期。無効/補助/必須/単体、既存再開・依存伝播をruntime regressionで検証。最終head CIはpush後に別記録する。
+- [ ] 実Agent縦断、全Skill formal trigger、独立Semantic Judge、実provider/実運用root/既存owner一意性、導入前・1 Skill・2 Skillの正式比較と最終構成選定を実施する。2026-11-27の利用者判断により、これらはmerge後に実利用環境・利用実績に基づいて実施する。2 Skill構成は維持するが、最適構成として選定済みとは扱わない。比較基準・試行条件・rubricは変更せず保持する。
 
 純粋helper・Skill本文・評価セットの設計は並行可。identity/保存契約とscope/owner契約を共有してから接続する。全タスクは同一branchで完結し、依頼されていない別PR作成・製品変更を行わない。
 
+## PR #40のmerge条件とmerge後の本格評価
+
+2026-11-26〜27の利用者判断により、このPRのmerge条件は安全に利用開始できる実装・既存契約との接続・決定論的回帰・CIの完了とする。本格利用時の品質確認・効果測定・構成選定・改善は実際の利用環境と実績に基づくmerge後の作業とする。基本設計13.2および本Plan §2〜4の複合受入を完了扱いにしたり、測定基準を変更したりするものではない。
+
+### 今回のmerge条件
+
+- 現行の`context-signal-audit`と`context-rule-synthesis`の2 Skillを維持し、既存qa-workflow routing・owner verifier・runtime・README/EVALS登録と接続する。2 Skill構成は正式比較による最終最適構成の選定結果ではない。
+- 許可root内の通常保存、3 kindの列挙/読取/履歴/条件付き更新/独立readback、workflow stateの永続化/中断再開、要求契約と実成果物scopeの照合が既存契約どおり機能する。
+- 開始時要求の固定、同一要求の冪等再登録、他要求の実行後の未確定要求具体化、A生成batchのB target化、source/range/condition/scopeの無断変更拒否、全要求・全run・最終scope・保存証拠の統合gateを正常系/異常系/中断再開の回帰で検証する。
+- 既存機能との互換性、v1/v2保存済みruntime証拠、単体/補助実行、root binding、readback、データ保護、未完了判定を維持し、merge阻害となる確認済み不具合が残らない。
+- 最終headの5既存GitHub Actions workflowがsuccessし、runtime/eval/skill/lint/format/構文/whitespace/copy整合を個別に確認する。ローカル環境制約によるFAILまたは未実施はPASSに置き換えず、理由とCI結果を区別して記録する。
+- Plan、検証記録、関連Skill/documentation、PR本文が実装と実際の証拠に一致し、PRはopen・未mergeとする。
+- 実運用rootや共有writer、外部owner一意性など未確認の操作は未完了のままにし、mergeを運用認可または外部更新許可とみなさない。
+
+### merge後の本格利用・評価・改善
+
+実運用root/writer/owner一意性、実Agent縦断、正式trigger全Skill評価、独立Semantic Judge、導入前・1 Skill・2 Skillの3構成比較、最終構成選定、品質・質問維持/重複削減・横断再利用・token/時間/費用/操作回数の実測、実利用に基づく改善、および本Plan §2〜4の複合受入残項目は、merge後に利用環境と実績を得てから実施する。比較条件・全数値基準・シナリオ・rubric・試行数は下記に保持し、緩和しない。正式外部評価や未承認データ送信は行わない。未実施項目は各表で`NOT RUN`/`PARTIAL`/`BLOCKED`として追跡する。
+
+### merge前の今回の判定記録
+
+以下を満たした範囲だけを今回のmerge readinessとして確認する。ここを完了しても基本設計13.2の全複合受入を完了したことにはしない。
+
+- [ ] 2 Skill実装とqa-workflow接続、通常保存・履歴・条件付き更新・独立readback・永続state/中断再開が既存契約どおり機能する。
+- [ ] 開始時要求の固定、冪等再登録、要求の後続具体化、A batchのB target化、source/scope/条件/rootの無断変更拒否、全run/全scope/保存証拠の最終gateが回帰で成立する。
+- [ ] v1/v2、単体/補助/必須、既存runtime/owner経路との互換性と、関連する9 runtime regression modulesを確認する。
+- [ ] formatter/lint/構文/whitespace/copy整合と、最終headで指定5 GitHub Actions workflowの成功を個別に確認する。
+- [ ] Plan/関連文書/検証記録/PR本文を実際の結果へ同期し、PRをopen・未mergeのまま保つ。
+- [ ] 未確認の実運用条件とmerge後の本格評価を明示し、未実施結果をPASSとしていない。
+
 ### 実施状態
 
-このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。2026-11-26のローカル作業では保存・owner contract・runtime state・runtime transportの対象suite 62件がPASSし、65,535/65,536/65,537 byteの3 kindを実保存からowner verifier、workflow_runtime完了、凍結結果のdownstream再開まで検証した。repository deterministic suiteは675件PASS、新規2 Skillのdeterministic output runnerは各1 eval・計6 assertions PASS、semantic datasetは39 Skill/227 cases・14 tests PASS、trigger contractは17件PASS、deterministic runnerは12件PASS、ci_handoffは28件PASS。継続レビューの回帰は6 suite・116 testsがPASSし、Ruff check/format、py_compileもPASS。CIで指摘された64 KiB統合fixtureの要求scope欠落を修正したhead `46fc0aaf`では、runtime全suite 1,509 tests（227.544秒）がPASSし、GitHub Actions 5 workflowすべてsuccess。ローカルdprint集約checkは今回対象外のtracked file 18件のline-ending差でexit 20だったが、CI Code QualityはPASS。今回の最新変更を含む全runtime suiteはローカルで1,513 tests中1,512件がPASSし、`test_real_local_http_status_200_with_wrong_body_fails` 1件がsandboxのloopback bind拒否でerrorとなった。同テスト単体は127.0.0.1だけを使う隔離実行でPASSした。コードhead `bd325df3`ではGitHub Actions 5 workflowすべてsuccessし、Deterministic Output Evalsのruntime unit/integration stepを含む全workflowを確認した。ローカルsuiteのenvironment-limited errorは隠さず記録する。最新の証拠は[検証記録](../implementation/pr40/verification.md)を参照する。
+このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。過去headのCI・検証記録は後続の履歴項目として残す。2026-11-27の最新ローカル結果は[検証記録](../implementation/pr40/verification.md)の「merge条件向け検証スナップショット」を参照する。そこでは指定9 runtime module 153 testsがPASSし、全runtime suiteは1516件中1515件PASS/1 loopback sandbox error、repository Deterministic Output Evalsは675件中674件PASS/1 loopback sandbox errorで、各該当testは隔離loopback許可実行で個別PASSした。ローカルsuiteを全体PASSにしない。変更Pythonのruff check/formatと`py_compile`はPASS、pinned `dprint`/`skills-ref` CLIはローカル未実行。最終headのGitHub Actions 5 workflowはpush後に確認し、この状態記録を更新する。
 
-通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較は未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。Codex等の外部サービスへのrepository data送信許可は未確定のため、formal evaluationを実行しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
+通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較はユーザー判断によりmerge後へ移管し、今回未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。今回は外部サービスへrepository dataを送信しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
 2026-11-26の再レビューではin_progress登録時の未確定candidate readback、関連candidateの保存境界precondition、workflow stateのartifact-root binding、全runを統合する最終completion gate、history symlink pathの副作用を再確認した。ローカル修正後にstore 12件、workflow state 12件、contract 14件、owner verifier 4件、runtime transport境界1件の計43 testsがPASSし、中断点からの再開も確認した。単体QA workflowの既存処理を保つためcompletion adapterをcontext scopeがある場合だけ読み込み、依存不足は当該scopeのみblocking issueとする。GitHub Actionsのruntime全suiteは`7a23afdf`で1,504 tests PASS、後続のdocs同期head `af7b1615`も5 workflowすべてsuccess。実Agent/ownerを介した受入、共有writer/外部owner一意性、実運用rootの認可は未実施で、局所テストで代替していない。詳細は[検証記録](../implementation/pr40/verification.md)。
 

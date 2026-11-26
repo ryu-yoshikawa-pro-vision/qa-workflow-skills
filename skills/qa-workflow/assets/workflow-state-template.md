@@ -47,7 +47,7 @@
 }
 ```
 
-`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。`requested_scopes`は工程開始時の要求集合を保持します。context必須処理では`context_request_contracts`がAの元source/range/観測条件、Bの開始時operation input/analysis scope/target batch refsを固定します。A試行とB run参照、および開始要求との対応は`context_workflow_state.py`が検証します。最終runtime inputには開始時要求の再読込用`context_workflow_state_root`を独立して渡します。共通workflow runtimeではoptional fieldであり、context必須処理でのみ設定します。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
+`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。`requested_scopes`は工程開始時の要求集合を保持します。context必須処理では`context_request_contracts`がAの元source/range/観測条件、Bの開始時operation input/analysis scope/target batch refsを`start_contract`として固定し、未確定値を後続のcurrent contractで具体化します。既知条件を変える具体化、要求削除/置換/縮小、別workflow/rootの証拠追加は拒否し、古いcontract再送で具体化を巻き戻しません。A試行とB run参照、および開始要求との対応は`context_workflow_state.py`が検証します。最終runtime inputには開始時要求の再読込用`context_workflow_state_root`を独立して渡します。共通workflow runtimeではoptional fieldであり、context必須処理でのみ設定します。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 

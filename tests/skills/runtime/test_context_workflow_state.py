@@ -1639,6 +1639,592 @@ class ContextWorkflowStateTests(unittest.TestCase):
         )
         self.assertEqual(replay["status"], "reused")
 
+    def test_started_signal_request_can_be_concretized_after_another_attempt(
+        self,
+    ) -> None:
+        unresolved_source = "project/specifications/future.md"
+        unresolved_contract = {
+            "skill": "context-signal-audit",
+            "source": {
+                "artifact_ref": unresolved_source,
+                "source_revision": None,
+                "content_hash": None,
+            },
+            "requested_range": {"kind": "sections", "items": ["SEC-1"]},
+            "observation_condition": {"locale": "ja"},
+        }
+        unresolved = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": unresolved_contract,
+            }
+        )
+        requested_scopes = [self.signal_scope_request, unresolved["request_scope"]]
+        workflow_root, workflow_ref, revision = self._new_registered_state(
+            requested_scopes,
+            [self.signal_request_contract, unresolved["contract"]],
+        )
+
+        first_batch = fixtures.build_batch()
+        first_readback = self.store.write("context-signal-batch", first_batch)[
+            "readback"
+        ]
+        first_attempt = context_workflow_state.handle(
+            {
+                "operation": "record-signal-attempt",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": revision,
+                "artifact_root": str(self.artifact_root),
+                "record": self.signal_record(
+                    first_readback,
+                    workflow_ref=workflow_ref,
+                    request_scope=self.signal_scope_request,
+                ),
+            }
+        )
+        self.assertEqual(first_attempt["status"], "written", first_attempt)
+
+        replay = context_workflow_state.handle(
+            {
+                "operation": "register-requested-scopes",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": first_attempt["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "requested_scopes": requested_scopes,
+                "context_request_contracts": [
+                    self.signal_request_contract,
+                    unresolved["contract"],
+                ],
+            }
+        )
+        self.assertEqual(replay["status"], "reused", replay)
+
+        resolved_contract = copy.deepcopy(unresolved_contract)
+        resolved_contract["source"].update(
+            {"source_revision": "r3", "content_hash": fixtures.SOURCE_HASH}
+        )
+        resolved = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": workflow_ref,
+                "contract": resolved_contract,
+                "request_scope": unresolved["request_scope"],
+            }
+        )
+        concretized = context_workflow_state.handle(
+            {
+                "operation": "register-requested-scopes",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": first_attempt["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "requested_scopes": requested_scopes,
+                "context_request_contracts": [
+                    self.signal_request_contract,
+                    resolved["contract"],
+                ],
+            }
+        )
+        self.assertEqual(concretized["status"], "written", concretized)
+        stored_contract = next(
+            row
+            for row in concretized["state"]["context_request_contracts"]
+            if row["request_scope"] == unresolved["request_scope"]
+        )
+        self.assertEqual(stored_contract["request_scope"], unresolved["request_scope"])
+        self.assertEqual(stored_contract["source"], resolved_contract["source"])
+        self.assertEqual(
+            stored_contract["start_contract"]["source"], unresolved_contract["source"]
+        )
+
+        stale_replay = context_workflow_state.handle(
+            {
+                "operation": "register-requested-scopes",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": concretized["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "requested_scopes": requested_scopes,
+                "context_request_contracts": [
+                    self.signal_request_contract,
+                    unresolved["contract"],
+                ],
+            }
+        )
+        self.assertEqual(stale_replay["status"], "reused", stale_replay)
+        self.assertEqual(
+            next(
+                row
+                for row in stale_replay["state"]["context_request_contracts"]
+                if row["request_scope"] == unresolved["request_scope"]
+            )["source"],
+            resolved_contract["source"],
+        )
+
+        resumed = context_workflow_state.handle(
+            {
+                "operation": "read-context-requests",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+            }
+        )
+        self.assertEqual(resumed["status"], "current", resumed)
+        self.assertEqual(
+            next(
+                row
+                for row in resumed["context_request_contracts"]
+                if row["request_scope"] == unresolved["request_scope"]
+            )["source"],
+            resolved_contract["source"],
+        )
+
+        resolved_batch = self.signal_batch_variant(source_ref=unresolved_source)
+        resolved_readback = self.store.write("context-signal-batch", resolved_batch)[
+            "readback"
+        ]
+        second_record = self.signal_record(
+            resolved_readback,
+            workflow_ref=workflow_ref,
+            request_scope=unresolved["request_scope"],
+        )
+        second_record.update(
+            {
+                "attempt_id": "2" * 64,
+                "source": resolved_contract["source"],
+            }
+        )
+        second = context_workflow_state.handle(
+            {
+                "operation": "record-signal-attempt",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": resumed["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "record": second_record,
+            }
+        )
+        self.assertEqual(second["status"], "written", second)
+
+    def test_late_signal_concretization_rejects_changed_source_range_or_condition(
+        self,
+    ) -> None:
+        unresolved = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-signal-audit",
+                    "source": {
+                        "artifact_ref": "project/specifications/future.md",
+                        "source_revision": None,
+                        "content_hash": None,
+                    },
+                    "requested_range": {
+                        "kind": "sections",
+                        "items": ["SEC-1", "SEC-2"],
+                    },
+                    "observation_condition": {"locale": "ja"},
+                },
+            }
+        )
+        requested_scopes = [self.signal_scope_request, unresolved["request_scope"]]
+        workflow_root, workflow_ref, revision = self._new_registered_state(
+            requested_scopes,
+            [self.signal_request_contract, unresolved["contract"]],
+        )
+        batch = self.store.write("context-signal-batch", fixtures.build_batch())[
+            "readback"
+        ]
+        first = context_workflow_state.handle(
+            {
+                "operation": "record-signal-attempt",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": revision,
+                "artifact_root": str(self.artifact_root),
+                "record": self.signal_record(
+                    batch,
+                    workflow_ref=workflow_ref,
+                    request_scope=self.signal_scope_request,
+                ),
+            }
+        )
+        self.assertEqual(first["status"], "written", first)
+
+        cases = [
+            (
+                "different_source",
+                lambda value: value["source"].update(
+                    {"artifact_ref": "project/specifications/other.md"}
+                ),
+            ),
+            (
+                "narrower_range",
+                lambda value: value.update(
+                    {"requested_range": {"kind": "sections", "items": ["SEC-1"]}}
+                ),
+            ),
+            (
+                "changed_observation_condition",
+                lambda value: value.update({"observation_condition": {"locale": "en"}}),
+            ),
+        ]
+        for name, change in cases:
+            with self.subTest(name=name):
+                changed = {
+                    key: copy.deepcopy(value)
+                    for key, value in unresolved["contract"].items()
+                    if key != "request_scope"
+                }
+                changed["source"].update(
+                    {"source_revision": "r3", "content_hash": fixtures.SOURCE_HASH}
+                )
+                change(changed)
+                built = context_workflow_state.build_request_scope(
+                    {
+                        "workflow_ref": workflow_ref,
+                        "contract": changed,
+                        "request_scope": unresolved["request_scope"],
+                    }
+                )
+                result = context_workflow_state.handle(
+                    {
+                        "operation": "register-requested-scopes",
+                        "workflow_state_root": str(workflow_root),
+                        "workflow_ref": workflow_ref,
+                        "expected_revision": first["state_revision"],
+                        "artifact_root": str(self.artifact_root),
+                        "requested_scopes": requested_scopes,
+                        "context_request_contracts": [
+                            self.signal_request_contract,
+                            built["contract"],
+                        ],
+                    }
+                )
+                self.assertEqual(result["status"], "blocked", result)
+                state_after = artifact_graph.read_sqlite_workflow_state(
+                    workflow_root, workflow_ref
+                )
+                self.assertEqual(state_after["state_revision"], first["state_revision"])
+
+    def test_synthesis_request_can_add_a_readback_batch_after_an_earlier_run(
+        self,
+    ) -> None:
+        base_input = fixtures.operation_input()
+        base_scope = fixtures.requested_scope()
+        base_scope["scope_refs"].append("feature:cancel")
+        base_scope["scope_refs"].sort()
+        synthesis_start = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": self.workflow_ref,
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": base_input,
+                    "requested_scope": base_scope,
+                    "target_batch_refs": [],
+                },
+            }
+        )
+        requested_scopes = [self.signal_scope_request, synthesis_start["request_scope"]]
+        workflow_root, workflow_ref, revision = self._new_registered_state(
+            requested_scopes,
+            [self.signal_request_contract, synthesis_start["contract"]],
+        )
+
+        first_run = self.run_for_current_workflow(workflow_ref=workflow_ref)
+        first_readback = self.store.write("context-synthesis-run", first_run)[
+            "readback"
+        ]
+        first_run_request = self.synthesis_request(
+            first_run,
+            first_readback["revision"],
+            workflow_ref=workflow_ref,
+            workflow_state_root=workflow_root,
+            expected_revision=revision,
+            request_scope=synthesis_start["request_scope"],
+        )
+        first_run_request["requested_scope"] = copy.deepcopy(base_scope)
+        first_registered = context_workflow_state.handle(first_run_request)
+        self.assertEqual(first_registered["status"], "written", first_registered)
+
+        batch = fixtures.build_batch()
+        batch_readback = self.store.write("context-signal-batch", batch)["readback"]
+        signal_attempt = context_workflow_state.handle(
+            {
+                "operation": "record-signal-attempt",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": first_registered["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "record": self.signal_record(
+                    batch_readback,
+                    workflow_ref=workflow_ref,
+                    request_scope=self.signal_scope_request,
+                ),
+            }
+        )
+        self.assertEqual(signal_attempt["status"], "written", signal_attempt)
+
+        resolved_input = copy.deepcopy(base_input)
+        resolved_input["input_sources"].append(
+            {
+                "artifact_ref": batch["artifact_ref"],
+                "content_hash": batch_readback["sha256"],
+                "effective_authority_fingerprint": None,
+                "source_revision": batch_readback["revision"],
+            }
+        )
+        resolved_input["input_sources"].sort(key=lambda row: row["artifact_ref"])
+
+        def registration(candidate_input: dict, candidate_scope: dict) -> dict:
+            candidate = context_workflow_state.build_request_scope(
+                {
+                    "workflow_ref": workflow_ref,
+                    "request_scope": synthesis_start["request_scope"],
+                    "contract": {
+                        "skill": "context-rule-synthesis",
+                        "requested_operation_input": candidate_input,
+                        "requested_scope": candidate_scope,
+                        "target_batch_refs": [batch["artifact_ref"]],
+                    },
+                }
+            )
+            return context_workflow_state.handle(
+                {
+                    "operation": "register-requested-scopes",
+                    "workflow_state_root": str(workflow_root),
+                    "workflow_ref": workflow_ref,
+                    "expected_revision": signal_attempt["state_revision"],
+                    "artifact_root": str(self.artifact_root),
+                    "requested_scopes": requested_scopes,
+                    "context_request_contracts": [
+                        self.signal_request_contract,
+                        candidate["contract"],
+                    ],
+                }
+            )
+
+        changed_source_input = copy.deepcopy(resolved_input)
+        next(
+            row
+            for row in changed_source_input["input_sources"]
+            if row["artifact_ref"] == fixtures.SOURCE_REF
+        )["artifact_ref"] = "project/specifications/other.md"
+        changed_source_input["input_sources"].sort(key=lambda row: row["artifact_ref"])
+        narrowed_scope = copy.deepcopy(base_scope)
+        narrowed_scope["scope_refs"] = ["feature:refund"]
+        changed_conditions_input = copy.deepcopy(resolved_input)
+        changed_conditions_input["investigation_conditions"] = {
+            "environment": "production"
+        }
+        foreign_input = copy.deepcopy(resolved_input)
+        foreign_input["input_sources"].append(
+            {
+                "artifact_ref": "project/specifications/unrelated.md",
+                "content_hash": fixtures.SOURCE_HASH,
+                "effective_authority_fingerprint": None,
+                "source_revision": "r3",
+            }
+        )
+        foreign_input["input_sources"].sort(key=lambda row: row["artifact_ref"])
+        invalid_expansions = {
+            "changed_source": (changed_source_input, base_scope),
+            "narrowed_analysis_scope": (resolved_input, narrowed_scope),
+            "changed_investigation_conditions": (
+                changed_conditions_input,
+                base_scope,
+            ),
+            "foreign_batch_source": (foreign_input, base_scope),
+        }
+        for name, (candidate_input, candidate_scope) in invalid_expansions.items():
+            with self.subTest(name=name):
+                result = registration(candidate_input, candidate_scope)
+                self.assertEqual(result["status"], "blocked", result)
+                current = artifact_graph.read_sqlite_workflow_state(
+                    workflow_root, workflow_ref
+                )
+                self.assertEqual(
+                    current["state_revision"], signal_attempt["state_revision"]
+                )
+
+        synthesis_resolved = context_workflow_state.build_request_scope(
+            {
+                "workflow_ref": workflow_ref,
+                "request_scope": synthesis_start["request_scope"],
+                "contract": {
+                    "skill": "context-rule-synthesis",
+                    "requested_operation_input": resolved_input,
+                    "requested_scope": base_scope,
+                    "target_batch_refs": [batch["artifact_ref"]],
+                },
+            }
+        )
+        concretized = context_workflow_state.handle(
+            {
+                "operation": "register-requested-scopes",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "expected_revision": signal_attempt["state_revision"],
+                "artifact_root": str(self.artifact_root),
+                "requested_scopes": requested_scopes,
+                "context_request_contracts": [
+                    self.signal_request_contract,
+                    synthesis_resolved["contract"],
+                ],
+            }
+        )
+        self.assertEqual(concretized["status"], "written", concretized)
+        self.assertEqual(
+            next(
+                row
+                for row in concretized["state"]["context_request_contracts"]
+                if row["request_scope"] == synthesis_start["request_scope"]
+            )["start_contract"]["requested_operation_input"],
+            base_input,
+        )
+
+        resumed = context_workflow_state.handle(
+            {
+                "operation": "read-context-requests",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+            }
+        )
+        self.assertEqual(resumed["status"], "current", resumed)
+        resumed_contract = next(
+            row
+            for row in resumed["context_request_contracts"]
+            if row["request_scope"] == synthesis_start["request_scope"]
+        )
+        self.assertEqual(resumed_contract["requested_operation_input"], resolved_input)
+        self.assertEqual(
+            resumed_contract["start_contract"]["requested_operation_input"],
+            base_input,
+        )
+
+        second_run = self.run_for_current_workflow(
+            scope=base_scope, workflow_ref=workflow_ref
+        )
+        self._attach_signal_batch(second_run, batch, batch_readback)
+        second_readback = self.store.write("context-synthesis-run", second_run)[
+            "readback"
+        ]
+        completed_group = context_workflow_state.handle(
+            self.synthesis_request(
+                second_run,
+                second_readback["revision"],
+                workflow_ref=workflow_ref,
+                workflow_state_root=workflow_root,
+                expected_revision=resumed["state_revision"],
+                request_scope=synthesis_start["request_scope"],
+            )
+        )
+        self.assertEqual(completed_group["status"], "written", completed_group)
+        group = completed_group["state"]["context_synthesis_run_refs"][0]
+        self.assertEqual(
+            group["request_id"],
+            contracts.workflow_operation_id(workflow_ref, base_input, base_scope),
+        )
+        self.assertEqual(group["requested_operation_input"], resolved_input)
+        self.assertEqual(group["mapping"]["status"], "complete")
+        self.assertEqual(len(group["run_refs"]), 2)
+
+        source_readback = {
+            "kind": "spec",
+            "root_binding": self.store.root_binding,
+            "artifact_ref": fixtures.SOURCE_REF,
+            "revision": "r3",
+            "sha256": fixtures.SOURCE_HASH,
+            "content": fixtures.SOURCE_CONTENT,
+        }
+        completion = context_workflow_state.handle(
+            {
+                "operation": "completion-check",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "artifact_root": str(self.artifact_root),
+                "requested_operation_input": resolved_input,
+                "requested_scope": base_scope,
+                "request_scopes": [synthesis_start["request_scope"]],
+                "target_batch_refs": [batch["artifact_ref"]],
+                "provider_readbacks": [source_readback, batch_readback],
+            }
+        )
+        self.assertEqual(completion["status"], "complete", completion)
+
+        signal_scope, signal_owner = self._signal_owner_scope(
+            batch,
+            batch_readback,
+            workflow_ref,
+            workflow_root,
+            [self.signal_scope_request],
+        )
+        first_scope, first_owner = self._synthesis_owner_scope(
+            first_run,
+            first_readback,
+            [source_readback],
+            workflow_root,
+            [synthesis_start["request_scope"]],
+        )
+        first_scope["normalized_input"]["context_workflow_state"]["requested_scope"] = (
+            copy.deepcopy(base_scope)
+        )
+        second_scope, second_owner = self._synthesis_owner_scope(
+            second_run,
+            second_readback,
+            [source_readback, batch_readback],
+            workflow_root,
+            [synthesis_start["request_scope"]],
+        )
+        second_scope["normalized_input"]["context_workflow_state"][
+            "requested_operation_input"
+        ] = copy.deepcopy(resolved_input)
+        second_scope["normalized_input"]["context_workflow_state"][
+            "requested_scope"
+        ] = copy.deepcopy(base_scope)
+        final_scopes = [
+            {
+                "skill": signal_scope["skill"],
+                "target": signal_scope["target"],
+                "execution_range": signal_scope["execution_range"],
+                "requirement": "required",
+            },
+            {
+                "skill": first_scope["skill"],
+                "target": first_scope["target"],
+                "execution_range": first_scope["execution_range"],
+                "requirement": "required",
+            },
+            {
+                "skill": second_scope["skill"],
+                "target": second_scope["target"],
+                "execution_range": second_scope["execution_range"],
+                "requirement": "required",
+            },
+        ]
+        final = context_workflow_state.handle(
+            {
+                "operation": "completion-check-workflow",
+                "workflow_state_root": str(workflow_root),
+                "workflow_ref": workflow_ref,
+                "artifact_root": str(self.artifact_root),
+                "requested_scopes": final_scopes,
+                "context_scopes": [signal_scope, first_scope, second_scope],
+                "verified_owner_scopes": [
+                    signal_owner,
+                    first_owner,
+                    second_owner,
+                ],
+                "provider_readbacks": [
+                    source_readback,
+                    batch_readback,
+                    first_readback,
+                    second_readback,
+                ],
+            }
+        )
+        self.assertEqual(final["status"], "complete", final)
+
     def test_requested_scope_snapshot_matches_runtime_scope_contract(self) -> None:
         workflow_root = self.base / "strict-request-scope-workflow"
         workflow_ref = self.workflow_ref
