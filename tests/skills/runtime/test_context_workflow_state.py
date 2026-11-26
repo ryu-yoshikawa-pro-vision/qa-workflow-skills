@@ -466,25 +466,38 @@ class ContextWorkflowStateTests(unittest.TestCase):
             },
         }
 
-        with mock.patch.dict(sys.modules, {"context_workflow_state": None}):
-            issues, completions = (
-                workflow_runtime._verify_context_synthesis_workflow_state(
-                    [scope], self.workflow_ref, []
-                )
-            )
+        for missing_module in (
+            "context_workflow_state",
+            "context_artifact_store",
+            "context_artifacts",
+        ):
+            with self.subTest(missing_module=missing_module):
+                with mock.patch.dict(sys.modules):
+                    for module_name in (
+                        "context_workflow_state",
+                        "context_artifact_store",
+                        "context_artifacts",
+                    ):
+                        sys.modules.pop(module_name, None)
+                    sys.modules[missing_module] = None
+                    issues, completions = (
+                        workflow_runtime._verify_context_synthesis_workflow_state(
+                            [scope], self.workflow_ref, []
+                        )
+                    )
 
-        self.assertEqual(completions, [])
-        self.assertEqual(
-            issues,
-            [
-                {
-                    "issue_type": "context_workflow_state_unavailable",
-                    "blocking": True,
-                    "reason": "context_workflow_state_dependencies_unavailable",
-                    "target": scope["target"],
-                }
-            ],
-        )
+                self.assertEqual(completions, [])
+                self.assertEqual(
+                    issues,
+                    [
+                        {
+                            "issue_type": "context_workflow_state_unavailable",
+                            "blocking": True,
+                            "reason": "context_workflow_state_dependencies_unavailable",
+                            "target": scope["target"],
+                        }
+                    ],
+                )
 
     def test_final_workflow_gate_requires_every_split_run_to_be_completed(
         self,
