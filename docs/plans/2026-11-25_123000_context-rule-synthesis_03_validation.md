@@ -35,16 +35,16 @@
 
 以下を満たした範囲だけを今回のmerge readinessとして確認する。ここを完了しても基本設計13.2の全複合受入を完了したことにはしない。
 
-- [ ] 2 Skill実装とqa-workflow接続、通常保存・履歴・条件付き更新・独立readback・永続state/中断再開が既存契約どおり機能する。
-- [ ] 開始時要求の固定、冪等再登録、要求の後続具体化、A batchのB target化、source/scope/条件/rootの無断変更拒否、全run/全scope/保存証拠の最終gateが回帰で成立する。
-- [ ] v1/v2、単体/補助/必須、既存runtime/owner経路との互換性と、関連する9 runtime regression modulesを確認する。
-- [ ] formatter/lint/構文/whitespace/copy整合と、最終headで指定5 GitHub Actions workflowの成功を個別に確認する。
-- [ ] Plan/関連文書/検証記録/PR本文を実際の結果へ同期し、PRをopen・未mergeのまま保つ。
-- [ ] 未確認の実運用条件とmerge後の本格評価を明示し、未実施結果をPASSとしていない。
+- [x] 2 Skill実装とqa-workflow接続、通常保存・履歴・条件付き更新・独立readback・永続state/中断再開が既存契約どおり機能する。
+- [x] 開始時要求の固定、冪等再登録、要求の後続具体化、A batchのB target化、source/scope/条件/rootの無断変更拒否、全run/全scope/保存証拠の最終gateが回帰で成立する。
+- [x] v1/v2、単体/補助/必須、既存runtime/owner経路との互換性と、関連する9 runtime regression modulesを確認する。
+- [x] formatter/lint/構文/whitespace/copy整合と、最終headの指定5 GitHub Actions workflowの成功を個別に確認する。
+- [x] Plan/関連文書/検証記録/PR本文を実際の結果へ同期し、PRはopen・未mergeのまま保つ。
+- [x] 未確認の実運用条件とmerge後の本格評価を明示し、未実施結果をPASSとしていない。
 
 ### 実施状態
 
-このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。過去headのCI・検証記録は後続の履歴項目として残す。2026-11-27の最新ローカル結果は[検証記録](../implementation/pr40/verification.md)の「merge条件向け検証スナップショット」を参照する。そこでは指定9 runtime module 153 testsがPASSし、全runtime suiteは1516件中1515件PASS/1 loopback sandbox error、repository Deterministic Output Evalsは675件中674件PASS/1 loopback sandbox errorで、各該当testは隔離loopback許可実行で個別PASSした。ローカルsuiteを全体PASSにしない。変更Pythonのruff check/formatと`py_compile`はPASS、pinned `dprint`/`skills-ref` CLIはローカル未実行。push済みhead `4fe5738e`ではGitHub Actions 5 workflow中4つがsuccessし、Code Qualityは2 Markdown tableのdprint整形差分でfailureした。CI指定の整形を反映し、修正版headの5 workflowを次のpush後に確認する。merge readiness項目は最終headでの成功確認まで未チェックとする。
+このチェックリストの項目は複数の必須条件をまとめている。部分実装や一部unit testだけではチェック済みにしない。過去headのCI・検証記録は後続の履歴項目として残す。2026-11-27の最新ローカル結果は[検証記録](../implementation/pr40/verification.md)の「merge条件向け検証スナップショット」を参照する。そこでは指定9 runtime module 153 testsがPASSし、全runtime suiteは1516件中1515件PASS/1 loopback sandbox error、repository Deterministic Output Evalsは675件中674件PASS/1 loopback sandbox errorで、各該当testは隔離loopback許可実行で個別PASSした。ローカルsuiteを全体PASSにしない。変更Pythonのruff check/formatと`py_compile`はPASS、pinned `dprint`/`skills-ref` CLIはローカル未実行。head `4fe5738e`のCode Qualityで検出した2 Markdown tableのdprint整形を修正し、head `3ada1cd8`のGitHub Actions 5 workflowすべてsuccessを確認した。本文・Plan・検証記録をこの結果へ同期する。設計13.2およびPlan 03の複合受入はmerge readinessと区別して未完了のまま追跡する。
 
 通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較はユーザー判断によりmerge後へ移管し、今回未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。今回は外部サービスへrepository dataを送信しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 

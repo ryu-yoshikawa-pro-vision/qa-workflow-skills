@@ -27,7 +27,7 @@
 | runtime contract copies                            | PASS                                           | 9個の`skills/*/scripts/runtime_contract.py`のSHA-256が一致。                                                                                                                                                                                                                                           |
 | GitHub Actions at pre-change head `4eebeab7`       | PASS: 5 workflows                              | 変更前のheadで成功。今回の変更を含むheadのCIはpush後に別途確認し、ここへ結果を追記する。                                                                                                                                                                                                               |
 
-2026-11-27にpushしたhead `4fe5738e`では5 workflow中4つ（Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Codex Harness）がsuccessし、Code Qualityはverification/designの2 Markdown tableに対するdprint整形差分でfailureした。Code Qualityログが示した整形を本記録と基本設計へ反映した。修正を含むheadのCIは次のpush後に確認する。
+2026-11-27にpushしたhead `4fe5738e`ではCode Qualityがverification/designの2 Markdown tableに対するdprint整形差分でfailureしたため、Code Qualityログが示した整形を両文書へ反映した。修正版head `3ada1cd8`のGitHub Actionsは5 workflowすべてsuccess（Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harness）。ローカルにないpinned dprintとskills-refはCIで検証した。基本設計13.2およびPlan 03の複合受入は、このmerge readinessとは別にPARTIAL/NOT RUN/BLOCKEDとして追跡する。
 
 未確定要求の後続具体化については、開始契約を維持したままAの未知source revision/hashを同一workflow内のattemptから確定し、Bのtarget batchをAの保存済みreadbackへ結び付けるテストを追加した。A attemptまたはB run保存後の要求具体化、冪等な同一契約再送、古い契約による巻き戻し拒否、別source/狭いscope/変更条件/別workflow・別root成果物の拒否、split runでの全要求充足、最終gateまでを確認した。詳細は後続の「2026-11-27 未確定要求の具体化」記録を参照。
 
