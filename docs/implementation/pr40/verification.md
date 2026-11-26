@@ -96,7 +96,7 @@
 ## 2026-11-26 再レビュー指摘の修正・再検証
 
 | 指摘                                                        | 判定                | 修正と局所証拠                                                                                                                                                                                                                                                                         |
-| --- | --- | --- |
+| ----------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | in_progress runの空のconfirmed_resultにもreadbackを要求する | must_fix / 修正済み | confirmed resultが未確定なら候補readbackを省き、予定runを既存SQLite stateへ登録する。候補保存後にconfirmed revisionを記録・再readbackして再開する。test_context_workflow_state.py。                                                                                                    |
 | 関連候補のrevision/hashが対象保存境界で確認されない         | must_fix / 修正済み | targetのexpected revision/hashとcanonicalなrelated_preconditionsを同じ保存境界で照合し、既存local file-lockの範囲で依存refを保持する。古い前提は拒否、依存更新が後続操作として直列化される順序をtest_context_artifact_store.pyで確認。後続更新を共有一意性や永続lock保証とは扱わない。 |
 | workflow stateが成果物rootに束縛されていない                | must_fix / 修正済み | 最初のA/B state記録時にroot bindingを保存し、異なるrootのrun登録を拒否する。test_context_workflow_state.py。                                                                                                                                                                           |
