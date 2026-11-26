@@ -8,6 +8,8 @@
 
 調査・レビューで使用したG1〜G5、CP01〜10、配置区分等の詳細は、[調査時の共通運用契約](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-operating-contract.md)、[調査時の成果物マトリクス](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-artifact-matrix.md)、[調査時の利用者ガイド](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/7339200bdffd765a9e71091905e0143c144db089/docs/reference/qa-workflow-user-guide.md)を参照する。これらはレビュー根拠の履歴であり、運用上の正本ではない。保存・承認・配置等の必要な実行条件は担当Skill・Runtimeと適用される契約を確認する。
 
+追加調査（2026-11-26）: [PR #41の調査revision](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/tree/1b6fa01cc4fd2ec517abfd1d2a66c67a4de4147c)（main 37 Skillと同じSkill実装）の全37 SKILL.md、主要Runtime・Helperの関数・完了条件を照合した。PR #40は[調査revision](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/tree/968629b33943570aa7f4654edd29d1cc2546a349)の追加2 Skill、保存・再開の関連コードおよび検証記録を参照した。以下の具体的な改善候補は既存OPSに統合する。全関数の呼出し元、全reference・schema・テスト、実Agentの比較測定は未確認であり、安全に削除できるコードや最終実装方式を確定したものではない。調査時点の制約・数・ファイル規模は根拠であって削減目標ではない。PR #40完了後のPRE-01/13を維持する。
+
 ## A. 質問・承認・checkpoint
 
 ### OPS-01 質問前後と工程引継ぎの永続化 (P1)
@@ -22,6 +24,8 @@
 
 追加要件：RV-03/07/09：質問提示前・回答反映後・引継ぎを必要範囲で区別し、Q ID・元質問定義・根拠・回答対応を保持する。HTML利用時は意味が変わった旧フォーム/旧回答を誤適用しない。保存不能でも質問・安全な候補・再開情報を返し、復元保証なしを明示する。通常保存に個別承認不要。未承認変更候補を正式仕様・承認済み決定と区別し、既存の意味を維持する。
 
+具体的な確認箇所: question-analysisのQ ID・回答正規化とagent-answer-formの質問JSON・HTML・回答Markdownの対応を保ち、同じ質問本文や承認状態をworkflow stateへ重複記録する必要性を評価する。回答前の中断、部分回答、質問の意味変更、保存失敗から再開できる最小限の情報を残す。フォーム生成Skillに質問採否・仕様判断・進行制御を追加しない。PR #40のhandoff intentや試行stateとの接続はOPS-06/18で確認し、質問を対話提示するだけの操作に外部副作用用の永続化を強制しない。
+
 ### OPS-02 承認要求の集約と進行許可の分離 (P1)
 
 対象: qa-workflow、project-context、question-analysis、計画・保存・実行owner。
@@ -33,6 +37,8 @@
 受入: 許可済み通常保存が承認待ちで停止しない、承認済み仕様と未承認変更候補が混在しても前者の意味を保全し後者を正式採用しない、通常の明示承認は追加認証なしで採用、別権限者が必要な判断・外部操作では必要な確認を維持。既定continuousと明示gated、必要承認の拒否・保留・有効性に影響する変更を確認する。
 
 追加要件：RV-03/08/16：Q03を適用。仕様決定、計画承認、進行、書込み許可、内容承認、操作認可、リスク受容を区別。必要承認のscope/ref/revision・差分・権限・失効条件は維持。通常保存には個別承認不要。
+
+具体的な確認箇所: [qa-workflow guidance](../../skills/qa-workflow/references/guidance.md)の進行モード優先順位は利用者の明示指定、案件コンテキスト、continuousであり、[Project Context template](../../skills/qa-workflow/assets/project-context-template.md) Section 10にも設定がある。Q11への変更では両方と関連fixtureを同期し、明示gatedの停止境界、必要な仕様質問・内容承認・操作許可は維持する。案件設定の廃止を理由に既存の承認済み内容や履歴を削除しない。
 
 ## B. 保存・承認・完了証拠
 
@@ -48,6 +54,10 @@
 
 追加要件：RV-01/02/15：保存・内容承認・currentnessを分離。結果不明時は実保存先を必要範囲で照合し、旧版のまま・成功済みと断定しない。複数成果物の依存整合が必要な場合は該当refと内容/必要revisionを照合し下流currentを保留。個別CASを一括整合とせず、盲目的再試行・無断rollback・別正本作成をしない。過去対象外は自動解除しない。
 
+具体的な確認箇所: project-contextの[artifact_store.py](../../skills/project-context/scripts/artifact_store.py)（SQLite・認可・履歴・条件付き更新）、[git_artifact_store.py](../../skills/project-context/scripts/git_artifact_store.py)（Git正本・commit SHA条件付き更新・認可）、feature-analysisのpersist_snapshot、test-item-analysis / test-condition-analysisのwrite precondition、e2e-test-selectionの保存済み成果物証拠、qa-knowledgeのcreate-if-absent / CAS、regression-testingのActivity / Suite保存を確認する。これらを通常の単独保存・非破壊的更新へ一律要求する必要性を評価し、共有writer、同一identityの競合、旧revisionへの追跡、依存する複数成果物の更新で実際に必要な保証は残す。ui-target-analysisの専用writer・生成領域・履歴制約は一般文書に拡大しない。既存storeは他ownerの利用・互換性があるため、project-contextの責務削減だけを根拠にファイル全体を削除しない。
+
+PR #40の[検証記録](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/968629b33943570aa7f4654edd29d1cc2546a349/docs/implementation/pr40/verification.md)では、指定rootで3 kindの通常create/read/list/history、ext4での条件付き更新、9pでの通常保存継続と条件付き更新の局所blockを報告している。専用認証hostを通常保存に要求しない方針は既に反映されているため再実装しない。共有writer・実運用rootの権限・既存ownerをまたぐ一意性・実Agent受入は別に再評価する。新しい汎用storage layerの追加は前提としない。
+
 ### OPS-04 必要な内容承認・操作認可・対象外判定 (P0)
 
 対象: qa-workflow、project-context、計画3 Skill、defect-management、test-evaluation。
@@ -60,6 +70,8 @@
 
 追加要件：内容承認は対象と明示判断を記録し、追加権限確認が必要な場合だけ該当する権限者・revision/build・失効条件を確認する。低リスクの通常保存へこの契約を拡大しない。必要な承認は形式validatorや編集提出だけで成立させず、未承認除外を必須scopeから外さない。
 
+具体的な確認箇所: [workflow_runtime.py](../../skills/qa-workflow/scripts/workflow_runtime.py) の _exclusion_confirmed は承認照合未定義のため常にFalseを返す。これは現行の安全契約であり単純なバグではない。元依頼で最初から対象外の範囲と、必須scopeを後から除外する判断を区別し、通常のQA範囲決定は依頼者の明示判断と適用範囲の記録を利用できる契約に改める。正式品質保証範囲や組織の終了基準に影響する除外は必要な権限者・承認経路を確認する。無条件Trueや形式的なapproval_refだけでの除外は禁止する。defect-managementの外部Issue操作に必要な認可は残し、test-evaluationの改善採用・引継ぎ確認に専用認証済みサービスが必要な場合と通常の明示判断で足りる場合を区別する。計画3 Skillの内容承認と保存を分離し、承認未確定の草案を保存できるようにする。認可を要する操作まで対話回答だけで許可しない。
+
 ### OPS-05 QA品質・完了検証契約の適正化 (P0)
 
 対象: qa-workflow/scripts/owner_verifiers.py とproject-context、feature-analysis、ui-target-analysis、defect-management、test-evaluation等。
@@ -71,6 +83,8 @@
 受入: 元依頼の必須scopeと必要な意味・形式・依存検証を満たす。保存が要求されない単発分析を保存証拠不足で誤停止しない。保存・再利用・実行証明が必要な経路では改変、別scope、stale、偽証拠を拒否し、変更したruntime-v2/owner契約の回帰なし。
 
 追加要件：RV-04/05/13：元依頼・要求成果物・必須scope・除外候補の対応を開始/完了時に照合し、入力母集団の完全性、必要な証拠と対象・実行・根拠の対応、信頼境界を確認する。requested_scopes、workflow_ref、owner登録・保存証拠形式等は現行の実現手段であり、改修後に一律維持することを目的としない。必要な保証を維持する代替手段は対象Planで特定し回帰を確認する。受入：必須scope漏れ、入力列挙漏れ、別対象/実行の証拠、必要検証不足、承認不明除外、依存する部分保存。
+
+具体的な確認箇所: [runtime_contract.py](../../skills/qa-workflow/scripts/runtime_contract.py)のRUNTIME_V2_SKILL_ROOTSは6 Skill、OWNER_VERIFIED_SKILLSは7 Skill（調査時点の37 Skill中、残り24 Skillはこの2集合の登録外）。[owner_verifiers.py](../../skills/qa-workflow/scripts/owner_verifiers.py)のverifyと[workflow_runtime.py](../../skills/qa-workflow/scripts/workflow_runtime.py)の_buildは未登録の非runtime-v2 scopeをunverified_scopesとし、unsupported_skill_verifierをblocking issueにする。24 Skillに個別検証機能がないという意味ではなく、このRuntimeの登録区分である。必要な成果物・scopeが実際に満たされたかという意味上の完了条件を先に定め、単発・非保存の仕様分析やレビューに保存本文hashやowner登録を要求しない経路を検討する。永続成果物の再利用、決定論的技法、正式報告、実行・承認・cleanupなどはそれぞれの必要な検証を残す。未登録を無条件に完了扱いせず、全owner追加や共通JSON schema新設も目的としない。runtime-v2のAuthority→TR→TCN/CI→TCの追跡、scope ownership、fingerprint/currentness、局所再検証、coverageの閉鎖性と独立反証を維持する。登録集合・verifierの契約を変更する場合は再開、未検証・stale・別scope証拠・必須scope欠落の否定試験と関連評価を同期する。
 
 ## C. 実行安全・継続管理
 
@@ -86,6 +100,8 @@
 
 追加要件：RV-01/12：外部Issue更新や共有資源操作など結果不明・重複が有害な副作用は既存ownerの必要な原子的開始/冪等契約を優先し、元操作・cleanup・必要revisionを照合するまで盲目的に再実行しない。claimを認可・CASの証明としない。実分離/予約が必要な並行実行の既存制約は改修まで維持する。
 
+具体的な確認箇所: [artifact_graph.py](../../skills/qa-workflow/scripts/artifact_graph.py)のclaim_mutable_operation / read_mutable_operation_claim / recover_claimと共有資源予約の呼出し元、test-execution / e2e-test-execution / testware-execution / exploratory-testing / usability-inspectionのpreflight・副作用上限・cleanup契約を調べる。読み取り専用操作、単独文書保存、実際の共有資源操作・外部更新を区別し、既存ownerの冪等開始や実行環境の隔離で足りる場合は重複claimを要求しない。実行結果不明・共有writer・必要な隔離が未確認の場合は従来のblockを維持し、単に復旧機能を無効化して再実行を許す変更は行わない。testware-implementationの隔離作業・許可差分・条件付きGit反映はコード変更の安全契約であり、通常QA文書保存の簡素化を理由に解除しない。
+
 ### OPS-07 実行・証跡・報告の横断受入 (P1)
 
 対象: test-execution、e2e-test-*、testware-*、regression-testing、exploratory-testing、defect-management、test-reporting。
@@ -97,6 +113,8 @@
 受入: 未実行、判定不能、FAIL、retry、収集不全、cleanup未確認、修正確認と別目的Regression、証跡保護、外部Issue未認可拒否。
 
 追加要件：RV-04/13/15：成果物完成、正式保存・承認、実行完了、合否、取得完全性、終了基準、Workflow完了、リリース承認を独立判定。元依頼と予定母集団・宣言scopeを対応付け、欠落sourceを0件にしない。母集団不明の直接報告は全体率・終了判定undetermined。新実環境の範囲は別途合意。受入：FAILを含む完了、scope漏れ、計画なし、未実行/判定不能、cleanup不明、部分保存。
+
+具体的な確認箇所: e2e-test-inspectionとe2e-test-executionの実効設定・安全条件の重複取得、test-executionの実行前YAMLと最終Markdownへの保持、e2e-test-reportingとtest-reportingの元結果・集計参照、regression-testingのActivity/Runと実行owner結果の重複記録を調べる。currentな確認結果を再利用できる場合は再調査・再保存を減らすが、実開始直前の環境・権限・副作用・cleanup確認、実行前条件の固定、rawと分析の分離、初回FAIL・retry・母集団の追跡を失わない。E2E固有報告と計画母集団による統合報告は目的が異なり、同じ値を表示することだけでSkill統合を判断しない。
 
 ## D. 文書整合・接続・効率
 
@@ -124,6 +142,8 @@
 
 追加要件：RV-10/14/15/17：配置・発見規則はOPS-14/15、移行はOPS-17を根拠とし、ここではQAコンテキスト・人間編集の横断受入を担当。UI package固有生成領域・draft key・retire・snapshot・writerを他ownerへ無条件流用しない。正式判断が必要な編集に限り提出と採用承認を分離。通常の非破壊的文書編集には専用writer・作業branch・個別承認を一律要求しない。直接改変時は編集案と元revision保全、無断復旧なし。過去対象外（開発連動QA Planの旧Q06等）は維持し再検証は別途合意。
 
+具体的な確認箇所: [project-context/scripts/project_context.py](../../skills/project-context/scripts/project_context.py) のdiscover、prepare_create、prepare_placement、placementとProject Context templateのSection 10/14/16を照合する。prepare_placementは案件名、owner、対象ref、revision、approval ref/revision、編集範囲、feature index refを照合し配置判断を記録する現行経路。Q07とOPS-14の方針に沿って案件探索・初回配置合意・Provider管理を除外し、QA目的・用語・業務ルール・環境制約・DEC/ASMの意味管理、必要なfieldの再利用と変更影響は維持する。既存正本・ID・履歴を壊さず、直接指定のコンテキストを使う経路で不要な初期化を求めない。独立Skillの存廃は管理責務を除いた後に評価する（OPS-18）。
+
 ### OPS-10 外部起動・製品CI接続 (P2)
 
 対象: 呼出し側、qa-workflow、feature-analysis、CI handoff。
@@ -147,6 +167,8 @@
 受入: 既存比較器、独立試行、同条件・品質/安全PASS、測定不能の明示。介入削減のため承認や品質を弱めない。
 
 追加要件：人間の作業・待ち時間、質問/承認回数、再開時再入力、保存漏れを測定候補に追加。人間レビュー・承認時間は過去比較で対象外承認済みのため、新たに測定する場合は計測法・比較母集団・範囲を別途合意し過去測定値に混入させない。品質・安全合格を前提にする。
+
+具体的な測定候補: 同じ要求・情報源・Agent・利用可能ツールで、読み込んだSKILL.md/reference、入力/output token、tool呼出し、質問・承認・設定、重複生成・保存、再開時の再入力、所要時間を既存評価経路で比較する。SKILL.mdの文字数やコード行数は読み込み負荷の調査手掛かりに留め、実測値の代用や固定削減目標にしない。専門品質・必要なトレーサビリティ・安全・再開を維持した場合だけ効率改善と評価する。PR #40の局所runtime回帰・filesystem試験をAgent発火・意味評価・構成比較の受入と混同しない。
 
 ## E. 成果物の標準配置・命名・発見
 
@@ -202,6 +224,8 @@
 受入: 同一成果物の再依頼は既存正本を解決し、異なるscope・Run・attemptは衝突しない。正本と表示物・draftの誤認を拒否。大文字小文字、禁止文字、path traversal、名前衝突、既存固定名との互換性を実際のファイル操作条件で必要範囲を検証。
 
 追加要件：RV-09：安定正本名・scope識別・Run/Attempt ID・必要なsnapshot・作業領域を分離。日時/版を一律付与しない。HTML利用時のフォーム元定義/必要revisionと回答を対応付け旧HTML/質問履歴を保持。改版後の旧回答自動適用禁止。命名変更で論理ID・履歴・依存を失わない。
+
+具体的な確認箇所: test-requirements-analysis、test-architecture-design、test-managementは現行のcanonical JSON packetを正本としMarkdownを描画物とする。人間の編集・利用が中心のQA要求・方式・計画はQ04に従い構造化Markdown等の正本が成立するか、機械集計用の母集団・状態と意味情報を分離する必要があるかを検討する。JSON正本の一律廃止は決めず、既存のvalidate_readback / impact / completion_check、managementのbuild_snapshot、test-reportingの参照と履歴・承認状態を確認する。形式変更が必要な場合も同じ意味情報を二重正本化したり不要な変換基盤を増やしたりしない。Machine Entity・実行raw・機械状態など機械処理に適した形式は維持する。既存資産の移行はOPS-17に従う。
 
 ### OPS-14 外部指定root・相対ref解決 (P1)
 
@@ -262,6 +286,17 @@
 改善: 共通原則を最初に適用する。全Skillに加えRuntime・validator・Helper・呼出し側の契約を確認し、維持/既存手段への委譲/必要な外部責務/削除に分類する。QA固有の質問・根拠・結果は担当owner、次工程・再開・完了判断はqa-workflow、実行環境管理は呼出し側。既存成果物で復元可能な情報の重複state、必要性のない保存証拠/validator/metadataを削減する。project-contextの存廃はQA専門責務から判断する。既存保証は必要性を評価し、変更する契約・回帰範囲を対象Planで明示する。不要な管理を別層へ移すだけの変更や汎用基盤新設は行わない。 Q12に従い実装不要・対応済み・外部責務・受入のみ等を再評価し、必要な対応と受入に絞る。
 
 受入: 実際に変更する責務・契約について、(1) 専門外処理・重複の削減理由、(2) 直接利用を含む必要な実行条件でQA品質・根拠追跡・再開が維持されること、(3) 実リスクに応じた必要な保存・権限・履歴・競合・完了検証、(4) 読込・質問・設定・重複処理の削減を既存評価で確認する。全ownerに同一のCAS・保存証拠・state・専用検証基盤を要求しない。未確認は未確認と記録する。
+
+具体的な確認箇所（調査revisionの実装に基づく候補）:
+
+- qa-workflow: [artifact_graph.py](../../skills/qa-workflow/scripts/artifact_graph.py)にはProject Context parse、fixed-root scan、local baseline/history、SQLite workflow state、WCAG評価状態・報告確定、claim/reservationの処理がある。[workflow_runtime.py](../../skills/qa-workflow/scripts/workflow_runtime.py)と合わせて呼出し元ごとに必要な保証を確認し、QA固有の進行・依存・停止/再開・完了と、案件管理・保存技術・実行環境の処理を分ける。WCAG固有の正式評価の保証は必要な担当境界に残す。ファイルの大きさや責務混在だけで全体削除・別Helperへの全移管を決めない。
+- project-context: OPS-09/14の責務削減後、共通QA目的・用語・DEC/ASM・業務制約の意味管理に独立した専門手順が必要か確認する。共通文書の直接参照で同等の意味管理が成立する場合は独立Skillの必要性を再評価する。所有者・参照・再開・既存資産の互換性を確認せず削除しない。
+- 共通自己検証: qa-workflow、spec-analysis、question-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、adversarial-reviewの9 Skillで、出力前の入力/停止条件確認、局所的な契約違反の最大1回修正、再確認、責務外への越境禁止が類似記述になっている。共通部分を短く整理できるか確認し、各Skill固有の品質条件・現行の修正回数制約・仕様根拠を創作しない条件は維持する。共通reference化は単体配布・直接利用・読み込み経路で利用可能な場合に限り、新たな生成frameworkを前提にしない。
+- Runtime契約と段階的詳細化: test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、qa-workflowの共通envelope・verify_runtime_evidence等の繰返しを確認し、実際の重複とSkill固有のpartial rerun、previous artifact、current_structure_state等を区別する。qa-workflow、test-condition-design、usability-evaluation、usability-inspection、wcag-conformance-evaluation等の長い手順では、発火・責務・必要入力・安全上の必須条件をSKILL.mdに残し、該当時だけ必要な詳細を読む構造を検討する。正式WCAG評価のsampling・観測・closure、ブラウザ操作の安全、既存テスト技法と参照検証を削らない。
+- 専門Skillの分割: test-requirements-analysisとtest-requirement-design、test-item-analysisとfeature-analysis、test-condition-analysisとtest-condition-design、coverage-analysisとadversarial-review、test-executionとE2E実行、e2e-test-reportingとtest-reporting、usability-evaluationとusability-inspection、regression-testingとtest-managementは、現行定義上は異なる専門責務を持つ。名称や処理の類似だけでは統合・削除の根拠にならない。全37 Skillの現行定義を確認した段階では安全に削除できるSkillは特定していない。Skill数を削減目標にしない。
+- PR #40: context-signal-auditの単一sourceの中立観察・不変batch・訂正、context-rule-synthesisの独立根拠/反例/差異条件・仮説・handoffは維持する。調査revisionではcontext-synthesis-runに予定payload、base revision/hash、related candidate前提、handoff intentを保持し、[context_workflow_state.py](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/blob/968629b33943570aa7f4654edd29d1cc2546a349/skills/qa-workflow/scripts/context_workflow_state.py)で開始要求、試行、run mapping、完了を扱い、workflow_runtime.pyの_verify_context_synthesis_workflow_stateが照合する。成果物から確実に復元できる情報の二重管理があるか確認する。一方、開始時の要求範囲、0件runと未実行の区別、別run混入防止、関連候補の同一保存境界での条件確認、外部handoffの結果不明からの再開など、成果物単体では証明できない情報や現在の必要保証は残す。通常保存の改善済み部分はOPS-03を参照し、未完了の実owner受入は維持する。
+
+受入の追加ではなく既存AT-21/22/24/25等への具体化として、実際に変更する呼出し経路と契約、除去・維持・委譲する理由を確認する。既存テストで十分な場合は新たな重複試験を要求しない。各具体候補は該当OPSとQ12に従って最新baselineで再判定する。
 
 ### 責務再評価の扱い
 
