@@ -132,3 +132,4 @@ normalized_input.owner_verificationは保存本文のcanonical JSON文字列、e
 - workflow stateのcontext記録はartifact root bindingを保持する。同一workflowへの異なるrootの証拠混在を拒否する。元要求の識別子・要求範囲と各実runの実scopeをstateに保持し、最終gateで要求集合、全runの完了、必要readback、同一rootを統合して検査する。state revisionが確認中に変化した場合は完了扱いしない。
 - `_history_dir()` は `.history` とidentity directoryの既存要素をsymlink検査してから作成する。対応するdirfd/no-follow経路と、dirfd非対応環境向けのlstat-before/after経路の双方を検証する。
 - 上記はQA共通のartifact契約・保存処理を `scripts/context_artifact_store.py` / `scripts/context_artifacts.py` に置き、QA workflow固有の永続stateとcompletion gateを `skills/qa-workflow/scripts/` に置く。Skill本文は各ownerの専門責務とruntime境界を参照する。既存helper/runtimeの接続範囲に留め、汎用保存基盤や別workflow engineは追加しない。実行結果・未実施受入は `docs/implementation/pr40/verification.md` に記録する。
+- `workflow_runtime.py` は共有context helperをcontext synthesis scopeがある場合だけ読み込む。helperが単体Skill packageにない場合はcontext scopeのみblocking issueとし、既存QA scopeの実行を継続する。単体Skill portabilityと、adapter/store/contractの各欠落による局所blockを回帰テストする。

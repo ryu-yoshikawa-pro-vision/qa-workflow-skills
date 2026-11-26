@@ -3,8 +3,8 @@
 ## 対象と実行条件
 
 - 対象branch: feat/context-rule-synthesis、対象PR: [#40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)
-- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87。実装commit `e5643535b1ddc61f36188cb7c25cc7680a2badbb`、検証記録/Plan同期commit `480033d27c8a9097d5e691220fef476f4a503465`、CI結果同期commit `c58a14f501501e1303154f7e16b775df353a2e85`を対象branchへpushし、PR #40へ反映した。
-- 3 commitそれぞれでValidate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Code Quality、Codex Harnessの5 workflowすべてsuccess。
+- 最新fetch時点: origin/main = 197f1e0e1abe870b0cc793355e7abf73bf241d87。最新コード/test head `7a23afdf00dd259f515c11e933d8fb51c98f763f`を対象branchへpushし、PR #40へ反映した。初期実装/Plan同期/CI同期commitは`e5643535`、`480033d2`、`c58a14f5`。
+- `7a23afdf`ではValidate Agent Skills (2368)、Validate Deterministic Output Evals (2366)、Validate Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflowすべてsuccess。runtime unit/integration suiteは1,504 tests、0 failures、0 errors。
 - 作業環境はPython 3.12.3。CI指定Python 3.11.18はローカルにない。Ruff 0.16.8、dprint 0.55.2、skills-ref pinned packageを/tmpで利用。
 - 実運用rootは未指定。これは通常保存に専用認証hostが必要という意味ではない。隔離ローカルrootで保存経路を実測した。/tmpのext4では条件付き更新を実測し、workspaceの9p filesystemでは通常create/read/list/historyは成功、条件付き更新だけを能力不足としてblockした。
 - shared writer、外部ownerの一意性保証、正式仕様の承認・認可、実運用rootの権限はローカルfilesystem試験から推定しない。
@@ -34,7 +34,7 @@
 | ID | 状態              | 対応・証拠                                                                                                                                                                                                                                                                                                        |
 | -- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B1 | BLOCKED           | semantic_handoff_keyの再計算と同一artifact_refのcreate-if-absentは検証。別ref・異なるworkflowをまたぐ既存ownerのatomic uniquenessは未接続・未確認。test_context_artifacts.py、test_context_artifact_store.py。                                                                                                    |
-| B2 | PARTIAL / BLOCKED | 候補関係とcycleを検証し、同一candidate revisionのCAS競合はローカル実filesystemで確認。merge/splitの関連候補一体更新と実owner保証は未実施。                                                                                                                                                                        |
+| B2 | PARTIAL / BLOCKED | 候補関係とcycleを検証し、対象revision/hashとrelated candidate revision/hashを同じlocal file-lock保存境界で照合。merge/splitのsemantic再確認と実owner保証は未実施。test_context_artifact_store.py、test_context_artifacts.py。                                                                                                                                 |
 | B3 | PARTIAL           | planned payload/hash/metadataを保持するrunをin_progressで登録し、候補保存前後・confirmed result記録・pendingからreturnedへのhandoff・readback不足後・run完了前の各地点から保存済みrevisionで再開する。外部owner実反映後の縦断再開は未実施。test_context_workflow_state.py。                                       |
 | B4 | PARTIAL           | 3 kindの実create/list/read/history、target/related revision+hashの同一保存境界照合、同じ境界の競合順序、old revision readback、symlink/noncanonical ref拒否を隔離filesystemで確認。workspace 9pでは通常保存継続・conditional update局所blockを実測。本番root/共有writerは未指定。test_context_artifact_store.py。 |
 | B5 | PARTIAL           | 通常createに専用host/保存ごとの承認を要求しない。ext4で条件付き更新を確認、9pで能力不足時の更新拒否と通常readbackを確認。実運用rootのOS権限失効や共有writer認可は未確認。                                                                                                                                         |
@@ -85,12 +85,13 @@
 | Trigger runner CLI                                                | HELP確認のみ                           | `--help`はClaude Code headless runnerと確認。Claudeは実行せず、Codex CLI実Agent評価は送信承認待ち。                                                                                                        |
 | skills-ref                                                        | PASS: 2 new Skills                     | 両Skillをpinned packageで個別validate。全39 Skillは追加変更後CIで確認する。                                                                                                                                |
 | Full runtime regression                                           | PASS: 1495 tests, 0 failures, 0 errors | Python 3.12.3、1119.725秒。明示的JSON nesting上限の修正、64 KiB境界統合、localhost fixtureを含む全runtime suite。                                                                                          |
+| Latest GitHub Actions runtime regression                          | PASS: 1504 tests, 0 failures, 0 errors | Head `7a23afdf`、CI Python 3.11、218.762秒。standalone QA workflowとcontext helper欠落の局所blockを含む最終runtime/integration suite。                                                                    |
 | 9p capability実測                                                 | PASS: 通常保存 / BLOCKED: CAS          | workspace下の隔離TemporaryDirectoryでcandidateをcreate/read/list/history。9pと判定されconditional updateだけconditional_update_requires_local_filesystemで拒否。                                           |
 | ext4 store実測                                                    | PASS                                   | /tmp isolated rootで3 kind create/list/read/history、candidate/run update、履歴revision readback、stale/conflicting writerをruntime testsで確認。                                                          |
 | Ruff 0.16.8                                                       | PASS                                   | `format_tracked.py`で追跡Python 327 filesのlint/formatを確認し、新規common helper 3 filesも個別lint/format check PASS。                                                                                    |
 | dprint / tracked format aggregate                                 | PARTIAL                                | `format_tracked.py check`はRuff PASS後、今回対象外の既存tracked files 18件のline-ending差でexit 20。今回変更したMarkdown/JSON/YAML 17 filesはpinned dprintで個別check PASS。既存ファイルは変更していない。 |
 | git diff --cached --check                                         | PASS                                   | staged PR #40差分にwhitespace errorなし。                                                                                                                                                                  |
-| GitHub Actions CI                                                 | PASS at c58a14f5                       | Validate Agent Skills (2361)、Deterministic Output Evals (2359)、Semantic Output Evals (2324)、Code Quality (1054)、Codex Harness (1054)の5 workflow。                                                     |
+| GitHub Actions CI                                                 | PASS at 7a23afdf                       | Validate Agent Skills (2368)、Deterministic Output Evals (2366)、Semantic Output Evals (2331)、Code Quality (1061)、Codex Harness (1061)の5 workflow。                                                     |
 | Code Quality契約tests                                             | PASS: 24 tests                         | formatter 19、patch whitespace 3、CI security configuration 2。                                                                                                                                            |
 
 ## 2026-11-26 再レビュー指摘の修正・再検証
@@ -102,8 +103,11 @@
 | workflow stateが成果物rootに束縛されていない                | must_fix / 修正済み | 最初のA/B state記録時にroot bindingを保存し、異なるrootのrun登録を拒否する。test_context_workflow_state.py。                                                                                                                                                                           |
 | 元要求・全run完了・readbackの最終workflow統合gateが不足     | must_fix / 修正済み | workflow_runtimeがrun scope群を要求単位に束ね、completion-checkがsource×scope対応、全current runの完了、root binding、必要readbackを再確認。in_progress split runとreturned handoffのreadback不足を拒否し、readback追加後の再開をtest_context_workflow_state.pyで確認。                |
 | history symlink検査前にidentity dirが作成される             | must_fix / 修正済み | 既存path検査後に、対応環境ではdirectory FD/no-follow、未対応環境ではcomponentごとの作成前後検査を用いる。両pathでhistory symlinkの外側に新規ファイル・identity dirを作らず、対象candidateも更新されないことをtest_context_artifact_store.pyで確認。                                    |
+| 共通helperのmodule importがQAの単体runtimeを停止させる      | must_fix / 修正済み | completion adapterをcontext synthesis scopeがある場合だけ読み込む。adapter/store/contractの欠落はcontext scopeのみblocking issueとし、通常QA runtimeは単体Skill copyで動作する。`test_context_workflow_state.py`、`test_runtime_portability.py`。 |
 
-修正後の関連suiteを個別実行し、`test_context_artifact_store` 12件、`test_context_workflow_state` 11件、`test_context_artifacts` 14件、`test_context_owner_verifiers` 4件、runtime transport 64 KiB境界1件の計42件PASS。中断点テストは候補保存前のrun登録、保存成功後readback失敗からの再読取、returned resultのreadback不足からの再開、split run完了gateを含む。初回store suiteで対象revision inode情報の未定義名を検出して修正した。競合testは保存境界後の関連候補更新が直列化されて成功する契約に合わせ、lock保持中は待機し、対象write後の更新となることを確認する期待値へ直した。full runtime regressionと対象branch更新後のCIは後記へ実測後に同期する。
+修正後の関連suiteを個別実行し、`test_context_artifact_store` 12件、`test_context_workflow_state` 12件、`test_context_artifacts` 14件、`test_context_owner_verifiers` 4件、runtime transport 64 KiB境界1件の計43件PASS。`test_context_workflow_state`と`test_runtime_portability`の計15件もPASSし、adapter/store/contractの各欠落と単体QA runtimeの継続を確認した。中断点テストは候補保存前のrun登録、保存成功後readback失敗からの再読取、returned resultのreadback不足からの再開、split run完了gateを含む。初回store suiteで対象revision inode情報の未定義名を検出して修正した。競合testは保存境界後の関連候補更新が直列化されて成功する契約に合わせ、lock保持中は待機し、対象write後の更新となることを確認する期待値へ直した。GitHub Actions `7a23afdf`でruntime 1,504 testsと5 workflowすべてPASS。ローカル全runtimeの重複実行はActions完了後に中断しPASS扱いしていない。
+
+先行head `0d789e1f`ではDeterministic Output Evalsがruntime portability test 2件で失敗した。`workflow_runtime.py`の追加adapter importが静的許可リストになく、単体Skill copyで共通helper不足時にも既存QA runtimeが起動できなかった。最初のテスト修正で共有helperをisolated rootへコピーしたが、自己レビューで親Planの単体Skill portability契約を弱めると判断し、そのfixture変更を戻した。最終実装はcontext scopeでのみadapterを遅延importし、adapter/store/contract不足はcontext scopeだけblocking issueにする。ローカル15件とhead `7a23afdf`のruntime全suiteで再検証した。
 
 ## 実環境依存・未実施
 
@@ -111,12 +115,13 @@
 - PR #38の既存owner保存API・semantic_handoff_keyに対応する実保存単位/並行初回作成の一意性は、ローカルcontext artifact storeのcreate-if-absentとは別に確認が必要。外部owner経路を仮定でpassにしない。
 - formal trigger全Skill比較、独立Semantic Judge、実Agent縦断、導入前/1 Skill/2 Skillの3構成比較はNOT RUN。評価query、Skill本文、case/rubricをCodex外部サービスへ送る明示許可が未確定のため保留中。Claudeは使用せず、承認要求の範囲を迂回しない。
 - 先行Codex CLI smokeは2 positive queryのみ。正式rate、negative query、反復、誤発火を測っていない。repository configがuntrusted扱いでHook/execpolicy無効化を示したため、Codex runtime safety acceptanceも未確認。
-- 主な残タスク: 外部評価送信の可否、実運用root/共有writer/owner一意性の確認、Agent/Judge/3構成比較、追加差分後のCI、完了条件の再評価。
+- 主な残タスク: 外部評価送信の許可範囲、実運用root/共有writer/owner一意性の確認、Agent/Judge/3構成比較、Plan 03の複合受入完了。
 
 ## 設計・実装間の差異と対応
 
 - 古いqa-workflow SKILL.md、semantic rubric/case、verification/Plan statusにあった「通常保存には専用host/認可hostが必要」という前提を、2026-11-25共通原則と最新版Planに合わせて修正した。通常root保存はOS権限と標準filesystem操作、外部/共有/正式仕様変更は既存ownerの認可・承認・履歴・readbackに分けた。
 - 共通context contract helperをproject-context Skill配下からrepository common scriptsへ移し、qa-workflow state adapterだけをqa-workflow scriptsに置いた。これはPRN-03/Q06/Q07/Q08の責務に一致する。旧data-contract相対pathも新配置へ修正した。
+- completion adapterはcontext synthesis scopeでのみ共有helperを読み込む。単体Skillで共通helperが未配置でも通常qa-workflow runtimeを保ち、context scopeだけを明示的にblockedにする。static import allowlistとsingle-copy regressionの範囲を狭く保った。
 - owner verifierはreadback自体を取得せず、callerから受け取った実保存本文/readbackの整合を検証する。専用host認証を意味しない。外部ownerのreadback/承認主体はこのverifierだけでは確立しない。
 - qa-workflow guidance.mdに残る共有resource reservation provider未選定時のblockは、複数workflowの外部共有resource排他の契約であり、通常context artifact保存の制限ではないため維持した。
 - workflow-state-template.mdのSQLite local-filesystem制約は既存qa.workflow_state_root providerの制約で、context artifactの通常filesystem保存とは別経路。JSON-only legacy stateは自動移行しないが、そのstate更新blockで通常artifact save/独立分析を停止しない。

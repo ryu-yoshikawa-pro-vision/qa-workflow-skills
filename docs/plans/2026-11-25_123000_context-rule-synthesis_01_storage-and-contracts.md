@@ -94,7 +94,7 @@ triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、
 - 条件付きcandidate更新は対象`expected_revision`と`expected_content_hash`に加え、依存する候補のcanonicalな`related_preconditions`（ref/revision/content hash）を保存境界で照合する。既存のlocal filesystem file-lock/atomic replaceの範囲で、対象保存が終わるまで関係refを同時保持する。古い前提、同時変更、local条件付き更新能力がない場合は該当操作を拒否する。これは保存時点の前提照合であり、保存後の関連候補更新を防止する共有・複数host保証ではない。最終採用時の現行性確認は別途行う。
 - workflow stateには最初のA/B証拠記録時にartifact root bindingを保存し、以後異なるrootからの証拠を拒否する。最終`completion-check`は元要求への全scope mapping、すべてのcurrent runの完了、run/snapshot/candidate/handoff/sourceの必要readbackを再確認し、state revisionが検査中に変わっていないことを読む。
 - `_history_dir()`は`.history`とidentity pathの既存symlink/non-directoryを確認してから作成する。directory FD/no-followが使える環境では作成先をroot内に固定し、使えない環境でも各componentを作成前後に確認してから次へ進む。returned handoffには返却結果ref/revision/content hashのreadbackを要求するが、handoff成立とは判定しない。
-- 回帰証拠: `test_context_artifact_store` 12件、`test_context_workflow_state` 11件、`test_context_artifacts` 14件が2026-11-26にPASS。中断再開はpending candidateの保存、confirmed result記録、returned result読取不足後の再開、全split run完了gateを確認する。共有owner一意性、実運用root、実Agent評価は本追補からPASSへ昇格させない。
+- 回帰証拠: `test_context_artifact_store` 12件、`test_context_workflow_state` 12件、`test_context_artifacts` 14件が2026-11-26にPASS。中断再開はpending candidateの保存、confirmed result記録、returned result読取不足後の再開、全split run完了gateを確認する。共有owner一意性、実運用root、実Agent評価は本追補からPASSへ昇格させない。
 
 ## 5. データ保護
 

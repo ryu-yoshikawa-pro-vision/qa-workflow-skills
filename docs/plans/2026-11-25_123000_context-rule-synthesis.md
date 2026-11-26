@@ -92,4 +92,4 @@
 4. 既存ownerへの調査/質問/確定知識のhandoff、鮮度・変更伝播、workflowの補助/必須/単体実行・verifierを接続。
 5. 評価・ドキュメント・実provider/Agent受入・全回帰、各構成のスモークテスト後に3構成の正式比較を実施。結果による構成変更も本branchで検証する。
 
-03の受入条件すべてを独立に確認する。計測不能・未接続・失敗はPASSにしない。既存の未達はbaselineと今回の差を区別して報告する。現時点では独立helper/owner/transport契約・Skill文書と評価fixture・一部runtime変更を実装し、host依存・実Agent・Judge・構成比較は未完了。最新結果を検証記録に同期し、全受入が終わるまで本Planを完了にしない。
+03の受入条件すべてを独立に確認する。計測不能・未接続・失敗はPASSにしない。既存の未達はbaselineと今回の差を区別して報告する。現在、3 kindの通常root保存・履歴・条件付き更新・独立readback、A/B workflow stateの中断再開と最終gate、owner verifierを接続し、レビューで見つかったin_progress readback、関連revision/hash、root混在、全run完了、symlink副作用、単体QA runtimeの共有helper依存を修正した。対象runtime/portabilityの局所15件はPASSし、GitHub Actions head `7a23afdf`はruntime 1,504件および5 workflowすべてPASS。実運用rootと共有writer/外部owner一意性、実Agent、正式trigger、独立Semantic Judge、3構成比較は未完了。最新結果を検証記録に同期し、全受入が終わるまで本Planを完了にしない。

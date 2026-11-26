@@ -19,7 +19,7 @@
 
 通常root保存に専用認証hostは要求しない。隔離ローカルfilesystemで3 kindの実保存、list/read/history/条件付き更新/readback、A/B stateのSQLite永続化・再開を実測した。実運用rootは未指定であり、共有writer/複数host、既存ownerの外部一意性、外部認可は未確認。実Agent縦断受入、正式trigger評価、独立Semantic Judge、3構成比較は未実施である。既存trigger runnerはClaude Code専用であり、Claudeは使用しない。先行するCodex CLI target-only positive smokeは各Skill 1件のみで正式評価ではなく、repository Hook/execpolicyも未確認。Codex等の外部サービスへのrepository data送信許可は未確定のため、formal evaluationを実行しない。各基本設計13.2項目の証拠と状態は[PR #40検証記録](../implementation/pr40/verification.md)に記録し、複合受入は未完了のままとする。
 
-2026-11-26の再レビューではin_progress登録時の未確定candidate readback、関連candidateの保存境界precondition、workflow stateのartifact-root binding、全runを統合する最終completion gate、history symlink pathの副作用を再確認した。ローカル修正後にstore 12件、workflow state 11件、contract 14件、owner verifier 4件、runtime transport境界1件の計42 testsがPASSし、runtime gateの中断再開も確認した。実Agent/ownerを介した受入、共有writer/外部owner一意性、実運用rootの認可は未実施で、局所テストで代替していない。再レビュー後のfull runtime rerunは実行中であり、実測完了後に結果を同期する。詳細は[検証記録](../implementation/pr40/verification.md)。
+2026-11-26の再レビューではin_progress登録時の未確定candidate readback、関連candidateの保存境界precondition、workflow stateのartifact-root binding、全runを統合する最終completion gate、history symlink pathの副作用を再確認した。ローカル修正後にstore 12件、workflow state 12件、contract 14件、owner verifier 4件、runtime transport境界1件の計43 testsがPASSし、中断点からの再開も確認した。単体QA workflowの既存処理を保つためcompletion adapterをcontext scopeがある場合だけ読み込み、依存不足は当該scopeのみblocking issueとする。workflow state/portability関連15件、ruff check/formatもPASS。GitHub Actionsのruntime全suiteは`7a23afdf`で1,504 tests PASS、5 workflowすべてsuccess。実Agent/ownerを介した受入、共有writer/外部owner一意性、実運用rootの認可は未実施で、局所テストで代替していない。詳細は[検証記録](../implementation/pr40/verification.md)。
 
 ## 2. テストの配置と受入マトリクス
 
