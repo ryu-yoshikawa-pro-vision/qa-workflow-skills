@@ -22,7 +22,7 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 ## 実装2 機械検証・全体完了・baseline
 
-- 機械検証不要の依頼はworkflow_runtime.pyを呼ばず、担当Skillとqa-workflowが元依頼に必要な成果物・検証から完了を判断する。混合workflowでは機械必須scopeのみ既存runtime/owner verifierへ渡し、その結果と意味・専用scopeの実成果物をqa-workflowが照合する。機械scope 0を空の機械runtimeで成功させない。機械必須scopeの欠落・未実行・不正証拠は未完了。_build/_requested_scope_rows/_verify_context_workflow_completion、owner_verifiers.verify/_stored_owner_artifact、downstream_state._validate_state_record/_validate_frozen_pair/evaluateと呼出し元を変更する。can_completeは機械対象の完了として扱い、全体完了へ読み替えない。旧v1/v2の固定キー・fingerprint・凍結pairは当時の意味で検証し、機械出力の意味変更が必要な場合だけ版を区別する。
+- 機械検証不要の依頼はworkflow_runtime.pyを呼ばず、担当Skillとqa-workflowが元依頼に必要な成果物・検証から完了を判断する。必要な検証は元依頼・要求成果物・担当Skillの既存契約・使用するruntimeと依存から判断し、機械検証の対象は実行前または追加工程の判明時に確定する。決定論的技法、機械schema、結果集計、正式WCAGなど既存契約で必須の検証をAgentの任意判断で省略しない。通常のMarkdown相談・分析には不要な機械検証を要求しない。成果物の有無だけで必須scopeを決めない。混合workflowでは機械必須scopeのみ既存runtime/owner verifierへ渡し、その結果と意味・専用scopeの実成果物をqa-workflowが照合する。機械scope 0を空の機械runtimeで成功させない。機械必須scopeの欠落・未実行・不正証拠は未完了。_build/_requested_scope_rows/_verify_context_workflow_completion、owner_verifiers.verify/_stored_owner_artifact、downstream_state._validate_state_record/_validate_frozen_pair/evaluateと呼出し元を変更する。can_completeは機械対象の完了として扱い、全体完了へ読み替えない。旧v1/v2の固定キー・fingerprint・凍結pairは当時の意味で検証し、機械出力の意味変更が必要な場合だけ版を区別する。
 - 必須A/Bは最初の実行前に元要求source・範囲・条件を既存依頼/計画または必要なJSONに記録する。最終run入力とは独立してその記録を読み、実batch/runの参照・分析範囲と照合する。途中追加・除外・再採用は実際の変更を反映する。最終入力からA/B scope・参照が全部落ちても元要求を読み欠落を検出する。0件と未実施、部分と完了、別root/workflow、split run未実施を区別する。後から判明したsource版やbatchは根拠付きで具体化する。context_workflow_state.pyのSQLite更新・全履歴照合・過剰なrevision搬送を通常ファイルへ置換する。
 - scripts/context_artifacts.pyの_validate_runはplanned_candidate_opsの固定fields（base_content_hash、expected_revision、related_preconditions、operation_id、planned_content_hash、planned_payload、write_request_meta、confirmed_result等）を要求する。保存方式だけ変えて旧schema用のダミー値を作らない。3 kindの意味・identity・source・観察・反例・範囲・候補採否・根拠・run完了を維持し、run/candidate schema・validator・projection・store・workflow adapter・owner verifier・fixtureを一体改訂する。runは要求/分析範囲、実候補ref、必要な予定作業・未完了、結果・根拠を持つ。全予定payload・毎更新receipt・関連候補同時CASは必須にしない。中断は実ファイルと残作業を照合し、必要な過去根拠を保全する。旧JSON fixtureは旧契約で読む。候補統合・分割は関連成果物の参照・採用整合を確認し、外部副作用は04。
 - 最後の正常な機械設計・入力・依存は既存Machine Runtime Input/Result/Entity、必要baseline refに保持する。commit_qa_workflow_baseline_localは検証済み成果物の保存と参照更新に縮小し、失敗・中断時は前回正常版を保持する。既存Git履歴やimmutable snapshotで足りれば新履歴を作らない。旧baselineのref/hash/凍結pairは読取可能とする。過去完了と現在採用を分け、現行要求と根拠で再評価する。
@@ -42,7 +42,9 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 4. 利用した意味が変わった場合は依存関係から影響scopeだけを要再検証に戻す。spec-analysis→test-analysis→TR→TCN/CI→TCの既存Entity・scope ownership・partial rerun・carry-forward・retirement・coverageを維持する。`downstream_state.py`、`migration_preflight.py`、各runtime generatorの現行経路に従う。全成果物の再生成を既定としない。前回完了したbaseline/過去報告は履歴として保持し、現在の採用可否と区別する。
 5. qa-knowledgeの `lookup`、`plan_revalidation`、`update_entry`、`read_entry` 等は既存entry形式で使用する。Knowledgeの利用は追加2 Skillの起動や新規保存を条件としない。#40の軽量projection・既存owner検索・本文の選択取得を利用し、全データの読込や新規全文検索基盤を前提としない。
 
-Entity以外の文書では参照した仕様の節・決定・用語・計画の行ID・Knowledge entryと適用範囲/例外、現行source revisionを既存依存記録で追跡する。hash変更時は担当ownerの既存impactと根拠本文を照合する。計画は06の実際に利用した承認対象・行と根拠、Knowledgeは現行entryのscope・status・根拠、通常仕様文書は実際の該当節と有効Authorityを確認する。物理的な入力revision/hashの変化と、実際に参照した意味の変化を分離する。ownerのimpactが旧版hashの変化を検出したときは該当根拠の差分を担当ownerで確認し、意味不変と判断できた範囲のみ再利用する。必要な当時の内容が取得できず意味不変を確認できない場合は該当依存を要再検証とする。一般文書の新規fingerprint schema、全節hash台帳、全文検索サービスは不要。
+Entity以外の文書では参照した仕様の節・決定・用語・計画の行ID・Knowledge entryと適用範囲/例外、現行source revisionを既存依存記録で追跡する。hash変更時は担当ownerの既存impactと根拠本文を照合する。計画は06の実際に利用した承認対象・行と根拠、Knowledgeは現行entryのscope・status・根拠、通常仕様文書は実際の該当節と有効Authorityを確認する。物理的な入力revision/hashの変化と、実際に参照した意味の変化を分離する。ownerのimpactが旧版hashの変化を検出したときは該当根拠の差分を担当ownerで確認し、意味不変と判断できた範囲のみ再利用する。必要な当時の内容が取得できず意味不変を確認できない場合は該当依存を要再検証とする。参照IDのない共通制約、例外、文書全体の適用範囲も意味判断に含める。IDブロックのhash一致だけで再利用を決めない。一般文書の新規fingerprint schema、全節hash台帳、全文検索サービスは不要。
+
+Contextを後から作成・更新した場合、既存のsource・対象範囲・判断理由・未確定事項・前提と、新たに有効になったDEC/ASM・制約を照合する。既存成果物にContext refがなくても、実際に影響する成果物を担当Skillで再評価し、必要な根拠refを更新する。意味不変の範囲は再利用し、過去成果物への一律ID付与や再登録は行わない。
 
 ## 実装4 横断分析の起動条件
 
@@ -55,8 +57,8 @@ Entity以外の文書では参照した仕様の節・決定・用語・計画�
 | 単発相談・レビュー・調査 | 対話回答を基本とし、再利用価値がある知識だけ許可済み既存ownerへ保存。観察・横断分析が必要ならA/Bを補助起動。保存先不明なら任意蓄積のために依頼を停止しない |
 | 利用者が明示無効 | A/Bを起動しない。通常Knowledge・既存仕様の参照は可能。必須目的と矛盾する場合は達成できない範囲を示す |
 | 利用者が明示指定 | 指定の対象・必須/補助・範囲に従う |
-| 未指定で再利用価値のある単一source観察が必要 | Aを補助として選択。必要な場合にのみ実施 |
-| 未指定で複数source/workflowの法則・反例・差異条件の分析が必要 | Bを補助として選択。既存batchやKnowledgeを先に利用し、Aの毎回実行後にBを自動起動しない |
+| 未指定で再利用価値のある単一source観察が必要 | Aを補助として選択。通常の資料読取だけでは起動しない |
+| 未指定で複数source/workflowの法則・反例・差異条件の分析が必要 | Bを補助として選択。通常の複数資料参照や一機能の仕様整理だけでは起動しない。既存batchやKnowledgeを先に利用し、Aの毎回実行後にBを自動起動しない |
 | 分析結果なしに元依頼の必須成果物を成立させられない | 必須として実行前に要求を登録。必要根拠・保存・検証不足は影響scopeを未完了 |
 | 有効な過去合意・Knowledgeの直接参照で足りる | A/Bを起動しない |
 
@@ -67,6 +69,6 @@ Aの中立観察・不変batch・訂正、Bの独立根拠、反例、候補の�
 ## 検証・完了条件
 
 - `test_workflow_runtime.py`、`test_qa_workflow_runtime.py`、`test_owner_verifier_gate.py`、`test_owner_verifier_registry.py`、`test_owner_scope_resume.py`、`test_runtime_workflow_integration.py`、`test_qa_workflow_baseline.py`、`test_input_revision.py`、`test_context_workflow_state.py`、`test_context_owner_verifiers.py`、`test_context_runtime_transport.py`、`test_context_artifact_store.py`、`test_runtime_portability.py` を関連する変更ごとに個別実行する。9個のruntime_contract.pyの同期テストを維持する。
-- routing fixtureの未指定/明示無効/補助/必須/単体、Aのみ・Bのみ・既存Knowledge直接参照、開始後の必須追加、全A/B要求の消去、別root/run、別source/range、補助結果の必須流用、未承認除外、独立補助失敗と依存補助失敗を確認する。
-- AT-06/07/08/12〜15/17/19/20/21/22/25。変更なし再依頼、部分改版、未承認候補追記、矛盾追加、未列挙source、stale、実副作用不明、登録外意味scopeを含む複合workflow、機械scope0、必須機械scope未達を対比する。
+- routing fixtureの未指定/明示無効/補助/必須/単体、Aのみ・Bのみ・既存Knowledge直接参照、開始後の必須追加、全A/B要求の消去、別root/run、別source/range、補助結果の必須流用、未承認除外、独立補助失敗と依存補助失敗を確認する。複数仕様書を使う通常の仕様整理・既存ルールの直接適用を負例、共通欠陥傾向・反例・差異条件の分析を必要とする依頼を正例として確認する。
+- AT-06/07/08/12〜15/17/19/20/21/22/25。変更なし再依頼、部分改版、未承認候補追記、矛盾追加、未列挙source、stale、実副作用不明、登録外意味scopeを含む複合workflow、機械scope0、必須機械scope未達を対比する。元依頼に含まれる必須機械scopeをAgentの最終入力から除外した場合、機械検証を不要扱いした場合、Context後発生成による関連成果物の再評価、IDのない共通制約・例外の変更も確認する。
 - 不要な全体停止・全再生成・無条件のA/B起動がなく、必要な専門判断と機械検証、元要求、実行・保存・履歴の保証を維持する。機械gateだけで全体完了と判定する経路を残さない。実Agent評価は05で確認する。

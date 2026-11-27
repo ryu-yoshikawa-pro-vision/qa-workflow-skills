@@ -45,7 +45,7 @@ inspectionの成果物から対象build、実効設定、locator/fixture、選�
 
 ## 実装3 証跡保護・結果不明・cleanup
 
-01の保護領域を実行経路へ接続する。実行前条件、実操作上限、環境、raw保存の許可と期限を既知条件から確認する。未知の危険な操作を試して確認しない。認証token、Cookie、秘密の実値、機密DOM/raw等を通常QA成果物、フォーム、公開ログへ入れない。安全な要約または許可refに限定し、rawが取得できない場合は証拠不足を明示する。root逸脱・symlink・保護領域外一時script生成を既存安全契約と実行環境で拒否する。
+01の保護領域を実行経路へ接続する。実行前条件、実操作上限、環境、raw保存の許可と期限を既知条件から確認する。未知の危険な操作を試して確認しない。認証token、Cookie、秘密実値、個人情報を通常QA成果物、フォーム、公開ログへ入れない。URL queryの認可コード・署名付きURL、HTTP header、DOM・スクリーンショット、console・trace、エラー内容の報告への転載も対象とする。既存の保護された保存先・Git除外設定を利用し、秘密rawはGit追跡・公開対象に含めない。追跡済みファイルやignoreだけでは保護できない保存先は安全な別の許可先を使う。全保存共通の検査Helperや無条件の.gitignore生成は要求しない。安全な要約または許可refに限定し、rawが取得できない場合は証拠不足を明示する。root逸脱・symlink・保護領域外一時script生成を既存安全契約と実行環境で拒否する。
 
 cleanupの成功は実際の対象状態から確認する。失敗・結果不明は該当実行範囲の制約として残す。予定母集団、run、attempt、必要履歴をcleanupで消さない。結果不明の再実行では、副作用が発生した可能性を上限から差し引く既存test-executionの契約を維持する。
 
@@ -72,5 +72,5 @@ WCAG-EM工程、sample/variation/process、ランダム選択の実結果、現�
 ## 検証・完了条件
 
 - `test_qa_operation_claim.py`、`test_context_artifact_store.py`、`test_context_workflow_state.py`、`test_ci_handoff.py`、`test_cross_owner_selection_to_inspection.py`、`test_cross_owner_results_to_reporting.py`、`test_cross_owner_exploration_to_defect.py`、`test_pr32_defect_management.py`、`test_pr32_test_reporting.py`、`test_testware_regression_handoff.py`、`test_workflow_runtime.py`、`test_runtime_workflow_integration.py` を関連変更ごとに個別実行する。WCAG、runner、E2E、直接TCの既存テストは対象Skillの評価資産とruntime全suiteから特定して実行する。
-- AT-10/11/12/15/16/17/18/20/21/25: 独立作業、同一正本更新、共有データ操作、結果不明、開始前中断、cleanup失敗、権限不明、未実行・FAIL・retry、母集団漏れ、部分報告、証跡保護を対比する。
+- AT-10/11/12/15/16/17/18/20/21/25: 独立作業、同一正本更新、共有データ操作、結果不明、開始前中断、cleanup失敗、権限不明、未実行・FAIL・retry、母集団漏れ、部分報告、証跡保護を対比する。 URL query・console・DOM・trace・報告転載の機密値が通常成果物へ漏れないことと、保護rawがGit追跡・公開対象に入らないことを既存fixture・mock・一時ディレクトリで確認する。
 - リポジトリ内のテスト・fixture・mockで直接TC、E2E、非E2E、Regression/Exploration、欠陥候補、統合報告の連携を検証する（05）。実運用接続は要求しない。既存実行安全・raw追跡、独立作業の並行実行、WCAG正式評価の文書・コード整合を完了条件とする。

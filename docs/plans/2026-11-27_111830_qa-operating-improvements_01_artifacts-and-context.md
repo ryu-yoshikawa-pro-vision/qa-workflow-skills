@@ -29,7 +29,7 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 
 `<root>` は前節の成果物root。既存正本の探索を先に行い、同じowner・論理対象・用途の有効な正本が一つならpathや形式を変更しない。新規の `<scope>` は単一機能なら既存FEAT ID、単一の別対象なら担当ownerの安定対象ID、複数対象なら既存の安定scope ref、案件横断なら common を用いる。複数対象で既存refがなければ対象の安定ref集合を重複除去・辞書順にしてscopeを構成する。IDを新規発行する必要がない単発対象では対象の正式名と情報源refを用いる。source revision、時刻、作業Agent名は継続成果物のidentityに含めない。
 
-IDが安全な単一path要素ならそのまま使う。そうでないrefや対象名を使う場合は、UTF-8の正規化NFC文字列に対するSHA-256の全64桁を使用する（複数要素は既存canonical JSONの配列としてhash）。名称変更時は既存正本を先に見つけてrefを維持する。Windows予約名・大小文字衝突・禁止文字・root逸脱がある場合も同じdigest方式を使い、実在する別identityに衝突したら上書きせず確認する。ファイル名を採番の根拠にしない。
+IDや対象名が安全で実用的な長さの単一path要素ならそのまま使う。日本語を理由にunsafeとしない。新規pathで禁止文字・予約名・大小文字衝突・長すぎるpath等が問題になる場合は、既存の短いIDを優先し、なければUTF-8のNFC文字列に対するSHA-256の先頭12桁を識別子に使う（複数要素は既存canonical JSONの配列としてhash）。候補pathに別identityの正本があると確認できた場合だけ必要な桁数へ延長する。identityを確認できない場合は上書きも別正本の作成もしない。既存正本の実pathとidentityを確認し、同一対象は既存refを維持する。root逸脱や正本の不明な競合は上書きせず該当箇所を確認する。新しい中央indexや命名サービスは作らない。ファイル名を採番の根拠にしない。
 
 継続する同じ対象の仕様・設計は同一正本へ更新する。並立する計画は計画の既存ID、なければ明示された対象release/build・期間・環境の組を上記digestで区別し `planning/<scope>/<plan-key>/` 配下に置く。QA要求・方式が同じ計画固有の対象を持つ場合は同じ計画ディレクトリへ保存し、複数計画で共用する有効な要求・方式は既存refで参照する。一つの継続計画の改版は同じpath。実行・観測・報告は既存run/attempt/snapshot/evaluation/session identityで分離する。既存の別scope・別案件と同じIDが衝突する場合は有効な既存案件root・対象refで区別する。大文字小文字やUnicodeの表記差を同一正本と推測せず、正本の実際のpathと論理identityを確認する。別writerの新規作成は出力先を分離し、同一正本の作成担当を決める。例: FEAT-001の設計は design/FEAT-001/test-cases.md、別環境のrunは実行ownerが発行した別runのディレクトリ、既存の tests/design/foo.md が同じ正本ならその場所のまま。新規中央台帳・命名サービスは不要。
 
@@ -86,7 +86,7 @@ feature-registry.json、selection.json、report.json は固定名のない新規
 
 - `project_context.py` の `discover` は指定済み文書・許可候補の解決に限定し、案件選択・案件探索を削る。`prepare_create` の前提から初回配置合意・案件ID必須を外す。`prepare_sections`、`prepare_update`、`prepare_ids`、`project_context_ids.py` の必要な意味管理・採番・履歴を維持する。`placement` / `prepare_placement` は新規通常経路から除き、既存配置・履歴を読む互換経路がある場合だけ維持する。呼出し元がなくなった管理専用分岐は削除する。
 - templateのSection番号とDEC/ASM・stable keyを使う既存parseの互換性を維持する。新規文書ではSection 10の案件進行設定を要求しない（02）。Section 14/16は既存ref・設定の読取互換として扱い、標準root解決に不要な設定を新規利用者に記入させない。QAの意味情報を削らない。既存文書から設定や承認履歴を無断削除しない。
-- `artifact_graph.py` の `parse_project_context`、`validate_required_context_fields`、`compare_used_context` と各Skillの呼出し元で、Context未作成を一律blockedにする経路を外す。必要なfieldの明示入力で成立させる。利用したfieldのcurrentnessは維持する。
+- `artifact_graph.py` の `parse_project_context`、`validate_required_context_fields`、`compare_used_context` と各Skillの呼出し元で、Context未作成を一律blockedにする経路を外す。必要なfieldの明示入力で成立させる。利用したfieldのcurrentnessは維持する。Contextを後から作成・更新した場合は03に従い、新たに有効になったDEC/ASM、前提、制約が既存成果物に及ぼす影響を確認する。Contextが存在しなかった時点の成果物にも適用し、Context作成自体を全成果物の再生成理由にしない。
 - 独立SkillはQAの意味管理とDEC/ASM更新の責務があるため維持する。配置管理削除後にその責務が他ownerと実際に完全重複していると確認された場合のみ、05の構成評価で統合を判断する。
 
 ### Contextなしで利用する入力
@@ -112,7 +112,7 @@ Contextからrootを取得する既存呼出し（workflow_state_root_from_proje
 
 ## 実装4 計画3 Skillの正本形式
 
-QA要求・architecture・計画は、既存機械検証・下流機械処理を必要とする場合はJSONを正本にする。人間向け文書だけの依頼は通常Markdown。指定と有効な既存正本を優先し、Markdown指定時は06の必要範囲だけ機械入力を生成する。独自文法・二重正本・恒久変換基盤は不要。
+QA要求・architecture・計画は、既存機械検証・下流機械処理を必要とする場合はJSONを正本にする。人間向け文書だけの依頼は通常Markdown。指定と有効な既存正本を優先する。後続依頼で機械処理が必要になった場合も既存Markdown正本を自動で変更せず、06に従い必要な機械入力を生成する。独自文法・二重正本・恒久変換基盤は不要。
 
 [06 計画成果物の形式・承認](2026-11-27_111830_qa-operating-improvements_06_planning-artifact-contract.md)に従いvalidate/impact/completion_check/build_snapshotの意味・集計・承認を維持する。v2形式・共通parserの新設は既定としない。
 
@@ -120,7 +120,7 @@ QA要求・architecture・計画は、既存機械検証・下流機械処理を
 
 - 通常のMarkdownは直接編集可能とし、必要な差分確認・根拠・承認済み意味の保全だけを要求する。計画3 Skillの承認時点の内容保全と未承認変更の扱いは06に従う。UI packageは `skills/ui-target-analysis/scripts/human_editing.py` と `skills/spec-analysis/scripts/ui_target_package.py` の編集提出・生成領域・ID・writer・履歴を維持する。通常Markdownにこの専用writerを要求しない。
 - 継続文書は安定ファイル名。Q/DEC/ASM/ITEM/COND/Entityの安定ID・retire・履歴は各owner。正式報告・依存再現・実行のRun/Attempt/snapshotを保持する。全更新の連番ファイル複製は不要。必要な旧フォームの復元は02。
-- `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。
+- `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。 04のURL・DOM・console・trace・報告への転載等の漏洩経路を確認し、既存保護先・Git除外設定を利用する。Git追跡済みファイルはignoreだけで保護されたと判断しない。
 - 既存配置をdirect ref/許可rootで読取・更新できるようにする（OPS-17）。標準化を理由に既存資産を移動・改名・再保存しない。別rootの同名refを分離する。外部資産の移行・切替・rollbackは対象外。
 
 基準mainのGit treeにSQLiteファイルは存在しない。SQLite利用コード・テストの契約変更は02〜04で行う。リポジトリ外のDB・成果物調査、移行、export、互換storeは対象外。既存Markdown/JSONのfixture、意味・ID・必要な参照を保全する。
@@ -128,5 +128,5 @@ QA要求・architecture・計画は、既存機械検証・下流機械処理を
 ## 検証・完了条件
 
 - `test_project_context_owner.py`、`test_project_context_ids.py`、`test_ui_human_editing.py`、`test_feature_registry.py`、`test_test_item_condition_analysis.py`、`test_context_artifact_store.py`、`test_context_runtime_transport.py` と計画3 Skillの `test_f_verifier_requirements.py`、`test_f_verifier_architecture.py`、`test_f_verifier_management.py`、`test_cross_owner_results_to_reporting.py` を変更箇所に応じて個別実行する。05の全suiteも実行する。
-- AT-01/02/03/09/12〜14/16/19/20/21/24/25: 新規・既存・指定あり/なし、別Agent、同一refの再利用、異なるscope・root、権限不足、重複、symlink、旧JSON、Markdown人間編集、変更前後の承認、機密raw、部分保存、必要な旧revisionを確認する。
+- AT-01/02/03/09/12〜14/16/19/20/21/24/25: 新規・既存・指定あり/なし、別Agent、同一refの再利用、異なるscope・root、権限不足、重複、symlink、旧JSON、Markdown人間編集、変更前後の承認、機密raw、部分保存、必要な旧revisionを確認する。Markdownから後続機械処理への継続、Context後発生成、安全な日本語名・予約名・長いpath・短縮識別子の衝突、別Agentによる同一正本解決も確認する。
 - 39 Skillの標準配置・形式・粒度・保存不要条件を各ownerと成果物マトリクスに反映する。特定ハーネス・案件初期化・provider選択なしの利用、既存Markdown/JSON fixtureの意味・ID・必要な機械検証・保護、06の形式別下流処理を確認する。全形式の完全相互変換は要求しない。
