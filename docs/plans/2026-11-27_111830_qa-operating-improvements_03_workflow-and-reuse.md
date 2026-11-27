@@ -14,7 +14,7 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 `qa-workflow/SKILL.md`、`references/guidance.md`、`assets/workflow-state-template.md` を以下の契約に置換する。各依頼の目的・対象・求められた成果物を起点とし、最短の必要な担当Skillから開始する。開始時に必要な成果物/工程とその依存を確認する。新しい固定工程表を作らない。
 
-- 単発相談・調査・レビュー: 担当Skillの意味品質と必要な形式確認で終了できる。永続state、機械runtime、保存証拠は依頼が要求する時だけ利用する。
+- 単発相談・調査・レビュー: 担当Skillの意味品質と必要な形式確認で終了できる。永続state、機械runtime、保存証拠は依頼または必要な知識蓄積の実契約に応じて利用する。通常の回答全体は保存しない。再利用価値のある知識だけ02の条件で自律保存できる。
 - 成果物作成: 担当Skillの意味/形式・根拠と02の必要保存。機械処理を必要とする成果物にはその既存検証を適用する。
 - 複合workflow: 元依頼の必須scope、依存する補助工程、独立した補助工程を区別する。前二者を必要な完了範囲とする。独立補助工程は制約を報告するが、必須範囲の完了を妨げない。補助工程の結果を必須成果物の根拠に採用した時は依存範囲に昇格し、該当する検証を実施する。未検証・必要な副作用残存を隠す目的で補助へ変更しない。
 - 機械検証: runtime-v2の生成・Entity・coverage、登録済みownerの正式成果物、専用WCAG検証、実行・承認・cleanup等に必要な実証拠を保持する。自己申告の `complete`、`valid`、保存先文字列だけで成立させない。
@@ -35,30 +35,34 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 qa-workflow自身はscopeに含めない。元要求・依存必須から必要機械対象のidentity集合を抽出しruntime入力と照合する。必要な機械scopeが一つでも欠けたら未完了。機械対象0は元要求のすべてが担当/専用検証だけで成立する場合に限りdispatch不要。依存不明は必要範囲に残す。独立補助scopeは最終報告に結果・制約を示すが機械gateに入れない。補助結果を必須成果物に採用する場合は事前に必須依存へ追加して検証する。
 
-### 開始後の要求追加
+### 開始要求・追加・範囲変更
 
-context_workflow_state.py の record_requested_scopes（register-requested-scopes）を既存集合を保全する追加と単調具体化に限定して拡張する。初回の全要求をstateへ保存し、以後は既存集合と追加分の和集合を同じSQLite CAS内で保存する。初回登録と、既存identityを維持した明示的な追加を区別する。追加は既存stateのexpected revisionと追加行・contractを入力とする（全集合の置換ではない）。完全同一追加の再送・既に保存した旧追加要求は現行集合を維持してreused。既存identityの契約変更・削除・縮小・別root・別workflowは拒否。最終要求照合は現行集合を基準にし、旧集合の再送を完了要求の縮小に使わない。新規contractは当該要求の実開始前のみ登録可とし、別要求にattempt/runがあるだけで拒否しない。実行済み別要求のstart_contract・mappingは不変。現在の追加要求集合を全て読戻してから実行する。必要なA/Bは同じworkflow_ref、artifact_root bindingで初回/追加とも登録し、既存source/range/条件、B batch追加、分割・readbackの単調具体化を維持する。既存補助成果物を利用する場合も必須要求として現行根拠・scope・完了証拠を確認し、過去補助runを今回実行済みと偽らない。CAS競合は最新stateを再取得し同じ追加を再照合する。
+同一依頼を同じworkflow_refで扱う。stateが必要な新規workflowでは既存SQLite履歴を正本とし、初回要求登録のstate revisionを request_start_revision に記録する。SQLite createまたは登録transactionで実際に保存するrevision tokenを設定し、そのsnapshotに同じ値が含まれることを独立readbackで確認する。初回要求は空でない全必要scope（依存必須を含む）。既存 requested_scopes の行（skill, target, execution_range, requirement, approval_ref）のidentityを使う。開始時/追加時の登録行を削除せず、現在の除外と再採用はstate内の履歴付き変更記録から導出する。初回登録以降のSQLite historyは欠落・不整合を拒否する。状態を必要としない通常文書では同じ意味を既存依頼・回答・成果物で保全し、DBを強制しない。
 
-complete_context_workflow はstateの全必須A/B（開始時と後続追加）を起点に実batch/run・owner検証・最終A/B scopeの完全一致を維持する。workflow_runtime.py の独立context_workflow_state_rootを必須A/Bが一件でも存在するworkflowで維持し、stateのアンカーと最終入力からA/Bを落とした場合をbaseline保存側でも検出する。別root/run、要求置換、未登録contract、後続追加直前/直後の中断、旧集合再送を回帰にする。
+- context_workflow_state.py の record_requested_scopes は一般要求登録とA/B固有の処理を分離する。一般要求の登録/変更ではDirectoryArtifactStoreを生成せず、A/Bを必要とする時に限り許可済みartifact_rootを必要なら作成し、既存root bindingとstart_contractを設定する。通常要求の初回登録でcross-context/を作らない。既存A/Bのinitialize・register-requested-scopes・attempt/runは互換を維持する。
+- 新規登録入口では初回全要求を保存し、以後の追加はexpected state revisionと追加行、必要なA/B start_contractだけを渡す。既存要求との和集合を同一CASで保存する。完全同一追加再送はreused、異なる契約で同じidentityを置換しない。新規A/B contractは当該要求の開始前に登録し、他要求のattempt/runを理由に拒否しない。既存start_contract、source/range、B batch、単調具体化・分割対応・readbackは維持する。
+- 範囲の縮小・再採用は同じworkflow内の明示された内容変更とする。既存stateに scope_removal_resolutions 等の既存下流契約で利用する解決・適用記録を結び付ける。要求の変更自体は state.request_scope_changes の追記行で保持する。行は skill/target/execution_range（既存要求identity）、base_state_revision、operation（exclude または restore）、approval_ref、approval_revision、reason、affected_scope_refs を持つ。実回答または正式承認の既存正本へのref/revisionを利用する。通常の回答に外部provider revisionを新規要求せず、保存済み回答のexact-content token等を使う。変更前stateの有効集合、対象・根拠・依存影響と照合し、一度除外された範囲の再送は重複適用しない。承認済み要求集合を直接置換しない。既存承認済み対象外を再採用するには現行の依頼・決定と適用範囲を確認する。通常の依頼変更は依頼者の明示回答、組織の正式品質保証scopeの縮小・リスク受容は既存担当ownerの必要な認可で成立する。権限や根拠不明、対象の曖昧さは該当変更を拒否する。現在必須集合は初回＋追加から有効な除外を差し引き、再採用を反映したもの。実副作用、結果不明、必要cleanupはscope除外で消さない。全取消は取消と報告し完了baselineを生成しない。
+- 変更は新規の汎用承認サービスではなく02の実回答/正式承認記録を担当ownerが読取り、必要な内容・権限・現在の対象を確認する。scope変更の記録を承認そのものとしない。approval_ref単独・AI自己申告は不可。v1/v2の _exclusion_confirmed はFalseのまま。v3の機械projectionには現行必須scopeだけを required として渡し、全登録・有効除外・再採用はstate履歴と完了表で照合する。
+- state書込みの共通入口 conditional_write_sqlite_workflow_state でv3管理workflowの要求集合・変更記録・context start_contract・履歴アンカーの変更を確認する。一般の状態更新ではこれらのfieldを変更できない。登録/変更入口からも、共通書込み境界で取得した現在stateと差分を照合し、対象の正規化・承認証拠の取得結果・旧履歴との整合を検証する。専用入口の呼出しやcallerのフラグだけを信頼しない。登録/変更の差分のみ同一transactionで適用し、失敗時はstateを進めない。保護対象の新設は要求変更に必要なfieldに限る。元のhistory revisionと後続snapshotの差分を検証し、未登録の削除、縮小、変更記録改変、初回アンカー変更、別root、古いstateでの上書きを拒否する。低レベルDBの特権改竄に対する保証は主張しない。
+- complete_context_workflow は同じstateから有効な現在必須A/B集合を取得し、当該要求の実batch/run・owner readback・最終scope分割の完全一致を維持する。有効除外の旧contract・attempt/runは履歴として残し、現行完了へ数えない。開始時または追加の全A/Bを最終入力から落としてもstateを根拠に検出する。A/Bの過去補助runは現行根拠・scopeと必要証拠を確認して再利用し、今回の実行と偽らない。旧完了の証明と現在採用は分離する。
 
-### 開始後のscope除外
-
-要求を減らす明示変更は別workflow_refの変更後依頼として扱い、元workflowは当初scopeで未完了/中断のまま履歴を残す。02の実回答と担当QA要求・計画に旧ref、除外scope、理由、依存影響、必要承認を記録し、新workflowで改訂済み要求を登録する。現在有効な成果物・実行結果は通常の再利用条件で引継げるが、旧A/B runを新workflowの今回runへ偽装しない。残る実副作用・必要cleanup・外部操作結果不明は変更後にも未解決として保持し、対象除外で消さない。通常の依頼変更は依頼者の明示回答で成立する。組織の正式品質保証範囲・決裁が関係する場合は既存正式承認を担当ownerで確認し、未確認なら縮小した正式完了を主張しない。全対象取消は取消として報告し完了baselineを作らない。
-
-_exclusion_confirmed は現行v1/v2と汎用機械gateではFalseを維持する。新規の別workflowでは合意済み変更後要求を開始集合とするため、機械入力に excluded_by_approval を混入させない。新認証サービス・汎用承認schemaを作らない。正式承認の真正性をapproval_ref文字列だけから推定しない。承認済み除外の目的は元要求を消さず変更後依頼を進めることで達成する。
+downstream_state.py evaluate/_scope_impact の既存 scope_removal_resolutions / scope_removal_applied_states の入力を利用し、同じworkflowの過去baselineに対する対象外TR/TCN/CI/TCの影響・必要なretirement/materializationを担当ownerで適用する。新しい要求変更を理由に既存ID・過去結果・過去報告を削除しない。正式承認済み要求縮小だけでは下流への適用済みを主張せず、既存の適用証拠を確認する。独立した別依頼だけ新workflow_refを発行する。
 
 ### 機械gate、全体完了、baselineの保存・再開
 
-1. workflow_runtime.py _build/_requested_scope_rows は必要機械scopeと依存の集合、expected unit/entity、currentness、owner readback、context completionを従来どおりstrictに照合する。unrequested/unverified/不足のissueを無条件無視しない。新規workflowの can_complete は当該機械対象の結果であり全体完了ではない。
-2. 新規凍結pairには generator_contract_version=workflow-runtime-v3 を使用しv1/v2を新解釈で読まない。入力は既存機械projectionを使い、全必須要求と各結果の対応は既存workflow成果物の完了表に保持する。表は元の Skill/target/execution_range、実scope（A/B分割対応含む）、担当成果物ref/revision、検証経路、結果、必要証拠ref、未完了理由を一行ずつ持つ。継続workflowでは開始要求・依存追加・最終要求をstateに保持し表が全件に対応することを機械的に照合する。意味判断は担当Skillとqa-workflowが実際の根拠を読んで行い、表の完了文字列だけで独立品質を証明しない。
-3. 機械baselineが必要なworkflowに限り、artifact_graph.py commit_qa_workflow_baseline_local の保存入口で全必須要求の対応、必要機械pair（既存verify_runtime_evidence、owner/context closure）、専用検証結果と実保存refを確認してから immutable Markdownを公開し last_completed_qa_workflow_artifact を進める。任意の完了boolや機械gate単独で進めない。機械scope0のworkflowは機械pairを作らず既存成果物/必要stateから再開する。
-4. 既存JSON stateのv1/v2 workflowは現行local baselineの原子的保存・state更新・読取互換を維持する。新規のstateを必要とするworkflowは既存SQLite envelopeを唯一のstateとし、同じroot内の既存immutable baseline artifact保存/readbackを再利用後、conditional_write_sqlite_workflow_state で検証したstate revisionに対しbindingだけ更新する。CAS失敗は旧bindingを維持して最新stateと全要求を再確認する。未参照artifactは完了証拠にしない。別JSON stateへ二重書込みしない。legacy JSON-onlyでv3の継続や必須A/Bを必要とする場合は元stateを移行せず新workflowへ引継ぎ、元の全必須要求・未解決の副作用・再利用範囲を記録する。旧workflowの完了履歴は変更しない。
-5. downstream_state.py の _validate_frozen_pair/_WORKFLOW_CONTRACTS/_validate_owner_verification_records/evaluate、artifact_graph.py のbaseline読取、runtime_contract.py verify_runtime_evidence、関連handoff/reporting/fixtureを同時更新する。v3は凍結pairのidentity/hash/必要機械scope、実保存baseline binding、完了表の全要求との対応を検証してから利用する。過去完了を現在採用可とみなさない。v1/v2は現行の厳密な読取・対象外拒否・履歴契約を維持する。SQLite使用時は同じworkflow_refのstateからbindingを取得し、JSONだけを探して欠落と判定しない。新旧が同時に存在する曖昧なstateを推測選択しない。
-6. test_integration_required_scopes.py、test_downstream_state.py、test_qa_workflow_baseline.py、test_context_workflow_state.py に機械scope0正常/欠落、必須専用検証未達、機械gate成功だが意味要求欠落、旧凍結pair、新v3、SQLite/JSON binding、CAS競合、追加要求・旧集合再送、変更後の別workflow・旧未完了保持を追加または既存fixtureで確認する。
+1. workflow_runtime.py _build/_requested_scope_rows はstateの現在必須要求・依存と実機械projectionを照合する。登録外の意味scopeを機械対象から分け、必要な専用検証を省略しない。機械結果の can_complete は当該機械対象だけの判定。機械scope0は元要求と担当/専用結果が実際に成立した場合だけdispatch不要。unrequested/unverified/不足を無条件無視しない。
+2. 機械対象の意味を変えるため新規pairは generator_contract_version=workflow-runtime-v3 とする（共通runtime-v2 envelopeは維持）。既存workflow成果物に完了表を保持し、全登録要求のidentity、現在必須/有効除外、対応する実scope、担当成果物ref/revision、検証経路、結果、必要証拠ref、未完了理由を一行ずつ記載。A/B分割は既存mappingを用いる。v3 inputの許可キーはv2の必須キーに workflow_state_root と completion_state_revision を追加し、既存の任意 context_workflow_state_root はA/B必須時だけ同じ実rootとして照合する。workflow_state_root は実際に許可された絶対rootを呼出し側から独立取得し、input内の文字列だけを信頼しない。既存stateの初回・追加・変更履歴と完了時snapshotから必須集合を復元し、表の自己申告だけで全体を完了としない。意味判断は実根拠を読んだ担当Skill/qa-workflow、専用検証は実ownerに残す。
+3. artifact_graph.py commit_qa_workflow_baseline_local はv1/v2の既存JSON経路を保持し、v3ではSQLiteのexpected revisionを受ける分岐とする。保存入口で現在stateを独立取得、初回からの要求変更の妥当性、全要求への証拠対応、機械pair・専用検証・必要な副作用解決・実保存refを確認する。検証したstateから変更を作り、callerの任意desired_stateで要求履歴を置換しない。機械baselineが不要なら既存成果物/必要stateだけで完了・再開する。
+4. 既存immutable artifactの path/sha/readbackを使用し、v3のlast_completed_qa_workflow_artifact に従来の3 fieldに加え completion_state_revision（binding更新直前に検証したSQLite revision）を保存する。凍結inputの同fieldと一致させる。artifact公開/readback後にそのrevisionでbinding更新をCASし、独立再読込で一致確認する。CAS失敗・readback不明は状態を読み直す。既に同一bindingが保存済みなら再利用、未参照artifactだけでは完了不可。最新要求が変化していれば再照合・再検証し、古いpairでbindingを進めない。別JSON stateへ二重書込みしない。
+5. downstream_state.py の _validate_state_record/_validate_frozen_pair/_WORKFLOW_CONTRACTS/_validate_owner_verification_records/evaluate、artifact_graph.py のbaseline読取、runtime_contract.py verify_runtime_evidence、関連handoff/reporting/fixtureを同時更新する。v3は保存先を扱う既存呼出し側でbindingのcompletion_state_revisionに対応する実SQLite historyを read_sqlite_workflow_state_revision で取得し、downstream_stateの検証入力にそのexact snapshotと取得metadataを渡す（純粋な意味検証処理に独自providerを持たせない）。当時の要求集合・完了表・凍結pair・hash/identityと照合する。現在のstateの要求追加・除外は過去完了を無効にせず、現在採用可否は現行要求と依存で別途判定する。過去snapshot欠落・hash不一致・別workflow/別rootを拒否。v1/v2は旧3 field binding・旧凍結pair・当時の対象外拒否を維持する。旧pairを新意味で読まない。
+6. legacy JSON-only workflowは旧経路を維持する。v3継続にSQLiteが必要な場合だけ新workflowへ明示的に引継ぐ。旧workflowの実ref・state revision・baseline binding/hashを独立取得し、元要求・未解決副作用・既存scope ownership・inactive Entity履歴・対象外適用記録を参照する。downstream_stateは旧workflow_refで旧pairを検証して影響を計算し、新workflowの現在採用と分ける。旧baselineのworkflow_refを書換えたり新workflowの完了bindingとして直接登録しない。旧参照が取得不能なら影響範囲の再利用を保留し、必要な元資産を破壊せず調査する。無断の一括移行は行わない。
+7. test_integration_required_scopes.py、test_downstream_state.py、test_qa_workflow_baseline.py、test_context_workflow_state.py、test_sqlite_workflow_history.py で機械scope0正常/欠落、専用検証未達、意味要求欠落、未認可のstate変更、開始時要求削除、追加・再送、承認済み除外/再採用、scope縮小とinactive履歴、過去完了後の要求追加、旧凍結pair、新v3、過去snapshot欠落、SQLite/JSON binding・旧参照引継ぎ、CAS競合・結果不明・再開を確認する。
 
 ## 実装3 発見・再利用と変更影響
 
 `qa-workflow/scripts/input_revision.py` の `_sha256_file` と `_compute_document` はファイル変更の検知として維持する。現行guidance L338〜340の「path変更=依存成果物の要再検証」を意味変化の確認へ置換する。`runtime_contract.py` の `compare_entity_dependencies`、`compare_runtime_dependencies`、`upstream_entity_fingerprints`、`machine_entity_dependency`、`resolve_entity_dependencies`、`input_fingerprint` を利用する。`artifact_graph.py compare_used_context`、`test-analysis/scripts/change_impact.py` と各ownerの `impact`/lookupを再利用する。
+
+入力revision記録は既存の input-revisions.json を用いる。新規の継続workflowで必要なら <root>/state/<workflow-ref>/input-revisions.json、単独の継続成果物ではownerの既存scope領域に置く。既存の一意な記録はそのまま利用し、複数workflowで同一ファイルを上書きしない。共有済み記録の所有範囲が不明なら再利用証拠にせず必要な母集団を再取得する。通常の単発作業に記録ファイルを強制しない。既存 record/compare と原子的置換を利用する。
 
 手順:
 
@@ -77,7 +81,8 @@ Entity以外の文書では参照した仕様の節・決定・用語・計画�
 <!-- dprint-ignore -->
 | 条件 | 動作 |
 | --- | --- |
-| 明示非保存または単発読取・相談で永続化の要求なし | 既存Knowledge・成果物を読取参照し、新規永続batch/candidate/runは作らない。正式A/Bが必須で保存不可なら矛盾を説明し該当範囲のみ未完了 |
+| 明示非保存 | 既存Knowledge・成果物を読取参照し、新規永続batch/candidate/run/Knowledgeは作らない。正式A/Bが必須で保存不可なら矛盾を説明し該当範囲のみ未完了 |
+| 単発相談・レビュー・調査 | 対話回答を基本とし、再利用価値がある知識だけ許可済み既存ownerへ保存。観察・横断分析が必要ならA/Bを補助起動。保存先不明なら任意蓄積のために依頼を停止しない |
 | 利用者が明示無効 | A/Bを起動しない。通常Knowledge・既存仕様の参照は可能。必須目的と矛盾する場合は達成できない範囲を示す |
 | 利用者が明示指定 | 指定の対象・必須/補助・範囲に従う |
 | 未指定で再利用価値のある単一source観察が必要 | Aを補助として選択。必要な場合にのみ実施 |

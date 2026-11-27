@@ -68,11 +68,13 @@ inspectionの成果物から対象build、実効設定、locator/fixture、選�
 
 cleanupの成功は実際の対象状態から確認する。失敗・結果不明は該当実行範囲の制約として残す。予定母集団、run、attempt、必要履歴をcleanupで消さない。結果不明の再実行では、副作用が発生した可能性を上限から差し引く既存test-executionの契約を維持する。
 
-## 実装4 WCAG closureガイダンス（OPS-08）
+## 実装4 WCAG closureガイダンスと直接利用（OPS-08・09・14）
 
 現行 `qa-workflow/references/guidance.md` L276〜278には、`finalize-wcag-report` がcurrent Machine Runtime rowを独立取得せずcaller metadataに依存する旧記述がある。`workflow_runtime.py` L245〜の `_execute_and_finalize_wcag_report`、`_wcag_state_operation`、`_runtime_metadata`、`_invoke_local_runtime`、`artifact_graph.py` のSQLite state/closure更新と `wcag-conformance-evaluation/scripts/wcag_runtime.py` のclose_report経路を照合し、実際の正規owner内部実行経路へ記述を置換する。
 
 既存の偽candidate/metadata拒否、current rowの独立取得、canonical Planの束縛、CAS conflict、履歴欠損、closure不完全、別connectionからのreadbackのテストを確認し、文書と実装を一致させる。文書修正が目的だが、テストが示す具体的な未解決不具合があれば必要な修正を行う。特権DB writer、複数host、実運用の本人性や意味判断まで保証するとは記載しない。WCAGの正式評価契約を汎用完了の簡素化で弱めない。
+
+正式WCAGの _current_project_context と _wcag_state_operation、_execute_and_finalize_wcag_report、_runtime_metadata、artifact_graph.py の workflow_state_context_from_project_context と評価登録/read/finalizeの入力を同期する。既存Context経路はそのまま維持し、新規直接経路は明示 workflow_state_root（未指定時01の許可済み既定root）と実評価対象・source refs・環境・scopeを受ける。Context有無の判別を明示し、ContextなしではContext用ref/revision/fingerprintを架空生成しない。新規直接評価のsource bindingは実rootの正規化された絶対pathとworkflow_ref、実source refs・revisionを既存canonical JSON/hashで束縛し、登録・観測・read・finalizeで同じbindingを独立に解決・照合する。既存評価のContext fingerprint契約は当時の履歴として維持する。必要な根拠・権限・実rootが不明なら正式closureのみ停止する。旧Contextあり/なし、別root、別workflow、実source改版、改変候補、CAS競合、過去revision、独立readbackを既存WCAGの回帰へ追加する。
 
 ## 実装5 外部起動・CI入力/結果受渡し（OPS-10）
 

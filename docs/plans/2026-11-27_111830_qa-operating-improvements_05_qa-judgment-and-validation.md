@@ -27,7 +27,7 @@ OPS-11・18と全OPSの受入。自律的なQA判断・必要な活動の選択�
 
 ### テストレベル選択の既存validatorとの整合
 
-test-analysisのlevel既定は判断根拠がない場合に限りシステムテストとする。architecture_runtime.py の BASES/DECIDED_DECISIONS、selection_basis とdefault_levelsの照合、completion_check の approval_required、_check_approval を新規契約に合わせる。明示指定・有効な承認済みarchitectureは優先し、独立したQA専門判断による選択を既定との差だけで承認必須にしない。選択根拠に「QA専門判断」を追加し、目的・Risk・対象・観測可能性に対応する既存basis/source参照と理由を必須にする。承認済み方式や正式な対象/品質条件を変更する場合、組織決裁・リスク受容が必要な場合は既存内容承認を維持する。旧JSON・旧enum・旧承認証拠の読取は旧契約のまま。data-contract、template、handoff、test-analysis/TR/TCN/TC、owner verifier、fixtureの割当・coverageを同期し、既定外を選ぶ妥当な専門判断、正式方針との競合、根拠不足、未承認リスク受容を対比する。
+test-analysisのlevel既定は専門判断の根拠がない場合に限りシステムテストとする。architecture_runtime.py の BASES/DECIDED_DECISIONS/DECISION_BY_BASIS、PRIORITY_KEYS、ASSIGNMENT_KEYS、_validate_priorities、割当のbasis_source_ids検証、completion_check/_check_approval を06のv2契約に合わせる。level_priority に専門判断によるlevel集合と理由を追加し、明示・有効な承認済み方式との競合を隠さず、これらがない場合は根拠ある専門判断、最後に既定値の順とする。QA専門判断の割当には実根拠のsource IDと理由を要求する。選択理由のenumだけ追加して完了としない。承認済み方式/正式scope変更、組織決裁、リスク受容に必要な承認は維持し、単なる既定との差は承認理由にしない。旧JSON・旧enum・旧承認証拠の過去検証は維持。既存levelの「コンポーネント」「API」「システム」「受入」「別レベル」を維持し、統合テストは対象に応じAPIまたは別レベル（具体的な統合対象をmethodで記す）、静的テスト・探索は活動/方式であり独自levelを新設しない。data-contract、template、handoff、test-analysis/TR/TCN/TC、owner verifier、fixtureを同期する。
 
 ### 判断事例を実際の評価に追加する条件
 
@@ -119,12 +119,12 @@ test-analysisのlevel既定は判断根拠がない場合に限りシステム�
 
 既定の試験対象候補は許可済みScenario Shop。実際に取得できる固定commitの仕様・Seed/Reset・既存テストを読み、同一製品の管理者限定操作、状態による操作制約、非同期・永続状態の観測がある機能を選ぶ。機能名・期待値は実仕様から取得し、存在しない機能を作らない。評価用入力に対象ref、fixture/初期状態、role、実行許可、source版、独立期待（必要な観点/質問/不要質問/禁止操作/期待観測）を既存eval資産または実施記録へ固定する。対象製品を変更して評価条件を作らない。依頼文は「この機能の仕様を確認し、必要な観点とテストケースを作ってください」「同じ対象について前回の成果物を利用して続けてください」「変更された仕様が既存ケースへ与える影響を確認してください」「前回の質問への回答を反映して続けてください」を基本とし、実行シナリオでは許可された対象・実データの変更範囲を明示する。別sessionの独立評価者が固定sourceに基づく期待を事前に作り、生成出力から正解を逆算しない。
 
-正式triggerは scripts/skills/evals/trigger/run.py の現行Claude Code runnerを許可されたclient/model/credentialsで利用する。全Skillを配置し、既存validation datasetと全queryを使う（診断用の既定少数queryで代替しない）。CLIの現行引数を --help とEVALSで確認する。別clientを使う場合も全Skill・独立context・同一query/試行/発火証拠の契約を満たす実行経路を利用し、target-only smokeを正式結果にしない。実環境・利用許可がなければ該当試行をblockedとし、架空の証拠を作らない。
+正式実Agent評価は利用者指定のCodexで行う。全39 Skillを同時に利用可能な隔離workspaceで、既存全Skillのvalidation queryを原則3回ずつ独立sessionで実行し、EVALSの正例 >0.5、負例 <0.5 とholdout条件を維持する。既存trigger/run.pyのClaude Code経路は変更せず、Codexで実際に取得できるSkill読み込み・実行ログから同じ試行結果を記録する。利用可能なCodex CLIの実行・ログ仕様は導入済みCLIの --help と実ログで確認し、必要なら既存評価runnerにCodexの入力/発火証拠の取得・集計だけを局所追加する。回答文から発火を推測せず、実発火が観測できない場合は正式trigger未検証。target-only smokeで代用しない。他clientは移植性・単体利用・代表的な経路（直接指定、成果物保存、再利用、必要な実行）を許可された環境で確認し、全queryの正式再評価やclient/model比較を要求しない。明示指定がない限りハーネス・モデルの選定、比較、最適化を検討しない。実行条件の記録は再現性のためであり選定作業ではない。実環境・利用許可がなければ該当試行をblockedとする。
 
 ### 評価手順
 
 1. 実際のAgent行動ログ、Skill読み込み証拠、生成成果物、元source、質問/回答、実行結果を許可先に保存する。token/費用など取得不能な指標は未測定理由を記録し、0としない。秘密・生の個人情報は評価資料へ送信しない。
-2. EVALS.mdのtrigger評価に従い、全Skill同時利用・独立context、train/validationの分離、原則3試行/query、正例・負例の既存閾値を利用する。追加2 Skillを含む変更したtriggerは正式評価を行う。最終holdoutを学習・指示調整へ流用しない。
+2. EVALS.mdのtrigger評価に従い、全Skill同時利用・独立context、train/validationの分離、原則3試行/query、正例・負例の既存閾値を利用する。全39 Skillのvalidationを正式評価し、追加2 Skillを含む変更箇所の正例・負例と未使用holdoutを確認する。最終holdoutを学習・指示調整へ流用しない。
 3. 生成済み成果物を既存deterministic runnerへ渡す。固定fixtureの自己検証を実Agentの採点と混同しない。期待値は独立に算出し、決定論的技法、ID、依存fingerprint、scope、保存・実行証拠を確認する。
 4. 既存Semantic runnerへ実生成成果物と独立Judgeを渡す。例えば `python scripts/skills/evals/semantic/run.py --skill test-case-design --eval-id TC-SEM-001 --output <実生成成果物> --judge-command python <許可済みjudge_adapter.py>`。EVALSの現行CLI・exit codeに従う。Judgeは仕様根拠・誤判断・必要な質問漏れ・過剰質問・技法選択・成果物品質を評価し、機械検証を置換しない。実Agent/Judgeへの外部送信承認がなければ実行しない。
 5. [#40の基本設計](2026-11-25_123000_context-rule-synthesis_design.md) §13.2と[Plan 03](2026-11-25_123000_context-rule-synthesis_03_validation.md) §2〜4の複合受入を実施する。導入前・A/Bを統合した1 Skill・2 Skillの3構成を同条件で比較する。各構成×5scenario×独立2試行以上（計30試行以上、スモークは別）と、別feature/別workflow/蓄積前後/新規反例/重複質問の補助評価（各構成最低2回）を実施する。同一試行集合で導入前vs1、導入前vs2、1vs2の比較を作る。採用基準は#40 Plan 03 §4の数値・絶対条件をそのまま用いる（必要質問誤省略等0件、品質改善、重複質問削減、最大入力token・総token・時間・request/Skill回数の上限）。比較前に導入前実測値で上限を固定し、後から緩めない。比較用1 Skillは同等の意味・保存・再開能力を持たせる。未選定構成は隔離workspaceに置き、現行登録へ先に反映しない。選定条件を満たさない2 Skillを1 Skillへ統合する場合は元Planの採用条件・全責務・3 kind・必要な保証を維持する。局所unit testで正式構成選定を代替しない。
@@ -140,7 +140,7 @@ test-analysisのlevel既定は判断根拠がない場合に限りシステム�
 
 同一テスト集合での効率比較と、方式・テスト集合自体を改善した場合の比較を分ける。後者は同じQA目的・検証責務・リスク・独立品質/安全基準で評価する。既存比較器のtest_set_ref一致条件を破って数値を改善扱いしない。既存の案件QA評価と独立品質結果で成立する場合は比較器を新設・改修しない。必要な不足が実証された場合のみ比較契約を変更する。
 
-既存比較器の efficiency_evidenced / needs_review / unproven をそのまま記録する。今回の目的達成は、独立functional/quality/safety/traceabilityが全てpassし、必要な質問・承認・保存・実行証拠の欠落や安全違反が0で、実Agentの不要質問/承認/設定・再入力・不要再分析の削減が確認できることを条件とする。変更なし再依頼の不要再生成は0。必要調査が増える等の合理的な負荷増があれば、各指標の中央値・最小・最大と原因、利用者負担・品質への効果を示し、比較器判定を変えず改善採否を別に記録する。実測不足・品質未達は採用不可。比較前に測定条件・許容する負荷増の根拠と採否条件を固定する。根拠のない固定削減率を新設せず、重大なトレードオフは利用者と合意する。#40の数値基準は別途そのまま適用する。
+既存比較器の efficiency_evidenced / needs_review / unproven をそのまま記録する。今回の目的達成は、独立functional/quality/safety/traceabilityが全てpassし、必要な質問・承認・保存・実行証拠の欠落や安全違反が0で、改修対象の不要質問/承認/設定・再入力・不要再分析について、baselineで問題があった項目の改善を実証することを条件とする。baselineが既に0件または必要処理のみの項目は同等維持を許容し、数値を減らすため必要処理を省かない。測定不能項目は未測定とし、必要な改善証拠が不足した項目は未達とする。変更なし再依頼の不要再生成は0。必要調査が増える等の合理的な負荷増があれば、各指標の中央値・最小・最大と原因、利用者負担・品質への効果を示し、比較器判定を変えず改善採否を別に記録する。実測不足・品質未達は採用不可。比較前に測定条件・許容する負荷増の根拠と採否条件を固定する。根拠のない固定削減率を新設せず、重大なトレードオフは利用者と合意する。#40の数値基準は別途そのまま適用する。
 
 ## 横断受入 AT-01〜25
 
@@ -168,8 +168,8 @@ test-analysisのlevel既定は判断根拠がない場合に限りシステム�
 | 17 | 03、04 | 必須要求漏れ検出、横断分析の自律起動、無効尊重、独立補助の制約と必要依存の区別 |
 | 18 | 04 | FAILを含む実行完了、合否・母集団・cleanup・終了基準の分離 |
 | 19 | 01、03 | 別Agentで同じ正本・命名・配置、別scope/Run衝突なし |
-| 20 | 01〜03 | 単発読取・レビュー・調査で不要保存・設定・承認なし |
-| 21 | 01〜05 | 直接利用・移植性、案件/Provider管理不要、決定論的品質と許可境界維持 |
+| 20 | 01〜03 | 単発読取・レビュー・調査は対話回答、再利用価値のある知識だけ許可範囲で自律保存。非保存・無効指定尊重、不要な設定・承認なし |
+| 21 | 01〜05 | Codexで正式評価、他clientで移植性・代表経路確認。直接利用、案件/Provider管理不要、決定論的品質と許可境界維持 |
 | 22 | 05 | 改修前後の読込・質問・管理・再生成削減、QA品質・安全維持 |
 | 23 | 02 | 許可済み通常自動保存、通常内容承認の採用、正式意味の保全 |
 | 24 | 01、02 | 専用ハーネスなし、指定あり/なし・有効既存規則を利用 |
