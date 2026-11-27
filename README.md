@@ -1,6 +1,6 @@
 # QAテスト分析・設計・コンテキスト抽出・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
-設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。
+設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。コード・Skill・文書は有効な正本に同期し、不要な旧実装・旧記述を残しません。
 
 新規・変更機能のQA成果物作成を中心に、workflowをまたぐ中立signalの蓄積と仮説候補の再利用、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
@@ -130,6 +130,14 @@ skills/
 | `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL      |
 
 PR #40ではこの2 Skill構成を維持します。導入前・1 Skill・2 Skillの正式比較による最終構成選定は、本格利用後に実測して行うため、現在の登録を最適構成の選定結果とはみなしません。
+
+## QA運用・利用者向けガイド
+
+2026-11-27の改善方針は、指定がなければ通常Markdown/JSONを保存し、SQLiteを廃止し、CAS・専用provider・全履歴などの不要な管理機構を削減することです。対象は本リポジトリ内の実装・検証資産に限ります。[実装Plan](docs/plans/2026-11-27_111830_qa-operating-improvements_00_index.md)に変更対象と受入を記載します。実装変更までは現行利用ガイドの条件が有効です。
+
+- [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・再開・完了の責務とタイミング。
+- [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
+- [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 依頼、回答、承認、編集、再開と結果確認。
 
 ## テスト分析・設計フロー
 
