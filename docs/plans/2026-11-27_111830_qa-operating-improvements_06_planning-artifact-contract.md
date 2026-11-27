@@ -45,39 +45,50 @@ QA要求:
 
 ```markdown
 ## 要求
-| requirement_id | statement | requester | scope | priority | state | basis | open_item_id |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| QAR-001 | 有効な権限だけで更新できる | 依頼者 | 商品更新 | 高 | 提案 | 対象仕様 | Q-001 |
+
+| requirement_id | statement                  | requester | scope    | priority | state | basis    | open_item_id |
+| -------------- | -------------------------- | --------- | -------- | -------- | ----- | -------- | ------------ |
+| QAR-001        | 有効な権限だけで更新できる | 依頼者    | 商品更新 | 高       | 提案  | 対象仕様 | Q-001        |
 ```
 
 方式:
 
 ```markdown
 ## レベル選択
-| target_ref | decision | conflict_resolution | specialist_reason |
-| --- | --- | --- | --- |
-| QAR-001 | QA専門判断 | | 権限制約はAPIから独立確認できる |
+
+| target_ref | decision   | conflict_resolution | specialist_reason               |
+| ---------- | ---------- | ------------------- | ------------------------------- |
+| QAR-001    | QA専門判断 |                     | 権限制約はAPIから独立確認できる |
+
 ### レベル集合
-| target_ref | 区分 | level |
-| --- | --- | --- |
-| QAR-001 | specialist_levels | API |
-| QAR-001 | levels | API |
-| QAR-001 | default_levels | システム |
+
+| target_ref | 区分              | level    |
+| ---------- | ----------------- | -------- |
+| QAR-001    | specialist_levels | API      |
+| QAR-001    | levels            | API      |
+| QAR-001    | default_levels    | システム |
 ```
 
 計画:
 
 ```markdown
 ## 基準
-| criterion_id | kind | criterion | scope |
-| --- | --- | --- | --- |
-| CRIT-001 | 終了 | 必須ケースの結果と未解決リスクを確認する | 商品更新 |
+
+| criterion_id | kind | criterion                                | scope    |
+| ------------ | ---- | ---------------------------------------- | -------- |
+| CRIT-001     | 終了 | 必須ケースの結果と未解決リスクを確認する | 商品更新 |
 ```
 
 計画の機械blockの行補助例（説明用の抜粋）:
 
 ```json
-{"schema":"test-management-plan-v2","owner":"test-management","row_metadata":{"criteria":{"CRIT-001":{"evidence_ref":null,"judgment":"未判定"}}}}
+{
+  "schema": "test-management-plan-v2",
+  "owner": "test-management",
+  "row_metadata": {
+    "criteria": { "CRIT-001": { "evidence_ref": null, "judgment": "未判定" } }
+  }
+}
 ```
 
 ## 承認対象と意味変化

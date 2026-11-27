@@ -68,6 +68,8 @@ inspectionの成果物から対象build、実効設定、locator/fixture、選�
 
 cleanupの成功は実際の対象状態から確認する。失敗・結果不明は該当実行範囲の制約として残す。予定母集団、run、attempt、必要履歴をcleanupで消さない。結果不明の再実行では、副作用が発生した可能性を上限から差し引く既存test-executionの契約を維持する。
 
+実運用の共有writer・外部ownerの横断一意性は#40のローカルfixtureで実証済みではない。必要な共有保存・外部handoffの実接続で、実行結果不明後のlookup、同じsemantic handoff keyの再送、重複生成防止、権限不足時の局所停止を確認する。対象の接続・権限がなければ未検証として記録する（05のAT-10/11/14）。不要な接続を評価のためだけに構築しない。
+
 ## 実装4 WCAG closureガイダンスと直接利用（OPS-08・09・14）
 
 現行 `qa-workflow/references/guidance.md` L276〜278には、`finalize-wcag-report` がcurrent Machine Runtime rowを独立取得せずcaller metadataに依存する旧記述がある。`workflow_runtime.py` L245〜の `_execute_and_finalize_wcag_report`、`_wcag_state_operation`、`_runtime_metadata`、`_invoke_local_runtime`、`artifact_graph.py` のSQLite state/closure更新と `wcag-conformance-evaluation/scripts/wcag_runtime.py` のclose_report経路を照合し、実際の正規owner内部実行経路へ記述を置換する。

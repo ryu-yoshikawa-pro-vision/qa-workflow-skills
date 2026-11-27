@@ -285,28 +285,18 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 各OPSの改善・受入本文を実装検討の入口とし、別の責務再評価表を正本にしない。共通原則とOPS-18を優先して削減・維持・委譲を判断する。
 
-### PR #40統合後の確認（必要なOPSに適用）
+### PR #40統合後の確認結果
 
-参照: [PR #40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)、[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)、[PR #39](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/39)、[PR #17](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/17)。PR #40の設計は利用者決定により指定ディレクトリ・責務縮小へ改訂済み。対象PRは参照のみとし変更しない。旧kind別branch案は採用しない。
+参照: [PR #40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)、[検証記録](../implementation/pr40/verification.md)、[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)、[PR #39](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/39)、[PR #17](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/17)。基準mainは003bbc7。#38は参照時点で未mergeであり、PR記載の保存案を統合済みとみなさない。#40はmainへ統合済み。旧kind別branch案は採用しない。
 
-<!-- dprint-ignore -->
-| ID | 着手前の確認 | OPS |
-| --- | --- | --- |
-| PRE-01 | 統合後の登録構成は39 Skill、runtime-v2 root 6、owner verifier 9。README・成果物マトリクス同期済み。正式比較による最終構成選定はPRE-11 | 05/12/18 |
-| PRE-02 | PR #38/#40の実保存・承認/認可境界、自己申告と認証の区別 | 02/03/04 |
-| PRE-03 | #40の指定root・3 kind配置は実装済み。全Skillの標準配置と利用者指定・既存配置の優先を整備 | 12/13/14/18 |
-| PRE-04 | 3 kindの固定相対配置・不変batch・候補・runの履歴を維持 | 12/13/17 |
-| PRE-05 | 質問前の自己解決、対話提示と永続的質問発行を区別 | 01/02 |
-| PRE-06 | #40の横断検索・既存Knowledge lookupを再利用。その他の成果物発見・変更影響はOPS-15で確認 | 15 |
-| PRE-07 | #40の補助/必須・単体・要求scopeの局所検証済み。未指定時の自律起動と汎用完了判定は改修・受入 | 05/07 |
-| PRE-08 | #40の過去完了と現在採用の分離は局所実装済み。通常QAの再利用・実利用を確認 | 05/15 |
-| PRE-09 | semantic handoff keyと実owner一意性・結果不明からの再開 | 01/06 |
-| PRE-10 | #40の64 KiB等の本文搬送境界は局所検証済み。関連変更時の回帰・実Agent入力負荷を確認 | 03/05/12/15 |
-| PRE-11 | PR #40の品質・構成比較・効率baselineと責務削減指標 | 11/18 |
-| PRE-12 | 実評価ランナー・CIの最新統合状況、旧未達/対象外 | 07/10/11 |
-| PRE-13 | 全18 OPSの目的・現状・対応を統合後に再評価済み。具体的な変更経路・削減可否は関連Planで精査 | 全18件 |
+- 登録構成は39 Skill、runtime-v2 root 6、owner verifier 9。README・成果物マトリクスを同期済み。現行2 Skillは利用開始時の構成であり、正式比較による最終選定は未実施（OPS-05/12/18）。
+- #40の指定root、3 kindの固定相対配置・不変batch・候補/runの履歴は実装済み。通常保存は専用認証hostを前提とせず、条件付き更新は実保存先の能力が必要。隔離ext4での条件付き更新、9pでの通常保存と条件付き更新の局所blockを検証済み。既存の認可・正式承認と自己申告を区別する（OPS-02/03/04/12/13/14/17/18）。
+- #40の横断検索・軽量projection・既存Knowledge lookup、補助/必須と単体利用、開始要求・実scope照合、過去完了と現在採用の分離は既存処理を利用する。関連runtime regression 153件と64 KiBのbyte境界・限定例外・凍結tree・completion/resume・9コピー同期の局所検証済み。通常QAの自律起動・変更影響・保存契約は未改修（OPS-03/05/07/12/15）。
+- 全18 OPSの目的・残存差分は統合後に再評価済み。質問前の自己解決は既存question-analysisを利用し、回答をSPEC/DEC/ASMに限定する現行契約を改修する。既存検索・保存・開始要求を再実装せず、必要な呼出し経路・削減可否は詳細Planの対象と根拠に従う（OPS-01/02/15/18）。
 
-PR #40はmainへ統合済み（PRE-01）。追加2 Skillの保存・要求照合・再利用の実装済み部分は各OPSで区別した。全18 OPSの目的・残存差分を再評価した（PRE-13）。具体的な変更経路・削減可否と他のPREは関連Planで確認する。PRE全件の完了を一律の着手条件にしない。本PRは文書のみを対象とする。未検証の操作は未検証のままとし、必要な安全条件は回避しない。既存資産の移行は別作業であり無断実施しない。Q12に従い必要な改善と受入が完了して目的を満たすことを終了基準とし、不要・責務外・対応済みの理由を既存Planへ記録する。必要な未対応・未検証を不要扱いしない。新しい管理台帳を作らない。
+残る実装・検証は[全体Planと詳細Plan](../plans/2026-11-27_111830_qa-operating-improvements_00_index.md)に集約する。01は標準配置・形式・既存履歴・搬送境界、02は保存・認可・自己解決・対話提示と永続的質問発行・回答正規化、03は検索・currentness・必須/補助・要求/完了・再開、04はsemantic handoff keyと実owner一意性・結果不明からの復旧・必要な実接続、05は正式実Agent評価・構成比較・効率・責務削減・既存CIと過去未達を扱う。実運用root・共有writer・既存owner横断一意性、実Agent縦断・正式trigger・独立Judge・3構成比較は未検証のまま引き継ぐ。
+
+旧PRE-01〜13は以上の確認済み前提と実装・受入に統合した。新たな管理台帳・事前承認gateは設けない。必要な安全条件は回避せず、既存資産の移行は無断で実施しない。Q12に従い必要な改善・受入が完了して目的を満たすことを終了基準とする。対応済み・不要・責務外の理由と必要な未対応・未検証は既存Planまたは実装記録へ記載する。
 
 ## 実装順序と受入候補
 

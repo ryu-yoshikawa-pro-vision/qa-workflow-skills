@@ -11,6 +11,8 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 - 計画3 Skillの正本はcanonical JSON、Markdownは描画物。各 `references/data-contract.md` のpacket項目とMarkdown表の対応、各 `assets/output-template.md`、owner runtime、`qa-workflow/scripts/owner_verifiers.py` に依存がある。
 - UI target packageの固定構造・single writer、Knowledgeのentry-ref、#40の3 kindと履歴、runtime-v2のMachine Entity、runnerのraw形式は個別の機械契約を持つ。
 
+#40の指定root・3 kindの固定相対配置、不変batchと履歴は実装済み。通常保存と条件付き更新の実測は[#40検証記録](../implementation/pr40/verification.md)のext4・9pの範囲に限る。新規の標準配置は既存資産の移行や再実装を前提としない。
+
 ## 実装1 保存先・指定の解決
 
 全Skillの保存先解決を次の順に統一する。必要な成果物の有無を先に判断し、単発の相談・読取・レビュー・調査に保存先確認を要求しない。再利用価値のある知識は許可済み保存先が既知の場合に限り自律的に蓄積し、任意蓄積のために通常回答を止めない。明示非保存を尊重する。

@@ -58,6 +58,8 @@ downstream_state.py evaluate/_scope_impact の既存 scope_removal_resolutions /
 6. legacy JSON-only workflowは旧経路を維持する。v3継続にSQLiteが必要な場合だけ新workflowへ明示的に引継ぐ。旧workflowの実ref・state revision・baseline binding/hashを独立取得し、元要求・未解決副作用・既存scope ownership・inactive Entity履歴・対象外適用記録を参照する。downstream_stateは旧workflow_refで旧pairを検証して影響を計算し、新workflowの現在採用と分ける。旧baselineのworkflow_refを書換えたり新workflowの完了bindingとして直接登録しない。旧参照が取得不能なら影響範囲の再利用を保留し、必要な元資産を破壊せず調査する。無断の一括移行は行わない。
 7. test_integration_required_scopes.py、test_downstream_state.py、test_qa_workflow_baseline.py、test_context_workflow_state.py、test_sqlite_workflow_history.py で機械scope0正常/欠落、専用検証未達、意味要求欠落、未認可のstate変更、開始時要求削除、追加・再送、承認済み除外/再採用、scope縮小とinactive履歴、過去完了後の要求追加、旧凍結pair、新v3、過去snapshot欠落、SQLite/JSON binding・旧参照引継ぎ、CAS競合・結果不明・再開を確認する。
 
+#40で実装済みの過去完了と現在採用の分離、開始要求照合、補助/必須の局所検証を再利用する。本文搬送の変更は `test_context_runtime_transport.py` の64 KiBのbyte境界・限定例外、凍結treeのowner path、completion/resume、runtime_contractの9コピー一致を回帰する。必要な根拠をtruncateして成功扱いしない。実Agentの読込量・負荷は05の実測に含める。
+
 ## 実装3 発見・再利用と変更影響
 
 `qa-workflow/scripts/input_revision.py` の `_sha256_file` と `_compute_document` はファイル変更の検知として維持する。現行guidance L338〜340の「path変更=依存成果物の要再検証」を意味変化の確認へ置換する。`runtime_contract.py` の `compare_entity_dependencies`、`compare_runtime_dependencies`、`upstream_entity_fingerprints`、`machine_entity_dependency`、`resolve_entity_dependencies`、`input_fingerprint` を利用する。`artifact_graph.py compare_used_context`、`test-analysis/scripts/change_impact.py` と各ownerの `impact`/lookupを再利用する。

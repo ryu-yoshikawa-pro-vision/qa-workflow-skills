@@ -91,6 +91,8 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 `requirements-dev-lint.txt` / `requirements-dev-evals.txt` とworkflow指定のpinnedツールを使う。実評価の外部LLMをCIへ組み込まない。全5 workflow（Code Quality、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Codex Harness）の最新HEADでsuccessを確認する。実行不能は理由・対象条件を記録し、loopback等の制約を安全機構の回避で解消しない。限定環境で再試験する場合は元suiteの結果と分ける。
 
+#40の検証記録では39 Skill・227 casesのdataset構造、runtime局所回帰153件、runner/contractテストを検証済み。これは実生成出力の評価ではない。既存評価資産と過去の未達を引き継ぎ、変更した箇所を回帰する。実Agentでは自己解決・回答反映、開始要求・過去完了と現在採用、既存知識再利用、本文読込量と必要根拠の保持を関連シナリオで確認する。実運用root・共有writer・必要な外部接続は04と組み合わせ、ローカルfixtureを実環境証拠としない。
+
 ## 検証2 実Agentによる改修前後の評価
 
 ### 環境と役割
