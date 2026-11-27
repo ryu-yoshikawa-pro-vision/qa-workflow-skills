@@ -14,7 +14,7 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 担当Skillは専門QA判断、必要な成果物・実行・検証を担当する。qa-workflowは依頼と必要な依存工程を確認し、完了・未完了・対象外・再開先を判断する。実行合否、報告、正式承認、リリース可否を混同しない。意味判断、既存Machine Runtime、登録owner validator、WCAG等の専用検証を必要範囲で使う。全Skillを汎用runtimeへ登録しない。
 
-開始要求は依頼・計画・質問回答・成果物から取得する。複数工程や中断で元要求、完了範囲、未解決、次工程が復元できない場合だけ既存workflow_ref単位のJSON stateまたはMarkdownに保持する。機械stateはcreate_workflow_state/read_workflow_stateの既存JSON envelopeを優先し、単一担当の通常更新を可能にする。旧SQLite stateは01の必要資産読取・exportで扱う。SQLite依存・全状態revision履歴・CASを通常経路から削除し、新workflow-runtime-v3、request_start_revision、completion_state_revision、共通書込みgateは追加しない。
+開始要求は元依頼・計画・質問回答を参照する。最終成果物の自己申告だけから元要求を再構成しない。複数工程や中断で元要求・完了範囲・未解決・次工程を復元できない場合だけ実行前に必要な記録を残す。機械stateは既存workflow_refのJSON envelopeを優先する。SQLite専用の初期化・読取・履歴・条件付き更新と設定・呼出しを削除する。全状態revision履歴、新workflow-runtime-v3、request_start_revision、completion_state_revision、共通書込みgateは追加しない。
 
 同一依頼の途中で必要な工程を発見したら実施前に追加範囲と理由を記録する。stateなしから必要になった場合は元依頼、完了済み成果物、未完了範囲、実行中/結果不明の操作を引き継ぎ、後から記録した時点を初回と偽らない。補助から必須へ変わった工程は既存成果物の範囲・現在性・必要検証を確認し、不足だけ実施する。過去実行を今回実行と偽らない。
 
@@ -22,11 +22,11 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 ## 実装2 機械検証・全体完了・baseline
 
-- workflow_runtime.pyの_build、_requested_scope_rows、_verify_context_workflow_completion、owner_verifiers.pyのverify/_stored_owner_artifact、downstream_state.pyの_validate_state_record/_validate_frozen_pair/evaluateを変更する。機械scopeは実成果物と既存検証、意味・専用scopeは担当Skillの必要条件を確認する。機械scope 0でも通常QAを完了可能とし、機械必須scopeの欠落・未実行・不正証拠は未完了。can_completeと利用側を照合し、機械成功を全体完了に読み替えない。旧pairを当時の意味で読む。新schemaは意味変更が避けられない場合だけ追加する。
-- 必須A/Bは元要求source・範囲・条件と実batch/run参照を依頼/必要JSON stateに保持し、元要求と実分析済み範囲を照合する。0件と未実施、部分と完了、別root/workflow、split run未実施を区別する。後から判明したsource版やA batchは根拠付きで具体化する。context_workflow_state.pyのSQLite専用更新、全履歴照合、過剰なrevision搬送は削減するが、元要求や実根拠が欠落した完了は認めない。
-- context_artifacts.py/context_artifact_store.pyの3 kind、schema・validator・検索を利用する。Bの分析結果と候補の関係、直接根拠・反例・範囲・採否、必要な当時の内容、未完了handoffを保持する。途中保存はrunと実ファイルを照合して再開する。全planned payload、毎更新receipt・revision/hash、関連候補の同時CASは通常必須条件から外す。共通候補は担当を一つにし、統合・分割の途中は必要な関連成果物を確認する。過去結論を最新候補で捏造せず必要な過去版を保全する。外部副作用は04。
+- 機械検証不要の依頼はworkflow_runtime.pyを呼ばず、担当Skillとqa-workflowが元依頼に必要な成果物・検証から完了を判断する。混合workflowでは機械必須scopeのみ既存runtime/owner verifierへ渡し、その結果と意味・専用scopeの実成果物をqa-workflowが照合する。機械scope 0を空の機械runtimeで成功させない。機械必須scopeの欠落・未実行・不正証拠は未完了。_build/_requested_scope_rows/_verify_context_workflow_completion、owner_verifiers.verify/_stored_owner_artifact、downstream_state._validate_state_record/_validate_frozen_pair/evaluateと呼出し元を変更する。can_completeは機械対象の完了として扱い、全体完了へ読み替えない。旧v1/v2の固定キー・fingerprint・凍結pairは当時の意味で検証し、機械出力の意味変更が必要な場合だけ版を区別する。
+- 必須A/Bは最初の実行前に元要求source・範囲・条件を既存依頼/計画または必要なJSONに記録する。最終run入力とは独立してその記録を読み、実batch/runの参照・分析範囲と照合する。途中追加・除外・再採用は実際の変更を反映する。最終入力からA/B scope・参照が全部落ちても元要求を読み欠落を検出する。0件と未実施、部分と完了、別root/workflow、split run未実施を区別する。後から判明したsource版やbatchは根拠付きで具体化する。context_workflow_state.pyのSQLite更新・全履歴照合・過剰なrevision搬送を通常ファイルへ置換する。
+- scripts/context_artifacts.pyの_validate_runはplanned_candidate_opsの固定fields（base_content_hash、expected_revision、related_preconditions、operation_id、planned_content_hash、planned_payload、write_request_meta、confirmed_result等）を要求する。保存方式だけ変えて旧schema用のダミー値を作らない。3 kindの意味・identity・source・観察・反例・範囲・候補採否・根拠・run完了を維持し、run/candidate schema・validator・projection・store・workflow adapter・owner verifier・fixtureを一体改訂する。runは要求/分析範囲、実候補ref、必要な予定作業・未完了、結果・根拠を持つ。全予定payload・毎更新receipt・関連候補同時CASは必須にしない。中断は実ファイルと残作業を照合し、必要な過去根拠を保全する。旧JSON fixtureは旧契約で読む。候補統合・分割は関連成果物の参照・採用整合を確認し、外部副作用は04。
 - 最後の正常な機械設計・入力・依存は既存Machine Runtime Input/Result/Entity、必要baseline refに保持する。commit_qa_workflow_baseline_localは検証済み成果物の保存と参照更新に縮小し、失敗・中断時は前回正常版を保持する。既存Git履歴やimmutable snapshotで足りれば新履歴を作らない。旧baselineのref/hash/凍結pairは読取可能とする。過去完了と現在採用を分け、現行要求と根拠で再評価する。
-- 要求漏れ、誤scope/根拠、未確認機械証拠、過去完了の誤採用、別workflow混線、無断縮小の拒否を維持する。SQLite CAS・全履歴固有の期待値は通常保存・再開・元要求充足へ置換する。旧DBの読取テストは必要な場合に維持する。
+- 要求漏れ、誤scope/根拠、未確認機械証拠、過去完了の誤採用、別workflow混線、無断縮小の拒否を維持する。SQLite CAS・全履歴固有テストを削除し、通常保存・再開・元要求充足の検証へ置換する。外部旧DB読取テストは追加しない。
 
 ## 実装3 発見・再利用と変更影響
 
@@ -66,7 +66,7 @@ Aの中立観察・不変batch・訂正、Bの独立根拠、反例、候補の�
 
 ## 検証・完了条件
 
-- `test_workflow_runtime.py`、`test_qa_workflow_runtime.py`、`test_owner_verifier_gate.py`、`test_owner_verifier_registry.py`、`test_owner_scope_resume.py`、`test_runtime_workflow_integration.py`、`test_qa_workflow_baseline.py`、`test_input_revision.py`、`test_context_workflow_state.py`、`test_context_owner_verifiers.py`、`test_context_runtime_transport.py`、`test_context_artifact_store.py`、`test_sqlite_workflow_history.py`、`test_runtime_portability.py` を関連する変更ごとに個別実行する。9個のruntime_contract.pyの同期テストを維持する。
+- `test_workflow_runtime.py`、`test_qa_workflow_runtime.py`、`test_owner_verifier_gate.py`、`test_owner_verifier_registry.py`、`test_owner_scope_resume.py`、`test_runtime_workflow_integration.py`、`test_qa_workflow_baseline.py`、`test_input_revision.py`、`test_context_workflow_state.py`、`test_context_owner_verifiers.py`、`test_context_runtime_transport.py`、`test_context_artifact_store.py`、`test_runtime_portability.py` を関連する変更ごとに個別実行する。9個のruntime_contract.pyの同期テストを維持する。
 - routing fixtureの未指定/明示無効/補助/必須/単体、Aのみ・Bのみ・既存Knowledge直接参照、開始後の必須追加、全A/B要求の消去、別root/run、別source/range、補助結果の必須流用、未承認除外、独立補助失敗と依存補助失敗を確認する。
 - AT-06/07/08/12〜15/17/19/20/21/22/25。変更なし再依頼、部分改版、未承認候補追記、矛盾追加、未列挙source、stale、実副作用不明、登録外意味scopeを含む複合workflow、機械scope0、必須機械scope未達を対比する。
 - 不要な全体停止・全再生成・無条件のA/B起動がなく、必要な専門判断と機械検証、元要求、実行・保存・履歴の保証を維持する。機械gateだけで全体完了と判定する経路を残さない。実Agent評価は05で確認する。

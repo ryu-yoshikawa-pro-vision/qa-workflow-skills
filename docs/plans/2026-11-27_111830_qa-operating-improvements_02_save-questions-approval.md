@@ -9,7 +9,7 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 - `question-analysis` の `references/guidance.md` L60〜99は期待挙動のSPEC/DEC/ASMへの正規化を中心とする。Q ID・UNKNOWN・分類・再開先は既存 `question_ids.py` と出力templateを維持する。
 - `agent-answer-form` の `scripts/build_form.py`、`references/json-format.md` はフォームID・質問ID・定義hashで回答を分離する。旧HTMLによる未回収回答の復元、v3/v4等の互換、外部通信なしを維持する。
 - `qa-workflow/references/guidance.md` の進行モードは利用者明示 > Context Section 10 > continuous。`test-item-analysis` / `test-condition-analysis` のSave and resumeはprovider CAS・approval policy・独立readbackを要求する。計画3 Skillは保存・承認provider未接続を草案とする。`test-evaluation` は改善採用・受領の認証済み確認を要求する。
-- `workflow_runtime.py` の `_exclusion_confirmed()` は常にFalse。`excluded_by_approval` は現在の完了契約では未確定になる。#40の指定root・通常create/read/list/history、条件付き更新、実owner handoffの結果不明時の停止は維持する。
+- 現行のworkflow_runtime.pyの_exclusion_confirmed()は常にFalseで、excluded_by_approvalは未確定。#40の指定root・create/read/list/history・条件付き更新・外部handoff結果不明時の停止は現行契約であり、通常保存・要求管理は02・03で置換する。外部副作用の結果不明時の確認は維持する。
 
 ## 実装1 保存対象と時点
 
@@ -33,11 +33,11 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 <!-- dprint-ignore -->
 | 対象 | 改修内容 | 維持する保証 |
 | --- | --- | --- |
-| `project_context.py`、`artifact_store.py`、`git_artifact_store.py` | prepare系の意味検証と通常Markdown保存を接続。SQLite store・専用Git保存を標準から外し、不要な管理処理を削除。実利用中の明示Git契約と旧DB読取・exportは01で確認 | DEC/ASM、意味情報、正本・必要履歴、許可範囲 |
-| `feature_registry.py` のpersist_snapshot/analyze/candidate_handoff | 通常JSON保存、保存技術と意味検証を分離。実Git inventory・reconcile_git_coverage・HEAD/前回source照合は正式台帳の採用時に維持 | FEAT ID、変更根拠、母集団、正式再分類・retire |
+| `project_context.py`、`artifact_store.py`、`git_artifact_store.py` | prepare系の意味検証結果を通常Markdownへ保存。persist_prepared、store型import、operation_id/approval_ref/approval_revision必須、read_revision/write依存・呼出しを除去し、不要になる専用store 2ファイル・設定・テストを削除 | DEC/ASM、既存文書・ID、正式な意味変更、必要参照、許可範囲 |
+| `feature_registry.py` のpersist_snapshot/analyze/candidate_handoff | 通常JSON保存。store型・read_revision/write・保存承認引数・receiptを除去し、実ファイルの前回snapshotと照合。_authorize_reclassificationsを実際の正式再分類の判断・根拠へ接続。実Git inventory・reconcile_git_coverage・source照合を維持 | FEAT ID、根拠、母集団、正式再分類・retire |
 | `item_candidates.py`、`condition_candidates.py`、双方のcandidate_support.py | materialize/_check_revision_gateから不要なprovider revision・保存権限・承認入力を除き、生成・検証と保存を分離。validate_readbackは必要な正本検証に限定 | ITEM/COND ID、親子、廃止・根拠、B snapshotの完全性 |
 | 計画3 Skillのruntimeとowner verifier | 06の通常Markdown/JSON、草案保存と正式採用を分離 | 計画母集団・依存・承認対象・集計 |
-| `selection_contract.py` | 全revision内包を見直す。旧v1の読取検証、既存ID・選定理由・retirementを保持し、過去に採用した選定を既存履歴または必要な保存版で参照 | 選定・実装・実行の追跡、currentness |
+| `selection_contract.py` | 全revision snapshot必須を廃止。現在の候補ID/key、既存retired ID/keyと理由を保持し、前回との照合でID再利用・key変更・理由消失を防ぐ。実装/実行が参照する版だけ既存履歴または必要な保存版で保全。旧JSON fixtureは旧契約で検証し、新しい意味契約は必要なowner固有版で区別 | 選定・実装・実行の追跡、currentness |
 | `knowledge_runtime.py` | update_entry/plan_update/plan_replacementの通常CAS callback必須を撤廃。同一entryを更新し、統合・置換中断時は実際の関係entryを確認 | 適用条件・根拠・訂正・既存ref・currentness |
 | regression/exploration/reporting/defect/evaluationの各runtime | Run/Activity/Session・報告・欠陥候補・改善記録を既存形式で保存。通常改善採否・受領は実際の依頼者/受領者の確認を使い、専用認証サービスを必須にしない | 実行結果・報告、母集団、採用/適用/効果測定、外部操作認可 |
 | `ui_target_package.py`、`human_editing.py` | package固有writerと生成領域保護を維持し、不要なContext・provider条件を外す | 関連ファイル整合、安定ID、生成領域、必要な回復 |
@@ -45,7 +45,7 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 
 既存規則を優先する。通常の同一正本は担当writerを一つにし、並行作業の出力先を分離して必要な結果を統合する。実際に共有する正本のみ既存Gitや運用による競合回避を行う。外部副作用・権限外操作は04の実認可を守る。保存・内容承認・現在性を別に判定する。保存結果不明は実保存先を読み、盲目的に再書込みしない。部分保存は実成果物と未保存依存を特定し、該当下流のみ採用保留。無断rollback・別正本化をしない。読取不能を不存在としない。
 
-表にないSkillは01・05に従う。専用保存API、共通認証host、JSON DB、全成果物CAS・全履歴・receiptは作らない。不要になった入口・契約・設定・テストを除く。
+通常保存のrevision・hash・readback・receiptは一律必須にしない。製品/source版、機械生成・Entity依存のfingerprint、実行証拠、必要な正式結果の照合は別責務として維持する。表にないSkillは01・05に従う。専用保存API、共通認証host、JSON DB、全成果物CAS・全履歴・receiptは作らない。不要になった入口・契約・設定・テストを除く。
 
 ## 実装3 質問と回答の正規化
 
@@ -86,12 +86,12 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 
 ## 実装6 結果不明からの再開
 
-成果物refと質問回答を優先し、復元できない情報だけ既存JSON stateまたは通常Markdownに保持する。機械baseline、A/B必須分析、正式WCAGも03・04の必要成果物を用い、SQLiteを開始・再開条件にしない。旧DBは01に従う。外部反映の結果不明時だけ必要なhandoff記録を用い、通常対話質問にclaimを追加しない。
+成果物refと質問回答を優先し、復元できない情報だけ通常JSONまたはMarkdownに保持する。機械baseline、A/B必須分析、正式WCAGも03・04の必要成果物を用い、SQLiteを開始・再開条件にしない。外部反映の結果不明時だけ必要なhandoff記録を用い、通常対話質問にclaimを追加しない。
 
 再開時は、①現在依頼と保存済み要求・scope、②現行未解決Qと元定義・回答、③担当ownerの正式反映ref/revision（回答受領だけでは反映済みにしない）、④最も早い影響工程と保存・実行状態の順で照合する。成果物と質問記録から復元できない引継ぎだけ既存stateの unresolved/handoffs に保持する。部分保存や回答後中断では反映済みownerを再実行せず、未反映先だけ再開する。未保存・結果不明・現在採用不可を区別し、別sessionで復元不能ならその範囲を明示する。03の元要求と全体完了を保持する。
 
 ## 検証・完了条件
 
-- 既存 `test_question_ids.py`、`test_project_context_ids.py`、`test_project_context_owner.py`、`test_pr24_artifact_store.py`、`test_pr24_git_artifact_store.py`、`test_feature_registry.py`、`test_cross_owner_feature_to_candidates.py`、`test_test_item_condition_analysis.py`、`test_f_owner_verifier_registration.py`、`test_owner_scope_resume.py`、`test_qa_workflow_baseline.py`、`test_workflow_runtime.py`、`test_context_workflow_state.py` とフォームのPython/Nodeテストを変更箇所に応じ個別実行する。
+- 既存 `test_question_ids.py`、`test_project_context_ids.py`、`test_project_context_owner.py`、`test_feature_registry.py`、`test_cross_owner_feature_to_candidates.py`、`test_test_item_condition_analysis.py`、`test_f_owner_verifier_registration.py`、`test_owner_scope_resume.py`、`test_qa_workflow_baseline.py`、`test_workflow_runtime.py`、`test_context_workflow_state.py` とフォームのPython/Nodeテストを変更箇所に応じ個別実行する。
 - AT-04/05/06/07/09/10/11/12/14/15/20/23/24/25。回答前中断、部分回答、古い回答、実行条件回答、承認済み意味の保全、通常保存の承認不要、明示gated、結果不明・部分保存、旧HTML復元を比較する。
 - 通常利用で保存技術や不要な承認の質問が発生せず、指定・厳密な運用・外部認可は維持され、許可済み自動保存と別Agent再開が成立する。未承認の意味変更・偽の権限・未回収回答誤適用・開始時必須scopeの無断縮小が拒否されることを確認して完了。

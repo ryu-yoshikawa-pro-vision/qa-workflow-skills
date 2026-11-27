@@ -8,7 +8,7 @@ OPS-11・18と全OPSの受入。自律的なQA判断・必要な活動の選択�
 
 - `EVALS.md` の仕様適合、trigger、決定論的出力、意味評価、workflow integrationの評価層を利用する。39 Skill・227件の決定論的出力評価データの構造検証、87 routing fixtureは実Agent発火や生成品質の証明ではない。
 - `EVALS.md` の効率比較は `scripts/skills/evals/workflow_efficiency.py` が実測済みJSONを比較する。Agentの起動は行わない。同一scenarioで同じproduct commit/source revisions/scope/QA目的/独立期待基準/test set/environmentを使い、baseline・candidateそれぞれ独立2試行以上を必要とする。品質・安全未PASS、必要試行不足、比較不能は実証済み改善としない。
-- #40の検証記録は実Agent縦断、正式trigger、独立Semantic Judge、実運用root・共有writer、既存owner一意性、3構成比較の未達を残している。過去の#22効率比較・人間レビュー/承認時間の対象外も書き換えない。
+- #40の検証記録と過去の#22効率比較は当時の結果として保持する。#40の構成比較・実運用受入は今回の完了条件にしない。
 
 ## 実装1 QA専門判断の改修
 
@@ -42,7 +42,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 - `qa-workflow`、`spec-analysis`、`question-analysis`、`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`adversarial-review` の共通自己検証記述を確認する。各Skillの出力品質・責務境界は維持し、同じ手順の重複・長い説明を整理する。機械的な採番・形式違反は既存validatorの局所修正で対応する。最大1回の局所自己修正は現時点では維持する。根拠不足・他owner判断は局所修正ではなく担当工程へ戻し、再実行は原因解消後に行う。実評価で制約が不適切と確認された場合は、対象違反・停止条件・必要な反復上限を根拠付きでPlan変更として合意し、EVALSと該当fixtureを同期する。
 - 9個の `runtime_contract.py` は現行単体配布の理由があり、複製だけを理由に共通外部依存へ置換しない。変更時は既存同期方法と `test_runtime_portability.py`、`test_context_runtime_transport.py` の同一性・単体利用を確認する。依存関係の管理を利用者へ移さない。
 - SKILL.mdは選択条件・責務・必要な入出力・手順に集中し、工程固有の詳細は必要なreferenceへ置く。必要な安全/品質判断の参照が実際のAgentで読まれることをtrigger/実利用で確認する。共通reference化で単体配布が壊れる場合は必要な同梱を維持する。
-- #40のA/Bの専門責務、3 kindのJSON、必要根拠を維持し、保存・stateを02・03で簡素化する。統合・分割・廃止は後述の3構成比較で品質・効率・利用性を確認して判断する。必要なhandoff・開始要求・反例/Authorityを削らない。
+- #40の現行2 Skill構成、A/Bの専門責務、3 kindのJSON、根拠を維持し、保存・stateを02・03で簡素化する。構成比較・統合候補の実装・最終選定は対象外。必要なhandoff・開始要求・反例/Authorityを削らない。
 
 ### 変更対象の判断
 
@@ -68,7 +68,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 ## 検証1 決定論的テスト・CI
 
-SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削除した契約に合わせて更新する。元要求漏れ、未承認正式変更、別root混入、過去根拠欠落、実行・cleanup、機密保護・path逸脱、安定ID・変更影響のテストは保存方式に依存しない結果検証として維持する。test_pr24_artifact_store.py、test_pr24_git_artifact_store.py、test_sqlite_workflow_history.py、test_context_artifact_store.py、test_context_workflow_state.py、test_qa_workflow_baseline.py、test_shared_resource_contract.py、test_qa_operation_claim.py、test_e2e_selection_contract.py、test_test_item_condition_analysis.py、test_pr32_test_evaluation.py、WCAG・UI・非E2E・CI handoff回帰を確認する。
+SQLite履歴・専用store固有のテスト（test_pr24_artifact_store.py、test_pr24_git_artifact_store.py、test_sqlite_workflow_history.py）は、廃止する処理だけを検証するものは削除し、QA上必要な保証の検証は通常ファイル経路へ置き換える。汎用予約・全snapshot固有テストも同様に整理する。元要求漏れ、未承認正式変更、別root混入、過去根拠欠落、実行・cleanup、機密保護・path逸脱、安定ID・変更影響のテストは保存方式に依存しない結果検証として維持する。test_context_artifact_store.py、test_context_workflow_state.py、test_qa_workflow_baseline.py、test_shared_resource_contract.py、test_qa_operation_claim.py、test_e2e_selection_contract.py、test_test_item_condition_analysis.py、test_pr32_test_evaluation.py、WCAG・UI・非E2E・CI handoff回帰を確認する。
 
 改修前HEAD、実行時のPython/Node/Agent client、対象branch、依存バージョンと検証範囲を記録する。各詳細Planで指定したruntimeテストを必要な変更ごとに実行し、変更前後の契約差を確認する。次のコマンドは独立して実行する。既存workflowが要求する環境・追加手順は各 `.github/workflows/*.yml` の現行定義に従う。
 
@@ -95,7 +95,7 @@ SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削�
 
 `requirements-dev-lint.txt` / `requirements-dev-evals.txt` とworkflow指定のpinnedツールを使う。実評価の外部LLMをCIへ組み込まない。全5 workflow（Code Quality、Validate Agent Skills、Validate Deterministic Output Evals、Validate Semantic Output Evals、Codex Harness）の最新HEADでsuccessを確認する。実行不能は理由・対象条件を記録し、loopback等の制約を安全機構の回避で解消しない。限定環境で再試験する場合は元suiteの結果と分ける。
 
-#40の検証記録では39 Skill・227 casesのdataset構造、runtime局所回帰153件、runner/contractテストを検証済み。これは実生成出力の評価ではない。既存評価資産と過去の未達を引き継ぎ、変更した箇所を回帰する。実Agentでは自己解決・回答反映、開始要求・過去完了と現在採用、既存知識再利用、本文読込量と必要根拠の保持を関連シナリオで確認する。実運用root・共有writer・必要な外部接続は04と組み合わせ、ローカルfixtureを実環境証拠としない。
+#40の検証記録では39 Skill・227 casesのdataset構造、runtime局所回帰153件、runner/contractテストを検証済み。実生成出力の評価とは区別する。既存評価資産で変更箇所を回帰し、Codexで自己解決・回答反映、元要求・過去完了と現在採用、知識再利用、本文読込量・必要根拠を評価する。実運用root・共有writerの実接続は対象外。
 
 ## 検証2 実Agentによる改修前後の評価
 
@@ -103,7 +103,7 @@ SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削�
 
 現行baselineはmain `003bbc7a32bf5b4605696564a9254dd5053ccf5f` の実装・当時の文書のみ（候補方針をbaselineのAgentに読ませない）。candidateは改修後の固定commit。各試行の対象repository、source revision、build、データ・初期状態、Agent client/version、model、利用可能なtool、許可範囲、出力rootを記録する。利用するAgent clientは全Skillを同時に利用できる状態にする。対象Skillだけをロードした診断試験を正式trigger評価に算入しない。
 
-実務Agentは新しいsessionでQAを実行し、実装Agentは出力を改善するための改修を担当する。評価者は元の仕様・期待・観測と出力を独立に確認する。実装Agentの自己採点だけで完了としない。許可された隔離環境として `qa-training-store`（Scenario Shop）等を候補にし、対象製品のコード・仕様をread-onlyのQA対象にする。テストデータreset、認証、実行副作用、外部送信には許可済み手段を使用する。実環境・Agent・外部送信の許可がなければその試行は未実施/blocked。別の許可済み環境でも同等の品質/安全基準で評価する。製品修正でテストを通さない。
+実務Agentは新しいsessionでQAを実行し、評価者は固定仕様・期待・観測と出力を独立に確認する。入力は本リポジトリの既存eval cases、routing fixture、runtime/integration fixtureとする。必要な横断シナリオは既存fixtureを組み合わせ、一時ディレクトリで保存・再開・改版・実行を検証する。外部製品・実案件・実サービスの実接続を要求しない。fixtureを正解に合わせて変更しない。
 
 ### 実施するQA活動
 
@@ -119,24 +119,24 @@ SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削�
 | 実行・報告 | 既存TC、E2E、非E2E、Regression、Explorationの必要な組合せ | raw、初回FAIL、retry、cleanup、欠陥候補、統合報告、母集団・終了判定 |
 | 直接利用・人間編集 | 単体Skill、指定なし/指定あり、既存配置・形式、Markdownの許可編集 | 専用ハーネス不要、必要時だけ質問、旧資産互換、形式と意味の保証 |
 
-最初から各工程の詳細手順をプロンプトで教えない。通常の依頼を出して、Skill選択・判断・実成果物・質問・承認・失敗を観察する。危険な操作が必要な試行では実行許可を明示し、必要条件を省略させない。改修前の失敗を意図的に補正してbaselineに混入させない。単一製品だけに過適合しないよう、同じQA原則を適用できる別機能・資料構造・許可済み製品のholdoutを用意する。
+通常の依頼を出してSkill選択・判断・成果物・質問・承認・失敗を観察する。baselineへ候補方針を混入させない。実行条件・必要な許可を明示し、既存の異なる機能・資料構造の未使用caseをholdoutにする。
 
 ### 実行条件の固定と独立した期待結果
 
-既定の試験対象候補は許可済みScenario Shop。実際に取得できる固定commitの仕様・Seed/Reset・既存テストを読み、同一製品の管理者限定操作、状態による操作制約、非同期・永続状態の観測がある機能を選ぶ。機能名・期待値は実仕様から取得し、存在しない機能を作らない。評価用入力に対象ref、fixture/初期状態、role、実行許可、source版、独立期待（必要な観点/質問/不要質問/禁止操作/期待観測）を既存eval資産または実施記録へ固定する。対象製品を変更して評価条件を作らない。依頼文は「この機能の仕様を確認し、必要な観点とテストケースを作ってください」「同じ対象について前回の成果物を利用して続けてください」「変更された仕様が既存ケースへ与える影響を確認してください」「前回の質問への回答を反映して続けてください」を基本とし、実行シナリオでは許可された対象・実データの変更範囲を明示する。別sessionの独立評価者が固定sourceに基づく期待を事前に作り、生成出力から正解を逆算しない。
+試験入力はリポジトリ内の仕様・入力・期待結果・観測・テストfixtureから選ぶ。初回、変更なし、局所変更、仕様改版、中断再開は同じ既存fixtureの固定版・初期状態・scope・目的・独立期待で比較する。依頼は通常の自然言語とし、実操作はfixtureが許可する範囲で実行する。必要な観点・質問・不要質問・禁止操作・期待観測を既存case/rubricまたは実施記録に固定し、出力から正解を逆算しない。
 
-正式実Agent評価は利用者指定のCodexで行う。全39 Skillを同時に利用可能な隔離workspaceで、既存全Skillのvalidation queryを原則3回ずつ独立sessionで実行し、EVALSの正例 >0.5、負例 <0.5 とholdout条件を維持する。既存trigger/run.pyのClaude Code経路は変更せず、Codexで実際に取得できるSkill読み込み・実行ログから同じ試行結果を記録する。利用可能なCodex CLIの実行・ログ仕様は導入済みCLIの --help と実ログで確認し、必要なら既存評価runnerにCodexの入力/発火証拠の取得・集計だけを局所追加する。回答文から発火を推測せず、実発火が観測できない場合は正式trigger未検証。target-only smokeで代用しない。他clientは移植性・単体利用・代表的な経路（直接指定、成果物保存、再利用、必要な実行）を許可された環境で確認し、全queryの正式再評価やclient/model比較を要求しない。明示指定がない限りハーネス・モデルの選定、比較、最適化を検討しない。実行条件の記録は再現性のためであり選定作業ではない。実環境・利用許可がなければ該当試行をblockedとする。
+実Agent評価は利用者指定のCodex。全39 Skillを同時に利用可能な隔離workspaceで、選択条件・入出力・連携を変更したSkillと影響するSkillの既存validation queryを原則3回ずつ独立sessionで実行し、EVALSの正例 >0.5、負例 <0.5 とholdout条件を維持する。全Skillの既存構造検証・trigger契約テストは維持する。変更と無関係な正式queryの全面再評価は必須にしない。既存trigger/run.pyのClaude Code経路は変更しない。Codex実ログで発火を確認し、必要な取得・集計だけ既存runnerへ局所追加する。回答文やtarget-only smokeで正式発火を代用しない。他clientは既存単体利用・配布・移植性テストで確認し、外部clientの実運用受入やモデル/ハーネス比較を要求しない。
 
 ### 評価手順
 
 1. 実際のAgent行動ログ、Skill読み込み証拠、生成成果物、元source、質問/回答、実行結果を許可先に保存する。token/費用など取得不能な指標は未測定理由を記録し、0としない。秘密・生の個人情報は評価資料へ送信しない。
-2. EVALS.mdのtrigger評価に従い、全Skill同時利用・独立context、train/validationの分離、原則3試行/query、正例・負例の既存閾値を利用する。全39 Skillのvalidationを正式評価し、追加2 Skillを含む変更箇所の正例・負例と未使用holdoutを確認する。最終holdoutを学習・指示調整へ流用しない。
+2. EVALS.mdのtrigger評価に従い、全Skill同時利用・独立context、train/validation分離、原則3試行/query、既存閾値を用いる。変更・影響Skillの正例/負例と未使用holdoutを確認する。全Skillの構造・routing回帰は維持する。
 3. 生成済み成果物を既存deterministic runnerへ渡す。固定fixtureの自己検証を実Agentの採点と混同しない。期待値は独立に算出し、決定論的技法、ID、依存fingerprint、scope、保存・実行証拠を確認する。
 4. 既存Semantic runnerへ実生成成果物と独立Judgeを渡す。例えば `python scripts/skills/evals/semantic/run.py --skill test-case-design --eval-id TC-SEM-001 --output <実生成成果物> --judge-command python <許可済みjudge_adapter.py>`。EVALSの現行CLI・exit codeに従う。Judgeは仕様根拠・誤判断・必要な質問漏れ・過剰質問・技法選択・成果物品質を評価し、機械検証を置換しない。実Agent/Judgeへの外部送信承認がなければ実行しない。
-5. [#40の基本設計](2026-11-25_123000_context-rule-synthesis_design.md) §13.2と[Plan 03](2026-11-25_123000_context-rule-synthesis_03_validation.md) §2〜4の複合受入を実施する。導入前・A/Bを統合した1 Skill・2 Skillの3構成を同条件で比較する。各構成×5scenario×独立2試行以上（計30試行以上、スモークは別）と、別feature/別workflow/蓄積前後/新規反例/重複質問の補助評価（各構成最低2回）を実施する。同一試行集合で導入前vs1、導入前vs2、1vs2の比較を作る。採用基準は#40 Plan 03 §4の数値・絶対条件をそのまま用いる（必要質問誤省略等0件、品質改善、重複質問削減、最大入力token・総token・時間・request/Skill回数の上限）。比較前に導入前実測値で上限を固定し、後から緩めない。比較用1 Skillは同等の意味・保存・再開能力を持たせる。未選定構成は隔離workspaceに置き、現行登録へ先に反映しない。選定条件を満たさない2 Skillを1 Skillへ統合する場合は元Planの採用条件・全責務・3 kind・必要な保証を維持する。局所unit testで正式構成選定を代替しない。
+5. 現行A/B 2 Skillの変更に関係する#40の既存case・rubric・回帰を利用し、観察事実・根拠・反例・範囲・必要質問・自律起動・保存/再開・要求充足を評価する。構成比較のための1 Skill候補や導入前構成は作らない。
 6. 失敗時は、対象製品の仕様不足、Agent判断、Skillの記述・発火、routing、Helper、環境、評価期待の誤りを切り分ける。実問題の原因に対応する層だけ修正する。確認できないものを推測で変更しない。改修したら該当試行と関連回帰を別sessionで再実施する。
 
-#40の3構成比較と今回の改修前後比較は別の試行目的とする。#40比較は導入前の固定基準と、同じ共通契約・実装条件でA/Bだけを統合/分離した候補を用い、今回の保存/承認/完了変更の有無を構成差と混ぜない。#40の元の比較条件・閾値を維持する。今回の改修効果はmain 003bbc7の現行実装と改修後commitを比較する。両方の条件を満たす実試行だけ共有してよい。
+今回の改修効果はmain 003bbc7と改修後commitの比較で確認する。過去の#40構成比較・最終選定・実運用受入は別目的であり対象外。既存評価結果と未実施記録を書き換えない。
 
 ## 検証3 効率・利用負担の測定
 
@@ -146,13 +146,13 @@ SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削�
 
 同一テスト集合での効率比較と、方式・テスト集合自体を改善した場合の比較を分ける。後者は同じQA目的・検証責務・リスク・独立品質/安全基準で評価する。既存比較器のtest_set_ref一致条件を破って数値を改善扱いしない。既存の案件QA評価と独立品質結果で成立する場合は比較器を新設・改修しない。必要な不足が実証された場合のみ比較契約を変更する。
 
-既存比較器の efficiency_evidenced / needs_review / unproven をそのまま記録する。今回の目的達成は、独立functional/quality/safety/traceabilityが全てpassし、必要な質問・承認・保存・実行証拠の欠落や安全違反が0で、改修対象の不要質問/承認/設定・再入力・不要再分析について、baselineで問題があった項目の改善を実証することを条件とする。baselineが既に0件または必要処理のみの項目は同等維持を許容し、数値を減らすため必要処理を省かない。測定不能項目は未測定とし、必要な改善証拠が不足した項目は未達とする。変更なし再依頼の不要再生成は0。必要調査が増える等の合理的な負荷増があれば、各指標の中央値・最小・最大と原因、利用者負担・品質への効果を示し、比較器判定を変えず改善採否を別に記録する。実測不足・品質未達は採用不可。比較前に測定条件・許容する負荷増の根拠と採否条件を固定する。根拠のない固定削減率を新設せず、重大なトレードオフは利用者と合意する。#40の数値基準は別途そのまま適用する。
+既存比較器の efficiency_evidenced / needs_review / unproven をそのまま記録する。今回の目的達成は、独立functional/quality/safety/traceabilityが全てpassし、必要な質問・承認・保存・実行証拠の欠落や安全違反が0で、改修対象の不要質問/承認/設定・再入力・不要再分析について、baselineで問題があった項目の改善を実証することを条件とする。baselineが既に0件または必要処理のみの項目は同等維持を許容し、数値を減らすため必要処理を省かない。測定不能項目は未測定とし、必要な改善証拠が不足した項目は未達とする。変更なし再依頼の不要再生成は0。必要調査が増える等の合理的な負荷増があれば、各指標の中央値・最小・最大と原因、利用者負担・品質への効果を示し、比較器判定を変えず改善採否を別に記録する。実測不足・品質未達は採用不可。比較前に測定条件・許容する負荷増の根拠と採否条件を固定する。根拠のない固定削減率を新設せず、重大なトレードオフは利用者と合意する。今回の比較器と既存品質基準を適用する。
 
-既存指標に加えて管理目的のHelper呼出し、保存の不要な停止、管理ファイル・保存手順数を実ログで確認する。独立試行は同じ初期状態、固定条件で行い失敗試行を除外しない。holdoutは改修用事例と分ける。#40の3構成比較・既存品質基準・試行数を削らない。
+既存指標に加えて管理目的のHelper呼出し、保存の不要な停止、管理ファイル・保存手順数を実ログで確認する。独立試行は同じ初期状態、固定条件で行い失敗試行を除外しない。holdoutは改修用事例と分ける。今回の5scenario×改修前後×各2試行以上の既存条件と品質基準を維持する。
 
 ## 横断受入 AT-01〜25
 
-各行は元のATの目的と実施先。関連詳細Planの個別テストと実Agent評価を利用し、同じ検証を重複しない。既存#40テストで確認済みの機械条件は関連変更時に回帰し、実運用・実Agentの受入は別に行う。
+各行は元のATの目的と実施先。関連詳細Planの個別テストとリポジトリ内の実Agent評価を利用し、重複しない。既存#40テストで確認済みの機械条件は関連変更時に回帰する。実運用受入は含めない。
 
 <!-- dprint-ignore -->
 | AT | 実施先 | 最終受入 |
@@ -177,17 +177,17 @@ SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削�
 | 18 | 04 | FAILを含む実行完了、合否・母集団・cleanup・終了基準の分離 |
 | 19 | 01、03 | 別Agentで同じ正本・命名・配置、別scope/Run衝突なし |
 | 20 | 01〜03 | 単発読取・レビュー・調査は対話回答、再利用価値のある知識だけ許可範囲で自律保存。非保存・無効指定尊重、不要な設定・承認なし |
-| 21 | 01〜05 | Codexで正式評価、他clientで移植性・代表経路確認。直接利用、案件/Provider管理不要、決定論的品質と許可境界維持 |
+| 21 | 01〜05 | 変更・影響SkillのCodex評価、既存単体利用・配布・移植性検証。案件/provider管理不要、決定論的品質と許可境界維持 |
 | 22 | 05 | 改修前後の読込・質問・管理・再生成削減、QA品質・安全維持 |
 | 23 | 02 | 許可済み通常自動保存、通常内容承認の採用、正式意味の保全 |
 | 24 | 01、02 | 専用ハーネスなし、指定あり/なし・有効既存規則を利用 |
-| 25 | 全詳細 | 通常Markdown/JSON・直接利用、不要なSQLite/CAS/全履歴/予約/Helper/複製/承認なし。品質・実安全・旧資産読取を維持 |
+| 25 | 全詳細 | 通常Markdown/JSON・直接利用、SQLite廃止、不要なCAS/全履歴/予約/Helper/複製/承認なし。品質・実安全・既存JSON/Markdown読取を維持 |
 
 ## リスクと未達の扱い
 
 - Agentの出力は非決定的なため、独立試行・holdout・評価元固定を維持する。fixture成功、CI成功、既存Skillの数・行数削減だけで利用性・品質向上を証明しない。
-- 外部Agent・Judge・本番root・共有writer・実owner接続の未設定/未認可は対象範囲を具体的に記録する。利用者が別途必要条件を合意しない限り実行しない。該当する受入は未実施/blockedでありPASSにしない。
-- 正式な構成比較が現行2 Skillの統合等を示す場合、実際に変わる責務・依存・成果物の契約と回帰範囲を利用者へ提示して決定する。必要な変更を未達のまま完了扱いしない。
+- リポジトリ内評価資産による必要なCodex/Judge実行が不能・未認可なら未実施と記録する。外部実運用root・共有writer・実owner接続・別clientの運用受入は対象外であり、今回の未達条件にしない。
+- 現行2 Skillを維持する。過去の構成比較は対象外であり、今回の完了をその比較結果に依存させない。
 
 ## 完了条件
 

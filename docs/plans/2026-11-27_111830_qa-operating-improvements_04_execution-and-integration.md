@@ -17,7 +17,7 @@ OPS-06・07・08・10・16・18。独立したQA活動の並行実行を不要�
 
 artifact_graph.pyのclaim_mutable_operation/read_mutable_operation_claim/recover_claim/reserve_shared_resource/release_shared_resourceと各ownerのpreflightを改修する。reserve/releaseは現在未接続providerを理由にblockする経路であり、汎用予約基盤を新設しない。既存ownerの実開始・結果・cleanup・必要な冪等性を使い、不要なclaim/reservationの呼出し・設定・テストを除く。結果不明の副作用に必要な記録を保全し、旧claim/予約を勝手に解除しない。
 
-testware-implementationのpublish_git/snapshot_guardは明示された共有先への反映時だけ必要なGit条件を使用する。通常worktree編集に予約不要。testware-executionのcontract.py/runner.pyはcheckout・コマンド・隔離・副作用上限・cleanupを維持し、未接続provider依存経路を既存環境で安全に実行できるか確認する。任意subprocessで上限を保証できない副作用を許可済みと偽らない。
+testware-implementationのpublish_git/snapshot_guardは明示された共有先への反映時だけ必要なGit条件を使用する。通常worktree編集に予約不要。testware-executionのcontract.py/runner.pyは独立したローカル実行を不要な予約で止めない。checkout・コマンド・隔離・副作用上限・cleanupを維持する。runner.executeのnative_provider_authorization_required/side_effect_limits_unenforceableは実際の外部副作用・共有資源・上限を保証できない操作に対して維持し、未対応操作を解放するproviderを新設しない。独立実行と拒否条件をリポジトリ内テストで対比する。
 
 defect-managementの外部IssueやA/Bの外部handoffは実際の利用者許可・サービス権限・対象・必要承認を確認し、既存結果を調べて反映する。結果不明の副作用を再実行しない。通常質問・ローカル候補/Knowledge保存に外部claim・認証サービス不要。実際の同時外部操作に重複防止が必要なら既存ownerの一意性または担当分離を使用する。保証できない危険な操作だけ停止する。過去の#22判断・#40検証記録は当時の記録として保持する。
 
@@ -49,7 +49,7 @@ inspectionの成果物から対象build、実効設定、locator/fixture、選�
 
 cleanupの成功は実際の対象状態から確認する。失敗・結果不明は該当実行範囲の制約として残す。予定母集団、run、attempt、必要履歴をcleanupで消さない。結果不明の再実行では、副作用が発生した可能性を上限から差し引く既存test-executionの契約を維持する。
 
-実運用の共有writer・外部ownerの横断一意性は#40のローカルfixtureで実証済みではない。必要な共有保存・外部handoffの実接続で、実行結果不明後のlookup、同じsemantic handoff keyの再送、重複生成防止、権限不足時の局所停止を確認する。対象の接続・権限がなければ未検証として記録する（05のAT-10/11/14）。不要な接続を評価のためだけに構築しない。
+共有writerや外部ownerの実運用受入は対象外。既存mock・fixture・一時ディレクトリで独立作業、実際の共有条件、結果不明後のlookup、必要なsemantic handoff keyの再送、重複防止、権限不足時の局所停止を検証する（AT-10/11/14）。実サービスの認可・実運用を検証済みとはしない。
 
 ## 実装4 WCAG正式評価の保存・closure（OPS-08・09・14）
 
@@ -57,9 +57,9 @@ cleanupの成功は実際の対象状態から確認する。失敗・結果不�
 
 許可済み評価ディレクトリにcanonical Plan、実source refs・版、評価対象/環境/scope、sample/variation/process、criterion結果、観測handoffと必要証拠を既存機械契約のJSONで保存する。Contextは有効情報がある場合だけ使用し、なければ評価入力を直接受け取る。未指定rootは01。架空Context ref/revisionを生成しない。
 
-正式報告では実保存Planと現在の評価結果から既存WCAG runtime close-reportを実際に実行する。必要工程・全対象・結果・証拠・closureを検証し、実runtime結果を評価refと結び付けてJSON保存する。報告Markdownは既存renderer。二段階CAS・別connection・全状態revision保存を外す。過去実評価・closureの必要証拠を保全し、不完全評価で以前の正式報告を上書きしない。Evaluation Statementは同じ評価の保存済みclosure・実結果・版・level・scopeの一致を確認する。caller自己申告・偽metadataを証拠にしない。
+正式報告では実保存Planと現在の評価結果を既存WCAG runtime close-reportへ渡し、実runtime結果と評価ref、評価対象の版、WCAG version/level、criterion ref集合、必要な評価工程・証拠・closureを対応付けてJSON保存する。正式報告Markdownは既存renderer。二段階CAS・別connection・全状態revisionを廃止する。不完全な評価で以前の正式報告を上書きしない。Evaluation Statementでは保存Plan・評価結果・実runtime出力・closureと要求する版/level/scope/criterion集合を照合し、現在の正式評価に合致しなければ生成しない。caller自己申告・偽metadataを証拠にしない。全更新履歴や別DBは不要。
 
-WCAG-EM工程、sample/variation/process、ランダム選択の実結果、現在性、観測probe、HMACの機密locator保護、正式適合主張・EARLの意味は維持する。旧DBは01。Contextあり/なし、別評価/別root、source改版、closure不完全、偽候補、実runtime結果不一致、Statement誤生成、保存失敗・再開を回帰する。SQLite固有の期待値は必要な旧資産読取以外、新しい結果・証拠の検証に置換する。
+WCAG-EM工程、sample/variation/process、ランダム選択の実結果、現在性、観測probe、HMACの機密locator保護、正式適合主張・EARLの意味は維持する。Contextあり/なし、別評価/別root、source改版、criterion集合不一致、closure不完全、偽候補、実runtime結果不一致、Statement誤生成、保存失敗・再開を既存fixtureで回帰する。SQLite固有テストは削除し、評価結果・証拠の検証へ置換する。
 
 ## 実装5 外部起動・CI入力/結果受渡し（OPS-10）
 
@@ -67,10 +67,10 @@ WCAG-EM工程、sample/variation/process、ランダム選択の実結果、現�
 
 - 直接依頼では指定情報源と必要な対象・成果物を使う。CI起動では呼出し側が同等の情報源/版/対象/権限/必要な結果先を供給する。新たな共通設定schemaや監視サービスは作らない。
 - 既存ci_handoff入力でsource・差分・必要成果物の確認ができる場合は再利用する。sample CIの分類・列挙対象を全案件共通の要件にしない。未分類差分・不足source・未取得を0件や成功扱いしない。
-- 実CI/release/外部Issue連携は利用者が必要とする接続だけ実装・受入する。接続先・実行/外部送信許可が未確定なら該当接続を未設定/blockedとし、直接利用を妨げない。実際に必要な接続の未達は全体完了時に明示する。
+- 実CI/release/外部Issueサービスの接続・運用受入は対象外。リポジトリ内のci_handoff、既存mock/fixtureで必要な入出力、権限・結果不明・未接続時の扱いを検証する。未対応接続は作らず直接利用を妨げない。
 
 ## 検証・完了条件
 
-- `test_qa_operation_claim.py`、`test_pr24_artifact_store.py`、`test_context_artifact_store.py`、`test_context_workflow_state.py`、`test_ci_handoff.py`、`test_cross_owner_selection_to_inspection.py`、`test_cross_owner_results_to_reporting.py`、`test_cross_owner_exploration_to_defect.py`、`test_pr32_defect_management.py`、`test_pr32_test_reporting.py`、`test_testware_regression_handoff.py`、`test_workflow_runtime.py`、`test_sqlite_workflow_history.py`、`test_runtime_workflow_integration.py` を関連変更ごとに個別実行する。WCAG、runner、E2E、直接TCの既存テストは対象Skillの評価資産とruntime全suiteから特定して実行する。
+- `test_qa_operation_claim.py`、`test_context_artifact_store.py`、`test_context_workflow_state.py`、`test_ci_handoff.py`、`test_cross_owner_selection_to_inspection.py`、`test_cross_owner_results_to_reporting.py`、`test_cross_owner_exploration_to_defect.py`、`test_pr32_defect_management.py`、`test_pr32_test_reporting.py`、`test_testware_regression_handoff.py`、`test_workflow_runtime.py`、`test_runtime_workflow_integration.py` を関連変更ごとに個別実行する。WCAG、runner、E2E、直接TCの既存テストは対象Skillの評価資産とruntime全suiteから特定して実行する。
 - AT-10/11/12/15/16/17/18/20/21/25: 独立作業、同一正本更新、共有データ操作、結果不明、開始前中断、cleanup失敗、権限不明、未実行・FAIL・retry、母集団漏れ、部分報告、証跡保護を対比する。
-- 許可された環境で、既存テスト直接実行、E2E、非E2E、Regression/Exploration、欠陥候補、統合報告を元の依頼範囲に応じて通す（05）。実接続が必要な場合はその経路も確認する。既存実行安全とrawの追跡を維持しながら不要な案件全体の停止・重複確認が解消され、WCAG文書とコードが一致した時点で完了。
+- リポジトリ内のテスト・fixture・mockで直接TC、E2E、非E2E、Regression/Exploration、欠陥候補、統合報告の連携を検証する（05）。実運用接続は要求しない。既存実行安全・raw追跡、独立作業の並行実行、WCAG正式評価の文書・コード整合を完了条件とする。

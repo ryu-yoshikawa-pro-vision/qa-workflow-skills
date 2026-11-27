@@ -112,7 +112,7 @@ Contextからrootを取得する既存呼出し（workflow_state_root_from_proje
 
 ## 実装4 計画3 Skillの正本形式
 
-QA要求・architecture・計画は人間向けなら通常Markdown、機械集計が主用途ならJSON。指定・既存形式を優先し同一内容を二重正本化しない。専用JSON block・固定escape・厳密Markdown文法を強制しない。既存v1 JSONを読み取り、必要な機械処理は実際に使う入力を既存validatorへ渡す。
+QA要求・architecture・計画は、既存機械検証・下流機械処理を必要とする場合はJSONを正本にする。人間向け文書だけの依頼は通常Markdown。指定と有効な既存正本を優先し、Markdown指定時は06の必要範囲だけ機械入力を生成する。独自文法・二重正本・恒久変換基盤は不要。
 
 [06 計画成果物の形式・承認](2026-11-27_111830_qa-operating-improvements_06_planning-artifact-contract.md)に従いvalidate/impact/completion_check/build_snapshotの意味・集計・承認を維持する。v2形式・共通parserの新設は既定としない。
 
@@ -121,12 +121,12 @@ QA要求・architecture・計画は人間向けなら通常Markdown、機械集�
 - 通常のMarkdownは直接編集可能とし、必要な差分確認・根拠・承認済み意味の保全だけを要求する。計画3 Skillの承認時点の内容保全と未承認変更の扱いは06に従う。UI packageは `skills/ui-target-analysis/scripts/human_editing.py` と `skills/spec-analysis/scripts/ui_target_package.py` の編集提出・生成領域・ID・writer・履歴を維持する。通常Markdownにこの専用writerを要求しない。
 - 継続文書は安定ファイル名。Q/DEC/ASM/ITEM/COND/Entityの安定ID・retire・履歴は各owner。正式報告・依存再現・実行のRun/Attempt/snapshotを保持する。全更新の連番ファイル複製は不要。必要な旧フォームの復元は02。
 - `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。
-- 既存配置をdirect ref/許可rootで読取・更新できるようにする（OPS-17）。標準化を理由に既存資産を移動・改名・再保存しない。別rootの同名refを分離する。実際に移行が必要な場合だけ、対象・旧新ref・履歴・依存・互換読取・条件付き切替・rollbackを別途合意する。無断移行やrollbackはしない。
+- 既存配置をdirect ref/許可rootで読取・更新できるようにする（OPS-17）。標準化を理由に既存資産を移動・改名・再保存しない。別rootの同名refを分離する。外部資産の移行・切替・rollbackは対象外。
 
-既存DB候補は `.qa-context-feature/artifacts.sqlite3` と `workflow-state.sqlite3`。許可済み利用先の存在を確認し、必要な場合だけ旧DBの読取・export、内容・ID・参照・必要な過去版の照合を用意する。実資産未確認を移行完了とせずDBを削除しない。既存Git専用branchの正本やviewは明示された運用として扱い、無断で移さない。
+基準mainのGit treeにSQLiteファイルは存在しない。SQLite利用コード・テストの契約変更は02〜04で行う。リポジトリ外のDB・成果物調査、移行、export、互換storeは対象外。既存Markdown/JSONのfixture、意味・ID・必要な参照を保全する。
 
 ## 検証・完了条件
 
-- `test_project_context_owner.py`、`test_project_context_ids.py`、`test_pr24_artifact_store.py`、`test_pr24_git_artifact_store.py`、`test_ui_human_editing.py`、`test_feature_registry.py`、`test_test_item_condition_analysis.py`、`test_context_artifact_store.py`、`test_context_runtime_transport.py` と計画3 Skillの `test_f_verifier_requirements.py`、`test_f_verifier_architecture.py`、`test_f_verifier_management.py`、`test_cross_owner_results_to_reporting.py` を変更箇所に応じて個別実行する。05の全suiteも実行する。
+- `test_project_context_owner.py`、`test_project_context_ids.py`、`test_ui_human_editing.py`、`test_feature_registry.py`、`test_test_item_condition_analysis.py`、`test_context_artifact_store.py`、`test_context_runtime_transport.py` と計画3 Skillの `test_f_verifier_requirements.py`、`test_f_verifier_architecture.py`、`test_f_verifier_management.py`、`test_cross_owner_results_to_reporting.py` を変更箇所に応じて個別実行する。05の全suiteも実行する。
 - AT-01/02/03/09/12〜14/16/19/20/21/24/25: 新規・既存・指定あり/なし、別Agent、同一refの再利用、異なるscope・root、権限不足、重複、symlink、旧JSON、Markdown人間編集、変更前後の承認、機密raw、部分保存、必要な旧revisionを確認する。
-- 39 Skillの標準配置・形式・粒度・保存不要条件が現行成果物マトリクスと各ownerで一致し、特定ハーネス/案件初期化/Provider選択なしで利用可能。既存資産を失わず、計画3 Skillの新旧形式で意味・母集団・検証結果が同等。必要な機密保護と旧形式互換を維持した場合に完了。
+- 39 Skillの標準配置・形式・粒度・保存不要条件を各ownerと成果物マトリクスに反映する。特定ハーネス・案件初期化・provider選択なしの利用、既存Markdown/JSON fixtureの意味・ID・必要な機械検証・保護、06の形式別下流処理を確認する。全形式の完全相互変換は要求しない。

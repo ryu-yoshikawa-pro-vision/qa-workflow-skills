@@ -6,7 +6,7 @@ test-requirements-analysis、test-architecture-design、test-managementの保存
 
 ## 形式と必要な情報
 
-指定・既存正本を優先し、未指定は人間向け通常Markdown、機械処理が主用途ならJSON。一つの正本とし、Markdownに専用JSON block、escape、固定列、全fieldの完全round-tripを要求しない。既存v1 JSONのschema・ID・履歴・過去承認を旧契約で読み取る。新規JSONは既存schemaを優先し必要な意味変更に限りowner固有の版を追加する。
+指定・既存正本を優先する。未指定で既存機械検証・下流集計を必要とする依頼はJSONを正本、人間向け文書だけなら通常Markdownを正本とする。Markdownに専用JSON block、escape、固定列、全fieldの完全round-tripを要求しない。既存v1 JSONのschema・ID・必要な過去承認を旧契約で読む。新規JSONは既存schemaを優先し、意味変更に必要な場合だけowner固有版を追加する。
 
 <!-- dprint-ignore -->
 | 担当 | 必要な意味情報 |
@@ -15,19 +15,19 @@ test-requirements-analysis、test-architecture-design、test-managementの保存
 | 方式 | 要求/対象別レベル・タイプ・方式・環境・データ・分担・制約、割当ID、選択理由、根拠、未解決、承認範囲、影響 |
 | 計画 | 対象build・環境・期間、計画項目・担当・資源・順序、予定source/母集団、終了基準、実績取得、project risk、差異・是正処置、承認 |
 
-Markdownは既存output-templateの自然な日本語見出し・表を用い、必要な根拠・ID・適用範囲を明示する。機械処理に必要な値だけ実正本から取得し既存validatorへ渡す。欠落・曖昧なら該当機械処理を未確定とし推測補完しない。通常文書の作成・編集は止めない。機械集計の計画母集団・実績snapshotは既存形式で保持し同一内容を恒久同期しない。
+Markdownは既存output-templateの自然な見出し・表を用い、必要な根拠・ID・適用範囲を明示する。人間向け文書だけの作成・編集・完了にJSON固有のvalidate_readbackや機械完了を要求しない。Markdown指定で機械処理が必要なら、担当Skillが実正本からその処理に必要な既存schemaの入力を組み立て、該当validator・集計を実行する。欠落・曖昧な値は推測補完せず該当処理だけ未確定にする。恒久parser・二重正本・全項目同期は作らない。既存JSONの計画母集団・実績snapshotは維持する。
 
 ## 承認済み内容・候補・現在の採用
 
 保存と承認は別。通常内容承認は実回答、対象、内容、適用範囲、必要な期限を記録する。正式決裁・リスク受容・操作認可が必要なら実権限を確認する。保存やhashを承認としない。
 
-承認対象は要求の目的・scope・成功条件・根拠、方式の割当・選択理由・共有制約と根拠、計画の対象・予定母集団・基準・計画項目・リスク対応方針等の実際の意味。表示変更、実績追記、別候補だけで承認を失効させない。方式のassignment_ids単位の部分承認を維持し、無関係な割当を変更しても失効させず、共有制約・根拠の変更が及ぶ割当は再評価する。既存content_fingerprintの意味を無断変更しない。
+承認対象は要求の目的・scope・成功条件・根拠、方式の割当・選択理由・共有制約と根拠、計画の対象・母集団・基準・項目・リスク対応等の意味。architecture_runtime._check_approvalは現行でassignment_idsに加え成果物全体のcontent_fingerprint/expected_revisionを要求する。旧JSON証拠は旧契約で検証し、改修後は実際の回答・決定、対象割当ID、適用範囲と根拠に基づく承認を使う。無関係な別割当・表示・実績追記で失効させず、共有制約・根拠の変更が及ぶ範囲だけ再評価する。承認対象hashの別基盤を新設せず、既存content_fingerprintの意味も無断変更しない。
 
 必要な承認時の内容は既存Git履歴、正式決定・回答、当時の必要な版で保持する。全履歴・固定SHA snapshot directoryを要求しない。現在草案、過去の承認済み内容、下流が現在使える内容を区別し、承認された範囲だけ採用する。必要な旧版取得不能・根拠失効なら該当採用のみ保留し編集原文を残す。無断復元・上書き・全面再承認なし。
 
 ## 既存機械処理との接続
 
-qa_requirement_runtime.py、architecture_runtime.py、management_runtime.pyのvalidate/readback/impact/completion_check、managementのbuild_snapshot、owner_verifiers._stored_owner_artifact/_verify_requirements/_verify_architecture/_verify_management、reporting_runtimeの計画参照を照合する。JSONは既存機械検証を使用。Markdownは実根拠・承認・意味項目を担当Skillが確認し、機械集計・構造検証が必要な範囲だけ正規化入力にする。自己申告で機械処理を代替しない。
+qa_requirement_runtime.py、architecture_runtime.py、management_runtime.pyのvalidate/readback/impact/completion_check、managementのbuild_snapshot、owner_verifiers._stored_owner_artifact/_verify_requirements/_verify_architecture/_verify_management、reporting_runtime.build_snapshotのplan_ref/plan_revision/current_plan_revisionを照合する。JSONは実保存ファイルを読んで既存schemaの意味・必要構造検証を行い、provider証拠を捏造しない。必要に応じreadback契約から専用provider・保存承認を除く。Markdownの意味判断は担当Skillが行い、機械処理が必要な範囲だけ上記入力を作る。実際に使う計画の版・母集団を報告へ渡し、取得不能な値は未確定とする。
 
 sourceの実revision変更を検知し、利用した意味・承認・適用条件の変化を担当ownerで判断する。旧JSONの数値revision・保存bytes hash・意味fingerprintを区別し、通常保存にprovider revisionを新設しない。既存validatorの制限・必要な下流検証を維持する。取得不能な機械入力は局所的に不足を示す。
 
