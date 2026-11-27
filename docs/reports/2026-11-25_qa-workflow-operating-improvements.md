@@ -42,7 +42,7 @@
 
 現状: [project-context](../../skills/project-context/SKILL.md)には明示選択local/Git provider、候補ownerにはwrite preconditionがあり、計画3 Skillには正式保存・承認providerへの依存が残る。#40の3 kindの通常保存・履歴・条件付き更新は局所実装・検証済み。
 
-改善: 利用者の指定・既存契約を優先し、指定がなければ許可済み作業先と標準契約を利用する。保存技術は内部処理として扱い、利用者には技術方式の選択を求めず、判断・操作が必要な不足だけ説明する。既存ファイル操作・Helperを優先し、通常の単独保存は結果確認、更新は対象・必要内容の保全を基本とする。共有更新・履歴再取得・後続の正本検証・外部操作に実際に必要な場合だけ条件付き保存、一意性、revision/hash、独立readback等を要求する。必要な能力不足は該当操作のみblockし、汎用保存層や全owner接続を目標にしない。保存・内容承認・currentnessは分離し、保存状態は[共通運用契約](../reference/qa-workflow-operating-contract.md)に従う。結果不明時は実保存先を照合する。依存する複数成果物の部分保存は必要な参照と内容/revisionを確認し、成立まで該当下流の採用を保留する。個別CASを一括整合とせず、無断rollback・別正本作成を避ける。過去対象外は自動解除しない。
+改善: 指定・既存規則を優先し、未指定の通常成果物はMarkdownまたはJSONを許可済み作業先へ保存する。SQLite、CAS、専用provider、全revision履歴・receiptを通常経路から除き、既存の不要な管理処理を削減する。作業分離を優先し実共有更新・外部副作用に必要な既存制御だけ使用する。保存・内容承認・現在性を分離し、結果不明は実保存先を確認する。部分保存で依存が成立しない範囲は採用しない。必要な旧資産の読取・データ保護を維持する。
 
 受入: 単独新規/更新の保存・失敗時報告・承認済み内容の保全。実共有更新が必要な経路では同一revisionの競合、create-if-absent、結果不明、必要履歴とreadbackを確認する。外部操作は必要権限・失効・再実行防止を確認。fixtureだけで未検証の遠隔先を保証しない。依存する部分保存と結果不明からの再開を確認する。
 
@@ -110,7 +110,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 改善: 現行コード・schema・否定試験と照合してguidance更新。特権DB writer、複数host、認可や意味判断まで保証すると解釈しない。今回の静的確認は攻撃経路全体の実証ではない。現行の正規owner内部実行経路に合わせて局所修正する。実Agent評価を前提とせず、既存テストと照合して修正する。
 
-受入: 偽造candidate/metadata拒否、owner内部実行、CAS conflict、履歴欠損、closure不完全、独立readbackを確認し文書とコード・テストを一致させる。
+受入: 偽造candidate/metadata拒否、実ownerのclose-report、Plan/評価結果・scope・必要証拠の照合、closure不完全、保存失敗・再開・Statement生成を検証する。通常JSON保存へ変更しSQLite固有の期待値は新しい必要保証へ置換する。現行説明と改修後の説明を区別する。
 
 ### OPS-09 QAコンテキスト・人間編集の受入 (P1)
 
@@ -258,7 +258,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 - 共通自己検証: qa-workflow、spec-analysis、question-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、adversarial-reviewの9 Skillで、出力前の入力/停止条件確認、局所的な契約違反の最大1回修正、再確認、責務外への越境禁止が類似記述になっている。共通部分を短く整理できるか確認し、各Skill固有の品質条件と仕様根拠を創作しない条件は維持する。[EVALS.md](../../EVALS.md)の現行最大1回制約は目的（無限修正・責務越境の防止）に照らして必要性を評価する。採番・形式等の機械的な違反は既存手段で修正・確認する。自Skillの専門責務内の判断・修正と、他ownerの判断が必要な問題の引継ぎを区別し、根拠不足は必要な質問・局所停止とする。改善しない反復は停止し残る違反を報告する。回数増加や無制限修正を目的とせず、変更する場合はEVALS.md・関連Skill・評価資産を同期する。共通reference化は単体配布・直接利用・読み込み経路で利用可能な場合に限り、新たな生成frameworkを前提にしない。
 - Runtime契約と段階的詳細化: test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、qa-workflowの共通envelope・verify_runtime_evidence等の繰返しを確認し、実際の重複とSkill固有のpartial rerun、previous artifact、current_structure_state等を区別する。現行は9 Skill（spec-analysis、test-analysis、test-requirement-design、test-condition-design、test-case-design、coverage-analysis、qa-workflow、usability-inspection、wcag-conformance-evaluation）にruntime_contract.pyを配置し、[test_runtime_portability.py](../../tests/skills/runtime/test_runtime_portability.py)で9コピーのバイト一致と代表7 Skillの単体実行を検証している。単体配布のための複製と不要な処理重複を区別し、各Skillで使われない処理や専門外の処理、変更時の同期負担を調べる。既存の一致検証・単体実行検証を優先し、他Skillやrepository全体の常時参照を必須にしない。新しい生成・配布基盤は前提としない。qa-workflow、test-condition-design、usability-evaluation、usability-inspection、wcag-conformance-evaluation等の長い手順では、発火・責務・必要入力・安全上の必須条件をSKILL.mdに残し、該当時だけ必要な詳細を読む構造を検討する。正式WCAG評価のsampling・観測・closure、ブラウザ操作の安全、既存テスト技法と参照検証を削らない。
 - 専門Skillの分割: test-requirements-analysisとtest-requirement-design、test-item-analysisとfeature-analysis、test-condition-analysisとtest-condition-design、coverage-analysisとadversarial-review、test-executionとE2E実行、e2e-test-reportingとtest-reporting、usability-evaluationとusability-inspection、regression-testingとtest-managementは、現行定義上は異なる専門責務を持つ。名称や処理の類似だけでは統合・削除の根拠にならない。全37 Skillと追加2 Skillの定義を確認した段階では安全に削除できるSkillは特定していない。Skill数を削減目標にしない。
-- PR #40: context-signal-auditの単一sourceの中立観察・不変batch・訂正、context-rule-synthesisの独立根拠/反例/差異条件・仮説・handoffは維持する。統合後の実装ではcontext-synthesis-runに予定payload、base revision/hash、related candidate前提、handoff intentを保持し、PR #40の skills/qa-workflow/scripts/context_workflow_state.pyで開始要求、試行、run mapping、完了を扱い、workflow_runtime.pyの_verify_context_synthesis_workflow_stateが照合する。成果物から確実に復元できる情報の二重管理があるか確認する。一方、開始時の要求範囲、0件runと未実行の区別、別run混入防止、関連候補の同一保存境界での条件確認、外部handoffの結果不明からの再開など、成果物単体では証明できない情報や現在の必要保証は残す。通常保存の改善済み部分はOPS-03を参照し、未完了の実owner受入は維持する。
+- PR #40: context-signal-auditの単一sourceの中立観察・不変batch・訂正、context-rule-synthesisの独立根拠/反例/差異条件・仮説・handoffは維持する。統合後の実装ではcontext-synthesis-runに予定payload、base revision/hash、related candidate前提、handoff intentを保持し、PR #40の skills/qa-workflow/scripts/context_workflow_state.pyで開始要求、試行、run mapping、完了を扱い、workflow_runtime.pyの_verify_context_synthesis_workflow_stateが照合する。成果物から確実に復元できる情報の二重管理があるか確認する。一方、開始時の要求範囲、0件runと未実行の区別、別run混入防止、関連候補の意味・適用条件の確認、外部handoffの結果不明からの再開など、成果物単体では証明できない情報や現在の必要保証は残す。通常保存の改善済み部分はOPS-03を参照し、未完了の実owner受入は維持する。
 
 受入の追加ではなく既存AT-21/22/24/25等への具体化として、実際に変更する呼出し経路と契約、除去・維持・委譲する理由を確認する。既存テストで十分な場合は新たな重複試験を要求しない。各具体候補は該当OPSとQ12に従って最新baselineで再判定する。
 
@@ -285,9 +285,18 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 各OPSの改善・受入本文を実装検討の入口とし、別の責務再評価表を正本にしない。共通原則とOPS-18を優先して削減・維持・委譲を判断する。
 
+### 2026-11-27 保存・状態管理の追加調査
+
+基準main `003bbc7a32bf5b4605696564a9254dd5053ccf5f`、PR #41 `f0512d7778aa77720dd978a2c4548fc14bd5eb0f`。全39 Skillの定義、99実行用スクリプト（90固有blob）、CI定義5本を確認し、スクリプトは保存・履歴・認可・競合制御の関連コードを走査して主要処理・テストを確認した。全reference・fixtureの行単位レビューと実環境実行ではない。
+
+- SQLite直接利用は `skills/project-context/scripts/artifact_store.py`（Project Context/機能台帳）と `skills/qa-workflow/scripts/artifact_graph.py`（workflow state/WCAG）。#40の3 kindはJSONだがcontext_artifact_store.pyがlock、関連候補前提、履歴・readbackを要求し、context_workflow_state.pyがSQLiteに依存する。02〜04で通常保存へ変更する。
+- qa-knowledgeのCAS callback、E2E選定の全snapshot、item/condition生成時のprovider前提、test-evaluationの専用承認サービス、未接続の汎用予約も削減対象。UI package、決定論的技法、安定ID、必要な履歴・実証跡・権限は維持する。
+- [qa-workspace](https://github.com/ryu-yoshikawa-pro-vision/qa-workspace) main `766154b` と5成果物branchのtreeを確認。Project Context 1、仕様分析27、質問分析27、テスト分析27のMarkdownと機能台帳JSON 1、計83ファイル。リモートtreeにSQLiteなし。ローカル未追跡DBは未確認。既存専用branch/正本を無断変更しない。既存保存障害の記録は同repoのdocs/artifact-storage.mdとprojects/champs-nextjs/records/upstream-proposal-authorize-callback.mdにある。
+- 利用者の追加合意: 指定なしはMarkdownまたはJSON。管理基盤を維持・拡張する前提を撤回し、通常保存とQA判断・検証を分ける。具体的な変更・受入は[詳細Plan](../plans/2026-11-27_111830_qa-operating-improvements_00_index.md) 01〜06を正本とする。
+
 ### PR #40統合後の確認結果
 
-参照: [PR #40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)、[検証記録](../implementation/pr40/verification.md)、[PR #38](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/38)、[PR #39](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/39)、[PR #17](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/17)。基準mainは003bbc7。#38は参照時点で未mergeであり、PR記載の保存案を統合済みとみなさない。#40はmainへ統合済み。旧kind別branch案は採用しない。
+参照: [PR #40](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/40)、[検証記録](../implementation/pr40/verification.md)。基準mainは003bbc7。#40はmainへ統合済み。
 
 - 登録構成は39 Skill、runtime-v2 root 6、owner verifier 9。README・成果物マトリクスを同期済み。現行2 Skillは利用開始時の構成であり、正式比較による最終選定は未実施（OPS-05/12/18）。
 - #40の指定root、3 kindの固定相対配置・不変batch・候補/runの履歴は実装済み。通常保存は専用認証hostを前提とせず、条件付き更新は実保存先の能力が必要。隔離ext4での条件付き更新、9pでの通常保存と条件付き更新の局所blockを検証済み。既存の認可・正式承認と自己申告を区別する（OPS-02/03/04/12/13/14/17/18）。
@@ -304,7 +313,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 ### 実装目的別の整理（既存OPSを維持）
 
-OPS-18を全改修の判断基準とし、01〜06・09・12〜16・18の明確な契約差を解消する。08は局所文書修正、07・11は既存経路で実Agent評価と必要な改修、10は必要な外部接続、17は12〜15の設計・受入条件として扱う。現行baselineの実Agent利用・評価は先行し、既知の問題の改修と並行する。次の5領域は計画の分類であり、新しい管理単位・独立実装・強制順序を作るものではない。
+OPS-18を全改修の判断基準とし、01〜06・09・12〜16・18の明確な契約差を解消する。08は現行説明の訂正とWCAG正式評価の保存経路改修、07・11は既存経路で実Agent評価と必要な改修、10は必要な外部接続、17は12〜15の設計・受入条件として扱う。現行baselineの実Agent利用・評価は先行し、既知の問題の改修と並行する。次の5領域は計画の分類であり、新しい管理単位・独立実装・強制順序を作るものではない。
 
 <!-- dprint-ignore -->
 | 領域 | 対象OPS | 目的 |
@@ -348,6 +357,6 @@ OPS-18を全改修の判断基準とし、01〜06・09・12〜16・18の明確�
 | AT-22 | 責務削減と回帰 | 実Agentの改修前後で専門外判断・読込・不要質問・重複管理削減、既存QA品質・安全・履歴維持 | 11/18 |
 | AT-23 | 成果物作成・通常保存・内容承認 | 明示の非保存指示がなければ許可範囲で自動保存、依頼者の明示内容承認を採用、必要時のみ追加権限確認、既存承認済み意味を保全 | 01/02/03/04/18 |
 | AT-24 | 直接Skill利用 | 特定ハーネスなし、指定・既存規則優先、指定なしは許可済み作業先・標準契約、必要時だけ保存・形式・運用の指定を確認 | 12/14/18 |
-| AT-25 | 最小構成 | 実リスク相応の防御・検証・形式・履歴、利用者に不要な保存技術の選択を求めず、不要なCAS/専用基盤/Helper/複製/承認なし、単体利用を維持 | 03/05/06/11/13/18 |
+| AT-25 | 最小構成 | 通常Markdown/JSON、不要なSQLite/CAS/専用基盤/全履歴/予約/Helper/複製/承認なし。必要な品質・実安全・旧資産読取・単体利用を維持 | 03/05/06/11/13/18 |
 
 上記は未実施の受入候補。具体的な相対path・必要最小の外部契約・実環境・過去対象外の再検証範囲は後続Planで確定する。共通原則の再承認は不要。過去のPR #22の未達・対象外・検証結果を上書きしない。Q11の既定continuous/明示gatedとQ12の必要性・終了判定は関連OPSの既存受入に統合する。

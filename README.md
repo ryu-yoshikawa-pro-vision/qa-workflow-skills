@@ -133,6 +133,8 @@ PR #40ではこの2 Skill構成を維持します。導入前・1 Skill・2 Skil
 
 ## QA運用・利用者向けガイド
 
+2026-11-27の改善方針は、指定がなければ通常Markdown/JSONを保存し、SQLite・CAS・専用provider・全履歴などの不要な管理機構を削減することです。[実装Plan](docs/plans/2026-11-27_111830_qa-operating-improvements_00_index.md)に変更対象と受入を記載します。実装変更までは現行利用ガイドの条件が有効です。
+
 - [共通運用契約](docs/reference/qa-workflow-operating-contract.md): 質問・承認・保存・再開・完了の責務とタイミング。
 - [Skill別成果物マトリクス](docs/reference/qa-workflow-artifact-matrix.md): QA Skillの開始条件、成果物、保存・引継ぎ、利用者対応。
 - [利用者マニュアル](docs/reference/qa-workflow-user-guide.md): 依頼、回答、承認、編集、再開と結果確認。

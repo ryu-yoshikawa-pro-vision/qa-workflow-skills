@@ -1,5 +1,7 @@
 # QAワークフロー利用者マニュアル
 
+> 本文は現行実装の利用条件。2026-11-27合意の通常Markdown/JSON保存、SQLite・CAS・専用管理の削減は[実装Plan](../plans/2026-11-27_111830_qa-operating-improvements_00_index.md)で定める。実装改修までは現行の制約が有効。
+
 [共通運用契約](qa-workflow-operating-contract.md)と[Skill別マトリクス](qa-workflow-artifact-matrix.md)の利用者向け入口。依頼に必要なSkillだけを利用する。特定のハーネスは前提としない。利用方法は担当Skillの実行契約に従う。必要な入力・実行条件を満たせない操作は停止し、可能な分析は継続する。
 
 ## 依頼時に指定すること

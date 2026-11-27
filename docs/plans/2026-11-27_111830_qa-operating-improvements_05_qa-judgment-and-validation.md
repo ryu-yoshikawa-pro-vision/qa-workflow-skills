@@ -37,12 +37,12 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 01の39行を対象一覧として利用する。実装時に各SKILL.mdと必要なreference、呼出し元/先、Helper・validator、テスト・fixture・配布条件を確認する。各改修Planの処理ごとに維持・削除・既存手段への委譲・必要な外部責務を決める。別の恒久台帳や追加承認gateは作らない。
 
-- `qa-workflow/scripts/artifact_graph.py` のContext parse、fixed-root scan、baseline/history、SQLite workflow state、WCAG確定、claim/reservationを01〜04の責務へ整理する。QA固有の要求・依存・再開・完了を維持する。既存成果物から復元できるstateは削除する。大きなファイルであることだけで再分割しない。
+- artifact_graph.py、workflow_runtime.py、context_workflow_state.py、owner_verifiers.py、downstream_state.pyを03・04へ変更する。SQLite state・全revision・汎用予約・保存gateを削減し、Context parse、QA要求、安定ID、依存、必要機械検証・再開を維持する。
 - `project-context` は01の意味管理を残し、案件探索・配置合意・Provider選択の不要な呼出しを削る。単体利用で必要なDEC/ASM・Context更新は維持する。
 - `qa-workflow`、`spec-analysis`、`question-analysis`、`test-analysis`、`test-requirement-design`、`test-condition-design`、`test-case-design`、`coverage-analysis`、`adversarial-review` の共通自己検証記述を確認する。各Skillの出力品質・責務境界は維持し、同じ手順の重複・長い説明を整理する。機械的な採番・形式違反は既存validatorの局所修正で対応する。最大1回の局所自己修正は現時点では維持する。根拠不足・他owner判断は局所修正ではなく担当工程へ戻し、再実行は原因解消後に行う。実評価で制約が不適切と確認された場合は、対象違反・停止条件・必要な反復上限を根拠付きでPlan変更として合意し、EVALSと該当fixtureを同期する。
 - 9個の `runtime_contract.py` は現行単体配布の理由があり、複製だけを理由に共通外部依存へ置換しない。変更時は既存同期方法と `test_runtime_portability.py`、`test_context_runtime_transport.py` の同一性・単体利用を確認する。依存関係の管理を利用者へ移さない。
 - SKILL.mdは選択条件・責務・必要な入出力・手順に集中し、工程固有の詳細は必要なreferenceへ置く。必要な安全/品質判断の参照が実際のAgentで読まれることをtrigger/実利用で確認する。共通reference化で単体配布が壊れる場合は必要な同梱を維持する。
-- #40のA/Bの専門責務と既存state/保存を利用する。統合・分割・廃止は後述の3構成比較で品質・効率・利用性を確認して判断する。必要な履歴・owner handoff・開始要求・反例/Authorityの保証を削らない。比較未達だけで現行2 Skillの優劣を断定しない。
+- #40のA/Bの専門責務、3 kindのJSON、必要根拠を維持し、保存・stateを02・03で簡素化する。統合・分割・廃止は後述の3構成比較で品質・効率・利用性を確認して判断する。必要なhandoff・開始要求・反例/Authorityを削らない。
 
 ### 変更対象の判断
 
@@ -64,7 +64,11 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 各変更は対象SKILL.md・該当reference・template・既存Helper/validator・呼出し元・必要fixtureを同時更新する。共通化は実際の重複のみ。
 
+全39 Skill・99スクリプトの関連コード走査に基づき、02〜04の対象関数・呼出し元、SKILL.md/reference/template、fixture・rubricを同期する。別の共通API、履歴サービス、JSON DB、中央indexへ置換しない。9個のruntime_contract.pyと2個のcandidate_support.pyのコピー整合・単体利用は維持する。決定論的技法・Entity・coverage・UI package・実行raw・独立検証は管理機構削減を理由に削らない。
+
 ## 検証1 決定論的テスト・CI
+
+SQLite履歴、専用store、汎用予約、全snapshot固有のテストは削除した契約に合わせて更新する。元要求漏れ、未承認正式変更、別root混入、過去根拠欠落、実行・cleanup、機密保護・path逸脱、安定ID・変更影響のテストは保存方式に依存しない結果検証として維持する。test_pr24_artifact_store.py、test_pr24_git_artifact_store.py、test_sqlite_workflow_history.py、test_context_artifact_store.py、test_context_workflow_state.py、test_qa_workflow_baseline.py、test_shared_resource_contract.py、test_qa_operation_claim.py、test_e2e_selection_contract.py、test_test_item_condition_analysis.py、test_pr32_test_evaluation.py、WCAG・UI・非E2E・CI handoff回帰を確認する。
 
 改修前HEAD、実行時のPython/Node/Agent client、対象branch、依存バージョンと検証範囲を記録する。各詳細Planで指定したruntimeテストを必要な変更ごとに実行し、変更前後の契約差を確認する。次のコマンドは独立して実行する。既存workflowが要求する環境・追加手順は各 `.github/workflows/*.yml` の現行定義に従う。
 
@@ -97,7 +101,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 ### 環境と役割
 
-現行baselineはmain `003bbc7...` の実装（#41の方針文書を参照するが未実装の契約を実行させない）。candidateは改修後の固定commit。各試行の対象repository、source revision、build、データ・初期状態、Agent client/version、model、利用可能なtool、許可範囲、出力rootを記録する。利用するAgent clientは全Skillを同時に利用できる状態にする。対象Skillだけをロードした診断試験を正式trigger評価に算入しない。
+現行baselineはmain `003bbc7a32bf5b4605696564a9254dd5053ccf5f` の実装・当時の文書のみ（候補方針をbaselineのAgentに読ませない）。candidateは改修後の固定commit。各試行の対象repository、source revision、build、データ・初期状態、Agent client/version、model、利用可能なtool、許可範囲、出力rootを記録する。利用するAgent clientは全Skillを同時に利用できる状態にする。対象Skillだけをロードした診断試験を正式trigger評価に算入しない。
 
 実務Agentは新しいsessionでQAを実行し、実装Agentは出力を改善するための改修を担当する。評価者は元の仕様・期待・観測と出力を独立に確認する。実装Agentの自己採点だけで完了としない。許可された隔離環境として `qa-training-store`（Scenario Shop）等を候補にし、対象製品のコード・仕様をread-onlyのQA対象にする。テストデータreset、認証、実行副作用、外部送信には許可済み手段を使用する。実環境・Agent・外部送信の許可がなければその試行は未実施/blocked。別の許可済み環境でも同等の品質/安全基準で評価する。製品修正でテストを通さない。
 
@@ -144,6 +148,8 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 
 既存比較器の efficiency_evidenced / needs_review / unproven をそのまま記録する。今回の目的達成は、独立functional/quality/safety/traceabilityが全てpassし、必要な質問・承認・保存・実行証拠の欠落や安全違反が0で、改修対象の不要質問/承認/設定・再入力・不要再分析について、baselineで問題があった項目の改善を実証することを条件とする。baselineが既に0件または必要処理のみの項目は同等維持を許容し、数値を減らすため必要処理を省かない。測定不能項目は未測定とし、必要な改善証拠が不足した項目は未達とする。変更なし再依頼の不要再生成は0。必要調査が増える等の合理的な負荷増があれば、各指標の中央値・最小・最大と原因、利用者負担・品質への効果を示し、比較器判定を変えず改善採否を別に記録する。実測不足・品質未達は採用不可。比較前に測定条件・許容する負荷増の根拠と採否条件を固定する。根拠のない固定削減率を新設せず、重大なトレードオフは利用者と合意する。#40の数値基準は別途そのまま適用する。
 
+既存指標に加えて管理目的のHelper呼出し、保存の不要な停止、管理ファイル・保存手順数を実ログで確認する。独立試行は同じ初期状態、固定条件で行い失敗試行を除外しない。holdoutは改修用事例と分ける。#40の3構成比較・既存品質基準・試行数を削らない。
+
 ## 横断受入 AT-01〜25
 
 各行は元のATの目的と実施先。関連詳細Planの個別テストと実Agent評価を利用し、同じ検証を重複しない。既存#40テストで確認済みの機械条件は関連変更時に回帰し、実運用・実Agentの受入は別に行う。
@@ -156,7 +162,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 | 03 | 01〜03 | 依頼された範囲の分析〜TC、根拠・正本・必要保存・検証 |
 | 04 | 02 | 仕様ブロッカーの部分保存、該当scopeのみ停止、保存状態の正しい説明 |
 | 05 | 02、03 | 部分回答、旧回答/保留、仕様と実行条件の区別、影響範囲再開 |
-| 06 | 02、03 | 別session/Agentで成果物・必要stateから継続、未保存を復元と誤認しない |
+| 06 | 02、03 | 別session/Agentで継続。途中でstateが必要になっても元要求・完了済み・未解決を保持 |
 | 07 | 03、05 | 同一入力・有効な根拠再利用、不要再質問/再生成なし |
 | 08 | 03、05 | 外部資料を含む改版・入力完全性、影響scopeのみ再検証 |
 | 09 | 01、02 | 通常人間編集・正式変更/生成領域の区別、無断上書きなし |
@@ -165,9 +171,9 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 | 12 | 01〜03 | 依存部分保存の整合が成立するまで下流current不可 |
 | 13 | 01、03 | 重複正本の誤選択・新規作成なし |
 | 14 | 01、02、03 | アクセス不能を不存在にしない、必要な操作だけblock |
-| 15 | 02、03 | 承認対象変更・失効・開始後除外。元要求を保持し未承認除外を拒否 |
+| 15 | 02、03、06 | 承認対象変更・失効・開始後除外。元要求、部分承認、過去採用と現在採用を区別 |
 | 16 | 01、04 | 機密証跡・一時物・必要履歴、任意/必須保存の区別 |
-| 17 | 03、04 | 必須要求漏れ検出、横断分析の自律起動、無効尊重、独立補助の制約と必要依存の区別 |
+| 17 | 03、04 | 必須要求漏れ、機械scope 0、専用検証・必須機械scope未達、補助から必須への変更、自律起動・無効尊重 |
 | 18 | 04 | FAILを含む実行完了、合否・母集団・cleanup・終了基準の分離 |
 | 19 | 01、03 | 別Agentで同じ正本・命名・配置、別scope/Run衝突なし |
 | 20 | 01〜03 | 単発読取・レビュー・調査は対話回答、再利用価値のある知識だけ許可範囲で自律保存。非保存・無効指定尊重、不要な設定・承認なし |
@@ -175,7 +181,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 | 22 | 05 | 改修前後の読込・質問・管理・再生成削減、QA品質・安全維持 |
 | 23 | 02 | 許可済み通常自動保存、通常内容承認の採用、正式意味の保全 |
 | 24 | 01、02 | 専用ハーネスなし、指定あり/なし・有効既存規則を利用 |
-| 25 | 全詳細 | 必要な保証と単体利用を維持し、不要なCAS/基盤/Helper/複製/承認を削減 |
+| 25 | 全詳細 | 通常Markdown/JSON・直接利用、不要なSQLite/CAS/全履歴/予約/Helper/複製/承認なし。品質・実安全・旧資産読取を維持 |
 
 ## リスクと未達の扱い
 

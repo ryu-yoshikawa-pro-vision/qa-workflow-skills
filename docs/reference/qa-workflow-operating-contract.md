@@ -1,5 +1,7 @@
 # QAワークフロー共通運用契約
 
+> 本文は現行実装の利用条件。2026-11-27合意の通常Markdown/JSON保存、SQLite・CAS・専用管理の削減は[実装Plan](../plans/2026-11-27_111830_qa-operating-improvements_00_index.md)で定める。実装改修までは現行の制約が有効。
+
 利用者とAgentの責務、進行、質問、承認、保存、再開、完了を定める。[共通設計原則](qa-skill-design-principles.md)、[成果物マトリクス](qa-workflow-artifact-matrix.md)、[利用者マニュアル](qa-workflow-user-guide.md)を参照する。工程固有の入出力・実行条件は担当SKILL.mdとreference、全体routingと実行条件は[qa-workflow](../../skills/qa-workflow/SKILL.md)および[詳細契約](../../skills/qa-workflow/references/guidance.md)を正本とする。
 
 本書は現行の利用時の共通契約を定める。工程固有の実行条件は担当Skill・Runtimeの契約に従う。共通設計原則は設計・改修の基準であり、現行の必須条件を変更するものではない。実操作では担当Skill・Runtimeの必須条件と、適用される[保存・承認契約](../plans/2026-11-07_170134_qa-full-process-implementation_02_storage-approval-reporting.md)、[配置契約](../plans/2026-11-07_122247_development-qa-traceability.md)、[人間編集契約](../plans/2026-11-07_170134_qa-full-process-implementation_08_human-artifact-editing.md)を満たす。必要な能力・権限・検証が不足する操作は停止し、独立した分析は継続する。原則の記載だけで自動化・実行成功・制約解除を保証しない。

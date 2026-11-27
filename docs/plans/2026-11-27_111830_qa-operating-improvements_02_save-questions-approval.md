@@ -28,35 +28,24 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 
 ## 実装2 保存経路の改修
 
-01の指定解決と既存OS/sandbox権限を利用する。既存のファイル操作・標準機能を優先する。通常の文書保存に新しい汎用保存adapterや認証hostを追加しない。保存と内容承認を別に判定する。
+01の指定解決と既存OS/sandbox権限で通常Markdown・JSONを作成・更新し、保存結果を確認する。既存正本を先に探し、更新前の対象・差分を確認する。機械writerの中断対策は既存の一時ファイル・置換処理を利用する。通常保存にCAS、専用認証callback、全revision、receiptを要求しない。単純なファイル置換を共有CASと呼ばない。
 
 <!-- dprint-ignore -->
-| 対象コード/契約 | 改修内容 | 維持する保証 |
+| 対象 | 改修内容 | 維持する保証 |
 | --- | --- | --- |
-| `project-context/scripts/project_context.py` の `persist_prepared`、`artifact_store.py`、`git_artifact_store.py` | 通常ローカル保存で既存書込権限を利用できるようにする。指定された厳密契約・既存Git/SQLite正本の経路は利用可能なまま残す | 必要な条件付き更新、旧revision、認可。既存storeを一括削除しない |
-| `feature-analysis/scripts/feature_registry.py` の `persist_snapshot`、`analyze`、`candidate_handoff` | 承認を必要としない台帳候補・分析結果の通常保存と、正式な再分類・retire等の判断を分離する。既存Git source検証・source inventoryを維持 | FEAT ID、変更履歴、Git sourceの真正性、再分類承認、現在性 |
-| `test-item-analysis/scripts/item_candidates.py`、`test-condition-analysis/scripts/condition_candidates.py`、双方の `candidate_support.py` とSave and resume | write preconditionから一律の保存承認・provider前提を外し、既存環境で候補を保存する経路を接続。候補schema、validator、既存論理refを利用 | stable ITEM/COND ID、履歴、根拠、B snapshotの完全性、共有更新時の競合防止 |
-| `test-requirements-analysis/scripts/qa_requirement_runtime.py`、`test-architecture-design/scripts/architecture_runtime.py`、`test-management/scripts/management_runtime.py` | 01の新規Markdown正本・既存JSON互換と接続し、草案の保存を可能にする。内容の確定・計画承認は保存の条件ではなく、正式採用の条件にする | ownerのvalidate/impact/completion、必要な計画母集団・承認対象の束縛 |
-| `e2e-test-selection/scripts/selection_contract.py`、`qa-knowledge/scripts/knowledge_runtime.py` | 通常保存の不要な承認を外し、既存schemaと選定/entryの同一性・currentnessを維持。改善承認に由来する更新は該当承認を保持 | 同一entry競合、replacement・履歴・既存refの一貫性、選定理由 |
-| `regression-testing/scripts/regression_runtime.py`、`exploratory-testing/scripts/exploratory_runtime.py`、`test-reporting/scripts/reporting_runtime.py`、`defect-management/scripts/defect_runtime.py`、`test-evaluation/scripts/evaluation_runtime.py` | Run/Activity/Session・報告・欠陥候補・改善記録を許可先へ保存。元結果の再判定、既存snapshot更新、外部Issue作成は通常保存と分離 | immutable結果/報告、安定ref、必要履歴・実行証拠、外部認可 |
-| `spec-analysis` / `ui-target-analysis` の既存 `ui_target_package.py`、`human_editing.py` | 専用writerを必要とするpackageだけ適用。通常Markdownへ一律拡大しない | packageの生成領域・ID・scope・履歴・atomic境界 |
-| `scripts/context_artifact_store.py`、`scripts/context_artifacts.py`、`context_workflow_state.py` | #40の保存実装を利用する。stateの要求追加・完了は03の契約に従い、通常QA文書に3 kindの制約を広げない | immutable batch、関連候補の同一保存境界、runの再開・必要なhistory |
+| `project_context.py`、`artifact_store.py`、`git_artifact_store.py` | prepare系の意味検証と通常Markdown保存を接続。SQLite store・専用Git保存を標準から外し、不要な管理処理を削除。実利用中の明示Git契約と旧DB読取・exportは01で確認 | DEC/ASM、意味情報、正本・必要履歴、許可範囲 |
+| `feature_registry.py` のpersist_snapshot/analyze/candidate_handoff | 通常JSON保存、保存技術と意味検証を分離。実Git inventory・reconcile_git_coverage・HEAD/前回source照合は正式台帳の採用時に維持 | FEAT ID、変更根拠、母集団、正式再分類・retire |
+| `item_candidates.py`、`condition_candidates.py`、双方のcandidate_support.py | materialize/_check_revision_gateから不要なprovider revision・保存権限・承認入力を除き、生成・検証と保存を分離。validate_readbackは必要な正本検証に限定 | ITEM/COND ID、親子、廃止・根拠、B snapshotの完全性 |
+| 計画3 Skillのruntimeとowner verifier | 06の通常Markdown/JSON、草案保存と正式採用を分離 | 計画母集団・依存・承認対象・集計 |
+| `selection_contract.py` | 全revision内包を見直す。旧v1の読取検証、既存ID・選定理由・retirementを保持し、過去に採用した選定を既存履歴または必要な保存版で参照 | 選定・実装・実行の追跡、currentness |
+| `knowledge_runtime.py` | update_entry/plan_update/plan_replacementの通常CAS callback必須を撤廃。同一entryを更新し、統合・置換中断時は実際の関係entryを確認 | 適用条件・根拠・訂正・既存ref・currentness |
+| regression/exploration/reporting/defect/evaluationの各runtime | Run/Activity/Session・報告・欠陥候補・改善記録を既存形式で保存。通常改善採否・受領は実際の依頼者/受領者の確認を使い、専用認証サービスを必須にしない | 実行結果・報告、母集団、採用/適用/効果測定、外部操作認可 |
+| `ui_target_package.py`、`human_editing.py` | package固有writerと生成領域保護を維持し、不要なContext・provider条件を外す | 関連ファイル整合、安定ID、生成領域、必要な回復 |
+| `context_artifact_store.py`、`context_artifacts.py`、`context_workflow_state.py` | 3 kindの通常JSON保存・取得。全更新履歴、複数ファイルlock、related_preconditions、receipt相当の重複情報を削減。03の要求・分析・再開を保持 | 不変観察batch、訂正、候補根拠、元要求、未完了、実handoff結果 |
 
-表にないownerも01のマトリクスの保存要否に従い、既存契約に含まれる一律承認・外部設定依存を除く。QAの判断・採番・構造検証を削らない。
+既存規則を優先する。通常の同一正本は担当writerを一つにし、並行作業の出力先を分離して必要な結果を統合する。実際に共有する正本のみ既存Gitや運用による競合回避を行う。外部副作用・権限外操作は04の実認可を守る。保存・内容承認・現在性を別に判定する。保存結果不明は実保存先を読み、盲目的に再書込みしない。部分保存は実成果物と未保存依存を特定し、該当下流のみ採用保留。無断rollback・別正本化をしない。読取不能を不存在としない。
 
-### 既存ownerの保存入口
-
-- project-context は prepare_create/prepare_sections/prepare_update/prepare_ids の意味検証を通し、通常文書は生成した候補を許可済み既存ファイル操作で保存・確認する。persist_prepared の厳密保存は指定済み契約に限定する。旧DEC/ASMを失わない。
-- feature_registry の analyze/candidate_handoff は候補検証・引継ぎに利用する。code sourceを正式台帳へ反映する persist_snapshot は実Git列挙・reconcile_git_coverage・HEAD/前回source照合と履歴・再分類認可を維持し、通常新規/通常更新だけ保存承認を不要にする。未検証候補を正式台帳へ直接書かない。
-- item/condition は既存候補helperでID・履歴・親子・依存を検証して保存する。新規・隔離した通常更新は実ファイル操作、共有更新は既存storeの条件付き更新。e2e-test-selection は selection_contract の validate/impact と現行revision digest、qa-knowledge は既存entryのvalidate/lookup/create/update/revalidationを通す。推定で履歴やIDを再生成しない。
-- 計画3 Skillは01の形式別validate/readback/impact/completionを利用し、草案保存と正式承認を分ける。regression/exploration/reporting/defect/evaluation は各runtimeの生成・検証済み成果物を既存schemaで保存する。Runやimmutable snapshotは同一identityに異なる内容を書込まない。report_snapshot の実readbackを維持する。UI package、A/B、実行rawの専用writerは引き続き使用する。
-- 新しい共通保存APIを作らず、既存writerの実行前検証と実書込み/結果確認を分ける。必要な認可・意味検証を無効化して通常保存を実現しない。
-
-単独作業の新規文書は既存の通常ファイル保存と結果確認。新規作成時は対象確認を行い既存正本を上書きしない。既存文書の非破壊更新は対象・差分・必要履歴を確認する。共有writer、同一IDのcreate、実行副作用、正式snapshotや必要な過去revisionの再取得が関係する経路では既存の原子的作成・条件付き更新・履歴・必要なreadbackを利用する。単一writerであることを根拠なく仮定しない。既存標準操作で必要な保証が成立しない場合はその操作だけblockし、独立した分析を続行する。必要な保存技術は利用者へ選択させず、不足する具体的な場所・許可・運用条件のみ確認する。
-
-保存状態は、確認済み成功=保存済み、今回の書込なしが確認済み=未保存、書込後の確認不能=保存結果不明。内容承認やcurrentnessとは別に扱う。結果不明時は実保存先から結果を再取得して確認し、盲目的に再書込みしない。依存する複数成果物の部分保存は実際に保存したref/revisionと対応を確認し、必要な依存整合が取れるまで下流をcurrentとしない。無断rollback・別正本生成はしない。
-
-#38のPR本文はuser-confirmed保存案の参照資料であり、未mergeの内容を現行mainの契約とみなさない。mainにある既存store・各ownerの保存処理を改修対象とする。#40の通常保存と条件付き更新を再利用し、実保存・外部認可の必要な条件と対話上の内容承認を区別する。
+表にないSkillは01・05に従う。専用保存API、共通認証host、JSON DB、全成果物CAS・全履歴・receiptは作らない。不要になった入口・契約・設定・テストを除く。
 
 ## 実装3 質問と回答の正規化
 
@@ -88,16 +77,16 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 
 通常の内容承認は依頼者の明示判断と、対象となる実成果物/決定/適用範囲の記録で成立する。回答者が正式な決裁権限を持たない場合、組織の決裁契約や外部操作権限が必要な場合は該当経路を維持する。人間の明示承認を通常Git pushや専用認証サービスと結び付けない。既存の有効な厳密契約が指定された経路には引き続き従う。
 
-- `qa-workflow/SKILL.md`、`references/guidance.md` の進行モード、`assets/project-context-template.md` Section 10、routing fixtures、運用文書を同期。既定continuous、利用者が明示したgatedのみ有効。既存Section 10に値があっても無条件に進行を停止しない。利用者が現在の依頼で既存運用を明示適用した場合は、その明示条件として扱う。gatedは指定境界だけ停止し、仕様承認と混同しない。
+- qa-workflowのSKILL.md、guidance、Context Section 10、routing fixtureを同期する。既定continuous。現在の明示指定または既存の有効な利用者承認済みgated規則は指定境界で尊重する。旧実装の既定値や根拠不明の設定だけで停止しない。gatedと仕様承認を区別する。
 - 関連ownerの内容承認recordは対象・承認内容・必要なscope・根拠/変更影響を保持する。複数判断は関連性があり一緒に回答できる場合だけ集約し、部分承認・保留・拒否を正しく扱う。承認に影響する意味・適用範囲・期限の変更は再判断する。候補の自動保存や意味不変の表示編集のみで承認を取り消さない。
 - `test-requirements-analysis`、`test-architecture-design`、`test-management` の既存validatorは承認recordと意味/対象の束縛を検証するが、利用者本人性や組織認可を証明するものではない。通常の内容承認では実際の利用者回答を正本または既存質問回答記録へ結び付け、認証済み権限が必要な経路だけ実証拠を確認する。`test-evaluation` の改善採否・受領も同じ境界で変更する。元実績を変更しない。
-- 必須scopeの開始後除外は、元要求の保存を維持し、依頼者が明示した変更、対象scope・根拠・範囲・依存/副作用の影響を既存のQA要求・計画・質問回答またはworkflowの必要な記録に保持する。元依頼の完了と、変更後の依頼の完了を区別する。元要求を削除せず、同一依頼の縮小は03の同じworkflow_ref内の承認済み要求変更として扱う。v1/v2の `_exclusion_confirmed` はFalseを維持し、v3の変更履歴から現在必須となる集合を導出する。03の実装に従い、通常の依頼範囲変更と厳密な正式品質保証scopeの除外を区別する。#40の必須要求・attempt/runの履歴は消さない。
+- 必須scopeの開始後除外は元依頼と実際の変更指示・対象・理由・影響・必要権限を成果物または必要な再開記録に残す。03の現在の要求集合へ反映し、元依頼・過去完了・未解決副作用を消さない。正式品質保証scopeの縮小は必要な承認を守る。SQLite履歴・新v3を要求しない。旧v1/v2は当時の契約で読む。
 
 旧JSONの読取時は当時の版・承認証拠を検証する。現在の通常保存、内容承認、進行は01・06の新運用を適用し、JSON形式だけを理由に専用認証・保存承認を要求しない。承認対象の変更を伴う場合は旧承認を改竄せず候補として保存し、06の必要な履歴・新承認を扱う。
 
 ## 実装6 結果不明からの再開
 
-qa-workflowの既存state・成果物refを優先し、`artifact_graph.py` の `create_workflow_state` / `read_workflow_state` の旧JSON互換と既存SQLite state / baseline bindingを03の選択条件に従い必要時に利用する。通常の文書継続は保存済み正本と未解決質問で足りる場合stateを作らない。実副作用・共有writer・#40必須分析・formal WCAGなど独立した実証明が必要な場合は既存のstate保存境界を維持する。#40のhandoff intentは永続的な外部反映だけに使い、通常対話質問へ追加しない。実結果不明時のowner lookupと再試行は04。
+成果物refと質問回答を優先し、復元できない情報だけ既存JSON stateまたは通常Markdownに保持する。機械baseline、A/B必須分析、正式WCAGも03・04の必要成果物を用い、SQLiteを開始・再開条件にしない。旧DBは01に従う。外部反映の結果不明時だけ必要なhandoff記録を用い、通常対話質問にclaimを追加しない。
 
 再開時は、①現在依頼と保存済み要求・scope、②現行未解決Qと元定義・回答、③担当ownerの正式反映ref/revision（回答受領だけでは反映済みにしない）、④最も早い影響工程と保存・実行状態の順で照合する。成果物と質問記録から復元できない引継ぎだけ既存stateの unresolved/handoffs に保持する。部分保存や回答後中断では反映済みownerを再実行せず、未反映先だけ再開する。未保存・結果不明・現在採用不可を区別し、別sessionで復元不能ならその範囲を明示する。03の元要求と全体完了を保持する。
 

@@ -23,7 +23,7 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 4. 必要時の質問は「保存先・形式・運用ルールに指定はありますか。なければ標準で進めます」を基本とする。既知の指定・既存規則は再質問しない。専用Provider、CAS、revisionの方式選択を利用者に求めない。指定が必須の意味・安全条件と両立しない場合は具体的な制約と可能な方法を説明する。
 5. refは指定root内の実在する正本または許可direct refへ解決する。symlink、path traversal、別root同名、読取不能、列挙不全、重複を区別し、曖昧な正本への新規作成・更新だけ停止する。通常保存のための専用ハーネス・案件登録・root登録CLI・新しい全成果物indexは作らない。
 
-既定の相対配置は以下。利用者指定・既存配置が優先する。機械形式を独自形式へ変える指定は、必要な検証と相互利用が維持できる場合に適用する。
+既定の形式は人間向け文書は通常Markdown、機械処理用データはJSON。実行raw・HTMLなど必要な専用形式は維持し、同じ意味のMarkdownとJSONを二重保存しない。既定の相対配置は以下。利用者指定・既存配置が優先する。機械形式を独自形式へ変える指定は、必要な検証と相互利用が維持できる場合に適用する。
 
 ## 実装2 39 Skillの標準配置・保存粒度
 
@@ -38,23 +38,23 @@ IDが安全な単一path要素ならそのまま使う。そうでないrefや�
 <!-- dprint-ignore -->
 | Skill | 新規の既定相対path | 正本・保存粒度/例外 |
 | --- | --- | --- |
-| qa-workflow | `state/`、必要時 `reports/<scope>/workflow.md` | 既存UUID/SQLite/baseline/claim・input-revisions.jsonの契約を維持。必要時のみstate。報告は同じ状態の複製台帳にしない |
+| qa-workflow | 必要時 `state/<workflow-ref>/`、`reports/<scope>/workflow.md` | 復元不能な要求・未解決・再開・baseline参照のみMarkdownまたはJSON。SQLite不要 |
 | project-context | `context/PROJECT_CONTEXT.md` | QA目的・用語・DEC/ASM・環境等の共通文書。既存正本優先、必須の初期化なし |
 | feature-analysis | `features/feature-registry.json` | 現行snapshotのschema・source inventory・ID・履歴。既存writer固定名があれば維持 |
 | spec-analysis | `specifications/<scope>/specification.md` | Authority・US/UC/Behavior/AC/UNKNOWN、Machine Entity。UI package利用時はその専用構造、別正本を作らない |
 | ui-target-analysis | `specifications/<scope>/ui-target/` | ui-target-v1内部構造、既存single writer・履歴 |
 | question-analysis | `questions/<scope>/questions.md` | Q ID、根拠、元質問・回答履歴、状態・再開先。同一論点を重複発行しない |
 | agent-answer-form | `questions/<scope>/forms/<既存form IDまたは論点集合ID>/` | `questions.json`・`answer-form.html`、必要な旧定義/HTML・回答。単発フォームは指定先/許可作業dir |
-| test-requirements-analysis | `planning/<scope>/requirements.md`（計画固有は `planning/<scope>/<plan-key>/requirements.md`） | 新規の構造化Markdown正本。既存JSONの読取互換を維持 |
-| test-architecture-design | `planning/<scope>/architecture.md`（計画固有は `planning/<scope>/<plan-key>/architecture.md`） | 同上、割当・制約・根拠・承認 |
-| test-management | `planning/<scope>/<plan-key>/plan.md`（単一継続計画は `planning/<scope>/plan.md`） | 同上、計画・予定母集団・基準・履歴、独立の必要snapshotは既存形式 |
+| test-requirements-analysis | `planning/<scope>/requirements.md`（計画固有は `planning/<scope>/<plan-key>/requirements.md`） | 人間向けMarkdown、機械処理用JSON。06に従い一方を正本とする |
+| test-architecture-design | `planning/<scope>/architecture.md`（計画固有は `planning/<scope>/<plan-key>/architecture.md`） | 同じ形式選択。割当・制約・根拠・承認 |
+| test-management | `planning/<scope>/<plan-key>/plan.md`（単一継続計画は `planning/<scope>/plan.md`） | 同じ形式選択。計画・予定母集団・基準、必要snapshotは既存形式 |
 | test-analysis | `analysis/<scope>/risk-analysis.md` | Risk・重点・技法候補、Machine Entity |
 | test-item-analysis | `analysis/<scope>/test-items.json` | test-item-candidates-v1、ID・親子・履歴 |
 | test-condition-analysis | `analysis/<scope>/condition-candidates.json` | test-condition-candidates-v1、共有条件はcommonに一度だけ保存 |
 | test-requirement-design | `design/<scope>/requirements.md` | TR・Machine Entity・runtime契約 |
 | test-condition-design | `design/<scope>/conditions.md` | TCN/CI・Disposition・runtime契約 |
 | test-case-design | `design/<scope>/test-cases.md` | TC・データ・期待結果・runtime契約 |
-| e2e-test-selection | `automation/<scope>/selection.json` | 選定record・理由・履歴。owner verifierが要求する既存canonical形式を維持。人間向け表示は必要時のみ |
+| e2e-test-selection | `automation/<scope>/selection.json` | 選定理由・安定ID・必要な過去版。全snapshot内包は見直し、旧形式読取を維持 |
 | coverage-analysis | `reviews/<scope>/coverage.md` | coverage・gap・閉鎖性・必要runtime evidence |
 | adversarial-review | `reviews/<scope>/adversarial-review.md` | 独立指摘。単発は対話回答、継続時のみ保存 |
 | e2e-test-inspection | `automation/<scope>/e2e-inspection.md` | 実装可否・実効設定、調査のみなら必要時保存 |
@@ -69,14 +69,14 @@ IDが安全な単一path要素ならそのまま使う。そうでないrefや�
 | regression-testing | `regression/<scope>/baseline`、`regression/<scope>/<run>/` | baseline・membership・Activity・Run。内部名/拡張子は既存schema・writer優先 |
 | exploratory-testing | `exploration/<scope>/<session>/` | Charter・Session・Finding・Observation、既存形式 |
 | context-signal-audit | `cross-context/context-signal-batch/<identity>.json` | #40の不変batch、訂正batch。cross-contextを指定artifact rootとする |
-| context-rule-synthesis | `cross-context/context-rule-candidate/<identity>.json`、`cross-context/context-synthesis-run/<identity>.json` | #40の候補・run・履歴・条件付き更新 |
+| context-rule-synthesis | `cross-context/context-rule-candidate/<identity>.json`、`cross-context/context-synthesis-run/<identity>.json` | #40の候補・run・根拠・必要な履歴。通常JSON更新 |
 | qa-knowledge | `knowledge/<entry-ref>.md` | 現行entry形式、1 entry=1 artifact、意味identityを保持 |
 | defect-management | `defects/<scope>/defects.md` | 欠陥候補・外部Issue参照。外部操作は許可時のみ |
 | test-reporting | `reports/<scope>/<snapshot>/report.json` | immutable snapshot、既存owner verifierの形式/拡張子を維持。人間向け表示必要時 |
 | test-evaluation | `reports/<scope>/evaluation.md` | 活動評価・改善・効果測定。元実績は参照 |
 | usability-evaluation | `usability/<scope>/evaluation.md` | 資料評価・根拠・改善案 |
 | usability-inspection | `usability/<scope>/<run>/inspection.md` | live観測・測定、保護証跡は指定安全領域 |
-| wcag-conformance-evaluation | `usability/<scope>/<evaluation-ref>/`、`state/workflow-state.sqlite3` | Plan・sample・結果・report・EARL。正式stateの既存SQLite契約とreport形式を維持 |
+| wcag-conformance-evaluation | `usability/<scope>/<evaluation-ref>/` | Plan・sample・結果・正式closureのJSONと報告Markdown、必要時EARL。04の専用検証を維持しSQLite依存を解消 |
 
 feature-registry.json、selection.json、report.json は固定名のない新規保存の既定名。regressionのbaseline・membership・Activity・RunとexplorationのCharter・Session・Finding・Observationは既存schemaとowner単位を保ち、既存writerの固定名がない場合はそれぞれ baseline.json、membership.json、activity.json、run.json、charter.md、session.json、finding.json、observation.json（複数の独立identityは既存IDごとのファイル）とする。既存writerによる一括更新が必要な構造は分割しない。UI package、testware実行manifest/raw、#40の3 kindは専用writerの実契約が正本であり改名しない。現行固定名を照合し成果物マトリクスへ記載する。形式を二重化せず、既存のwriterやschemaの目的を満たすことを確認する。この確認は利用者への設計質問にしない。
 
@@ -110,13 +110,11 @@ feature-registry.json、selection.json、report.json は固定名のない新規
 
 Contextからrootを取得する既存呼出し（workflow_state_root_from_project_context、workflow_state_context_from_project_context、Knowledge/feature/defect/Regressionの入力）では、同じ意味の明示値を優先して受け、未設定時は上表を使う。架空のContext本文や設定値を生成して必須チェックを通さない。旧Contextはそのまま読める。
 
-## 実装4 計画3 Skillの人間向け正本
+## 実装4 計画3 Skillの正本形式
 
-新規のQA要求・architecture・計画は指定がなければMarkdownを唯一の保存正本とする。JSON指定があれば06のv2 JSONを利用する。既存JSON packetを新規正本と二重保存しない。現行JSON資産はその形式のまま読取・更新できる。自動変換は行わず、利用者が形式指定した場合は互換経路を用いる。変更によって既存の機械集計・承認・依存の意味を欠落させない。
+QA要求・architecture・計画は人間向けなら通常Markdown、機械集計が主用途ならJSON。指定・既存形式を優先し同一内容を二重正本化しない。専用JSON block・固定escape・厳密Markdown文法を強制しない。既存v1 JSONを読み取り、必要な機械処理は実際に使う入力を既存validatorへ渡す。
 
-対象: `skills/test-requirements-analysis/scripts/qa_requirement_runtime.py`、`skills/test-architecture-design/scripts/architecture_runtime.py`、`skills/test-management/scripts/management_runtime.py`、各 `SKILL.md` / `references/data-contract.md` / `references/guidance.md` / `assets/output-template.md`、`qa-workflow/scripts/owner_verifiers.py` の `_stored_owner_artifact`、`_verify_requirements`、`_verify_architecture`、`_verify_management`、報告・計画・方式の既存packet読取側。
-
-具体的なv2 schema、表・機械管理block、承認対象と実績の区別、旧JSONの読取・更新、人間編集時の承認済み内容の保全は[06 計画成果物の形式・承認](2026-11-27_111830_qa-operating-improvements_06_planning-artifact-contract.md)を正本とする。既存のvalidate/impact/completion_check/build_snapshotを再利用し、形式判定・保存hash・承認束縛に必要な部分だけ変更する。旧JSONの過去検証を維持しつつ、新規JSON指定と既存JSONの現在の通常保存に02の新運用を適用する。無断移行や二重正本は作らない。
+[06 計画成果物の形式・承認](2026-11-27_111830_qa-operating-improvements_06_planning-artifact-contract.md)に従いvalidate/impact/completion_check/build_snapshotの意味・集計・承認を維持する。v2形式・共通parserの新設は既定としない。
 
 ## 実装5 人間編集・履歴・保護・互換性
 
@@ -124,6 +122,8 @@ Contextからrootを取得する既存呼出し（workflow_state_root_from_proje
 - 継続文書は安定ファイル名。Q/DEC/ASM/ITEM/COND/Entityの安定ID・retire・履歴は各owner。正式報告・依存再現・実行のRun/Attempt/snapshotを保持する。全更新の連番ファイル複製は不要。必要な旧フォームの復元は02。
 - `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。
 - 既存配置をdirect ref/許可rootで読取・更新できるようにする（OPS-17）。標準化を理由に既存資産を移動・改名・再保存しない。別rootの同名refを分離する。実際に移行が必要な場合だけ、対象・旧新ref・履歴・依存・互換読取・条件付き切替・rollbackを別途合意する。無断移行やrollbackはしない。
+
+既存DB候補は `.qa-context-feature/artifacts.sqlite3` と `workflow-state.sqlite3`。許可済み利用先の存在を確認し、必要な場合だけ旧DBの読取・export、内容・ID・参照・必要な過去版の照合を用意する。実資産未確認を移行完了とせずDBを削除しない。既存Git専用branchの正本やviewは明示された運用として扱い、無断で移さない。
 
 ## 検証・完了条件
 
