@@ -40,9 +40,17 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 | `e2e-test-selection/scripts/selection_contract.py`、`qa-knowledge/scripts/knowledge_runtime.py` | 通常保存の不要な承認を外し、既存schemaと選定/entryの同一性・currentnessを維持。改善承認に由来する更新は該当承認を保持 | 同一entry競合、replacement・履歴・既存refの一貫性、選定理由 |
 | `regression-testing/scripts/regression_runtime.py`、`exploratory-testing/scripts/exploratory_runtime.py`、`test-reporting/scripts/reporting_runtime.py`、`defect-management/scripts/defect_runtime.py`、`test-evaluation/scripts/evaluation_runtime.py` | Run/Activity/Session・報告・欠陥候補・改善記録を許可先へ保存。元結果の再判定、既存snapshot更新、外部Issue作成は通常保存と分離 | immutable結果/報告、安定ref、必要履歴・実行証拠、外部認可 |
 | `spec-analysis` / `ui-target-analysis` の既存 `ui_target_package.py`、`human_editing.py` | 専用writerを必要とするpackageだけ適用。通常Markdownへ一律拡大しない | packageの生成領域・ID・scope・履歴・atomic境界 |
-| `scripts/context_artifact_store.py`、`scripts/context_artifacts.py`、`context_workflow_state.py` | #40の実装をそのまま利用する。通常QA文書に3 kindの制約を広げない | immutable batch、関連候補の同一保存境界、runの再開・必要なhistory |
+| `scripts/context_artifact_store.py`、`scripts/context_artifacts.py`、`context_workflow_state.py` | #40の保存実装を利用する。stateの要求追加・完了は03の契約に従い、通常QA文書に3 kindの制約を広げない | immutable batch、関連候補の同一保存境界、runの再開・必要なhistory |
 
 表にないownerも01のマトリクスの保存要否に従い、既存契約に含まれる一律承認・外部設定依存を除く。QAの判断・採番・構造検証を削らない。
+
+### 既存ownerの保存入口
+
+- project-context は prepare_create/prepare_sections/prepare_update/prepare_ids の意味検証を通し、通常文書は生成した候補を許可済み既存ファイル操作で保存・確認する。persist_prepared の厳密保存は指定済み契約に限定する。旧DEC/ASMを失わない。
+- feature_registry の analyze/candidate_handoff は候補検証・引継ぎに利用する。code sourceを正式台帳へ反映する persist_snapshot は実Git列挙・reconcile_git_coverage・HEAD/前回source照合と履歴・再分類認可を維持し、通常新規/通常更新だけ保存承認を不要にする。未検証候補を正式台帳へ直接書かない。
+- item/condition は既存候補helperでID・履歴・親子・依存を検証して保存する。新規・隔離した通常更新は実ファイル操作、共有更新は既存storeの条件付き更新。e2e-test-selection は selection_contract の validate/impact と現行revision digest、qa-knowledge は既存entryのvalidate/lookup/create/update/revalidationを通す。推定で履歴やIDを再生成しない。
+- 計画3 Skillは01の形式別validate/readback/impact/completionを利用し、草案保存と正式承認を分ける。regression/exploration/reporting/defect/evaluation は各runtimeの生成・検証済み成果物を既存schemaで保存する。Runやimmutable snapshotは同一identityに異なる内容を書込まない。report_snapshot の実readbackを維持する。UI package、A/B、実行rawの専用writerは引き続き使用する。
+- 新しい共通保存APIを作らず、既存writerの実行前検証と実書込み/結果確認を分ける。必要な認可・意味検証を無効化して通常保存を実現しない。
 
 単独作業の新規文書は既存の通常ファイル保存と結果確認。新規作成時は対象確認を行い既存正本を上書きしない。既存文書の非破壊更新は対象・差分・必要履歴を確認する。共有writer、同一IDのcreate、実行副作用、正式snapshotや必要な過去revisionの再取得が関係する経路では既存の原子的作成・条件付き更新・履歴・必要なreadbackを利用する。単一writerであることを根拠なく仮定しない。既存標準操作で必要な保証が成立しない場合はその操作だけblockし、独立した分析を続行する。必要な保存技術は利用者へ選択させず、不足する具体的な場所・許可・運用条件のみ確認する。
 
@@ -70,7 +78,7 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 
 `agent-answer-form/SKILL.md`・`references/json-format.md`・`scripts/build_form.py`・既存Node/Pythonテストを使用する。単発質問は通常対話/Markdown。複数の独立質問をまとめる方が効率的な場合にフォームを利用する。質問の採否・仕様決定・進行制御をフォームSkillに追加しない。
 
-- 質問JSONのQ IDは元質問のID。フォームの `formId`、定義hash、Q IDと回答Markdownを照合し、意味が変わる質問は旧回答を流用しない。利用者にJSON/HTMLの整合検証を求めない。
+- 質問JSONのQ IDは元質問のID。assets/form.js の exportMarkdown でフォームIDと各回答のQ ID・既存 q._definitionHash を自動出力する。コピー・保存の両経路に同じ情報を含め、build_form.py が埋め込む実定義と照合する。フォームIDが一致しても定義hashが異なる質問は保留する。旧出力は元フォーム・対象scope・Q ID・定義を一意に対応付けられる場合のみ利用し、不明な回答だけ再確認する。hashは意味対応の識別であり本人性の証明ではない。利用者にhash入力やJSON/HTML整合検証を求めない。
 - 定義変更前のHTML・元JSON・元質問は未回収回答の回収に必要な間保持する。現行のlocalStorage v4/v3契約を維持し、旧HTMLを同じブラウザ・保存領域で開けば旧回答を回収できることを実テストする。元JSONから旧HTMLを再生成する方法で同等の保存領域/キーが確実に利用できることを実証できる場合だけ保管を簡素化する。再生成が成立しない場合は旧HTML保管を継続する。
 - 質問の意味変更、表示番号のみ変更、部分回答、保留、推奨未選択、古い定義、未保存、複数form、別scope、秘密情報を検証する。回答回収不能を「未回答だった」と推定しない。未保存の候補は現在の対話で返すが別sessionの復元保証をしない。
 
@@ -81,11 +89,13 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 - `qa-workflow/SKILL.md`、`references/guidance.md` の進行モード、`assets/project-context-template.md` Section 10、routing fixtures、運用文書を同期。既定continuous、利用者が明示したgatedのみ有効。既存Section 10に値があっても無条件に進行を停止しない。利用者が現在の依頼で既存運用を明示適用した場合は、その明示条件として扱う。gatedは指定境界だけ停止し、仕様承認と混同しない。
 - 関連ownerの内容承認recordは対象・承認内容・必要なscope・根拠/変更影響を保持する。複数判断は関連性があり一緒に回答できる場合だけ集約し、部分承認・保留・拒否を正しく扱う。承認に影響する意味・適用範囲・期限の変更は再判断する。候補の自動保存や意味不変の表示編集のみで承認を取り消さない。
 - `test-requirements-analysis`、`test-architecture-design`、`test-management` の既存validatorは承認recordと意味/対象の束縛を検証するが、利用者本人性や組織認可を証明するものではない。通常の内容承認では実際の利用者回答を正本または既存質問回答記録へ結び付け、認証済み権限が必要な経路だけ実証拠を確認する。`test-evaluation` の改善採否・受領も同じ境界で変更する。元実績を変更しない。
-- 必須scopeの開始後除外は、元要求の保存を維持し、依頼者が明示した変更、対象scope・根拠・範囲・依存/副作用の影響を既存のQA要求・計画・質問回答またはworkflowの必要な記録に保持する。元依頼の完了と、変更後の依頼の完了を区別する。元要求を削除しない。`_exclusion_confirmed` を無条件Trueにしない。03の実装に従い、通常の依頼範囲変更と厳密な正式品質保証scopeの除外を区別する。#40の必須要求・attempt/runの履歴は消さない。
+- 必須scopeの開始後除外は、元要求の保存を維持し、依頼者が明示した変更、対象scope・根拠・範囲・依存/副作用の影響を既存のQA要求・計画・質問回答またはworkflowの必要な記録に保持する。元依頼の完了と、変更後の依頼の完了を区別する。元要求を削除せず、縮小時は03の別workflow_refへ引き継ぐ。`_exclusion_confirmed` はFalseを維持する。03の実装に従い、通常の依頼範囲変更と厳密な正式品質保証scopeの除外を区別する。#40の必須要求・attempt/runの履歴は消さない。
 
 ## 実装6 結果不明からの再開
 
-qa-workflowの既存state・成果物refを優先し、`artifact_graph.py` の `create_workflow_state` / `read_workflow_state` / SQLite state / baseline bindingを必要時に利用する。通常の文書継続は保存済み正本と未解決質問で足りる場合stateを作らない。実副作用・共有writer・#40必須分析・formal WCAGなど独立した実証明が必要な場合は既存のstate保存境界を維持する。#40のhandoff intentは永続的な外部反映だけに使い、通常対話質問へ追加しない。実結果不明時のowner lookupと再試行は04。
+qa-workflowの既存state・成果物refを優先し、`artifact_graph.py` の `create_workflow_state` / `read_workflow_state` の旧JSON互換と既存SQLite state / baseline bindingを03の選択条件に従い必要時に利用する。通常の文書継続は保存済み正本と未解決質問で足りる場合stateを作らない。実副作用・共有writer・#40必須分析・formal WCAGなど独立した実証明が必要な場合は既存のstate保存境界を維持する。#40のhandoff intentは永続的な外部反映だけに使い、通常対話質問へ追加しない。実結果不明時のowner lookupと再試行は04。
+
+再開時は、①現在依頼と保存済み要求・scope、②現行未解決Qと元定義・回答、③担当ownerの正式反映ref/revision（回答受領だけでは反映済みにしない）、④最も早い影響工程と保存・実行状態の順で照合する。成果物と質問記録から復元できない引継ぎだけ既存stateの unresolved/handoffs に保持する。部分保存や回答後中断では反映済みownerを再実行せず、未反映先だけ再開する。未保存・結果不明・現在採用不可を区別し、別sessionで復元不能ならその範囲を明示する。03の元要求と全体完了を保持する。
 
 ## 検証・完了条件
 

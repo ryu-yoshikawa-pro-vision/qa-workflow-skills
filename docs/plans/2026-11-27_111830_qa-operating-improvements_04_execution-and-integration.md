@@ -33,6 +33,13 @@ OPS-06・07・08・10・16・18。独立したQA活動の並行実行を不要�
 4. 副作用の重複防止は対象操作を基準にする。#40の `semantic_handoff_key` と既存ownerの実ref・lookup・一意性・readbackを活用する。通常の対話質問提示にはhandoff claimを要求しない。別ref・異なるworkflowの同じ外部Issue/質問/Knowledge作成で実ownerの一意性が証明できない場合は、実ownerの反映があるか調査し、必要条件が不足するcreateをblockする。fixtureやハッシュの一致だけで跨ownerの一意性を保証しない。
 5. [#22マージ判断](../implementation/pr22/merge-decision-2026-11-14.md)の過去記録は上書きしない。改修された現行の同一案件並列条件は新しい担当契約へ明記し、現行文書から旧一律制約を除く。過去対象外の実環境は別途必要な認可を得て検証する。
 
+### 呼出し経路ごとの扱い
+
+- test-target-inspection、e2e-test-inspection、読取だけのusability-inspection/探索、分析・レビューは汎用claim/reservationを呼ばない。実データ変更を伴う探索・観測は実行ownerの操作前条件へ進む。
+- test-execution は個別TCの実操作・attempt・副作用上限・cleanupを既存ownerで確認し、共有ユーザー/データへの操作でのみ実予約を要求する。E2E/testwareはrunner固有の実開始、隔離、manifest、cleanupを使用し、同じ実行を別の汎用claimで二重管理しない。
+- defect-management の外部Issue、A/Bからの質問・Knowledge・欠陥の永続handoffは実ownerの一意性・pending intent・readbackを利用する。対話質問やローカル候補のみなら外部claim不要。実ownerの保証がない外部createは対象だけ停止する。
+- artifact_graph.py の claim_mutable_operation/read_mutable_operation_claim は実副作用で既存ownerに冪等開始がない経路だけ残す。recover_claim/reserve_shared_resource/release_shared_resource は既存の実owner/環境が安全に実行できる場合だけ接続し、実接続のない能力フラグを認可・予約成功へ読み替えない。呼出し元がないことを確認できた管理専用CLI/設定は除去する。過去のclaim/予約は状態不明のまま勝手に解除・削除しない。
+
 ## 実装2 実行から報告までの横断処理
 
 対象Skillは `e2e-test-inspection`、`e2e-test-implementation`、`e2e-test-execution`、`e2e-test-result-analysis`、`e2e-test-reporting`、`test-execution`、`testware-implementation`、`testware-execution`、`regression-testing`、`exploratory-testing`、`defect-management`、`test-reporting`、`test-evaluation`。対応する既存reference・template・runtime/runnerを修正する。
@@ -50,6 +57,10 @@ OPS-06・07・08・10・16・18。独立したQA活動の並行実行を不要�
 | 終了・評価 | 合否、取得完全性、終了基準、必要cleanup、workflow完了、リリース判断を分ける。計画なし/母集団不明では全体率・終了判定undetermined。FAILを含む必要工程完了は可能 |
 
 実際に同じ値を複数成果物へ保存している場合は、独立した正式snapshot・過去結果の再現など保存理由があるか確認し、不要な複製は参照へ置換する。必要な元結果・実行証拠を削らない。テストの実行基盤・既存Playwright選択順は今回の改善で勝手に変更しない。利用者の明示したCLI等の条件がある場合は既存安全契約と両立する形で扱う。
+
+### 引継ぎ時と実行直前の確認
+
+inspectionの成果物から対象build、実効設定、locator/fixture、選定ID、検証可能性、必要環境・データを再利用する。E2Eは現在checkout・runner設定・対象suite・認証/データ隔離を開始直前に確認する。非E2Eはtestwareの許可checkout・manifest・対象test・保護領域・timeout/cleanupを確認する。直接TCはTC ID/期待根拠と実行前YAMLを再利用し実環境・状態・権限・操作上限を確認する。Regressionはbaseline/membership/Run予定の選択と元結果ref、ExplorationはCharter/Session/Finding/観測条件を再利用し、実対象・時点・操作条件を再確認する。build・対象・権限・環境・データが変わったら影響する実行範囲だけ見直す。全ownerで実開始していない結果をPASS/FAILにせず、必要cleanupが不明なら実行完了としない。統合報告には計画母集団と取得・実行・判定状態を引継ぎ、別目的の集計を混ぜない。
 
 ## 実装3 証跡保護・結果不明・cleanup
 

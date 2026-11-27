@@ -25,9 +25,13 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 
 ## 実装2 39 Skillの標準配置・保存粒度
 
-`<root>` は前節で解決した成果物root。以下の `<scope>` は既存の機能ID・対象ID・安定scope refを優先したディレクトリ名。案件横断は `common`。明示的に区別される複数対象・build・環境・Runを同じ正本へ上書きしない。ID未付与の単発新規成果物では利用者指定の対象名を安全なファイル名にし、既存ref/対象との衝突時のみ既存ID又は正規scopeのdigestを付ける。ID自体はファイル名から生成しない。Windows等の禁止文字、大小文字衝突、`.`・`..`・予約名、root逸脱を既存ファイル操作で拒否する。必要なディレクトリだけ生成する。
+`<root>` は前節の成果物root。既存正本の探索を先に行い、同じowner・論理対象・用途の有効な正本が一つならpathや形式を変更しない。新規の `<scope>` は単一機能なら既存FEAT ID、単一の別対象なら担当ownerの安定対象ID、複数対象なら既存の安定scope ref、案件横断なら common を用いる。複数対象で既存refがなければ対象の安定ref集合を重複除去・辞書順にしてscopeを構成する。IDを新規発行する必要がない単発対象では対象の正式名と情報源refを用いる。source revision、時刻、作業Agent名は継続成果物のidentityに含めない。
 
-表のファイル名は本Planの提案する新規成果物の既定値。既存writerがファイル名・内部構造を固定しているものは、そのwriterの契約を維持する。`<run>`、`<attempt>`、`<snapshot>`、`<entry-ref>`、`<workflow-ref>` は担当ownerの既存識別子を用いる。正式な正本が存在する場合はこの表より既存refを優先する。
+IDが安全な単一path要素ならそのまま使う。そうでないrefや対象名を使う場合は、UTF-8の正規化NFC文字列に対するSHA-256の全64桁を使用する（複数要素は既存canonical JSONの配列としてhash）。名称変更時は既存正本を先に見つけてrefを維持する。Windows予約名・大小文字衝突・禁止文字・root逸脱がある場合も同じdigest方式を使い、実在する別identityに衝突したら上書きせず確認する。ファイル名を採番の根拠にしない。
+
+継続する同じ対象の仕様・設計は同一正本へ更新する。並立する計画は計画の既存ID、なければ明示された対象release/build・期間・環境の組を上記digestで区別し `planning/<scope>/<plan-key>/` 配下に置く。QA要求・方式が同じ計画固有の対象を持つ場合は同じ計画ディレクトリへ保存し、複数計画で共用する有効な要求・方式は既存refで参照する。一つの継続計画の改版は同じpath。実行・観測・報告は既存run/attempt/snapshot/evaluation/session identityで分離する。例: FEAT-001の設計は design/FEAT-001/test-cases.md、別環境のrunは実行ownerが発行した別runのディレクトリ、既存の tests/design/foo.md が同じ正本ならその場所のまま。新規中央台帳・命名サービスは不要。
+
+表のファイル名を新規成果物の既定値とする。既存writerがファイル名・内部構造を固定しているものは、表のディレクトリをwriterへ渡し、その固定名・拡張子・公開単位を変更しない。`<run>`、`<attempt>`、`<snapshot>`、`<entry-ref>`、`<workflow-ref>` は担当ownerの既存識別子を用いる。正式な正本が存在する場合はこの表より既存refを優先する。
 
 <!-- dprint-ignore -->
 | Skill | 新規の既定相対path | 正本・保存粒度/例外 |
@@ -39,9 +43,9 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 | ui-target-analysis | `specifications/<scope>/ui-target/` | ui-target-v1内部構造、既存single writer・履歴 |
 | question-analysis | `questions/<scope>/questions.md` | Q ID、根拠、元質問・回答履歴、状態・再開先。同一論点を重複発行しない |
 | agent-answer-form | `questions/<scope>/forms/<既存form IDまたは論点集合ID>/` | `questions.json`・`answer-form.html`、必要な旧定義/HTML・回答。単発フォームは指定先/許可作業dir |
-| test-requirements-analysis | `planning/<scope>/requirements.md` | 新規の構造化Markdown正本。既存JSONの読取互換を維持 |
-| test-architecture-design | `planning/<scope>/architecture.md` | 同上、割当・制約・根拠・承認 |
-| test-management | `planning/<scope>/plan.md` | 同上、計画・予定母集団・基準・履歴、独立の必要snapshotは既存形式 |
+| test-requirements-analysis | `planning/<scope>/requirements.md`（計画固有は `planning/<scope>/<plan-key>/requirements.md`） | 新規の構造化Markdown正本。既存JSONの読取互換を維持 |
+| test-architecture-design | `planning/<scope>/architecture.md`（計画固有は `planning/<scope>/<plan-key>/architecture.md`） | 同上、割当・制約・根拠・承認 |
+| test-management | `planning/<scope>/<plan-key>/plan.md`（単一継続計画は `planning/<scope>/plan.md`） | 同上、計画・予定母集団・基準・履歴、独立の必要snapshotは既存形式 |
 | test-analysis | `analysis/<scope>/risk-analysis.md` | Risk・重点・技法候補、Machine Entity |
 | test-item-analysis | `analysis/<scope>/test-items.json` | test-item-candidates-v1、ID・親子・履歴 |
 | test-condition-analysis | `analysis/<scope>/condition-candidates.json` | test-condition-candidates-v1、共有条件はcommonに一度だけ保存 |
@@ -72,7 +76,7 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 | usability-inspection | `usability/<scope>/<run>/inspection.md` | live観測・測定、保護証跡は指定安全領域 |
 | wcag-conformance-evaluation | `usability/<scope>/<evaluation-ref>/`、`state/workflow-state.sqlite3` | Plan・sample・結果・report・EARL。正式stateの既存SQLite契約とreport形式を維持 |
 
-上表の既存機械writer優先の行（feature、selection、regression、exploration、reporting等）は、実装者が当該data-contract・writerの現行ファイル名/拡張子を確認し、既定の具体名を成果物マトリクスとowner契約に記載する。既存writerに固定名がないものは論理名に対応する `.json`（機械正本）、`.md`（人間向け正本）を用いる。形式を二重化せず、既存のwriterやschemaの目的を満たすことを確認する。この確認は利用者への設計質問にしない。
+feature-registry.json、selection.json、report.json は固定名のない新規保存の既定名。regressionのbaseline・membership・Activity・RunとexplorationのCharter・Session・Finding・Observationは既存schemaとowner単位を保ち、既存writerの固定名がない場合はそれぞれ baseline.json、membership.json、activity.json、run.json、charter.md、session.json、finding.json、observation.json（複数の独立identityは既存IDごとのファイル）とする。既存writerによる一括更新が必要な構造は分割しない。UI package、testware実行manifest/raw、#40の3 kindは専用writerの実契約が正本であり改名しない。現行固定名を照合し成果物マトリクスへ記載する。形式を二重化せず、既存のwriterやschemaの目的を満たすことを確認する。この確認は利用者への設計質問にしない。
 
 ## 実装3 project-contextの責務
 
@@ -83,6 +87,27 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 - `artifact_graph.py` の `parse_project_context`、`validate_required_context_fields`、`compare_used_context` と各Skillの呼出し元で、Context未作成を一律blockedにする経路を外す。必要なfieldの明示入力で成立させる。利用したfieldのcurrentnessは維持する。
 - 独立SkillはQAの意味管理とDEC/ASM更新の責務があるため維持する。配置管理削除後にその責務が他ownerと実際に完全重複していると確認された場合のみ、05の構成評価で統合を判断する。
 
+### Contextなしで利用する入力
+
+明示入力、有効な既存正本、許可済み環境、以下の既定の順で必要fieldだけ解決する。parse_project_context と validate_required_context_fields はContextが入力された場合に内容を検証する。既存stable keyは入力の意味名として維持し、Context文書作成を要求しない。利用した値と根拠だけをcompare_used_contextへ渡す。
+
+<!-- dprint-ignore -->
+| 既存field/意味 | 未指定時の取得・扱い |
+| --- | --- |
+| QA目的・対象・優先順位・DEC/ASM・用語 | 現依頼、既存仕様/決定、担当SkillのAuthority解決。正式な決定不足のみ質問 |
+| 環境・認証・データ・非機能制約 | 許可済み実行環境と指定資料。実行不能なら実行のみ停止 |
+| qa.regression_scope / qa.regression_policy | 依頼scope、既存baseline/方針、担当Skillのリスク判断。必要範囲不明なら質問 |
+| qa.knowledge_root | 既存配置、なければ <root>/knowledge |
+| qa.workflow_state_root | 継続・機械baseline・正式WCAG・必須A/Bに必要な場合のみ <root>/state |
+| qa.reservation_root | 実予約経路が必要な場合だけ既存指定。共有操作の安全が確認できなければ該当操作停止 |
+| qa.auxiliary_testware_refs / qa.feature_source_refs | 直接refと許可範囲で発見した実資料、未取得は明示 |
+| qa.feature_artifact_root | 既存配置、なければ <root>/features |
+| qa.feature_base_ref | 実Git差分・保存済みsource revision。なければ初回として扱い差分取得済みとしない |
+| qa.feature_approval_policy_ref | 指定された正式再分類・組織決裁にのみ適用。通常保存では不要 |
+| qa.defect_issue_tracker_ref | 指定・既存の有効な外部連携先。なければローカル候補まで |
+
+Contextからrootを取得する既存呼出し（workflow_state_root_from_project_context、workflow_state_context_from_project_context、Knowledge/feature/defect/Regressionの入力）では、同じ意味の明示値を優先して受け、未設定時は上表を使う。架空のContext本文や設定値を生成して必須チェックを通さない。旧Contextはそのまま読める。
+
 ## 実装4 計画3 Skillの人間向け正本
 
 新規のQA要求・architecture・計画はMarkdownを唯一の保存正本とする設計を採用する。既存JSON packetを新規正本と二重保存しない。現行JSON資産はその形式のまま読取・更新できる。自動変換は行わず、利用者が形式指定した場合は互換経路を用いる。変更によって既存の機械集計・承認・依存の意味を欠落させない。
@@ -91,12 +116,13 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 
 具体方式:
 
-1. 各data-contractにあるpacket→Markdown対応表を使い、既存templateの見出しを基本に、必要なフィールドが一対一に読める表へ修正する。メタデータ・単一objectは項目/値表、配列は既存IDを持つ行の表とする。複合objectの列は意味に沿って分割し、配列セルはJSON配列（空配列は `[]`）、深い複合値だけJSON objectセルを許容する。本文・根拠・説明文は可読な文字列とし、改行は `\n`、区切りの `|` は `\|`、バックスラッシュは `\\` にescapeする。nullと空文字を区別する（nullable列の `null`、文字列のliteral `null` は引用文字列）。型・必須列・既存enumはdata-contractに明記する。必要な未確定値を欠落させず、未確定の状態を現行enumで表す。行順に意味がある配列は順序を保持する。
-2. Markdown parserは各ownerの既存runtimeに入口を追加する。明示的な見出し・列・ID・値型を検査し、既存packetと等価なobjectへ変換する。曖昧な列・重複ID・未知の必須値・不正escapeは該当箇所を返す。既存の `validate` / `impact` / `completion_check` / `build_snapshot` には変換したobjectを渡す。新しい汎用文書schema、LLMによるJSON復元、外部依存を前提としない。実際に共通となる小さな表の読取処理のみ必要時再利用し、単体配布で失敗しないことを検証する。
-3. QA要求の `purpose`（対象/対象外を分離）、`sources`（hash/acquisition/未取得理由）、`requirements`、`open_items`、`approval`、`downstream`、`history` の全項目を対応付ける。architectureの `requirement_coverage`、`assignments`（level/type/measurement/automation/selection_basis/approval_id/依存/下流ref等）、`sources`、`constraints`、`open_items`、`change_impacts`、`history` を保持する。計画の `planned_sources`、`planned_populations`、`readbacks`（actual/zero_check含む）、`plan_items`、`criteria`、`project_risks`、`corrective_actions`、`differences`、`approval`、`history`、`monitoring` を保持する。テンプレートにない列を補い、同じ情報の重複記述を正本扱いしない。
-4. 原文Markdownの保存byte SHA-256と、変換した意味objectのfingerprintを区別する。実際の保存照合はMarkdown bytes、既存の意味fingerprintは正規化objectで求める。revisionは既存ownerの論理版・保存先revisionの意味を維持し、承認の対象となる内容が変わらない見た目の変更で不要な承認失効を起こさない。正式承認済みの過去revisionを必要時に再取得できるよう保持する。既存architecture `content_fingerprint` は自己fieldを除く既存算法で算出する。導出されるcurrentness・集計値は原則保存正本の二重入力にせず、正式報告snapshotに必要な値は既存の再計算・照合契約を維持する。
-5. owner verifierは原文保存内容・実ref・revisionを読み、対応形式を判別する。Markdownを変換してvalidate/impact/completionへ渡すが、JSONへ変換したbyte hashを原文readbackとして使わない。旧JSON verifierは従来のcanonical JSON hashを維持する。schema判別に失敗したら勝手に別形式として採用しない。必要な64 KiB例外は実際の契約経路に限定し、他の入力制限を全体緩和しない。
-6. 同一論理内容の旧JSON・新Markdownをfixtureとして比較し、要求・割当・母集団・集計・承認・影響結果が等価であることを確認する。利用者がMarkdown表を直接編集した場合に必要な意味変更のみ再判断し、生成領域の改変を見逃さない。編集後の承認・保存は02に従う。既存JSONからMarkdownへの移行作業は別途合意する。
+1. 新規正本は既存templateを基に、人間が判断・編集する情報を見出し・通常の表に置く。QA要求の purpose/requirements/open_items、architectureの requirement_coverage/assignments/constraints/open_items、計画の plan_items/criteria/planned_populations/project_risks/corrective_actions/differences を人間向けの正本とする。行は既存IDを使用し、自由記述は読みやすい本文・表とする。配列や複合値を大量のJSONセルにしない。型、必須列、行順が意味を持つ場合の扱い、改行・区切りのescapeは各data-contractで固定する。
+2. source inventory、依存ref/revision/hash、approval record、history、機械的なcoverage/assignment参照集合、実取得readbacks（actual/zero_checkを含む）、monitoringなどは表で表現しにくい機械専用項目だけを、同じMarkdown内のowner固有の機械管理JSON block（既存Machine blockの区切り方式を利用）または既存の独立した正式snapshotに保持する。人間向け表と同じ意味の値を再入力するJSON正本を作らず本文IDを参照する。実取得/実績の正本は元ownerを参照し、closureに必要な当時のsnapshotだけを保持する。集計・currentnessは既存処理で導出する。
+3. 各owner runtimeに新形式は既存packet schemaの次versionとしてメタデータに明示し、旧JSONのschema値を流用しない。旧schemaの判別・読取を維持し、Markdown読取入口で表の行と機械専用block/refを合成して既存意味objectへ変換する。全既存packetフィールドを人間向け表・機械block・既存snapshot・導出値のいずれか一箇所に割当て、data-contractの対応表を更新する。曖昧な列、重複ID、同じ意味の重複、必須値欠落、生成領域改変を拒否する。新形式を旧canonical JSONとみなさない。従来の validate/impact/completion_check/build_snapshot を再利用し、形式判定・保存hash・承認束縛に必要な部分だけ分岐する。汎用Markdown frameworkや別保存層は追加しない。旧JSONの全fieldと新形式の等価性をfixtureで検証する。
+4. 保存byte hashは原文UTF-8 bytesのSHA-256。意味上の承認対象は既存canonical JSON化の方法で計算する。新形式の承認対象projectionはQA要求なら owner/artifact_ref/scope/target_period/purpose/requirements/open_items と適用sourceの意味・取得条件、architectureなら owner/artifact_ref/scope/requirement_coverage/assignments/constraints/open_items・level選択の根拠と必要source、計画なら owner/artifact_ref/scope/target/plan_version/planned_sources/planned_populations/plan_items/criteria・計画上のrisk/是正/差異の決定内容。承認record自身・履歴・単なる表示・保存版・現在の集計値・後続readbackを計画承認のhashに混ぜない。各sourceの意味を確認できないときはrevision/hash変更を安全側で再評価する。risk受容、是正完了、終了判定はそれぞれ既存証拠/承認の束縛を維持し、計画承認で代用しない。
+5. qa_requirement_runtime.py の承認revision、architecture_runtime.py の _check_approval（content_fingerprint と expected_revision）、management_runtime.py の _parse_approval を新形式についてのみ改修する。承認recordは実際に承認した内容projectionのhash・scope/ref・当時の保存revision・根拠を保持する。表示変更時は現行保存revisionを読み直すが承認時revisionを書換えず、現在projectionが承認時と一致し必要な根拠・権限・期限が有効な場合のみ承認を再利用する。意味/範囲/根拠の有効性変更時は対象承認を失効させ、候補保存は可能とする。旧JSONは旧revision/fingerprint判定のまま。承認済み過去内容は既存履歴または承認時immutable snapshotで再取得可能にする（全編集のsnapshotは不要）。
+6. owner_verifiers.py の _stored_owner_artifact と3 verifierは独立取得した原文・revision/hashを形式別に検証し、Markdown bytesをJSON bytesのhashで代用しない。実際の意味objectでvalidate/impact/completionを行う。test-reporting の reporting_runtime.py の plan_ref/plan_revision/current_plan_revision と各上流・下流の依存は実保存ref/版と採用した意味を区別し、意味不変を確認した場合だけ再利用する。旧JSONの保存hashと検証入口は変えない。必要な64 KiB例外は既存対象経路に限る。
+7. 旧JSONと新Markdownの要求・割当・母集団・集計・承認・影響の等価性、通常編集・表示変更・承認対象変更・過去revision取得・機械block改変・参照先欠落をfixtureと実保存で確認する。別形式指定時も必要な意味・検証が成立する既存経路を優先する。無断移行は行わない。
 
 ## 実装5 人間編集・履歴・保護・互換性
 
