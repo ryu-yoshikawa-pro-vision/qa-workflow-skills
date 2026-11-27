@@ -1,0 +1,10 @@
+{
+  "skill": "context-signal-audit",
+  "cases": [
+    {
+      "id": "CSA-OUT-001",
+      "input": "cases/case-001/input.md",
+      "expected": "cases/case-001/expected.json"
+    }
+  ]
+}

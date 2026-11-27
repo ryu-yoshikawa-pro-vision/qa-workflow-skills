@@ -1,0 +1,109 @@
+# 保存・認可・データ契約
+
+親: [実装Plan](2026-11-25_123000_context-rule-synthesis.md)。添付設計の4、7、8、11、12、14章を具体化する。
+
+## 1. ディレクトリ配置・信頼境界・保存能力
+
+[共通原則](../reference/qa-skill-design-principles.md) PRN-01〜08・Q01〜08を確定前提とする。許可済みroot内の通常保存は都度承認不要、内容承認・破壊的変更・必要な外部操作は別。特定ハーネスは必須でなく、直接利用でも必要入力・権限があれば実行する。通常保存に専用認証基盤・独自CAS・分散lockを一律要求しない。実際の共有/競合条件に応じて必要な保証だけ確認する。既存ownerの正式判断・安全制約は維持する。
+
+2026-11-25 利用者決定：成果物は指定ディレクトリで統一管理する。Skillに案件識別・探索・切替・保存先決定・Provider選択・ブランチ管理・認証方式選択を持たせない。必要な案件境界・root・実行条件・権限はハーネスが入力として提供し、不要な管理は移管せず削除する。SkillはQAの意味判断、成果物の意味・形式・相対配置、必要な質問・引継ぎに集中する。Helperは決定論的識別・検証・保存を担当する。ハーネスの特定製品への依存、新しい汎用管理基盤、既存案件の移行は本PRの対象外。
+
+- 新規3 kindは指定成果物root直下の `context-signal-batch/`、`context-rule-candidate/`、`context-synthesis-run/` に分類する。各kind内のファイル名は64桁lowercase SHA-256 identity + `.json`。A/Bのowner関係を保持する。1 Skill採用時もパス・kind・identityを変えず、必要なowner登録と認可を外部で同期する。既存正本の移動・別コピー作成を行わない。ディレクトリは必要時のみ作成する。
+- rootはハーネスまたは直接利用時の明示入力で与える。Skillは案件ID、Repository、ブランチ、Providerを探索・選択せず、root配下の相対refのみを扱う。保存実体の同一性、共有/隔離、許可範囲をハーネス/保存層で確認する。異なるrootの同名refや同じパス文字列だけでは共有・同一正本・CASを保証しない。rootの変更・既存成果物移行・既存保存契約の互換変換はSkillの責務外。
+- 有効化・補助/必須・単体実行条件は明示依頼またはハーネスから提供される設定で解決。無指定は無効。Project Contextの配置DEC/Section 14/16を新Skillが探索・更新することは要求せず、新規stable keyも追加しない。必要な既存設定の解決は外部境界で行う。
+- artifact_refは `<kind>/<64桁のlowercase SHA-256 identity>.json` のroot相対ref。kindはcontext-signal-batch、context-rule-candidate、context-synthesis-run。新規canonical本文/意味identityにproject_refを必須としない。refの解決・同一性・一意性は指定root内に限定し、別rootの参照・receipt・証拠を混ぜない。既存ownerのschemaに案件識別が必要な場合だけ外部接続で供給し、新Skillの意味判断へ持ち込まない。runとcandidate/batchの保存順は予定とrevision付き実readbackで確認する。
+- 実行環境で指定root・許可範囲・実書込み/読取・必要な履歴/readbackを確認。通常保存には都度承認、認証サービス、操作ごとの認可発行を追加しない。実際の共有writer、外部操作、権限失効等が関係する場合だけ必要な条件付き保存・一意性・操作/対象/権限の確認を既存経路で実証する。PR #38のuser-confirmed自己申告を認証済みとしない。
+- 信頼境界は呼出し元の許可と既存実行/保存環境。既存helper・標準ファイル操作を優先し、専用hook、認証基盤、汎用Provider抽象化、中央DBを新設しない。任意AI入力やダミーauthorizeを認証済みとみなさない。保存能力不足は該当操作のみblock、分析・対話質問は継続可。
+- root内のkind限定列挙、相対refによるcurrent/history読取、独立readbackを既存helperから利用する。既存の保存技術はディレクトリ契約と安全要件を満たす場合のみ外部で再利用し、既存storeのKINDS拡張を必須としない。新規DB・Git保存専用分岐・独自CASを追加しない。列挙の完全性、未取得理由、revision/content hashを明示する。
+- 決定論的保存層は許可root外脱出・symlink逸脱・非canonical ref・別root証拠を拒否。必要なreadbackと履歴を維持し、単一writerの隔離が実際に保証される場合は最小ファイル処理で成立させる。共有更新時は既存条件付き更新/create-if-absent等で安全性を確認。通常書込みやatomic renameだけで共有CASを証明しない。全環境向け独自排他機構を新設しない。
+
+## 2. 共通データ契約
+
+3種ともschema_version="1.0"、artifact_refをトップレベルに持つcanonical JSON。owner_verifiers._canonical_stored_jsonと同じUTF-8、sort_keys=True、ensure_ascii=False、separators=(",", ":"), allow_nan=False、末尾改行なし。重複キー・非有限値を拒否し保存本文bytesのSHA-256を用いる。集合として定義したref/条件は明示的に正規化・重複排除して順序を固定し、観察や履歴等の意味ある順序は維持。既存runtime_contractのstrict JSON/安定hashの互換性を確認し、既存helperを利用できる範囲で利用。配布のため巨大なruntimeを新Skillへ安易に複製しない。本文hashとidentityの入力を区別し、hash自身は自己参照計算から除外する。機密を含むraw値のhashだけを保存して安全と扱わない。
+
+identity生成はJSONの構造化キーをcanonical化してsha256。文字列連結による曖昧性を避ける。
+
+- candidate_identity = identity_key（指定root内）。identity_keyはdomain、operation_axis、rule_kind、target_scope_kind、governing_conditions（roles/channels/data_states/environment_and_versions等の意味決定条件）、assertion_polarity、normalized_assertion。検索タグの追加はidentity不変。意味条件の変化は別候補。applicabilityとの構造矛盾はhelper、意味矛盾はAIが確認。属性値を閉じた辞書にしない。
+- signal_identity = source_artifact_ref + observation_locator（rule-item粒度、元本文外の観測条件を含む）+ source_content_hash。signal_content_hashは正規化signal（hash欄を除く）のhash。
+- batch_identity = source_artifact_ref + source_content_hash + actual_inspected_range + observation_condition（意味を変える場合だけ、その他null）。requested_rangeや分析観点、workflowはidentityに含めない。確認済みの抽出誤りを訂正する場合のみ、同じkindで通常batch_identityを基に、訂正対象batch refの集合と訂正済みsignal集合のcanonical hashから別のbatch_identityを決定論的に算出する（§3）。通常抽出のidentity規則は変更しない。
+- workflow_operation_id = workflow_ref + 処理対象ref群 + 操作種別 + 要求scope/観点/調査条件/環境 + 入力content hash群。run_identity = workflow_operation_id（指定root内）。Bは開始時の正規化入力から算出し、自己更新や追加調査後のsnapshotのhashで再計算しない。本文不変のAuthority変化等も既存ownerの現行性を表す入力（Authority解決結果/fingerprint等）のhashへ反映する。関連情報源の取得可否、認可・安全条件の充足状態、環境条件、保留論点の合否必須化、当該範囲で有効な訂正版など、再評価理由に直接関係する開始時条件も正規化して算出元へ含める。実際の値・状態の変化を区別し、毎回の時刻、乱数、無関係な認証token更新やHEAD進行を新operationの理由にしない。機密の認証情報自体は保存しない。runにworkflow_refと開始時の算出元（§3のoperation_input）を保持してidentityを再計算可能にする。中断再開と新規分析は02 §4で区別する。意味的操作identityとprovider書込みoperation_idは別。本文、expected revision、関連候補の前提revision/hash、認可・書込みmetadata等の再送fingerprint構成要素が変わる新要求は、元操作の保存結果と変更後の前提を確認して新しいprovider operation_idを発行する。完全同一再送だけ同じIDを用いる。
+- semantic_handoff_key = target_owner + target_scope + normalized_intentのhash。workflow_ref/candidate_identityに非依存。intentの元値を記録し再計算可能にする。意味の同一性をhashだけで推測せずownerの既存成果物とも照合。 一意性の比較・実ownerへの反映は同一許可root/実保存先の境界内で行う。
+
+## 3. 3成果物のフィールドと検証
+
+### context-signal-batch（A）
+
+batch_identity、workflow_operation_id、source:{artifact_ref,source_revision,source_content_hash,requested_range,actual_inspected_range,observation_condition}、scan_completeness: complete|partial、candidate_check:{status,triggered_candidate_identities}（checked_with_triggers|checked_no_conflict|not_checked）、signals[]。
+
+signal: signal_identity、signal_content_hash、observation_locator、evidence_type（spec|decision|approved_asm|unapproved_user_response|impl_observation|exploratory_finding）、fact_summary、independence_group、cross_cutting_attributes（operations/domains/roles/channels/data_states、必要な横断属性）、environment_and_versions（environment/version_constraint）、unapproved_response_meta（responder_role、approval_status=unapproved、question_ref、question_revision、scope_ref、該当時のみ）。
+
+正常抽出した確定実取得範囲だけimmutable create-if-absent。部分でも範囲確定ならpartialとして保存可。初回要求に対する取得不完全だけで必須完了にしない。範囲不明、取得/抽出失敗は保存しない。completeの0件も保存する。既存batchの再送はidentityとsource/実範囲・保存構造を検証して再利用する。異なるworkflow_operation_id、requested_range、candidate_checkやsource_revisionのみの違いでimmutable batchを上書きしない（初回保存時のprovenanceとして保持）。今回の要求範囲に対する完全性・照合結果はworkflow stateに記録。特に初回not_checkedを後から照合してもbatchを書き換えない。中立signalの内容に不整合がある場合だけ当該観察を再判断する。別範囲の完全取得は別identity。
+
+#### 不変バッチの訂正
+
+単なるAIの表現差、候補の評価変更、再抽出のたびの揺れは訂正理由にしない。一次情報の同一ref・content hash・実取得範囲・観測条件を照合し、抽出漏れ・誤抽出が確認された場合に限り訂正する。Bは一次情報を直接参照して分析を続け、訂正の根拠を候補・runへ記録し、Aへ該当範囲の再抽出を依頼する。次回以降のA/Bで訂正を再利用できるよう、正常に再抽出した全実取得範囲の訂正結果を同じcontext-signal-batch kindのimmutable create-if-absentで保存する。通常のbatchに訂正専用フィールドを必須にしない。
+
+訂正版には元の通常batch_identity、訂正対象batch ref/revision/hashの集合、訂正理由と一次情報の根拠参照、訂正後のsignalsを保持する。訂正対象と通常batchのsource・実範囲・観測条件が一致すること、訂正済みsignalのidentity/hashを再計算できることを確認する。訂正版のidentityは§2の規則で算出し、同じ訂正対象と同じ訂正内容の再送は再利用する。旧batchは変更・削除せず、既存のlist/historyで元の通常batchと訂正版を発見し、参照された旧版を現行の観察集合から除外する。異なる訂正版が並行して保存された場合は、内容が同一なら重複根拠に数えず、異なる場合は一次情報で差分を再照合し、必要なら両方を訂正対象とする正常な訂正版で収束させる。最新時刻やref順だけで有効版を選ばない。関連する誤観察が未訂正・競合中なら該当範囲だけ再取得・再評価し、誤観察を現在の完了や判断の根拠にしない。他の範囲は継続する。新しいストア・中央index・通常batchの版番号管理は不要。
+
+既存候補・runが参照する旧batch/signalは歴史的証拠として維持し、訂正を鮮度変化として該当候補だけ再評価する。訂正前後の同じ観察は独立根拠に数えない。初回0件batchの抽出漏れも同様に訂正できる。情報源自体が改訂された場合は通常の新しいsource hashによるbatchを使用し、訂正扱いにしない。
+
+`scan_completeness` は初回保存時の要求に対する取得完全性であり、再利用時の完了フラグではない。今回の要求範囲は以下の構造化範囲を使用して実取得範囲と比較する。source ref・現行source content hash・観測条件が一致し、保存済み実取得範囲が今回の要求全域を包含し、当該範囲の正常抽出と実readbackを確認できる場合に限り、今回の試行をcompleteとする。過去にA+Bを要求してAのみ正常抽出したpartialバッチは、今回Aだけを要求する場合に再利用できる。逆に過去completeでも今回がより広い要求なら不足部分を取得する。同一source ref・現行source content hash・意味を変える観測条件で、正常抽出済みで現在有効な複数batchの実範囲の和集合が今回の要求全域を包含するなら再利用可。訂正版がある場合は上記の現行観察集合を使用し、訂正前のbatchを現在の完了証拠として再利用しない。重複範囲は二重計上せず、異なるhash/観測条件を混ぜて完全性を証明しない。`all` を範囲未確定の代用にせず、部分集合や同義pathを推測で包含扱いしない。広いバッチの再利用時は今回の範囲外signalを今回の完了根拠に数えない。完全性はバッチを改訂せず要求・実取得範囲・実readbackを元にowner verifierが再計算する（02 §5）。既知partialで不足範囲が残る場合とBのpartial/failed runは未完了のまま。
+
+#### requested_range / actual_inspected_rangeの正規化
+
+両フィールドは同じ型と比較規則を使う。全範囲は `{"kind":"all"}`、部分範囲は `{"kind":"sections","items":[...]}` または `{"kind":"paths","items":[...]}` のように、情報源の既存識別契約を使ったkindと順序に依存しないitems集合で表す。Markdownはsource ref内のsection ID（なければ一意のheading/位置）、コードはrepository相対path・必要時はstable symbol、PR差分は対象revisionと変更path/差分範囲、UIは既存画面・状態・要素ID、質問/QA成果物は既存Q ID・scope・stable IDを使う。kindの具体名・詳細型は既存ownerの表現に合わせ、未知の情報源のための汎用parserを先に作らない。
+
+helperはsource ref・revisionに対応する既存識別子を正規化し、集合の重複排除・安定順序・同一kind内の包含を行う。部分範囲の和集合は、sourceの全範囲が確定していなければallの完了証拠にならない。全体/部分や異種識別子の対応を、文字列のprefix・AIの推測だけで完全としない。同義表記をAIが発見した場合も既存sourceの位置/IDで照合してから同じ範囲とする。範囲が確定しないときは既存のpartial/失敗経路で扱う。観察locatorは対象範囲に対応し、範囲外の観察を今回の完了根拠へ数えない。必要な場合のみ範囲の不一致部分を再取得する。
+
+### context-rule-candidate（B）
+
+candidate_identity、identity_key、rule_statement、applicability:{scope_summary,cross_cutting_attributes,invalidation_conditions}、related_candidate_refs[]（candidate_identity,relation）、evidence_links[]、unobserved_ranges[]、currentness_dependencies[]、evaluation_status、resolution_state、resolution_links[]、implementation_conformance_refs[]、question_refs[]、handoff_records[]、rejection_or_deferral_detail、investigation_history[]。
+
+- relation: competing_hypothesis|alternative|replaced_by|merged_into|split_into。自己参照不可、後継3種の循環だけ不可。比較関係は相互参照可。
+- evidence_links: link_kind=signal_ref|direct_source_ref、signal_batch_ref/signal_identity/signal_content_hashまたはdirect_source_ref/direct_source_revision、source_content_hash、evaluation=supports|counterexample|indeterminate|out_of_scope、counterexample_classification（scope_difference|impl_bug_candidate|spec_change|observation_condition|hypothesis_error|unclassified|null）。非観察はunobserved_rangesへ（第五分類）。同じsignalを異なる候補で異なる評価に使える。評価は候補に属し、batchを変更しない。参照先と保存hashを検証する。直接参照根拠もsnapshotの対応するsource ref/revision/hashへ照合する。
+- currentness_dependencies: target_ref、dependency_content_hash、effective_authority_fingerprint、source_revision、dependency_freshness=current|changed|unverifiable|deleted。evaluation_status: scan_completeness=complete|partial|failed、revalidation_required、revalidation_reasons、last_synthesis_run_ref。解決状態、鮮度、完全性を別軸にする（設計書のrevalidation_needed表記はrevalidation_requiredに統一）。
+- resolution_links: owner、artifact_kind=SPEC|DEC|ASM|PROJECT_CONTEXT|KNOWLEDGE|PRODUCT_RISK|INSPECTION|DEFECT、artifact_ref/revision/content_hash、coverage=full|partial。implementation_conformance_refs: scope_ref、environment、build_ref、status=conforms|confirmed_mismatch|unverified、ref/revision、verified（実owner証拠の照合結果、自己申告で真にしない）。question_refs: unknown_ref（UNK-xxxまたはnull）、question_id、question_artifact_ref、question_revision。
+- handoff_records: semantic_handoff_key、workflow_operation_id、target_owner、target_scope、normalized_intent、reason、status=pending|confirmed_by_readback|returned|blocked_unverifiable、confirmed_target_ref:{artifact_ref,artifact_revision,artifact_content_hash}。returnedは返却された結果の参照を照合し、引継ぎ成立と同義にしない。
+- rejection_or_deferral_detail: reason、authority_basis_ref（ref/revision/判断主体）、negated_conditions、non_negated_conditions、scope_at_decision。investigation_history: target_skill、source_ref/source_content_hash、condition_hash、outcome=resolved|no_new_info|blocked_transient|blocked_permission|blocked_env|blocked_safety、resume_condition。
+
+状態7種: 新規uninvestigated→investigating（調査、質問、handoff）、全範囲の有効なowner結果のreadbackでuninvestigated/investigating→resolved、一部ならinvestigating。investigating→rejectedはownerによる根拠ある否定のみ、未承認回答不可。uninvestigated/investigating→deferredは合否に不要な論点、investigating→blockedは進行不能。resolved/rejected/deferred/blockedから鮮度変化・必須化・障害解消でinvestigatingへ。supersededは後継保存・根拠保持・元revision一致を確認後。解決状態を正式仕様確定と混同しない。
+
+### context-synthesis-run（B）
+
+run_identity、workflow_ref、workflow_operation_id、operation_input、requested_scope:{scope_refs,analysis_aspect,environment_and_versions（調査条件/横断検索条件も復元可能にする）}、inspected_scope、scan_completeness=complete|partial|failed、snapshot、triage_plan、result_summary。
+
+operation_inputは開始時の操作種別、処理対象ref群、入力refとcontent hashの対応（有効Authority等の意味を変える入力も含む）、要求scope/観点/調査条件/環境を正規化して保持する。workflow_refとrequested_scopeは既存フィールドを参照し、同じ値を二重管理しない。開始時のidentity算出に必要な値はrun保存後に変更しない。helperはその保存値からworkflow_operation_idとrun_identityを再計算し、project_ref、artifact_ref、今回の要求との対応も照合する。実フィールドの分割・命名は既存canonical契約に合わせてよいが、算出元をhashだけに置き換えない。runの一覧からworkflow_ref・開始時要求を照合できるようにし、stateへrun refを書き込む前に中断しても正しいrunを探せるようにする。
+
+snapshot: snapshot_hash（自身を除く）、search_roots_and_scopes、search_criteria、referenced_sources[]（source_kind=signal_batch|candidate|spec|decision|asm|question_answer|knowledge|inspection_or_finding|authority_resolution、artifact_ref、source_revision、content_hash、effective_authority_fingerprint）、unverifiable_sources、excluded_scope_notes。直接参照ソース全件と根拠集合を復元可能にする。開始時入力と、実行中の追加調査・owner連携・再判断で使用した根拠を分けて扱う。追加されたソースは既存snapshot.referenced_sourcesへref/revision/hash・Authority fingerprintを保持し、現在の検索範囲・完全性・未取得情報を反映してsnapshot_hashを再計算する。同一refの別revisionを区別し、以前に用いた根拠はrun/provider履歴またはsnapshotの参照で追跡する。確定結果の鮮度判定では現在採用している根拠を照合し、履歴参照だけの古いrevisionを現行Authorityとして採用しない。snapshot更新で開始時operation_inputとrun identityを変えない。履歴参照できない取得元は未確認として残す。
+
+triage_plan: target_batch_refs、planned_candidate_ops[]（candidate_identity、candidate_ref、action=create|update|merge_into|split_into|reuse、base_content_hash、expected_revision、関連候補の前提revision/hash（統合・分割等の保存条件に必要な場合）、operation_id、planned_content_hash、planned_payload、write_request_meta:{source_ref,source_revision,approval_ref,approval_revision,change_reason}、confirmed_result:{artifact_ref,storage_revision,content_hash}）。reuseのpayload=null、planned_content_hashは再利用対象の実本文hash。新規/更新payloadは候補本文。復元性を優先し差分保存やstaging storeは追加しない。helperがrunの要約・未確認予定・必要候補単位のpayloadを取り出し、AIへ全run本文を常時渡さない。保存サイズ・読取token・処理時間を測定し、必要時は独立した要求範囲/分析単位にrunを分割できる（02 §4・5）。固定候補数の上限は設けない。result_summary:{status=in_progress|completed|completed_zero_changes|blocked_incomplete,zero_change_reason=no_related_candidates|existing_candidates_sufficient|all_evidence_known|empty_search|null,unresolved_and_handoff_refs}。0件もrunを正本に保存する。signal_count、persistence_verified等は導出値で持たない。
+
+## 4. 保存順序・再開・並行実行
+
+1. Aはバッチidentityでread、既存整合ならreuse、なければcreate。readback失敗と保存失敗を区別し、結果不明なら再実行前にreadする。旧batchを改訂しない。
+2. Bは固定した開始時入力と分析時点のsnapshot、全候補のplanned_payload/metadata・関連候補の前提を含むin_progress runを先に保存。実行中に追加の直接根拠を用いる場合は、該当候補の新しい予定を保存する前にsnapshotへ反映する。候補を一件ずつ書き、実readbackのhash/revisionをrunに追記。永続的な副作用（質問発行・owner成果物保存・外部課題作成等）に先立ち、予定候補のhandoff_recordsへsemantic_handoff_key・反映意図・target・pendingを記録し、runの予定本文および必要な候補の保存を確認する。read-only調査には事前保存を強制しない。handoffの開始前/再開時にownerで既存反映を照合し、実行結果を実readbackで確認してから候補更新の予定をrunへ保存し、候補とrunを更新する。最新予定と確認結果は一致させ、以前の判断はrun/provider履歴から参照する。予定未確認のままcompletedにしない。 対話質問は保存不能でも提示可。永続的handoffの成立と区別し、許可済み通常保存に都度承認を要求しない。
+3. 保存直前に対象本文hash・期待revision・関連依存ref/revision/hashを取得し、条件付き更新またはcreate-if-absentを行う。内容・依存・認可が不変と確認できる無関係な更新では不要な意味再分析をしない。真の対象変更・依存変更・承認失効は再判断する。条件付き保存のrevision更新や同時性は保存層に閉じ込め、Skillは保存技術を判断しない。別成果物の保存順はrunと独立readbackで確認し、複数ファイルの原子性は推測しない。
+4. 保存結果不明ならplanned_content_hashと実readbackを照合して既保存分を確認、未保存のみ実行。再送fingerprintの構成要素（本文、expected revision、関連候補の前提revision/hash、認可・書込みmetadata等）が変化した新要求は、元操作の結果を確認して新operation_idを発行する。元操作が既に成功していればそのreceipt/readbackを確認し、現在の結果が採用可能かを別途照合する。無条件上書き・ref巻戻し・別rootへの無断保存はしない。runの最終保存後も独立readback。完了済みrunの保存結果はconfirmed_result.storage_revisionのread_revisionとcontent hashで検証し、最新候補が後続runで更新されたことだけを理由に過去runを未完了に戻さない。未完了の再開では過去revision/operation履歴で既保存分を識別し、現在の候補・依存の変化は別に再評価する。現在の採用可能性は最新read_current・Authorityで判定する。過去revisionが取得不能なら当時の完了証明は未確認とし、最新本文で代替しない。
+5. 並行handoffはownerの既存CAS/create-if-absentと意味的重複再確認で収束させる。同一semantic_handoff_keyに対する実際の一意性保証をownerごとに確認し、同じ正本へのCAS、既存の一意性制約、外部サービスのatomic dedupe等を用いる。異なるartifact_refへのCASや事前の重複検索だけでは初回作成の重複を保証できない。既存ownerで反映先を同じ保存単位に正規化できる場合はその経路を使用し、保証単位が異なる場合は既存owner/hostの承認・単一writer等の実行経路で、当該同一意図の操作を順序付けて直前に再照合する。単に別workflowのローカルで直列実行しても共有先の排他を保証したとしない。実際の保証がない外部サービスでは、他の操作と同様に可能な範囲の調査・反映案・既存ownerへの承認依頼を続けるが、同一意図の無条件の並行createは実行しない。既存正本へ反映済みならreuse。結果不明で冪等性の保証がなければblocked_unverifiableとし、該当操作だけ停止する。候補統合は先に継承先を保存/readbackし、元候補のbase hashとrevision、先の有効性・継承根拠・後継循環を同じ保存条件で確認後に元をsuperseded。元/先と必要な後継経路のrevision/hash・有効性を、既存保存層の条件付き更新または実保証された単一writer境界で更新対象と一体確認する。意味判断は境界外、前提の不変確認は更新境界内。関連refの許可root・権限を検証し、前提集合を再送fingerprintに含める。関連候補の前提変更では本文不変でも再照合・新operation_id。安全に保証できない個別操作は旧候補を有効なまま独立保持し再判断する。独自lock・分散transactionを新設しない。
+6. 分割先には現在有効で適用範囲に合う根拠のみ継承し、分割元の全履歴は関係refで追跡。新規反例が分析中に追加されたら旧snapshotの実行記録を残しても採用は再評価後。異なるkind間で保存順がずれた場合も既存runと各成果物のreadbackから再開し、完了と現在の採用可否を分離する。自身の候補更新はcurrent hash=confirmed_result hashのときだけ計画済みとみなす。
+7. 実保存先の独立readbackはハーネス/保存層の信頼境界で取得する。保存済みJSON・hash・refをAIが組み立て直さない。既存verifier CLIの構造照合だけでは認可・実保存の真正性を証明しない。
+
+### 4.1 2026-11-26再レビュー追補
+
+- 途中runのstate登録では`confirmed_result`が全nullの予定に対する候補readbackを要求しない。候補保存後にconfirmed resultを記録したrevisionだけをreadbackし、候補保存前/後・handoff前/後・run完了前から保存済みrunを再開する。
+- 条件付きcandidate更新は対象`expected_revision`と`expected_content_hash`に加え、依存する候補のcanonicalな`related_preconditions`（ref/revision/content hash）を保存境界で照合する。既存のlocal filesystem file-lock/atomic replaceの範囲で、対象保存が終わるまで関係refを同時保持する。古い前提、同時変更、local条件付き更新能力がない場合は該当操作を拒否する。これは保存時点の前提照合であり、保存後の関連候補更新を防止する共有・複数host保証ではない。最終採用時の現行性確認は別途行う。
+- workflow stateには最初のA/B証拠記録時にartifact root bindingを保存し、以後異なるrootからの証拠を拒否する。最終`completion-check`は元要求への全scope mapping、すべてのcurrent runの完了、run/snapshot/candidate/handoff/sourceの必要readbackを再確認し、state revisionが検査中に変わっていないことを読む。
+- `_history_dir()`は`.history`とidentity pathの既存symlink/non-directoryを確認してから作成する。directory FD/no-followが使える環境では作成先をroot内に固定し、使えない環境でも各componentを作成前後に確認してから次へ進む。returned handoffには返却結果ref/revision/content hashのreadbackを要求するが、handoff成立とは判定しない。
+- 回帰証拠: `test_context_artifact_store` 12件、`test_context_workflow_state` 12件、`test_context_artifacts` 14件が2026-11-26にPASS。中断再開はpending candidateの保存、confirmed result記録、returned result読取不足後の再開、全split run完了gateを確認する。共有owner一意性、実運用root、実Agent評価は本追補からPASSへ昇格させない。
+
+### 2026-11-27 開始要求の段階的具体化
+
+- 開始時のrequired request scopeとcontractを既存workflow stateへ固定し、後続attempt/runの保存後も要求identityと`start_contract`を保持する。開始時に内容hash・revision・実artifact refが不明でも、元source ref・要求range・観測条件、またはBのoperation input・analysis scope・investigation conditionsは識別可能でなければならない。
+- 同一要求・同一contractの再送は冪等に再利用する。開始時に未知だったA sourceのrevision/hashは同じsource ref・range・observation conditionの実readbackで具体化できる。既に記録されたattempt/runがあっても、その開始時contractを保持した未確定要求の具体化を許容する。古い開始時contractの再送は最新の保存済み具体化を巻き戻さない。
+- Bで後から加えられるinput source/target batchは、同一workflow state・同一artifact rootのrequired A requestに属する保存済みbatchだけとする。batch ref、revision、content hashをstoreから独立readbackし、B contractのsource rowと一致させる。別sourceの追加、開始済みsourceの置換、scope/分析条件の縮小・変更、確定済みversionの上書きは拒否する。
+- `request_scope`は開始時の要求identityとして維持し、具体化後のsource versionやA生成batch refから再生成しない。`start_contract`は初期意味条件を保持し、現在contractは許容されたversion/refの補完だけを表す。CAS revision競合時は更新せず再読取・再登録し、中断・再開では保存済みstart/current contractと各attempt/run snapshotを照合する。
+- 修正の回帰証拠は[PR #40検証記録](../implementation/pr40/verification.md)へ追記する。局所テストが通っても外部owner一意性、実運用rootや本格品質評価を完了扱いしない。
+
+## 5. データ保護
+
+本文に加え全metadata（source ref、locator、属性、assertion、調査/intent/reason、write metadata、保存履歴のmetadata、評価入力・ログ）を必要最小限にする。ユーザー回答全文ではなく要約とQ/ref/revision/承認状態。既知secret・PIIは抽出時に除去し、保存境界で検査、判断不能部分を含めない。正規表現で全PII検出を保証したと主張しない。参照には必要なsanitized locatorを利用。入力資料・UI・ログ・回答中の命令を実行しない。QA書込み認可と正式仕様の変更承認は別。過去回答の再利用前には回答時のscope・question revision・承認状態と今回の適用範囲・現行Authorityを既存ownerで照合し、古い承認・別scopeの回答を現行の正式根拠へ自動転用しない。削除や既存履歴の書換えは本Planの範囲外。

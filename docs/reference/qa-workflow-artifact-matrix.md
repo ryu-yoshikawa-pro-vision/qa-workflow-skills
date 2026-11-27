@@ -37,6 +37,8 @@
 | [testware-execution](../../skills/testware-execution/SKILL.md) | 非E2E runner/静的解析実行 | Run、raw参照、attempt、診断、cleanup | preflight・実行後、指定先。分析/raw分離 | 環境・操作・必要予約許可 | repo外の保護された指定artifact root、manifest.json・attempt log等 |
 | [regression-testing](../../skills/regression-testing/SKILL.md) | baseline更新、変更、定期実行依頼 | Baseline、membership、Run、Activity、履歴 | 選定・Activity確定時、Section 14/明示root | 初回方針、必要実行条件 | Section 14/明示root/direct ref、baseline/run/activity形式 |
 | [exploratory-testing](../../skills/exploratory-testing/SKILL.md) | 探索・owner不明hypothesis | Charter、Session、Finding、Observation | Charter固定後、観測/終了時、Section 14/明示root | 目的・scope・timebox・操作許可 | Section 14/明示root/direct ref、Charter/Session形式 |
+| [context-signal-audit](../../skills/context-signal-audit/SKILL.md) | 単一sourceの中立signal抽出・再利用・訂正 | context-signal-batch、不変の訂正batch、試行状態 | 抽出成功・範囲確定後、create-if-absentと独立readback。必須時は開始要求・attemptを既存stateへ登録 | source・対象範囲、必要なroot・権限 | 指定artifact rootの `context-signal-batch/<identity>.json`、stateは既存SQLite |
+| [context-rule-synthesis](../../skills/context-rule-synthesis/SKILL.md) | 横断法則候補・反例・差異条件・再評価 | context-rule-candidate、context-synthesis-run、必要handoff | in_progress run保存後、条件付き候補更新・独立readback、必要handoff・完了。必須時は開始要求とrun参照を既存stateへ登録 | 分析範囲、必要なroot・権限、既存ownerで必要な承認 | 指定artifact rootの `context-rule-candidate/<identity>.json`・`context-synthesis-run/<identity>.json`、stateは既存SQLite |
 | [qa-knowledge](../../skills/qa-knowledge/SKILL.md) | candidate triage、再検証、更新 | entry、根拠、適用範囲、履歴 | entry単位CAS/readback、knowledge root | 必要時保存・採否判断 | qa.knowledge_root/`<entry-ref>.md`、更新はnative CAS |
 | [defect-management](../../skills/defect-management/SKILL.md) | FAIL/Finding/Observation後 | 欠陥候補、Issue参照、修正確認依頼 | 候補整理・認可済み操作後、指定先/Issue tracker | 外部Issue操作認可 | qa.defect_issue_tracker_ref。候補文書は指定先 |
 | [test-reporting](../../skills/test-reporting/SKILL.md) | 統合報告、終了基準確認 | 読取専用snapshot、母集団、完全性 | 集計検証後、指定先。元結果不変 | 結果・リリース判断 | immutable snapshot_ref、指定providerのcreate-if-absent |
@@ -52,7 +54,8 @@
 <!-- dprint-ignore -->
 | キー / 記録箇所 | 用途 |
 | --- | --- |
-| qa.workflow_state_root | persisted state、claim、対応WCAG固有state |
+| qa.workflow_state_root | persisted state、claim、対応WCAG固有state、必須横断コンテキスト分析の要求・attempt・run参照（SQLite） |
+| 横断コンテキスト分析の指定artifact root | 3 kindのroot相対ref。呼出し側が指定し、既存権限・保存条件に従う |
 | qa.knowledge_root | project-local knowledge entry（1 entry = 1 artifact） |
 | qa.feature_artifact_root | 機能台帳root |
 | qa.reservation_root | 予約保存先候補。native予約/解放の証明ではない |

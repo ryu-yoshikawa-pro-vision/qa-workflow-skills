@@ -1,0 +1,62 @@
+{
+  "artifact_ref": "context-synthesis-run/35408ea2a5009230aa8da811e7e22a6708facb4b3d5a4663fb42209efc71afb3.json",
+  "inspected_scope": "feature:refund",
+  "operation_input": {
+    "input_sources": [
+      {
+        "artifact_ref": "project/specifications/payment.md",
+        "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_authority_fingerprint": null,
+        "source_revision": "git:example-v1"
+      }
+    ],
+    "investigation_conditions": {
+      "environment": "staging"
+    },
+    "operation_type": "synthesize_context"
+  },
+  "requested_scope": {
+    "analysis_aspect": "refund and cancellation behavior",
+    "environment_and_versions": [
+      {
+        "environment": "staging",
+        "version_constraint": "v1"
+      }
+    ],
+    "scope_refs": [
+      "feature:refund"
+    ]
+  },
+  "result_summary": {
+    "status": "completed_zero_changes",
+    "unresolved_and_handoff_refs": [],
+    "zero_change_reason": "no_related_candidates"
+  },
+  "run_identity": "35408ea2a5009230aa8da811e7e22a6708facb4b3d5a4663fb42209efc71afb3",
+  "scan_completeness": "complete",
+  "schema_version": "1.0",
+  "snapshot": {
+    "excluded_scope_notes": "No excluded scope.",
+    "referenced_sources": [
+      {
+        "artifact_ref": "project/specifications/payment.md",
+        "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "effective_authority_fingerprint": null,
+        "source_kind": "spec",
+        "source_revision": "git:example-v1"
+      }
+    ],
+    "search_criteria": "payment refund rules, candidates and authority",
+    "search_roots_and_scopes": [
+      "designated context root"
+    ],
+    "snapshot_hash": "01b27cf57ef340b68db5484063e13dc8eca5d9ef3530644ac108deff3a577e17",
+    "unverifiable_sources": []
+  },
+  "triage_plan": {
+    "planned_candidate_ops": [],
+    "target_batch_refs": []
+  },
+  "workflow_operation_id": "35408ea2a5009230aa8da811e7e22a6708facb4b3d5a4663fb42209efc71afb3",
+  "workflow_ref": "workflow:ctx-001"
+}

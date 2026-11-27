@@ -130,6 +130,22 @@ class RuntimePortabilityTests(unittest.TestCase):
                         if skill == "qa-workflow" and path.name == "workflow_runtime.py"
                         else set()
                     )
+                    # The workflow finalization gate reads persisted QA state
+                    # through the existing context workflow-state adapter.
+                    if skill == "qa-workflow" and path.name == "workflow_runtime.py":
+                        skill_allowed |= {"context_workflow_state"}
+                    # This workflow-state adapter reuses the established qa-workflow
+                    # SQLite provider and the common context artifact contract/store.
+                    # It is not an artifact generator or a standalone Skill payload.
+                    if (
+                        skill == "qa-workflow"
+                        and path.name == "context_workflow_state.py"
+                    ):
+                        skill_allowed |= {
+                            "artifact_graph",
+                            "context_artifact_store",
+                            "context_artifacts",
+                        }
                     if skill == "spec-analysis" and path.name == "ui_target_package.py":
                         skill_allowed = skill_allowed | {"authority_entities"}
                     for name in names:

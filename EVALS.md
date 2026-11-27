@@ -102,6 +102,10 @@ skills/<skill-name>/evals/
 │       └── case-002/
 │           ├── input.md
 │           └── expected.json
+├── semantic/
+│   ├── evals.json
+│   ├── rubric.json
+│   └── cases/
 └── deterministic/
     └── validator.py
 ```
@@ -287,6 +291,8 @@ Skillごとのsemantic case数と合計は各`evals.json`から導出します�
 
 現在の意味評価で扱う拡張責務とcase対応は次のとおりです。
 
+この一覧と各Skillのdatasetは評価契約を定義します。repository内のvalidatorやfixture testの成功は、Agent出力の評価や独立Semantic Judgeによる意味評価を実施したことを意味しません。PR #40では正式な全Skill trigger評価・独立Judge・構成比較を実施せず、実利用環境と利用実績に基づくmerge後の評価に残します。
+
 | Skill                         | 責務                                                                                        | Case ID                                                                                                                |
 | ----------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `test-analysis`               | Domain Testing採用                                                                          | `RISK-SEM-003`                                                                                                         |
@@ -307,6 +313,8 @@ Skillごとのsemantic case数と合計は各`evals.json`から導出します�
 | `testware-implementation`     | 非E2E testwareの実装、検証、期待仕様とUI観測の分離                                          | `TW-IMPL-SEM-001`                                                                                                      |
 | `testware-execution`          | runner safety、開始前確認、実行結果、cleanup                                                | `TW-EXEC-SEM-001`                                                                                                      |
 | `qa-workflow`                 | 対象確認・今回runと永続E2Eのrouting境界                                                     | `WF-SEM-003`                                                                                                           |
+| `context-signal-audit`        | 単一source抽出の完全性、range、訂正、provenance、保存・認可境界                             | `CSA-SEM-001` ～ `CSA-SEM-008`                                                                                         |
+| `context-rule-synthesis`      | 横断法則、競合仮説、根拠分類、部分解決、Authority、owner routing、currentness、run完了      | `CRS-SEM-001` ～ `CRS-SEM-009`                                                                                         |
 | `regression-testing`          | baseline currentness / Run scope / actual start / FAIL feedback                             | `REG-SEM-001` ～ `REG-SEM-006`                                                                                         |
 | `exploratory-testing`         | Charter / Observation・Finding / cleanup / resume                                           | `EXP-SEM-001` ～ `EXP-SEM-005`                                                                                         |
 | `qa-knowledge`                | candidate triage / currentness / CAS / identity lifecycle                                   | `KN-SEM-001` ～ `KN-SEM-007`                                                                                           |
@@ -458,7 +466,7 @@ scripts/skills/evals/
 
 決定論的な`qa-workflow` validatorは、開始・省略・再利用・ブロック・再開・修正routing、対象 / 実行範囲付き状態、TCあり / TCなし経路の成果物整合を評価します。実Agentクライアント上のSkill読み込み・遷移・実runtime操作は、利用可能なクライアント環境がある場合に限って別途評価し、dataset検証を実Agent発火PASSとは扱いません。
 
-83件のrouting fixture（PR #14後の61件へUI対象分析modeの8件、PR #22の新設Skill routing 14件`WF-PROCESS-001`〜`014`を追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、UI仕様理解・回答後resume・実対象観測・保存画面評価・live usability・formal WCAGの開始Skillと停止境界を固定します。UI構造packageの作成・更新は`ui-target-analysis`から開始し、回答後は`question-analysis`→`spec-analysis`→`ui-target-analysis`へ戻します。`WF-PROCESS-*`は案件配置、機能ID、item / condition候補、QA要求→方式→計画、E2E選定→inspection→実装、欠陥、統合報告、活動評価、非E2E testwareの開始・停止境界を固定し、旧`test-analysis`のE2E選定routeや方式設計の省略を拒否します。routing登録はowner verifier登録とは別で、`workflow_runtime.py`の`RUNTIME_V2_SKILL_ROOTS`外のscopeは`unverified_scopes`として完了不可のままです。
+87件のrouting fixture（既存83件へ単一source signal抽出・訂正と横断context synthesisを各2件追加）は、入力条件と独立した期待routingを`skills/qa-workflow/evals/deterministic/routing_cases.json`へ、検証対象のcandidate outputを`routing_candidate_outputs.json`へ分離して保持します。リポジトリ決定論的テストではcandidateを期待routingから生成せず、UI仕様理解・回答後resume・実対象観測・保存画面評価・live usability・formal WCAGの開始Skillと停止境界を固定します。UI構造packageの作成・更新は`ui-target-analysis`から開始し、回答後は`question-analysis`→`spec-analysis`→`ui-target-analysis`へ戻します。`WF-PROCESS-*`は案件配置、機能ID、item / condition候補、QA要求→方式→計画、E2E選定→inspection→実装、欠陥、統合報告、活動評価、非E2E testware、横断context分析の開始・停止境界を固定し、旧`test-analysis`のE2E選定routeや方式設計の省略を拒否します。routing登録はowner verifier登録とは別で、`workflow_runtime.py`の`RUNTIME_V2_SKILL_ROOTS`外のscopeはowner verifierで検証されない限り`unverified_scopes`として完了不可です。
 
 PR #16では決定論的output evalを44件から46件へ、semantic evalを155件から163件へ増やします。`SPEC-OUT-003`はrepository専用[`scripts/skills/evals/ui_target_projection.py`](scripts/skills/evals/ui_target_projection.py)で複数Markdown packageを一fileへ投影し、canonical file marker / stable ID / tableを検証します。`TR-OUT-003`はcurrent Acceptance Criteria、Authority、Product Riskの各closureを独立して検証します。raw SHA-256の再計算はprojectionで行わず、production validatorとrepository unit testで確認します。
 

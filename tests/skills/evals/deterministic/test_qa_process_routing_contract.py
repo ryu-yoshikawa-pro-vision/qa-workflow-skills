@@ -69,6 +69,26 @@ EXPECTED_PROCESS_ROUTES = {
         "testware-execution",
         ["testware-execution"],
     ),
+    "WF-PROCESS-015": (
+        "context-signal-audit",
+        "context-signal-audit",
+        ["context-signal-audit"],
+    ),
+    "WF-PROCESS-016": (
+        "context-signal-audit",
+        "context-signal-audit",
+        ["context-signal-audit"],
+    ),
+    "WF-PROCESS-017": (
+        "context-rule-synthesis",
+        "question-analysis",
+        ["context-rule-synthesis", "spec-analysis", "question-analysis"],
+    ),
+    "WF-PROCESS-018": (
+        "context-rule-synthesis",
+        "question-analysis",
+        ["context-rule-synthesis", "spec-analysis", "question-analysis"],
+    ),
 }
 
 

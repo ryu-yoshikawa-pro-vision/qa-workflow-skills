@@ -21,12 +21,24 @@ description: 新規・変更機能のQA設計と要求されたE2E工程に加�
 12. ワークフロー完了と全E2EテストPASSを同一視しません。必要な実行・分析・報告・cleanup確認・再検証が完了しているかで判定します。
 13. 最終出力前に、実際に利用した入力が本Skillの入力契約を満たし、停止条件に該当する未解決状態がないか確認します。あわせて、生成したオーケストレーション成果物へ本Skill自身の出力契約・品質ゲートを適用して自己検証します。明白かつ局所的で新しい工程固有の判断を必要としないオーケストレーション契約違反だけを最大1回修正し、修正後は修正箇所を含めて最終確認します。仕様根拠不足、上流判断不足、他Skillの工程固有ロジックが必要な問題は推測補完せず既存の停止条件・ブロック中・ルーティングに従います。最終確認後も本Skill自身のオーケストレーション契約違反が残り、既存の停止条件・ブロック中・ルーティングに該当しない場合は2回目の自動修正を行わず、その成果物を契約適合済み・完成済みとして扱わず、現在残る契約上の制約だけを明示します。自己検証でも他Skillの工程固有ロジックを再判定・再設計せず、自己検証の経緯や修正回数は出力しません。
 
+## 横断コンテキスト分析
+
+- 単一の仕様・決定・承認済みASM・実装確認・探索成果物から、中立な観察signalの抽出、範囲の訂正、batch再利用を求められた場合は`context-signal-audit`へroutingします。
+- 別workflowのsignal・候補・Authority・回答・Knowledgeを横断する法則性分析、新機能QA開始時の再利用、重大反例や下流設計前の再評価は`context-rule-synthesis`へroutingします。A実行のたびにBを自動起動しません。
+- 両Skillの候補は仮説であり、期待仕様・正式Product Risk・テスト期待結果へ昇格させません。Authorityは`spec-analysis`、未知事項は`question-analysis`、調査は対応する既存調査ownerへ渡します。
+- モードが無効 / 未指定なら起動しません。補助モードの未設定・失敗は既存workflow完了を破壊せず、必須モードの未設定・不完全・認可不足はrequested scopeに残して該当範囲をblockedにします。単体実行も既存owner verifierと保存・認可条件を満たした範囲だけ正式完了とします。
+- A試行とB run refは既存workflow stateへ記録します。指定されたrootにOS権限でアクセスできる場合、通常保存は既存ファイル操作で行い、専用認証hostや保存ごとの承認を要求しません。root不明・書込権限不足・必要な共有/外部owner認可の不足は該当scopeだけを未完了にし、独立した調査を続けます。
+
 ## 決定論的runtime統合
 
 本Skillは工程固有generatorを再実装せず、対象scopeが1件以上ある場合だけ担当Skillのruntime dispatch結果を統合します。scope 0ではruntimeをdispatchせず、既存のworkflow契約を維持します。統合するMachine Runtime Input / ResultとMachine Entityは、Skill名・runtime unit・Model Key・stable ID・fingerprint・freshnessを持つ機械証拠です。
 
 `workflow_runtime.py`へのnormalized inputは、既存workflow stateと同じcanonical UUIDの`workflow_ref`を必須で渡します。Result payloadも同じ値を返し、別workflowのevidence混在を許しません。
-工程開始時に記録した要求集合（`requested_scopes`、各要素は`skill / target / execution_range / requirement`）を必ず渡します。未宣言・空は完了不可（`required_scopes_undeclared`）です。要求集合に含まれる`required` scopeの欠落は`required_scope_missing`、`excluded_by_approval`は、承認の照合手段（承認provider）が定義されるまで対象外として確定しません。該当scopeは必須のまま残り、placeholderや欠落は`approval_ref_missing`、具体的な参照は`approval_unverifiable`として`unverified_exclusions`に出ます（完了不可）。`approval_ref`の形式があっても承認済みとして扱わず、真正性・対象scope・revision・承認状態は`workflow_runtime.py`が確認しません。再開条件と検証の範囲は`references/guidance.md`の「要求集合と「省略」」を参照します。要求外のSkillを推論で追加せず、状態値「省略」の定義は`references/guidance.md`の「要求集合と「省略」」に従います。
+`workflow_runtime.py`へ渡す`requested_scopes`（各要素は`skill / target / execution_range / requirement`）は、今回の最終判定で必要なscope集合です。未宣言・空は完了不可（`required_scopes_undeclared`）です。Context A/Bを含む場合、開始時に受け付けた元要求は既存workflow stateに固定して保存します。仮targetから実artifact refへ具体化した後は、そのstate対応とowner検証から導ける実scope集合を最終runtime入力へ渡します。元要求はstateから削除せず、対応がない要求を最終集合から黙って落としません。要求集合に含まれる`required` scopeの欠落は`required_scope_missing`、`excluded_by_approval`は、承認の照合手段（承認provider）が定義されるまで対象外として確定しません。該当scopeは必須のまま残り、placeholderや欠落は`approval_ref_missing`、具体的な参照は`approval_unverifiable`として`unverified_exclusions`に出ます（完了不可）。`approval_ref`の形式があっても承認済みとして扱わず、真正性・対象scope・revision・承認状態は`workflow_runtime.py`が確認しません。再開条件と検証の範囲は`references/guidance.md`の「要求集合と「省略」」を参照します。要求外のSkillを推論で追加せず、状態値「省略」の定義は`references/guidance.md`の「要求集合と「省略」」に従います。
+
+context A/Bが必須scopeに含まれるworkflowでは、最初のcontext処理前に同じ`workflow_ref`・指定artifact rootで`context_workflow_state.py register-requested-scopes`を呼び、開始時の全要求集合とA/Bの要求契約を既存stateへ保存します。既に初期stateへ保存済みなら同一内容の登録を再利用します。A契約には元source ref、既知ならrevision/hash、要求範囲、観測条件を、B契約には開始時のoperation input、analysis scope、target batch refsを固定します。識別可能な未確定要求は開始contractと元`request_scope`を保持したまま、他要求のattempt/run後でも既知情報を具体化できます。Aの取得で判明したrevision/hashはstate CASと同じ更新内でcontractへ確定します。Bの要求には同一workflow・同一artifact rootのrequired A attemptで保存され、ref/revision/hashを独立readbackしたbatchだけを後から追加できます。既存の開始条件を維持し、source置換、scope/range縮小、観測/調査条件変更、確定済みversionの上書きは拒否します。古い開始contractの再送は現在の具体化を巻き戻しません。A attemptの`request_scope`、B run groupの`request_scopes`と各runの開始時input/target snapshotには開始時の元scope identityを残し、仮targetを実refへ具体化した後はstateの要求mappingと実readbackに対応するartifact scopeを最終`requested_scopes`と`workflow_scopes`へ渡します。
+
+同じ必須context workflowの最終runtime inputには、`context_workflow_state_root`を`requested_scopes`と`workflow_scopes`とは独立して渡します。runtimeはこのrootから開始時の要求を再読込し、最終入力からA/Bの要求・scope・state参照がすべて落ちていても未完了にします。共通workflow runtimeでこのfieldは任意なので、Context A/Bを使わない単体・補助実行には追加しません。最終gateは開始要求、永続attempt/run group、最終scope集合を一体で照合します。補助実行と過去履歴は必須要求の充足に数えません。
 
 runtimeの`can_complete`はオーケストレーションの要約であり、下流のsemantic coverage、実行結果、報告、cleanup確認を置き換えません。`current`でない上流Entityやruntime結果は再利用せず、変更があれば依存fingerprintから影響対象だけを`要再検証`へ伝播します。
 
@@ -54,9 +66,9 @@ candidate qa-workflow artifactの`verify_runtime_evidence.valid=true`とruntime 
 
 ### 新設Skillのowner verifier
 
-runtime-v2 rootを持たないSkillのscopeは、`scripts/owner_verifiers.py`に登録されたownerの**本番CLI**が保存済み成果物を検証できた場合だけ、`workflow_runtime.py`が完了対象（`verified_owner_scopes`）にします。登録済みownerは`test-item-analysis`、`test-condition-analysis`（保存本文のhash、owner validator、source currentness）、`e2e-test-selection`（owner validator、保存本文のhash）、`test-reporting`（入力からの再計算との一致、完全性、currentness）です。F 3 Skillの`test-requirements-analysis`・`test-architecture-design`・`test-management`も登録済みで、canonical JSON packetの保存本文を`validate`・`validate_readback`・`impact`・`completion_check`で検証します。保存済み成果物と呼出し側のreadback証拠を照合しますが、実providerのreadbackと承認の真正性は未確立で、fixtureによる検証のみです。未検証・stale・未完了は完了扱いしません。
+runtime-v2 rootを持たないSkillのscopeは、`scripts/owner_verifiers.py`に登録されたowner validatorが保存済み成果物を検証できた場合だけ、`workflow_runtime.py`が完了対象（`verified_owner_scopes`）にします。登録済みownerは`test-item-analysis`、`test-condition-analysis`（保存本文のhash、owner validator、source currentness）、`e2e-test-selection`（owner validator、保存本文のhash）、`test-reporting`（入力からの再計算との一致、完全性、currentness）です。F 3 Skillの`test-requirements-analysis`・`test-architecture-design`・`test-management`も登録済みで、canonical JSON packetの保存本文を`validate`・`validate_readback`・`impact`・`completion_check`で検証します。`context-signal-audit`はcanonical batch、current source、要求範囲に対するreadback batchの和集合を検証し、`context-rule-synthesis`はrun identity、planned candidate、直接根拠、handoffと保存readback一式を検証します。新規2 ownerのverifierは渡されたreadbackの整合性を検証し、独立してproviderへ接続する機能は持ちません。通常の指定root保存はローカル実filesystem上の保存/readbackを含むテストで確認済みですが、運用rootは未指定で、共有writerと外部owner認可は未検証です。未検証・stale・未完了は完了扱いしません。
 
-証拠は`normalized_input.owner_verification`に、provider hashの対象になった**保存本文そのもの（JSON文字列）**で渡します。runtimeは構造化入力を並べ替えるため、構造化データではhashの元のbytesを保てません。本文のhash、ownerのvalidator、source currentnessのどれかが確認できない、ownerのscriptが無い・失敗する、scopeのtargetと成果物のrefが違う場合は未検証のままで、自己申告の`verified`や`can_complete`は証拠になりません。F 3 Skillの3件は検証入口を実装して登録済みです（fixture検証のみ。実providerのreadbackと承認の真正性は未確立）。登録されていないSkill（`defect-management`、`test-evaluation`、`feature-analysis`、`project-context`、`ui-target-analysis`など）は保存済み成果物を検証する本番入口が無いため、`unverified_scopes`として完了不可のままです。
+証拠は`normalized_input.owner_verification`に、保存境界がhashした**保存本文そのもの（JSON文字列）**で渡します。runtimeは構造化入力を並べ替えるため、構造化データではhashの元のbytesを保てません。本文のhash、ownerのvalidator、source currentnessのどれかが確認できない、ownerのscriptが無い・失敗する、scopeのtargetと成果物のrefが違う場合は未検証のままで、自己申告の`verified`や`can_complete`は証拠になりません。登録されていないSkill（`defect-management`、`test-evaluation`、`feature-analysis`、`project-context`、`ui-target-analysis`など）はowner入口が無いため、`unverified_scopes`として完了不可のままです。fixtureだけでは運用rootの権限や外部owner認可を証明しません。
 保存済みv2 workflowを再開するときは、runtime-v2 rootのscopeの`current_structure_state`を従来どおり検証します。owner完了scopeは`current_structure_state=null`で、保存済みresultの`verified_owner_scopes`の記録と1対1に対応し、登録Skill、記録の`verified_artifact`（artifact_ref・artifact_revision・content_hash）、保存済み証拠の本文のsha256、targetが一致する場合だけ受理します。root以外のscopeに非nullの構造stateがある場合、rootのscopeにnullがある場合は拒否します。v1は従来の検査のままで（owner scopeのnullは従来どおり拒否）、新しい完了baselineにしません。この照合は保存された記録を信頼する境界の内側の整合性確認で、保存本文・記録・証拠を一式で偽造された場合は検出できません（残る制約）。
 
 ## 継続管理workflowの決定論的処理
@@ -80,6 +92,8 @@ helperの必須処理が入力不足・実行不能・保存先能力不足で�
 | 工程固有ロジック                                          | 担当Skill                     |
 | --------------------------------------------------------- | ----------------------------- |
 | 案件Project Context / 成果物配置・編集方針の合意          | `project-context`             |
+| 単一sourceから中立signalを抽出・訂正                      | `context-signal-audit`        |
+| 横断法則・差異条件の分析と候補run                         | `context-rule-synthesis`      |
 | 製品機能ID / 情報源母集団 / 開発差分分類                  | `feature-analysis`            |
 | 現在有効な仕様根拠                                        | `spec-analysis`               |
 | UI構造・画面・操作・状態・遷移、human editing             | `ui-target-analysis`          |

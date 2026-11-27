@@ -1,8 +1,8 @@
-# QAテスト分析・設計・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
+# QAテスト分析・設計・コンテキスト抽出・UI/UX評価・WCAG・Regression・Exploration・知識管理・E2Eワークフロー Agent Skills
 
 設計・開発の共通前提：[QA Skill設計・開発の共通原則](docs/reference/qa-skill-design-principles.md)。Skillは専門QAに集中し、不要な作り込み・過剰防衛・管理責務を削減します。コード・Skill・文書は有効な正本に同期し、不要な旧実装・旧記述を残しません。
 
-新規・変更機能のQA成果物作成を中心に、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
+新規・変更機能のQA成果物作成を中心に、workflowをまたぐ中立signalの蓄積と仮説候補の再利用、UI/UX評価、live usability inspection、WCAG-EM 2.0適合性評価、Regression baseline / Run履歴、Charterに沿った探索・Investigation、QA knowledge lifecycle、要求されたPlaywright E2E実装・実行・分析・報告を成果物ベースで扱うAgent Skills群です。
 
 ## Formatter / lintとCodex開発ハーネス
 
@@ -39,6 +39,8 @@ node --check .codex/hooks/pre_tool_use_policy.mjs
 skills/
 ├── qa-workflow/
 ├── project-context/
+├── context-signal-audit/
+├── context-rule-synthesis/
 ├── feature-analysis/
 ├── spec-analysis/
 ├── ui-target-analysis/
@@ -89,6 +91,8 @@ skills/
 | ----------------------------- | ---------------------------------------------------------------------------------------------- |
 | `qa-workflow`                 | 開始点、再利用、ルーティング、ブロック中、再開、変更伝播、完了                                 |
 | `project-context`             | 案件Project Contextの既存正本の発見・差分更新候補、DEC/ASM ID・配置契約                    |
+| `context-signal-audit`        | 単一sourceから中立signalを抽出し、訂正可能な不変batchとして保存・再利用                   |
+| `context-rule-synthesis`      | 複数workflowのsignal・候補・Authorityを横断し、独立仮説・差異条件・再評価runを管理          |
 | `feature-analysis`            | 製品機能の安定IDと階層、情報源母集団・Git差分分類・履歴の正本                                   |
 | `spec-analysis`               | 期待仕様 / Authority / US / UC / Behavior / AC / UNKNOWN lifecycle                              |
 | `ui-target-analysis`          | UI構造・操作・状態・遷移、ui-target-v1 packageとhuman editing / history                         |
@@ -124,6 +128,8 @@ skills/
 | `usability-evaluation`        | 保存済みevidence・画面資料をreferenceと照合する意味上のUI/UX評価。browserを操作しない          |
 | `usability-inspection`        | 既存Playwright経路でlive Web UIを観測し、fixed probe・measurement・general accessibilityを扱う |
 | `wcag-conformance-evaluation` | WCAG-EM 2.0に沿ったWCAG 2.0 / 2.1 / 2.2のformal evaluation、sampling、report、claim、EARL      |
+
+PR #40ではこの2 Skill構成を維持します。導入前・1 Skill・2 Skillの正式比較による最終構成選定は、本格利用後に実測して行うため、現在の登録を最適構成の選定結果とはみなしません。
 
 ## QA運用・利用者向けガイド
 

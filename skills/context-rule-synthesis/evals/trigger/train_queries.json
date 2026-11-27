@@ -1,0 +1,50 @@
+[
+  {
+    "query": "別workflowで得た複数batchとDECを照合し、共通法則と差異条件の候補を独立仮説で整理して。",
+    "should_trigger": true
+  },
+  {
+    "query": "新機能QAを始める。過去候補・Knowledge・仕様根拠を横断発見し、現行性をownerごとに確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "管理者権限と復元可能性を混同しない競合仮説を、独立根拠と反例を付けて比較して。",
+    "should_trigger": true
+  },
+  {
+    "query": "下流テスト設計の前に未処理not_checked batchを照合し、今回のrunで未解決事項を残して。",
+    "should_trigger": true
+  },
+  {
+    "query": "同じ行動の繰り返し観察を独立支持と数えず、scope別candidateとevidence linkを再評価して。",
+    "should_trigger": true
+  },
+  {
+    "query": "複数の候補のうち裏付けが揃った範囲だけ解決し、残りをinvestigatingとしてrunへ保存して。",
+    "should_trigger": true
+  },
+  {
+    "query": "この一つの仕様書から項目ごとの事実を抽出してimmutable signal batchにして。",
+    "should_trigger": false
+  },
+  {
+    "query": "SPECとDECを新規発行して、どちらを正式仕様にするか決定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "プロダクトリスクを正式に採点しテスト深度を決めて。",
+    "should_trigger": false
+  },
+  {
+    "query": "質問artifactを作成し利用者へ送信して。",
+    "should_trigger": false
+  },
+  {
+    "query": "新しいKnowledge entryを直接登録して既存entryを置換して。",
+    "should_trigger": false
+  },
+  {
+    "query": "確認済みの仕様違反を外部Issueへ作成して修正を依頼して。",
+    "should_trigger": false
+  }
+]

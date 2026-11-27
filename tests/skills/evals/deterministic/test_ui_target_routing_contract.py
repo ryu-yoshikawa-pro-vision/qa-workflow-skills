@@ -18,8 +18,8 @@ class UiTargetRoutingContractTests(unittest.TestCase):
         )
 
     def test_fixture_count_and_identity_sets_are_synchronized(self) -> None:
-        self.assertEqual(len(self.cases), 83)
-        self.assertEqual(len(self.candidates), 83)
+        self.assertEqual(len(self.cases), 87)
+        self.assertEqual(len(self.candidates), 87)
         self.assertEqual(
             {row["id"] for row in self.cases},
             {row["id"] for row in self.candidates},
