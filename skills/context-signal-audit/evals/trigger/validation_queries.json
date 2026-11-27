@@ -1,0 +1,34 @@
+[
+  {
+    "query": "このDEC一件から、適用範囲と例外を分けた中立signalを抽出して。",
+    "should_trigger": true
+  },
+  {
+    "query": "同じ仕様sourceの抽出漏れを一次情報で確認した。旧記録を残した訂正版の条件を照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "SEC-1からSEC-3だけを確認できた。実取得rangeのsignal batchとして扱えるか検証して。",
+    "should_trigger": true
+  },
+  {
+    "query": "この一つのUI inspection findingから観察事実と環境条件を記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "複数プロジェクトの観察を比較し、横断的な仮説候補へまとめて。",
+    "should_trigger": false
+  },
+  {
+    "query": "この結果でテストケースと期待結果を作成して。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様不明点を整理し、重複しない質問を作って発行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "正式QA計画のプロジェクトリスクを更新して。",
+    "should_trigger": false
+  }
+]

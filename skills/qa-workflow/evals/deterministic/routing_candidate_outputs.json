@@ -997,5 +997,53 @@
     "overall": "実行中",
     "targets": {},
     "states": {}
+  },
+  {
+    "id": "WF-PROCESS-015",
+    "start": "context-signal-audit",
+    "final": "context-signal-audit",
+    "skills": [
+      "context-signal-audit"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-016",
+    "start": "context-signal-audit",
+    "final": "context-signal-audit",
+    "skills": [
+      "context-signal-audit"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-017",
+    "start": "context-rule-synthesis",
+    "final": "question-analysis",
+    "skills": [
+      "context-rule-synthesis",
+      "spec-analysis",
+      "question-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
+  },
+  {
+    "id": "WF-PROCESS-018",
+    "start": "context-rule-synthesis",
+    "final": "question-analysis",
+    "skills": [
+      "context-rule-synthesis",
+      "spec-analysis",
+      "question-analysis"
+    ],
+    "overall": "実行中",
+    "targets": {},
+    "states": {}
   }
 ]

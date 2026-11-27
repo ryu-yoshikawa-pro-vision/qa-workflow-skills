@@ -1,0 +1,53 @@
+{
+  "skill": "context-signal-audit",
+  "criteria": [
+    {
+      "id": "SEM-CSA-OBS",
+      "title": "観察事実の忠実性",
+      "description": "sourceの事実・範囲・条件を保ち、原因推測や未確認期待値を混ぜない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-COMPLETE",
+      "title": "抽出完全性",
+      "description": "対象範囲の重要な規則、例外、否定条件を取りこぼさず、誤抽出も作らない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-PROVENANCE",
+      "title": "provenanceとidentity",
+      "description": "source ref/revision/hash、stable locator、観測条件、independence groupを保持し再取得を独立支持にしない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-RANGE",
+      "title": "rangeと取得状態",
+      "description": "要求範囲と実取得範囲を区別し、partial・failed・complete 0件・未実行・not_checkedを区別する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-UNAPPROVED",
+      "title": "未承認回答の扱い",
+      "description": "未承認回答を明示し、仕様支持・候補解決・質問省略へ昇格しない。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-CORRECTION",
+      "title": "訂正の根拠と不変性",
+      "description": "一次情報で同一source/hash/range/conditionの抽出誤りを確認し、旧batchを保持した別identity訂正版を再計算可能にする。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-TRUST",
+      "title": "保存と信頼境界",
+      "description": "許可root/providerを自己選択しない。指定root内の通常保存は既存OS権限と標準filesystem操作で行い、専用hostを要求しない。独立readbackなしに保存・完了を主張せず、共有更新・外部操作には既存ownerの認可を適用する。",
+      "critical": true
+    },
+    {
+      "id": "SEM-CSA-ROUTING",
+      "title": "責務境界",
+      "description": "横断仮説、Authority決定、Risk、質問、Knowledge、defectを既存ownerへ渡す。",
+      "critical": false
+    }
+  ]
+}

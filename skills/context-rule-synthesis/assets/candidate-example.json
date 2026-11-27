@@ -1,0 +1,43 @@
+{
+  "applicability": {
+    "cross_cutting_attributes": {
+      "role": "customer"
+    },
+    "invalidation_conditions": [],
+    "scope_summary": "Customer refunds for eligible purchases."
+  },
+  "artifact_ref": "context-rule-candidate/47ace2e2e8e19315241a4410e447a7b7fa24fda3268b97f50ef4441b9f880ced.json",
+  "candidate_identity": "47ace2e2e8e19315241a4410e447a7b7fa24fda3268b97f50ef4441b9f880ced",
+  "currentness_dependencies": [],
+  "evaluation_status": {
+    "last_synthesis_run_ref": null,
+    "revalidation_reasons": [],
+    "revalidation_required": false,
+    "scan_completeness": "complete"
+  },
+  "evidence_links": [],
+  "handoff_records": [],
+  "identity_key": {
+    "assertion_polarity": "positive",
+    "domain": "payments",
+    "governing_conditions": {
+      "role": "customer"
+    },
+    "normalized_assertion": "eligible purchases are refundable",
+    "operation_axis": "refund",
+    "rule_kind": "eligibility",
+    "target_scope_kind": "feature"
+  },
+  "implementation_conformance_refs": [],
+  "investigation_history": [],
+  "question_refs": [],
+  "rejection_or_deferral_detail": null,
+  "related_candidate_refs": [],
+  "resolution_links": [],
+  "resolution_state": "uninvestigated",
+  "rule_statement": "Eligible purchases can be refunded.",
+  "schema_version": "1.0",
+  "unobserved_ranges": [
+    "refund processing after settlement"
+  ]
+}

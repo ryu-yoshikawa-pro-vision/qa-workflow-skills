@@ -1,0 +1,10 @@
+{
+  "skill": "context-rule-synthesis",
+  "cases": [
+    {
+      "id": "CRS-OUT-001",
+      "input": "cases/case-001/input.md",
+      "expected": "cases/case-001/expected.json"
+    }
+  ]
+}

@@ -23,6 +23,7 @@ DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_ARTIFACT_BYTES = 16 * 1024 * 1024
+MAX_JSON_NESTING = 64
 
 
 class _SecureReadbackUnavailable(ValueError):
@@ -38,6 +39,31 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _check_json_nesting(text: str) -> None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for char in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "[{":
+            depth += 1
+            if depth > MAX_JSON_NESTING:
+                raise ValueError("JSON input nesting is too deep")
+        elif char in "]}":
+            depth -= 1
+            if depth < 0:
+                raise ValueError("JSON input nesting is invalid")
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise ValueError("JSON input must be a regular file")
@@ -46,8 +72,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     if len(raw) > MAX_JSON_BYTES:
         raise ValueError("JSON input is too large")
     try:
+        text = raw.decode("utf-8")
+        _check_json_nesting(text)
         value = json.loads(
-            raw.decode("utf-8"),
+            text,
             object_pairs_hook=_pairs,
             parse_constant=lambda token: (_ for _ in ()).throw(
                 ValueError(f"unsupported JSON number: {token}")

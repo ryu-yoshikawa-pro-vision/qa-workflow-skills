@@ -1,0 +1,34 @@
+[
+  {
+    "query": "今回の機能QAに関係する既存batch、candidate、DECを横断して、共通条件と例外を調べて。",
+    "should_trigger": true
+  },
+  {
+    "query": "反例が見つかった候補だけ再評価し、同一観察の再取得を別の支持根拠として数えないで。",
+    "should_trigger": true
+  },
+  {
+    "query": "関連Knowledgeと以前の回答を現行Authority・scope・承認状態へ照合し、必要な質問だけ残して。",
+    "should_trigger": true
+  },
+  {
+    "query": "必須分析なので、候補更新がなくても検索範囲とreadbackを含む今回runを記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "この一つのPRコメントから観察された事実だけをsignalへ抽出して。",
+    "should_trigger": false
+  },
+  {
+    "query": "現在有効な仕様を判断してSPEC / DEC / UNKNOWNを正本として更新して。",
+    "should_trigger": false
+  },
+  {
+    "query": "欠陥内容を外部チケットへ登録し、重複課題を解決して。",
+    "should_trigger": false
+  },
+  {
+    "query": "新しいテストケースを作りcoverage matrixを更新して。",
+    "should_trigger": false
+  }
+]

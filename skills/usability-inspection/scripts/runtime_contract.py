@@ -57,8 +57,11 @@ OWNER_VERIFIED_SKILLS = frozenset(
         "test-requirements-analysis",
         "test-architecture-design",
         "test-management",
+        "context-signal-audit",
+        "context-rule-synthesis",
     }
 )
+CONTEXT_OWNER_SKILLS = frozenset({"context-signal-audit", "context-rule-synthesis"})
 
 SUPPORTED_STATUSES = {
     "ok",
@@ -282,72 +285,193 @@ def _scan_json_string_limits(
     text: str,
     *,
     exempt_top_level_string_keys: frozenset[str] = frozenset(),
+    exempt_value_paths: frozenset[tuple[str | int, ...]] = frozenset(),
 ) -> None:
-    """Apply the per-string limit, with narrowly scoped top-level exemptions."""
-    depth = 0
-    root_is_object = False
-    top_level_state: str | None = None
-    top_level_key: str | None = None
+    """Apply the per-string limit with exact value-path transport exemptions."""
     index = 0
-    while index < len(text):
+
+    def whitespace() -> None:
+        nonlocal index
+        while index < len(text) and text[index] in " \t\r\n":
+            index += 1
+
+    def string_token(path: tuple[str | int, ...], *, is_key: bool = False) -> str:
+        nonlocal index
+        start = index
+        index += 1
+        escaped = False
+        while index < len(text):
+            char = text[index]
+            index += 1
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                break
+        token = text[start:index]
+        string_bytes = len(text[start + 1 : index - 1].encode("utf-8", "surrogatepass"))
+        top_level_exempt = len(path) == 1 and path[0] in exempt_top_level_string_keys
+        if (
+            string_bytes > MAX_STRING_BYTES
+            and not is_key
+            and not top_level_exempt
+            and path not in exempt_value_paths
+        ):
+            raise LimitExceeded("1文字列の上限を超えました")
+        if is_key and string_bytes > MAX_STRING_BYTES:
+            raise LimitExceeded("JSON key exceeds 64 KiB")
+        try:
+            return json.loads(token)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise InvalidInput("JSON string token is invalid") from exc
+
+    def value(path: tuple[str | int, ...]) -> None:
+        nonlocal index
+        whitespace()
+        if index >= len(text):
+            return
         char = text[index]
         if char == '"':
-            end = index + 1
-            escaped = False
-            while end < len(text):
-                token_char = text[end]
-                if escaped:
-                    escaped = False
-                elif token_char == "\\":
-                    escaped = True
-                elif token_char == '"':
-                    end += 1
-                    break
-                end += 1
-            token = text[index:end]
-            is_top_level_key = (
-                root_is_object and depth == 1 and top_level_state == "key"
-            )
-            is_top_level_value = (
-                root_is_object and depth == 1 and top_level_state == "value"
-            )
-            string_bytes = len(text[index + 1 : end].encode("utf-8", "surrogatepass"))
-            if (
-                not (
-                    is_top_level_value and top_level_key in exempt_top_level_string_keys
-                )
-                and string_bytes > MAX_STRING_BYTES
-            ):
-                raise LimitExceeded("1文字列の上限を超えました")
-            if is_top_level_key:
-                top_level_key = json.loads(token)
-                top_level_state = "colon"
-            elif is_top_level_value:
-                top_level_state = "member_done"
-            index = end
-            continue
+            string_token(path)
+            return
+        if char == "{":
+            index += 1
+            whitespace()
+            while index < len(text) and text[index] != "}":
+                key = string_token(path, is_key=True)
+                whitespace()
+                index += 1  # colon; strict JSON decoding already validated it
+                value(path + (key,))
+                whitespace()
+                if index < len(text) and text[index] == ",":
+                    index += 1
+                    whitespace()
+            index += 1
+            return
+        if char == "[":
+            index += 1
+            item = 0
+            whitespace()
+            while index < len(text) and text[index] != "]":
+                value(path + (item,))
+                item += 1
+                whitespace()
+                if index < len(text) and text[index] == ",":
+                    index += 1
+                    whitespace()
+            index += 1
+            return
+        while index < len(text) and text[index] not in ",]} \t\r\n":
+            index += 1
 
-        if char in "[{":
-            if depth == 0 and char == "{":
-                root_is_object = True
-                top_level_state = "key"
-            elif root_is_object and depth == 1 and top_level_state == "value":
-                top_level_state = "nested"
-            depth += 1
-        elif char in "]}":
-            depth -= 1
-            if root_is_object and depth == 1 and top_level_state == "nested":
-                top_level_state = "member_done"
-        elif root_is_object and depth == 1:
-            if char == ":" and top_level_state == "colon":
-                top_level_state = "value"
-            elif char == "," and top_level_state == "member_done":
-                top_level_state = "key"
-                top_level_key = None
-            elif not char.isspace() and top_level_state == "value":
-                # A number, boolean, or null starts a scalar member value.
-                top_level_state = "member_done"
-        index += 1
+    value(())
+
+
+def _owner_transport_paths(value: Any) -> frozenset[tuple[str | int, ...]]:
+    """Return only registered context-owner stored_content paths."""
+    paths: set[tuple[str | int, ...]] = set()
+    scope_keys = {
+        "skill",
+        "target",
+        "execution_range",
+        "input_mode",
+        "normalized_input",
+        "current_structure_state",
+    }
+
+    def add_context_readback_paths(evidence: Any, base: tuple[str | int, ...]) -> None:
+        if not isinstance(evidence, dict):
+            return
+        if isinstance(evidence.get("readback"), dict) and isinstance(
+            evidence["readback"].get("content"), str
+        ):
+            paths.add(base + ("readback", "content"))
+        batch_readbacks = evidence.get("batch_readbacks")
+        if isinstance(batch_readbacks, list):
+            for item_index, readback in enumerate(batch_readbacks):
+                if isinstance(readback, dict) and isinstance(
+                    readback.get("content"), str
+                ):
+                    paths.add(base + ("batch_readbacks", item_index, "content"))
+        provider_readbacks = evidence.get("provider_readbacks")
+        if isinstance(provider_readbacks, list):
+            for item_index, readback in enumerate(provider_readbacks):
+                if isinstance(readback, dict) and isinstance(
+                    readback.get("content"), str
+                ):
+                    paths.add(base + ("provider_readbacks", item_index, "content"))
+
+    def visit(node: Any, path: tuple[str | int, ...]) -> None:
+        if isinstance(node, dict):
+            scopes = node.get("workflow_scopes")
+            if isinstance(scopes, list):
+                for item_index, row in enumerate(scopes):
+                    if (
+                        isinstance(row, dict)
+                        and set(row) == scope_keys
+                        and isinstance(row.get("skill"), str)
+                        and row.get("skill") in CONTEXT_OWNER_SKILLS
+                        and isinstance(row.get("normalized_input"), dict)
+                    ):
+                        evidence = row["normalized_input"].get("owner_verification")
+                        if isinstance(evidence, dict) and isinstance(
+                            evidence.get("stored_content"), str
+                        ):
+                            paths.add(
+                                path
+                                + (
+                                    "workflow_scopes",
+                                    item_index,
+                                    "normalized_input",
+                                    "owner_verification",
+                                    "stored_content",
+                                )
+                            )
+                            add_context_readback_paths(
+                                evidence,
+                                path
+                                + (
+                                    "workflow_scopes",
+                                    item_index,
+                                    "normalized_input",
+                                    "owner_verification",
+                                ),
+                            )
+            if (
+                node.get("operation") == "verify_runtime_evidence"
+                and isinstance(node.get("skill"), str)
+                and node.get("skill") in CONTEXT_OWNER_SKILLS
+                and isinstance(node.get("normalized_skill_input"), dict)
+            ):
+                evidence = node["normalized_skill_input"].get("owner_verification")
+                if isinstance(evidence, dict) and isinstance(
+                    evidence.get("stored_content"), str
+                ):
+                    paths.add(
+                        path
+                        + (
+                            "normalized_skill_input",
+                            "owner_verification",
+                            "stored_content",
+                        )
+                    )
+                    add_context_readback_paths(
+                        evidence,
+                        path
+                        + (
+                            "normalized_skill_input",
+                            "owner_verification",
+                        ),
+                    )
+            for key, child in node.items():
+                visit(child, path + (key,))
+        elif isinstance(node, list):
+            for item_index, child in enumerate(node):
+                visit(child, path + (item_index,))
+
+    visit(value, ())
+    return frozenset(paths)
 
 
 def _reject_surrogates(value: Any) -> None:
@@ -448,6 +572,7 @@ def strict_loads(
     _scan_json_string_limits(
         text,
         exempt_top_level_string_keys=exempt_string_keys,
+        exempt_value_paths=_owner_transport_paths(value),
     )
     _reject_surrogates(value)
     return _normalize_numbers(value)

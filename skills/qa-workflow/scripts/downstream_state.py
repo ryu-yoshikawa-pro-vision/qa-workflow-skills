@@ -20,6 +20,7 @@ from runtime_contract import (
     InvalidInput,
     LimitExceeded,
     RuntimeErrorBase,
+    _owner_transport_paths,
     _state_row_map,
     _validate_metadata,
     canonical_json_text,
@@ -49,6 +50,7 @@ _V1_INPUT_KEYS = frozenset(
     }
 )
 _V2_INPUT_KEYS = _V1_INPUT_KEYS | {"requested_scopes"}
+_V2_OPTIONAL_INPUT_KEYS = frozenset({"context_workflow_state_root"})
 _WORKFLOW_CONTRACTS = {_V1: _V1_INPUT_KEYS, _V2: _V2_INPUT_KEYS}
 _V2_PAYLOAD_KEYS = frozenset(
     {
@@ -128,21 +130,44 @@ def _number(token: str) -> int | Decimal:
     return int(token) if re.fullmatch(r"-?(?:0|[1-9][0-9]*)", token) else Decimal(token)
 
 
-def _check_tree(value: Any, *, depth: int = 0, count: list[int] | None = None) -> None:
+def _check_tree(
+    value: Any,
+    *,
+    depth: int = 0,
+    count: list[int] | None = None,
+    path: tuple[str | int, ...] = (),
+    allowed_large_strings: frozenset[tuple[str | int, ...]] = frozenset(),
+) -> None:
     count = count if count is not None else [0]
     count[0] += 1
     if count[0] > MAX_EXPLORATION_NODES or depth > MAX_DEPTH:
         raise LimitExceeded("JSON depth or item limit exceeded")
-    if isinstance(value, str) and len(value.encode("utf-8")) > MAX_STRING_BYTES:
+    if (
+        isinstance(value, str)
+        and len(value.encode("utf-8")) > MAX_STRING_BYTES
+        and path not in allowed_large_strings
+    ):
         raise LimitExceeded("JSON string exceeds 64 KiB")
     if isinstance(value, dict):
         for key, child in value.items():
             if len(key.encode("utf-8")) > MAX_STRING_BYTES:
                 raise LimitExceeded("JSON key exceeds 64 KiB")
-            _check_tree(child, depth=depth + 1, count=count)
+            _check_tree(
+                child,
+                depth=depth + 1,
+                count=count,
+                path=path + (key,),
+                allowed_large_strings=allowed_large_strings,
+            )
     elif isinstance(value, list):
-        for child in value:
-            _check_tree(child, depth=depth + 1, count=count)
+        for index, child in enumerate(value):
+            _check_tree(
+                child,
+                depth=depth + 1,
+                count=count,
+                path=path + (index,),
+                allowed_large_strings=allowed_large_strings,
+            )
 
 
 def _load_request(raw: bytes) -> dict[str, Any]:
@@ -177,7 +202,10 @@ def _load_request(raw: bytes) -> dict[str, Any]:
         for key, value in request.items()
         if key != "previous_qa_workflow_artifact_markdown"
     }
-    _check_tree(transport)
+    _check_tree(
+        transport,
+        allowed_large_strings=_owner_transport_paths(transport),
+    )
     return request
 
 
@@ -370,7 +398,10 @@ def _validate_frozen_pair(
     if metadata.get("generator_contract_version") != version:
         raise InvalidInput("historical runtime generator version mismatch")
     # v1とv2はそれぞれ固定のキー集合だけを受理する（版とキー集合の不一致は拒否）。
-    if set(input_value) != _WORKFLOW_CONTRACTS[version]:
+    allowed_input_keys = _WORKFLOW_CONTRACTS[version]
+    if version == _V2 and "context_workflow_state_root" in input_value:
+        allowed_input_keys = allowed_input_keys | _V2_OPTIONAL_INPUT_KEYS
+    if set(input_value) != allowed_input_keys:
         raise InvalidInput("historical workflow input schema is invalid")
     entities = input_value["current_entities"]
     if not isinstance(entities, list):

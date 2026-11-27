@@ -23,6 +23,10 @@
     "overall_state": "実行中",
     "started_source_refs": [],
     "knowledge_entry_refs": [],
+    "requested_scopes": [],
+    "context_request_contracts": [],
+    "context_signal_attempts": [],
+    "context_synthesis_run_refs": [],
     "project_context_ref": "",
     "project_context_revision": "",
     "used_project_context_fields": [
@@ -43,7 +47,7 @@
 }
 ```
 
-`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。WCAG formal evaluation stateだけは、下記の限定された追加契約を使用します。
+`artifact_graph.py`が保存するrecordは`workflow_ref` / `schema_version` / caller提供の`state`からなるenvelopeです。汎用helperはenvelopeとworkflow identityを扱いますが、`state`内部のfield schemaは検証しません。`requested_scopes`は工程開始時の要求集合を保持します。context必須処理では`context_request_contracts`がAの元source/range/観測条件、Bの開始時operation input/analysis scope/target batch refsを`start_contract`として固定し、未確定値を後続のcurrent contractで具体化します。既知条件を変える具体化、要求削除/置換/縮小、別workflow/rootの証拠追加は拒否し、古いcontract再送で具体化を巻き戻しません。A試行とB run参照、および開始要求との対応は`context_workflow_state.py`が検証します。最終runtime inputには開始時要求の再読込用`context_workflow_state_root`を独立して渡します。共通workflow runtimeではoptional fieldであり、context必須処理でのみ設定します。このtemplateにないobjective / scope / produced refs等の固定fieldを、現在helperにない契約として追加しません。
 
 `state_revision`は保存record内のfieldではありません。helperがcreate / read結果のmetadataとして返すexact-content tokenで、local token自体はCAS条件になりません。更新を保存済みとして扱うには、保存先のnative atomic conditional writeへexpected revisionを渡せる必要があります。read後の比較と無条件writeをCAS扱いしません。Project Context全体revisionはprovenanceとして記録できますが、currentnessは利用したstable keyだけを比較します。
 
@@ -52,6 +56,8 @@
 | Skill                       | 対象 / 実行範囲                                                       | 状態                                                           | 成果物 / バージョン | ブロッカー / 備考 |
 | --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------- | ----------------- |
 | project-context             |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| context-signal-audit        | 単一sourceのsignal抽出 / 訂正 / 再利用                                | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
+| context-rule-synthesis      | 横断検索 / 候補分析 / 再評価run                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | feature-analysis            |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | spec-analysis               |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
 | ui-target-analysis          |                                                                       | 未開始 / 実行中 / 要再検証 / ブロック中 / 完了 / 再利用 / 省略 |                     |                   |
@@ -96,11 +102,13 @@
 - 同じworkflowのmutable operationはstate更新だけで二重開始を防げません。owner側のatomic pre-start claim / idempotent startがない場合、`qa.workflow_state_root/claims/<workflow_ref + operation_refのcanonical identity digest>.json`へatomic pre-start claimを作成します。claim targetはhelperが導出し、別claim rootをProject Contextへ追加しません。claimを取得できなければ開始をblockします。
 - shared resource reservationは既存の外部reservationを優先します。project-local reservationはatomic create-if-absentとlifecycleを閉じるnative atomic conditional releaseの両方がある場合だけ取得します。どちらかがない保存先では予約を作らず、状態を安全に確認できないreservation recoveryもblockします。rootは既存の`qa.reservation_root`を使います。
 
-## WCAG formal evaluation stateの単一ホスト例外
+## 既存SQLite workflow state provider
 
-PR #14のWCAG formal report provenanceには、既存の`qa.workflow_state_root`を使う`artifact_graph.py`内のPython標準`sqlite3` providerを使用します。これはWCAG評価状態の登録・読込・report完了専用であり、generic workflow CAS、handoff reservation、claimの代替ではありません。対応範囲は同一ホストのlocal filesystemだけです。root未設定、network / multi-host filesystem、DB破損、lock / transaction保証不能では処理をblockします。
+PR #14のWCAG formal report provenanceとcontext A/B stateには、既存の`qa.workflow_state_root/workflow-state.sqlite3`を使う`artifact_graph.py`内のPython標準`sqlite3` providerを使用します。providerは既存workflow envelopeの`state`をnative CASと履歴付きで更新し、同じrootに別storeを作りません。これは汎用handoff reservationやclaimの代替ではありません。対応範囲は同一ホストのlocal filesystemだけです。root未設定、network / multi-host filesystem、DB破損、lock / transaction保証不能では処理をblockします。
 
-既存envelopeは変更せず、`state.wcag_evaluations`へevaluation ref/revision、WCAG version/level、scopeと根拠ref、selected sample identity、variation、process membership、source artifact ref/revision、canonical Plan identity、report進行状態を保存します。raw URL、secret、DOM text、scope本文、評価 narrativeは保存しません。state provider revisionはWCAG evaluation revisionとは別にSQLite内で単調管理します。
+既存envelopeは変更せず、`state.wcag_evaluations`へevaluation ref/revision、WCAG version/level、scopeと根拠ref、selected sample identity、variation、process membership、source artifact ref/revision、canonical Plan identity、report進行状態を保存します。Context stateは`state.requested_scopes`へ工程開始時の全要求を保持し、`state.context_signal_attempts`へAの元要求identity・各試行/範囲・batch ref/revision・candidate check・状態/再開条件を、`state.context_synthesis_run_refs`へBの開始時input/requested scope、要求identity、run ref/revision、target batch、実scopeと元要求の対応を保存します。通常完了では最終`requested_scopes`・owner verifier証拠・実readbackとの対応を確認します。raw URL、secret、DOM text、scope本文、評価 narrativeは保存しません。state provider revisionはworkflow内のcontext/QA更新とWCAG evaluation revisionの双方と分けてSQLite内で単調管理します。
+
+`context_workflow_state.py initialize`は新規workflow_refのstateのみ初期化します。JSON-only legacy stateの自動移行や上書きは行いません。既存JSON stateにCAS更新を必要とする場合は当該state操作をblockし、通常成果物の保存可否とは分けて扱います。
 
 WCAG runtimeの`close-report`は保存済みcurrent recordとPlan/result集合を照合したclosure candidateを`unresolved`で返します。QA workflowが保存先revisionを条件にCAS更新し、別connectionで再読込してreport完了を確かめた後だけ正式な`ready`を返します。SQLite recordの存在はユーザー承認の証明ではなく、登録は既存owner入力・scope根拠・source refsを確認できるworkflow経路から行います。既存のtest-only `wcag_handoff_cas_provider.py`はproductionでは使用しません。
 

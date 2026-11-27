@@ -1,0 +1,50 @@
+[
+  {
+    "query": "この一つの仕様書から、記載された事実だけを中立signalとして抽出して。",
+    "should_trigger": true
+  },
+  {
+    "query": "このPR差分のうち、実装状態として観察できた点をrange付きbatchにして。",
+    "should_trigger": true
+  },
+  {
+    "query": "SEC-4まで読めた既存signal batchを再利用し、SEC-5を追加取得して要求範囲を確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "一次仕様を再読して抽出漏れを確認した。旧batchを変更せず訂正版を作れるか確認して。",
+    "should_trigger": true
+  },
+  {
+    "query": "取得範囲とsource hashが確定したので、該当文書からsignalを抽出して保存readbackを照合して。",
+    "should_trigger": true
+  },
+  {
+    "query": "探索Finding一件から観察事実を分け、推測と未確認範囲を混ぜずに記録して。",
+    "should_trigger": true
+  },
+  {
+    "query": "別workflowの複数signalから共通ルールと適用条件を推論して。",
+    "should_trigger": false
+  },
+  {
+    "query": "仕様書を更新してこの挙動を正式な期待結果として確定して。",
+    "should_trigger": false
+  },
+  {
+    "query": "同一障害の外部issueを検索し、defect-managementへ登録して。",
+    "should_trigger": false
+  },
+  {
+    "query": "この挙動からProduct Riskを採点し、正式テスト重点を更新して。",
+    "should_trigger": false
+  },
+  {
+    "query": "未解決仕様をUNKNOWNへ登録して、担当者へ質問を発行して。",
+    "should_trigger": false
+  },
+  {
+    "query": "既存QA Knowledgeを再検証してcanonical entryを置換して。",
+    "should_trigger": false
+  }
+]

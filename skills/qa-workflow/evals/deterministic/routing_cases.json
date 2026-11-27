@@ -942,5 +942,49 @@
       "testware-execution"
     ],
     "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-015",
+    "input_conditions": "単一の有効DECから、観察事実だけをsignalとして抽出して後で再利用する",
+    "start": "context-signal-audit",
+    "final": "context-signal-audit",
+    "skills": [
+      "context-signal-audit"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-016",
+    "input_conditions": "一次仕様で確認したsignalの抽出漏れを旧batchを保持した訂正版で修正する",
+    "start": "context-signal-audit",
+    "final": "context-signal-audit",
+    "skills": [
+      "context-signal-audit"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-017",
+    "input_conditions": "新機能QA開始時に別workflowのbatch、候補、DEC、Knowledgeを照合し、残った未知事項だけ既存ownerへ渡す",
+    "start": "context-rule-synthesis",
+    "final": "question-analysis",
+    "skills": [
+      "context-rule-synthesis",
+      "spec-analysis",
+      "question-analysis"
+    ],
+    "overall": "実行中"
+  },
+  {
+    "id": "WF-PROCESS-018",
+    "input_conditions": "下流設計前に未処理not_checked batchを横断分析し、候補は正式仕様やriskへ昇格せず既存ownerへhandoffする",
+    "start": "context-rule-synthesis",
+    "final": "question-analysis",
+    "skills": [
+      "context-rule-synthesis",
+      "spec-analysis",
+      "question-analysis"
+    ],
+    "overall": "実行中"
   }
 ]

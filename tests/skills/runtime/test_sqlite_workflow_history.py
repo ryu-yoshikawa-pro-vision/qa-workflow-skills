@@ -88,6 +88,29 @@ class SqliteWorkflowHistoryTests(unittest.TestCase):
         self.assertEqual(self.read_history("sqlite:3")["status"], "blocked")
         self.assertEqual(self.read_history("sqlite:2")["state"], {"marker": "changed"})
 
+    def test_database_root_rejects_real_git_metadata_not_an_empty_sentinel(
+        self,
+    ) -> None:
+        sentinel_root = self.root / "sentinel" / "workflow-state"
+        sentinel_root.mkdir(parents=True)
+        (sentinel_root.parent / ".git").mkdir()
+        created = artifact_graph.create_sqlite_workflow_state(
+            sentinel_root, REF, {"marker": "outside a repository"}
+        )
+        self.assertEqual(created["status"], "created", created)
+
+        repository_root = self.root / "repository" / "workflow-state"
+        repository_root.mkdir(parents=True)
+        git_dir = repository_root.parent / ".git"
+        git_dir.mkdir()
+        (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        (git_dir / "config").write_text("[core]\n", encoding="utf-8")
+        blocked = artifact_graph.create_sqlite_workflow_state(
+            repository_root, OTHER, {"marker": "must stay out"}
+        )
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertEqual(blocked["reason"], "workflow_state_provider_unavailable")
+
     def test_history_write_failure_rolls_back_current_update(self) -> None:
         self.create()
         database = self.root / "workflow-state.sqlite3"

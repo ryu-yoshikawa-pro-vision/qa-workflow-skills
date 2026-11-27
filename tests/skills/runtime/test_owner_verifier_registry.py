@@ -407,6 +407,8 @@ class OwnerVerifierRegistryTests(unittest.TestCase):
                 "test-requirements-analysis",
                 "test-architecture-design",
                 "test-management",
+                "context-signal-audit",
+                "context-rule-synthesis",
             },
         )
         # 検証入口を持たないownerは登録しない（登録しないことが完了不可を保つ）。

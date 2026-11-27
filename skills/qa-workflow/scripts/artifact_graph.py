@@ -1096,9 +1096,34 @@ def _local_sqlite_path(workflow_root: str | Path) -> Path:
     path = root / _SQLITE_WORKFLOW_DB
     if path.is_symlink():
         raise ValueError("workflow_state_database_symlink_unsupported")
-    if any((parent / ".git").exists() for parent in (root, *root.parents)):
+    if any(
+        _is_git_worktree_metadata(parent / ".git") for parent in (root, *root.parents)
+    ):
         raise ValueError("workflow_state_database_must_be_outside_git_worktree")
     return path
+
+
+def _is_git_worktree_metadata(marker: Path) -> bool:
+    """Ignore empty sandbox sentinel directories; reject actual Git metadata."""
+    try:
+        if marker.is_dir():
+            return (marker / "HEAD").is_file() and (
+                (marker / "config").is_file() or (marker / "commondir").is_file()
+            )
+        if marker.is_file():
+            value = marker.read_text(encoding="utf-8", errors="strict").strip()
+            if not value.startswith("gitdir:"):
+                return False
+            target = Path(value[len("gitdir:") :].strip())
+            if not target.is_absolute():
+                target = marker.parent / target
+            target = target.resolve(strict=True)
+            return (target / "HEAD").is_file() and (
+                (target / "config").is_file() or (target / "commondir").is_file()
+            )
+    except (OSError, UnicodeError):
+        return False
+    return False
 
 
 def _sqlite_connection(path: Path) -> sqlite3.Connection:

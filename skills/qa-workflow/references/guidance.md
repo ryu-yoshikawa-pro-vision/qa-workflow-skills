@@ -45,6 +45,8 @@
 - `e2e-test-selection`
 - `feature-analysis`
 - `project-context`
+- `context-signal-audit`
+- `context-rule-synthesis`
 - `test-architecture-design`
 - `test-condition-analysis`
 - `test-evaluation`
@@ -68,6 +70,8 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 | 工程固有ロジック                                            | 担当Skill                    |
 | ----------------------------------------------------------- | ---------------------------- |
 | 案件Project Context / 成果物配置・編集方針の合意            | `project-context`            |
+| 単一sourceから中立signalを抽出・訂正・再利用                | `context-signal-audit`       |
+| 複数workflowの横断法則・差異条件・候補run                   | `context-rule-synthesis`     |
 | 製品機能ID / 情報源母集団 / 開発差分分類                    | `feature-analysis`           |
 | 現在有効な仕様根拠の解決                                    | `spec-analysis`              |
 | UI構造・画面・操作・状態・遷移、human editing               | `ui-target-analysis`         |
@@ -110,6 +114,28 @@ Agent Skills Specificationは共通Skill-to-Skill呼び出しAPIを規定しま�
 `qa-workflow`自身は、SPEC / DECISION / ASMの優先関係、バージョン選択、情報源優先順位、仕様根拠の競合解消を行いません。
 
 Project ContextのSection 12 / 13が案件の決定事項・仮定の正本ownerである場合、DEC / ASMのstable IDと履歴は`project_context_ids.py`でmaterialize / validate-historyします。別の正本ownerが明示されている場合はProject Contextへ複製・再採番しません。runtime-v1からの移行順序、UI target package migration、scope ownership normalizationの次工程は`migration_preflight.py`のstatusと`cutover_next_action`を正本とし、Agentがartifact versionやscope readinessから再判断しません。
+
+### 横断コンテキスト分析
+
+単一のsourceから後のworkflowでも参照する中立な観察事実を抽出する要求、範囲確定済みbatchの再利用、一次情報で確認した抽出漏れ・誤抽出の訂正は`context-signal-audit`へroutingします。1回のA実行は単一sourceに限定し、別sourceや候補を横断した法則判断はしません。
+
+複数workflowのsignal・既存候補・Authority・回答・調査・Knowledgeの横断検索と分析、新機能QA開始時の再利用、重大な反例・競合、下流設計や仕様根拠を確定する直前の未処理signal確認、明示的な法則分析要求は`context-rule-synthesis`へroutingします。通常のA実行ごとには起動しません。complete 0件batchだけでBを起動せず、必須または明示要求のB実行が変更0件でも`completed_zero_changes` runとreadbackで今回の分析を区別します。
+
+候補は独立仮説として保存し、正式仕様・Product Risk・テスト期待結果にはしません。Authorityの有効性は`spec-analysis`、未解決の仕様質問は`question-analysis`、実対象の調査は既存の`exploratory-testing`や適切なinspection ownerへ戻します。過去回答はQ / UNKNOWN、scope、revision、承認状態と現行Authorityをownerで確認し、回答受領だけで候補を解決しません。Knowledge・Risk・Project Context・defectは各既存ownerのread/lookup、意味的重複確認、承認経路、保存/readbackを使います。
+
+モードは既存のrequested scope契約に従います。無効 / 未指定はA/Bを起動せず、補助モードの未設定・失敗は既存完了を維持し、必須モードは未設定・不完全・認可不足でも要求から除外せず該当範囲だけ未完了にします。単体実行も正式保存・readback・owner verifierの条件を満たす範囲だけ完了します。Aの各試行状態は既存`state.context_signal_attempts`、Bのrun refは`state.context_synthesis_run_refs`へ記録します。第4 storeや独自workflow engineは追加しません。
+
+#### context stateとreadback
+
+許可された指定root内の通常保存は`context_artifact_store.py`で標準filesystem操作を使います。専用認証host、保存ごとの承認、案件管理用DBは要求しません。既存OS権限で書けるrootに対する`write`、`list`、`read`、`history`を使い、更新には`expected_revision`と`expected_content_hash`を渡します。統合・分割等で関連候補の前提がある更新では、ref・revision・content hashを`related_preconditions`に含め、対象更新と同じ保存境界で照合します。前提の変更や保存能力不足は当該操作だけをblockし、再照合後に再開します。`write`の返却readbackに加えて同じrevisionを`read`し、ref・root binding・hash・canonical本文を照合します。既存ownerの共有更新、外部操作、正式仕様変更には、それぞれの認可・承認・履歴・独立readbackを適用します。
+
+`context_workflow_state.py`は既存`qa.workflow_state_root/workflow-state.sqlite3`のSQLite providerを使い、providerのrevision/CAS/historyを利用します。必須A/Bを実行する前に`register-requested-scopes`で工程開始時の全`requested_scopes`を同じstate envelopeへ保存し、後から要求の欠落を検出できるようにします。Aの`context_signal_attempts[]`には元request scope、attempt ID、開始時operation/source/requested range、actual range、各batch ref/revision/hashと担当range、candidate check、状態、失敗理由、再開条件を記録します。Bの`context_synthesis_run_refs[]`には開始時operation input/requested scopeと元request scope群、run ref/revision/hash、runごとの実scope/target batch、元要求への対応状況を保持し、stateには対応する成果物root bindingを記録します。confirmed resultが未確定のin_progress runは候補readbackを要求せず登録・再開できます。分割runは各実scopeをsubsetとして照合し、全開始時source×scopeの対応がそろうまでmappingをincompleteにします。qa-workflowの最終完了gateは開始時A/B要求の全件、最終`requested_scopes`への実scope具体化、owner verifier結果、保存成果物と実readback、すべてのcurrent runの完了をまとめて再確認します。補助scopeと過去revisionは必須scopeの完了に数えません。再開時はstateとexact artifact revisionをreadbackし、自己更新後の内容hashで開始時inputを置換しません。
+
+新しいworkflow stateは`context_workflow_state.py initialize`で既存providerへ初期化できます。JSON-onlyのlegacy stateは自動移行・上書きしません。SQLite recordがない既存JSON stateで更新要求があれば、stateだけを`legacy_json_workflow_state_update_unavailable`としてblockし、通常成果物の保存や独立分析は継続します。共有root・複数host・SQLite providerの利用可否は別に確認し、ローカルfixtureの成功を実運用providerの証拠にしません。
+
+A owner scopeの`normalized_input.context_request`は`workflow_ref`、元source ref/revision/hash、全`requested_range`、当該batchの`assigned_range`、`observation_condition`を含みます。`execution_range`はassigned rangeのcanonical JSONです。ownerは選択batchが担当範囲を包含し、独立readbackされたactive batchの和集合が元要求全域を満たすことを確認します。actual inspected rangeが要求より広いbatchも、範囲外signalを完了根拠に使わず再利用できます。
+
+B owner scopeの`normalized_input.context_request`は`workflow_ref`、runの`operation_input` /実`requested_scope`、`target_batch_refs`を含み、保存runと完全一致させます。`normalized_input.context_workflow_state`には呼出し側の`artifact_root`・`workflow_state_root`、元`request_scope(s)`、Bではそのrunが開始された時点のcontract `requested_operation_input`・元`requested_scope`を渡し、split run間で同じ元要求を維持します。開始時に未確定なA生成batchは、同一workflow/rootのrequired A attemptに保存され実readbackできた後、同じ元`request_scope`でBのcontractへ追加できます。開始時の既存source、operation type、analysis scope、調査条件は維持し、要求の削除・別sourceへの置換・範囲縮小・条件変更・確定済みversion上書きは拒否します。古い開始contractを再送して具体化済みstateを巻き戻さず、CAS revision競合時は再読取します。Aもattemptの`request_scope`とscope側request identityを対応させ、開始時に未確定だったsource revision/hashだけを同一要求の実取得後に具体化します。provider readbackはrefごとの辞書ではなく`{artifact_ref, revision, sha256, content}`の配列で渡し、同一refの更新前後revisionをそれぞれ照合します。qa-workflowの最終gateはA/Bの開始要求全件、最終scope集合、owner verifier結果、保存batch/run、全current runの完了、必要readbackを統合して確認します。runのsnapshot、開始時入力、target batch、予定候補のbase/result、run本体を正確なrevisionで読めない場合は完了しません。`returned`のhandoffは返却された結果ref/revision/hashのreadbackを要求しますが、ownerへのhandoff成立とは扱いません。fixture verifierは実運用root許可や実provider接続を証明しません。
 
 ### その他の工程固有ロジックへの依存
 
@@ -441,7 +467,8 @@ handoff identityはorigin artifact/revisionとartifact-local handoff refの組�
 
 ## 要求集合と「省略」
 
-- `requested_scopes`（要求集合）は、工程開始時にqa-workflowが利用者の要求から記録する、今回の完了に必須のscopeの一覧です。各要素は`skill / target / execution_range / requirement`を持ちます。`requirement`は`required`（必須）または`excluded_by_approval`（承認された対象外）です。
+- `workflow state.requested_scopes`は、工程開始時にqa-workflowが利用者の要求から保存する元要求集合です。各要素は`skill / target / execution_range / requirement`を持ちます。`requirement`は`required`（必須）または`excluded_by_approval`（承認された対象外）です。この開始時集合は仮targetを含めて保持し、ref具体化で上書きしません。
+- `workflow_runtime.py`へ渡す`requested_scopes`は、今回の最終完了判定に必要なscope集合です。Context A/Bでは開始時要求から永続stateの対応をたどり、実artifact ref・execution range・owner検証で裏付けられた最終scopeへ具体化してから渡します。元要求に対応のないscopeの追加、要求の削除、scope/rangeの縮小や別refへの置換は認めません。runtime入力の`workflow_scopes`と最終`requested_scopes`は具体化後の同一scope identityを使い、completion gateが開始時集合・A/B保存記録・owner/readback証拠・最終scope集合を照合します。
 - 要求集合は`workflow_runtime.py`の完了判定に必須の入力です。未宣言・空の集合は完了できません。呼び出し側が「全工程確認済み」と自己申告しても、要求集合の代わりにはなりません。
 - 完了判定の対象は要求集合に含めたscopeだけです。QA計画だけ、報告だけ、欠陥だけ、既存成果物を使う途中開始は、要求集合を小さく宣言して表します。qa-workflowは他Skillを推論で追加しません。
 - `excluded_by_approval`は、現時点では対象外として確定しません。承認記録を実在の承認として照合する手段（承認provider・認証主体）が未定義のためです。形式上の参照（`APR-999`、別scope・別revisionを指す参照を含む）があっても、承認の真正性を確認したものとして扱いません。該当scopeは必須のまま完了判定に残し、黙って除外しません。空・欠落・空白のみ、および`未設定`・`未取得`・`未確認`・`未承認`・`失効`・`unknown`・`N/A`・`-`・`dummy`・`pending`・`TODO`・`承認済み`・`approved`などのplaceholderや承認状態の語は、`approval_ref_missing`になります。それ以外の具体的な参照は`approval_unverifiable`になります。どちらも`unverified_exclusions`に`skill / target / execution_range / reason`で出し、blockingとして完了不可です。`excluded_scopes`（確定した対象外）は現在常に空です。再開条件は、対象外の宣言を取り下げて`required`にするか、承認記録の照合手段（承認provider）が定義され、その照合結果が提示されるまで、そのscopeを必須として検証することです。照合手段が定義された場合は、`workflow_runtime.py`の`_exclusion_confirmed`だけを差し替えます。保存済みv2の対象外の主張は、再開時に受理しません（`downstream_state.py`）。古い承認参照を再利用して対象外を確定することはありません。真正性について実際に検証したのは、承認参照の形式（空・placeholder・状態語の除外）だけです。検証していないのは、承認の実在、対象scope・revisionとの一致、承認状態（承認済み・失効）、承認者、再開時の失効です。
