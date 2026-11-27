@@ -28,7 +28,7 @@
 
 現状: continuous/gated、開発連動QA Planの旧Q06配置合意、Git既定承認方式は既存。複数成果物の提示単位・部分承認の横断保証は未確認。#40の通常保存は都度承認不要だが、既存ownerの保存承認と案件コンテキストによるgated指定は残る。
 
-改善: 許可済み通常保存は都度承認なしとする。候補・回答の記録と内容の正式承認、工程進行、操作認可、破壊的変更を区別する。正式決定・仮定採用・承認済み仕様の意味変更・必要な外部操作は既存の有効な承認単位でまとめる。利用者の指定・既存規則を優先し、指定がなければ標準契約で進行する。必要時は保存先・形式・運用上の指定の有無だけ確認し、既知の条件を再質問しない。既存の候補欄・文書構造を優先し、別draftや承認状態管理を一律新設しない。計画等の正式確定・リスク受容が必要な場合は維持する。Q10に従い通常の内容承認は依頼者の明示判断で成立する。Q11のcontinuousを既定としgatedは明示指定時のみ。案件単位の進行設定を要求しない。必要な内容承認・操作認可では対象scope/ref/revision・差分・権限・失効条件を確認する（OPS-04）。
+改善: 許可済み通常保存は都度承認なしとする。候補・回答の記録と内容の正式承認、工程進行、操作認可、破壊的変更を区別する。正式決定・仮定採用・承認済み仕様の意味変更・必要な外部操作は既存の有効な承認単位でまとめる。利用者の指定・既存規則を優先し、指定がなければ標準契約で進行する。必要時は保存先・形式・運用上の指定の有無だけ確認し、既知の条件を再質問しない。既存の候補欄・文書構造を優先し、別draftや承認状態管理を一律新設しない。計画等の正式確定・リスク受容が必要な場合は維持する。Q10に従い通常の内容承認は依頼者の明示判断で成立する。Q11のcontinuousを既定とし、gatedは現在の明示指定または有効な既存の利用者承認済み規則がある場合のみ。案件単位の進行設定を要求しない。必要な内容承認・操作認可では対象scope/ref/revision・差分・権限・失効条件を確認する（OPS-04）。
 
 受入: 許可済み通常保存が承認待ちで停止しない、承認済み仕様と未承認変更候補が混在しても前者の意味を保全し後者を正式採用しない、通常の明示承認は追加認証なしで採用、別権限者が必要な判断・外部操作では必要な確認を維持。既定continuousと明示gated、必要承認の拒否・保留・有効性に影響する変更を確認する。
 
@@ -108,7 +108,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 確認した差異: guidanceは現行finalize-wcag-reportがcaller提供dependency metadataとcandidateを照合するだけでcurrent rowを独立取得しないと記載。一方SKILL.mdはQA runtimeでcurrent stateを取得し公式WCAG close-reportを内部実行・CAS保存・独立readback後に完了する契約。コードもread-wcag-evaluation-stateを内部実行し、取得結果からWCAG runtimeを実行、_record_wcag_report_runtime_execution、finalize_wcag_reportを呼ぶ。旧説明は少なくとも現行owner内部実行経路と一致しない。
 
-改善: 現行コード・schema・否定試験と照合してguidance更新。特権DB writer、複数host、認可や意味判断まで保証すると解釈しない。今回の静的確認は攻撃経路全体の実証ではない。現行の正規owner内部実行経路に合わせて局所修正する。実Agent評価を前提とせず、既存テストと照合して修正する。
+改善: 現行コード・schema・否定試験と照合して旧説明を訂正し、04に従い正式評価のSQLite依存を解消する。Plan・実結果・必要な証拠・実runtime closureをJSON、正式報告をMarkdownで保持する。WCAG-EM工程・適合判断・Evaluation Statementの必要条件を維持する。現行実装の証拠と改修後の受入を区別し、旧記述の訂正だけで改善完了としない。
 
 受入: 偽造candidate/metadata拒否、実ownerのclose-report、Plan/評価結果・scope・必要証拠の照合、closure不完全、保存失敗・再開・Statement生成を検証する。通常JSON保存へ変更しSQLite固有の期待値は新しい必要保証へ置換する。現行説明と改修後の説明を区別する。
 
@@ -197,7 +197,7 @@ PR #40の[PR本文・検証記録への導線](https://github.com/ryu-yoshikawa-
 
 受入: 同一成果物の再依頼は既存正本を解決し、異なるscope・Run・attemptは衝突しない。正本と表示物・draftの誤認を拒否。大文字小文字、禁止文字、path traversal、名前衝突、既存固定名との互換性を実際のファイル操作条件で必要範囲を検証。改版前後の質問定義と回答の対応、旧回答の誤適用防止、必要な復元を確認する。
 
-具体的な確認箇所: test-requirements-analysis、test-architecture-design、test-managementは現行のcanonical JSON packetを正本としMarkdownを描画物とする。人間の編集・利用が中心のQA要求・方式・計画はQ04に従い構造化Markdown等の正本が成立するか、機械集計用の母集団・状態と意味情報を分離する必要があるかを検討する。JSON正本の一律廃止は決めず、既存のvalidate_readback / impact / completion_check、managementのbuild_snapshot、test-reportingの参照と履歴・承認状態を確認する。形式変更が必要な場合も同じ意味情報を二重正本化したり不要な変換基盤を増やしたりしない。Machine Entity・実行raw・機械状態・#40の3 kindなど機械処理に適した形式は維持する。計画3 Skillの正本形式は利用者の編集性と必要な機械検証を両立する具体的な変更案を比較し、既存JSON validatorの都合だけで決めない。既存資産の移行はOPS-17に従う。
+具体的な確認箇所: test-requirements-analysis、test-architecture-design、test-managementは現行のcanonical JSON packetを正本としMarkdownを描画物とする。人間の編集・利用が中心なら通常Markdown、機械集計が主用途ならJSONを正本にする。必要な機械入力は実正本から取得し、独自の厳密Markdown文法や全項目の完全相互変換を強制しない。JSON正本の一律廃止は決めず、既存のvalidate_readback / impact / completion_check、managementのbuild_snapshot、test-reportingの参照と履歴・承認状態を確認する。形式変更が必要な場合も同じ意味情報を二重正本化したり不要な変換基盤を増やしたりしない。Machine Entity・実行raw・機械状態・#40の3 kindなど機械処理に適した形式は維持する。計画3 Skillの正本形式は利用者の編集性と必要な機械検証を両立する具体的な変更案を比較し、既存JSON validatorの都合だけで決めない。既存資産の移行はOPS-17に従う。
 
 ### OPS-14 外部指定root・相対ref解決 (P1)
 

@@ -31,7 +31,7 @@ OPS-09・12〜14・16・17・18。指定がない通常のQA依頼でも、人�
 
 IDが安全な単一path要素ならそのまま使う。そうでないrefや対象名を使う場合は、UTF-8の正規化NFC文字列に対するSHA-256の全64桁を使用する（複数要素は既存canonical JSONの配列としてhash）。名称変更時は既存正本を先に見つけてrefを維持する。Windows予約名・大小文字衝突・禁止文字・root逸脱がある場合も同じdigest方式を使い、実在する別identityに衝突したら上書きせず確認する。ファイル名を採番の根拠にしない。
 
-継続する同じ対象の仕様・設計は同一正本へ更新する。並立する計画は計画の既存ID、なければ明示された対象release/build・期間・環境の組を上記digestで区別し `planning/<scope>/<plan-key>/` 配下に置く。QA要求・方式が同じ計画固有の対象を持つ場合は同じ計画ディレクトリへ保存し、複数計画で共用する有効な要求・方式は既存refで参照する。一つの継続計画の改版は同じpath。実行・観測・報告は既存run/attempt/snapshot/evaluation/session identityで分離する。例: FEAT-001の設計は design/FEAT-001/test-cases.md、別環境のrunは実行ownerが発行した別runのディレクトリ、既存の tests/design/foo.md が同じ正本ならその場所のまま。新規中央台帳・命名サービスは不要。
+継続する同じ対象の仕様・設計は同一正本へ更新する。並立する計画は計画の既存ID、なければ明示された対象release/build・期間・環境の組を上記digestで区別し `planning/<scope>/<plan-key>/` 配下に置く。QA要求・方式が同じ計画固有の対象を持つ場合は同じ計画ディレクトリへ保存し、複数計画で共用する有効な要求・方式は既存refで参照する。一つの継続計画の改版は同じpath。実行・観測・報告は既存run/attempt/snapshot/evaluation/session identityで分離する。既存の別scope・別案件と同じIDが衝突する場合は有効な既存案件root・対象refで区別する。大文字小文字やUnicodeの表記差を同一正本と推測せず、正本の実際のpathと論理identityを確認する。別writerの新規作成は出力先を分離し、同一正本の作成担当を決める。例: FEAT-001の設計は design/FEAT-001/test-cases.md、別環境のrunは実行ownerが発行した別runのディレクトリ、既存の tests/design/foo.md が同じ正本ならその場所のまま。新規中央台帳・命名サービスは不要。
 
 表のファイル名を新規成果物の既定値とする。既存writerがファイル名・内部構造を固定しているものは、表のディレクトリをwriterへ渡し、その固定名・拡張子・公開単位を変更しない。`<run>`、`<attempt>`、`<snapshot>`、`<entry-ref>`、`<workflow-ref>` は担当ownerの既存識別子を用いる。正式な正本が存在する場合はこの表より既存refを優先する。
 
@@ -100,8 +100,8 @@ feature-registry.json、selection.json、report.json は固定名のない新規
 | 環境・認証・データ・非機能制約 | 許可済み実行環境と指定資料。実行不能なら実行のみ停止 |
 | qa.regression_scope / qa.regression_policy | 依頼scope、既存baseline/方針、担当Skillのリスク判断。必要範囲不明なら質問 |
 | qa.knowledge_root | 既存配置、なければ <root>/knowledge |
-| qa.workflow_state_root | 継続・機械baseline・正式WCAG・必須A/Bに必要な場合のみ <root>/state |
-| qa.reservation_root | 実予約経路が必要な場合だけ既存指定。共有操作の安全が確認できなければ該当操作停止 |
+| qa.workflow_state_root | 既存設定を優先。成果物から復元できない継続情報が必要な場合だけ <root>/state。正式WCAGの評価成果物は評価ディレクトリを利用 |
+| qa.reservation_root | 旧設定の読取互換。実際に必要な既存環境の制御がある場合のみ利用し、新規の汎用予約rootを要求しない |
 | qa.auxiliary_testware_refs / qa.feature_source_refs | 直接refと許可範囲で発見した実資料、未取得は明示 |
 | qa.feature_artifact_root | 既存配置、なければ <root>/features |
 | qa.feature_base_ref | 実Git差分・保存済みsource revision。なければ初回として扱い差分取得済みとしない |

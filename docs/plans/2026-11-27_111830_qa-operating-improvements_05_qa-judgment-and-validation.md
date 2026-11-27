@@ -27,7 +27,7 @@ OPS-11・18と全OPSの受入。自律的なQA判断・必要な活動の選択�
 
 ### テストレベル選択の既存validatorとの整合
 
-test-analysisのlevel既定は専門判断の根拠がない場合に限りシステムテストとする。architecture_runtime.py の BASES/DECIDED_DECISIONS/DECISION_BY_BASIS、PRIORITY_KEYS、ASSIGNMENT_KEYS、_validate_priorities、割当のbasis_source_ids検証、completion_check/_check_approval を06のv2契約に合わせる。level_priority に専門判断によるlevel集合と理由を追加し、明示・有効な承認済み方式との競合を隠さず、これらがない場合は根拠ある専門判断、最後に既定値の順とする。QA専門判断の割当には実根拠のsource IDと理由を要求する。選択理由のenumだけ追加して完了としない。承認済み方式/正式scope変更、組織決裁、リスク受容に必要な承認は維持し、単なる既定との差は承認理由にしない。旧JSON・旧enum・旧承認証拠の過去検証は維持。既存levelの「コンポーネント」「API」「システム」「受入」「別レベル」を維持し、統合テストは対象に応じAPIまたは別レベル（具体的な統合対象をmethodで記す）、静的テスト・探索は活動/方式であり独自levelを新設しない。data-contract、template、handoff、test-analysis/TR/TCN/TC、owner verifier、fixtureを同期する。
+test-analysisのlevel既定は専門判断の根拠がない場合に限りシステムテストとする。architecture_runtime.py の BASES/DECIDED_DECISIONS/DECISION_BY_BASIS、PRIORITY_KEYS、ASSIGNMENT_KEYS、_validate_priorities、割当のbasis_source_ids検証、completion_check/_check_approval を06のレベル選択契約に合わせる。level_priority に専門判断によるlevel集合と理由を追加し、明示・有効な承認済み方式との競合を隠さず、これらがない場合は根拠ある専門判断、最後に既定値の順とする。QA専門判断の割当には実根拠のsource IDと理由を要求する。選択理由のenumだけ追加して完了としない。承認済み方式/正式scope変更、組織決裁、リスク受容に必要な承認は維持し、単なる既定との差は承認理由にしない。旧JSON・旧enum・旧承認証拠の過去検証は維持。既存levelの「コンポーネント」「API」「システム」「受入」「別レベル」を維持し、統合テストは対象に応じAPIまたは別レベル（具体的な統合対象をmethodで記す）、静的テスト・探索は活動/方式であり独自levelを新設しない。data-contract、template、handoff、test-analysis/TR/TCN/TC、owner verifier、fixtureを同期する。
 
 ### 判断事例を実際の評価に追加する条件
 
@@ -60,7 +60,7 @@ test-analysisのlevel既定は専門判断の根拠がない場合に限りシ�
 | test-target-inspection、test-execution、testware-implementation、testware-execution | 01〜04の保存・許可・実行/隔離/cleanup。観測と実行証拠・コード保護を維持 |
 | regression-testing、exploratory-testing、qa-knowledge、context-signal-audit、context-rule-synthesis | 01〜04の既存ref/履歴、局所再利用・横断自律起動。A/Bの不変batch・候補・run・根拠と再開を維持 |
 | defect-management、test-reporting、test-evaluation | 02・04の候補/承認・実結果連携、05の活動改善。正式欠陥・母集団・終了判断・効果測定を区別 |
-| usability-evaluation、usability-inspection、wcag-conformance-evaluation | 01・03・04の資料評価/実観測/正式評価の区別、保護証跡と専用closure維持。WCAGの旧説明を修正 |
+| usability-evaluation、usability-inspection、wcag-conformance-evaluation | 01・03・04の資料評価/実観測/正式評価の区別、保護証跡と専用closure維持。WCAGの旧説明を修正しSQLite依存を解消 |
 
 各変更は対象SKILL.md・該当reference・template・既存Helper/validator・呼出し元・必要fixtureを同時更新する。共通化は実際の重複のみ。
 

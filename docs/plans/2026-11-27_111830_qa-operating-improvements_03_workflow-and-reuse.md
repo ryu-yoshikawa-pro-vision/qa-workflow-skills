@@ -6,9 +6,9 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 
 ## 現状と変更境界
 
-`qa-workflow/scripts/workflow_runtime.py` の `_scope_rows`（L445〜）、`_requested_scope_rows`（L869〜）、`_build`（L1049〜）は要求集合と全scopeを扱う。L1132〜でunrequestedを求めるがL1159〜は全scopeを検証し、L1284〜は未検証をblocking issue、L1375は `can_complete = not issues and bool(scopes) and scope_set_declared` とする。`owner_verifiers.py` は9 owner、`runtime_contract.py` はruntime-v2 root 6。残り24 Skillはこの登録外であり個別の品質判断・専用検証を持つものがある。単体Skillの完了と汎用runtime完了を混同しない。
+`qa-workflow/scripts/workflow_runtime.py` の `_scope_rows`（L445〜）、`_requested_scope_rows`（L869〜）、`_build`（L1049〜）は要求集合と全scopeを扱う。L1132〜でunrequestedを求めるがL1159〜は全scopeを検証し、L1284〜は未検証をblocking issue、L1375は `can_complete = not issues and bool(scopes) and scope_set_declared` とする。`owner_verifiers.py` は9 owner、`runtime_contract.py` はruntime-v2 root 6。runtime-v2 rootにはqa-workflow自身も含まれる。未登録の担当Skillには個別の品質判断・専用検証を持つものがある。単体Skillの完了と汎用runtime完了を混同しない。
 
-#40の `context_workflow_state.py` の `record_requested_scopes`、`record_signal_attempt`、`record_synthesis_run`、`complete_context_workflow` は開始時の全要求を保存し、最終のA/B実scope・実readback・runを照合する。`complete_context_workflow` の開始/最終要求照合（L1599〜2058）はA/Bを対象とする。`workflow_runtime.py` の `_verify_context_workflow_completion` は独立した `context_workflow_state_root` により最終入力からA/Bが消えた場合も検出する。これを弱めない。
+#40の `context_workflow_state.py` の `record_requested_scopes`、`record_signal_attempt`、`record_synthesis_run`、`complete_context_workflow` は開始時の全要求を保存し、最終のA/B実scope・実readback・runを照合する。`complete_context_workflow` の開始/最終要求照合（L1599〜2058）はA/Bを対象とする。`workflow_runtime.py` の `_verify_context_workflow_completion` は独立した `context_workflow_state_root` により最終入力からA/Bが消えた場合も検出する。元要求の欠落を検出する目的は維持し、SQLiteへの依存は本Planで置換する。
 
 ## 実装1 要求集合と完了判定の分離
 
@@ -42,7 +42,7 @@ OPS-05・15・18、01・04との接続。依頼に必要な工程と根拠だけ
 4. 利用した意味が変わった場合は依存関係から影響scopeだけを要再検証に戻す。spec-analysis→test-analysis→TR→TCN/CI→TCの既存Entity・scope ownership・partial rerun・carry-forward・retirement・coverageを維持する。`downstream_state.py`、`migration_preflight.py`、各runtime generatorの現行経路に従う。全成果物の再生成を既定としない。前回完了したbaseline/過去報告は履歴として保持し、現在の採用可否と区別する。
 5. qa-knowledgeの `lookup`、`plan_revalidation`、`update_entry`、`read_entry` 等は既存entry形式で使用する。Knowledgeの利用は追加2 Skillの起動や新規保存を条件としない。#40の軽量projection・既存owner検索・本文の選択取得を利用し、全データの読込や新規全文検索基盤を前提としない。
 
-Entity以外の文書では参照した仕様の節・決定・用語・計画の行ID・Knowledge entryと適用範囲/例外、現行source revisionを既存依存記録で追跡する。hash変更時は担当ownerの既存impactと根拠本文を照合する。計画は06の実際に利用した承認対象・行と根拠、Knowledgeは現行entryのscope・status・根拠、通常仕様文書は実際の該当節と有効Authorityを確認する。意味不変を確認できない場合は該当依存を要再検証とする。一般文書の新規fingerprint schema、全節hash台帳、全文検索サービスは不要。
+Entity以外の文書では参照した仕様の節・決定・用語・計画の行ID・Knowledge entryと適用範囲/例外、現行source revisionを既存依存記録で追跡する。hash変更時は担当ownerの既存impactと根拠本文を照合する。計画は06の実際に利用した承認対象・行と根拠、Knowledgeは現行entryのscope・status・根拠、通常仕様文書は実際の該当節と有効Authorityを確認する。物理的な入力revision/hashの変化と、実際に参照した意味の変化を分離する。ownerのimpactが旧版hashの変化を検出したときは該当根拠の差分を担当ownerで確認し、意味不変と判断できた範囲のみ再利用する。必要な当時の内容が取得できず意味不変を確認できない場合は該当依存を要再検証とする。一般文書の新規fingerprint schema、全節hash台帳、全文検索サービスは不要。
 
 ## 実装4 横断分析の起動条件
 
