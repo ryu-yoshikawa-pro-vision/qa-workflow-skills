@@ -15,7 +15,7 @@ test-requirements-analysis、test-architecture-design、test-managementの保存
 | 方式 | 要求/対象別レベル・タイプ・方式・環境・データ・分担・制約、割当ID、選択理由、根拠、未解決、承認範囲、影響 |
 | 計画 | 対象build・環境・期間、計画項目・担当・資源・順序、予定source/母集団、終了基準、実績取得、project risk、差異・是正処置、承認 |
 
-Markdownは既存output-templateの自然な見出し・表を用い、必要な根拠・ID・適用範囲を明示する。人間向け文書だけの作成・編集・完了にJSON固有のvalidate_readbackや機械完了を要求しない。Markdown指定または後続依頼で機械処理が必要になった場合は、担当Skillが実正本からその処理に必要な既存schemaの入力を組み立て、該当validator・集計を実行する。欠落・曖昧な値は推測補完せず該当処理だけ未確定にする。JSON入力を生成しても既存Markdown正本を自動昇格・削除・置換しない。入力の保存は実行・報告の再現や下流参照に必要な場合だけ行い、参照元Markdownと利用時点を対応付けた機械入力snapshotとして扱う。独立して更新する正本にせず、元の意味が変われば必要な入力を再生成・検証する。正本形式の変更は利用者の指定に従う。恒久parser・二重正本・全項目同期は作らない。既存JSONの計画母集団・実績snapshotは維持する。
+Markdownは既存output-templateの自然な見出し・表を用い、必要な根拠・ID・適用範囲を明示する。人間向け文書だけの作成・編集・完了にJSON固有のvalidate_readbackや機械完了を要求しない。Markdown指定または後続依頼で機械処理が必要になった場合は、担当Skillが実正本からその処理に必要な既存schemaの入力を組み立て、該当validator・集計を実行する。欠落・曖昧な値は推測補完せず該当処理だけ未確定にする。JSON入力を生成しても既存Markdown正本を自動昇格・削除・置換しない。入力の保存は実行・報告の再現や下流参照に必要な場合だけ行い、参照元Markdownと利用時点を対応付けた機械入力snapshotとして扱う。保存先は実際に利用するRun・報告・機械処理の既存成果物領域とし、正本の既定pathとは区別する（例: 報告snapshot配下のplan-input.json）。参照元Markdownのrefと利用時点の版・機械入力refは既存の入力参照・依存記録等で対応付ける。厳密な既存schemaのJSONに未定義項目を加えない。機械入力は正本探索から除外し、別sessionでもMarkdownを正本として解決する。独立して更新する正本にせず、元の意味が変われば必要な入力を再生成・検証する。過去報告・実行が参照するsnapshotは上書きしない。正本形式の変更は利用者の指定に従う。恒久parser・二重正本・全項目同期は作らない。既存JSONの計画母集団・実績snapshotは維持する。
 
 ## 承認済み内容・候補・現在の採用
 
@@ -39,4 +39,4 @@ sourceの実revision変更を検知し、利用した意味・承認・適用条
 
 ## 検証
 
-既存3 owner verifier、cross-owner reporting、owner registry、runtime portability、依存/currentnessテストを利用する。通常Markdown編集、指定JSON・旧v1読取/更新、必要機械入力の欠落・曖昧さ・不正型、計画母集団・終了基準、部分承認・別割当・共有制約、表示変更と意味不変、旧承認版取得不能、草案と現在採用、権限・根拠失効、必要な過去版、保存失敗を対比する。全形式round-trip・共通parserの実装を受入条件にしない。01/02/05のATで実保存・編集・既存JSON利用を確認する。 通常相談・MarkdownでID未発行の実根拠による専門判断、根拠自体の不足、後続の機械入力生成と正本の維持、必要snapshotの参照と再検証、機械JSONの不正・欠落source IDを対比する。
+既存3 owner verifier、cross-owner reporting、owner registry、runtime portability、依存/currentnessテストを利用する。通常Markdown編集、指定JSON・旧v1読取/更新、必要機械入力の欠落・曖昧さ・不正型、計画母集団・終了基準、部分承認・別割当・共有制約、表示変更と意味不変、旧承認版取得不能、草案と現在採用、権限・根拠失効、必要な過去版、保存失敗を対比する。全形式round-trip・共通parserの実装を受入条件にしない。01/02/05のATで実保存・編集・既存JSON利用を確認する。通常相談・MarkdownでID未発行の実根拠による専門判断、根拠自体の不足、後続の機械入力生成と正本の維持、必要snapshotの参照と再検証、機械JSONの不正・欠落source IDを対比する。 派生snapshotとMarkdownが共存する場合の正本探索、実際の重複正本、厳密な旧schemaへの未定義項目の混入、参照元と利用時点の照合、別sessionでの再開を確認する。

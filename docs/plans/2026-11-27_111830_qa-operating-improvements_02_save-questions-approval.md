@@ -28,16 +28,16 @@ OPS-01〜04・06・18。成果物作成は必要な時点で保存し、通常�
 
 ## 実装2 保存経路の改修
 
-01の指定解決と既存OS/sandbox権限で通常Markdown・JSONを作成・更新し、保存結果を確認する。既存正本を先に探し、更新前の対象・差分を確認する。機械writerの中断対策は既存の一時ファイル・置換処理を利用する。通常保存にCAS、専用認証callback、全revision、receiptを要求しない。単純なファイル置換を共有CASと呼ばない。
+01の指定解決と既存OS/sandbox権限で通常Markdown・JSONを作成・更新し、保存結果を確認する。既存正本を先に探し、更新前の対象・差分を確認する。feature/selectionなど前回との比較が必要な更新は、置換前に実際の前回正本と今回の候補を照合し、ID継続、廃止理由、変更条件を検証する。更新後は実保存内容の構造・identity・必要な廃止情報・参照・現在性を検証する。前回ファイルを失った事後検証に、置換前の比較を一律要求しない。現在の記録だけで過去の更新過程まで証明済みとしない。過去版の検証・再現に必要な場合はその版を保持する。機械writerの中断対策は既存の一時ファイル・置換処理を利用する。通常保存にCAS、専用認証callback、全revision、receiptを要求しない。単純なファイル置換を共有CASと呼ばない。
 
 <!-- dprint-ignore -->
 | 対象 | 改修内容 | 維持する保証 |
 | --- | --- | --- |
 | `project_context.py`、`artifact_store.py`、`git_artifact_store.py` | prepare系の意味検証結果を通常Markdownへ保存。persist_prepared、store型import、operation_id/approval_ref/approval_revision必須、read_revision/write依存・呼出しを除去し、不要になる専用store 2ファイル・設定・テストを削除 | DEC/ASM、既存文書・ID、正式な意味変更、必要参照、許可範囲 |
-| `feature_registry.py` のpersist_snapshot/analyze/candidate_handoff | 通常JSON保存。store型・read_revision/write・保存承認引数・receiptを除去し、実ファイルの前回snapshotと照合。_authorize_reclassificationsを実際の正式再分類の判断・根拠へ接続。実Git inventory・reconcile_git_coverage・source照合を維持 | FEAT ID、根拠、母集団、正式再分類・retire |
+| `feature_registry.py` のpersist_snapshot/analyze/candidate_handoff | 通常JSON保存。store型・read_revision/write・保存承認引数・receiptを除去し、置換前の実ファイルと照合（_event_basisを含む更新条件）。保存後の検証から不要な前回ファイル必須条件を除く。_authorize_reclassificationsを実際の正式再分類の判断・根拠へ接続。実Git inventory・reconcile_git_coverage・source照合を維持 | FEAT ID、根拠、母集団、正式再分類・retire |
 | `item_candidates.py`、`condition_candidates.py`、双方のcandidate_support.py | materialize/_check_revision_gateから不要なprovider revision・保存権限・承認入力を除き、生成・検証と保存を分離。validate_readbackは必要な正本検証に限定 | ITEM/COND ID、親子、廃止・根拠、B snapshotの完全性 |
 | 計画3 Skillのruntimeとowner verifier | 06の通常Markdown/JSON、草案保存と正式採用を分離 | 計画母集団・依存・承認対象・集計 |
-| `selection_contract.py` | 全revision snapshot必須を廃止。現在の候補ID/key、既存retired ID/keyと理由を保持し、前回との照合でID再利用・key変更・理由消失を防ぐ。実装/実行が参照する版だけ既存履歴または必要な保存版で保全。旧JSON fixtureは旧契約で検証し、新しい意味契約は必要なowner固有版で区別 | 選定・実装・実行の追跡、currentness |
+| `selection_contract.py` | 全revision snapshot必須を廃止。現在の候補ID/key、既存retired ID/keyと理由を保持し、置換前の前回正本との照合でID再利用・key変更・理由消失を防ぐ。保存後のowner verifierは現行構造・ID/key・廃止理由・source currentnessを検証し、全履歴を要求しない。実装/実行が参照する版や過去検証に必要な版だけ既存履歴または必要な保存版で保全。旧JSON fixtureは旧契約で検証し、新しい意味契約は必要なowner固有版で区別 | 選定・実装・実行の追跡、currentness |
 | `knowledge_runtime.py` | update_entry/plan_update/plan_replacementの通常CAS callback必須を撤廃。同一entryを更新し、統合・置換中断時は実際の関係entryを確認 | 適用条件・根拠・訂正・既存ref・currentness |
 | regression/exploration/reporting/defect/evaluationの各runtime | Run/Activity/Session・報告・欠陥候補・改善記録を既存形式で保存。通常改善採否・受領は実際の依頼者/受領者の確認を使い、専用認証サービスを必須にしない | 実行結果・報告、母集団、採用/適用/効果測定、外部操作認可 |
 | `ui_target_package.py`、`human_editing.py` | package固有writerと生成領域保護を維持し、不要なContext・provider条件を外す | 関連ファイル整合、安定ID、生成領域、必要な回復 |
@@ -93,5 +93,5 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 ## 検証・完了条件
 
 - 既存 `test_question_ids.py`、`test_project_context_ids.py`、`test_project_context_owner.py`、`test_feature_registry.py`、`test_cross_owner_feature_to_candidates.py`、`test_test_item_condition_analysis.py`、`test_f_owner_verifier_registration.py`、`test_owner_scope_resume.py`、`test_qa_workflow_baseline.py`、`test_workflow_runtime.py`、`test_context_workflow_state.py` とフォームのPython/Nodeテストを変更箇所に応じ個別実行する。
-- AT-04/05/06/07/09/10/11/12/14/15/20/23/24/25。回答前中断、部分回答、古い回答、実行条件回答、承認済み意味の保全、通常保存の承認不要、明示gated、結果不明・部分保存、旧HTML復元を比較する。
+- AT-04/05/06/07/09/10/11/12/14/15/20/23/24/25。回答前中断、部分回答、古い回答、実行条件回答、承認済み意味の保全、通常保存の承認不要、明示gated、結果不明・部分保存、旧HTML復元を比較する。 feature/selectionの置換前の不正な変更拒否、置換後に旧ファイルがなくても成立する現行検証、必要な旧版を参照する処理の未取得を区別する。
 - 通常利用で保存技術や不要な承認の質問が発生せず、指定・厳密な運用・外部認可は維持され、許可済み自動保存と別Agent再開が成立する。未承認の意味変更・偽の権限・未回収回答誤適用・開始時必須scopeの無断縮小が拒否されることを確認して完了。
