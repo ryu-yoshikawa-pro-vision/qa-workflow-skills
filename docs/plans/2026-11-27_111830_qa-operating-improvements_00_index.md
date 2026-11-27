@@ -8,7 +8,7 @@ QA Skill群を、通常のAgent環境から直接利用でき、成果物を自�
 
 ## 現状と根拠
 
-- 対象repository: `ryu-yoshikawa-pro-vision/qa-workflow-skills`。基準main: `003bbc7a32bf5b4605696564a9254dd5053ccf5f`（#40統合済み）。今回のレビュー基準: PR #41 HEAD `5e4f4852d5717c2ad95329cd324b49f12ce840dc`（open）。このHEADの5 CIはsuccessを確認した。
+- 対象repository: `ryu-yoshikawa-pro-vision/qa-workflow-skills`。基準main: `003bbc7a32bf5b4605696564a9254dd5053ccf5f`（#40統合済み）。初回CI確認時点のPR #41 commit: `5e4f4852d5717c2ad95329cd324b49f12ce840dc`（5 CI成功確認済み）。合意対象は[PR #41](https://github.com/ryu-yoshikawa-pro-vision/qa-workflow-skills/pull/41)の最終合意内容とし、最終HEADのCI結果はPRで確認する。
 - [改善候補一覧](../reports/2026-11-25_qa-workflow-operating-improvements.md)の運用改善項目（OPS-01〜18）と横断受入シナリオ（AT-01〜25）を全て対象とする。OPSは改善目的、ATは受入時の確認内容を識別する。[共通設計原則](../reference/qa-skill-design-principles.md)、[現行運用契約](../reference/qa-workflow-operating-contract.md)、[成果物マトリクス](../reference/qa-workflow-artifact-matrix.md)、[利用者ガイド](../reference/qa-workflow-user-guide.md)、[EVALS](../../EVALS.md)を参照する。
 - 現行39 Skill、runtime-v2 root 6、owner verifier 9。#40の3 kindの保存、開始要求、attempt/run再開、owner検証、横断検索は実装済み。[#40検証記録](../implementation/pr40/verification.md)の未実施事項は当時の記録として保持する。今回は現行2 Skill構成の改修・リポジトリ内回帰・品質評価を行い、過去の構成選定・運用受入は引き継がない。
 - 既存ownerの保存承認・配置決定、全scopeの汎用検証、案件単位の並列制約、質問回答のSPEC/DEC/ASM中心の処理が残る。詳細Planに変更箇所と既存契約の根拠を記載する。
@@ -55,7 +55,7 @@ Skillの単体利用、既存のschema・ID・履歴の読取互換、正式仕�
 ## 実装順序と作業規則
 
 1. 合意済み#41の内容が作業branchに存在することを確認する。最新mainと実装開始HEADを記録し、本Planと異なる変更があれば差分だけ再照合する。Plan作成branch上で実装を始めない。実装は利用者が許可した非protected branchで行う。対象base・作業branch・PRの作成/更新範囲は実装依頼で確定する。
-2. 05のリポジトリ内評価資産でbaselineを取得する。許可されたCodex実行環境を利用し、実行不能は該当評価を未実施と記録して決定論的検証を続行する。外部製品・運用受入を要求しない。
+2. 05のリポジトリ内評価資産でbaselineを取得する。定量効率比較は基準mainでも必要な品質・安全を満たして完了できる条件を事前選定し、旧契約で完了不能な経路の解消は機能・受入評価で別に確認する。許可されたCodex実行環境を利用し、実行不能は該当評価を未実施と記録して決定論的検証を続行する。外部製品・運用受入を要求しない。
 3. 01〜04の変更を依存関係順に実施する。各詳細Planの対象ファイルで呼出し元・先を確認し、既存契約を置換する。過去Planと実装にある必須条件を変更する場合は、該当範囲・根拠・回帰を改修した正本と実装記録へ反映する。
 4. 05に従い専門QA判断・責務を改修する。重複・不要になった処理は利用経路を確認して除く。単体利用に必要な同梱ファイルや既存正本の互換処理を、重複して見えることだけで削除しない。
 5. 各詳細Planの独立validationを実行し、最後に05の全体受入を実施する。変更したSkill、reference、template、Helper、validator、fixture、評価資産、README、EVALS、共通運用契約、成果物マトリクス、利用者ガイドを同期する。実装予定を現行利用ガイドに残さない。

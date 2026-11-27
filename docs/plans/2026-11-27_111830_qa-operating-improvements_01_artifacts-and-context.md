@@ -86,7 +86,7 @@ feature-registry.json、selection.json、report.json は固定名のない新規
 
 - `project_context.py` の `discover` は指定済み文書・許可候補の解決に限定し、案件選択・案件探索を削る。`prepare_create` の前提から初回配置合意・案件ID必須を外す。`prepare_sections`、`prepare_update`、`prepare_ids`、`project_context_ids.py` の必要な意味管理・採番・履歴を維持する。`placement` / `prepare_placement` は新規通常経路から除き、既存配置・履歴を読む互換経路がある場合だけ維持する。呼出し元がなくなった管理専用分岐は削除する。
 - templateのSection番号とDEC/ASM・stable keyを使う既存parseの互換性を維持する。新規文書ではSection 10の案件進行設定を要求しない（02）。Section 14/16は既存ref・設定の読取互換として扱い、標準root解決に不要な設定を新規利用者に記入させない。QAの意味情報を削らない。既存文書から設定や承認履歴を無断削除しない。
-- `artifact_graph.py` の `parse_project_context`、`validate_required_context_fields`、`compare_used_context` と各Skillの呼出し元で、Context未作成を一律blockedにする経路を外す。必要なfieldの明示入力で成立させる。利用したfieldのcurrentnessは維持する。Contextを後から作成・更新した場合は03に従い、新たに有効になったDEC/ASM、前提、制約が既存成果物に及ぼす影響を確認する。Contextが存在しなかった時点の成果物にも適用し、Context作成自体を全成果物の再生成理由にしない。 使用済みfieldが空でも、新規Contextの適用範囲を03に従って確認する。
+- `artifact_graph.py` の `parse_project_context`、`validate_required_context_fields`、`compare_used_context` と各Skillの呼出し元で、Context未作成を一律blockedにする経路を外す。必要なfieldの明示入力で成立させる。利用したfieldのcurrentnessは維持する。Contextを後から作成・更新した場合は03に従い、新たに有効になったDEC/ASM、前提、制約が既存成果物に及ぼす影響を確認する。Contextが存在しなかった時点の成果物にも適用し、Context作成自体を全成果物の再生成理由にしない。使用済みfieldが空でも、新規Contextの適用範囲を03に従って確認する。
 - 独立SkillはQAの意味管理とDEC/ASM更新の責務があるため維持する。配置管理削除後にその責務が他ownerと実際に完全重複していると確認された場合のみ、05の構成評価で統合を判断する。
 
 ### Contextなしで利用する入力
@@ -120,7 +120,7 @@ QA要求・architecture・計画は、既存機械検証・下流機械処理を
 
 - 通常のMarkdownは直接編集可能とし、必要な差分確認・根拠・承認済み意味の保全だけを要求する。計画3 Skillの承認時点の内容保全と未承認変更の扱いは06に従う。UI packageは `skills/ui-target-analysis/scripts/human_editing.py` と `skills/spec-analysis/scripts/ui_target_package.py` の編集提出・生成領域・ID・writer・履歴を維持する。通常Markdownにこの専用writerを要求しない。
 - 継続文書は安定ファイル名。Q/DEC/ASM/ITEM/COND/Entityの安定ID・retire・履歴は各owner。正式報告・依存再現・実行のRun/Attempt/snapshotを保持する。全更新の連番ファイル複製は不要。必要な旧フォームの復元は02。
-- `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。 04のURL・DOM・console・trace・報告への転載等の漏洩経路を確認し、既存保護先・Git除外設定を利用する。Git追跡済みファイルはignoreだけで保護されたと判断しない。
+- `test-target-inspection`、`usability-inspection`、`test-execution`、`e2e-test-execution`、`testware-execution`、`agent-answer-form`、#40の保護契約を共通運用文書と各ownerへ同期する。成果物・未回収回答・再開draft・raw・一時物を区別する。秘密実値を通常成果物へ保存しない。rawを安全な許可先に保全できない場合は安全な要約と未保存/取得不能を報告する。保存要求がある証跡は保存不能を正式完了にしない。任意snapshotは未保存だけで完了を妨げない。cleanupは許可された今回の一時物だけを対象とし、履歴・継続資料を削除しない。04のURL・DOM・console・trace・報告への転載等の漏洩経路を確認し、既存保護先・Git除外設定を利用する。Git追跡済みファイルはignoreだけで保護されたと判断しない。
 - 既存配置をdirect ref/許可rootで読取・更新できるようにする（OPS-17）。標準化を理由に既存資産を移動・改名・再保存しない。別rootの同名refを分離する。外部資産の移行・切替・rollbackは対象外。
 
 基準mainのGit treeにSQLiteファイルは存在しない。SQLite利用コード・テストの契約変更は02〜04で行う。リポジトリ外のDB・成果物調査、移行、export、互換storeは対象外。既存Markdown/JSONのfixture、意味・ID・必要な参照を保全する。
@@ -128,5 +128,5 @@ QA要求・architecture・計画は、既存機械検証・下流機械処理を
 ## 検証・完了条件
 
 - `test_project_context_owner.py`、`test_project_context_ids.py`、`test_ui_human_editing.py`、`test_feature_registry.py`、`test_test_item_condition_analysis.py`、`test_context_artifact_store.py`、`test_context_runtime_transport.py` と計画3 Skillの `test_f_verifier_requirements.py`、`test_f_verifier_architecture.py`、`test_f_verifier_management.py`、`test_cross_owner_results_to_reporting.py` を変更箇所に応じて個別実行する。05の全suiteも実行する。
-- AT-01/02/03/09/12〜14/16/19/20/21/24/25: 新規・既存・指定あり/なし、別Agent、同一refの再利用、異なるscope・root、権限不足、重複、symlink、旧JSON、Markdown人間編集、変更前後の承認、機密raw、部分保存、必要な旧revisionを確認する。Markdownから後続機械処理への継続、Context後発生成、安全な日本語名・予約名・長いpath・短縮識別子の衝突、別Agentによる同一正本解決も確認する。 派生snapshotと本当の重複正本、別sessionの正本解決、NFC/分解表現の新規名・既存実path、内部IDなしの明示ref更新、曖昧な別対象との競合を対比する。
+- AT-01/02/03/09/12〜14/16/19/20/21/24/25: 新規・既存・指定あり/なし、別Agent、同一refの再利用、異なるscope・root、権限不足、重複、symlink、旧JSON、Markdown人間編集、変更前後の承認、機密raw、部分保存、必要な旧revisionを確認する。Markdownから後続機械処理への継続、Context後発生成、安全な日本語名・予約名・長いpath・短縮識別子の衝突、別Agentによる同一正本解決も確認する。派生snapshotと本当の重複正本、別sessionの正本解決、NFC/分解表現の新規名・既存実path、内部IDなしの明示ref更新、曖昧な別対象との競合を対比する。
 - 39 Skillの標準配置・形式・粒度・保存不要条件を各ownerと成果物マトリクスに反映する。特定ハーネス・案件初期化・provider選択なしの利用、既存Markdown/JSON fixtureの意味・ID・必要な機械検証・保護、06の形式別下流処理を確認する。全形式の完全相互変換は要求しない。

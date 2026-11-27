@@ -39,4 +39,4 @@ sourceの実revision変更を検知し、利用した意味・承認・適用条
 
 ## 検証
 
-既存3 owner verifier、cross-owner reporting、owner registry、runtime portability、依存/currentnessテストを利用する。通常Markdown編集、指定JSON・旧v1読取/更新、必要機械入力の欠落・曖昧さ・不正型、計画母集団・終了基準、部分承認・別割当・共有制約、表示変更と意味不変、旧承認版取得不能、草案と現在採用、権限・根拠失効、必要な過去版、保存失敗を対比する。全形式round-trip・共通parserの実装を受入条件にしない。01/02/05のATで実保存・編集・既存JSON利用を確認する。通常相談・MarkdownでID未発行の実根拠による専門判断、根拠自体の不足、後続の機械入力生成と正本の維持、必要snapshotの参照と再検証、機械JSONの不正・欠落source IDを対比する。 派生snapshotとMarkdownが共存する場合の正本探索、実際の重複正本、厳密な旧schemaへの未定義項目の混入、参照元と利用時点の照合、別sessionでの再開を確認する。
+既存3 owner verifier、cross-owner reporting、owner registry、runtime portability、依存/currentnessテストを利用する。通常Markdown編集、指定JSON・旧v1読取/更新、必要機械入力の欠落・曖昧さ・不正型、計画母集団・終了基準、部分承認・別割当・共有制約、表示変更と意味不変、旧承認版取得不能、草案と現在採用、権限・根拠失効、必要な過去版、保存失敗を対比する。全形式round-trip・共通parserの実装を受入条件にしない。01/02/05のATで実保存・編集・既存JSON利用を確認する。通常相談・MarkdownでID未発行の実根拠による専門判断、根拠自体の不足、後続の機械入力生成と正本の維持、必要snapshotの参照と再検証、機械JSONの不正・欠落source IDを対比する。派生snapshotとMarkdownが共存する場合の正本探索、実際の重複正本、厳密な旧schemaへの未定義項目の混入、参照元と利用時点の照合、別sessionでの再開を確認する。

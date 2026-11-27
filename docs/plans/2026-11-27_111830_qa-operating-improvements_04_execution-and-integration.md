@@ -72,5 +72,5 @@ WCAG-EM工程、sample/variation/process、ランダム選択の実結果、現�
 ## 検証・完了条件
 
 - `test_qa_operation_claim.py`、`test_context_artifact_store.py`、`test_context_workflow_state.py`、`test_ci_handoff.py`、`test_cross_owner_selection_to_inspection.py`、`test_cross_owner_results_to_reporting.py`、`test_cross_owner_exploration_to_defect.py`、`test_pr32_defect_management.py`、`test_pr32_test_reporting.py`、`test_testware_regression_handoff.py`、`test_workflow_runtime.py`、`test_runtime_workflow_integration.py` を関連変更ごとに個別実行する。WCAG、runner、E2E、直接TCの既存テストは対象Skillの評価資産とruntime全suiteから特定して実行する。
-- AT-10/11/12/15/16/17/18/20/21/25: 独立作業、同一正本更新、共有データ操作、結果不明、開始前中断、cleanup失敗、権限不明、未実行・FAIL・retry、母集団漏れ、部分報告、証跡保護を対比する。 URL query・console・DOM・trace・報告転載の機密値が通常成果物へ漏れないことと、保護rawがGit追跡・公開対象に入らないことを既存fixture・mock・一時ディレクトリで確認する。
+- AT-10/11/12/15/16/17/18/20/21/25: 独立作業、同一正本更新、共有データ操作、結果不明、開始前中断、cleanup失敗、権限不明、未実行・FAIL・retry、母集団漏れ、部分報告、証跡保護を対比する。URL query・console・DOM・trace・報告転載の機密値が通常成果物へ漏れないことと、保護rawがGit追跡・公開対象に入らないことを既存fixture・mock・一時ディレクトリで確認する。
 - リポジトリ内のテスト・fixture・mockで直接TC、E2E、非E2E、Regression/Exploration、欠陥候補、統合報告の連携を検証する（05）。実運用接続は要求しない。既存実行安全・raw追跡、独立作業の並行実行、WCAG正式評価の文書・コード整合を完了条件とする。

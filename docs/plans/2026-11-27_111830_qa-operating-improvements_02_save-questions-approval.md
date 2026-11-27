@@ -93,5 +93,5 @@ question-analysisは回答の意味・反映先・再開先を判断し、他own
 ## 検証・完了条件
 
 - 既存 `test_question_ids.py`、`test_project_context_ids.py`、`test_project_context_owner.py`、`test_feature_registry.py`、`test_cross_owner_feature_to_candidates.py`、`test_test_item_condition_analysis.py`、`test_f_owner_verifier_registration.py`、`test_owner_scope_resume.py`、`test_qa_workflow_baseline.py`、`test_workflow_runtime.py`、`test_context_workflow_state.py` とフォームのPython/Nodeテストを変更箇所に応じ個別実行する。
-- AT-04/05/06/07/09/10/11/12/14/15/20/23/24/25。回答前中断、部分回答、古い回答、実行条件回答、承認済み意味の保全、通常保存の承認不要、明示gated、結果不明・部分保存、旧HTML復元を比較する。 feature/selectionの置換前の不正な変更拒否、置換後に旧ファイルがなくても成立する現行検証、必要な旧版を参照する処理の未取得を区別する。
+- AT-04/05/06/07/09/10/11/12/14/15/20/23/24/25。回答前中断、部分回答、古い回答、実行条件回答、承認済み意味の保全、通常保存の承認不要、明示gated、結果不明・部分保存、旧HTML復元を比較する。feature/selectionの置換前の不正な変更拒否、置換後に旧ファイルがなくても成立する現行検証、必要な旧版を参照する処理の未取得を区別する。
 - 通常利用で保存技術や不要な承認の質問が発生せず、指定・厳密な運用・外部認可は維持され、許可済み自動保存と別Agent再開が成立する。未承認の意味変更・偽の権限・未回収回答誤適用・開始時必須scopeの無断縮小が拒否されることを確認して完了。
